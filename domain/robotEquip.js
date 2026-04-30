@@ -7,9 +7,9 @@
 // ---------------------------------------------------------------------------
 
 const BODY_PLAN_SLOTS = {
-  protectron:  ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
-  assaultron:  ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
-  sentryBot:   ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
+  protectron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+  assaultron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+  sentryBot:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
   misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
   robobrain:   ['head', 'body', 'leftArm', 'rightArm', 'chassis'],
 };
