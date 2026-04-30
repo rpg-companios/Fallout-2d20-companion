@@ -19,7 +19,7 @@ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScr
  * @param {string} slotKey
  * @param {object|null|undefined} slotData - { limb, armor, plating, frame, heldWeapon }
  * @param {object} callbacks - { onUpgradeLimb, onUpgradeArmor, onWeaponPress, t }
- * @returns {{ slotTitle: string, limbName: string|null, stats: object[] }}
+ * @returns {{ slotTitle: string, slotSubtitle: string, limbName: string|null, stats: object[] }}
  */
 export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
   const { onUpgradeLimb, onUpgradeArmor, t = tWeaponsAndArmorScreen } = callbacks;
@@ -31,6 +31,7 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
     : t('robotSlot.noLimb');
 
   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
+  const slotSubtitle = t(`armor.slots.${slotKey}.subtitle`) || '';
 
   const stats = [];
 
@@ -91,5 +92,5 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
     onPress: () => onUpgradeArmor && onUpgradeArmor('frame'),
   });
 
-  return { slotTitle, limbName, stats };
+  return { slotTitle, slotSubtitle, limbName, stats };
 };
