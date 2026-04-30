@@ -701,96 +701,28 @@ const InventoryScreen = () => {
         return;
     }
 
-    const freeSlotIndex = equippedWeapons.findIndex(w => w === null);
-    
-    const equipAction = (index) => {
-        const replacedWeapon = equippedWeapons[index];
-
-        setEquippedWeapons(prev => {
-            const newEquipped = [...prev];
-            // Сохраняем модифицированное оружие с правильным itemType
-            const weaponToEquip = {
-              ...displayWeapon,
-              itemType: 'weapon',
-              stackKey: sourceStackKey,
-              uniqueId: displayWeapon.uniqueId || createWeaponInstanceId(),
-            };
-            newEquipped[index] = weaponToEquip;
-            return newEquipped;
-        });
-        
-        // Уменьшаем количество предмета в инвентаре
-        const newItems = equipment?.items ? [...equipment.items] : [];
-
-        if (replacedWeapon) {
-            const replacedStackKey = replacedWeapon.stackKey || getStackKey(replacedWeapon);
-            const replacedIndex = newItems.findIndex(i => (i.stackKey || getStackKey(i)) === replacedStackKey);
-            if (replacedIndex !== -1) {
-                newItems[replacedIndex].quantity += 1;
-            } else {
-                newItems.push({
-                    ...replacedWeapon,
-                    itemType: getItemType(replacedWeapon),
-                    stackKey: replacedStackKey,
-                    quantity: 1,
-                    uniqueId: undefined,
-                });
-            }
-        }
-
-        const itemIndex = newItems.findIndex(i => (i.stackKey || getStackKey(i)) === sourceStackKey);
-        
-        if (itemIndex !== -1) {
-            newItems[itemIndex].quantity -= 1;
-            
-            // Если количество стало 0, удаляем предмет из инвентаря
-            if (newItems[itemIndex].quantity <= 0) {
-                newItems.splice(itemIndex, 1);
-            }
-            
-            updateInventoryItems(newItems);
-
-        }
+    const weaponEntry = {
+      ...displayWeapon,
+      itemType: 'weapon',
+      stackKey: sourceStackKey,
+      uniqueId: displayWeapon.uniqueId || createWeaponInstanceId(),
     };
 
-    if (freeSlotIndex !== -1) {
-        equipAction(freeSlotIndex);
-    } else {
-      const equippedOptions = equippedWeapons
-        .map((weapon, index) => ({
-          index,
-          name: getItemName(weapon) || `${tInventory('screen.actions.weapon')} ${index + 1}`,
-        }))
-        .filter(({ name }) => Boolean(name));
+    setEquippedWeapons(prev => [...prev, weaponEntry]);
 
-      const optionsText = equippedOptions
-        .map(({ index, name }) => `${index + 1}. ${name}`)
-        .join('\n');
-      const replaceMessage = optionsText
-        ? `${tInventory('screen.alerts.replaceWeaponMessage')}\n\n${optionsText}`
-        : tInventory('screen.alerts.replaceWeaponMessage');
+    // Уменьшаем количество предмета в инвентаре
+    const newItems = equipment?.items ? [...equipment.items] : [];
+    const itemIndex = newItems.findIndex(i => (i.stackKey || getStackKey(i)) === sourceStackKey);
 
-      if (typeof window !== 'undefined' && window.prompt) {
-        const answer = window.prompt(replaceMessage, '1');
-        const selectedIndex = Number(answer) - 1;
-        if (Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < equippedWeapons.length) {
-          equipAction(selectedIndex);
-        }
-      } else {
-        const replaceButtons = equippedOptions.map(({ index, name }) => ({
-          text: name,
-          onPress: () => equipAction(index),
-        }));
+    if (itemIndex !== -1) {
+      newItems[itemIndex].quantity -= 1;
 
-        showAlert(
-          tInventory('screen.alerts.replaceWeaponTitle'),
-          replaceMessage,
-          [
-            ...replaceButtons,
-            { text: tInventory('screen.actions.cancel'), style: "cancel" }
-          ]
-        );
+      // Если количество стало 0, удаляем предмет из инвентаря
+      if (newItems[itemIndex].quantity <= 0) {
+        newItems.splice(itemIndex, 1);
       }
+
+      updateInventoryItems(newItems);
     }
   };
 
