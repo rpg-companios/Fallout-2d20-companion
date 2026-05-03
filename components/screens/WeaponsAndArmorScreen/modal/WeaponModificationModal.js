@@ -67,9 +67,8 @@ function normalizeSlotKey(slot) {
 function translateModPrefix(token) {
   if (!token) return token;
   const t = String(token).trim();
-  const localized = tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`);
-  // tWeaponsAndArmorScreen returns the key path if not found — fall back to original
-  return localized.startsWith('weapon.modPrefixes.') ? t : localized;
+  // Keep original token as fallback to avoid showing generic i18n error text for unknown prefixes.
+  return tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`, t);
 }
 
 function getModDisplayName(mod, weaponBaseName) {
@@ -87,7 +86,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // строим имя только от базового имени, чтобы не дублировать префиксы при повторных открытиях
   const prefixesRu = [];
   for (const mod of selectedMods) {
-    const p = getModDisplayNameRu(mod, baseName);
+    const p = getModDisplayName(mod, baseName);
     if (!p) continue;
     if (!prefixesRu.includes(p)) prefixesRu.push(p);
   }
