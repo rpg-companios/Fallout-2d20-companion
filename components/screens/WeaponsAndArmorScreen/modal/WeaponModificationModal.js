@@ -27,11 +27,11 @@ function normalizeModRow(row) {
     prefix: row.prefix,
     slot: normalizeSlotKey(row.slot),
     rawSlot: row.slot,
-    // БД: weight/cost/effects/effect_description
-    weight: row.weight,
-    cost: row.cost,
-    effects: row.effects,
-    effect_description: row.effect_description,
+    // canonical DB fields only
+    weight: row.weight ?? 0,
+    cost: row.cost ?? 0,
+    effects: row.effects ?? '',
+    effect_description: row.effect_description ?? row.effects ?? '',
   };
 }
 
@@ -40,36 +40,25 @@ function normalizeModRow(row) {
 // If a new mod is selected in the same category, it MUST replace the previous one.
 function normalizeSlotKey(slot) {
   const raw = String(slot || '').trim();
-  const key = raw.toLowerCase();
-  const map = {
-    barrel: 'Barrels',
-    barrels: 'Barrels',
-    receiver: 'Receivers',
-    receivers: 'Receivers',
-    sight: 'Sights',
-    sights: 'Sights',
-    muzzle: 'Muzzles',
-    muzzles: 'Muzzles',
-    stock: 'Stocks',
-    stocks: 'Stocks',
-    grip: 'Grips',
-    grips: 'Grips',
-    magazine: 'Magazines',
-    magazines: 'Magazines',
-    capacitor: 'Capacitors',
-    capacitors: 'Capacitors',
-    unique: 'Uniques',
-    uniques: 'Uniques',
+  if (!raw) return 'other';
+
+  const key = raw.toLowerCase().replace(/\s+/g, '');
+  // Canonicalize common plural DB values: Barrels -> barrel, Sights -> sight, Capacitors -> capacitor.
+  const singular = key.endsWith('s') ? key.slice(0, -1) : key;
+
+  // Keep a tiny alias map only for known irregular/legacy tokens.
+  const aliases = {
+    uniques: 'unique',
   };
-  return map[key] || raw || 'Other';
+
+  return aliases[singular] || singular;
 }
 
 function translateModPrefix(token) {
   if (!token) return token;
   const t = String(token).trim();
-  const localized = tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`);
-  // tWeaponsAndArmorScreen returns the key path if not found — fall back to original
-  return localized.startsWith('weapon.modPrefixes.') ? t : localized;
+  // Keep original token as fallback to avoid showing generic i18n error text for unknown prefixes.
+  return tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`, t);
 }
 
 function getModDisplayName(mod, weaponBaseName) {
@@ -87,7 +76,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // строим имя только от базового имени, чтобы не дублировать префиксы при повторных открытиях
   const prefixesRu = [];
   for (const mod of selectedMods) {
-    const p = getModDisplayNameRu(mod, baseName);
+    const p = getModDisplayName(mod, baseName);
     if (!p) continue;
     if (!prefixesRu.includes(p)) prefixesRu.push(p);
   }
@@ -148,9 +137,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   const RANGE_ORDER = ['Close', 'Medium', 'Long', 'Extreme'];
   const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
   const currentRangeName = String(baseWeapon.range_name ?? 'Close').trim();
-  // range_name in DB may be stored in Russian — map back to English key
-  const RANGE_RU_TO_EN = { 'Близкая': 'Close', 'Средняя': 'Medium', 'Дальняя': 'Long', 'Экстремальная': 'Extreme' };
-  const currentRangeKey = RANGE_RU_TO_EN[currentRangeName] || currentRangeName;
+  const currentRangeKey = currentRangeName;
   const currentRangeIndex = Math.max(0, RANGE_ORDER.indexOf(currentRangeKey));
   const nextRangeIndex = Math.max(0, Math.min(RANGE_ORDER.length - 1, currentRangeIndex + rangeShift));
   const range_name_key = RANGE_ORDER[nextRangeIndex];
@@ -172,7 +159,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
       Object.entries(selectedBySlot).map(([slot, mod]) => [slot, mod?.id]).filter(([, id]) => !!id)
     ),
     _selectedModsBySlot: selectedBySlot,
-    _mods_effects_debug: extraEffectsText.join('; '),
+    damage_effects: extraEffectsText.join('; '),
   };
 }
 
@@ -249,7 +236,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           for (const m of (mods || [])) {
             const nm = normalizeModRow(m);
             if (!nm) continue;
-            const slot = normalizeSlotKey(nm.slot || nm.rawSlot || 'Other');
+            const slot = normalizeSlotKey(nm.slot || nm.rawSlot || 'other');
             if (!bySlot[slot]) bySlot[slot] = [];
             bySlot[slot].push(nm);
           }
@@ -360,7 +347,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
               {Object.entries(modsBySlot).map(([slot, mods]) => (
                 <CollapsibleSection
                   key={slot}
-                  title={`${slot} (${mods.length})`}
+                  title={`${tWeaponsAndArmorScreen(`weapon.modSlots.${slot}`, slot)} (${mods.length})`}
                   isExpanded={expandedCategories[slot]}
                   onToggle={() => handleToggleCategory(slot)}
                 >
@@ -397,7 +384,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                     {tWeaponsAndArmorScreen('modals.weaponRange')}: {modifiedWeapon.range_name || tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {modifiedWeapon.weight} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {modifiedWeapon.cost}
                   </Text>
                   <Text style={styles.previewEffects}>
-                    {tWeaponsAndArmorScreen('modals.previewEffects')}: {modifiedWeapon.damage_effects ?? modifiedWeapon.Эффекты ?? modifiedWeapon._mods_effects_debug}
+                    {tWeaponsAndArmorScreen('modals.previewEffects')}: {modifiedWeapon.damage_effects}
                   </Text>
                   <Text style={styles.previewQualities}>
                     {tWeaponsAndArmorScreen('modals.previewQualities')}: {modifiedWeapon.qualities}
