@@ -40,36 +40,25 @@ function normalizeModRow(row) {
 // If a new mod is selected in the same category, it MUST replace the previous one.
 function normalizeSlotKey(slot) {
   const raw = String(slot || '').trim();
-  const key = raw.toLowerCase();
-  const map = {
-    barrel: 'Barrels',
-    barrels: 'Barrels',
-    receiver: 'Receivers',
-    receivers: 'Receivers',
-    sight: 'Sights',
-    sights: 'Sights',
-    muzzle: 'Muzzles',
-    muzzles: 'Muzzles',
-    stock: 'Stocks',
-    stocks: 'Stocks',
-    grip: 'Grips',
-    grips: 'Grips',
-    magazine: 'Magazines',
-    magazines: 'Magazines',
-    capacitor: 'Capacitors',
-    capacitors: 'Capacitors',
-    unique: 'Uniques',
-    uniques: 'Uniques',
+  if (!raw) return 'other';
+
+  const key = raw.toLowerCase().replace(/\s+/g, '');
+  // Canonicalize common plural DB values: Barrels -> barrel, Sights -> sight, Capacitors -> capacitor.
+  const singular = key.endsWith('s') ? key.slice(0, -1) : key;
+
+  // Keep a tiny alias map only for known irregular/legacy tokens.
+  const aliases = {
+    uniques: 'unique',
   };
-  return map[key] || raw || 'Other';
+
+  return aliases[singular] || singular;
 }
 
 function translateModPrefix(token) {
   if (!token) return token;
   const t = String(token).trim();
-  const localized = tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`);
-  // tWeaponsAndArmorScreen returns the key path if not found — fall back to original
-  return localized.startsWith('weapon.modPrefixes.') ? t : localized;
+  // Keep original token as fallback to avoid showing generic i18n error text for unknown prefixes.
+  return tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`, t);
 }
 
 function getModDisplayName(mod, weaponBaseName) {
@@ -87,7 +76,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // строим имя только от базового имени, чтобы не дублировать префиксы при повторных открытиях
   const prefixesRu = [];
   for (const mod of selectedMods) {
-    const p = getModDisplayNameRu(mod, baseName);
+    const p = getModDisplayName(mod, baseName);
     if (!p) continue;
     if (!prefixesRu.includes(p)) prefixesRu.push(p);
   }
@@ -360,7 +349,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
               {Object.entries(modsBySlot).map(([slot, mods]) => (
                 <CollapsibleSection
                   key={slot}
-                  title={`${slot} (${mods.length})`}
+                  title={`${tWeaponsAndArmorScreen(`weapon.modSlots.${slot}`, slot)} (${mods.length})`}
                   isExpanded={expandedCategories[slot]}
                   onToggle={() => handleToggleCategory(slot)}
                 >
