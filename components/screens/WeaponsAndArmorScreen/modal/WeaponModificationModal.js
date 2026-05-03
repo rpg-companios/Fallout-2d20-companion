@@ -27,11 +27,11 @@ function normalizeModRow(row) {
     prefix: row.prefix,
     slot: normalizeSlotKey(row.slot),
     rawSlot: row.slot,
-    // БД: weight/cost/effects/effect_description
-    weight: row.weight,
-    cost: row.cost,
-    effects: row.effects,
-    effect_description: row.effect_description,
+    // canonical DB fields only
+    weight: row.weight ?? 0,
+    cost: row.cost ?? 0,
+    effects: row.effects ?? '',
+    effect_description: row.effect_description ?? row.effects ?? '',
   };
 }
 
@@ -137,9 +137,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   const RANGE_ORDER = ['Close', 'Medium', 'Long', 'Extreme'];
   const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
   const currentRangeName = String(baseWeapon.range_name ?? 'Close').trim();
-  // range_name in DB may be stored in Russian — map back to English key
-  const RANGE_RU_TO_EN = { 'Близкая': 'Close', 'Средняя': 'Medium', 'Дальняя': 'Long', 'Экстремальная': 'Extreme' };
-  const currentRangeKey = RANGE_RU_TO_EN[currentRangeName] || currentRangeName;
+  const currentRangeKey = currentRangeName;
   const currentRangeIndex = Math.max(0, RANGE_ORDER.indexOf(currentRangeKey));
   const nextRangeIndex = Math.max(0, Math.min(RANGE_ORDER.length - 1, currentRangeIndex + rangeShift));
   const range_name_key = RANGE_ORDER[nextRangeIndex];
@@ -161,7 +159,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
       Object.entries(selectedBySlot).map(([slot, mod]) => [slot, mod?.id]).filter(([, id]) => !!id)
     ),
     _selectedModsBySlot: selectedBySlot,
-    _mods_effects_debug: extraEffectsText.join('; '),
+    damage_effects: extraEffectsText.join('; '),
   };
 }
 
@@ -238,7 +236,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           for (const m of (mods || [])) {
             const nm = normalizeModRow(m);
             if (!nm) continue;
-            const slot = normalizeSlotKey(nm.slot || nm.rawSlot || 'Other');
+            const slot = normalizeSlotKey(nm.slot || nm.rawSlot || 'other');
             if (!bySlot[slot]) bySlot[slot] = [];
             bySlot[slot].push(nm);
           }
@@ -386,7 +384,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                     {tWeaponsAndArmorScreen('modals.weaponRange')}: {modifiedWeapon.range_name || tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {modifiedWeapon.weight} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {modifiedWeapon.cost}
                   </Text>
                   <Text style={styles.previewEffects}>
-                    {tWeaponsAndArmorScreen('modals.previewEffects')}: {modifiedWeapon.damage_effects ?? modifiedWeapon.Эффекты ?? modifiedWeapon._mods_effects_debug}
+                    {tWeaponsAndArmorScreen('modals.previewEffects')}: {modifiedWeapon.damage_effects}
                   </Text>
                   <Text style={styles.previewQualities}>
                     {tWeaponsAndArmorScreen('modals.previewQualities')}: {modifiedWeapon.qualities}
