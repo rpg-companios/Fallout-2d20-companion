@@ -30,8 +30,7 @@ function normalizeModRow(row) {
     // canonical DB fields only
     weight: row.weight ?? 0,
     cost: row.cost ?? 0,
-    effects: row.effects ?? '',
-    effect_description: row.effect_description ?? row.effects ?? '',
+    effectDescription: row.effectDescription ?? row.effect_description ?? row.effects ?? '',
   };
 }
 
@@ -106,7 +105,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // Если не распознали — просто сохраняем описание.
   const extraEffectsText = [];
   for (const mod of selectedMods) {
-    const eff = String(mod.effects || '');
+    const eff = String(mod.effectDescription || '');
     if (eff) extraEffectsText.push(eff);
 
     const dmgPlus = eff.match(/plus\s+(\d+)\s+CD\s+Damage/i);
@@ -361,7 +360,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                       onPress={() => handleSelectModification(slot, mod)}
                     >
                       <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
-                      <Text style={styles.modificationEffects}>{mod.effect_description || mod.effects}</Text>
+                      <Text style={styles.modificationEffects}>{mod.effectDescription}</Text>
                       <Text style={styles.modificationStats}>
                         {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
                       </Text>
