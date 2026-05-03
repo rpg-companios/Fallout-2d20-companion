@@ -67,9 +67,8 @@ function normalizeSlotKey(slot) {
 function translateModPrefix(token) {
   if (!token) return token;
   const t = String(token).trim();
-  const localized = tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`);
-  // tWeaponsAndArmorScreen returns the key path if not found — fall back to original
-  return localized.startsWith('weapon.modPrefixes.') ? t : localized;
+  // Keep original token as fallback to avoid showing generic i18n error text for unknown prefixes.
+  return tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`, t);
 }
 
 function getModDisplayName(mod, weaponBaseName) {
