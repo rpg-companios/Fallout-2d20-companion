@@ -87,7 +87,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // строим имя только от базового имени, чтобы не дублировать префиксы при повторных открытиях
   const prefixesRu = [];
   for (const mod of selectedMods) {
-    const p = getModDisplayNameRu(mod, baseName);
+    const p = getModDisplayName(mod, baseName);
     if (!p) continue;
     if (!prefixesRu.includes(p)) prefixesRu.push(p);
   }
