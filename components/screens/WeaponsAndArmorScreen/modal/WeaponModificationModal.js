@@ -30,7 +30,9 @@ function normalizeModRow(row) {
     // canonical DB fields only
     weight: row.weight ?? 0,
     cost: row.cost ?? 0,
-    effectDescription: row.effectDescription ?? row.effect_description ?? row.effects ?? '',
+    // Prefer canonical legacy effect tokens from `effects` for deterministic parsing/rendering.
+    // Localized `effectDescription` may omit values or use different grammar.
+    effectDescription: row.effects ?? row.effectDescription ?? row.effect_description ?? '',
   };
 }
 
@@ -108,13 +110,15 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     const eff = String(mod.effectDescription || '');
     if (eff) extraEffectsText.push(eff);
 
-    const dmgPlus = eff.match(/plus\s+(\d+)\s+CD\s+Damage/i);
-    const dmgMinus = eff.match(/minus\s+(\d+)\s+CD\s+Damage/i);
+    const dmgPlus = eff.match(/plus\s+(\d+)\s+CD\s+Damage/i) || eff.match(/(?:урон)\s*\+(\d+)\s*БК/i);
+    const dmgMinus = eff.match(/minus\s+(\d+)\s+CD\s+Damage/i) || eff.match(/(?:урон)\s*-(\d+)\s*БК/i);
     if (dmgPlus) damage += Number(dmgPlus[1]);
     if (dmgMinus) damage -= Number(dmgMinus[1]);
+    const dmgSet = eff.match(/set\s+(\d+)\s+CD\s+Damage/i);
+    if (dmgSet) damage = Number(dmgSet[1]);
 
-    const frPlus = eff.match(/plus\s+(\d+)\s+Fire\s+Rate/i);
-    const frMinus = eff.match(/minus\s+(\d+)\s+Fire\s+Rate/i);
+    const frPlus = eff.match(/plus\s+(\d+)\s+Fire\s+Rate/i) || eff.match(/(?:скорострельность)\s*\+(\d+)/i);
+    const frMinus = eff.match(/minus\s+(\d+)\s+Fire\s+Rate/i) || eff.match(/(?:скорострельность)\s*-(\d+)/i);
     if (frPlus) fire_rate += Number(frPlus[1]);
     if (frMinus) fire_rate -= Number(frMinus[1]);
 
