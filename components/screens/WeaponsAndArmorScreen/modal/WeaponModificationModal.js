@@ -360,7 +360,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                       onPress={() => handleSelectModification(slot, mod)}
                     >
                       <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
-                      <Text style={styles.modificationEffects}>{mod.effectDescription}</Text>
+                      <Text style={styles.modificationEffects}>
+                        {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
+                      </Text>
                       <Text style={styles.modificationStats}>
                         {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
                       </Text>
