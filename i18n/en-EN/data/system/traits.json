@@ -90,23 +90,23 @@
       },
       "educated": {
         "name": "Educated",
-        "description": "You gain additional skill points when leveling up."
+        "description": "Tag one additional skill. When you fail a check for an untagged skill, the GM gains 1 AP."
       },
       "quickShot": {
         "name": "Quick Shot",
-        "description": "You can attack faster, but with less accuracy."
+        "description": "If in combat you take a second major action and use it for a ranged attack, the second major action costs 1 AP instead of 2. You cannot take aiming actions — you are too impatient."
       },
       "gifted": {
         "name": "Gifted",
-        "description": "Your attributes are higher, but you gain fewer skill points."
+        "description": "Gain +1 to two attributes or +2 to one attribute. In return, your Luck is reduced by -1."
       },
       "heavyHanded": {
         "name": "Heavy Handed",
-        "description": "Your melee attacks deal more damage."
+        "description": "Your melee damage bonus increases by +1. Your melee and unarmed attacks gain a complication on a 19 or 20, not just on 20."
       },
       "smallFrame": {
         "name": "Small Frame",
-        "description": "Your small stature gives advantages in stealth."
+        "description": "You may reroll 1d20 on any AGI check that depends on balance or flexibility. You can carry less than others."
       }
     },
     "misterHandy": {
