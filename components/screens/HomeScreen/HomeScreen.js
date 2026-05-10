@@ -149,6 +149,7 @@ export default function HomeScreen({ navigation }) {
         const { outcome } = await installPrompt.userChoice;
         if (outcome === 'accepted') {
           setInstallPrompt(null);
+          setIsStandalone(true);
           window.__pwaInstallPrompt = null;
           return;
         }
