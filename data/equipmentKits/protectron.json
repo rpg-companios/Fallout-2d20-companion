@@ -1,0 +1,514 @@
+{
+  "protectron_standard": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_protectron",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_protectron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_protectron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_protectron_manipulator",
+        "itemType": "weapon",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_protectron_manipulator",
+        "itemType": "weapon",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "weight": 0,
+        "requiresWeaponId": "robot_weapon_protectron_manipulator",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 14,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_recon_sensors",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_hazard_detection",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_item_repair_kit",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 20
+      }
+    ]
+  },
+  "protectron_medic": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_protectron",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_protectron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_protectron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_shocker_arms",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_diagnostics",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_stimpak",
+        "itemType": "chem",
+        "quantity": 2
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_radaway",
+        "itemType": "chem"
+      }
+    ]
+  },
+  "protectron_firefighter": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_protectron",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_protectron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_protectron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_cryojet",
+        "itemType": "weapon",
+        "slot": "left",
+        "ammo": {
+          "ammoId": "ammo_cryo_cell",
+          "quantity": {
+            "base": 14,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "itemId": "robot_module_hazard_detection",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_sensor_array",
+            "itemType": "module"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_stimpak",
+        "itemType": "chem"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
+  "protectron_nukatron": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_protectron",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_protectron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_protectron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_protectron_manipulator",
+        "itemType": "weapon",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "itemId": "robot_module_behavior_analysis",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_boiler",
+            "itemType": "module"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "food_perfectly_preserved_pie",
+        "itemType": "food"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "itemId": "drink_nuka_cola",
+                "itemType": "drinks",
+                "quantity": 4
+              }
+            ]
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "itemId": "drink_nuka_cherry",
+                "itemType": "drinks",
+                "quantity": 2
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "protectron_worker": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_protectron",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_protectron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_protectron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_protectron_manipulator",
+        "itemType": "weapon",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_factory_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_sledgehammer",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_baton",
+            "itemType": "weapon"
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "weaponId": "weapon_railway_rifle",
+                "itemType": "weapon",
+                "overrideQualities": [
+                  "remove:quality_two-handed"
+                ],
+                "ammo": {
+                  "ammoId": "ammo_railway_spike",
+                  "quantity": {
+                    "base": 6,
+                    "rollType": "rollCD",
+                    "rollValue": 3,
+                    "op": "+"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "itemId": "robot_module_hazard_detection",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_sensor_array",
+            "itemType": "module"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_item_repair_kit",
+        "itemType": "misc"
+      }
+    ]
+  },
+  "protectron_model_x": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_protectron",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_protectron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_protectron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_protectron",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_protectron_manipulator",
+        "itemType": "weapon",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_protectron_manipulator",
+        "itemType": "weapon",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_plating_factory_body",
+                "itemType": "plating"
+              }
+            ]
+          },
+          {
+            "itemId": "robot_module_behavior_analysis",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_diagnostics",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_hacking",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_hazard_detection",
+            "itemType": "module"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "itemId": "robot_module_radiation_coils",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_recon_sensors",
+            "itemType": "module"
+          },
+          {
+            "itemId": "robot_module_sensor_array",
+            "itemType": "module"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_machete",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_baseball_bat_aluminum",
+            "itemType": "weapon"
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "weaponId": "weapon_syringer",
+                "itemType": "weapon",
+                "ammo": {
+                  "ammoId": "ammo_syringe_bloodpack",
+                  "quantity": {
+                    "base": 10
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "type": "rollTable",
+            "tableId": "oddity",
+            "roll": {
+              "rollType": "D20",
+              "count": 1,
+              "mode": "separate"
+            }
+          },
+          {
+            "itemId": "robot_item_repair_kit",
+            "itemType": "misc"
+          }
+        ]
+      }
+    ]
+  }
+}

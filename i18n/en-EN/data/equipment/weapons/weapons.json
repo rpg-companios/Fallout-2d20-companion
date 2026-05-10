@@ -1,0 +1,1047 @@
+[
+  {
+    "id": "weapon_44_pistol",
+    "name": ".44 Pistol",
+    "rangeName": "Close",
+    "flavour": "The .44 pistol is a double-action revolver, chambered to use the .44 Magnum cartridge. It's a powerful gun, though not as customizable as other handguns. Due to their simple, rugged design, they're prized by their owners, but not so uncommon as to be truly rare.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_10mm_pistol",
+    "name": "10mm Pistol",
+    "rangeName": "Close",
+    "flavour": "Small, dependable, reasonably powerful, and available, the 10mm pistol has been a staple widely since the bombs first fell.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_flare_gun",
+    "name": "Flare Gun",
+    "rangeName": "Medium",
+    "flavour": "A Flare gun is a break-action single-shot device not really designed to inflict damage.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_assault_rifle",
+    "name": "Assault Rifle",
+    "rangeName": "Medium",
+    "flavour": "This gas-operated rifle is a common sight across the wasteland.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_combat_rifle",
+    "name": "Combat Rifle",
+    "rangeName": "Medium",
+    "flavour": "A pre-War weapon found across the wastelands and used in large numbers by various aggressive factions.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gauss_rifle",
+    "name": "Gauss Rifle",
+    "rangeName": "Long",
+    "flavour": "The gauss rifle uses magnetic induction to propel a projectile at incredible, devastating speeds.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_hunting_rifle",
+    "name": "Hunting Rifle",
+    "rangeName": "Medium",
+    "flavour": "A bolt-action rifle commonly found in the hands of super mutants and raiders.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_submachine_gun",
+    "name": "Submachine Gun",
+    "rangeName": "Close",
+    "flavour": "These submachine guns were an old design, even before the War.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_combat_shotgun",
+    "name": "Combat Shotgun",
+    "rangeName": "Close",
+    "flavour": "Combat shotguns are shotguns intended for an offensive role.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_double_barrel_shotgun",
+    "name": "Double-Barrel Shotgun",
+    "rangeName": "Close",
+    "flavour": "Before the Great War, double-barrel shotguns were mainly used for hunting and home defense.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pipe_bolt_action",
+    "name": "Pipe Bolt-Action",
+    "rangeName": "Close",
+    "flavour": "A makeshift weapon, usually seen in the hands of those who can't make, buy or scavenge anything better.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pipe_gun",
+    "name": "Pipe Gun",
+    "rangeName": "Close",
+    "flavour": "A crude, homemade weapon, normally seen in the hands of those who can't make, buy or scavenge anything better.",
+    "stockNames": {
+      "without": "Pipe Pistol",
+      "with": "Pipe Carbine"
+    }
+  },
+  {
+    "id": "weapon_pipe_revolver",
+    "name": "Pipe Revolver",
+    "rangeName": "Close",
+    "flavour": "Like the other forms of pipe gun, the pipe revolver is a makeshift or homemade gun.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_railway_rifle",
+    "name": "Railway Rifle",
+    "rangeName": "Medium",
+    "flavour": "A makeshift weapon created by enterprising engineers in the wastelands.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_syringer",
+    "name": "Syringer",
+    "rangeName": "Medium",
+    "flavour": "A makeshift weapon using air pressure to propel customized syringes at a target.",
+    "stockNames": {
+      "without": "Syringer",
+      "with": "Syringer Carbine"
+    }
+  },
+  {
+    "id": "weapon_institute_laser",
+    "name": "Institute Laser",
+    "rangeName": "Close",
+    "flavour": "Developed by The Institute after the Great War.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_laser_musket",
+    "name": "Laser Musket",
+    "rangeName": "Medium",
+    "flavour": "The laser musket is a homemade form of laser rifle.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_laser_gun",
+    "name": "Laser Gun",
+    "rangeName": "Close",
+    "flavour": "Laser guns are high-tech weapons which emit a concentrated beam of coherent, directional light.",
+    "stockNames": {
+      "without": "Laser Pistol",
+      "with": "Laser Rifle"
+    }
+  },
+  {
+    "id": "weapon_plasma_gun",
+    "name": "Plasma Gun",
+    "rangeName": "Close",
+    "flavour": "Plasma guns, or plasma casters, are high-tech weapons firing super heated ionized gas, or plasma.",
+    "stockNames": {
+      "without": "Plasma Pistol",
+      "with": "Plasma Rifle"
+    }
+  },
+  {
+    "id": "weapon_gamma_gun",
+    "name": "Gamma Gun",
+    "rangeName": "Medium",
+    "flavour": "A crude-looking weapon, the gamma gun emits directed blasts of high-intensity ionizing radiation.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_fat_man",
+    "name": "Fat Man",
+    "rangeName": "Medium",
+    "flavour": "The M42 Nuclear Catapult is a shoulder-fired infantry support weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_flamer",
+    "name": "Flamer",
+    "rangeName": "Close",
+    "flavour": "A flamethrower, or flamer, is a weapon which sprays an ignited fuel mixture over an area.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gatling_laser",
+    "name": "Gatling Laser",
+    "rangeName": "Medium",
+    "flavour": "A high rate-of-fire laser weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_heavy_incinerator",
+    "name": "Heavy Incinerator",
+    "rangeName": "Medium",
+    "flavour": "Like a flamethrower, a heavy incinerator also propels ignited fuel mixtures to burn a target.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_junk_jet",
+    "name": "Junk Jet",
+    "rangeName": "Medium",
+    "flavour": "The Junk Jet is a makeshift heavy weapon which fires anything.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_minigun",
+    "name": "Minigun",
+    "rangeName": "Medium",
+    "flavour": "The minigun is a motorized Gatling-style rapid fire weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_missile_launcher",
+    "name": "Missile Launcher",
+    "rangeName": "Long",
+    "flavour": "A refined, highly adaptable multipurpose missile weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_sword",
+    "name": "Sword",
+    "rangeName": "",
+    "flavour": "Swords have been in use for almost as long as wars have been fought.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_combat_knife",
+    "name": "Combat Knife",
+    "rangeName": "",
+    "flavour": "For both fighting and for utility uses, soldiers frequently carry knives.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_machete",
+    "name": "Machete",
+    "rangeName": "",
+    "flavour": "A long, sharp knife designed to hack through dense or tough vegetation.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_ripper",
+    "name": "Ripper",
+    "rangeName": "",
+    "flavour": "The Ripper is a small, handheld, militarised chainsaw.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_shishkebab",
+    "name": "Shishkebab",
+    "rangeName": "",
+    "flavour": "A makeshift \"flaming sword\".",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_switchblade",
+    "name": "Switchblade",
+    "rangeName": "",
+    "flavour": "The switchblade is a commonly found melee weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_baseball_bat",
+    "name": "Baseball Bat",
+    "rangeName": "",
+    "flavour": "Baseball bats were once used in the sport of baseball.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_baseball_bat_aluminum",
+    "name": "Aluminum Baseball Bat",
+    "rangeName": "",
+    "flavour": "Baseball bats were once used in the sport of baseball.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_board",
+    "name": "Board",
+    "rangeName": "",
+    "flavour": "Little more than a long plank of wood with a handle wrapped in duct tape.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_lead_pipe",
+    "name": "Lead Pipe",
+    "rangeName": "",
+    "flavour": "A length of heavy, metal pipe.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pipe_wrench",
+    "name": "Pipe Wrench",
+    "rangeName": "",
+    "flavour": "A heavy, metal, adjustable wrench.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pool_cue",
+    "name": "Pool Cue",
+    "rangeName": "",
+    "flavour": "A long, slender piece of wood used in games like pool.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_rolling_pin",
+    "name": "Rolling Pin",
+    "rangeName": "",
+    "flavour": "A sturdy cylinder of wood found in kitchens everywhere.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_baton",
+    "name": "Baton",
+    "rangeName": "",
+    "flavour": "A collapsible baton of the sort used by police departments.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_sledgehammer",
+    "name": "Sledgehammer",
+    "rangeName": "",
+    "flavour": "Sledgehammers are primitive weapons, used as tools before the Great War.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_super_sledge",
+    "name": "Super Sledge",
+    "rangeName": "",
+    "flavour": "Super Sledgehammers are powered variants of the regular sledgehammer.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_tire_iron",
+    "name": "Tire Iron",
+    "rangeName": "",
+    "flavour": "A simple L-shaped tool found commonly in cars and garages.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_walking_cane",
+    "name": "Walking Cane",
+    "rangeName": "",
+    "flavour": "A simple stick used to support those who can't walk so well.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_boxing_glove",
+    "name": "Boxing Glove",
+    "rangeName": "",
+    "flavour": "A large, leather mitt, used to protect the hands and wrists while punching.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_deathclaw_gauntlet",
+    "name": "Deathclaw Gauntlet",
+    "rangeName": "",
+    "flavour": "Made from the severed fingers and talons of a deathclaw.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_knuckles",
+    "name": "Knuckles",
+    "rangeName": "",
+    "flavour": "Developed in antiquity, this weapon is nevertheless quite prevalent in the post-Great War wastelands.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_power_fist",
+    "name": "Power Fist",
+    "rangeName": "",
+    "flavour": "A Power Fist is a reinforced gauntlet or vambrace which mounts a heavy-duty pneumatic ram.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_throwing_knife",
+    "name": "Throwing Knife",
+    "rangeName": "Close",
+    "flavour": "A small, sharp knife, specially balanced for throwing.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_tomahawk",
+    "name": "Tomahawk",
+    "rangeName": "Close",
+    "flavour": "A small, short-handled axe, akin to a small hatchet.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_javelin",
+    "name": "Javelin",
+    "rangeName": "Medium",
+    "flavour": "A short spear, not typically sturdy enough for close-in fighting.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_baseball_grenade",
+    "name": "Baseball Grenade",
+    "rangeName": "Medium",
+    "flavour": "Little more than a hollowed-out baseball filled with an improvised explosive mixture.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_frag_grenade",
+    "name": "Frag Grenade",
+    "rangeName": "Medium",
+    "flavour": "A basic fragmentation grenade.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_molotov",
+    "name": "Molotov Cocktail",
+    "rangeName": "Medium",
+    "flavour": "Consisting of a glass bottle containing a flammable fuel mixture.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_nuka_grenade",
+    "name": "Nuka Grenade",
+    "rangeName": "Medium",
+    "flavour": "A tiny, handheld tactical nuclear weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_plasma_grenade",
+    "name": "Plasma Grenade",
+    "rangeName": "Medium",
+    "flavour": "A canister containing chemicals which are rapidly transformed into superheated ionized gas.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pulse_grenade",
+    "name": "Pulse Grenade",
+    "rangeName": "Medium",
+    "flavour": "Pulse grenades emit a burst of electromagnetism.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_bottlecap_mine",
+    "name": "Bottlecap Mine",
+    "rangeName": "",
+    "flavour": "The Bottlecap mine is crudely put together, yet a formidable explosive.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_frag_mine",
+    "name": "Frag Mine",
+    "rangeName": "",
+    "flavour": "Similar in design and construction to a frag grenade, a fragmentation mine is instead placed on the ground.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_nuke_mine",
+    "name": "Nuke Mine",
+    "rangeName": "",
+    "flavour": "It is a nuclear variant of a landmine.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_plasma_mine",
+    "name": "Plasma Mine",
+    "rangeName": "",
+    "flavour": "These magnetically sealed mines unleash a blast of energized plasma upon being triggered.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_m79_grenade_launcher",
+    "name": "M79 Grenade Launcher",
+    "rangeName": "Long",
+    "flavour": "A grenade launcher is designed to launch large-caliber projectiles.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_acid_soaker",
+    "name": "Acid Soaker",
+    "rangeName": "Close",
+    "flavour": "The acid soaker is a small gun modified to receive a corrosive compound.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_alien_blaster",
+    "name": "Alien Blaster",
+    "rangeName": "Close",
+    "flavour": "The alien blaster is sometimes referred to as an alien blaster pistol.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_unarmed_attack",
+    "name": "Unarmed Attack",
+    "rangeName": "Close",
+    "flavour": "Sometimes your fists are the only weapon you have.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_rock",
+    "name": "Rock",
+    "rangeName": "Close",
+    "flavour": "A simple rock. Primitive, but effective when thrown with enough force.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pulse_mine",
+    "name": "Pulse Mine",
+    "rangeName": "Medium",
+    "flavour": "A proximity-triggered mine that emits a burst of electromagnetism, devastating to machines.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_assaultron_head_laser",
+    "name": "Assaultron Head Laser",
+    "rangeName": "Близкая",
+    "flavour": "The head of an Assaultron contains a high-yield laser emitter, shielded behind sturdy armor plating. Assaultrons use this laser to blast the enemy as they close into melee. The laser itself uses a capacitor that can build up an extremely powerful charge, but which requires considerable energy for each fully charged blast. Due to the solid design, destroyed Assaultrons sometimes have an intact head that can be used as an impromptu hand-held laser.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_mesmetron",
+    "name": "Mesmetron",
+    "rangeName": "Средняя",
+    "flavour": "A weapon similar to the gamma gun with the ability to create blasts of high intense energy. This approach creates variable waves that, when received by the brain of a sentient creature, overwhelms the senses and distorts perception making individuals confused and more susceptible.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_tesla_rifle",
+    "name": "Tesla Rifle",
+    "rangeName": "Средняя",
+    "flavour": "The Tesla gun is a firearm that takes the energy from a fusion cell and launches the energy out as a coil of electrical energy. The energy generally seeks out a way to dissipate allowing for it to arc out to multiple targets in a single shot.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_broadsider",
+    "name": "Broadsider",
+    "rangeName": "Средняя",
+    "flavour": "The broadsider is a naval cannon that has been modified with a chassis that allows for it to be a portable weapon. In addition to having a portable frame, the firing mechanism has been altered to include electronic triggers to avoid the traditional fuse. The cannon requires traditional loading however, with cannonballs being loaded directly into the muzzle.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_cryolator",
+    "name": "Cryolator",
+    "rangeName": "Близкая",
+    "flavour": "The cryolator, a machine designed with the ability to perform cryogenic freezing while maintaining mobility. Operating on a similar principle to a flamer, the cryolater takes pressurized nitrogen gas from a cryo cell and liquefies it, spraying the concentrated chemical element over a desired area in range.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_harpoon_gun",
+    "name": "Harpoon Gun",
+    "rangeName": "Средняя",
+    "flavour": "The harpoon gun is a handheld version of the harpoon cannon, sacrificing power for mobility. A special designed chassis allows for the weapon to be portable and is adapted with a firing mechanism for convenient firing.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_357_magnum_revolver",
+    "name": ".357 Magnum Revolver",
+    "rangeName": "Близкая",
+    "flavour": "A single-action revolver chambered for .357 magnum (though ones using .38 special rounds also exist). Not as potent as the feared and respected .44 revolver, these guns remain scattered around parts of the Wasteland due to their common use by police forces as service weapons and due to their extremely simple, durable build that makes them easy to maintain and extremely Надёжное.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_12_7mm_pistol",
+    "name": "12.7mm Pistol",
+    "rangeName": "Близкая",
+    "flavour": "A heavy-duty single-shot weapon with exceptional stopping power. Most known examples are believed to have been imported from overseas before the war. Given the weapon's punishing recoil, it can be tricky to use for those not prepared for its kick.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_12_7mm_smg",
+    "name": "12.7mm SMG",
+    "rangeName": "Близкая",
+    "flavour": "An uncommon mixture of compact weapon and large-caliber round, the 12.7mm submachine gun features an unconventional top-mounted magazine, lying parallel to the weapon's barrel. While small and lightweight itself, the weapon's recoil and rate of fire can make it tricky to handle.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_25mm_grenade_apw",
+    "name": "25mm Grenade APW",
+    "rangeName": "Дальняя",
+    "flavour": "The 25mm grenade APW is a semi-automatic grenade launcher. Specifically, this weapon contains a stock magazine capacity of six grenades, a brisk rate of fire, decent accuracy and allows modifications. While the grenades are much smaller and less impactful than those found in many other grenade launchers, the weapon itself is not as cumbersome as larger grenade launchers.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_9mm_pistol",
+    "name": "9mm Pistol",
+    "rangeName": "Близкая",
+    "flavour": "A common sight in the California and Mojave Wastelands and used as a standard sidearm by the New California Republic Army, this model of 9mm autoloader handgun was manufactured in vast quantities before the Great War. Its light weight, ease of handling, and common ammunition makes it a popular choice for personal defense, or as a backup weapon. However, the sturdy design doesn't lend itself as well to modifications as other common weapons.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_anti_materiel_rifle",
+    "name": "Anti-Materiel Rifle",
+    "rangeName": "Дальняя",
+    "flavour": "Utilizing an ergonomic, metallic skeleton design with a free-floating barrel, the anti-materiel rifle is a bolt-action, high-caliber precision weapon intended for use against materiel and hard targets. The weapon is designed for use at long ranges and should ideally not be fired while standing up due to the heavy recoil. Rare and highly sought-after, these guns are ideal for dealing with things like deathclaws, the larger radscorpions, and other sizeable threats… so long as you've got time to set up the first shot.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_battle_rifle",
+    "name": "Battle Rifle",
+    "rangeName": "Средняя",
+    "flavour": "Something of a relic of old 20th-century engineering, this sturdy, gas-operated semi-automatic rifle is nevertheless a solid choice of rifle for the discerning raider or mercenary. Its old-fashioned construction makes for a durable weapon with considerable stopping power, but it isn't easily modified.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_black_powder_blunderbuss",
+    "name": "Black Powder Blunderbuss",
+    "rangeName": "Близкая",
+    "flavour": "An archaic percussion-cap firearm, of a kind possibly salvaged from museums or the collections of reenactors. They fire a heavy .50 musket ball propelled by gunpowder, and are only effective at very close ranges, but when they do hit, they can do a lot of damage.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_black_powder_pistol",
+    "name": "Black Powder Pistol",
+    "rangeName": "Близкая",
+    "flavour": "An archaic percussion-cap firearm, of a kind possibly salvaged from museums or the collections of reenactors. Compared to the blunderbuss, the pistol is less Неточное and has a slightly longer effective range, but it packs no less of a punch.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_black_powder_rifle",
+    "name": "Black Powder Rifle",
+    "rangeName": "Средняя",
+    "flavour": "An archaic percussion-cap muzzle-loading rifle, of a kind possibly salvaged from museums or the collections of reenactors. The rifle's longer barrel gives it considerably longer range and slightly more stopping power than its smaller counterparts, but while it's fine against one or two foes, the slow rate of fire and long reload process make it inconvenient when heavily outnumbered.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gauss_pistol",
+    "name": "Gauss Pistol",
+    "rangeName": "Средняя",
+    "flavour": "A handheld alternative to a full-sized gauss rifle. Despite its small size, it maintains formidable stopping power over considerable distances, and in the hands of a skilled user, it can bring down even the most durable foes.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gauss_shotgun",
+    "name": "Gauss Shotgun",
+    "rangeName": "Близкая",
+    "flavour": "Technically more of a volley gun than a shotgun, as it fires multiple shots from multiple barrels at once, the gauss shotgun is a rare and devastating weapon which peppers a target with hypervelocity rounds.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_lever_action_rifle",
+    "name": "Lever-Action Rifle",
+    "rangeName": "Средняя",
+    "flavour": "As the name suggests, a lever-action rifle uses a lever to cycle the weapon's action; this is typically part of the trigger guard, allowing the shooter to cycle the action with minimal effort or movement. Though this slows the rate of fire, it's a Надёжное design that stands up to use, time, and nuclear war.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_light_machine_gun",
+    "name": "Light Machine Gun",
+    "rangeName": "Средняя",
+    "flavour": "The light machine gun is built to provide heavy firepower in a package not much larger than a typical rifle. While certainly heavier and more cumbersome than an assault rifle, it maintains a high rate of fire and can be easily modified with parts used by a variety of similar weapons, allowing the user to customize their fire support.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_pump_action_shotgun",
+    "name": "Pump-Action Shotgun",
+    "rangeName": "Близкая",
+    "flavour": "A solid and wideРазброс design of shotgun found across the Wastelands. While it has a far larger magazine capacity than double-barreled shotguns, the slow (but distinctive) pump-action design keeps the rate of fire low compared to semi-automatic combat shotguns.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_radium_rifle",
+    "name": "Radium Rifle",
+    "rangeName": "Средняя",
+    "flavour": "The Radium Rifle irradiates bullets as they are fired, causing ballistic damage, with an extra kick of radiation damage that is deadly to humans",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_sniper_rifle",
+    "name": "Sniper Rifle",
+    "rangeName": "Дальняя",
+    "flavour": "A scoped rifle once designed for use by military and police forces to eliminate targets efficiently from long distances. The design incorporates many features that other weapons would be modded to have, but such built-in design means that it's difficult to alter purpose-made sniper rifles",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_bow",
+    "name": "Bow",
+    "rangeName": "Средняя",
+    "flavour": "A bolt-action rifle commonly found in the hands of super mutants and raiders. The simple design made them common amongst hunters and survivalists before the Great War, and they're endlessly customizable. It seems fanciful to suggest that the simple short-barrelled slug-thrower carried by a super mutant could be turned into a precision sniper's rifle, yet that describes the hunting rifle perfectly.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_alien_atomizer",
+    "name": "Alien Atomizer",
+    "rangeName": "Близкая",
+    "flavour": "A form of alien energy pistol, found in use by the extra-terrestrial beings sometimes called \"Zetans\". Encounters with these creatures are extremely rare, and their weapons are extremely potent. Nobody understands their technology well enough to modify these guns, however.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_alien_disintegrator",
+    "name": "Alien Disintegrator",
+    "rangeName": "Средняя",
+    "flavour": "A form of alien energy rifle, appearing like a space-age blunderbuss, found in use by the extra-terrestrial beings sometimes called \"Zetans\". Like the smaller atomizers, the technology of these weapons is too unknown for anyone to successfully modify one of these weapons.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_arc_welder",
+    "name": "Arc Welder",
+    "rangeName": "Близкая",
+    "flavour": "This odd weapon can discharge a constant, high-voltage stream of electricity. While painful and damaging to living creatures, it is especially effective against robots and enemies in Power Armor, as electricity discharges into delicate components.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_microwave_emitter",
+    "name": "Microwave Emitter",
+    "rangeName": "Средняя",
+    "flavour": "This advanced Энергооружие generates intense blasts of microwave radiation. While it won't irradiate you—microwaves are non-ionizing radiation—it can cause intense burns as whatever is hit by the blast is heated up from the inside, boiling the water in your cells. And metal is little protection: the microwave blast can't effectively be dispersed by metallic objects, which heat up, produce electrical sparks, damage delicate circuitry. While extremely rare, these weapons provide a serious advantage when used against heavily armored targets.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_50_cal_machine_gun",
+    "name": ".50 Cal Machine Gun",
+    "rangeName": "Средняя",
+    "flavour": "These machine guns, chambered for the powerful .50 round, are extremely effective against infantry, materiel, lightly armored vehicles, boats, buildings, aircraft, and a wide range of other targets. This design has been in use in one form or another since long before the Great War but finds a new lease of life when carried by Power Armored fighters who can wield the cumbersome gun.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_auto_grenade_launcher",
+    "name": "Auto Grenade Launcher",
+    "rangeName": "Дальняя",
+    "flavour": "The automatic grenade launcher (sometimes referred to as a grenade machine gun), is a belt-fed, blowback-operated, air-cooled automatic weapon designed to lay down a heavy volume of explosive ordnance and support infantry and vehicle operations. Designed for use as a crew-served weapon, the automatic grenade launcher was intended for use against a variety of targets ranging from infantry and light vehicles to fortifications and other materiel. The sheer weight of the weapon and bulk of the ammunition limited its versatility, until the advent of Power Armor. Since then, many units were converted for use on foot, rather than from a tripod.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_drone_cannon",
+    "name": "Drone Cannon",
+    "rangeName": "Средняя",
+    "flavour": "Found on the arms of guardian drones—a form of alien robot sometimes seen on board crashed alien spacecraft—these potent, if strange, Энергооружиеs fire a ball of energy that acts a little like a grenade, bouncing for a few seconds before exploding.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gatling_gun",
+    "name": "Гатлинг Gun",
+    "rangeName": "Средняя",
+    "flavour": "Originally referred to as \"Гатлинг's battery gun\", these weapons resemble an old-fashioned version of a minigun, with the rotating barrels operated by a hand-crank rather than an electric motor. Naturally, this means that it has a slower rate of fire than its more advanced counterpart, but the weapon is no less functional for its old-fashioned design.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gatling_plasma",
+    "name": "Гатлинг Plasma",
+    "rangeName": "Средняя",
+    "flavour": "An evolution of plasma gun technology, the gatling plasma is a rare, potent, and costly weapon to use. Like smaller weapons of its kind, it inflicts damage through a combination of both physical impact and thermal transfer, and like other gatling weaponry, it inflicts this damage via a rapid-firing collection of rotating barrels that spray huge numbers of shots at the enemy. The relative scarcity of plasma cartridges, or extremely rare plasma cores, and the rate at which this weapon consumes ammunition, means that keeping the weapon supplied for use can be a full-time job.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_gauss_minigun",
+    "name": "Gauss Minigun",
+    "rangeName": "Дальняя",
+    "flavour": "The Gauss Minigun is a powerful, automatic ballistic weapon that rapidly fires hypervelocity 2mm rounds that deal devastating damage. Given their scarce ammunition and the sheer rate of fire it possesses—particularly when modified—this is a powerful weapon that demands a wealthy and well-supplied owner. It can even be fitted with a Tesla coil, charging rounds with electricity as they're fired.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_plasma_caster",
+    "name": "Plasma Caster",
+    "rangeName": "Средняя",
+    "flavour": "The Tesla cannon is a shoulder-mounted directed Энергооружие using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_tesla_cannon",
+    "name": "Tesla Cannon",
+    "rangeName": "Дальняя",
+    "flavour": "The Tesla cannon is a shoulder-mounted directed Энергооружие using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "unarmed_human",
+    "name": "Fists",
+    "rangeName": "Close"
+  }
+]

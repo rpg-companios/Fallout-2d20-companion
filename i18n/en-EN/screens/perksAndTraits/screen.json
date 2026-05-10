@@ -1,0 +1,35 @@
+{
+  "labels": {
+    "name": "Name",
+    "rank": "Rank",
+    "description": "Description"
+  },
+  "buttons": {
+    "addPerk": "+ Add perk"
+  },
+  "alerts": {
+    "warningTitle": "Warning",
+    "errorTitle": "Error",
+    "perkSelectedTitle": "Perk selected"
+  },
+  "warnings": {
+    "perkLimitReached": "No more perks can be taken at the current level"
+  },
+  "errors": {
+    "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
+  },
+  "perkSelected": {
+    "intensiveTrainingSuccess": "Perk \"{perkName}\" selected! You received +{bonus} attribute point. Go to the \"Character\" tab to distribute it."
+  },
+  "modal": {
+    "title": "Select a perk",
+    "requiresLevel": "Requires level: {required} (current: {current})",
+    "requiresAttribute": "Requires {code}: {required} (current: {current})",
+    "buttons": {
+      "choose": "Select",
+      "cancelChoice": "Cancel selection",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
+    }
+  }
+}

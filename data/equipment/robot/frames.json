@@ -1,0 +1,18 @@
+{
+  "frames": [
+    { "id": "robot_frame_actuated_optics",   "templateId": "robot_frame_actuated", "layer": "frame", "robotLocation": "Optics",    "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 15, "perkRequired": null },
+    { "id": "robot_frame_actuated_body",     "templateId": "robot_frame_actuated", "layer": "frame", "robotLocation": "Main Body", "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 30, "perkRequired": null },
+    { "id": "robot_frame_actuated_arms",     "templateId": "robot_frame_actuated", "layer": "frame", "robotLocation": "Arms",      "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 15, "perkRequired": null },
+    { "id": "robot_frame_actuated_thruster", "templateId": "robot_frame_actuated", "layer": "frame", "robotLocation": "Thruster",  "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 15, "perkRequired": null },
+
+    { "id": "robot_frame_voltaic_optics",    "templateId": "robot_frame_voltaic", "layer": "frame", "robotLocation": "Optics",    "damageResistance": { "physical": 2, "energy": 2 }, "carryWeightModifier": 10, "cost": 20, "perkRequired": "Armorer 2" },
+    { "id": "robot_frame_voltaic_body",      "templateId": "robot_frame_voltaic", "layer": "frame", "robotLocation": "Main Body", "damageResistance": { "physical": 2, "energy": 2 }, "carryWeightModifier": 20, "cost": 40, "perkRequired": "Armorer 2" },
+    { "id": "robot_frame_voltaic_arms",      "templateId": "robot_frame_voltaic", "layer": "frame", "robotLocation": "Arms",      "damageResistance": { "physical": 2, "energy": 2 }, "carryWeightModifier": 20, "cost": 20, "perkRequired": "Armorer 2" },
+    { "id": "robot_frame_voltaic_thruster",  "templateId": "robot_frame_voltaic", "layer": "frame", "robotLocation": "Thruster",  "damageResistance": { "physical": 2, "energy": 2 }, "carryWeightModifier": 20, "cost": 20, "perkRequired": "Armorer 2" },
+
+    { "id": "robot_frame_hydraulic_optics",  "templateId": "robot_frame_hydraulic", "layer": "frame", "robotLocation": "Optics",    "damageResistance": { "physical": 3, "energy": 3 }, "carryWeightModifier": 5,  "cost": 30, "perkRequired": "Armorer 3" },
+    { "id": "robot_frame_hydraulic_body",    "templateId": "robot_frame_hydraulic", "layer": "frame", "robotLocation": "Main Body", "damageResistance": { "physical": 3, "energy": 3 }, "carryWeightModifier": 10, "cost": 60, "perkRequired": "Armorer 3" },
+    { "id": "robot_frame_hydraulic_arms",    "templateId": "robot_frame_hydraulic", "layer": "frame", "robotLocation": "Arms",      "damageResistance": { "physical": 3, "energy": 3 }, "carryWeightModifier": 5,  "cost": 30, "perkRequired": "Armorer 3" },
+    { "id": "robot_frame_hydraulic_thruster","templateId": "robot_frame_hydraulic", "layer": "frame", "robotLocation": "Thruster",  "damageResistance": { "physical": 3, "energy": 3 }, "carryWeightModifier": 5,  "cost": 30, "perkRequired": "Armorer 3" }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "title": "Character Manager",
+  "subtitle": "Fallout Tabletop Roleplaying (2d20)",
+  "createButton": {
+    "text": "Create\nCharacter",
+    "plus": "+"
+  },
+  "upload": {
+    "icon": "⇪",
+    "button": "Upload\nCharacter",
+    "unsupported": "File import is available only in web version.",
+    "overwriteConfirm": "Character with this name already exists. Overwrite it?",
+    "errors": {
+      "default": "Failed to import character.",
+      "invalidJson": "The file is corrupted: invalid JSON.",
+      "invalidFormat": "Unsupported export file format.",
+      "unsupportedVersion": "This export file version is not supported.",
+      "missingCharacter": "Character block is missing in the file.",
+      "missingName": "Character name is missing in the file.",
+      "missingData": "Character data is missing in the file."
+    }
+  },
+  "download": {
+    "unsupported": "File save/export is available only in web version.",
+    "errors": {
+      "notFound": "Character was not found."
+    }
+  },
+  "deleteConfirm": "Do you really want to delete this character?",
+  "language": {
+    "russian": "Русский",
+    "english": "English"
+  },
+  "labels": {
+    "level": "Lvl."
+  },
+  "buttons": {
+    "yes": "Yes",
+    "no": "No",
+    "ok": "Ok"
+  },
+  "menu": {
+    "sync": "Cloud sync",
+    "about": "About app",
+    "community": "Community",
+    "buyCoffee": "Buy author a coffee",
+    "buyCoffeeDescription": "Author support links will be added in future updates."
+  },
+  "about": {
+    "description": "Fallout 2d20 Companion is a character manager for tabletop RPG: create, store, edit, import/export, and sync through cloud."
+  },
+  "cloudSync": {
+    "unsupported": "Cloud sync is available only in web version.",
+    "remoteIsNewer": "Newer character saves were found in cloud. Download them locally?",
+    "success": "Sync completed.",
+    "error": "Cloud sync failed."
+  },
+  "pwa": {
+    "install": "Install App",
+    "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
+    "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
+  }
+}

@@ -1,0 +1,179 @@
+{
+  "stats": {
+    "initiative": "Инициатива",
+    "defense": "Защита",
+    "meleeBonus": "Бонус Б.Боя",
+    "effects": "Эффекты",
+    "poisonResistance": "Сопр. Яду",
+    "health": "Здоровье"
+  },
+  "armor": {
+    "slots": {
+      "head": {
+        "title": "Голова",
+        "subtitle": "1-2"
+      },
+      "leftArm": {
+        "title": "Левая рука",
+        "subtitle": "9-11"
+      },
+      "rightArm": {
+        "title": "Правая рука",
+        "subtitle": "12-14"
+      },
+      "body": {
+        "title": "Тело",
+        "subtitle": "3-8"
+      },
+      "leftLeg": {
+        "title": "Левая нога",
+        "subtitle": "15-17"
+      },
+      "rightLeg": {
+        "title": "Правая нога",
+        "subtitle": "18-20"
+      }
+    },
+    "fields": {
+      "physical": "Физ.Су",
+      "energy": "Энрг.Су",
+      "radiation": "Рад.Су",
+      "clothingModification": "Улучшить одежду",
+      "armorModification": "Улучшить броню"
+    },
+    "groups": {
+      "robotArmor": "Броня роботов"
+    }
+  },
+  "weapon": {
+    "emptySlot": "Пустой слот",
+    "notEquipped": "Оружие не надето",
+    "unequip": "Снять",
+    "rangeDefault": "Близкая",
+    "rangeNames": {
+      "Close": "Близкая",
+      "Medium": "Средняя",
+      "Long": "Дальняя",
+      "Extreme": "Экстремальная"
+    },
+    "modPrefixes": {
+      "Hardened": "Укреплённый",
+      "Improved": "Улучшенный",
+      "Advanced": "Продвинутый",
+      "Tuned": "Чувствительный",
+      "Calibrated": "Калиброванный",
+      "Automatic": "Автоматический",
+      "Rapid": "Быстрый",
+      "Quick": "Быстрый",
+      "Suppressed": "Тихий",
+      "Supressed": "Тихий",
+      "Silent": "Тихий",
+      "Long": "Длинный",
+      "Short": "Короткий",
+      "Tactical": "Тактический",
+      "Recon": "Разведывательный",
+      "Night": "Ночного видения",
+      "Bayonet": "Штыковой",
+      "Compensated": "Компенсированный",
+      "Perforated": "Перфорированный",
+      "Vented": "Вентилируемый",
+      "Ribbed": "Ребристый"
+    },
+    "fields": {
+      "success": "ЗНАЧЕНИЕ УСПЕХА",
+      "damageType": "ТИП УРОНА",
+      "damage": "УРОН",
+      "effect": "ЭФФЕКТ",
+      "fireRate": "СКОРОСТЬ СТРЕЛЬБЫ",
+      "range": "ДИСТАНЦИЯ",
+      "qualities": "КАЧЕСТВА",
+      "modification": "Модификация"
+    },
+    "modSlots": {
+      "barrel": "Ствол",
+      "receiver": "Ресивер",
+      "sight": "Прицел",
+      "muzzle": "Дульная насадка",
+      "stock": "Приклад",
+      "grip": "Рукоять",
+      "magazine": "Магазин",
+      "capacitor": "Конденсатор",
+      "unique": "Уникальный",
+      "other": "Другое"
+    }
+  },
+  "robotSlot": {
+    "noLimb": "Нет конечности",
+    "slotNames": {
+      "head": "Голова",
+      "body": "Корпус",
+      "leftArm": "Левая рука",
+      "rightArm": "Правая рука",
+      "leftLeg": "Левая нога",
+      "rightLeg": "Правая нога",
+      "arm1": "Рука 1",
+      "arm2": "Рука 2",
+      "arm3": "Рука 3",
+      "thruster": "Двигатель",
+      "chassis": "Шасси"
+    },
+    "layers": {
+      "plating": "Обшивка",
+      "armor": "Броня",
+      "frame": "Рама"
+    },
+    "weapon": {
+      "damage": "Урон"
+    },
+    "buttons": {
+      "upgradeLimb": "Конечность",
+      "upgradeArmor": "Броня",
+      "upgradePlating": "Обшивка",
+      "upgradeFrame": "Рама"
+    }
+  },
+  "common": {
+    "empty": "—",
+    "none": "00",
+    "close": "Закрыть"
+  },
+  "kitResolver": {
+    "currency": "Крышки",
+    "currencyNcr": "Доллары НКР",
+    "unknownItem": "Неизвестный предмет"
+  },
+  "modals": {
+    "requirements": "Требования",
+    "armorModification": "Улучшить броню",
+    "clothingModification": "Улучшить одежду",
+    "availableModifications": "Доступные модификации",
+    "standard": "Стандартные",
+    "unique": "Уникальные",
+    "removeStandard": "Снять стандартный мод",
+    "noStandard": "Без стандартного мода",
+    "removeUnique": "Снять уникальный мод",
+    "noUnique": "Без уникального мода",
+    "preview": "Предварительный просмотр",
+    "effects": "Эффекты",
+    "weight": "Вес",
+    "cost": "Цена",
+    "cancel": "Отмена",
+    "apply": "Применить",
+    "improvements": "Улучшения",
+    "clothingReinforced": "Усиленные швы",
+    "clothingInsulated": "Утеплённая подкладка",
+    "weaponModification": "Модификации оружия",
+    "unknownWeapon": "Неизвестное оружие",
+    "weaponDamage": "Урон",
+    "weaponFireRate": "Скорость",
+    "weaponRange": "Дистанция",
+    "weaponWeight": "Вес",
+    "weaponCost": "Цена",
+    "availableModificationsLabel": "Доступные модификации:",
+    "previewLabel": "Предварительный просмотр:",
+    "previewEffects": "Эффекты",
+    "previewQualities": "Качества",
+    "errorTitle": "Ошибка",
+    "errorSelectMod": "Выберите хотя бы одну модификацию"
+  }
+}

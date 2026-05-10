@@ -1,0 +1,16 @@
+[
+  { "id": "robot_frame_actuated_optics",    "name": "Actuated Frame (Optics)",   "special": "Arms: +1 DC melee damage; Thruster: Move (minor) + Sprint (major) in same turn" },
+  { "id": "robot_frame_actuated_body",      "name": "Actuated Frame (Main Body)", "special": "Arms: +1 DC melee damage; Thruster: Move (minor) + Sprint (major) in same turn" },
+  { "id": "robot_frame_actuated_arms",      "name": "Actuated Frame (Arms)",     "special": "Arms: +1 DC melee damage; Thruster: Move (minor) + Sprint (major) in same turn" },
+  { "id": "robot_frame_actuated_thruster",  "name": "Actuated Frame (Thruster)", "special": "Arms: +1 DC melee damage; Thruster: Move (minor) + Sprint (major) in same turn" },
+
+  { "id": "robot_frame_voltaic_optics",     "name": "Voltaic Frame (Optics)",   "special": "Energy attacks: +1 DC per piece (+2 DC for 3 pieces, +3 DC for 5+)" },
+  { "id": "robot_frame_voltaic_body",       "name": "Voltaic Frame (Main Body)", "special": "Energy attacks: +1 DC per piece (+2 DC for 3 pieces, +3 DC for 5+)" },
+  { "id": "robot_frame_voltaic_arms",       "name": "Voltaic Frame (Arms)",     "special": "Energy attacks: +1 DC per piece (+2 DC for 3 pieces, +3 DC for 5+)" },
+  { "id": "robot_frame_voltaic_thruster",   "name": "Voltaic Frame (Thruster)", "special": "Energy attacks: +1 DC per piece (+2 DC for 3 pieces, +3 DC for 5+)" },
+
+  { "id": "robot_frame_hydraulic_optics",   "name": "Hydraulic Frame (Optics)",   "special": "Arms melee attacks: +1 DC damage + Stun" },
+  { "id": "robot_frame_hydraulic_body",     "name": "Hydraulic Frame (Main Body)", "special": "Arms melee attacks: +1 DC damage + Stun" },
+  { "id": "robot_frame_hydraulic_arms",     "name": "Hydraulic Frame (Arms)",     "special": "Arms melee attacks: +1 DC damage + Stun" },
+  { "id": "robot_frame_hydraulic_thruster", "name": "Hydraulic Frame (Thruster)", "special": "Arms melee attacks: +1 DC damage + Stun" }
+]

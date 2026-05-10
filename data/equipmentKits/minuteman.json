@@ -1,0 +1,156 @@
+{
+  "minuteman_shooter": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_casual_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_casual_hat",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "armorId": "armor_leather_chest_001",
+            "itemType": "armor"
+          },
+          {
+            "armorId": "armor_leather_hand_001",
+            "itemType": "armor"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_laser_musket",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_energy_cell",
+              "quantity": {
+                "base": 7,
+                "rollType": "rollCD",
+                "rollValue": 7,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_hunting_rifle",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_308",
+              "quantity": {
+                "base": 3,
+                "rollType": "rollCD",
+                "rollValue": 3,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 4,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 5
+      }
+    ]
+  },
+  "minuteman_skirmisher": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_casual_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_military_helmet",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_metal_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_double_barrel_shotgun",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_shotgun_shell",
+              "quantity": {
+                "base": 3,
+                "rollType": "rollCD",
+                "rollValue": 3,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_submachine_gun",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_45",
+              "quantity": {
+                "base": 4,
+                "rollType": "rollCD",
+                "rollValue": 4,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "chem",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 5
+      }
+    ]
+  }
+}

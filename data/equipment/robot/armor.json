@@ -1,0 +1,10 @@
+{
+  "armor": [
+    { "id": "robot_armor_factory_optics",   "templateId": "robot_armor_factory", "layer": "armor", "robotLocation": "Optics",    "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 10, "perkRequired": null },
+    { "id": "robot_armor_factory_body",     "templateId": "robot_armor_factory", "layer": "armor", "robotLocation": "Main Body", "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 20, "cost": 10, "perkRequired": null },
+    { "id": "robot_armor_factory_arms",     "templateId": "robot_armor_factory", "layer": "armor", "robotLocation": "Arms",      "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 10, "perkRequired": null },
+    { "id": "robot_armor_factory_thruster", "templateId": "robot_armor_factory", "layer": "armor", "robotLocation": "Thruster",  "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 10, "cost": 10, "perkRequired": null },
+
+    { "id": "robot_armor_storage_body",     "templateId": "robot_armor_factory_storage", "layer": "armor", "robotLocation": "Main Body", "damageResistance": { "physical": 1, "energy": 1 }, "carryWeightModifier": 20, "cost": 25, "perkRequired": "Armorer 1" }
+  ]
+}

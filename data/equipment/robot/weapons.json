@@ -1,0 +1,519 @@
+[
+  {
+    "id": "robot_weapon_manipulator",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "weaponType": "Unarmed",
+    "damage": 2,
+    "damageType": "physical",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "meleeBonusApplies": true,
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_protectron_manipulator",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "weaponType": "Unarmed",
+    "damage": 2,
+    "damageType": "physical",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "meleeBonusApplies": true,
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_flamethrower",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "name": "Огнемёт",
+    "weaponType": "Heavy",
+    "damage": 3,
+    "damageType": "fire",
+    "fireRate": 2,
+    "range": "C",
+    "mainAttr": "AGI",
+    "mainSkill": "BIG_GUNS",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "ammoId": "ammo_flamer_fuel",
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "qualities": [
+      {
+        "qualityId": "quality_persistent"
+      },
+      {
+        "qualityId": "quality_spread"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_circular_saw",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "name": "Циркулярная пила",
+    "weaponType": "Melee",
+    "damage": 3,
+    "damageType": "physical",
+    "damageEffects": [
+      "piercing"
+    ],
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "weight": 3,
+    "cost": 25,
+    "rarity": 2,
+    "meleeBonusApplies": true,
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Blacksmith 1"
+    ],
+    "installSkill": "Repair",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_laser_cutter",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "name": "Лазерный резак",
+    "weaponType": "Energy",
+    "damage": 4,
+    "damageType": "energy",
+    "fireRate": 1,
+    "range": "C",
+    "mainAttr": "PER",
+    "mainSkill": "ENERGY_WEAPONS",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "ammoId": "ammo_energy_cell",
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_auto_10mm",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "name": "Автоматическая 10мм пушка",
+    "weaponType": "Light",
+    "damage": 4,
+    "damageType": "physical",
+    "fireRate": 3,
+    "range": "C",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "ammoId": "ammo_10mm",
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_cryojet",
+    "itemType": "weapon",
+    "name": "Криоструя",
+    "weaponType": "Energy",
+    "damage": 3,
+    "damageType": "energy",
+    "fireRate": 3,
+    "range": "C",
+    "mainAttr": "AGI",
+    "mainSkill": "ENERGY_WEAPONS",
+    "weight": 8,
+    "cost": 261,
+    "rarity": 4,
+    "ammoId": "ammo_cryo_cell",
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1",
+      "Science! 1"
+    ],
+    "installSkill": "Science",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_freeze"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_shocker_arms",
+    "itemType": "weapon",
+    "name": "Шоковые руки",
+    "weaponType": "Melee",
+    "damage": 4,
+    "damageType": "energy",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "meleeBonusApplies": true,
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_self_destruct",
+    "itemType": "weapon",
+    "name": "Самоуничтожение",
+    "weaponType": "Explosive",
+    "damage": 6,
+    "damageType": "energy",
+    "range": "C",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "selfDestruct": true,
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "qualities": [
+      {
+        "qualityId": "quality_blast"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_construction_claw",
+    "itemType": "weapon",
+    "name": "Строительный коготь",
+    "weaponType": "Unarmed",
+    "damage": 4,
+    "damageType": "physical",
+    "damageEffects": [
+      "breaking"
+    ],
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 3,
+    "cost": 25,
+    "rarity": 0,
+    "meleeBonusApplies": true,
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Blacksmith 1"
+    ],
+    "installSkill": "Repair",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_drill",
+    "itemType": "weapon",
+    "name": "Дрель",
+    "weaponType": "Unarmed",
+    "damage": 5,
+    "damageType": "physical",
+    "damageEffects": [
+      "vicious"
+    ],
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 20,
+    "cost": 50,
+    "rarity": 1,
+    "meleeBonusApplies": true,
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Blacksmith 2"
+    ],
+    "installSkill": "Repair",
+    "qualities": [
+      {
+        "qualityId": "quality_debilitating"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_vice_grip",
+    "itemType": "weapon",
+    "name": "Тиски",
+    "weaponType": "Unarmed",
+    "damage": 4,
+    "damageType": "physical",
+    "damageEffects": [
+      "breaking"
+    ],
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 15,
+    "cost": 30,
+    "rarity": 2,
+    "meleeBonusApplies": true,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Blacksmith 3"
+    ],
+    "installSkill": "Repair",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_mod_shock",
+    "itemType": "weapon",
+    "name": "Модуль шока",
+    "weaponType": "Melee",
+    "damage": 0,
+    "damageType": "energy",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 1,
+    "isMod": true,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "Science",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_mod_stun",
+    "itemType": "weapon",
+    "name": "Модуль оглушения",
+    "weaponType": "Melee",
+    "damage": 0,
+    "damageType": "energy",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 1,
+    "isMod": true,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "Science",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_assaultron_head_laser",
+    "itemType": "weapon",
+    "name": "Лазер головы ассаултрона",
+    "weaponType": "Energy",
+    "damage": 5,
+    "damageType": "energy",
+    "fireRate": 0,
+    "range": "C",
+    "mainAttr": "PER",
+    "mainSkill": "ENERGY_WEAPONS",
+    "weight": 8,
+    "cost": 115,
+    "rarity": 4,
+    "builtinToHead": "robot_head_assaultron_laser",
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "ammoId": "ammo_energy_cell",
+    "ammoConsumption": {
+      "basePerShot": 2,
+      "minPerShot": 1,
+      "damageFloor": 4,
+      "damageReductionPerAmmoSaved": 1
+    },
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_mesmetron",
+    "itemType": "weapon",
+    "name": "Мезметрон",
+    "weaponType": "Energy",
+    "damage": 3,
+    "damageType": "energy",
+    "fireRate": 1,
+    "range": "M",
+    "mainAttr": "PER",
+    "mainSkill": "ENERGY_WEAPONS",
+    "weight": 2,
+    "cost": 120,
+    "rarity": 4,
+    "builtinToHead": "robot_head_robobrain",
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "ammoId": "ammo_energy_cell",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_claw",
+    "itemType": "weapon",
+    "name": "Коготь",
+    "weaponType": "Unarmed",
+    "damage": 3,
+    "damageType": "physical",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 2,
+    "cost": 25,
+    "rarity": 1,
+    "meleeBonusApplies": true,
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_tesla_arm",
+    "itemType": "weapon",
+    "weaponSlots": 0,
+    "name": "Карабин Теслы",
+    "weaponType": "Energy",
+    "damage": 4,
+    "damageType": "energy",
+    "fireRate": 2,
+    "range": "M",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "ammoId": "ammo_fusion_core",
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1",
+      "Science! 1"
+    ],
+    "installSkill": "Science",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      }
+    ]
+  },
+  {
+    "id": "robot_weapon_smoke_claws",
+    "itemType": "weapon",
+    "name": "Дымовые когти",
+    "weaponType": "Small Guns",
+    "damage": 4,
+    "damageType": "poison",
+    "damageEffects": [
+      "persistent"
+    ],
+    "fireRate": 0,
+    "range": "M",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "builtinToArm": "robot_arm_robobrain",
+    "installComplexity": null,
+    "installPerksRequired": null,
+    "installSkill": null,
+    "ammoId": "ammo_gas_grenade",
+    "qualities": [
+      {
+        "qualityId": "quality_blast"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ]
+  }
+]

@@ -1,0 +1,116 @@
+{
+  "labels": {
+    "characterName": "Имя",
+    "origin": "Происхождение",
+    "trait": "Черта",
+    "attributes": "Атрибуты",
+    "equipmentKit": "Комплект снаряжения",
+    "level": "Уровень",
+    "skills": "Навыки",
+    "skill": "Навык",
+    "value": "Значение",
+    "rank": "Ранг",
+    "points": "Очки",
+    "luckPoints": "Очки удачи",
+    "taggedSkills": "Отмечено навыков",
+    "skillPoints": "Очки навыков",
+    "attributePoints": "Очки атрибутов",
+    "isTaggedSkill": "Отмечен",
+    "available": "Доступно",
+    "pointsShort": "очков",
+    "extraTaggedSkills": "Дополнительные навыки от черты",
+    "extraSlotsAvailable": "Доступно дополнительных слотов"
+  },
+  "buttons": {
+    "save": "Сохранить",
+    "reset": "Сбросить",
+    "cancel": "Отмена",
+    "agree": "Согласен",
+    "continue": "Продолжить",
+    "confirm": "Подтвердить",
+    "yesReset": "Да, сбросить",
+    "select": "Выбрать"
+  },
+  "placeholders": {
+    "selectNone": "Не выбрано",
+    "enterName": "Введите имя"
+  },
+  "warnings": {
+    "attentionTitle": "Внимание!",
+    "resetAllValues": "Все значения будут сброшены к изначальным параметрам.",
+    "changeOriginTitle": "Сменить происхождение?",
+    "changeOriginConfirm": "Все ваши атрибуты, навыки и черты будут сброшены. Вы уверены?",
+    "equipmentResetConfirm": "Инвентарь и всё снаряжение будет сброшено. Продолжить?",
+    "traitAlreadySelected": "Черта для этого происхождения уже выбрана.",
+    "noTraitsForOrigin": "Для данного происхождения нет доступных черт",
+    "selectOriginFirst": "Сначала выберите происхождение",
+    "selectOriginError": "Выберите происхождение",
+    "noEquipmentForOrigin": "Для данного происхождения нет комплектов снаряжения.",
+    "equipmentResetOnWeb": "Внимание! При выборе нового комплекта снаряжения весь текущий инвентарь будет сброшен. Продолжить?"
+  },
+  "alerts": {
+    "errorTitle": "Ошибка",
+    "warningTitle": "Предупреждение",
+    "infoTitle": "Информация"
+  },
+  "errors": {
+    "distributeAllPerkAttributePoints": "Вы должны распределить все доступные очки атрибутов.",
+    "saveAttributesFirst": "Сначала распределите и сохраните атрибуты",
+    "cannotUnselectForcedSkill": "Нельзя снять выбор с обязательного навыка",
+    "skillTagExceedsMaxRank": "Отметка этого навыка превысит максимальный ранг ({skillMax}). Сначала понизьте его значение.",
+    "maxBaseSkills": "Можно выбрать максимум {count} основных навыка.{extraText}",
+    "saveAttributesFirstSimple": "Сначала сохраните атрибуты",
+    "noSkillPointsLeft": "У вас не осталось очков навыков для распределения.",
+    "originRequired": "Необходимо выбрать происхождение.",
+    "traitRequired": "Необходимо выбрать черту.",
+    "equipmentRequired": "Необходимо выбрать комплект снаряжения.",
+    "spendAllAttributePoints": "Потратьте все очки атрибутов перед сохранением.",
+    "spendAllSkillPoints": "Необходимо распределить все очки навыков.",
+    "exactBaseSkillsRequired": "Необходимо выбрать ровно {required} основных навыка. Выбрано: {selected}.",
+    "exactExtraSkillsRequired": "Необходимо выбрать {required} дополнительных навыка от черты. Выбрано: {selected}.",
+    "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
+  },
+  "modals": {
+    "goodSoul": {
+      "title": "Добрая Душа: выберите 2 навыка",
+      "description": "Выберите два навыка из группы. Они будут отмечены как дополнительные."
+    },
+    "origin": {
+      "title": "Выберите происхождение"
+    },
+    "traitSkill": {
+      "title": "Выберите дополнительный навык"
+    }
+  },
+  "origins": {
+    "brotherhoodOfSteel": "Братство Стали"
+  },
+  "attributes": {
+    "STR": "СИЛ",
+    "END": "ВЫН",
+    "PER": "ВОС",
+    "AGI": "ЛОВ",
+    "INT": "ИНТ",
+    "CHA": "ХАР",
+    "LCK": "УДЧ"
+  },
+  "skillsCatalog": {
+    "ATHLETICS": "Атлетика",
+    "BARTER": "Бартер",
+    "BIG_GUNS": "Тяжелое оружие",
+    "ENERGY_WEAPONS": "Энергооружие",
+    "EXPLOSIVES": "Взрывчатка",
+    "LOCKPICK": "Отмычки",
+    "MEDICINE": "Медицина",
+    "MELEE_WEAPONS": "Ближний бой",
+    "PILOT": "Управление ТС",
+    "REPAIR": "Ремонт",
+    "SCIENCE": "Наука",
+    "SMALL_GUNS": "Стрелковое оружие",
+    "SNEAK": "Скрытность",
+    "SPEECH": "Красноречие",
+    "SURVIVAL": "Выживание",
+    "THROWING": "Метание",
+    "UNARMED": "Рукопашная"
+  }
+}

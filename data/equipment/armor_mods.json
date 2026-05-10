@@ -1,0 +1,590 @@
+[
+  {
+    "modType": "armor",
+    "id": "mod_std_laminate",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "targetArmorCategories": [
+      "all"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 5
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_rubberized",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "targetArmorCategories": [
+      "all"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 10
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_microcarbon",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "targetArmorCategories": [
+      "all"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 15
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_soft_padding",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 2,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_2",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_asbestos_lining",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_ignore_energy_persistent",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_dense",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 3",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 7
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_4",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_biocomponents_mesh",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4, Наука! 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 9
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_chems_duration_double",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_pneumatic",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 9
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_stun_immunity",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_melee",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_unarmed_melee_damage_1",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_parrying",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_melee_damage_resistance_2",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_balanced",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_aimed_ranged_damage_1",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_aerodynamic",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 3",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_ap_bonus_damage_melee",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_lightweight_arms",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_melee_piercing_1",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_soft_padding_legs",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Leg"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_fall_damage_resistance",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "modType": "armor",
+    "id": "mod_std_soundproofed",
+    "modCategory": "standardMods",
+    "protectedAreas": [
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "value": 1
+      }
+    ]
+  }
+]

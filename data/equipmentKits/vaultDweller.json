@@ -1,0 +1,94 @@
+{
+  "vault_security": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_vault_jumpsuit",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_vault_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_vault_head_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_baton",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_10mm_pistol",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_10mm",
+          "quantity": {
+            "base": 4,
+            "rollType": "rollCD",
+            "rollValue": 4,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_stimpak",
+        "itemType": "chem"
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_pip_boy",
+        "itemType": "misc"
+      }
+    ]
+  },
+  "vault_resident": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_vault_jumpsuit",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_switchblade",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_10mm_pistol",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_10mm",
+          "quantity": {
+            "base": 3,
+            "rollType": "rollCD",
+            "rollValue": 3,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_stimpak",
+        "itemType": "chem",
+        "quantity": 2
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_pip_boy",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  }
+}

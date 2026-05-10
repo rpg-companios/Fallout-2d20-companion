@@ -1,0 +1,86 @@
+{
+  "outcast_former_knight": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_bos_uniform",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "itemId": "food_purified_water",
+        "itemType": "food"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_musket",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 4,
+            "rollType": "rollCD",
+            "rollValue": 6,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "outcast",
+        "roll": {
+          "rollType": "D20",
+          "count": 2,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
+  "outcast_former_scribe": {
+    "items": [
+      {
+        "type": "fixed",
+        "armorId": "armor_bos_scribe_worn",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 4,
+            "rollType": "rollCD",
+            "rollValue": 4,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_multi_tool",
+        "itemType": "misc"
+      },
+      {
+        "type": "rollTable",
+        "tableId": "outcast",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 15
+      }
+    ]
+  }
+}

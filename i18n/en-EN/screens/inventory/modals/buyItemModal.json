@@ -1,0 +1,15 @@
+{
+  "title": "Buy: {itemName}",
+  "balance": "Available caps: {caps}",
+  "quantityLabel": "Quantity",
+  "pricePerItem": "Price per item",
+  "totalPrice": "Total to pay: {totalPrice}",
+  "buy": "Buy",
+  "cancel": "Cancel",
+  "invalidQuantity": "Enter a valid quantity greater than zero.",
+  "invalidPrice": "Enter a valid price.",
+  "noCapsTitle": "Not enough caps",
+  "noCapsMessage": "You have no caps to buy items.",
+  "notEnoughCapsTitle": "Not enough caps",
+  "notEnoughCapsMessage": "Need {total}, available {caps}."
+}

@@ -1,0 +1,2696 @@
+[
+  {
+    "id": "weapon_44_pistol",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 1,
+    "weight": "4",
+    "cost": 99,
+    "rarity": 2,
+    "ammoId": "ammo_44_magnum",
+    "range": "C",
+    "imageName": ".44 Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_10mm_pistol",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 2,
+    "weight": "4",
+    "cost": 50,
+    "rarity": 1,
+    "ammoId": "ammo_10mm",
+    "range": "C",
+    "imageName": "10mm Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_reliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_flare_gun",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 50,
+    "rarity": 1,
+    "ammoId": "ammo_flare",
+    "range": "M",
+    "imageName": "Flare Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_reliable"
+      }
+    ],
+    "weaponType": "Light",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_assault_rifle",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 2,
+    "weight": "13",
+    "cost": 144,
+    "rarity": 2,
+    "ammoId": "ammo_5_56mm",
+    "range": "M",
+    "imageName": "Assault Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_combat_rifle",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 2,
+    "weight": "11",
+    "cost": 117,
+    "rarity": 2,
+    "ammoId": "ammo_45",
+    "range": "M",
+    "imageName": "Combat Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_gauss_rifle",
+    "itemType": "weapon",
+    "damage": 10,
+    "fireRate": 1,
+    "weight": "16",
+    "cost": 228,
+    "rarity": 5,
+    "ammoId": "ammo_2mm_ec",
+    "range": "L",
+    "imageName": "Gauss Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_hunting_rifle",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "10",
+    "cost": 55,
+    "rarity": 2,
+    "ammoId": "ammo_308",
+    "range": "M",
+    "imageName": "Hunting Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_submachine_gun",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 3,
+    "weight": "12",
+    "cost": 109,
+    "rarity": 1,
+    "ammoId": "ammo_45",
+    "range": "C",
+    "imageName": "Submachine Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_combat_shotgun",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 2,
+    "weight": "11",
+    "cost": 87,
+    "rarity": 2,
+    "ammoId": "ammo_shotgun_shell",
+    "range": "C",
+    "imageName": "Combat Shotgun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_double_barrel_shotgun",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "9",
+    "cost": 39,
+    "rarity": 1,
+    "ammoId": "ammo_shotgun_shell",
+    "range": "C",
+    "imageName": "Double-Barrel Shotgun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_pipe_bolt_action",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 30,
+    "rarity": 0,
+    "ammoId": "ammo_308",
+    "range": "C",
+    "imageName": "Pipe Bolt-Action",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_pipe_gun",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 2,
+    "weight": "2",
+    "cost": 30,
+    "rarity": 0,
+    "ammoId": "ammo_38",
+    "range": "C",
+    "imageName": "Pipe Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": true,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_pipe_revolver",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 1,
+    "weight": "4",
+    "cost": 25,
+    "rarity": 0,
+    "ammoId": "ammo_45",
+    "range": "C",
+    "imageName": "Pipe Revolver",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_railway_rifle",
+    "itemType": "weapon",
+    "damage": 10,
+    "fireRate": 0,
+    "weight": "14",
+    "cost": 290,
+    "rarity": 4,
+    "ammoId": "ammo_railway_spike",
+    "range": "M",
+    "imageName": "Railway Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_breaking"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_unreliable"
+      },
+      {
+        "qualityId": "quality_debilitating"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_syringer",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "6",
+    "cost": 132,
+    "rarity": 2,
+    "ammoId": "ammo_syringe",
+    "range": "M",
+    "imageName": "Syringer",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": true,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_institute_laser",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 3,
+    "weight": "4",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "ammo_energy_cell",
+    "range": "C",
+    "imageName": "Institute Laser",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_laser_musket",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "13",
+    "cost": 57,
+    "rarity": 1,
+    "ammoId": "ammo_energy_cell",
+    "range": "M",
+    "imageName": "Laser Musket",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_laser_gun",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 2,
+    "weight": "4",
+    "cost": 69,
+    "rarity": 2,
+    "ammoId": "ammo_energy_cell",
+    "range": "C",
+    "imageName": "Laser Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": true,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_plasma_gun",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 1,
+    "weight": "4",
+    "cost": 123,
+    "rarity": 3,
+    "ammoId": "ammo_plasma_cartridge",
+    "range": "C",
+    "imageName": "Plasma Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": true,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_gamma_gun",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 1,
+    "weight": "3",
+    "cost": 15,
+    "rarity": 5,
+    "ammoId": "ammo_gamma_round",
+    "range": "M",
+    "imageName": "Gamma Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "radiation",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      },
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_fat_man",
+    "itemType": "weapon",
+    "damage": 21,
+    "fireRate": 0,
+    "weight": "31",
+    "cost": 512,
+    "rarity": 4,
+    "ammoId": "ammo_mini_nuke",
+    "range": "M",
+    "imageName": "Fat Man",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_breaking"
+      },
+      {
+        "qualityId": "quality_radioactive"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_flamer",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 4,
+    "weight": "16",
+    "cost": 137,
+    "rarity": 3,
+    "ammoId": "ammo_flamer_fuel",
+    "range": "C",
+    "imageName": "Flamer",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_persistent"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      },
+      {
+        "qualityId": "quality_debilitating"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_gatling_laser",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 6,
+    "weight": "19",
+    "cost": 804,
+    "rarity": 3,
+    "ammoId": "ammo_energy_cell,ammo_fusion_core",
+    "range": "M",
+    "imageName": "Р“Р°С‚Р»РёРЅРі Laser",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_gatling"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_heavy_incinerator",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 3,
+    "weight": "20",
+    "cost": 350,
+    "rarity": 4,
+    "ammoId": "ammo_flamer_fuel",
+    "range": "M",
+    "imageName": "Heavy Incinerator",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_persistent"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_debilitating"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_junk_jet",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 1,
+    "weight": "30",
+    "cost": 285,
+    "rarity": 3,
+    "ammoId": "ammo_anything",
+    "range": "M",
+    "imageName": "Junk Jet",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_minigun",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 5,
+    "weight": "27",
+    "cost": 382,
+    "rarity": 2,
+    "ammoId": "ammo_5mm",
+    "range": "M",
+    "imageName": "Minigun",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_gatling"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_missile_launcher",
+    "itemType": "weapon",
+    "damage": 11,
+    "fireRate": 0,
+    "weight": "21",
+    "cost": 314,
+    "rarity": 4,
+    "ammoId": "ammo_missile",
+    "range": "L",
+    "imageName": "Missile Launcher",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_sword",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Sword",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_parry"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_combat_knife",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 25,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Combat Knife",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_machete",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 25,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Machete",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_ripper",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "6",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Ripper",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_shishkebab",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 200,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Shishkebab",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_parry"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_switchblade",
+    "itemType": "weapon",
+    "damage": 2,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 20,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Switchblade",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_concealed"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_baseball_bat",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 25,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Baseball Bat",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_baseball_bat_aluminum",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 32,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Aluminum Baseball Bat",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_board",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 20,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Board",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_lead_pipe",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 15,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Lead Pipe",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_pipe_wrench",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 30,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Pipe Wrench",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_pool_cue",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 10,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Pool Cue",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_rolling_pin",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 10,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Rolling Pin",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_baton",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 15,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Baton",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_sledgehammer",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "12",
+    "cost": 40,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Sledgehammer",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_super_sledge",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "20",
+    "cost": 180,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Super Sledge",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_breaking"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_tire_iron",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 25,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Tire Iron",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_walking_cane",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 10,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Walking Cane",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee"
+  },
+  {
+    "id": "weapon_boxing_glove",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 10,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Boxing Glove",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      }
+    ],
+    "weaponType": "Unarmed"
+  },
+  {
+    "id": "weapon_deathclaw_gauntlet",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "10",
+    "cost": 75,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Deathclaw Gauntlet",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      }
+    ],
+    "weaponType": "Unarmed"
+  },
+  {
+    "id": "weapon_knuckles",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 10,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Knuckles",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_concealed"
+      }
+    ],
+    "weaponType": "Unarmed"
+  },
+  {
+    "id": "weapon_power_fist",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "4",
+    "cost": 100,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Power Fist",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      }
+    ],
+    "weaponType": "Unarmed"
+  },
+  {
+    "id": "weapon_throwing_knife",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 10,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "C",
+    "imageName": "Throwing Knives",
+    "mainAttr": "AGI",
+    "mainSkill": "THROWING",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_concealed"
+      },
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_silent"
+      }
+    ],
+    "weaponType": "Thrown",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_tomahawk",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 15,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "C",
+    "imageName": "Tomahawk",
+    "mainAttr": "AGI",
+    "mainSkill": "THROWING",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_silent"
+      }
+    ],
+    "weaponType": "Thrown",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_javelin",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "4",
+    "cost": 10,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Javelin",
+    "mainAttr": "AGI",
+    "mainSkill": "THROWING",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_silent"
+      }
+    ],
+    "weaponType": "Thrown",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_baseball_grenade",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 40,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Baseball Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_frag_grenade",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Frag Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_molotov",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 20,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Molotov Cocktail",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_persistent"
+      },
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_nuka_grenade",
+    "itemType": "weapon",
+    "damage": 9,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 100,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Nuka Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_breaking"
+      },
+      {
+        "qualityId": "quality_radioactive"
+      },
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_plasma_grenade",
+    "itemType": "weapon",
+    "damage": 9,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 135,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Plasma Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_pulse_grenade",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 100,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Pulse Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      },
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_bottlecap_mine",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 75,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Bottlecap Mine",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_frag_mine",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Frag Mine",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_nuke_mine",
+    "itemType": "weapon",
+    "damage": 9,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 100,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Nuke Mine",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_breaking"
+      },
+      {
+        "qualityId": "quality_radioactive"
+      },
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_plasma_mine",
+    "itemType": "weapon",
+    "damage": 9,
+    "fireRate": 0,
+    "weight": "<1",
+    "cost": 135,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Plasma Mine",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive"
+  },
+  {
+    "id": "weapon_m79_grenade_launcher",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "6",
+    "cost": 300,
+    "rarity": 3,
+    "ammoId": "ammo_40mm_grenade",
+    "range": "L",
+    "imageName": "M79 Grenade Launcher",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_acid_soaker",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 2,
+    "weight": "3",
+    "cost": 125,
+    "rarity": 3,
+    "ammoId": "ammo_acid_concentrate",
+    "range": "C",
+    "imageName": "Acid Soaker",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_persistent"
+      }
+    ],
+    "weaponType": "Energy",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_alien_blaster",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 2,
+    "weight": "2",
+    "cost": 90,
+    "rarity": 5,
+    "ammoId": "ammo_alien_power_cell",
+    "range": "C",
+    "imageName": "Alien Blaster",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": true,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_assaultron_head_laser",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "8",
+    "cost": 115,
+    "rarity": 4,
+    "ammoId": "ammo_fusion_core",
+    "range": "C",
+    "imageName": "Assaultron Head Laser",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 2
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_mesmetron",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 1,
+    "weight": "2",
+    "cost": 120,
+    "rarity": 4,
+    "ammoId": "ammo_gamma_round",
+    "range": "M",
+    "imageName": "Mesmetron",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_stun"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_tesla_rifle",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 2,
+    "weight": "8",
+    "cost": 180,
+    "rarity": 4,
+    "ammoId": "ammo_fusion_core",
+    "range": "M",
+    "imageName": "Tesla Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_burst"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_broadsider",
+    "itemType": "weapon",
+    "damage": 10,
+    "fireRate": 0,
+    "weight": "16",
+    "cost": 140,
+    "rarity": 5,
+    "ammoId": "ammo_cannonball",
+    "range": "M",
+    "imageName": "Broadsider",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_cryolator",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 4,
+    "weight": "14",
+    "cost": 300,
+    "rarity": 4,
+    "ammoId": "ammo_cryo_cell",
+    "range": "C",
+    "imageName": "Cryolator",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_debilitating"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_harpoon_gun",
+    "itemType": "weapon",
+    "damage": 12,
+    "fireRate": 0,
+    "weight": "16",
+    "cost": 120,
+    "rarity": 5,
+    "ammoId": "ammo_harpoon",
+    "range": "M",
+    "imageName": "Harpoon Gun",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 2
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_357_magnum_revolver",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 1,
+    "weight": "2",
+    "cost": 110,
+    "rarity": 2,
+    "ammoId": "ammo_357_magnum",
+    "range": "C",
+    "imageName": ".357 Magnum Revolver",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_12_7mm_pistol",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 1,
+    "weight": "4",
+    "cost": 400,
+    "rarity": 4,
+    "ammoId": "ammo_12_7mm",
+    "range": "C",
+    "imageName": "12.7mm Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_12_7mm_smg",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 3,
+    "weight": "5",
+    "cost": 510,
+    "rarity": 4,
+    "ammoId": "ammo_12_7mm",
+    "range": "C",
+    "imageName": "12.7mm SMG",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_25mm_grenade_apw",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 1,
+    "weight": "8",
+    "cost": 420,
+    "rarity": 4,
+    "ammoId": "ammo_25mm_grenade",
+    "range": "L",
+    "imageName": "25mm Grenade APW",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_9mm_pistol",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 2,
+    "weight": "2",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "ammo_9mm",
+    "range": "C",
+    "imageName": "9mm Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_reliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_anti_materiel_rifle",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 0,
+    "weight": "20",
+    "cost": 560,
+    "rarity": 4,
+    "ammoId": "ammo_50_cal",
+    "range": "L",
+    "imageName": "Anti-Materiel Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 2
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_battle_rifle",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 1,
+    "weight": "10",
+    "cost": 150,
+    "rarity": 3,
+    "ammoId": "ammo_308",
+    "range": "M",
+    "imageName": "Battle Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_black_powder_blunderbuss",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 90,
+    "rarity": 3,
+    "ammoId": "ammo_50_ball",
+    "range": "C",
+    "imageName": "Black Powder Blunderbuss",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_black_powder_pistol",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 60,
+    "rarity": 3,
+    "ammoId": "ammo_50_ball",
+    "range": "C",
+    "imageName": "Black Powder Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_black_powder_rifle",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 0,
+    "weight": "6",
+    "cost": 60,
+    "rarity": 3,
+    "ammoId": "ammo_50_ball",
+    "range": "M",
+    "imageName": "Black Powder Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_gauss_pistol",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 1,
+    "weight": "6",
+    "cost": 334,
+    "rarity": 5,
+    "ammoId": "ammo_2mm_ec",
+    "range": "M",
+    "imageName": "Gauss Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_gauss_shotgun",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "14",
+    "cost": 400,
+    "rarity": 5,
+    "ammoId": "ammo_2mm_ec",
+    "range": "C",
+    "imageName": "Gauss Shotgun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_lever_action_rifle",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "9",
+    "cost": 201,
+    "rarity": 3,
+    "ammoId": "ammo_308",
+    "range": "M",
+    "imageName": "Lever-Action Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_light_machine_gun",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 4,
+    "weight": "15",
+    "cost": 150,
+    "rarity": 3,
+    "ammoId": "ammo_5_56mm",
+    "range": "M",
+    "imageName": "Light Machine Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_pump_action_shotgun",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 1,
+    "weight": "11",
+    "cost": 70,
+    "rarity": 1,
+    "ammoId": "ammo_shotgun_shell",
+    "range": "C",
+    "imageName": "Pump-Action Shotgun",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_spread"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_radium_rifle",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 3,
+    "weight": "11",
+    "cost": 110,
+    "rarity": 3,
+    "ammoId": "ammo_45",
+    "range": "M",
+    "imageName": "Radium Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "radiation",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_burst"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_sniper_rifle",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "10",
+    "cost": 300,
+    "rarity": 4,
+    "ammoId": "ammo_308",
+    "range": "L",
+    "imageName": "Sniper Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_bow",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 2,
+    "weight": "3",
+    "cost": 44,
+    "rarity": 1,
+    "ammoId": "ammo_arrow",
+    "range": "M",
+    "imageName": "Bow",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_silent"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_alien_atomizer",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 3,
+    "weight": "3",
+    "cost": 1536,
+    "rarity": 5,
+    "ammoId": "ammo_alien_power_cell",
+    "range": "C",
+    "imageName": "Alien Atomizer",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_alien_disintegrator",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 7,
+    "weight": "7",
+    "cost": 921,
+    "rarity": 5,
+    "ammoId": "ammo_alien_power_cell",
+    "range": "M",
+    "imageName": "Alien Disintegrator",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 2
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_arc_welder",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 4,
+    "weight": "15",
+    "cost": 370,
+    "rarity": 4,
+    "ammoId": "ammo_2mm_ec",
+    "range": "C",
+    "imageName": "Arc Welder",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_persistent"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_microwave_emitter",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 1,
+    "weight": "8",
+    "cost": 500,
+    "rarity": 5,
+    "ammoId": "ammo_fusion_core",
+    "range": "M",
+    "imageName": "Microwave Emitter",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_debilitating"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_50_cal_machine_gun",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 3,
+    "weight": "31",
+    "cost": 350,
+    "rarity": 3,
+    "ammoId": "ammo_50_cal",
+    "range": "M",
+    "imageName": ".50 Cal Machine Gun",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_auto_grenade_launcher",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 2,
+    "weight": "30",
+    "cost": 450,
+    "rarity": 4,
+    "ammoId": "ammo_40mm_grenade",
+    "range": "L",
+    "imageName": "Auto Grenade Launcher",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_drone_cannon",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 0,
+    "weight": "18",
+    "cost": 600,
+    "rarity": 5,
+    "ammoId": "ammo_alien_power_module",
+    "range": "M",
+    "imageName": "Drone Cannon",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_gatling_gun",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 3,
+    "weight": "20",
+    "cost": 350,
+    "rarity": 1,
+    "ammoId": "ammo_5mm",
+    "range": "M",
+    "imageName": "Р“Р°С‚Р»РёРЅРі Gun",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_gatling"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
+    "id": "weapon_gatling_plasma",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 4,
+    "weight": "24",
+    "cost": 1000,
+    "rarity": 4,
+    "ammoId": "ammo_plasma_cartridge",
+    "range": "M",
+    "imageName": "Р“Р°С‚Р»РёРЅРі Plasma",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_gatling"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_gauss_minigun",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 3,
+    "weight": "38",
+    "cost": 912,
+    "rarity": 6,
+    "ammoId": "ammo_2mm_ec",
+    "range": "L",
+    "imageName": "Gauss Minigun",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 1
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_gatling"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_plasma_caster",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 3,
+    "weight": "30",
+    "cost": 700,
+    "rarity": 5,
+    "ammoId": "ammo_fusion_core",
+    "range": "M",
+    "imageName": "Plasma Caster",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy"
+  },
+  {
+    "id": "weapon_tesla_cannon",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 0,
+    "weight": "24",
+    "cost": 870,
+    "rarity": 5,
+    "ammoId": "ammo_fusion_core",
+    "range": "L",
+    "imageName": "Tesla Cannon",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_burst"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Energy",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_unarmed_attack",
+    "itemType": "weapon",
+    "damage": 2,
+    "fireRate": 0,
+    "weight": "0",
+    "cost": 0,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "C",
+    "imageName": "Unarmed Attack",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Unarmed",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_rock",
+    "itemType": "weapon",
+    "damage": 2,
+    "fireRate": 0,
+    "weight": "0.5",
+    "cost": 0,
+    "rarity": 0,
+    "ammoId": "",
+    "range": "C",
+    "imageName": "Rock",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_vicious"
+      },
+      {
+        "qualityId": "quality_thrown"
+      }
+    ],
+    "weaponType": "Thrown",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_pulse_mine",
+    "itemType": "weapon",
+    "damage": 9,
+    "fireRate": 0,
+    "weight": "0.5",
+    "cost": 135,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Pulse Mine",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "withoutMods": true
+  },
+  {
+    "id": "unarmed_human",
+    "itemType": "weapon",
+    "weaponType": "Unarmed",
+    "damage": 2,
+    "damageType": "physical",
+    "range": "C",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "weight": 0,
+    "cost": 0,
+    "rarity": 0,
+    "isBuiltin": true,
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "withoutMods": true
+  }
+]

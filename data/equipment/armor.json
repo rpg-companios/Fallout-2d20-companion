@@ -1,0 +1,912 @@
+{
+  "raiderArmor": {
+    "allowedModCategories": [
+      "standardMods"
+    ],
+    "allowedUniqueModCategories": [
+      "raiderUniqueMods"
+    ],
+    "tiers": {
+      "standard": {
+        "pieces": [
+          {
+            "id": "armor_raider_chest_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "raider_armor_chest",
+            "physicalDamageRating": 1,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 18,
+            "rarity": 0
+          },
+          {
+            "id": "armor_raider_leg_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "raider_armor_leg",
+            "physicalDamageRating": 1,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 8,
+            "rarity": 0
+          },
+          {
+            "id": "armor_raider_hand_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "raider_armor_hand",
+            "physicalDamageRating": 1,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 6,
+            "rarity": 0
+          }
+        ]
+      },
+      "sturdy": {
+        "pieces": [
+          {
+            "id": "armor_raider_chest_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "raider_armor_chest_sturdy",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 12,
+            "cost": 33,
+            "rarity": 1
+          },
+          {
+            "id": "armor_raider_leg_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "raider_armor_leg_sturdy",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 13,
+            "rarity": 1
+          },
+          {
+            "id": "armor_raider_hand_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "raider_armor_hand_sturdy",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 8,
+            "rarity": 1
+          }
+        ]
+      },
+      "heavy": {
+        "pieces": [
+          {
+            "id": "armor_raider_chest_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "raider_armor_chest_heavy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 17,
+            "cost": 48,
+            "rarity": 2
+          },
+          {
+            "id": "armor_raider_leg_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "raider_armor_leg_heavy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 10,
+            "cost": 18,
+            "rarity": 2
+          },
+          {
+            "id": "armor_raider_hand_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "raider_armor_hand_heavy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 10,
+            "cost": 15,
+            "rarity": 2
+          }
+        ]
+      }
+    }
+  },
+  "leatherArmor": {
+    "allowedModCategories": [
+      "standardMods"
+    ],
+    "allowedUniqueModCategories": [
+      "leatherUniqueMods"
+    ],
+    "tiers": {
+      "standard": {
+        "pieces": [
+          {
+            "id": "armor_leather_chest_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "leather_armor_chest",
+            "physicalDamageRating": 1,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 5,
+            "cost": 25,
+            "rarity": 1
+          },
+          {
+            "id": "armor_leather_leg_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "leather_armor_leg",
+            "physicalDamageRating": 1,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 2,
+            "cost": 10,
+            "rarity": 1
+          },
+          {
+            "id": "armor_leather_hand_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "leather_armor_hand",
+            "physicalDamageRating": 1,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 2,
+            "cost": 8,
+            "rarity": 1
+          }
+        ]
+      },
+      "sturdy": {
+        "pieces": [
+          {
+            "id": "armor_leather_chest_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "leather_armor_chest_sturdy",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 10,
+            "cost": 50,
+            "rarity": 2
+          },
+          {
+            "id": "armor_leather_leg_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "leather_armor_leg_sturdy",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 5,
+            "cost": 20,
+            "rarity": 2
+          },
+          {
+            "id": "armor_leather_hand_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "leather_armor_hand_sturdy",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 5,
+            "cost": 18,
+            "rarity": 2
+          }
+        ]
+      },
+      "heavy": {
+        "pieces": [
+          {
+            "id": "armor_leather_chest_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "leather_armor_chest_heavy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 15,
+            "cost": 75,
+            "rarity": 3
+          },
+          {
+            "id": "armor_leather_leg_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "leather_armor_leg_heavy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 30,
+            "rarity": 3
+          },
+          {
+            "id": "armor_leather_hand_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "leather_armor_hand_heavy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 28,
+            "rarity": 3
+          }
+        ]
+      }
+    }
+  },
+  "metalArmor": {
+    "allowedModCategories": [
+      "standardMods"
+    ],
+    "allowedUniqueModCategories": [
+      "metalUniqueMods"
+    ],
+    "tiers": {
+      "standard": {
+        "pieces": [
+          {
+            "id": "armor_metal_head_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "metal_armor_head",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 15,
+            "rarity": 1
+          },
+          {
+            "id": "armor_metal_chest_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "metal_armor_chest",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 6,
+            "cost": 40,
+            "rarity": 1
+          },
+          {
+            "id": "armor_metal_leg_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "metal_armor_leg",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 15,
+            "rarity": 1
+          },
+          {
+            "id": "armor_metal_hand_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "metal_armor_hand",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 1,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 15,
+            "rarity": 1
+          }
+        ]
+      },
+      "sturdy": {
+        "pieces": [
+          {
+            "id": "armor_metal_head_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "metal_armor_head_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 8,
+            "cost": 65,
+            "rarity": 2
+          },
+          {
+            "id": "armor_metal_chest_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "metal_armor_chest_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 16,
+            "cost": 115,
+            "rarity": 2
+          },
+          {
+            "id": "armor_metal_leg_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "metal_armor_leg_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 8,
+            "cost": 65,
+            "rarity": 2
+          },
+          {
+            "id": "armor_metal_hand_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "metal_armor_hand_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 8,
+            "cost": 65,
+            "rarity": 2
+          }
+        ]
+      },
+      "heavy": {
+        "pieces": [
+          {
+            "id": "armor_metal_head_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "metal_armor_head_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 12,
+            "cost": 115,
+            "rarity": 3
+          },
+          {
+            "id": "armor_metal_chest_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "metal_armor_chest_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 23,
+            "cost": 190,
+            "rarity": 3
+          },
+          {
+            "id": "armor_metal_leg_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "metal_armor_leg_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 12,
+            "cost": 115,
+            "rarity": 3
+          },
+          {
+            "id": "armor_metal_hand_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "metal_armor_hand_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 12,
+            "cost": 115,
+            "rarity": 3
+          }
+        ]
+      }
+    }
+  },
+  "combatArmor": {
+    "allowedModCategories": [
+      "standardMods"
+    ],
+    "allowedUniqueModCategories": [
+      "combatUniqueMods"
+    ],
+    "tiers": {
+      "standard": {
+        "pieces": [
+          {
+            "id": "armor_combat_head_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "combat_armor_head",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 4,
+            "cost": 25,
+            "rarity": 2
+          },
+          {
+            "id": "armor_combat_chest_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "combat_armor_chest",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 8,
+            "cost": 60,
+            "rarity": 2
+          },
+          {
+            "id": "armor_combat_leg_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "combat_armor_leg",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 2,
+            "cost": 25,
+            "rarity": 2
+          },
+          {
+            "id": "armor_combat_hand_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "combat_armor_hand",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 2,
+            "radiationDamageRating": 0,
+            "weight": 2,
+            "cost": 25,
+            "rarity": 2
+          }
+        ]
+      },
+      "sturdy": {
+        "pieces": [
+          {
+            "id": "armor_combat_head_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "combat_armor_head_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 5,
+            "cost": 105,
+            "rarity": 3
+          },
+          {
+            "id": "armor_combat_chest_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "combat_armor_chest_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 12,
+            "cost": 140,
+            "rarity": 3
+          },
+          {
+            "id": "armor_combat_leg_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "combat_armor_leg_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 5,
+            "cost": 105,
+            "rarity": 3
+          },
+          {
+            "id": "armor_combat_hand_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "combat_armor_hand_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 5,
+            "cost": 105,
+            "rarity": 3
+          }
+        ]
+      },
+      "heavy": {
+        "pieces": [
+          {
+            "id": "armor_combat_head_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "combat_armor_head_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 185,
+            "rarity": 4
+          },
+          {
+            "id": "armor_combat_chest_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "combat_armor_chest_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 16,
+            "cost": 220,
+            "rarity": 4
+          },
+          {
+            "id": "armor_combat_leg_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "combat_armor_leg_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 185,
+            "rarity": 4
+          },
+          {
+            "id": "armor_combat_hand_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "combat_armor_hand_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 145,
+            "rarity": 4
+          }
+        ]
+      }
+    }
+  },
+  "synthArmor": {
+    "allowedModCategories": [
+      "standardMods"
+    ],
+    "allowedUniqueModCategories": [
+      "synthUniqueMods"
+    ],
+    "tiers": {
+      "standard": {
+        "pieces": [
+          {
+            "id": "armor_synth_head_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "synth_armor_head",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 33,
+            "rarity": 3
+          },
+          {
+            "id": "armor_synth_chest_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "synth_armor_chest",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 75,
+            "rarity": 3
+          },
+          {
+            "id": "armor_synth_leg_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "synth_armor_leg",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 30,
+            "rarity": 3
+          },
+          {
+            "id": "armor_synth_hand_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "synth_armor_hand",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 3,
+            "radiationDamageRating": 0,
+            "weight": 3,
+            "cost": 30,
+            "rarity": 4
+          }
+        ]
+      },
+      "sturdy": {
+        "pieces": [
+          {
+            "id": "armor_synth_head_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "synth_armor_head_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 70,
+            "rarity": 4
+          },
+          {
+            "id": "armor_synth_chest_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "synth_armor_chest_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 12,
+            "cost": 125,
+            "rarity": 4
+          },
+          {
+            "id": "armor_synth_leg_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "synth_armor_leg_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 80,
+            "rarity": 4
+          },
+          {
+            "id": "armor_synth_hand_002",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "synth_armor_hand_sturdy",
+            "physicalDamageRating": 3,
+            "energyDamageRating": 4,
+            "radiationDamageRating": 0,
+            "weight": 7,
+            "cost": 70,
+            "rarity": 4
+          }
+        ]
+      },
+      "heavy": {
+        "pieces": [
+          {
+            "id": "armor_synth_head_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "synth_armor_head_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 5,
+            "radiationDamageRating": 0,
+            "weight": 10,
+            "cost": 110,
+            "rarity": 5
+          },
+          {
+            "id": "armor_synth_chest_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body"
+            ],
+            "imageName": "synth_armor_chest_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 5,
+            "radiationDamageRating": 0,
+            "weight": 17,
+            "cost": 175,
+            "rarity": 5
+          },
+          {
+            "id": "armor_synth_leg_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Leg"
+            ],
+            "imageName": "synth_armor_leg_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 5,
+            "radiationDamageRating": 0,
+            "weight": 10,
+            "cost": 130,
+            "rarity": 5
+          },
+          {
+            "id": "armor_synth_hand_003",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Hand"
+            ],
+            "imageName": "synth_armor_hand_heavy",
+            "physicalDamageRating": 4,
+            "energyDamageRating": 5,
+            "radiationDamageRating": 0,
+            "weight": 10,
+            "cost": 110,
+            "rarity": 5
+          }
+        ]
+      }
+    }
+  },
+  "vaultSecurityArmor": {
+    "allowedModCategories": [
+      "standardMods"
+    ],
+    "allowedUniqueModCategories": [
+      "vaultUniqueMods"
+    ],
+    "tiers": {
+      "standard": {
+        "pieces": [
+          {
+            "id": "armor_vault_head_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Head"
+            ],
+            "imageName": "vault_armor_head",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 0,
+            "radiationDamageRating": 0,
+            "weight": 2,
+            "cost": 20,
+            "rarity": 1
+          },
+          {
+            "id": "armor_vault_fullbody_001",
+            "itemType": "armor",
+            "protectedAreas": [
+              "Body",
+              "Hand",
+              "Leg"
+            ],
+            "imageName": "vault_armor_fullbody",
+            "physicalDamageRating": 2,
+            "energyDamageRating": 0,
+            "radiationDamageRating": 2,
+            "weight": 8,
+            "cost": 16,
+            "rarity": 1
+          }
+        ]
+      }
+    }
+  }
+}

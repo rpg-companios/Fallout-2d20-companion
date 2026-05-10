@@ -1,0 +1,882 @@
+{
+  "armor": [
+    {
+      "type": "Рейдерская броня",
+      "categoryKey": "raiderArmor",
+      "items": [
+        {
+          "id": "armor_raider_chest_001",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Рейдерский Нагрудник",
+          "imageName": "raider_armor_chest",
+          "itemType": "armor",
+          "physicalDamageRating": 1,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 18,
+          "rarity": 0
+        },
+        {
+          "id": "armor_raider_leg_001",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Рейдерский Понож",
+          "imageName": "raider_armor_leg",
+          "itemType": "armor",
+          "physicalDamageRating": 1,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 8,
+          "rarity": 0
+        },
+        {
+          "id": "armor_raider_hand_001",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Рейдерский Наруч",
+          "imageName": "raider_armor_hand",
+          "itemType": "armor",
+          "physicalDamageRating": 1,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 6,
+          "rarity": 0
+        },
+        {
+          "id": "armor_raider_chest_002",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Прочный Рейдерский Нагрудник",
+          "imageName": "raider_armor_chest_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 12,
+          "cost": 33,
+          "rarity": 1
+        },
+        {
+          "id": "armor_raider_leg_002",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Прочный Рейдерский Понож",
+          "imageName": "raider_armor_leg_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 13,
+          "rarity": 1
+        },
+        {
+          "id": "armor_raider_hand_002",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Прочный Рейдерский Наруч",
+          "imageName": "raider_armor_hand_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 8,
+          "rarity": 1
+        },
+        {
+          "id": "armor_raider_chest_003",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Тяжёлый Рейдерский Нагрудник",
+          "imageName": "raider_armor_chest_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 17,
+          "cost": 48,
+          "rarity": 2
+        },
+        {
+          "id": "armor_raider_leg_003",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Тяжёлый Рейдерский Понож",
+          "imageName": "raider_armor_leg_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 10,
+          "cost": 18,
+          "rarity": 2
+        },
+        {
+          "id": "armor_raider_hand_003",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Тяжёлый Рейдерский Наруч",
+          "imageName": "raider_armor_hand_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 10,
+          "cost": 15,
+          "rarity": 2
+        }
+      ]
+    },
+    {
+      "type": "Кожаная броня",
+      "categoryKey": "leatherArmor",
+      "items": [
+        {
+          "id": "armor_leather_chest_001",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Кожаный Нагрудник",
+          "imageName": "leather_armor_chest",
+          "itemType": "armor",
+          "physicalDamageRating": 1,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 5,
+          "cost": 25,
+          "rarity": 1
+        },
+        {
+          "id": "armor_leather_leg_001",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Кожаный Понож",
+          "imageName": "leather_armor_leg",
+          "itemType": "armor",
+          "physicalDamageRating": 1,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 2,
+          "cost": 10,
+          "rarity": 1
+        },
+        {
+          "id": "armor_leather_hand_001",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Кожаный Наруч",
+          "imageName": "leather_armor_hand",
+          "itemType": "armor",
+          "physicalDamageRating": 1,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 2,
+          "cost": 8,
+          "rarity": 1
+        },
+        {
+          "id": "armor_leather_chest_002",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Прочный Кожаный Нагрудник",
+          "imageName": "leather_armor_chest_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 10,
+          "cost": 50,
+          "rarity": 2
+        },
+        {
+          "id": "armor_leather_leg_002",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Прочный Кожаный Понож",
+          "imageName": "leather_armor_leg_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 5,
+          "cost": 20,
+          "rarity": 2
+        },
+        {
+          "id": "armor_leather_hand_002",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Прочный Кожаный Наруч",
+          "imageName": "leather_armor_hand_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 5,
+          "cost": 18,
+          "rarity": 2
+        },
+        {
+          "id": "armor_leather_chest_003",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Тяжёлый Кожаный Нагрудник",
+          "imageName": "leather_armor_chest_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 15,
+          "cost": 75,
+          "rarity": 3
+        },
+        {
+          "id": "armor_leather_leg_003",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Тяжёлый Кожаный Понож",
+          "imageName": "leather_armor_leg_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 30,
+          "rarity": 3
+        },
+        {
+          "id": "armor_leather_hand_003",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Тяжёлый Кожаный Наруч",
+          "imageName": "leather_armor_hand_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 28,
+          "rarity": 3
+        }
+      ]
+    },
+    {
+      "type": "Металлическая броня",
+      "categoryKey": "metalArmor",
+      "items": [
+        {
+          "id": "armor_metal_head_001",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Металлический Шлем",
+          "imageName": "metal_armor_head",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 15,
+          "rarity": 1
+        },
+        {
+          "id": "armor_metal_chest_001",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Металлический Нагрудник",
+          "imageName": "metal_armor_chest",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 6,
+          "cost": 40,
+          "rarity": 1
+        },
+        {
+          "id": "armor_metal_leg_001",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Металлический Понож",
+          "imageName": "metal_armor_leg",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 15,
+          "rarity": 1
+        },
+        {
+          "id": "armor_metal_hand_001",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Металлический Наруч",
+          "imageName": "metal_armor_hand",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 1,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 15,
+          "rarity": 1
+        },
+        {
+          "id": "armor_metal_head_002",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Прочный Металлический Шлем",
+          "imageName": "metal_armor_head_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 8,
+          "cost": 65,
+          "rarity": 2
+        },
+        {
+          "id": "armor_metal_chest_002",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Прочный Металлический Нагрудник",
+          "imageName": "metal_armor_chest_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 16,
+          "cost": 115,
+          "rarity": 2
+        },
+        {
+          "id": "armor_metal_leg_002",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Прочный Металлический Понож",
+          "imageName": "metal_armor_leg_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 8,
+          "cost": 65,
+          "rarity": 2
+        },
+        {
+          "id": "armor_metal_hand_002",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Прочный Металлический Наруч",
+          "imageName": "metal_armor_hand_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 8,
+          "cost": 65,
+          "rarity": 2
+        },
+        {
+          "id": "armor_metal_head_003",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Тяжёлый Металлический Шлем",
+          "imageName": "metal_armor_head_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 12,
+          "cost": 115,
+          "rarity": 3
+        },
+        {
+          "id": "armor_metal_chest_003",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Тяжёлый Металлический Нагрудник",
+          "imageName": "metal_armor_chest_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 23,
+          "cost": 190,
+          "rarity": 3
+        },
+        {
+          "id": "armor_metal_leg_003",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Тяжёлый Металлический Понож",
+          "imageName": "metal_armor_leg_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 12,
+          "cost": 115,
+          "rarity": 3
+        },
+        {
+          "id": "armor_metal_hand_003",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Тяжёлый Металлический Наруч",
+          "imageName": "metal_armor_hand_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 12,
+          "cost": 115,
+          "rarity": 3
+        }
+      ]
+    },
+    {
+      "type": "Боевая броня",
+      "categoryKey": "combatArmor",
+      "items": [
+        {
+          "id": "armor_combat_head_001",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Боевой Шлем",
+          "imageName": "combat_armor_head",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 4,
+          "cost": 25,
+          "rarity": 2
+        },
+        {
+          "id": "armor_combat_chest_001",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Боевой Нагрудник",
+          "imageName": "combat_armor_chest",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 8,
+          "cost": 60,
+          "rarity": 2
+        },
+        {
+          "id": "armor_combat_leg_001",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Боевой Понож",
+          "imageName": "combat_armor_leg",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 2,
+          "cost": 25,
+          "rarity": 2
+        },
+        {
+          "id": "armor_combat_hand_001",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Боевой Наруч",
+          "imageName": "combat_armor_hand",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 2,
+          "radiationDamageRating": 0,
+          "weight": 2,
+          "cost": 25,
+          "rarity": 2
+        },
+        {
+          "id": "armor_combat_head_002",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Прочный Боевой Шлем",
+          "imageName": "combat_armor_head_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 5,
+          "cost": 105,
+          "rarity": 3
+        },
+        {
+          "id": "armor_combat_chest_002",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Прочный Боевой Нагрудник",
+          "imageName": "combat_armor_chest_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 12,
+          "cost": 140,
+          "rarity": 3
+        },
+        {
+          "id": "armor_combat_leg_002",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Прочный Боевой Понож",
+          "imageName": "combat_armor_leg_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 5,
+          "cost": 105,
+          "rarity": 3
+        },
+        {
+          "id": "armor_combat_hand_002",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Прочный Боевой Наруч",
+          "imageName": "combat_armor_hand_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 5,
+          "cost": 105,
+          "rarity": 3
+        },
+        {
+          "id": "armor_combat_head_003",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Тяжёлый Боевой Шлем",
+          "imageName": "combat_armor_head_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 185,
+          "rarity": 4
+        },
+        {
+          "id": "armor_combat_chest_003",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Тяжёлый Боевой Нагрудник",
+          "imageName": "combat_armor_chest_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 16,
+          "cost": 220,
+          "rarity": 4
+        },
+        {
+          "id": "armor_combat_leg_003",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Тяжёлый Боевой Понож",
+          "imageName": "combat_armor_leg_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 185,
+          "rarity": 4
+        },
+        {
+          "id": "armor_combat_hand_003",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Тяжёлый Боевой Наруч",
+          "imageName": "combat_armor_hand_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 145,
+          "rarity": 4
+        }
+      ]
+    },
+    {
+      "type": "Броня синтов",
+      "categoryKey": "synthArmor",
+      "items": [
+        {
+          "id": "armor_synth_head_001",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Шлем Синтов",
+          "imageName": "synth_armor_head",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 33,
+          "rarity": 3
+        },
+        {
+          "id": "armor_synth_chest_001",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Нагрудник Синтов",
+          "imageName": "synth_armor_chest",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 75,
+          "rarity": 3
+        },
+        {
+          "id": "armor_synth_leg_001",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Понож Синтов",
+          "imageName": "synth_armor_leg",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 30,
+          "rarity": 3
+        },
+        {
+          "id": "armor_synth_hand_001",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Наруч Синтов",
+          "imageName": "synth_armor_hand",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 3,
+          "radiationDamageRating": 0,
+          "weight": 3,
+          "cost": 30,
+          "rarity": 4
+        },
+        {
+          "id": "armor_synth_head_002",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Прочный Шлем Синтов",
+          "imageName": "synth_armor_head_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 70,
+          "rarity": 4
+        },
+        {
+          "id": "armor_synth_chest_002",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Прочный Нагрудник Синтов",
+          "imageName": "synth_armor_chest_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 12,
+          "cost": 125,
+          "rarity": 4
+        },
+        {
+          "id": "armor_synth_leg_002",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Прочный Понож Синтов",
+          "imageName": "synth_armor_leg_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 80,
+          "rarity": 4
+        },
+        {
+          "id": "armor_synth_hand_002",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Прочный Наруч Синтов",
+          "imageName": "synth_armor_hand_sturdy",
+          "itemType": "armor",
+          "physicalDamageRating": 3,
+          "energyDamageRating": 4,
+          "radiationDamageRating": 0,
+          "weight": 7,
+          "cost": 70,
+          "rarity": 4
+        },
+        {
+          "id": "armor_synth_head_003",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Тяжёлый Шлем Синтов",
+          "imageName": "synth_armor_head_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 5,
+          "radiationDamageRating": 0,
+          "weight": 10,
+          "cost": 110,
+          "rarity": 5
+        },
+        {
+          "id": "armor_synth_chest_003",
+          "protectedAreas": [
+            "Body"
+          ],
+          "name": "Тяжёлый Нагрудник Синтов",
+          "imageName": "synth_armor_chest_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 5,
+          "radiationDamageRating": 0,
+          "weight": 17,
+          "cost": 175,
+          "rarity": 5
+        },
+        {
+          "id": "armor_synth_leg_003",
+          "protectedAreas": [
+            "Leg"
+          ],
+          "name": "Тяжёлый Понож Синтов",
+          "imageName": "synth_armor_leg_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 5,
+          "radiationDamageRating": 0,
+          "weight": 10,
+          "cost": 130,
+          "rarity": 5
+        },
+        {
+          "id": "armor_synth_hand_003",
+          "protectedAreas": [
+            "Hand"
+          ],
+          "name": "Тяжёлый Наруч Синтов",
+          "imageName": "synth_armor_hand_heavy",
+          "itemType": "armor",
+          "physicalDamageRating": 4,
+          "energyDamageRating": 5,
+          "radiationDamageRating": 0,
+          "weight": 10,
+          "cost": 110,
+          "rarity": 5
+        }
+      ]
+    },
+    {
+      "type": "Броня охранника Волт-Тек",
+      "categoryKey": "vaultSecurityArmor",
+      "items": [
+        {
+          "id": "armor_vault_head_001",
+          "protectedAreas": [
+            "Head"
+          ],
+          "name": "Шлем охранника Волт-Тек",
+          "imageName": "vault_armor_head",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 0,
+          "radiationDamageRating": 0,
+          "weight": 2,
+          "cost": 20,
+          "rarity": 1
+        },
+        {
+          "id": "armor_vault_fullbody_001",
+          "protectedAreas": [
+            "Body",
+            "Hand",
+            "Leg"
+          ],
+          "name": "Броня охранника Волт-Тек",
+          "imageName": "vault_armor_fullbody",
+          "itemType": "armor",
+          "physicalDamageRating": 2,
+          "energyDamageRating": 0,
+          "radiationDamageRating": 2,
+          "weight": 8,
+          "cost": 16,
+          "rarity": 1
+        }
+      ]
+    }
+  ]
+}

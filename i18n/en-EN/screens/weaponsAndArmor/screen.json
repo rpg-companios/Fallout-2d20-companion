@@ -1,0 +1,179 @@
+{
+  "stats": {
+    "initiative": "Initiative",
+    "defense": "Defense",
+    "meleeBonus": "Melee Bonus",
+    "effects": "Effects",
+    "poisonResistance": "Poison Res.",
+    "health": "Health"
+  },
+  "armor": {
+    "slots": {
+      "head": {
+        "title": "Head",
+        "subtitle": "1-2"
+      },
+      "leftArm": {
+        "title": "Left Arm",
+        "subtitle": "9-11"
+      },
+      "rightArm": {
+        "title": "Right Arm",
+        "subtitle": "12-14"
+      },
+      "body": {
+        "title": "Body",
+        "subtitle": "3-8"
+      },
+      "leftLeg": {
+        "title": "Left Leg",
+        "subtitle": "15-17"
+      },
+      "rightLeg": {
+        "title": "Right Leg",
+        "subtitle": "18-20"
+      }
+    },
+    "fields": {
+      "physical": "Phys. DR",
+      "energy": "Energy DR",
+      "radiation": "Rad. DR",
+      "clothingModification": "Upgrade clothing",
+      "armorModification": "Upgrade armor"
+    },
+    "groups": {
+      "robotArmor": "Robot Armor"
+    }
+  },
+  "weapon": {
+    "emptySlot": "Empty Slot",
+    "notEquipped": "No weapon equipped",
+    "unequip": "Unequip",
+    "rangeDefault": "Close",
+    "rangeNames": {
+      "Close": "Close",
+      "Medium": "Medium",
+      "Long": "Long",
+      "Extreme": "Extreme"
+    },
+    "modPrefixes": {
+      "Hardened": "Hardened",
+      "Improved": "Improved",
+      "Advanced": "Advanced",
+      "Tuned": "Tuned",
+      "Calibrated": "Calibrated",
+      "Automatic": "Automatic",
+      "Rapid": "Rapid",
+      "Quick": "Quick",
+      "Suppressed": "Suppressed",
+      "Supressed": "Suppressed",
+      "Silent": "Silent",
+      "Long": "Long",
+      "Short": "Short",
+      "Tactical": "Tactical",
+      "Recon": "Recon",
+      "Night": "Night Vision",
+      "Bayonet": "Bayoneted",
+      "Compensated": "Compensated",
+      "Perforated": "Perforated",
+      "Vented": "Vented",
+      "Ribbed": "Ribbed"
+    },
+    "fields": {
+      "success": "SUCCESS VALUE",
+      "damageType": "DAMAGE TYPE",
+      "damage": "DAMAGE",
+      "effect": "EFFECT",
+      "fireRate": "RATE OF FIRE",
+      "range": "RANGE",
+      "qualities": "QUALITIES",
+      "modification": "Modification"
+    },
+    "modSlots": {
+      "barrel": "Barrel",
+      "receiver": "Receiver",
+      "sight": "Sight",
+      "muzzle": "Muzzle",
+      "stock": "Stock",
+      "grip": "Grip",
+      "magazine": "Magazine",
+      "capacitor": "Capacitor",
+      "unique": "Unique",
+      "other": "Other"
+    }
+  },
+  "robotSlot": {
+    "noLimb": "No Limb",
+    "slotNames": {
+      "head": "Head",
+      "body": "Body",
+      "leftArm": "Left Arm",
+      "rightArm": "Right Arm",
+      "leftLeg": "Left Leg",
+      "rightLeg": "Right Leg",
+      "arm1": "Arm 1",
+      "arm2": "Arm 2",
+      "arm3": "Arm 3",
+      "thruster": "Thruster",
+      "chassis": "Chassis"
+    },
+    "layers": {
+      "plating": "Plating",
+      "armor": "Armor",
+      "frame": "Frame"
+    },
+    "weapon": {
+      "damage": "DMG"
+    },
+    "buttons": {
+      "upgradeLimb": "Limb",
+      "upgradeArmor": "Armor",
+      "upgradePlating": "Plating",
+      "upgradeFrame": "Frame"
+    }
+  },
+  "common": {
+    "empty": "—",
+    "none": "00",
+    "close": "Close"
+  },
+  "kitResolver": {
+    "currency": "Caps",
+    "currencyNcr": "NCR Dollars",
+    "unknownItem": "Unknown item"
+  },
+  "modals": {
+    "requirements": "Requirements",
+    "armorModification": "Upgrade armor",
+    "clothingModification": "Upgrade clothing",
+    "availableModifications": "Available modifications",
+    "standard": "Standard",
+    "unique": "Unique",
+    "removeStandard": "Remove standard mod",
+    "noStandard": "No standard mod",
+    "removeUnique": "Remove unique mod",
+    "noUnique": "No unique mod",
+    "preview": "Preview",
+    "effects": "Effects",
+    "weight": "Weight",
+    "cost": "Cost",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "improvements": "Improvements",
+    "clothingReinforced": "Reinforced seams",
+    "clothingInsulated": "Insulated lining",
+    "weaponModification": "Weapon Modifications",
+    "unknownWeapon": "Unknown weapon",
+    "weaponDamage": "Damage",
+    "weaponFireRate": "Rate",
+    "weaponRange": "Range",
+    "weaponWeight": "Weight",
+    "weaponCost": "Cost",
+    "availableModificationsLabel": "Available modifications:",
+    "previewLabel": "Preview:",
+    "previewEffects": "Effects",
+    "previewQualities": "Qualities",
+    "errorTitle": "Error",
+    "errorSelectMod": "Please select at least one modification"
+  }
+}

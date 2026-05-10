@@ -1,0 +1,602 @@
+[
+  {
+    "id": "mod_std_laminate",
+    "modCategory": "standardMods",
+    "name": "Ламинированная",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "targetArmorCategories": [
+      "all"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 5
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "id": "mod_std_rubberized",
+    "modCategory": "standardMods",
+    "name": "Прорезиненная",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "targetArmorCategories": [
+      "all"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 10
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "id": "mod_std_microcarbon",
+    "modCategory": "standardMods",
+    "name": "Микроуглеродистая",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "targetArmorCategories": [
+      "all"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 15
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "id": "mod_std_soft_padding",
+    "modCategory": "standardMods",
+    "name": "Мягкая",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 2,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_2",
+        "description": "+2 к сопротивлению всем повреждениям против взрывного оружия.",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "id": "mod_std_asbestos_lining",
+    "modCategory": "standardMods",
+    "name": "Асбестовая подкладка",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_ignore_energy_persistent",
+        "description": "Игнорируйте энергетический урон от эффекта 'Стойкий урон'.",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "mod_std_dense",
+    "modCategory": "standardMods",
+    "name": "Плотная",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 3",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 7
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_4",
+        "description": "+4 к сопротивлению урону против взрывного оружия.",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "id": "mod_std_biocomponents_mesh",
+    "modCategory": "standardMods",
+    "name": "Сеть биокомпонентов",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4, Наука! 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 9
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_chems_duration_double",
+        "description": "Препараты действуют в два раза дольше (см. стр. 164).",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "id": "mod_std_pneumatic",
+    "modCategory": "standardMods",
+    "name": "Пневматическая",
+    "protectedAreas": [
+      "Body"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 9
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_stun_immunity",
+        "description": "Эффект оглушения требует выпадения 2+ Эффектов при атаке, чтобы поразить вас.",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "id": "mod_std_melee",
+    "modCategory": "standardMods",
+    "name": "Рукопашная",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_unarmed_melee_damage_1",
+        "description": "Рукопашные атаки наносят +1 урона.",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "mod_std_parrying",
+    "modCategory": "standardMods",
+    "name": "Парирующая",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_melee_damage_resistance_2",
+        "description": "+2 к сопротивлению урону от атак ближнего боя.",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "id": "mod_std_balanced",
+    "modCategory": "standardMods",
+    "name": "Сбалансированная",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_aimed_ranged_damage_1",
+        "description": "Прицелившись и совершив дальнобойную атаку, вы наносите +1 урона.",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "mod_std_aerodynamic",
+    "modCategory": "standardMods",
+    "name": "Аэродинамическая",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 3",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_ap_bonus_damage_melee",
+        "description": "Может потратить до 4 ОД на бонусный урон для атак ближнего боя.",
+        "value": 4
+      }
+    ]
+  },
+  {
+    "id": "mod_std_lightweight_arms",
+    "modCategory": "standardMods",
+    "name": "Облегчённая",
+    "protectedAreas": [
+      "Hand"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_melee_piercing_1",
+        "description": "Атаки ближнего боя и рукопашные атаки получают эффект 'Проникающий' 1.",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "id": "mod_std_soft_padding_legs",
+    "modCategory": "standardMods",
+    "name": "Мягкая подкладка",
+    "protectedAreas": [
+      "Leg"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_fall_damage_resistance",
+        "description": "+2 к сопротивлению физическому урону от падения.",
+        "value": 2
+      }
+    ]
+  },
+  {
+    "id": "mod_std_soundproofed",
+    "modCategory": "standardMods",
+    "name": "Звукоизолированная",
+    "protectedAreas": [
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "description": "Перебросьте 1d20 при проверке на скрытность.",
+        "value": 1
+      }
+    ]
+  }
+]

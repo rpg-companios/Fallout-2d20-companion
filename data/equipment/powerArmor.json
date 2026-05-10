@@ -1,0 +1,319 @@
+{
+  "frame": {
+    "pieces": [
+      {
+        "id": "power_armor_frame",
+        "itemType": "powerArmor",
+        "set": "frame",
+        "protectedAreas": ["Head", "Body", "Hand", "Leg"],
+        "imageName": "Power Armor Frame",
+        "physicalDamageRating": 0,
+        "energyDamageRating": 0,
+        "radiationDamageRating": 0,
+        "weight": 4500,
+        "cost": 75,
+        "rarity": 4
+      }
+    ]
+  },
+  "raiderPower": {
+    "pieces": [
+      {
+        "id": "power_armor_raider_helmet",
+        "itemType": "powerArmor",
+        "set": "raiderPower",
+        "protectedAreas": ["Head"],
+        "imageName": "Raider Power Armor Helmet",
+        "physicalDamageRating": 6,
+        "energyDamageRating": 4,
+        "radiationDamageRating": 7,
+        "hp": 7,
+        "weight": 7,
+        "cost": 50,
+        "rarity": 2
+      },
+      {
+        "id": "power_armor_raider_chest",
+        "itemType": "powerArmor",
+        "set": "raiderPower",
+        "protectedAreas": ["Body"],
+        "imageName": "Raider Power Armor Chest Piece",
+        "physicalDamageRating": 8,
+        "energyDamageRating": 6,
+        "radiationDamageRating": 9,
+        "hp": 10,
+        "weight": 11,
+        "cost": 100,
+        "rarity": 2
+      },
+      {
+        "id": "power_armor_raider_arm",
+        "itemType": "powerArmor",
+        "set": "raiderPower",
+        "protectedAreas": ["Hand"],
+        "imageName": "Raider Power Armor Arm",
+        "physicalDamageRating": 4,
+        "energyDamageRating": 3,
+        "radiationDamageRating": 7,
+        "hp": 7,
+        "weight": 8,
+        "cost": 75,
+        "rarity": 2
+      },
+      {
+        "id": "power_armor_raider_leg",
+        "itemType": "powerArmor",
+        "set": "raiderPower",
+        "protectedAreas": ["Leg"],
+        "imageName": "Raider Power Armor Leg",
+        "physicalDamageRating": 4,
+        "energyDamageRating": 3,
+        "radiationDamageRating": 7,
+        "hp": 7,
+        "weight": 8.5,
+        "cost": 75,
+        "rarity": 2
+      }
+    ]
+  },
+  "t45": {
+    "pieces": [
+      {
+        "id": "power_armor_t45_helmet",
+        "itemType": "powerArmor",
+        "set": "t45",
+        "protectedAreas": ["Head"],
+        "imageName": "T-45 Helmet",
+        "physicalDamageRating": 6,
+        "energyDamageRating": 4,
+        "radiationDamageRating": 7,
+        "hp": 7,
+        "weight": 6,
+        "cost": 60,
+        "rarity": 2
+      },
+      {
+        "id": "power_armor_t45_chest",
+        "itemType": "powerArmor",
+        "set": "t45",
+        "protectedAreas": ["Body"],
+        "imageName": "T-45 Chest Piece",
+        "physicalDamageRating": 8,
+        "energyDamageRating": 7,
+        "radiationDamageRating": 9,
+        "hp": 14,
+        "weight": 10,
+        "cost": 140,
+        "rarity": 2
+      },
+      {
+        "id": "power_armor_t45_arm",
+        "itemType": "powerArmor",
+        "set": "t45",
+        "protectedAreas": ["Hand"],
+        "imageName": "T-45 Arm",
+        "physicalDamageRating": 4,
+        "energyDamageRating": 3,
+        "radiationDamageRating": 7,
+        "hp": 7,
+        "weight": 7.5,
+        "cost": 100,
+        "rarity": 2
+      },
+      {
+        "id": "power_armor_t45_leg",
+        "itemType": "powerArmor",
+        "set": "t45",
+        "protectedAreas": ["Leg"],
+        "imageName": "T-45 Leg",
+        "physicalDamageRating": 4,
+        "energyDamageRating": 3,
+        "radiationDamageRating": 7,
+        "hp": 7,
+        "weight": 7.5,
+        "cost": 100,
+        "rarity": 2
+      }
+    ]
+  },
+  "t51": {
+    "pieces": [
+      {
+        "id": "power_armor_t51_helmet",
+        "itemType": "powerArmor",
+        "set": "t51",
+        "protectedAreas": ["Head"],
+        "imageName": "T-51 Helmet",
+        "physicalDamageRating": 6,
+        "energyDamageRating": 5,
+        "radiationDamageRating": 7,
+        "hp": 9,
+        "weight": 6,
+        "cost": 80,
+        "rarity": 3
+      },
+      {
+        "id": "power_armor_t51_chest",
+        "itemType": "powerArmor",
+        "set": "t51",
+        "protectedAreas": ["Body"],
+        "imageName": "T-51 Chest Piece",
+        "physicalDamageRating": 8,
+        "energyDamageRating": 7,
+        "radiationDamageRating": 9,
+        "hp": 18,
+        "weight": 10,
+        "cost": 180,
+        "rarity": 3
+      },
+      {
+        "id": "power_armor_t51_arm",
+        "itemType": "powerArmor",
+        "set": "t51",
+        "protectedAreas": ["Hand"],
+        "imageName": "T-51 Arm",
+        "physicalDamageRating": 5,
+        "energyDamageRating": 4,
+        "radiationDamageRating": 7,
+        "hp": 9,
+        "weight": 7.5,
+        "cost": 130,
+        "rarity": 3
+      },
+      {
+        "id": "power_armor_t51_leg",
+        "itemType": "powerArmor",
+        "set": "t51",
+        "protectedAreas": ["Leg"],
+        "imageName": "T-51 Leg",
+        "physicalDamageRating": 5,
+        "energyDamageRating": 4,
+        "radiationDamageRating": 7,
+        "hp": 9,
+        "weight": 7.5,
+        "cost": 130,
+        "rarity": 3
+      }
+    ]
+  },
+  "t60": {
+    "pieces": [
+      {
+        "id": "power_armor_t60_helmet",
+        "itemType": "powerArmor",
+        "set": "t60",
+        "protectedAreas": ["Head"],
+        "imageName": "T-60 Helmet",
+        "physicalDamageRating": 7,
+        "energyDamageRating": 6,
+        "radiationDamageRating": 7,
+        "hp": 10,
+        "weight": 6,
+        "cost": 650,
+        "rarity": 4
+      },
+      {
+        "id": "power_armor_t60_chest",
+        "itemType": "powerArmor",
+        "set": "t60",
+        "protectedAreas": ["Body"],
+        "imageName": "T-60 Chest Piece",
+        "physicalDamageRating": 9,
+        "energyDamageRating": 8,
+        "radiationDamageRating": 9,
+        "hp": 21,
+        "weight": 10,
+        "cost": 750,
+        "rarity": 4
+      },
+      {
+        "id": "power_armor_t60_arm",
+        "itemType": "powerArmor",
+        "set": "t60",
+        "protectedAreas": ["Hand"],
+        "imageName": "T-60 Arm",
+        "physicalDamageRating": 6,
+        "energyDamageRating": 5,
+        "radiationDamageRating": 7,
+        "hp": 10,
+        "weight": 7.5,
+        "cost": 700,
+        "rarity": 4
+      },
+      {
+        "id": "power_armor_t60_leg",
+        "itemType": "powerArmor",
+        "set": "t60",
+        "protectedAreas": ["Leg"],
+        "imageName": "T-60 Leg",
+        "physicalDamageRating": 6,
+        "energyDamageRating": 5,
+        "radiationDamageRating": 7,
+        "hp": 10,
+        "weight": 7.5,
+        "cost": 700,
+        "rarity": 4
+      }
+    ]
+  },
+  "x01": {
+    "pieces": [
+      {
+        "id": "power_armor_x01_helmet",
+        "itemType": "powerArmor",
+        "set": "x01",
+        "protectedAreas": ["Head"],
+        "imageName": "X-01 Helmet",
+        "physicalDamageRating": 8,
+        "energyDamageRating": 7,
+        "radiationDamageRating": 7,
+        "hp": 12,
+        "weight": 6,
+        "cost": 60,
+        "rarity": 5
+      },
+      {
+        "id": "power_armor_x01_chest",
+        "itemType": "powerArmor",
+        "set": "x01",
+        "protectedAreas": ["Body"],
+        "imageName": "X-01 Chest Piece",
+        "physicalDamageRating": 10,
+        "energyDamageRating": 8,
+        "radiationDamageRating": 9,
+        "hp": 24,
+        "weight": 10,
+        "cost": 140,
+        "rarity": 5
+      },
+      {
+        "id": "power_armor_x01_arm",
+        "itemType": "powerArmor",
+        "set": "x01",
+        "protectedAreas": ["Hand"],
+        "imageName": "X-01 Arm",
+        "physicalDamageRating": 7,
+        "energyDamageRating": 6,
+        "radiationDamageRating": 7,
+        "hp": 12,
+        "weight": 7.5,
+        "cost": 130,
+        "rarity": 5
+      },
+      {
+        "id": "power_armor_x01_leg",
+        "itemType": "powerArmor",
+        "set": "x01",
+        "protectedAreas": ["Leg"],
+        "imageName": "X-01 Leg",
+        "physicalDamageRating": 7,
+        "energyDamageRating": 6,
+        "radiationDamageRating": 7,
+        "hp": 12,
+        "weight": 7.5,
+        "cost": 100,
+        "rarity": 5
+      }
+    ]
+  }
+}

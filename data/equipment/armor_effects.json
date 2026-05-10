@@ -1,0 +1,14 @@
+{
+  "effect_explosive_resistance_2": { "type": "resistance", "damageType": "explosive", "value": 2 },
+  "effect_explosive_resistance_4": { "type": "resistance", "damageType": "explosive", "value": 4 },
+  "effect_ignore_energy_persistent": { "type": "ignore", "damageType": "energyPersistent", "value": 1 },
+  "effect_chems_duration_double": { "type": "modifier", "target": "chemDuration", "value": 2 },
+  "effect_stun_immunity": { "type": "threshold", "target": "stun", "value": 2 },
+  "effect_unarmed_melee_damage_1": { "type": "bonusDamage", "target": "unarmedMelee", "value": 1 },
+  "effect_melee_damage_resistance_2": { "type": "resistance", "damageType": "melee", "value": 2 },
+  "effect_aimed_ranged_damage_1": { "type": "bonusDamage", "target": "aimedRanged", "value": 1 },
+  "effect_ap_bonus_damage_melee": { "type": "apBonusDamage", "target": "melee", "value": 4 },
+  "effect_melee_piercing_1": { "type": "effect", "target": "melee", "name": "piercing", "value": 1 },
+  "effect_fall_damage_resistance": { "type": "resistance", "damageType": "fall", "value": 2 },
+  "effect_sneak_reroll": { "type": "reroll", "target": "sneak", "value": 1 }
+}

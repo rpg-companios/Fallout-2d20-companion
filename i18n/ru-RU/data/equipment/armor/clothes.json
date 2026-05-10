@@ -1,0 +1,95 @@
+{
+  "clothes": [
+    {
+      "type": "Костюмы",
+      "clothingType": "suit",
+      "items": [
+        { "id": "clothing_harness", "name": "Портупея" },
+        { "id": "clothing_bos_uniform", "name": "Униформа Братства Стали" },
+        { "id": "clothing_casual_clothes", "name": "Повседневная одежда" },
+        { "id": "clothing_road_leathers", "name": "Дорожная кожа" },
+        { "id": "clothing_sturdy_clothes", "name": "Прочная одежда" },
+        { "id": "clothing_military_fatigues", "name": "Военная форма" },
+        { "id": "clothing_vault_jumpsuit", "name": "Комбинезон Убежища" },
+        {
+          "id": "clothing_lab_coat",
+          "name": "Лабораторный халат",
+          "specialEffects": [
+            { "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Интеллекта." }
+          ]
+        },
+        { "id": "clothing_blouse", "name": "Blouse" }
+      ]
+    },
+    {
+      "type": "Обмундирование",
+      "clothingType": "outfit",
+      "items": [
+        { "id": "clothing_nomad_outfit", "name": "Костюм бродяги" },
+        { "id": "clothing_hides", "name": "Шкура" },
+        { "id": "clothing_cage_armor", "name": "Бойцовская броня" },
+        { "id": "clothing_engineer_armor", "name": "Броня инженера" },
+        {
+          "id": "clothing_heavy_coat",
+          "name": "Плотное пальто",
+          "specialEffects": [
+            { "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Выносливости." }
+          ]
+        },
+        {
+          "id": "clothing_work_coveralls",
+          "name": "Рабочий Комбинезон",
+          "specialEffects": [
+            { "id": "effect_carry_capacity", "description": "+5 к максимальной грузоподъемности." }
+          ]
+        },
+        { "id": "clothing_fancy_clothes", "name": "Формальная одежда" },
+        { "id": "clothing_bos_scribe_armor", "name": "Доспехи писца Братства" },
+        { "id": "clothing_bos_fatigues", "name": "Облачение Братства Стали" },
+        {
+          "id": "clothing_hazmat_suit",
+          "name": "Защитный костюм",
+          "specialEffects": [
+            { "description": "Полный иммунитет к радиационному урону и эффектам облучения." }
+          ]
+        },
+        { "id": "clothing_spiked_armor", "name": "Броня с шипами" }
+      ]
+    },
+    {
+      "type": "Головные уборы",
+      "clothingType": "headwear",
+      "items": [
+        {
+          "id": "headwear_casual_hat",
+          "name": "Обычная шляпа",
+          "specialEffects": [
+            { "description": "Игнорируйте увеличение сложности от ослепляющего или яркого света." }
+          ]
+        },
+        { "id": "headwear_military_helmet", "name": "Армейский шлем" },
+        { "id": "headwear_bos_scribe_hat", "name": "Шляпа писца" },
+        { "id": "headwear_bos_hood", "name": "Капюшон Братства Стали" },
+        { "id": "headwear_sack_hood", "name": "Капюшон из мешковины" },
+        { "id": "headwear_hood", "name": "Капюшон" },
+        { "id": "headwear_hard_hat", "name": "Каска" },
+        { "id": "headwear_welding_mask", "name": "Щиток сварщика" },
+        {
+          "id": "headwear_fancy_hat",
+          "name": "Формальная шляпа",
+          "specialEffects": [
+            { "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Харизмы." }
+          ]
+        },
+        {
+          "id": "headwear_gas_mask",
+          "name": "Противогаз",
+          "specialEffects": [
+            { "id": "effect_poison_resistance", "description": "+3 к сопротивлению урону от яда." },
+            { "description": "Иммунитет к воздействию газов и пыли. Все проверки Речи получают +1 к сложности." }
+          ]
+        }
+      ]
+    }
+  ]
+}

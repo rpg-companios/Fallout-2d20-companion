@@ -1,0 +1,94 @@
+[
+  {
+    "id": "robot_legs_mister_handy_thruster",
+    "itemType": "robotLegs",
+    "slot": "Thruster",
+    "compatibleBodyPlans": [
+      "misterHandy"
+    ],
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "physicalDR": 2,
+    "energyDR": 2,
+    "radDR": 0,
+    "name": "robot_legs_mister_handy_thruster"
+  },
+  {
+    "id": "robot_legs_protectron",
+    "itemType": "robotLegs",
+    "slot": "Legs",
+    "compatibleBodyPlans": [
+      "protectron"
+    ],
+    "complexity": 3,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_legs_protectron"
+  },
+  {
+    "id": "robot_legs_assaultron",
+    "itemType": "robotLegs",
+    "slot": "Legs",
+    "compatibleBodyPlans": [
+      "assaultron"
+    ],
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 2"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "physicalDR": 3,
+    "energyDR": 2,
+    "radDR": 0,
+    "name": "robot_legs_assaultron"
+  },
+  {
+    "id": "robot_legs_robobrain_treads",
+    "itemType": "robotLegs",
+    "slot": "Legs",
+    "compatibleBodyPlans": [
+      "robobrain"
+    ],
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "physicalDR": 2,
+    "energyDR": 2,
+    "radDR": 0,
+    "name": "robot_legs_robobrain_treads"
+  },
+  {
+    "id": "robot_legs_sentry_bot",
+    "itemType": "robotLegs",
+    "slot": "Legs",
+    "compatibleBodyPlans": [
+      "sentryBot"
+    ],
+    "complexity": 6,
+    "perksRequired": [
+      "Armorer 1",
+      "Robotics Expert 3"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "name": "robot_legs_sentry_bot"
+  }
+]

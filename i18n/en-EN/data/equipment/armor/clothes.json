@@ -1,0 +1,95 @@
+{
+  "clothes": [
+    {
+      "type": "Suits",
+      "clothingType": "suit",
+      "items": [
+        { "id": "clothing_harness", "name": "Harness" },
+        { "id": "clothing_bos_uniform", "name": "Brotherhood of Steel Uniform" },
+        { "id": "clothing_casual_clothes", "name": "Casual Clothes" },
+        { "id": "clothing_road_leathers", "name": "Road Leathers" },
+        { "id": "clothing_sturdy_clothes", "name": "Sturdy Clothes" },
+        { "id": "clothing_military_fatigues", "name": "Military Fatigues" },
+        { "id": "clothing_vault_jumpsuit", "name": "Vault Jumpsuit" },
+        {
+          "id": "clothing_lab_coat",
+          "name": "Lab Coat",
+          "specialEffects": [
+            { "description": "Once per scene, you may reroll 1d20 on an Intelligence skill test." }
+          ]
+        },
+        { "id": "clothing_blouse", "name": "Blouse" }
+      ]
+    },
+    {
+      "type": "Outfits",
+      "clothingType": "outfit",
+      "items": [
+        { "id": "clothing_nomad_outfit", "name": "Nomad Outfit" },
+        { "id": "clothing_hides", "name": "Hides" },
+        { "id": "clothing_cage_armor", "name": "Cage Armor" },
+        { "id": "clothing_engineer_armor", "name": "Engineer Armor" },
+        {
+          "id": "clothing_heavy_coat",
+          "name": "Heavy Coat",
+          "specialEffects": [
+            { "description": "Once per scene, you may reroll 1d20 on an Endurance skill test." }
+          ]
+        },
+        {
+          "id": "clothing_work_coveralls",
+          "name": "Work Coveralls",
+          "specialEffects": [
+            { "id": "effect_carry_capacity", "description": "+5 to maximum carry capacity." }
+          ]
+        },
+        { "id": "clothing_fancy_clothes", "name": "Fancy Clothes" },
+        { "id": "clothing_bos_scribe_armor", "name": "Brotherhood Field Scribe Armor" },
+        { "id": "clothing_bos_fatigues", "name": "Brotherhood of Steel Fatigues" },
+        {
+          "id": "clothing_hazmat_suit",
+          "name": "Hazmat Suit",
+          "specialEffects": [
+            { "description": "Complete immunity to radiation damage and radiation effects." }
+          ]
+        },
+        { "id": "clothing_spiked_armor", "name": "Spiked Armor" }
+      ]
+    },
+    {
+      "type": "Headwear",
+      "clothingType": "headwear",
+      "items": [
+        {
+          "id": "headwear_casual_hat",
+          "name": "Casual Hat",
+          "specialEffects": [
+            { "description": "Ignore difficulty increase from bright or blinding light." }
+          ]
+        },
+        { "id": "headwear_military_helmet", "name": "Military Helmet" },
+        { "id": "headwear_bos_scribe_hat", "name": "Brotherhood Field Scribe Hat" },
+        { "id": "headwear_bos_hood", "name": "Brotherhood of Steel Hood" },
+        { "id": "headwear_sack_hood", "name": "Sack Hood" },
+        { "id": "headwear_hood", "name": "Hood" },
+        { "id": "headwear_hard_hat", "name": "Hard Hat" },
+        { "id": "headwear_welding_mask", "name": "Welding Mask" },
+        {
+          "id": "headwear_fancy_hat",
+          "name": "Fancy Hat",
+          "specialEffects": [
+            { "description": "Once per scene, you may reroll 1d20 on a Charisma skill test." }
+          ]
+        },
+        {
+          "id": "headwear_gas_mask",
+          "name": "Gas Mask",
+          "specialEffects": [
+            { "id": "effect_poison_resistance", "description": "+3 to resistance against poison damage." },
+            { "description": "Immune to gas and dust effects. All Speech tests suffer +1 difficulty." }
+          ]
+        }
+      ]
+    }
+  ]
+}

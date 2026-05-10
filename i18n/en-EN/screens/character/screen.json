@@ -1,0 +1,116 @@
+{
+  "labels": {
+    "characterName": "Name",
+    "origin": "Origin",
+    "trait": "Trait",
+    "attributes": "Attributes",
+    "equipmentKit": "Equipment Kit",
+    "level": "Level",
+    "skills": "Skills",
+    "skill": "Skill",
+    "value": "Value",
+    "rank": "Rank",
+    "points": "Points",
+    "luckPoints": "Luck points",
+    "taggedSkills": "Tagged Skills",
+    "skillPoints": "Skill Points",
+    "attributePoints": "Attribute Points",
+    "isTaggedSkill": "Tagged",
+    "available": "Available",
+    "pointsShort": "points",
+    "extraTaggedSkills": "Extra trait skills",
+    "extraSlotsAvailable": "Extra slots available"
+  },
+  "buttons": {
+    "save": "Save",
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "agree": "OK",
+    "continue": "Continue",
+    "confirm": "Confirm",
+    "yesReset": "Yes, reset",
+    "select": "Select"
+  },
+  "placeholders": {
+    "selectNone": "Not selected",
+    "enterName": "Enter name"
+  },
+  "warnings": {
+    "attentionTitle": "Attention!",
+    "resetAllValues": "All values will be reset to initial parameters.",
+    "changeOriginTitle": "Change origin?",
+    "changeOriginConfirm": "All attributes, skills and traits will be reset. Are you sure?",
+    "equipmentResetConfirm": "Inventory and all equipment will be reset. Continue?",
+    "traitAlreadySelected": "Trait for this origin is already selected.",
+    "noTraitsForOrigin": "No traits available for this origin",
+    "selectOriginFirst": "Select origin first",
+    "selectOriginError": "Select origin",
+    "noEquipmentForOrigin": "No equipment kits for this origin.",
+    "equipmentResetOnWeb": "Attention! Choosing a new equipment kit will reset current inventory. Continue?"
+  },
+  "alerts": {
+    "errorTitle": "Error",
+    "warningTitle": "Warning",
+    "infoTitle": "Info"
+  },
+  "errors": {
+    "distributeAllPerkAttributePoints": "You must distribute all available attribute points.",
+    "saveAttributesFirst": "Distribute and save attributes first.",
+    "cannotUnselectForcedSkill": "You cannot unselect a forced skill.",
+    "skillTagExceedsMaxRank": "Tagging this skill will exceed max rank ({skillMax}). Lower it first.",
+    "maxBaseSkills": "You can choose a maximum of {count} base skills.{extraText}",
+    "saveAttributesFirstSimple": "Save attributes first.",
+    "noSkillPointsLeft": "You have no skill points left to distribute.",
+    "originRequired": "You must select an origin.",
+    "traitRequired": "You must select a trait.",
+    "equipmentRequired": "You must select an equipment kit.",
+    "spendAllAttributePoints": "Spend all attribute points before saving.",
+    "spendAllSkillPoints": "You must distribute all skill points.",
+    "exactBaseSkillsRequired": "You must select exactly {required} base skills. Selected: {selected}.",
+    "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
+    "maxSkillRank": "Error: maximum skill rank is {maxRank}"
+  },
+  "modals": {
+    "goodSoul": {
+      "title": "Good Soul: choose 2 skills",
+      "description": "Choose two skills from the group. They will be marked as extra."
+    },
+    "origin": {
+      "title": "Select origin"
+    },
+    "traitSkill": {
+      "title": "Select extra skill"
+    }
+  },
+  "origins": {
+    "brotherhoodOfSteel": "Brotherhood of Steel"
+  },
+  "attributes": {
+    "STR": "STR",
+    "END": "END",
+    "PER": "PER",
+    "AGI": "AGI",
+    "INT": "INT",
+    "CHA": "CHA",
+    "LCK": "LCK"
+  },
+  "skillsCatalog": {
+    "ATHLETICS": "Athletics",
+    "BARTER": "Barter",
+    "BIG_GUNS": "Big Guns",
+    "ENERGY_WEAPONS": "Energy Weapons",
+    "EXPLOSIVES": "Explosives",
+    "LOCKPICK": "Lockpick",
+    "MEDICINE": "Medicine",
+    "MELEE_WEAPONS": "Melee Weapons",
+    "PILOT": "Pilot",
+    "REPAIR": "Repair",
+    "SCIENCE": "Science",
+    "SMALL_GUNS": "Small Guns",
+    "SNEAK": "Sneak",
+    "SPEECH": "Speech",
+    "SURVIVAL": "Survival",
+    "THROWING": "Throwing",
+    "UNARMED": "Unarmed"
+  }
+}

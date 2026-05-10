@@ -1,0 +1,122 @@
+[
+  {
+    "id": "robot_head_protectron",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": "protectron",
+    "unique": false,
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "mind": 5,
+    "other": 2,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_head_protectron"
+  },
+  {
+    "id": "robot_head_mister_handy_eye_stalk",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": "misterHandy",
+    "unique": true,
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "mind": null,
+    "other": null,
+    "physicalDR": 1,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_head_mister_handy_eye_stalk"
+  },
+  {
+    "id": "robot_head_assaultron",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": "assaultron",
+    "unique": false,
+    "complexity": 6,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "mind": 6,
+    "other": 4,
+    "physicalDR": 3,
+    "energyDR": 3,
+    "radDR": 0,
+    "name": "robot_head_assaultron"
+  },
+  {
+    "id": "robot_head_assaultron_laser",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": null,
+    "unique": false,
+    "complexity": 7,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 2"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "mind": 6,
+    "other": 4,
+    "physicalDR": 3,
+    "energyDR": 4,
+    "radDR": 0,
+    "name": "robot_head_assaultron_laser"
+  },
+  {
+    "id": "robot_head_robobrain",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": "robobrain",
+    "unique": true,
+    "complexity": 6,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 3"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "mind": 7,
+    "other": 3,
+    "physicalDR": 2,
+    "energyDR": 3,
+    "radDR": 0,
+    "name": "robot_head_robobrain"
+  },
+  {
+    "id": "robot_head_sentry_bot",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": "sentryBot",
+    "unique": false,
+    "complexity": 6,
+    "perksRequired": [
+      "Armorer 1",
+      "Robotics Expert 2",
+      "Science! 2"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "mind": 6,
+    "other": 4,
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "name": "robot_head_sentry_bot"
+  }
+]

@@ -1,0 +1,51 @@
+{
+  "weaponTypeLabels": {
+    "light": "Стрелковое",
+    "heavy": "Тяжелое",
+    "energy": "Энергетическое",
+    "melee": "Ближний бой",
+    "unarmed": "Рукопашная",
+    "thrown": "Метательное",
+    "explosive": "Взрывчатка",
+    "other": "Прочее"
+  },
+  "categories": {
+    "weapon": "Оружие",
+    "armor": "Броня",
+    "clothing": "Одежда",
+    "ammo": "Боеприпасы",
+    "food": "Еда",
+    "drinks": "Напитки",
+    "chems": "Препараты",
+    "materials": "Материалы",
+    "items": "Предметы",
+    "all": "Все",
+    "robotEquipment": "Снаряжение роботов",
+    "robotWeapons": "Оружие роботов",
+    "robotPlating": "Обшивка",
+    "robotArmorLayer": "Броня",
+    "robotFrame": "Привод",
+    "robotBodyParts": "Части тела роботов",
+    "robotModules": "Модули роботов"
+  },
+  "itemTypes": {
+    "weapon": "🔫 Оружие",
+    "armor": "🛡️ Броня",
+    "clothing": "👕 Одежда",
+    "chem": "💊 Препарат",
+    "drinks": "🥤 Напиток",
+    "ammo": "🔹 Боеприпасы",
+    "plating": "🔩 Обшивка",
+    "robotArmor": "🛡️ Броня робота",
+    "robotFrame": "⚙️ Привод"
+  },
+  "title": "Добавить предмет",
+  "back": "...Назад",
+  "searchPlaceholder": "Поиск по всем предметам...",
+  "emptyCategory": "Категория пуста",
+  "close": "Закрыть",
+  "buyTitle": "Купить предметы",
+  "quantityLabel": "Количество",
+  "addButton": "Добавить",
+  "cancelButton": "Отмена"
+}

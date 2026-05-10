@@ -1,0 +1,96 @@
+import { StyleSheet } from 'react-native';
+
+const styles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalContent: {
+    width: '90%',
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    padding: 20,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  kitContainer: {
+    marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 15,
+  },
+  kitName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#005A9C',
+  },
+  kitDetails: {
+    marginTop: 10,
+    paddingLeft: 15,
+  },
+  categoryContainer: { marginBottom: 10 },
+  categoryTitle: { fontSize: 16, fontWeight: '600', color: '#444', marginBottom: 5 },
+  fixedItem: {
+    marginLeft: 10,
+    marginBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  choiceContainer: { marginVertical: 5 },
+  radioContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    marginLeft: 10,
+    flexWrap: 'wrap',
+  },
+  radio: {
+    height: 22,
+    width: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#005A9C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  radioSelected: { backgroundColor: '#005A9C' },
+  ammoText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    marginLeft: 5,
+  },
+  selectButton: {
+    backgroundColor: '#2E7D32',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  selectButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  closeButton: {
+    backgroundColor: '#C62828',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  closeButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+});
+
+export default styles;

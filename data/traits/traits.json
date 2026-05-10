@@ -1,0 +1,271 @@
+[
+  {
+    "id": "brotherhood-chain-that-binds",
+    "originId": "brotherhood",
+    "displayNameKey": "traits.brotherhood.chainThatBinds.name",
+    "descriptionKey": "traits.brotherhood.chainThatBinds.description",
+    "modifiers": {
+      "extraSkills": 1,
+      "forcedSkills": ["energy_weapons", "science", "repair"]
+    }
+  },
+  {
+    "id": "brotherhoodoutcast-chain-that-breaks",
+    "originId": "brotherhoodOutcast",
+    "displayNameKey": "traits.brotherhoodOutcast.chainThatBreaks.name",
+    "descriptionKey": "traits.brotherhoodOutcast.chainThatBreaks.description",
+    "modifiers": {
+      "extraSkills": 1,
+      "forcedSkills": ["energy_weapons", "science", "repair"]
+    }
+  },
+  {
+    "id": "supermutant-forced-evolution",
+    "originId": "superMutant",
+    "displayNameKey": "traits.superMutant.forcedEvolution.name",
+    "descriptionKey": "traits.superMutant.forcedEvolution.description",
+    "modifiers": {
+      "attributes": {
+        "STR": { "baseBonus": 2, "min": 6, "max": 12 },
+        "END": { "baseBonus": 2, "min": 6, "max": 12 },
+        "CHA": { "max": 6 },
+        "INT": { "max": 6 }
+      },
+      "skillMaxValue": 4,
+      "immunities": ["radiation", "poison"],
+      "armorConstraint": "mutantOnly"
+    }
+  },
+  {
+    "id": "ghoul-necrotic-posthuman",
+    "originId": "ghoul",
+    "displayNameKey": "traits.ghoul.necroticPosthuman.name",
+    "descriptionKey": "traits.ghoul.necroticPosthuman.description",
+    "modifiers": {
+      "skillModifiers": {
+        "survival": 2
+      },
+      "immunities": ["radiation"],
+      "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"]
+    }
+  },
+  {
+    "id": "minuteman-peoples-militia",
+    "originId": "minuteman",
+    "displayNameKey": "traits.minuteman.peoplesMilitia.name",
+    "descriptionKey": "traits.minuteman.peoplesMilitia.description",
+    "modifiers": {
+      "extraSkills": 1,
+      "forcedSkills": ["energy_weapons", "small_guns"],
+      "effects": ["improved_caravans", "base_defense_4", "cover_dr_bonus", "outnumbered_damage_bonus"]
+    }
+  },
+  {
+    "id": "childofatom-radioactive-sponge",
+    "originId": "childOfAtom",
+    "displayNameKey": "traits.childOfAtom.radioactiveSponge.name",
+    "descriptionKey": "traits.childOfAtom.radioactiveSponge.description",
+    "modifiers": {
+      "extraPerks": 1,
+      "radiationResistance": 1,
+      "effects": ["extra_perk_level_1", "radiation_absorption", "radiation_melee_charge"]
+    }
+  },
+  {
+    "id": "vaultdweller-vault-kid",
+    "originId": "vaultDweller",
+    "displayNameKey": "traits.vaultDweller.vaultKid.name",
+    "descriptionKey": "traits.vaultDweller.vaultKid.description",
+    "modifiers": {
+      "extraSkills": 1,
+      "effects": ["reduced_end_check_difficulty", "disease_resistance", "luck_restore_on_complication"]
+    }
+  },
+  {
+    "id": "protectron-protect-or-destroy",
+    "originId": "protectron",
+    "displayNameKey": "traits.protectron.protectOrDestroy.name",
+    "descriptionKey": "traits.protectron.protectOrDestroy.description",
+    "modifiers": {
+      "immunities": ["disease", "radiation", "poison"],
+      "carryWeightFixed": 225,
+      "carryWeightStrengthMultiplier": 0,
+      "isRobot": true,
+      "robotRules": {
+        "canSelfUseConsumables": false,
+        "canUseConsumablesOnOthers": false,
+        "canEquipStandardArmor": false,
+        "canEquipPowerArmor": false,
+        "maxRobotMods": 2
+      },
+      "effects": ["hazard_reroll", "no_consumables_food_rest", "repair_to_heal", "model_check_discount"]
+    }
+  },
+  {
+    "id": "assaultron-designed-for-frontline",
+    "originId": "assaultron",
+    "displayNameKey": "traits.assaultron.designedForFrontline.name",
+    "descriptionKey": "traits.assaultron.designedForFrontline.description",
+    "modifiers": {
+      "immunities": ["disease", "radiation", "poison"],
+      "carryWeightFixed": 150,
+      "carryWeightStrengthMultiplier": 0,
+      "isRobot": true,
+      "meleeBonusDelta": 1,
+      "robotRules": {
+        "canSelfUseConsumables": false,
+        "canEquipStandardArmor": false,
+        "canEquipPowerArmor": false
+      },
+      "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"]
+    }
+  },
+  {
+    "id": "ncr-resident",
+    "originId": "ncr",
+    "displayNameKey": "traits.ncr.resident.name",
+    "descriptionKey": "traits.ncr.resident.description",
+    "modifiers": {
+      "isMultiTrait": true,
+      "subTraitIds": [
+        "ncr-good-soul",
+        "ncr-infantryman",
+        "ncr-home-on-the-range",
+        "ncr-technique-of-descent",
+        "ncr-brahmin-baron"
+      ]
+    }
+  },
+  {
+    "id": "ncr-good-soul",
+    "originId": "ncr",
+    "displayNameKey": "traits.ncr.goodSoul.name",
+    "descriptionKey": "traits.ncr.goodSoul.description",
+    "modifiers": {}
+  },
+  {
+    "id": "ncr-infantryman",
+    "originId": "ncr",
+    "displayNameKey": "traits.ncr.infantryman.name",
+    "descriptionKey": "traits.ncr.infantryman.description",
+    "modifiers": {
+      "ncrInfantryWeaponIds": ["weapon_submachine_gun", "weapon_black_powder_rifle", "weapon_assault_rifle", "weapon_frag_grenade", "weapon_combat_knife"]
+    }
+  },
+  {
+    "id": "ncr-home-on-the-range",
+    "originId": "ncr",
+    "displayNameKey": "traits.ncr.homeOnTheRange.name",
+    "descriptionKey": "traits.ncr.homeOnTheRange.description",
+    "modifiers": {}
+  },
+  {
+    "id": "ncr-technique-of-descent",
+    "originId": "ncr",
+    "displayNameKey": "traits.ncr.techniqueOfDescent.name",
+    "descriptionKey": "traits.ncr.techniqueOfDescent.description",
+    "modifiers": {}
+  },
+  {
+    "id": "ncr-brahmin-baron",
+    "originId": "ncr",
+    "displayNameKey": "traits.ncr.brahminBaron.name",
+    "descriptionKey": "traits.ncr.brahminBaron.description",
+    "modifiers": {}
+  },
+  {
+    "id": "survivor-survivor",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.survivor.name",
+    "descriptionKey": "traits.survivor.survivor.description",
+    "modifiers": {
+      "isMultiTrait": true,
+      "subTraitIds": [
+        "survivor-educated",
+        "survivor-quick-shot",
+        "survivor-gifted",
+        "survivor-heavy-handed",
+        "survivor-small-frame"
+      ]
+    }
+  },
+  {
+    "id": "survivor-educated",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.educated.name",
+    "descriptionKey": "traits.survivor.educated.description",
+    "modifiers": {
+      "extraSkills": 1
+    }
+  },
+  {
+    "id": "survivor-quick-shot",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.quickShot.name",
+    "descriptionKey": "traits.survivor.quickShot.description",
+    "modifiers": {}
+  },
+  {
+    "id": "survivor-gifted",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.gifted.name",
+    "descriptionKey": "traits.survivor.gifted.description",
+    "modifiers": {
+      "attributePointsBonus": 2,
+      "luckMaxDelta": -1
+    }
+  },
+  {
+    "id": "survivor-heavy-handed",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.heavyHanded.name",
+    "descriptionKey": "traits.survivor.heavyHanded.description",
+    "modifiers": {
+      "meleeBonusDelta": 1
+    }
+  },
+  {
+    "id": "survivor-small-frame",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.smallFrame.name",
+    "descriptionKey": "traits.survivor.smallFrame.description",
+    "modifiers": {
+      "carryWeightStrengthMultiplier": 5
+    }
+  },
+  {
+    "id": "misterhandy-robot-mr-handy",
+    "originId": "misterHandy",
+    "displayNameKey": "traits.misterHandy.robotMrHandy.name",
+    "descriptionKey": "traits.misterHandy.robotMrHandy.description",
+    "modifiers": {
+      "immunities": ["radiation", "poison"],
+      "carryWeightFixed": 150,
+      "carryWeightStrengthMultiplier": 0,
+      "isRobot": true,
+      "robotType": "misterHandy",
+      "robotBodyPlan": "misterHandy",
+      "robotRules": {
+        "canSelfUseConsumables": false,
+        "canUseConsumablesOnOthers": true,
+        "canEquipStandardArmor": false,
+        "canEquipPowerArmor": false,
+        "carryWeightLimit": 150,
+        "armorConstraints": []
+      },
+      "effects": ["no_consumables_food_rest", "repair_to_heal", "hover_movement", "360_vision"]
+    }
+  },
+  {
+    "id": "robobrain-robot-with-brains",
+    "originId": "robobrain",
+    "displayNameKey": "traits.robobrain.robotWithBrains.name",
+    "descriptionKey": "traits.robobrain.robotWithBrains.description",
+    "modifiers": {
+      "immunities": ["radiation", "poison"],
+      "carryWeightFixed": 150,
+      "isRobot": true,
+      "effects": ["no_consumables_food_rest", "repair_to_heal", "ir_vision", "ignore_darkness_penalty"]
+    }
+  }
+]

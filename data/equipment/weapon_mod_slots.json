@@ -1,0 +1,199 @@
+{
+  "weapon_alien_blaster": {
+    "Barrel": [
+      "mod_017", "mod_053", "mod_054", "mod_055"
+    ],
+    "Grip": ["mod_027"],
+    "Stock": ["mod_058", "mod_059"],
+    "Sights": ["mod_062", "mod_034"]
+  },
+  "weapon_mesmetron": {
+    "Capacitor": ["mod_043"],
+    "Grips": ["mod_027"],
+    "Sights": ["mod_062"]
+  },
+  "weapon_tesla_rifle": {
+    "Barrel": ["mod_053", "mod_052", "mod_054"],
+    "Sights": ["mod_062"]
+  },
+  "weapon_357_magnum_revolver": {
+    "Receiver": ["mod_009"],
+    "Barrel": ["mod_017"],
+    "Magazine": ["mod_023"]
+  },
+  "weapon_12_7mm_pistol": {
+    "Receiver": ["mod_007", "mod_004", "mod_009", "mod_005", "mod_006", "mod_002", "mod_010"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Grip": ["mod_026", "mod_027"],
+    "Magazine": ["mod_023", "mod_024"],
+    "Sights": ["mod_033"],
+    "Muzzle": ["mod_042"]
+  },
+  "weapon_12_7mm_smg": {
+    "Receiver": ["mod_004", "mod_005", "mod_002"],
+    "Grip": ["mod_028", "mod_030"],
+    "Magazine": ["mod_023"],
+    "Sights": ["mod_033"],
+    "Muzzle": ["mod_042"]
+  },
+  "weapon_25mm_grenade_apw": {
+    "Receiver": ["mod_009"],
+    "Barrel": ["mod_017"],
+    "Magazine": ["mod_023"]
+  },
+  "weapon_9mm_pistol": {
+    "Receiver": ["mod_008", "mod_007", "mod_004", "mod_009", "mod_078"],
+    "Grip": ["mod_026"],
+    "Magazine": ["mod_023"],
+    "Sights": ["mod_033", "mod_034"],
+    "Muzzle": ["mod_042"]
+  },
+  "weapon_anti_materiel_rifle": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Magazine": ["mod_023"],
+    "Sights": ["mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_042"]
+  },
+  "weapon_battle_rifle": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017"],
+    "Sights": ["mod_033", "mod_034"],
+    "Muzzle": ["mod_039"]
+  },
+  "weapon_black_powder_blunderbuss": { 
+  },
+  "weapon_black_powder_pistol": { 
+  },
+  "weapon_black_powder_rifle": {
+    "Muzzle": ["mod_039"]
+  },
+  "weapon_gauss_pistol": {
+    "Barrel": ["mod_021"],
+    "Capacitors": ["mod_031", "mod_032"],
+    "Sights": ["mod_033"]
+  },
+  "weapon_gauss_shotgun": {
+    "Barrel": ["mod_021"],
+    "Capacitors": ["mod_031", "mod_032"]
+  },
+  "weapon_lever_action_rifle": {
+    "Receiver": ["mod_007", "mod_004", "mod_005", "mod_006", "mod_010", "mod_010"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_029"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037"],
+    "Muzzle": ["mod_042"]
+  },
+  "weapon_light_machine_gun": {
+    "Receiver": ["mod_007", "mod_004", "mod_005", "mod_011", "mod_010"],
+    "Barrel": ["mod_017", "mod_018", "mod_019"],
+    "Magazine": ["mod_023", "mod_024", "mod_025"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033"],
+    "Muzzle": ["mod_040", "mod_041"]
+  },
+  "weapon_pump_action_shotgun": {
+    "Receiver": ["mod_007", "mod_009", "mod_004", "mod_005", "mod_006", "mod_010"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_radium_rifle": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_sniper_rifle": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_bow": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_alien_atomizer": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_alien_disintegrator": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_arc_welder": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_microwave_emitter": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_50_cal_machine_gun": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_auto_grenade_launcher": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_drone_cannon": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_gatling_gun": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_gatling_plasma": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_gauss_minigun": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_plasma_caster": {
+    "Receiver": ["mod_004", "mod_005", "mod_009"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_030"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  }
+}

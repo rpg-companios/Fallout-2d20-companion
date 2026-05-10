@@ -1,0 +1,223 @@
+[
+  {
+    "id": "drink_nuka_cola",
+    "itemType": "drinks",
+    "weight": 0.1,
+    "cost": 25,
+    "rarity": 1,
+    "positiveEffect": { "apModifier": { "op": "+", "value": 1 } },
+    "negativeEffect": "addiction",
+    "positiveEffectDuration": "lasting",
+    "negativeEffectDuration": ""
+  },
+  {
+    "id": "drink_beer",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 1,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.beer"
+  },
+  {
+    "id": "drink_refreshing_beverage",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 110,
+    "rarity": 5,
+    "hpHealed": 11,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.refreshingBeverage"
+  },
+  {
+    "id": "drink_bourbon",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 2,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.bourbon"
+  },
+  {
+    "id": "drink_moonshine",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 30,
+    "rarity": 3,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.moonshine"
+  },
+  {
+    "id": "drink_purified_water",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 1,
+    "hpHealed": 3,
+    "irradiated": false,
+    "effectKey": ""
+  },
+  {
+    "id": "drink_dirty_water",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 0,
+    "hpHealed": 2,
+    "irradiated": true,
+    "effectKey": ""
+  },
+  {
+    "id": "drink_dirty_wastelander",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 3,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.dirtyWastelander"
+  },
+  {
+    "id": "drink_mutfruit_juice",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 2,
+    "hpHealed": 3,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.mutfruitJuice"
+  },
+  {
+    "id": "drink_tarberry_juice",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 4,
+    "hpHealed": 3,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.tarberryJuice"
+  },
+  {
+    "id": "drink_melon_juice",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 2,
+    "hpHealed": 3,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.melonJuice"
+  },
+  {
+    "id": "drink_potato_juice",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 3,
+    "hpHealed": 3,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.potatoJuice"
+  },
+  {
+    "id": "drink_brahmin_milk",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 15,
+    "rarity": 2,
+    "hpHealed": 1,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.brahminMilk"
+  },
+  {
+    "id": "drink_nuka_cherry",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 40,
+    "rarity": 3,
+    "hpHealed": 3,
+    "irradiated": true,
+    "effectKey": "itemEffects.drinks.nukaCherry"
+  },
+  {
+    "id": "drink_nuka_cola_quantum",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 50,
+    "rarity": 5,
+    "hpHealed": 10,
+    "irradiated": true,
+    "effectKey": "itemEffects.drinks.nukaColaQuantum"
+  },
+  {
+    "id": "drink_blood_pack",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 2,
+    "hpHealed": 3,
+    "irradiated": false,
+    "effectKey": ""
+  },
+  {
+    "id": "drink_glowing_blood_pack",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 30,
+    "rarity": 3,
+    "hpHealed": 4,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.glowingBloodPack"
+  },
+  {
+    "id": "drink_rum",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 2,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.rum"
+  },
+  {
+    "id": "drink_irradiated_blood",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 50,
+    "rarity": 2,
+    "hpHealed": 3,
+    "irradiated": true,
+    "effectKey": "itemEffects.drinks.irradiatedBlood"
+  },
+  {
+    "id": "drink_wine",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 3,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.wine"
+  },
+  {
+    "id": "drink_vodka",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 3,
+    "hpHealed": 2,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.vodka"
+  },
+  {
+    "id": "drink_whiskey",
+    "itemType": "drinks",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 3,
+    "hpHealed": 0,
+    "irradiated": false,
+    "effectKey": "itemEffects.drinks.whiskey"
+  }
+]

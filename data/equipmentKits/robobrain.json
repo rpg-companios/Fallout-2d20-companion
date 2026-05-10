@@ -1,0 +1,60 @@
+{
+  "robobrain_servomechanizmy": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_mesmetron",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_tesla_arm",
+        "itemType": "weapon",
+        "slot": "left",
+        "ammo": {
+          "ammoId": "ammo_fusion_core",
+          "quantity": {
+            "base": 14,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_smoke_manipulator",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_item_repair_kit",
+        "itemType": "misc",
+        "quantity": 2
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "clothingId": "headwear_casual_hat",
+            "itemType": "clothing"
+          },
+          {
+            "clothingId": "headwear_fancy_hat",
+            "itemType": "clothing"
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      }
+    ]
+  }
+}

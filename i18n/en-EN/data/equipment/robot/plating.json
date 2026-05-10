@@ -1,0 +1,36 @@
+[
+  { "id": "robot_plating_standard_optics",   "name": "Standard Plating (Optics)",   "special": "Default equipment, no installation required" },
+  { "id": "robot_plating_standard_body",     "name": "Standard Plating (Main Body)", "special": "Default equipment, no installation required" },
+  { "id": "robot_plating_standard_arms",     "name": "Standard Plating (Arms)",     "special": "Default equipment, no installation required" },
+  { "id": "robot_plating_standard_thruster", "name": "Standard Plating (Thruster)", "special": "Default equipment, no installation required" },
+
+  { "id": "robot_plating_gutsy_optics",      "name": "Mister Gutsy Plating (Optics)",   "special": "Default for Mister Gutsy starting package" },
+  { "id": "robot_plating_gutsy_body",        "name": "Mister Gutsy Plating (Main Body)", "special": "Default for Mister Gutsy starting package" },
+  { "id": "robot_plating_gutsy_arms",        "name": "Mister Gutsy Plating (Arms)",     "special": "Default for Mister Gutsy starting package" },
+  { "id": "robot_plating_gutsy_thruster",    "name": "Mister Gutsy Plating (Thruster)", "special": "Default for Mister Gutsy starting package" },
+
+  { "id": "robot_plating_factory_optics",    "name": "Factory Plating (Optics)",   "special": "Standard factory-made plating" },
+  { "id": "robot_plating_factory_body",      "name": "Factory Plating (Main Body)", "special": "Standard factory-made plating" },
+  { "id": "robot_plating_factory_arms",      "name": "Factory Plating (Arms)",     "special": "Standard factory-made plating" },
+  { "id": "robot_plating_factory_thruster",  "name": "Factory Plating (Thruster)", "special": "Standard factory-made plating" },
+
+  { "id": "robot_plating_primal_optics",     "name": "Primal Plate (Optics)",   "special": "Makeshift armor, reduces carrying capacity" },
+  { "id": "robot_plating_primal_body",       "name": "Primal Plate (Main Body)", "special": "Makeshift armor, reduces carrying capacity" },
+  { "id": "robot_plating_primal_arms",       "name": "Primal Plate (Arms)",     "special": "Makeshift armor, reduces carrying capacity" },
+  { "id": "robot_plating_primal_thruster",   "name": "Primal Plate (Thruster)", "special": "Makeshift armor, reduces carrying capacity" },
+
+  { "id": "robot_plating_serrated_optics",   "name": "Serrated Plate (Optics)",   "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_body",     "name": "Serrated Plate (Main Body)", "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_arms",     "name": "Serrated Plate (Arms)",     "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_thruster", "name": "Serrated Plate (Thruster)", "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+
+  { "id": "robot_plating_noxious_optics",    "name": "Noxious Plate (Optics)",   "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_body",      "name": "Noxious Plate (Main Body)", "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_arms",      "name": "Noxious Plate (Arms)",     "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_thruster",  "name": "Noxious Plate (Thruster)", "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+
+  { "id": "robot_plating_toxic_optics",      "name": "Toxic Plate (Optics)",   "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" },
+  { "id": "robot_plating_toxic_body",        "name": "Toxic Plate (Main Body)", "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" },
+  { "id": "robot_plating_toxic_arms",        "name": "Toxic Plate (Arms)",     "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" },
+  { "id": "robot_plating_toxic_thruster",    "name": "Toxic Plate (Thruster)", "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" }
+]

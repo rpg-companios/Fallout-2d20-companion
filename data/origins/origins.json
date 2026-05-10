@@ -1,0 +1,198 @@
+[
+  {
+    "id": "brotherhood",
+    "displayNameKey": "origins.brotherhood.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["brotherhood-chain-that-binds"],
+    "equipmentKitIds": ["brotherhood_initiate", "brotherhood_scribe"]
+  },
+  {
+    "id": "ncr",
+    "displayNameKey": "origins.ncr.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["ncr-resident"],
+    "equipmentKitIds": ["ncr_infantry", "ncr_caravaneer", "ncr_marksman"]
+  },
+  {
+    "id": "minuteman",
+    "displayNameKey": "origins.minuteman.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["minuteman-peoples-militia"],
+    "equipmentKitIds": ["minuteman_shooter", "minuteman_skirmisher"]
+  },
+  {
+    "id": "childOfAtom",
+    "displayNameKey": "origins.childOfAtom.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["childofatom-radioactive-sponge"],
+    "equipmentKitIds": ["atom_missionary", "atom_zealot"]
+  },
+  {
+    "id": "vaultDweller",
+    "displayNameKey": "origins.vaultDweller.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["vaultdweller-vault-kid"],
+    "equipmentKitIds": ["vault_security", "vault_resident"]
+  },
+  {
+    "id": "ghoul",
+    "displayNameKey": "origins.ghoul.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["ghoul-necrotic-posthuman"],
+    "equipmentKitIds": [
+      "wastelander_mercenary",
+      "wastelander_settler",
+      "wastelander_wanderer",
+      "wastelander_raider",
+      "wastelander_trader"
+    ]
+  },
+  {
+    "id": "survivor",
+    "displayNameKey": "origins.survivor.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["survivor-survivor"],
+    "equipmentKitIds": [
+      "wastelander_mercenary",
+      "wastelander_settler",
+      "wastelander_wanderer",
+      "wastelander_raider",
+      "wastelander_trader"
+    ]
+  },
+  {
+    "id": "superMutant",
+    "displayNameKey": "origins.superMutant.name",
+    "isRobot": false,
+    "isMutant": true,
+    "canWearStandardArmor": false,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": true,
+    "traitIds": ["supermutant-forced-evolution"],
+    "equipmentKitIds": ["supermutant_bruiser", "supermutant_skirmisher"]
+  },
+  {
+    "id": "brotherhoodOutcast",
+    "displayNameKey": "origins.brotherhoodOutcast.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": ["brotherhoodoutcast-chain-that-breaks"],
+    "equipmentKitIds": ["outcast_former_knight", "outcast_former_scribe"]
+  },
+  {
+    "id": "robobrain",
+    "displayNameKey": "origins.robobrain.name",
+    "isRobot": true,
+    "canWearStandardArmor": false,
+    "canWearRobotArmor": true,
+    "canWearMutantArmor": false,
+    "traitIds": ["robobrain-robot-with-brains"],
+    "equipmentKitIds": ["robobrain_servomechanizmy"]
+  },
+  {
+    "id": "securitron",
+    "displayNameKey": "origins.securitron.name",
+    "isRobot": true,
+    "canWearStandardArmor": false,
+    "canWearRobotArmor": true,
+    "canWearMutantArmor": false,
+    "traitIds": [],
+    "equipmentKitIds": ["default_caps_only"]
+  },
+  {
+    "id": "assaultron",
+    "displayNameKey": "origins.assaultron.name",
+    "isRobot": true,
+    "canWearStandardArmor": false,
+    "canWearRobotArmor": true,
+    "canWearMutantArmor": false,
+    "traitIds": ["assaultron-designed-for-frontline"],
+    "equipmentKitIds": ["default_caps_only"]
+  },
+  {
+    "id": "misterHandy",
+    "displayNameKey": "origins.misterHandy.name",
+    "isRobot": true,
+    "canWearStandardArmor": false,
+    "canWearRobotArmor": true,
+    "canWearMutantArmor": false,
+    "traitIds": ["misterhandy-robot-mr-handy"],
+    "equipmentKitIds": [
+      "mister_handy_assistant",
+      "mister_handy_brave",
+      "mister_handy_nanny",
+      "mister_handy_medic",
+      "mister_handy_farmer"
+    ]
+  },
+  {
+    "id": "protectron",
+    "displayNameKey": "origins.protectron.name",
+    "isRobot": true,
+    "canWearStandardArmor": false,
+    "canWearRobotArmor": true,
+    "canWearMutantArmor": false,
+    "traitIds": ["protectron-protect-or-destroy"],
+    "equipmentKitIds": [
+      "protectron_standard",
+      "protectron_medic",
+      "protectron_firefighter",
+      "protectron_nukatron",
+      "protectron_worker",
+      "protectron_model_x"
+    ]
+  },
+  {
+    "id": "shadow",
+    "displayNameKey": "origins.shadow.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": [],
+    "equipmentKitIds": ["default_caps_only"]
+  },
+  {
+    "id": "synth",
+    "displayNameKey": "origins.synth.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": [],
+    "equipmentKitIds": ["default_caps_only"]
+  },
+  {
+    "id": "savage",
+    "displayNameKey": "origins.savage.name",
+    "isRobot": false,
+    "canWearStandardArmor": true,
+    "canWearRobotArmor": false,
+    "canWearMutantArmor": false,
+    "traitIds": [],
+    "equipmentKitIds": ["default_caps_only"]
+  }
+]

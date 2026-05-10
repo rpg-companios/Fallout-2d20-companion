@@ -1,0 +1,51 @@
+{
+  "weaponTypeLabels": {
+    "light": "Small Guns",
+    "heavy": "Heavy Weapons",
+    "energy": "Energy Weapons",
+    "melee": "Melee",
+    "unarmed": "Unarmed",
+    "thrown": "Thrown",
+    "explosive": "Explosives",
+    "other": "Other"
+  },
+  "categories": {
+    "weapon": "Weapons",
+    "armor": "Armor",
+    "clothing": "Clothing",
+    "ammo": "Ammo",
+    "food": "Food",
+    "drinks": "Drinks",
+    "chems": "Chems",
+    "materials": "Materials",
+    "items": "Items",
+    "all": "All",
+    "robotEquipment": "Robot Equipment",
+    "robotWeapons": "Robot Weapons",
+    "robotPlating": "Plating",
+    "robotArmorLayer": "Armor",
+    "robotFrame": "Frame",
+    "robotBodyParts": "Robot Body Parts",
+    "robotModules": "Robot Modules"
+  },
+  "itemTypes": {
+    "weapon": "🔫 Weapon",
+    "armor": "🛡️ Armor",
+    "clothing": "👕 Clothing",
+    "chem": "💊 Chem",
+    "drinks": "🥤 Drink",
+    "ammo": "🔹 Ammo",
+    "plating": "🔩 Plating",
+    "robotArmor": "🛡️ Robot Armor",
+    "robotFrame": "⚙️ Frame"
+  },
+  "title": "Add item",
+  "back": "...Back",
+  "searchPlaceholder": "Search all items...",
+  "emptyCategory": "Category is empty",
+  "close": "Close",
+  "buyTitle": "Buy items",
+  "quantityLabel": "Quantity",
+  "addButton": "Add",
+  "cancelButton": "Cancel"
+}

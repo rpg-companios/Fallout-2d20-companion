@@ -1,0 +1,831 @@
+[
+  {
+    "modType": "armorUnique",
+    "id": "uniq_raider_welded",
+    "modCategory": "raiderUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_raider_hardened",
+    "modCategory": "raiderUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 2,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 6
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_raider_reinforced",
+    "modCategory": "raiderUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 9
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_raider_bolstered",
+    "modCategory": "raiderUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 12
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_leather_boiled",
+    "modCategory": "leatherUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 5
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_leather_stitched",
+    "modCategory": "leatherUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 2,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 10
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_leather_tanned",
+    "modCategory": "leatherUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 15
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_leather_shadowed",
+    "modCategory": "leatherUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 20
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_leather_studded",
+    "modCategory": "leatherUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 25
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_metal_painted",
+    "modCategory": "metalUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 10
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_metal_enameled",
+    "modCategory": "metalUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 20
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_metal_shadowed",
+    "modCategory": "metalUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 25
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_metal_alloy",
+    "modCategory": "metalUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 30
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_metal_polished",
+    "modCategory": "metalUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 40
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_combat_reinforced",
+    "modCategory": "combatUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 15
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_combat_shadowed",
+    "modCategory": "combatUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 1,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 15
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_combat_fiberglass",
+    "modCategory": "combatUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 30
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_combat_polymer",
+    "modCategory": "combatUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 45
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_synth_laminated",
+    "modCategory": "synthUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 1,
+    "requiredPerk": "",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 5
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_synth_rubberized",
+    "modCategory": "synthUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 2,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 10
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_synth_microcarbon",
+    "modCategory": "synthUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 15
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_synth_nanofiber",
+    "modCategory": "synthUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg",
+      "Head"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "Repair",
+    "costModifier": {
+      "op": "+",
+      "value": 20
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  }
+]

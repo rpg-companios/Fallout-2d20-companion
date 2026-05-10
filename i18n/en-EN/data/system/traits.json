@@ -1,0 +1,125 @@
+{
+  "traits": {
+    "brotherhood": {
+      "chainThatBinds": {
+        "name": "The Chain That Binds",
+        "description": "You grew up in the strict hierarchy of the Brotherhood of Steel, where the chain of command is sacred. Your devotion to the order and its technological ideals knows no bounds.\n\nYou gain one additional tagged skill of your choice from: Energy Weapons, Science, or Repair.",
+        "forcedSkills": ["Energy Weapons", "Science", "Repair"]
+      }
+    },
+    "brotherhoodOutcast": {
+      "chainThatBreaks": {
+        "name": "The Chain That Breaks",
+        "description": "You believe your Brotherhood leadership cares only about collecting pre-war technology. Your role as a member, as a descendant of soldiers, compels you to help others and pursue goals beyond the Brotherhood's dogma.\n\nYou gain one additional tagged skill of your choice from: Energy Weapons, Science, or Repair.",
+        "forcedSkills": ["Energy Weapons", "Science", "Repair"]
+      }
+    },
+    "superMutant": {
+      "forcedEvolution": {
+        "name": "Forced Evolution",
+        "description": "Your starting Strength and Endurance are each increased by +2, and their maximums are raised to 12, while Intelligence and Charisma maximums are reduced to 6. All your skills are capped at rank 4. You are fully immune to radiation and poison damage. You do not appear to age, but you are sterile. You may only wear armor made for super mutants."
+      }
+    },
+    "ghoul": {
+      "necroticPosthuman": {
+        "name": "Necrotic Posthuman",
+        "description": "You are immune to radiation damage. Moreover, you heal from it — restoring 1 HP for every 3 points of radiation damage dealt to you. If you rest in an irradiated area, you may reroll your dice pool when checking if your injuries heal. Additionally, Survival becomes a tagged skill, raising it by 2 ranks."
+      }
+    },
+    "minuteman": {
+      "peoplesMilitia": {
+        "name": "People's Militia",
+        "description": "You grew up in the tradition of the Minutemen — defenders of the common people of the Commonwealth. Your dedication to protecting civilians and readiness to help at any moment have become part of your nature.\n\nYou gain one additional tagged skill of your choice from: Small Guns, Survival, or Speech.",
+        "forcedSkills": ["Small Guns", "Survival", "Speech"]
+      }
+    },
+    "childOfAtom": {
+      "radioactiveSponge": {
+        "name": "Radioactive Sponge",
+        "description": "Your unusual life experience grants you an additional perk at first level. You can resist, accumulate, and even channel radiation through your body. Your base radiation damage resistance is 1. Once per scene, when someone at close range would suffer radiation damage, you may take the hit instead."
+      }
+    },
+    "vaultDweller": {
+      "vaultKid": {
+        "name": "Vault Kid",
+        "description": "Your healthy upbringing from skilled doctors and high-tech Auto-Docs reduces the difficulty of all END checks and lets you resist disease effects. Additionally, thanks to your carefully planned education, you gain one additional tagged skill of your choice."
+      }
+    },
+    "protectron": {
+      "protectOrDestroy": {
+        "name": "Protect or Destroy",
+        "description": "You were built to survive harsh conditions. Once per scene you may reroll a check to overcome an environmental hazard. You are immune to disease, radiation, and poison, but cannot use chems or benefit from food, drink, or rest. You cannot recover from injuries or restore HP without repair."
+      }
+    },
+    "assaultron": {
+      "designedForFrontline": {
+        "name": "Designed for the Frontline",
+        "description": "You are a robot immune to disease, radiation damage, and poison, but unable to use chems or benefit from food, drink, or rest. You cannot recover from injuries or restore HP without repair. Your chain-driven limbs grant +1 Combat Die to melee attacks. A powerful laser is built into your armored head."
+      }
+    },
+    "ncr": {
+      "resident": {
+        "name": "NCR Resident",
+        "description": "You grew up in the New California Republic."
+      },
+      "goodSoul": {
+        "name": "Good Soul",
+        "description": "You gain one additional tagged skill of your choice from: Speech, Medicine, Repair, Science, or Barter."
+      },
+      "infantryman": {
+        "name": "Infantryman",
+        "description": "You deal +1 damage when using NCR infantry weapons."
+      },
+      "homeOnTheRange": {
+        "name": "Home on the Range",
+        "description": "You feel at home on the open wasteland."
+      },
+      "techniqueOfDescent": {
+        "name": "Trigger Discipline",
+        "description": "Reduces fire rate of small guns and energy weapons by 1 when both types are equipped simultaneously."
+      },
+      "brahminBaron": {
+        "name": "Brahmin Baron",
+        "description": "Your connections with traders give advantages in barter."
+      }
+    },
+    "survivor": {
+      "survivor": {
+        "name": "Survivor",
+        "description": "You are hardened by life on the wasteland."
+      },
+      "educated": {
+        "name": "Educated",
+        "description": "You gain additional skill points when leveling up."
+      },
+      "quickShot": {
+        "name": "Quick Shot",
+        "description": "You can attack faster, but with less accuracy."
+      },
+      "gifted": {
+        "name": "Gifted",
+        "description": "Your attributes are higher, but you gain fewer skill points."
+      },
+      "heavyHanded": {
+        "name": "Heavy Handed",
+        "description": "Your melee attacks deal more damage."
+      },
+      "smallFrame": {
+        "name": "Small Frame",
+        "description": "Your small stature gives advantages in stealth."
+      }
+    },
+    "misterHandy": {
+      "robotMrHandy": {
+        "name": "Robot Mr. Handy",
+        "description": "You have 360-degree vision and an enhanced sensor suite. You are immune to radiation and poison damage, but cannot use chems or benefit from food, drink, or rest. You hover via jet propulsion. You cannot recover from injuries or restore HP without repair."
+      }
+    },
+    "robobrain": {
+      "robotWithBrains": {
+        "name": "Robot with Brains",
+        "description": "You are a robot with a human brain as your central processor. You have visual sensors capable of detecting the visual spectrum and infrared radiation. You are immune to radiation and poison, but cannot use chems or benefit from food, drink, or rest."
+      }
+    }
+  }
+}

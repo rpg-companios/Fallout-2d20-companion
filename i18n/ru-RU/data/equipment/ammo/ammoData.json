@@ -1,0 +1,162 @@
+[
+  {
+    "name": ".38",
+    "find_formula": "10+5fn{CD}",
+    "weight": 0.015,
+    "price": 1,
+    "rarity": 0,
+    "itemType": "ammo"
+  },
+  {
+    "name": "10-мм",
+    "find_formula": "8+4fn{CD}",
+    "weight": 0.025,
+    "price": 2,
+    "rarity": 0,
+    "itemType": "ammo"
+  },
+  {
+    "name": ".308",
+    "find_formula": "6+3fn{CD}",
+    "weight": 0.045,
+    "price": 3,
+    "rarity": 1,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Сигнальная ракета",
+    "find_formula": "2+1fn{CD}",
+    "weight": 0.085,
+    "price": 1,
+    "rarity": 1,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Патрон дробовика",
+    "find_formula": "6+3fn{CD}",
+    "weight": 0.1,
+    "price": 3,
+    "rarity": 1,
+    "itemType": "ammo"
+  },
+  {
+    "name": ".45",
+    "find_formula": "8+4fn{CD}",
+    "weight": 0.03,
+    "price": 3,
+    "rarity": 2,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Топливо огнемета",
+    "find_formula": "12+6fn{CD}",
+    "weight": 0.015,
+    "price": 1,
+    "rarity": 2,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Ядерная батарея",
+    "find_formula": "14+7fn{CD}",
+    "weight": 0.03,
+    "price": 3,
+    "rarity": 2,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Патрон гамма-пушки",
+    "find_formula": "4+2fn{CD}",
+    "weight": 0.025,
+    "price": 10,
+    "rarity": 2,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Ж/Д гвоздь",
+    "find_formula": "6+3fn{CD}",
+    "weight": 0.2,
+    "price": 1,
+    "rarity": 2,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Шприц",
+    "find_formula": "4+2fn{CD}",
+    "weight": 0.1,
+    "price": "1",
+    "rarity": 2,
+    "itemType": "ammo"
+  },
+  {
+    "name": ".44 Магнум",
+    "find_formula": "4+2fn{CD}",
+    "weight": 0.055,
+    "price": 3,
+    "rarity": 3,
+    "itemType": "ammo"
+  },
+  {
+    "name": ".50",
+    "find_formula": "4+2fn{CD}",
+    "weight": 0.075,
+    "price": 4,
+    "rarity": 3,
+    "itemType": "ammo"
+  },
+  {
+    "name": "5.56-мм",
+    "find_formula": "8+4fn{CD}",
+    "weight": 0.035,
+    "price": 2,
+    "rarity": 3,
+    "itemType": "ammo"
+  },
+  {
+    "name": "5-мм",
+    "find_formula": "10x(12+6fn{CD})",
+    "weight": 0.01,
+    "price": 1,
+    "rarity": 3,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Ядерный блок",
+    "find_formula": "1",
+    "weight": 4,
+    "price": 200,
+    "rarity": 3,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Ракета",
+    "find_formula": "2+1fn{CD}",
+    "weight": 7,
+    "price": 25,
+    "rarity": 3,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Заряд плазмы",
+    "find_formula": "10+5fn{CD}",
+    "weight": 0.03,
+    "price": 5,
+    "rarity": 4,
+    "itemType": "ammo"
+  },
+  {
+    "name": "2-мм ЭК",
+    "find_formula": "6+3fn{CD}",
+    "weight": 0.13,
+    "price": 10,
+    "rarity": 5,
+    "itemType": "ammo"
+  },
+  {
+    "name": "Ядерный минизаряд",
+    "find_formula": "1+1fn{CD}",
+    "weight": 12,
+    "price": 100,
+    "rarity": 6,
+    "itemType": "ammo"
+  }
+] 

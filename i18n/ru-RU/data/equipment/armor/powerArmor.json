@@ -1,0 +1,55 @@
+{
+  "powerArmor": [
+    {
+      "categoryKey": "frame",
+      "items": [
+        { "id": "power_armor_frame", "name": "Каркас силовой брони" }
+      ]
+    },
+    {
+      "categoryKey": "raiderPower",
+      "items": [
+        { "id": "power_armor_raider_helmet", "name": "Шлем силовой брони рейдера" },
+        { "id": "power_armor_raider_chest", "name": "Нагрудник силовой брони рейдера" },
+        { "id": "power_armor_raider_arm", "name": "Наручи силовой брони рейдера" },
+        { "id": "power_armor_raider_leg", "name": "Поножи силовой брони рейдера" }
+      ]
+    },
+    {
+      "categoryKey": "t45",
+      "items": [
+        { "id": "power_armor_t45_helmet", "name": "Шлем Т-45" },
+        { "id": "power_armor_t45_chest", "name": "Нагрудник Т-45" },
+        { "id": "power_armor_t45_arm", "name": "Наручи Т-45" },
+        { "id": "power_armor_t45_leg", "name": "Поножи Т-45" }
+      ]
+    },
+    {
+      "categoryKey": "t51",
+      "items": [
+        { "id": "power_armor_t51_helmet", "name": "Шлем Т-51" },
+        { "id": "power_armor_t51_chest", "name": "Нагрудник Т-51" },
+        { "id": "power_armor_t51_arm", "name": "Наручи Т-51" },
+        { "id": "power_armor_t51_leg", "name": "Поножи Т-51" }
+      ]
+    },
+    {
+      "categoryKey": "t60",
+      "items": [
+        { "id": "power_armor_t60_helmet", "name": "Шлем Т-60" },
+        { "id": "power_armor_t60_chest", "name": "Нагрудник Т-60" },
+        { "id": "power_armor_t60_arm", "name": "Наручи Т-60" },
+        { "id": "power_armor_t60_leg", "name": "Поножи Т-60" }
+      ]
+    },
+    {
+      "categoryKey": "x01",
+      "items": [
+        { "id": "power_armor_x01_helmet", "name": "Шлем X-01" },
+        { "id": "power_armor_x01_chest", "name": "Нагрудник X-01" },
+        { "id": "power_armor_x01_arm", "name": "Наручи X-01" },
+        { "id": "power_armor_x01_leg", "name": "Поножи X-01" }
+      ]
+    }
+  ]
+}

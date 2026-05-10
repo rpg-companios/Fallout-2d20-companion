@@ -1,0 +1,75 @@
+import { StyleSheet } from 'react-native';
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '92%',
+    maxWidth: 640,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+  },
+  modalTitle: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  perkItem: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  perkDisabled: { backgroundColor: '#f1f5f9' },
+  selectedPerk: { backgroundColor: '#299764' },
+  selectedPerkName: { color: '#fff' },
+  perkHeader: { paddingHorizontal: 10, paddingVertical: 10 },
+  perkName: { color: '#000', fontWeight: 'bold' },
+  perkNameDisabled: { color: '#9aa1a9' },
+  perkBody: { paddingHorizontal: 10, paddingBottom: 10 },
+  perkDescription: { color: '#000', marginBottom: 8 },
+  chooseButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#16a34a',
+  },
+  chooseButtonDisabled: { backgroundColor: '#9ca3af', borderColor: '#9ca3af' },
+  selectedChooseButton: { backgroundColor: '#ef4444', borderColor: '#b91c1c' },
+  chooseButtonText: { color: '#fff', fontWeight: 'bold' },
+  unmetContainer: { marginBottom: 8 },
+  unmetText: { color: '#dc2626', marginBottom: 2 },
+  modalButtons: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  confirmButton: {
+    backgroundColor: '#16a34a',
+    borderColor: '#15803d',
+    marginRight: 8,
+  },
+  cancelButton: { backgroundColor: '#ef4444', borderColor: '#b91c1c' },
+  modalButtonText: { color: '#fff', fontWeight: 'bold' },
+});
+
+export default styles;

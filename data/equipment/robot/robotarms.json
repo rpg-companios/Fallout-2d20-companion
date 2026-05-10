@@ -1,0 +1,374 @@
+[
+  {
+    "id": "robot_weapon_manipulator",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "complexity": 2,
+    "perksRequired": [],
+    "skill": "Repair",
+    "rarity": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "builtinWeaponId": "robot_weapon_manipulator",
+    "name": "robot_weapon_manipulator"
+  },
+  {
+    "id": "robot_weapon_protectron_manipulator",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "complexity": 3,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "builtinWeaponId": "robot_weapon_protectron_manipulator",
+    "name": "robot_weapon_protectron_manipulator"
+  },
+  {
+    "id": "robot_arm_protectron",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "melee": 2,
+    "guns": 2,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "name": "robot_arm_protectron"
+  },
+  {
+    "id": "robot_arm_mister_handy",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "maxSlots": 3,
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "melee": 3,
+    "guns": 1,
+    "physicalDR": 2,
+    "energyDR": 2,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "builtinWeaponId": "robot_weapon_manipulator",
+    "name": "robot_arm_mister_handy"
+  },
+  {
+    "id": "robot_arm_assaultron",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 2"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "melee": 5,
+    "guns": 5,
+    "physicalDR": 3,
+    "energyDR": 3,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "name": "robot_arm_assaultron"
+  },
+  {
+    "id": "robot_arm_assaultron_shocker",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 6,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "melee": 5,
+    "guns": 3,
+    "physicalDR": 3,
+    "energyDR": 4,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "builtinWeaponId": "robot_weapon_shocker_arms",
+    "name": "robot_arm_assaultron_shocker"
+  },
+  {
+    "id": "robot_arm_robobrain",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "melee": 2,
+    "guns": 4,
+    "physicalDR": 2,
+    "energyDR": 3,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "name": "robot_arm_robobrain"
+  },
+  {
+    "id": "robot_arm_sentry_bot",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 6,
+    "perksRequired": [
+      "Armorer 1",
+      "Robotics Expert 3",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "melee": 4,
+    "guns": 5,
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "name": "robot_arm_sentry_bot"
+  },
+  {
+    "id": "robot_weapon_flamethrower",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_flamethrower",
+    "name": "robot_weapon_flamethrower"
+  },
+  {
+    "id": "robot_weapon_circular_saw",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_circular_saw",
+    "name": "robot_weapon_circular_saw"
+  },
+  {
+    "id": "robot_weapon_laser_cutter",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_laser_cutter",
+    "name": "robot_weapon_laser_cutter"
+  },
+  {
+    "id": "robot_weapon_auto_10mm",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_auto_10mm",
+    "name": "robot_weapon_auto_10mm"
+  },
+  {
+    "id": "robot_weapon_cryojet",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_cryojet",
+    "name": "robot_weapon_cryojet"
+  },
+  {
+    "id": "robot_weapon_shocker_arms",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_shocker_arms",
+    "name": "robot_weapon_shocker_arms"
+  },
+  {
+    "id": "robot_weapon_construction_claw",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_construction_claw",
+    "name": "robot_weapon_construction_claw"
+  },
+  {
+    "id": "robot_weapon_drill",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_drill",
+    "name": "robot_weapon_drill"
+  },
+  {
+    "id": "robot_weapon_vice_grip",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_vice_grip",
+    "name": "robot_weapon_vice_grip"
+  },
+  {
+    "id": "robot_weapon_claw",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm",
+      "arm1",
+      "arm2",
+      "arm3"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_claw",
+    "name": "robot_weapon_claw"
+  },
+  {
+    "id": "robot_weapon_tesla_arm",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "weaponSlots": 0,
+    "canHoldWeapons": false,
+    "builtinWeaponId": "robot_weapon_tesla_arm",
+    "name": "robot_weapon_tesla_arm"
+  },
+  {
+    "id": "robot_arm_smoke_manipulator",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "melee": 2,
+    "guns": 4,
+    "physicalDR": 2,
+    "energyDR": 3,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "builtinWeaponId": "robot_weapon_smoke_claws",
+    "name": "robot_arm_smoke_manipulator"
+  }
+]

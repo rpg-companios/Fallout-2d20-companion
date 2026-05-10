@@ -1,0 +1,90 @@
+{
+  "armor": [
+    {
+      "categoryKey": "raiderArmor",
+      "items": [
+        { "id": "armor_raider_chest_001", "name": "Raider Chest Piece" },
+        { "id": "armor_raider_leg_001", "name": "Raider Leg" },
+        { "id": "armor_raider_hand_001", "name": "Raider Arm" },
+        { "id": "armor_raider_chest_002", "name": "Sturdy Raider Chest Piece" },
+        { "id": "armor_raider_leg_002", "name": "Sturdy Raider Leg" },
+        { "id": "armor_raider_hand_002", "name": "Sturdy Raider Arm" },
+        { "id": "armor_raider_chest_003", "name": "Heavy Raider Chest Piece" },
+        { "id": "armor_raider_leg_003", "name": "Heavy Raider Leg" },
+        { "id": "armor_raider_hand_003", "name": "Heavy Raider Arm" }
+      ]
+    },
+    {
+      "categoryKey": "leatherArmor",
+      "items": [
+        { "id": "armor_leather_chest_001", "name": "Leather Chest Piece" },
+        { "id": "armor_leather_leg_001", "name": "Leather Leg" },
+        { "id": "armor_leather_hand_001", "name": "Leather Arm" },
+        { "id": "armor_leather_chest_002", "name": "Sturdy Leather Chest Piece" },
+        { "id": "armor_leather_leg_002", "name": "Sturdy Leather Leg" },
+        { "id": "armor_leather_hand_002", "name": "Sturdy Leather Arm" },
+        { "id": "armor_leather_chest_003", "name": "Heavy Leather Chest Piece" },
+        { "id": "armor_leather_leg_003", "name": "Heavy Leather Leg" },
+        { "id": "armor_leather_hand_003", "name": "Heavy Leather Arm" }
+      ]
+    },
+    {
+      "categoryKey": "metalArmor",
+      "items": [
+        { "id": "armor_metal_head_001", "name": "Metal Helmet" },
+        { "id": "armor_metal_chest_001", "name": "Metal Chest Piece" },
+        { "id": "armor_metal_leg_001", "name": "Metal Leg" },
+        { "id": "armor_metal_hand_001", "name": "Metal Arm" },
+        { "id": "armor_metal_head_002", "name": "Sturdy Metal Helmet" },
+        { "id": "armor_metal_chest_002", "name": "Sturdy Metal Chest Piece" },
+        { "id": "armor_metal_leg_002", "name": "Sturdy Metal Leg" },
+        { "id": "armor_metal_hand_002", "name": "Sturdy Metal Arm" },
+        { "id": "armor_metal_head_003", "name": "Heavy Metal Helmet" },
+        { "id": "armor_metal_chest_003", "name": "Heavy Metal Chest Piece" },
+        { "id": "armor_metal_leg_003", "name": "Heavy Metal Leg" },
+        { "id": "armor_metal_hand_003", "name": "Heavy Metal Arm" }
+      ]
+    },
+    {
+      "categoryKey": "combatArmor",
+      "items": [
+        { "id": "armor_combat_head_001", "name": "Combat Helmet" },
+        { "id": "armor_combat_chest_001", "name": "Combat Chest Piece" },
+        { "id": "armor_combat_leg_001", "name": "Combat Leg" },
+        { "id": "armor_combat_hand_001", "name": "Combat Arm" },
+        { "id": "armor_combat_head_002", "name": "Sturdy Combat Helmet" },
+        { "id": "armor_combat_chest_002", "name": "Sturdy Combat Chest Piece" },
+        { "id": "armor_combat_leg_002", "name": "Sturdy Combat Leg" },
+        { "id": "armor_combat_hand_002", "name": "Sturdy Combat Arm" },
+        { "id": "armor_combat_head_003", "name": "Heavy Combat Helmet" },
+        { "id": "armor_combat_chest_003", "name": "Heavy Combat Chest Piece" },
+        { "id": "armor_combat_leg_003", "name": "Heavy Combat Leg" },
+        { "id": "armor_combat_hand_003", "name": "Heavy Combat Arm" }
+      ]
+    },
+    {
+      "categoryKey": "synthArmor",
+      "items": [
+        { "id": "armor_synth_head_001", "name": "Synth Helmet" },
+        { "id": "armor_synth_chest_001", "name": "Synth Chest Piece" },
+        { "id": "armor_synth_leg_001", "name": "Synth Leg" },
+        { "id": "armor_synth_hand_001", "name": "Synth Arm" },
+        { "id": "armor_synth_head_002", "name": "Sturdy Synth Helmet" },
+        { "id": "armor_synth_chest_002", "name": "Sturdy Synth Chest Piece" },
+        { "id": "armor_synth_leg_002", "name": "Sturdy Synth Leg" },
+        { "id": "armor_synth_hand_002", "name": "Sturdy Synth Arm" },
+        { "id": "armor_synth_head_003", "name": "Heavy Synth Helmet" },
+        { "id": "armor_synth_chest_003", "name": "Heavy Synth Chest Piece" },
+        { "id": "armor_synth_leg_003", "name": "Heavy Synth Leg" },
+        { "id": "armor_synth_hand_003", "name": "Heavy Synth Arm" }
+      ]
+    },
+    {
+      "categoryKey": "vaultSecurityArmor",
+      "items": [
+        { "id": "armor_vault_head_001", "name": "Vault Security Helmet" },
+        { "id": "armor_vault_fullbody_001", "name": "Vault Security Armor" }
+      ]
+    }
+  ]
+}

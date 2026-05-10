@@ -1,0 +1,1434 @@
+{
+      "Name": "Rapid",
+      "Prefix": "Rapid",
+      "Effects": "minus 1 CD Damage, plus 2 Fire Rate",
+      "Mod Applies to list": "Submachine Gun"
+    },
+    {
+      "Name": "Armor Piercing",
+      "Prefix": "Armor Piercing",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": "Submachine Gun"
+    },
+    {
+      "Name": "Tuned",
+      "Prefix": "Tuned",
+      "Effects": "plus 1 CD Damage, plus 1 Fire Rate",
+      "Mod Applies to list": "Hunting Rifle"
+    },
+    {
+      "Name": "Hardened",
+      "Prefix": "Hardened",
+      "Effects": "plus 1 CD Damage",
+      "Mod Applies to list": ".44 Pistol, 10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Double-Barrel Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Powerful",
+      "Prefix": "Powerful",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ".44 Pistol, 10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Double-Barrel Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Advanced",
+      "Prefix": "Advanced",
+      "Effects": "plus 3 CD Damage, plus 1 Fire Rate",
+      "Mod Applies to list": ".44 Pistol, 10mm Pistol, Assault Rifle, Combat Rifle, Combat Shotgun, Double-Barrel Shotgun"
+    },
+    {
+      "Name": "Calibrated",
+      "Prefix": "Calibrated",
+      "Effects": "gain Vicious",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Automatic",
+      "Prefix": "Auto",
+      "Effects": "minus 1 CD Damage, plus 2 Fire Rate, gain Burst, gain Inaccurate",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Combat Shotgun, Pipe Gun"
+    },
+    {
+      "Name": "Hair Trigger",
+      "Prefix": "Hair Trigger",
+      "Effects": "plus 1 Fire Rate",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Combat Shotgun, Double-Barrel Shotgun, Pipe Gun"
+    },
+    {
+      "Name": ".38 Reciever",
+      "Prefix": ".38",
+      "Effects": "Set 4 CD Damage, Ammo .38",
+      "Mod Applies to list": "Combat Rifle, Hunting Rifle, Pipe Bolt-Action, Pipe Revolver"
+    },
+    {
+      "Name": ".308 Reciever",
+      "Prefix": ".308",
+      "Effects": "Set 7 CD Damage, Ammo .308",
+      "Mod Applies to list": "Combat Rifle, Pipe Revolver"
+    },
+    {
+      "Name": ".45 Reciever",
+      "Prefix": ".45",
+      "Effects": "Set 4 CD Damage, Ammo .45",
+      "Mod Applies to list": "Pipe Gun"
+    },
+    {
+      "Name": ".50 Reciever",
+      "Prefix": ".50",
+      "Effects": "Set 8 CD Damage, Ammo .50",
+      "Mod Applies to list": "Hunting Rifle, Pipe Bolt-Action"
+    },
+    {
+      "Name": "Automatic Piston",
+      "Prefix": "Automatic",
+      "Effects": "plus 2 Fire Rate, minus 1 Range",
+      "Mod Applies to list": "Railway Rifle"
+    },
+    {
+      "Name": "Snubnose",
+      "Prefix": "Snub-Noses",
+      "Effects": "gain Inaccurate",
+      "Mod Applies to list": ".44 Pistol, Submachine Gun, Pipe Bolt-Action, Syringer"
+    },
+    {
+      "Name": "Bull Barrel",
+      "Prefix": "Bull Barrel",
+      "Effects": "gain Reliable",
+      "Mod Applies to list": ".44 Pistol"
+    },
+    {
+      "Name": "Long",
+      "Prefix": "Long",
+      "Effects": "plus 1 Range",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Combat Shotgun, Double-Barrel Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Ported",
+      "Prefix": "Ported",
+      "Effects": "plus 1 Range, plus 1 Fire Rate",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Vented",
+      "Prefix": "Vented",
+      "Effects": "plus 1 Range, plus 1 Fire Rate, gain Reliable",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Hunting Rifle"
+    },
+    {
+      "Name": "Sawed-Off",
+      "Prefix": "Sawed-Off",
+      "Effects": "gain Close Quarters, lose Two-Handed",
+      "Mod Applies to list": "Double-Barrel Shotgun"
+    },
+    {
+      "Name": "Shielded Barrel",
+      "Prefix": "Shielded",
+      "Effects": "plus 1 CD Damage",
+      "Mod Applies to list": "Gauss Rifle"
+    },
+    {
+      "Name": "Finned",
+      "Prefix": "Finned",
+      "Effects": "plus 1 CD Damage, plus 1 Range",
+      "Mod Applies to list": "Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Large Magazine",
+      "Prefix": "High Capacity",
+      "Effects": "plus 1 Fire Rate, gain Unreliable",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Pipe Gun"
+    },
+    {
+      "Name": "Quick-Eject Mag",
+      "Prefix": "Quick",
+      "Effects": "gain Reliable",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Pipe Gun"
+    },
+    {
+      "Name": "Large Quick-Eject Mag",
+      "Prefix": "Quick High Capacity",
+      "Effects": "plus 1 Fire Rate",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Pipe Gun"
+    },
+    {
+      "Name": "Comfort Grip",
+      "Prefix": "Comfort",
+      "Effects": "lose Inaccurate",
+      "Mod Applies to list": ".44 Pistol, 10mm Pistol"
+    },
+    {
+      "Name": "Sharpshooter's Grip",
+      "Prefix": "Sharpshooter's",
+      "Effects": "gain Piercing 1, lose Inaccurate",
+      "Mod Applies to list": "10mm Pistol, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Full Stock",
+      "Prefix": "Full Stock",
+      "Effects": "gain Two-Handed, lose Inaccurate",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Double-Barrel Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Marksman's Stock",
+      "Prefix": "Markman's",
+      "Effects": "gain Two-Handed, gain Accurate, lose Inaccurate",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Syringer"
+    },
+    {
+      "Name": "Recoil Compensating Stock",
+      "Prefix": "Recoil Compensated",
+      "Effects": "gain Two-Handed, plus 1 Fire Rate, lose Inaccurate",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Gauss Rifle, Submachine Gun, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Full Capacitors",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Vicious",
+      "Mod Applies to list": "Gauss Rifle"
+    },
+    {
+      "Name": "Capacitor Boosting Coil",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, minus 1 Fire Rate",
+      "Mod Applies to list": "Gauss Rifle"
+    },
+    {
+      "Name": "Reflex Sight",
+      "Prefix": "Tactical",
+      "Effects": "gain Re-roll Hit Location",
+      "Mod Applies to list": ".44 Pistol, 10mm Pistol, Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Double-Barrel Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Short Scope",
+      "Prefix": "Scoped",
+      "Effects": "gain Accurate",
+      "Mod Applies to list": ".44 Pistol, Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Long Scope",
+      "Prefix": "Long Scoped",
+      "Effects": "gain Accurate, plus 1 Range",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Short Night Vision Scope",
+      "Prefix": "Night Vision",
+      "Effects": "gain Accurate, gain Night Vision",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Long Night Vision Scope",
+      "Prefix": "Long Night Vision",
+      "Effects": "gain Accurate, gain Night Vision, plus 1 Range",
+      "Mod Applies to list": "Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Recon Scope",
+      "Prefix": "Recon",
+      "Effects": "gain Accurate, gain Recon",
+      "Mod Applies to list": ".44 Pistol, 10mm Pistol, Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle, Syringer"
+    },
+    {
+      "Name": "Bayonet",
+      "Prefix": "Beyoneted",
+      "Effects": "gain Bayonet",
+      "Mod Applies to list": "Combat Rifle, Hunting Rifle, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver, Railway Rifle"
+    },
+    {
+      "Name": "Compensator",
+      "Prefix": "Componsated",
+      "Effects": "lose Inaccurate",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Submachine Gun, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Muzzle Break",
+      "Prefix": "Muzzled",
+      "Effects": "lose Inaccurate, plus 1 Fire Rate",
+      "Mod Applies to list": "Submachine Gun, Combat Shotgun, Double-Barrel Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Suppressor",
+      "Prefix": "Supressed",
+      "Effects": "gain Supressed",
+      "Mod Applies to list": "10mm Pistol, Assault Rifle, Combat Rifle, Gauss Rifle, Hunting Rifle, Submachine Gun, Combat Shotgun, Pipe Bolt-Action, Pipe Gun, Pipe Revolver"
+    },
+    {
+      "Name": "Beta Wave Tuner",
+      "Prefix": "",
+      "Effects": "gain Persistent",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Boosted Capacitor",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, minus 1 Fire Rate",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Photon Exciter",
+      "Prefix": "",
+      "Effects": "gain Vicious",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Photon Agitator",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Vicious",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Three-Crank Capacitor",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, 3 ammo per attack",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Four-Crank Capacitor",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, 4 ammo per attack",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Five-Crank Capacitor",
+      "Prefix": "",
+      "Effects": "plus 3 CD Damage, 5 ammo per attack",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Six-Crank Capacitor",
+      "Prefix": "",
+      "Effects": "plus 4 CD Damage, 6 ammo per attack",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Bracketed Short Barrel",
+      "Prefix": "",
+      "Effects": "Adds Muzzle Mod Slot",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Long Barrel",
+      "Prefix": "",
+      "Effects": "plus 1 Range, lose Close-Quarters",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun"
+    },
+    {
+      "Name": "Splitter",
+      "Prefix": "",
+      "Effects": "minus 1 CD Damage, gain Spread, Inaccurate",
+      "Mod Applies to list": "Plasma Gun"
+    },
+    {
+      "Name": "Automatic Barrel",
+      "Prefix": "",
+      "Effects": "minus 1 CD Damage, plus 1 Range, 1 Fire Rate, lose Close Quarters",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Bracketed Long Barrel",
+      "Prefix": "",
+      "Effects": "Adds Muzzle Mod Slot, plus 1 Range, lose Close Quarters",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Improved Barrel",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Sniper Barrel",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, 1 Range, minus 1 Fire Rate, lose Close Quarters",
+      "Mod Applies to list": "Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Flamer Barrel",
+      "Prefix": "",
+      "Effects": "minus 2 CD Damage, 1 Range, plus 2 Fire Rate, gain Burst, Spread, Innacurate",
+      "Mod Applies to list": "Plasma Gun"
+    },
+    {
+      "Name": "Sharpshooter's Grip",
+      "Prefix": "",
+      "Effects": "plus Piercing 1, lose Inaccurate",
+      "Mod Applies to list": "Laser Gun"
+    },
+    {
+      "Name": "Standard Stock",
+      "Prefix": "",
+      "Effects": "gain Two-Handed, lose Inaccurate, Close Quarters",
+      "Mod Applies to list": "Institute Laser, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Full Stock",
+      "Prefix": "",
+      "Effects": "gain Piercing 1, lose Close Quarters",
+      "Mod Applies to list": "Laser Musket"
+    },
+    {
+      "Name": "Marksman's Stock",
+      "Prefix": "",
+      "Effects": "gain Two-Handed, Accurate, lose Inaccurate, Close Quarters",
+      "Mod Applies to list": "Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Recoil Compensating",
+      "Prefix": "",
+      "Effects": "plus 1 Range, gain Two-Handed, lose Inaccurate, Close Quarters",
+      "Mod Applies to list": "Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Reflex Sight",
+      "Prefix": "",
+      "Effects": "gain Re-roll Hit Location",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Short Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Long Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate, plus 1 Range",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Short Night Vision Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate, Night Vision",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Long Night Vision Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate, Night Vision, plus 1 Range",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Recon Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate, gain Recon",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun, Plasma Gun"
+    },
+    {
+      "Name": "Beam Splitter",
+      "Prefix": "",
+      "Effects": "minus 1 CD Damage, 1 Fire Rate, 1 Range, gain Spread, Inaccurate",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun"
+    },
+    {
+      "Name": "Beam Focuser",
+      "Prefix": "",
+      "Effects": "plus 1 Range",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun"
+    },
+    {
+      "Name": "Gyro Compensating Lens",
+      "Prefix": "",
+      "Effects": "plus 1 Fire Rate, lose Inaccurate",
+      "Mod Applies to list": "Institute Laser, Laser Musket, Laser Gun"
+    },
+    {
+      "Name": "Gamma Gun Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Gamma Gun",
+      "Prefix": "",
+      "Effects": "3CD Radiation, Piercing 1, Stun, Blast, Inaccurate, Range M, Fire Rate 1",
+      "Mod Applies to list": "Gamma Gun"
+    },
+    {
+      "Name": "Deep Dish",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, 1 Range, Dish Mod",
+      "Mod Applies to list": "Gamma Gun"
+    },
+    {
+      "Name": "Electric Signal Carrier Antennae",
+      "Prefix": "",
+      "Effects": "Set 7 CD Damage, Energy Damage, gain Radioactive, Muzzle Mod",
+      "Mod Applies to list": "Gamma Gun"
+    },
+    {
+      "Name": "Signal Repeater",
+      "Prefix": "",
+      "Effects": "plus 2 Fire Rate, gain Burst, remove Blast, Muzzle Mod",
+      "Mod Applies to list": "Gamma Gun"
+    },
+    {
+      "Name": "Flamer Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Flamer",
+      "Prefix": "",
+      "Effects": "3CD Energy, Burst, Persistent, Spread, Debilitating, Inaccurate, 2Handed, Range C, Fire Rate 4",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Napalm Fuel",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage",
+      "Mod Applies to list": "Flamer"
+    },
+    {
+      "Name": "Long Barrel",
+      "Prefix": "",
+      "Effects": "lose Inaccurate",
+      "Mod Applies to list": "Flamer"
+    },
+    {
+      "Name": "Large Tank",
+      "Prefix": "",
+      "Effects": "plus 1 Fire Rate",
+      "Mod Applies to list": "Flamer"
+    },
+    {
+      "Name": "Huge Tank",
+      "Prefix": "",
+      "Effects": "plus 2 Fire Rate",
+      "Mod Applies to list": "Flamer"
+    },
+    {
+      "Name": "Compression Nozzle",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage",
+      "Mod Applies to list": "Flamer"
+    },
+    {
+      "Name": "Vaporization Nozzle",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Vicious",
+      "Mod Applies to list": "Flamer"
+    },
+    {
+      "Name": "Gatling Laser Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Gatling Laser",
+      "Prefix": "",
+      "Effects": "3CD Energy, Burst, Piercing 1, Gatling, Inaccurate, 2Handed, Range M, Fire Rate 6",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Photon Exciter",
+      "Prefix": "",
+      "Effects": "gain Vicious",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Beta Wave Tuner",
+      "Prefix": "",
+      "Effects": "gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Boosted Capacitor",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Photon Agitator",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Vicious",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Charging Barrels",
+      "Prefix": "",
+      "Effects": "plus 4 CD Damage, 1 Range, minus 3 Fire Rate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Reflex Sight",
+      "Prefix": "",
+      "Effects": "lose Inaccurate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Beam Focuser",
+      "Prefix": "",
+      "Effects": "plus 1 Range, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Junk Jet Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Junk Jet",
+      "Prefix": "",
+      "Effects": "6CD Phys, 2Handed, Range M, Fire Rate 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Long Barrel",
+      "Prefix": "",
+      "Effects": "plus 1 Range",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Recoil Compensating Stock",
+      "Prefix": "",
+      "Effects": "plus 1 Fire Rate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Gunner Sight",
+      "Prefix": "",
+      "Effects": "gain Re-roll Hit Location",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Electrification Module",
+      "Prefix": "",
+      "Effects": "gain Vicious, Energy Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Ignition Module",
+      "Prefix": "",
+      "Effects": "gain Persistent (Energy)",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Minigun Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Minigun",
+      "Prefix": "",
+      "Effects": "3CD Phys, Burst, Spread, Gatling, Inaccurate, 2Handed, Range M, Fire Rate 5",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Accelerated Barrel",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, 1 Fire Rate, minus 1 Range",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Tri-Barrel",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, minus 2 Fire Rate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Gunner Sight",
+      "Prefix": "",
+      "Effects": "lose Inaccurate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Shredder",
+      "Prefix": "",
+      "Effects": "gain Melee Weapon with CD Damage equal to Fire Rate Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Missile Launcher Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Missile Launcher",
+      "Prefix": "",
+      "Effects": "11CD Phys, Blast, 2Handed, Range L, Fire Rate 0",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Triple Barrel",
+      "Prefix": "",
+      "Effects": "plus 1 Fire Rate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Quad Barrel",
+      "Prefix": "",
+      "Effects": "plus 2 Fire Rate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Night Vision Scope",
+      "Prefix": "",
+      "Effects": "gain Accurate, Night Vision",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Targeting Computer",
+      "Prefix": "",
+      "Effects": "Aim ignores cover and conveys bonus for next future shot as well during scene",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Bayonet",
+      "Prefix": "",
+      "Effects": "gain Melee Weapon with 4 CD Damage Piercing 1 Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Stabilizer",
+      "Prefix": "",
+      "Effects": "gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Melee Weapons",
+      "Prefix": "",
+      "Effects": "All Melee Weapon type unless specifed as Unarmed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Unarmed Strike",
+      "Prefix": "",
+      "Effects": "Unarmed, 2CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Handy Rock",
+      "Prefix": "",
+      "Effects": "Unarmed, 2CD Phys, Vicious, Thrown C",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Gun Bash 1 handed",
+      "Prefix": "",
+      "Effects": "2CD Phys, Stun, Qualities of gun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Gun Bash 2 handed",
+      "Prefix": "",
+      "Effects": "3CD Phys, Stun, Qualities of gun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sword",
+      "Prefix": "",
+      "Effects": "4CD Phys, Piercing 1, Parry",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Combat Knife",
+      "Prefix": "",
+      "Effects": "3CD Phys, Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Machete",
+      "Prefix": "",
+      "Effects": "3CD Phys, Piericng 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Ripper",
+      "Prefix": "",
+      "Effects": "4CD Phys, Vicious",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Shishkebab",
+      "Prefix": "",
+      "Effects": "5CD Energy, Piercing 1, Parry",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Switchblade",
+      "Prefix": "",
+      "Effects": "2CD Phys Piercing 1, Concealed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Baseball Bat",
+      "Prefix": "",
+      "Effects": "4CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Aluminum Baseball Bat",
+      "Prefix": "",
+      "Effects": "5CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Board",
+      "Prefix": "",
+      "Effects": "4CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Lead Pipe",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Pipe Wrench",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Pool Cue",
+      "Prefix": "",
+      "Effects": "3CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Rolling Pin",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Baton",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sledgehammer",
+      "Prefix": "",
+      "Effects": "5CD Phys, ?Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Super Sledge",
+      "Prefix": "",
+      "Effects": "6CD Phys, Two-Handed, Breaking",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Tire Iron",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Walking Cane",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Boxing Glove",
+      "Prefix": "",
+      "Effects": "Unarmed, 3CD Phys, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Deathclaw Gauntlet",
+      "Prefix": "",
+      "Effects": "Unarmed, 5CD Phys, Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Knuckles",
+      "Prefix": "",
+      "Effects": "Unarmed, 3CD Phys Concealed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Power Fist",
+      "Prefix": "",
+      "Effects": "Unarmed, 4CD Phys, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Melee Weapon Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sword Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sword",
+      "Prefix": "",
+      "Effects": "4CD Phys, Piercing 1, Parry",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Serrated Blade",
+      "Prefix": "",
+      "Effects": "gain persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Electrified Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gains Energy damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Electrified Serrated Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gains Energy damage, Persistent (physical)",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Stun Pack",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gains Energy damage, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Combat Knife Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Combat Knife",
+      "Prefix": "",
+      "Effects": "3CD Phys, Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Serrated Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gains Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Stealth Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, 2 CD Damage on Steak Attacks, gains Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Machete Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Machete",
+      "Prefix": "",
+      "Effects": "3CD Phys, Piericng 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Serrated Blade",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gains Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Ripper Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Ripper",
+      "Prefix": "",
+      "Effects": "4CD Phys, Vicious",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Curved Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, On succesful attack, spend 2 AP to disarm 1 weapon",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Extended Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Shishkebab Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Shishkebab",
+      "Prefix": "",
+      "Effects": "5CD Energy, Piercing 1, Parry",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Extra Flame Jets",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Switchblade Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Switchblade",
+      "Prefix": "",
+      "Effects": "2CD Phys Piercing 1, Concealed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Serrated Blade",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Baseball Bat Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Baseball Bat",
+      "Prefix": "",
+      "Effects": "4CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Aluminum Baseball Bat",
+      "Prefix": "",
+      "Effects": "5CD Phys, Two-Handed (Can only apply mods with Blacksmith 1+)",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Barbed",
+      "Prefix": "",
+      "Effects": "gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sharp",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Chain-Wrapped",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Bladed",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Board Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Board",
+      "Prefix": "",
+      "Effects": "4CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Puncturing",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Bladed",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Lead Pipe Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Lead Pipe",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Heavy",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Pipe Wrench Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Pipe Wrench",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Hooked",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, On succesful attack, spend 2 AP to disarm 1 weapon",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Heavy",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Puncturing",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Extra Heavy",
+      "Prefix": "",
+      "Effects": "plus 3 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Pool Cue Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Pool Cue",
+      "Prefix": "",
+      "Effects": "3CD Phys, Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Barbed",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sharp",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Rolling Pin Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Rolling Pin",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sharp",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Baton Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Baton",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Electrified",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gain Energy Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Stun Pack",
+      "Prefix": "",
+      "Effects": "plus 3 CD Damage, gain Energy Damage, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sledgehammer Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sledgehammer",
+      "Prefix": "",
+      "Effects": "5CD Phys, ?Two-Handed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Puncturing",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Heavy",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Super Sledge Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Super Sledge",
+      "Prefix": "",
+      "Effects": "6CD Phys, Two-Handed, Breaking",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Heating Coil",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Energy Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Stun Pack",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gain Energy Damage, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Tire Iron Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Tire Iron",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Bladed",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Walking Cane Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Walking Cane",
+      "Prefix": "",
+      "Effects": "3CD Phys",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Barbed",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Boxing Glove Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Boxing Glove",
+      "Prefix": "",
+      "Effects": "Unarmed, 3CD Phys, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Puncturing",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Lead Lining",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Deathclaw Gauntlet Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Deathclaw Gauntlet",
+      "Prefix": "",
+      "Effects": "Unarmed, 5CD Phys, Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Extra Claw",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, On succesful attack, spend 2 AP to disarm 1 weapon",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Knuckles Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Knuckles",
+      "Prefix": "",
+      "Effects": "Unarmed, 3CD Phys Concealed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Sharp",
+      "Prefix": "",
+      "Effects": "gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Spiked",
+      "Prefix": "",
+      "Effects": "gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Puncturing",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Bladed",
+      "Prefix": "",
+      "Effects": "plus 1 CD Damage, gain Persistent",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Power Fist Mods",
+      "Prefix": "",
+      "Effects": "",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Power Fist",
+      "Prefix": "",
+      "Effects": "Unarmed, 4CD Phys, Stun",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Puncturing",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, Gain Piercing 1",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Heating Coil",
+      "Prefix": "",
+      "Effects": "plus 2 CD Damage, gain Energy damage",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Throwing Weapons",
+      "Prefix": "",
+      "Effects": "Weapon Type Throwing",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Throwing Knives",
+      "Prefix": "",
+      "Effects": "3 CD Phys, Piercing 1, Thrown C, Concealed, Suppressed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Tomahawk",
+      "Prefix": "",
+      "Effects": "4 CD Phys, Piercing 1, Thrown C, Suppressed",
+      "Mod Applies to list": ""
+    },
+    {
+      "Name": "Javelin",
+      "Prefix": "",
+      "Effects": "4 CD Phys, Piercing 1, Thrown M, Suppressed",
+      "Mod Applies to list": ""
+    }

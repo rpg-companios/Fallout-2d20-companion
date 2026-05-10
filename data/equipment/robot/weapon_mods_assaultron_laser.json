@@ -1,0 +1,50 @@
+[
+  {
+    "id": "robot_mod_assaultron_laser_capacitor_mk3",
+    "itemType": "robotWeaponMod",
+    "weaponId": "robot_weapon_assaultron_head_laser",
+    "modType": "capacitor",
+    "damageBonusDelta": 1,
+    "ammoPerShotDelta": 1,
+    "complexity": null,
+    "perksRequired": ["Robotics Expert 1", "Science! 1"],
+    "skill": "Science",
+    "rarity": 2
+  },
+  {
+    "id": "robot_mod_assaultron_laser_capacitor_mk4",
+    "itemType": "robotWeaponMod",
+    "weaponId": "robot_weapon_assaultron_head_laser",
+    "modType": "capacitor",
+    "damageBonusDelta": 2,
+    "ammoPerShotDelta": 2,
+    "complexity": null,
+    "perksRequired": ["Robotics Expert 1", "Science! 1"],
+    "skill": "Science",
+    "rarity": 3
+  },
+  {
+    "id": "robot_mod_assaultron_laser_capacitor_mk5",
+    "itemType": "robotWeaponMod",
+    "weaponId": "robot_weapon_assaultron_head_laser",
+    "modType": "capacitor",
+    "damageBonusDelta": 3,
+    "ammoPerShotDelta": 3,
+    "complexity": null,
+    "perksRequired": ["Robotics Expert 1", "Science! 2"],
+    "skill": "Science",
+    "rarity": 4
+  },
+  {
+    "id": "robot_mod_assaultron_laser_capacitor_mk6",
+    "itemType": "robotWeaponMod",
+    "weaponId": "robot_weapon_assaultron_head_laser",
+    "modType": "capacitor",
+    "damageBonusDelta": 4,
+    "ammoPerShotDelta": 4,
+    "complexity": null,
+    "perksRequired": ["Robotics Expert 1", "Science! 3"],
+    "skill": "Science",
+    "rarity": 5
+  }
+]

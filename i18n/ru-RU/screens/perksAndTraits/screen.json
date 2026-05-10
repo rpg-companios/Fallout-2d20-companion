@@ -1,0 +1,35 @@
+{
+  "labels": {
+    "name": "Название",
+    "rank": "Ранг",
+    "description": "Описание"
+  },
+  "buttons": {
+    "addPerk": "+ Добавить перк"
+  },
+  "alerts": {
+    "warningTitle": "Предупреждение",
+    "errorTitle": "Ошибка",
+    "perkSelectedTitle": "Перк выбран"
+  },
+  "warnings": {
+    "perkLimitReached": "На текущем уровне больше перков взять нельзя"
+  },
+  "errors": {
+    "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
+  },
+  "perkSelected": {
+    "intensiveTrainingSuccess": "Перк \"{perkName}\" выбран! Вы получили +{bonus} очко атрибута. Перейдите на вкладку \"Персонаж\", чтобы распределить его."
+  },
+  "modal": {
+    "title": "Выберите перк",
+    "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
+    "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
+    "buttons": {
+      "choose": "Выбрать",
+      "cancelChoice": "Отменить выбор",
+      "confirm": "Подтвердить",
+      "cancel": "Отмена"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "powerArmor": [
+    {
+      "categoryKey": "frame",
+      "items": [
+        { "id": "power_armor_frame", "name": "Power Armor Frame" }
+      ]
+    },
+    {
+      "categoryKey": "raiderPower",
+      "items": [
+        { "id": "power_armor_raider_helmet", "name": "Raider Power Armor Helmet" },
+        { "id": "power_armor_raider_chest", "name": "Raider Power Armor Chest Piece" },
+        { "id": "power_armor_raider_arm", "name": "Raider Power Armor Arm" },
+        { "id": "power_armor_raider_leg", "name": "Raider Power Armor Leg" }
+      ]
+    },
+    {
+      "categoryKey": "t45",
+      "items": [
+        { "id": "power_armor_t45_helmet", "name": "T-45 Helmet" },
+        { "id": "power_armor_t45_chest", "name": "T-45 Chest Piece" },
+        { "id": "power_armor_t45_arm", "name": "T-45 Arm" },
+        { "id": "power_armor_t45_leg", "name": "T-45 Leg" }
+      ]
+    },
+    {
+      "categoryKey": "t51",
+      "items": [
+        { "id": "power_armor_t51_helmet", "name": "T-51 Helmet" },
+        { "id": "power_armor_t51_chest", "name": "T-51 Chest Piece" },
+        { "id": "power_armor_t51_arm", "name": "T-51 Arm" },
+        { "id": "power_armor_t51_leg", "name": "T-51 Leg" }
+      ]
+    },
+    {
+      "categoryKey": "t60",
+      "items": [
+        { "id": "power_armor_t60_helmet", "name": "T-60 Helmet" },
+        { "id": "power_armor_t60_chest", "name": "T-60 Chest Piece" },
+        { "id": "power_armor_t60_arm", "name": "T-60 Arm" },
+        { "id": "power_armor_t60_leg", "name": "T-60 Leg" }
+      ]
+    },
+    {
+      "categoryKey": "x01",
+      "items": [
+        { "id": "power_armor_x01_helmet", "name": "X-01 Helmet" },
+        { "id": "power_armor_x01_chest", "name": "X-01 Chest Piece" },
+        { "id": "power_armor_x01_arm", "name": "X-01 Arm" },
+        { "id": "power_armor_x01_leg", "name": "X-01 Leg" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "robotItems": [
+    {
+      "id": "robot_item_repair_kit",
+      "itemType": "misc",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0,
+      "healAmount": 6
+    },
+    {
+      "id": "robot_item_fertilizer_bag",
+      "itemType": "misc",
+      "weight": 1,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "food_mutafruit",
+      "itemType": "food",
+      "weight": 0.5,
+      "cost": 0,
+      "rarity": 0
+    }
+  ],
+  "robotModules": [
+    {
+      "id": "robot_module_boiler",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0,
+      "grantsItemId": "drink_clean_water",
+      "grantsEveryHours": 24
+    },
+    {
+      "id": "robot_module_recon_sensors",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_module_behavior_analysis",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_module_hazard_detection",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_module_diagnostics",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_module_sensor_array",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_module_hacking",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_module_radiation_coils",
+      "itemType": "module",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    }
+  ],
+  "robotPartsUpgrade": []
+}

@@ -1,0 +1,251 @@
+{
+  "ncr_infantry": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_military_fatigues",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_military_helmet",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_combat_rifle",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_45",
+              "quantity": {
+                "base": 4,
+                "rollType": "rollCD",
+                "rollValue": 4,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_combat_shotgun",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_shotgun_shell",
+              "quantity": {
+                "base": 3,
+                "rollType": "rollCD",
+                "rollValue": 3,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_10mm_pistol",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_10mm",
+              "quantity": {
+                "base": 4,
+                "rollType": "rollCD",
+                "rollValue": 4,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_combat_knife",
+            "itemType": "weapon"
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "food_purified_water",
+        "itemType": "food"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency_ncr",
+        "quantity": {
+          "base": 5,
+          "rollType": "rollCD",
+          "rollValue": 5,
+          "op": "+"
+        }
+      }
+    ]
+  },
+  "ncr_caravaneer": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_sturdy_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "armorId": "armor_leather_chest_001",
+            "itemType": "armor"
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "armor_leather_hand_001",
+                "itemType": "armor"
+              },
+              {
+                "type": "fixed",
+                "armorId": "armor_leather_leg_001",
+                "itemType": "armor"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_double_barrel_shotgun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_shotgun_shell",
+          "quantity": {
+            "base": 3,
+            "rollType": "rollCD",
+            "rollValue": 3,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_combat_knife",
+            "itemType": "weapon"
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "weaponId": "weapon_knuckles",
+                "itemType": "weapon"
+              },
+              {
+                "type": "fixed",
+                "weaponId": "weapon_knuckles",
+                "itemType": "weapon"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_pack_brahmin",
+        "itemType": "misc"
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "brewery",
+        "roll": {
+          "rollType": "D20",
+          "count": 2,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_playing_cards",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency_ncr",
+        "quantity": {
+          "base": 2,
+          "rollType": "D20",
+          "rollValue": 20,
+          "op": "multiply"
+        }
+      }
+    ]
+  },
+  "ncr_marksman": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_military_fatigues",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_military_helmet",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_hunting_rifle",
+        "itemType": "weapon",
+        "modIds": [
+          "mod_005",
+          "mod_035"
+        ],
+        "ammo": {
+          "ammoId": "ammo_308",
+          "quantity": {
+            "base": 3,
+            "rollType": "rollCD",
+            "rollValue": 3,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_mentats",
+        "itemType": "chem"
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_us_special_ops_manual",
+        "itemType": "misc"
+      }
+    ]
+  }
+}

@@ -1,0 +1,131 @@
+[
+  {
+    "id": "robot_body_mister_handy",
+    "itemType": "robotBody",
+    "robotBodyPlan": "misterHandy",
+    "replaceable": false,
+    "armorSlots": [
+      "Optics",
+      "Main Body",
+      "Arms",
+      "Thruster"
+    ],
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "body": 5,
+    "carryWeight": 150,
+    "physicalDR": 3,
+    "energyDR": 2,
+    "radDR": 0,
+    "name": "robot_body_mister_handy"
+  },
+  {
+    "id": "robot_body_protectron",
+    "itemType": "robotBody",
+    "robotBodyPlan": "protectron",
+    "replaceable": true,
+    "armorSlots": [
+      "Head",
+      "Main Body",
+      "Left Arm",
+      "Right Arm",
+      "Left Leg",
+      "Right Leg"
+    ],
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "body": 5,
+    "carryWeight": 225,
+    "physicalDR": 3,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_body_protectron"
+  },
+  {
+    "id": "robot_body_assaultron",
+    "itemType": "robotBody",
+    "robotBodyPlan": "assaultron",
+    "replaceable": true,
+    "armorSlots": [
+      "Head",
+      "Main Body",
+      "Left Arm",
+      "Right Arm",
+      "Left Leg",
+      "Right Leg"
+    ],
+    "complexity": 5,
+    "perksRequired": [
+      "Robotics Expert 2"
+    ],
+    "skill": "Repair",
+    "rarity": 1,
+    "body": 9,
+    "carryWeight": 150,
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "name": "robot_body_assaultron"
+  },
+  {
+    "id": "robot_body_robobrain",
+    "itemType": "robotBody",
+    "robotBodyPlan": "robobrain",
+    "replaceable": true,
+    "armorSlots": [
+      "Head",
+      "Main Body",
+      "Left Arm",
+      "Right Arm"
+    ],
+    "complexity": 6,
+    "perksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "body": 6,
+    "carryWeight": 150,
+    "physicalDR": 3,
+    "energyDR": 3,
+    "radDR": 0,
+    "name": "robot_body_robobrain"
+  },
+  {
+    "id": "robot_body_sentry_bot",
+    "itemType": "robotBody",
+    "robotBodyPlan": "sentryBot",
+    "replaceable": true,
+    "armorSlots": [
+      "Head",
+      "Main Body",
+      "Left Arm",
+      "Right Arm",
+      "Left Leg",
+      "Right Leg"
+    ],
+    "complexity": 7,
+    "perksRequired": [
+      "Armorer 1",
+      "Robotics Expert 3",
+      "Science! 2"
+    ],
+    "skill": "Repair",
+    "rarity": 2,
+    "body": 10,
+    "carryWeight": 225,
+    "physicalDR": 5,
+    "energyDR": 4,
+    "radDR": 0,
+    "name": "robot_body_sentry_bot"
+  }
+]
