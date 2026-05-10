@@ -104,6 +104,7 @@ export default function HomeScreen({ navigation }) {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [iosInstallVisible, setIosInstallVisible] = useState(false);
+  const [androidInstallVisible, setAndroidInstallVisible] = useState(false);
   const [desktopInstallVisible, setDesktopInstallVisible] = useState(false);
 
   useEffect(() => {
@@ -134,18 +135,29 @@ export default function HomeScreen({ navigation }) {
     /iphone|ipad|ipod/i.test(navigator.userAgent) &&
     !/crios|fxios|opios|mercury/i.test(navigator.userAgent);
 
+  const isAndroidMobile = Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    /android/i.test(navigator.userAgent) &&
+    /mobile/i.test(navigator.userAgent);
+
   const showInstallButton = Platform.OS === 'web' && !isStandalone;
 
   const handleInstallPress = async () => {
     if (installPrompt) {
-      installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstallPrompt(null);
-        window.__pwaInstallPrompt = null;
-      }
-    } else if (isIosSafari) {
+      try {
+        installPrompt.prompt();
+        const { outcome } = await installPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setInstallPrompt(null);
+          window.__pwaInstallPrompt = null;
+          return;
+        }
+      } catch (_) {}
+    }
+    if (isIosSafari) {
       setIosInstallVisible(true);
+    } else if (isAndroidMobile) {
+      setAndroidInstallVisible(true);
     } else {
       setDesktopInstallVisible(true);
     }
@@ -530,6 +542,18 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install', 'Установить приложение')}</Text>
             <Text style={styles.infoText}>{tHomeScreen('pwa.iosInstructions', '')}</Text>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIosInstallVisible(false)}>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={androidInstallVisible} transparent animationType="slide" onRequestClose={() => setAndroidInstallVisible(false)}>
+        <View style={styles.modalBackdropCenter}>
+          <View style={styles.infoModal}>
+            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install', 'Установить приложение')}</Text>
+            <Text style={styles.infoText}>{tHomeScreen('pwa.androidInstructions', '')}</Text>
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAndroidInstallVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
             </TouchableOpacity>
           </View>
