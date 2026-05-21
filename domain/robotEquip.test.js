@@ -286,6 +286,23 @@ describe('initRobotSlots — protectron_standard', () => {
     expect(ids).toContain('weapon_laser_gun');
     expect(ids).toContain('robot_weapon_protectron_manipulator');
   });
+
+  it('adds builtinToHead weapons to equipped head weapon list', () => {
+    const weaponBuiltinToHead = {
+      id: 'robot_weapon_mesmetron',
+      itemType: 'weapon',
+      builtinToHead: 'robot_head_protectron',
+      damage: 5,
+    };
+    const { weapons } = initRobotSlots('protectron', [weaponBuiltinToHead], {
+      ...robotCatalog,
+      weapons: [weaponBuiltinToHead],
+    });
+    expect(weapons.map((w) => w.id)).toContain('robot_weapon_mesmetron');
+    const mesmetron = weapons.find((w) => w.id === 'robot_weapon_mesmetron');
+    expect(mesmetron?.isBuiltin).toBe(true);
+    expect(mesmetron?.sourceSlot).toBe('head');
+  });
 });
 
 // ---------------------------------------------------------------------------

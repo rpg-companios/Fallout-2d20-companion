@@ -98,6 +98,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   const slotKeys = getRobotSlotKeys(bodyPlan);
   const modules = [];
   const inventoryItems = [];
+  let pendingHeadBuiltinWeapon = null;
 
   const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
 
@@ -202,7 +203,10 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     if (itype === 'weapon') {
       const weaponData = item._weapon ?? item;
       // Встроенное в голову оружие — пропускаем, оно придёт через builtinWeapons головы
-      if (weaponData.builtinToHead) continue;
+      if (weaponData.builtinToHead) {
+        pendingHeadBuiltinWeapon = weaponData;
+        continue;
+      }
       const armEntry = resolveArmEntry(weaponData.id ?? item.weaponId);
       if (armEntry) {
         const targetKey = findFreeCompatibleSlot(armEntry);
@@ -291,6 +295,11 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     ) {
       slots[k].limb = defaultLeg;
     }
+  }
+
+  if (pendingHeadBuiltinWeapon && slots.head?.limb) {
+    const headLimb = slots.head.limb;
+    slots.head.limb = { ...headLimb, builtinWeapons: [{ ...pendingHeadBuiltinWeapon, isBuiltin: true }] };
   }
 
   // Собираем оружия
