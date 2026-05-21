@@ -256,7 +256,8 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
           if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'plating', 'armor', 'frame', 'module'].includes(item.itemType)) return false;
           // Weapons that replace arm slots are part of the robot body, not inventory
           if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
-
+          // robot_weapon_* is built-in to robot limbs — never goes to inventory
+          if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
           return true;
         }
       ), ...robotInventory];
