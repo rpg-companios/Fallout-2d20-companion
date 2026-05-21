@@ -355,7 +355,18 @@ const WeaponsAndArmorScreen = () => {
     equipment?.items || [],
   );
   const localizedEquippedWeapons = equippedWeapons.map((weapon) => findLocalizedWeapon(equipmentCatalog, weapon));
-  
+
+  const weaponFingerprint = (w) => {
+    if (!w) return null;
+    const mods = w.appliedMods ? Object.entries(w.appliedMods).sort().map(([k, v]) => `${k}:${v}`).join(',') : '';
+    return `${w.id}|${mods}`;
+  };
+  const dedupedEquippedWeapons = localizedEquippedWeapons.filter((w, idx, arr) => {
+    if (!w) return true;
+    const fp = weaponFingerprint(w);
+    return arr.findIndex(x => weaponFingerprint(x) === fp) === idx;
+  });
+
   // Состояние для модального окна модификаций
   const [modificationModalVisible, setModificationModalVisible] = useState(false);
   const [selectedWeaponForModification, setSelectedWeaponForModification] = useState(null);
@@ -595,16 +606,16 @@ const WeaponsAndArmorScreen = () => {
             
             {/* Оружие */}
             <View style={{ marginBottom: 16 }}>
-              {Array.from({ length: Math.ceil(localizedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+              {Array.from({ length: Math.ceil(dedupedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
                 <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
                   <WeaponCard
-                    weapon={localizedEquippedWeapons[rowIndex * 2] ?? null}
+                    weapon={dedupedEquippedWeapons[rowIndex * 2] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={false}
                   />
                   <WeaponCard
-                    weapon={localizedEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                    weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={false}
