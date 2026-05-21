@@ -180,6 +180,11 @@ export async function resolveWeaponItem(item) {
 }
 
 export async function resolveNonWeaponItem(item) {
+  if (item.itemType === 'ammo' && item.ammoId) {
+    const resolved = await resolveAmmoObject({ ammoId: item.ammoId, quantity: item.quantity }, item.ammoId);
+    if (resolved) return { ...resolved, type: item.type };
+  }
+
   if (item.type === 'rollTable') {
     const count = resolveTableRollCount(item.roll);
     const tableId = ROLL_TABLE_TAG[item.tableId] || item.tableId;

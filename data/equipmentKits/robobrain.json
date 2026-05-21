@@ -3,11 +3,6 @@
     "items": [
       {
         "type": "fixed",
-        "weaponId": "robot_weapon_mesmetron",
-        "itemType": "weapon"
-      },
-      {
-        "type": "fixed",
         "weaponId": "robot_weapon_tesla_arm",
         "itemType": "weapon",
         "slot": "left",
@@ -61,16 +56,13 @@
     "items": [
       {
         "type": "fixed",
-        "weaponId": "robot_weapon_mesmetron",
-        "itemType": "weapon",
-        "ammo": {
-          "ammoId": "ammo_energy_cell",
-          "quantity": {
-            "base": 14,
-            "rollType": "rollCD",
-            "rollValue": 7,
-            "op": "+"
-          }
+        "itemType": "ammo",
+        "ammoId": "ammo_energy_cell",
+        "quantity": {
+          "base": 14,
+          "rollType": "rollCD",
+          "rollValue": 7,
+          "op": "+"
         }
       },
       {
