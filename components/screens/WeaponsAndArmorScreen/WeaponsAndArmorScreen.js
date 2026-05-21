@@ -21,7 +21,7 @@ import WeaponModificationModal from './modal/WeaponModificationModal';
 import ArmorModificationModal from './modal/ArmorModificationModal';
 import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
-import ArmorLayerModal from '../CharacterScreen/modals/ArmorLayerModal';
+import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
 
 
 const HealthCounter = ({ max, isEnabled }) => {
@@ -431,19 +431,17 @@ const WeaponsAndArmorScreen = () => {
   const bodyPlan = trait?.modifiers?.robotBodyPlan || null;
   const [limbUpgradeModalVisible, setLimbUpgradeModalVisible] = useState(false);
   const [selectedLimbSlot, setSelectedLimbSlot] = useState(null);
-  const [robotArmorLayerModalVisible, setRobotArmorLayerModalVisible] = useState(false);
-  const [selectedRobotArmorSlot, setSelectedRobotArmorSlot] = useState(null);
-  const [selectedRobotArmorLayer, setSelectedRobotArmorLayer] = useState(null);
+  const [armorPickerVisible, setArmorPickerVisible] = useState(false);
+  const [armorPickerSlot, setArmorPickerSlot] = useState(null);
 
   const handleOpenLimbUpgradeModal = (slotKey) => {
     setSelectedLimbSlot(slotKey);
     setLimbUpgradeModalVisible(true);
   };
 
-  const handleOpenRobotArmorLayerModal = (slotKey, layer) => {
-    setSelectedRobotArmorSlot(slotKey);
-    setSelectedRobotArmorLayer(layer);
-    setRobotArmorLayerModalVisible(true);
+  const handleOpenArmorPicker = (slotKey) => {
+    setArmorPickerSlot(slotKey);
+    setArmorPickerVisible(true);
   };
 
   const handleWeaponPress = (weapon) => {
@@ -573,7 +571,7 @@ const WeaponsAndArmorScreen = () => {
                         slotData={equippedRobotSlots[slotKey]}
                         bodyPlan={bodyPlan}
                         onUpgradeLimb={handleOpenLimbUpgradeModal}
-                        onUpgradeArmor={(layer) => handleOpenRobotArmorLayerModal(slotKey, layer)}
+                        onOpenArmorPicker={handleOpenArmorPicker}
                         onWeaponPress={handleWeaponPress}
                       />
                     ))}
@@ -645,14 +643,11 @@ const WeaponsAndArmorScreen = () => {
         bodyPlan={bodyPlan}
         onClose={() => { setLimbUpgradeModalVisible(false); setSelectedLimbSlot(null); }}
       />
-      <ArmorLayerModal
-        visible={robotArmorLayerModalVisible}
-        slotKey={selectedRobotArmorSlot}
-        layer={selectedRobotArmorLayer}
-        currentItem={selectedRobotArmorSlot && selectedRobotArmorLayer && equippedRobotSlots
-          ? equippedRobotSlots[selectedRobotArmorSlot]?.[selectedRobotArmorLayer]
-          : null}
-        onClose={() => { setRobotArmorLayerModalVisible(false); setSelectedRobotArmorSlot(null); setSelectedRobotArmorLayer(null); }}
+      <ArmorPickerModal
+        visible={armorPickerVisible}
+        slotKey={armorPickerSlot}
+        equippedRobotSlots={equippedRobotSlots}
+        onClose={() => { setArmorPickerVisible(false); setArmorPickerSlot(null); }}
       />
       <Modal
         visible={robotBodyUpgradeModalVisible}

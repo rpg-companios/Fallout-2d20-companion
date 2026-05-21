@@ -10,19 +10,16 @@ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScr
  *   1. Физ.СУ  — physicalDR from limb
  *   2. Энрг.СУ — energyDR from limb
  *   3. Рад.СУ  — radDR from limb
- *   4. Встроенное оружие — only if limb.builtinWeaponId (no "Удерживаемое")
- *   5. Кнопка "Модернизировать конечность"
- *   6. Кнопка "Улучшить обшивку"
- *   7. Кнопка "Улучшить броню"
- *   8. Кнопка "Улучшить раму"
+ *   4. Кнопка "Конечность"
+ *   5. Кнопка "Броня" (opens picker for plating/armor/frame)
  *
  * @param {string} slotKey
  * @param {object|null|undefined} slotData - { limb, armor, plating, frame, heldWeapon }
- * @param {object} callbacks - { onUpgradeLimb, onUpgradeArmor, onWeaponPress, t }
+ * @param {object} callbacks - { onUpgradeLimb, onOpenArmorPicker, t }
  * @returns {{ slotTitle: string, slotSubtitle: string, limbName: string|null, stats: object[] }}
  */
 export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
-  const { onUpgradeLimb, onUpgradeArmor, t = tWeaponsAndArmorScreen } = callbacks;
+  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen } = callbacks;
 
   const limb = slotData?.limb;
 
@@ -56,40 +53,24 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
     type: 'value',
   });
 
-  // --- Оружие конечности (не интерактивно, имя берём от конечности) ---
-  if (limb?.builtinWeaponId) {
-    const weaponName = limb.name ?? limb._builtinWeapon?.name ?? limb.builtinWeaponId ?? t('common.empty');
-    stats.push({
-      label: null,
-      value: weaponName,
-      type: 'weapon',
-    });
-  }
-
-  // --- Кнопки апгрейда ---
+  // --- Кнопка модернизации конечности ---
   stats.push({
     label: t('robotSlot.buttons.upgradeLimb'),
     value: '⋯',
     type: 'button',
     onPress: () => onUpgradeLimb && onUpgradeLimb(slotKey),
   });
-  stats.push({
-    label: t('robotSlot.buttons.upgradePlating'),
-    value: '⋯',
-    type: 'button',
-    onPress: () => onUpgradeArmor && onUpgradeArmor('plating'),
+
+  // --- Единая кнопка "Броня" (обшивка / броня / рама) ---
+  const openPicker = onOpenArmorPicker || ((sk) => {
+    // fallback: если передан только onUpgradeArmor, открываем броню напрямую
+    onUpgradeArmor && onUpgradeArmor('armor');
   });
   stats.push({
     label: t('robotSlot.buttons.upgradeArmor'),
     value: '⋯',
     type: 'button',
-    onPress: () => onUpgradeArmor && onUpgradeArmor('armor'),
-  });
-  stats.push({
-    label: t('robotSlot.buttons.upgradeFrame'),
-    value: '⋯',
-    type: 'button',
-    onPress: () => onUpgradeArmor && onUpgradeArmor('frame'),
+    onPress: () => openPicker(slotKey),
   });
 
   return { slotTitle, slotSubtitle, limbName, stats };
