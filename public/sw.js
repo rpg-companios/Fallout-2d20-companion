@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rpg-companion-v7';
+const CACHE_NAME = 'rpg-companion-v8';
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/favicon.ico', '/pwa-icon.svg'];
 
 self.addEventListener('install', (event) => {
