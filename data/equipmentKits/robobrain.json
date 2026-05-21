@@ -56,5 +56,64 @@
         }
       }
     ]
+  },
+  "robobrain_us_army": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_mesmetron",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 14,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_smoke_manipulator",
+        "itemType": "robotArm",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_smoke_manipulator",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_combat_rifle",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_45",
+          "quantity": {
+            "base": 8,
+            "rollType": "rollCD",
+            "rollValue": 4,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_armor_factory_body",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_armor_factory_arms",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_armor_factory_arms",
+        "itemType": "armor"
+      }
+    ]
   }
 }
