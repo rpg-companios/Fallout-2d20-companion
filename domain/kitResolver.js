@@ -143,7 +143,9 @@ export async function resolveWeaponItem(item) {
   const weapon = await safeDbCall(getWeaponById, item.weaponId);
   const catalog = getEquipmentCatalog();
   const fallbackWeapon = (catalog?.weapons || []).find((entry) => entry.id === item.weaponId);
-  const weaponData = weapon || fallbackWeapon;
+  const weaponData = (weapon || fallbackWeapon)
+    ? { ...(fallbackWeapon || {}), ...(weapon || {}) }
+    : null;
   if (!weaponData) {
     return {
       ...item,
