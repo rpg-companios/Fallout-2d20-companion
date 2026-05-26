@@ -98,7 +98,6 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   const slotKeys = getRobotSlotKeys(bodyPlan);
   const modules = [];
   const inventoryItems = [];
-  let pendingHeadBuiltinWeapon = null;
 
   const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
 
@@ -202,10 +201,24 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     // Оружие
     if (itype === 'weapon') {
       const weaponData = item._weapon ?? item;
-      // Встроенное в голову оружие — пропускаем, оно придёт через builtinWeapons головы
+
+      // Встроенное оружие в голову
       if (weaponData.builtinToHead) {
-        pendingHeadBuiltinWeapon = weaponData;
-        continue;
+        const headSlotKey = slotKeys.find((k) => k === 'head');
+        if (headSlotKey && slots[headSlotKey]) {
+          const weaponStats = resolveWeaponStats(weaponData.id || item.weaponId);
+          if (weaponStats) {
+            if (!slots[headSlotKey].limb) {
+              slots[headSlotKey].limb = { builtinWeapons: [] };
+            }
+            const limb = slots[headSlotKey].limb;
+            if (!limb.builtinWeapons) limb.builtinWeapons = [];
+            if (!limb.builtinWeapons.some((w) => w.id === weaponStats.id)) {
+              limb.builtinWeapons.push({ ...weaponStats, isBuiltin: true });
+            }
+          }
+        }
+        continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
       }
       const armEntry = resolveArmEntry(weaponData.id ?? item.weaponId);
       if (armEntry) {
@@ -297,10 +310,6 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     }
   }
 
-  if (pendingHeadBuiltinWeapon && slots.head?.limb) {
-    const headLimb = slots.head.limb;
-    slots.head.limb = { ...headLimb, builtinWeapons: [{ ...pendingHeadBuiltinWeapon, isBuiltin: true }] };
-  }
 
   // Собираем оружия
   const weapons = getBuiltinWeaponsFromSlots(slots);
