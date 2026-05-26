@@ -34,7 +34,10 @@ export function createSlotsFromBodyPlan(planId) {
       plating: null,
       frame: null,
       heldWeapon: null,
-      capabilities: plan.slotCapabilities?.[slotKey] || { canEquipArmor: false, canEquipWeapon: false },
+      capabilities: {
+        canEquipWeapon: plan.slotCapabilities?.[slotKey]?.canEquipWeapon === true,
+        canEquipArmor: plan.slotCapabilities?.[slotKey]?.canEquipArmor !== false,
+      },
     };
     return acc;
   }, {});
