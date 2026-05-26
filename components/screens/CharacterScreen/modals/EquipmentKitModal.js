@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
 import { isRobotCharacter, initRobotSlots } from '../../../../domain/robotEquip';
+import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import styles from '../../../../styles/EquipmentKitModal.styles';
 
@@ -239,9 +240,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     const isRobot = isRobotCharacter(character);
 
     if (isRobot) {
-      const bodyPlan = character?.trait?.modifiers?.robotBodyPlan
-        || character?.origin?.robotBodyPlan
-        || 'protectron';
+      const bodyPlan = resolveBodyPlan(character);
       const robotCatalog = loadRobotCatalog();
       const { slots, weapons, modules, inventoryItems: robotInventory } = initRobotSlots(
         bodyPlan,

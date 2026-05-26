@@ -1,3 +1,5 @@
+import { getBodyPlan, createSlotsFromBodyPlan } from './bodyplan';
+
 // domain/robotEquip.js
 // Pure functions for robot equipment logic.
 // No React, no UI dependencies. All reason strings are i18n keys.
@@ -6,13 +8,6 @@
 // Slot schemas per body plan
 // ---------------------------------------------------------------------------
 
-const BODY_PLAN_SLOTS = {
-  protectron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
-  assaultron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
-  sentryBot:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
-  misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
-  robobrain:   ['head', 'body', 'leftArm', 'rightArm', 'chassis'],
-};
 
 
 // ---------------------------------------------------------------------------
@@ -24,15 +19,15 @@ export function isRobotCharacter(character) {
 }
 
 export function getRobotSlotKeys(bodyPlan) {
-  return BODY_PLAN_SLOTS[bodyPlan] ?? BODY_PLAN_SLOTS.protectron;
+  const plan = getBodyPlan(bodyPlan) || getBodyPlan('protectron');
+  return Array.isArray(plan?.slots) ? plan.slots : [];
 }
 
 export function createEmptyRobotSlots(bodyPlan) {
-  const keys = getRobotSlotKeys(bodyPlan);
-  return keys.reduce((slots, key) => {
-    slots[key] = { limb: null, armor: null, plating: null, frame: null, heldWeapon: null };
-    return slots;
-  }, {});
+  const slots = createSlotsFromBodyPlan(bodyPlan);
+  const slotKeys = Object.keys(slots);
+  if (slotKeys.length > 0) return slots;
+  return createSlotsFromBodyPlan('protectron');
 }
 
 export function getSlotForDirection(bodyPlan, direction) {
