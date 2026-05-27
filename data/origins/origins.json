@@ -6,8 +6,15 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["brotherhood-chain-that-binds"],
-    "equipmentKitIds": ["brotherhood_initiate", "brotherhood_scribe"]
+    "traitIds": [
+      "brotherhood-chain-that-binds"
+    ],
+    "equipmentKitIds": [
+      "brotherhood_initiate",
+      "brotherhood_scribe"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "ncr",
@@ -16,8 +23,16 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["ncr-resident"],
-    "equipmentKitIds": ["ncr_infantry", "ncr_caravaneer", "ncr_marksman"]
+    "traitIds": [
+      "ncr-resident"
+    ],
+    "equipmentKitIds": [
+      "ncr_infantry",
+      "ncr_caravaneer",
+      "ncr_marksman"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "minuteman",
@@ -26,8 +41,15 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["minuteman-peoples-militia"],
-    "equipmentKitIds": ["minuteman_shooter", "minuteman_skirmisher"]
+    "traitIds": [
+      "minuteman-peoples-militia"
+    ],
+    "equipmentKitIds": [
+      "minuteman_shooter",
+      "minuteman_skirmisher"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "childOfAtom",
@@ -36,8 +58,15 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["childofatom-radioactive-sponge"],
-    "equipmentKitIds": ["atom_missionary", "atom_zealot"]
+    "traitIds": [
+      "childofatom-radioactive-sponge"
+    ],
+    "equipmentKitIds": [
+      "atom_missionary",
+      "atom_zealot"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "vaultDweller",
@@ -46,8 +75,15 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["vaultdweller-vault-kid"],
-    "equipmentKitIds": ["vault_security", "vault_resident"]
+    "traitIds": [
+      "vaultdweller-vault-kid"
+    ],
+    "equipmentKitIds": [
+      "vault_security",
+      "vault_resident"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "ghoul",
@@ -56,14 +92,18 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["ghoul-necrotic-posthuman"],
+    "traitIds": [
+      "ghoul-necrotic-posthuman"
+    ],
     "equipmentKitIds": [
       "wastelander_mercenary",
       "wastelander_settler",
       "wastelander_wanderer",
       "wastelander_raider",
       "wastelander_trader"
-    ]
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "survivor",
@@ -72,14 +112,18 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["survivor-survivor"],
+    "traitIds": [
+      "survivor-survivor"
+    ],
     "equipmentKitIds": [
       "wastelander_mercenary",
       "wastelander_settler",
       "wastelander_wanderer",
       "wastelander_raider",
       "wastelander_trader"
-    ]
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "superMutant",
@@ -89,8 +133,15 @@
     "canWearStandardArmor": false,
     "canWearRobotArmor": false,
     "canWearMutantArmor": true,
-    "traitIds": ["supermutant-forced-evolution"],
-    "equipmentKitIds": ["supermutant_bruiser", "supermutant_skirmisher"]
+    "traitIds": [
+      "supermutant-forced-evolution"
+    ],
+    "equipmentKitIds": [
+      "supermutant_bruiser",
+      "supermutant_skirmisher"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "supermutant_raider_only"
   },
   {
     "id": "brotherhoodOutcast",
@@ -99,8 +150,15 @@
     "canWearStandardArmor": true,
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
-    "traitIds": ["brotherhoodoutcast-chain-that-breaks"],
-    "equipmentKitIds": ["outcast_former_knight", "outcast_former_scribe"]
+    "traitIds": [
+      "brotherhoodoutcast-chain-that-breaks"
+    ],
+    "equipmentKitIds": [
+      "outcast_former_knight",
+      "outcast_former_scribe"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "robobrain",
@@ -109,8 +167,15 @@
     "canWearStandardArmor": false,
     "canWearRobotArmor": true,
     "canWearMutantArmor": false,
-    "traitIds": ["robobrain-robot-with-brains"],
-    "equipmentKitIds": ["robobrain_servomechanizmy", "robobrain_us_army"]
+    "traitIds": [
+      "robobrain-robot-with-brains"
+    ],
+    "equipmentKitIds": [
+      "robobrain_servomechanizmy",
+      "robobrain_us_army"
+    ],
+    "bodyPlan": "robobrain",
+    "armorPolicy": "robot_only"
   },
   {
     "id": "securitron",
@@ -120,7 +185,11 @@
     "canWearRobotArmor": true,
     "canWearMutantArmor": false,
     "traitIds": [],
-    "equipmentKitIds": ["default_caps_only"]
+    "equipmentKitIds": [
+      "default_caps_only"
+    ],
+    "bodyPlan": "protectron",
+    "armorPolicy": "robot_only"
   },
   {
     "id": "assaultron",
@@ -129,8 +198,14 @@
     "canWearStandardArmor": false,
     "canWearRobotArmor": true,
     "canWearMutantArmor": false,
-    "traitIds": ["assaultron-designed-for-frontline"],
-    "equipmentKitIds": ["default_caps_only"]
+    "traitIds": [
+      "assaultron-designed-for-frontline"
+    ],
+    "equipmentKitIds": [
+      "default_caps_only"
+    ],
+    "bodyPlan": "assaultron",
+    "armorPolicy": "robot_only"
   },
   {
     "id": "misterHandy",
@@ -139,14 +214,18 @@
     "canWearStandardArmor": false,
     "canWearRobotArmor": true,
     "canWearMutantArmor": false,
-    "traitIds": ["misterhandy-robot-mr-handy"],
+    "traitIds": [
+      "misterhandy-robot-mr-handy"
+    ],
     "equipmentKitIds": [
       "mister_handy_assistant",
       "mister_handy_brave",
       "mister_handy_nanny",
       "mister_handy_medic",
       "mister_handy_farmer"
-    ]
+    ],
+    "bodyPlan": "misterHandy",
+    "armorPolicy": "robot_only"
   },
   {
     "id": "protectron",
@@ -155,7 +234,9 @@
     "canWearStandardArmor": false,
     "canWearRobotArmor": true,
     "canWearMutantArmor": false,
-    "traitIds": ["protectron-protect-or-destroy"],
+    "traitIds": [
+      "protectron-protect-or-destroy"
+    ],
     "equipmentKitIds": [
       "protectron_standard",
       "protectron_medic",
@@ -163,7 +244,9 @@
       "protectron_nukatron",
       "protectron_worker",
       "protectron_model_x"
-    ]
+    ],
+    "bodyPlan": "protectron",
+    "armorPolicy": "robot_only"
   },
   {
     "id": "shadow",
@@ -173,7 +256,11 @@
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
     "traitIds": [],
-    "equipmentKitIds": ["default_caps_only"]
+    "equipmentKitIds": [
+      "default_caps_only"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "synth",
@@ -183,7 +270,11 @@
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
     "traitIds": [],
-    "equipmentKitIds": ["default_caps_only"]
+    "equipmentKitIds": [
+      "default_caps_only"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   },
   {
     "id": "savage",
@@ -193,6 +284,10 @@
     "canWearRobotArmor": false,
     "canWearMutantArmor": false,
     "traitIds": [],
-    "equipmentKitIds": ["default_caps_only"]
+    "equipmentKitIds": [
+      "default_caps_only"
+    ],
+    "bodyPlan": "humanoid",
+    "armorPolicy": "humanoid_full"
   }
 ]
