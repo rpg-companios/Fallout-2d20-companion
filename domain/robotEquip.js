@@ -225,10 +225,13 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     // Оружие
     if (itype === 'weapon') {
       const weaponData = item._weapon ?? item;
+      const weaponId = weaponData.id || item.weaponId;
+      // Resolve from catalog to pick up flags like builtinToHead that live only in catalog data
+      const resolvedWeapon = weaponId ? resolveWeaponStats(weaponId) : null;
 
       // Встроенное оружие в голову
-      if (weaponData.builtinToHead) {
-        const weaponStats = resolveWeaponStats(weaponData.id || item.weaponId);
+      if (weaponData.builtinToHead || item.builtinToHead || resolvedWeapon?.builtinToHead) {
+        const weaponStats = resolvedWeapon || resolveWeaponStats(weaponId);
         if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
       }
