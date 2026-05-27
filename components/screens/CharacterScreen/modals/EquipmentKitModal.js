@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
 import { isRobotCharacter, initRobotSlots } from '../../../../domain/robotEquip';
+import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import styles from '../../../../styles/EquipmentKitModal.styles';
+import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 // Lazy-load robot catalog data
 const loadRobotCatalog = () => ({
@@ -18,10 +20,10 @@ const loadRobotCatalog = () => ({
 // All robot limbs/plating collapse into a single "Стандартная конструкция" group;
 // weapons and modules are their own buckets; everything else goes to "Разное".
 const META_CATEGORY_LABELS = {
-  structure: 'Стандартная конструкция',
-  weapon: 'Оружие',
-  module: 'Модули',
-  misc: 'Разное',
+  structure: tCharacterScreen('modals.equipmentKit.categories.structure', 'Standard Structure'),
+  weapon: tCharacterScreen('modals.equipmentKit.categories.weapon', 'Weapons'),
+  module: tCharacterScreen('modals.equipmentKit.categories.module', 'Modules'),
+  misc: tCharacterScreen('modals.equipmentKit.categories.misc', 'Misc'),
 };
 
 const META_CATEGORY_ORDER = ['structure', 'weapon', 'module', 'misc'];
@@ -239,9 +241,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     const isRobot = isRobotCharacter(character);
 
     if (isRobot) {
-      const bodyPlan = character?.trait?.modifiers?.robotBodyPlan
-        || character?.origin?.robotBodyPlan
-        || 'protectron';
+      const bodyPlan = resolveBodyPlan(character);
       const robotCatalog = loadRobotCatalog();
       const { slots, weapons, modules, inventoryItems: robotInventory } = initRobotSlots(
         bodyPlan,
@@ -312,7 +312,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <Text style={styles.title}>Выберите комплект снаряжения</Text>
+          <Text style={styles.title}>{tCharacterScreen('modals.equipmentKit.title', 'Select equipment kit')}</Text>
 
           {isLoading ? (
             <ActivityIndicator size="large" color="#005A9C" style={{ marginVertical: 30 }} />
@@ -333,7 +333,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
 
                           return (
                             <View key={category} style={styles.categoryContainer}>
-                              <Text style={styles.categoryTitle}>{META_CATEGORY_LABELS[category] || 'Снаряжение'}:</Text>
+                              <Text style={styles.categoryTitle}>{META_CATEGORY_LABELS[category] || tCharacterScreen('labels.equipmentKit', 'Equipment Kit')}:</Text>
                               {groups[category].map((entry) => {
                                 if (entry?.type === 'choice') {
                                   return (

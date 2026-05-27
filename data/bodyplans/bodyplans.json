@@ -1,0 +1,165 @@
+{
+  "humanoid": {
+    "slots": [
+      "head",
+      "torso",
+      "leftArm",
+      "rightArm",
+      "leftLeg",
+      "rightLeg"
+    ],
+    "defaults": {
+      "head": null,
+      "torso": null,
+      "leftArm": null,
+      "rightArm": null,
+      "leftLeg": null,
+      "rightLeg": null
+    },
+    "slotCapabilities": {
+      "leftArm": {
+        "canEquipWeapon": true
+      },
+      "rightArm": {
+        "canEquipWeapon": true
+      }
+    }
+  },
+  "robobrain": {
+    "slots": [
+      "head",
+      "body",
+      "leftArm",
+      "rightArm",
+      "chassis"
+    ],
+    "defaults": {
+      "head": "robot_head_robobrain",
+      "body": "robot_body_robobrain",
+      "leftArm": "robot_arm_robobrain",
+      "rightArm": "robot_arm_robobrain",
+      "chassis": "robot_legs_robobrain_treads"
+    },
+    "slotCapabilities": {
+      "leftArm": {
+        "canEquipWeapon": true
+      },
+      "rightArm": {
+        "canEquipWeapon": true
+      },
+      "head": {
+        "canEquipWeapon": true
+      }
+    }
+  },
+  "misterHandy": {
+    "slots": [
+      "head",
+      "body",
+      "arm1",
+      "arm2",
+      "arm3",
+      "thruster"
+    ],
+    "defaults": {
+      "head": "robot_head_mister_handy",
+      "body": "robot_body_mister_handy",
+      "arm1": "robot_arm_mister_handy",
+      "arm2": "robot_arm_mister_handy",
+      "arm3": "robot_arm_mister_handy",
+      "thruster": "robot_legs_mister_handy_thruster"
+    },
+    "slotCapabilities": {
+      "arm1": {
+        "canEquipWeapon": true
+      },
+      "arm2": {
+        "canEquipWeapon": true
+      },
+      "arm3": {
+        "canEquipWeapon": true
+      }
+    }
+  },
+  "protectron": {
+    "slots": [
+      "leftArm",
+      "head",
+      "rightArm",
+      "leftLeg",
+      "body",
+      "rightLeg"
+    ],
+    "defaults": {
+      "leftArm": "robot_arm_protectron",
+      "head": "robot_head_protectron",
+      "rightArm": "robot_arm_protectron",
+      "leftLeg": "robot_legs_protectron",
+      "body": "robot_body_protectron",
+      "rightLeg": "robot_legs_protectron"
+    },
+    "slotCapabilities": {
+      "leftArm": {
+        "canEquipWeapon": true
+      },
+      "rightArm": {
+        "canEquipWeapon": true
+      }
+    }
+  },
+  "assaultron": {
+    "slots": [
+      "leftArm",
+      "head",
+      "rightArm",
+      "leftLeg",
+      "body",
+      "rightLeg"
+    ],
+    "defaults": {
+      "leftArm": "robot_arm_assaultron",
+      "head": "robot_head_assaultron",
+      "rightArm": "robot_arm_assaultron",
+      "leftLeg": "robot_legs_assaultron",
+      "body": "robot_body_assaultron",
+      "rightLeg": "robot_legs_assaultron"
+    },
+    "slotCapabilities": {
+      "leftArm": {
+        "canEquipWeapon": true
+      },
+      "rightArm": {
+        "canEquipWeapon": true
+      },
+      "head": {
+        "canEquipWeapon": true
+      }
+    }
+  },
+  "sentryBot": {
+    "slots": [
+      "leftArm",
+      "head",
+      "rightArm",
+      "leftLeg",
+      "body",
+      "rightLeg"
+    ],
+    "defaults": {
+      "leftArm": "robot_arm_sentry_bot",
+      "head": "robot_head_sentry_bot",
+      "rightArm": "robot_arm_sentry_bot",
+      "leftLeg": "robot_legs_sentry_bot",
+      "body": "robot_body_sentry_bot",
+      "rightLeg": "robot_legs_sentry_bot"
+    },
+    "slotCapabilities": {
+      "leftArm": {
+        "canEquipWeapon": true
+      },
+      "rightArm": {
+        "canEquipWeapon": true
+      }
+    }
+  }
+}
