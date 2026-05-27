@@ -1,3 +1,5 @@
+import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodyplan';
+
 // domain/robotEquip.js
 // Pure functions for robot equipment logic.
 // No React, no UI dependencies. All reason strings are i18n keys.
@@ -24,15 +26,51 @@ export function isRobotCharacter(character) {
 }
 
 export function getRobotSlotKeys(bodyPlan) {
-  return BODY_PLAN_SLOTS[bodyPlan] ?? BODY_PLAN_SLOTS.protectron;
+  const plan = getBodyPlan(bodyPlan) || getBodyPlan('humanoid');
+  const raw = Array.isArray(plan?.slots) ? plan.slots : [];
+  const preferred = ['head', 'body', 'leftArm', 'rightArm', 'arm1', 'arm2', 'arm3', 'leftLeg', 'rightLeg', 'chassis', 'thruster'];
+  const existing = preferred.filter((slot) => raw.includes(slot));
+  const tail = raw.filter((slot) => !existing.includes(slot));
+  return [...existing, ...tail];
 }
 
 export function createEmptyRobotSlots(bodyPlan) {
-  const keys = getRobotSlotKeys(bodyPlan);
-  return keys.reduce((slots, key) => {
-    slots[key] = { limb: null, armor: null, plating: null, frame: null, heldWeapon: null };
-    return slots;
-  }, {});
+  const rawSlots = createSlotsFromBodyPlan(bodyPlan);
+  const ordered = {};
+  for (const key of getRobotSlotKeys(bodyPlan)) {
+    if (rawSlots[key]) ordered[key] = rawSlots[key];
+  }
+  return ordered;
+}
+
+function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
+  if (!limb) return [];
+  const normalized = [];
+  const seen = new Set();
+  const catalog = Array.isArray(weaponsCatalog) ? weaponsCatalog : [];
+
+  const pushWeapon = (weapon) => {
+    if (!weapon) return;
+    const id = weapon.id || weapon.weaponId;
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    normalized.push({ ...weapon, id, weaponId: weapon.weaponId || id, isBuiltin: true });
+  };
+
+  if (Array.isArray(limb.builtinWeapons)) {
+    limb.builtinWeapons.forEach(pushWeapon);
+  }
+
+  if (limb.builtinWeaponId) {
+    const byId = catalog.find((w) => w.id === limb.builtinWeaponId);
+    pushWeapon(byId ? { ...byId } : { id: limb.builtinWeaponId });
+  }
+
+  if (normalized.length === 0 && limb.builtinManipulator) {
+    pushWeapon({ ...limb, isManipulator: true });
+  }
+
+  return normalized;
 }
 
 export function getSlotForDirection(bodyPlan, direction) {
@@ -42,12 +80,6 @@ export function getSlotForDirection(bodyPlan, direction) {
   if (direction === 'center') return slotKeys.find((k) => k === 'arm3') ?? null;
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Простая инициализация слотов
-// ---------------------------------------------------------------------------
-
-
 
 // ---------------------------------------------------------------------------
 // buildArmLimb — normalize a robotarms catalog entry into a slot-ready limb
@@ -176,23 +208,18 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
           // Preserve any kit-level overrides (e.g. slot, name) that came on `item`.
           const armEntry = resolveArmEntry(item.id) || item;
           const limbFromArm = buildLimbFromArmEntry(armEntry);
+          const normalizedBuiltin = normalizeBuiltinWeapons({ ...limbFromArm, ...item }, weaponsCatalog);
           slots[targetKey].limb = {
             ...limbFromArm,
             ...item,
-            builtinWeapons: limbFromArm.builtinWeapons,
+            builtinWeapons: normalizedBuiltin,
             canHoldWeapons: limbFromArm.canHoldWeapons,
             weaponSlots: limbFromArm.weaponSlots,
             itemType: 'robotArm',
           };
         } else {
-          // For heads (and other non-arm limbs): resolve builtinWeaponId into builtinWeapons
-          let limbData = item;
-          if (item.builtinWeaponId && (!Array.isArray(item.builtinWeapons) || item.builtinWeapons.length === 0)) {
-            const weaponStats = resolveWeaponStats(item.builtinWeaponId);
-            if (weaponStats) {
-              limbData = { ...item, builtinWeapons: [{ ...weaponStats, isBuiltin: true }] };
-            }
-          }
+          const builtinWeapons = normalizeBuiltinWeapons(item, weaponsCatalog);
+          const limbData = builtinWeapons.length > 0 ? { ...item, builtinWeapons } : item;
           slots[targetKey].limb = limbData;
         }
       }
@@ -288,25 +315,21 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
 
   // Автозаполнение недостающих конечностей
   const { heads = [], bodies = [], legs = [] } = robotCatalog;
-
-  const defaultHead = heads.find(h => h.defaultForBodyPlan === bodyPlan);
-  const defaultBody = bodies.find(b => b.robotBodyPlan === bodyPlan);
-  const defaultLeg = legs.find(l => 
-    l.compatibleBodyPlans?.includes(bodyPlan) || l.defaultForBodyPlan === bodyPlan
-  );
+  const planDefaults = getDefaultLimbs(bodyPlan);
+  const defaultHead = heads.find((h) => h.id === planDefaults.head)
+    || heads.find((h) => h.defaultForBodyPlan === bodyPlan);
+  const defaultBody = bodies.find((b) => b.id === planDefaults.body)
+    || bodies.find((b) => b.robotBodyPlan === bodyPlan);
+  const defaultLeg = legs.find((l) => l.id === planDefaults.legs || l.id === planDefaults.leg)
+    || legs.find((l) => l.compatibleBodyPlans?.includes(bodyPlan) || l.defaultForBodyPlan === bodyPlan);
 
   for (const k of slotKeys) {
     if (slots[k].limb !== null) continue;
 
     if (k === 'head' && defaultHead) {
       // Resolve builtinWeaponId for the default head (e.g. robobrain mesmetron)
-      let headLimb = defaultHead;
-      if (defaultHead.builtinWeaponId && (!Array.isArray(defaultHead.builtinWeapons) || defaultHead.builtinWeapons.length === 0)) {
-        const weaponStats = resolveWeaponStats(defaultHead.builtinWeaponId);
-        if (weaponStats) {
-          headLimb = { ...defaultHead, builtinWeapons: [{ ...weaponStats, isBuiltin: true }] };
-        }
-      }
+      const builtinWeapons = normalizeBuiltinWeapons(defaultHead, weaponsCatalog);
+      const headLimb = builtinWeapons.length > 0 ? { ...defaultHead, builtinWeapons } : defaultHead;
       slots[k].limb = headLimb;
     } else if (k === 'body' && defaultBody) {
       slots[k].limb = defaultBody;
@@ -481,6 +504,7 @@ export function canReplaceLimb(slotKey, newLimb, character) {
  * @returns {{ slots: object, weapons: object[] }}
  */
 export function applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog = []) {
+  const previousLimb = slots?.[slotKey]?.limb;
   // If the new limb has a builtinWeaponId that hasn't been resolved yet,
   // normalize it so that getBuiltinWeaponsFromSlots can produce attack cards.
   let normalizedLimb = newLimb;
