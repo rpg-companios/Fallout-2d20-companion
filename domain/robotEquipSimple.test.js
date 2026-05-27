@@ -92,7 +92,7 @@ describe('robotEquipSimple', () => {
   describe('getRobotSlotKeys', () => {
     it('возвращает слоты для protectron', () => {
       expect(getRobotSlotKeys('protectron')).toEqual([
-        'head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg',
+        'leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg',
       ]);
     });
 
@@ -107,7 +107,7 @@ describe('robotEquipSimple', () => {
     it('создает пустые слоты для protectron', () => {
       const slots = createEmptyRobotSlots('protectron');
       expect(Object.keys(slots)).toEqual([
-        'head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg',
+        'leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg',
       ]);
       
       for (const slot of Object.values(slots)) {

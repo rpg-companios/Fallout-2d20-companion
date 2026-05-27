@@ -189,7 +189,7 @@ describe('getRobotSlotKeys', () => {
 
   it('returns robobrain slots', () => {
     expect(getRobotSlotKeys('robobrain')).toEqual([
-      'leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg',
+      'leftArm', 'head', 'rightArm', 'body', 'chassis',
     ]);
   });
 

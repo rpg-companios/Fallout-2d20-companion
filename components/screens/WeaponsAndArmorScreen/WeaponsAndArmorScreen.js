@@ -4,6 +4,7 @@ import { useCharacter } from '../../CharacterContext';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
 import { TRAITS } from '../CharacterScreen/logic/traitsData';
 import { isRobotCharacter } from '../../../domain/robotEquip';
+import { resolveBodyPlan } from '../../../domain/bodyplan';
 import styles from '../../../styles/CharacterScreen.styles';
 import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
@@ -439,7 +440,7 @@ const WeaponsAndArmorScreen = () => {
 
   // Robot-specific state and handlers
   const isRobot = isRobotCharacter({ origin, trait });
-  const bodyPlan = trait?.modifiers?.robotBodyPlan || null;
+  const bodyPlan = resolveBodyPlan({ origin, trait }) || null;
   const [limbUpgradeModalVisible, setLimbUpgradeModalVisible] = useState(false);
   const [selectedLimbSlot, setSelectedLimbSlot] = useState(null);
   const [armorPickerVisible, setArmorPickerVisible] = useState(false);

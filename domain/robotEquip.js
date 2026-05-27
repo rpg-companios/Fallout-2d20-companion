@@ -13,7 +13,7 @@ const BODY_PLAN_SLOTS = {
   assaultron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
   sentryBot:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
   misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
-  robobrain:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+  robobrain:   ['leftArm', 'head', 'rightArm', 'body', 'chassis'],
 };
 
 
@@ -27,11 +27,7 @@ export function isRobotCharacter(character) {
 
 export function getRobotSlotKeys(bodyPlan) {
   const plan = getBodyPlan(bodyPlan) || getBodyPlan('humanoid');
-  const raw = Array.isArray(plan?.slots) ? plan.slots : [];
-  const preferred = ['head', 'body', 'leftArm', 'rightArm', 'arm1', 'arm2', 'arm3', 'leftLeg', 'rightLeg', 'chassis', 'thruster'];
-  const existing = preferred.filter((slot) => raw.includes(slot));
-  const tail = raw.filter((slot) => !existing.includes(slot));
-  return [...existing, ...tail];
+  return Array.isArray(plan?.slots) ? [...plan.slots] : [];
 }
 
 export function createEmptyRobotSlots(bodyPlan) {
