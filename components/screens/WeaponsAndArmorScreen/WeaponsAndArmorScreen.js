@@ -283,6 +283,19 @@ const findLocalizedArmor = (catalog, armorItem) => {
   };
 };
 
+const findLocalizedLimb = (catalog, limb) => {
+  if (!limb?.id) return limb;
+  const allParts = [
+    ...(catalog?.robotHeads || []),
+    ...(catalog?.robotBody || []),
+    ...(catalog?.robotLegs || []),
+    ...(catalog?.robotArms || []),
+  ];
+  const found = allParts.find((p) => p.id === limb.id);
+  if (!found?.name || found.name === limb.id) return limb;
+  return { ...limb, name: found.name };
+};
+
 const findLocalizedClothing = (catalog, clothingItem) => {
   if (!clothingItem?.id) return clothingItem;
   const allClothes = (catalog?.clothes?.clothes || []).flatMap((group) => group.items || []);
@@ -467,7 +480,11 @@ const WeaponsAndArmorScreen = () => {
     
     // Если робот и есть equippedRobotSlots, отображаем RobotSlot
     if (isRobot && equippedRobotSlots && equippedRobotSlots[slotKey]) {
-      return <RobotSlot key={slotKey} slotKey={slotKey} slotData={equippedRobotSlots[slotKey]} />;
+      const rawSlotData = equippedRobotSlots[slotKey];
+      const localizedSlotData = rawSlotData?.limb
+        ? { ...rawSlotData, limb: findLocalizedLimb(equipmentCatalog, rawSlotData.limb) }
+        : rawSlotData;
+      return <RobotSlot key={slotKey} slotKey={slotKey} slotData={localizedSlotData} />;
     }
     
     // Иначе отображаем обычный ArmorPart

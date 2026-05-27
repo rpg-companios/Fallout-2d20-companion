@@ -38,8 +38,8 @@ const RobotSlot = ({
     <View style={localStyles.armorPartContainer}>
       {/* Header: slot name + limb name */}
       <View style={[globalStyles.sectionHeader, { flexDirection: 'column', alignItems: 'center', paddingBottom: limbName ? 2 : 4, minHeight: 50 }]}>
-        <Text style={globalStyles.sectionTitle}>{slotTitle}</Text>
-        {slotSubtitle ? <Text style={[globalStyles.sectionTitle, { fontSize: 12 }]}>{slotSubtitle}</Text> : null}
+        <Text style={[globalStyles.sectionTitle, { textAlign: 'center' }]}>{slotTitle}</Text>
+        {slotSubtitle ? <Text style={[globalStyles.sectionTitle, { fontSize: 12, textAlign: 'center' }]}>{slotSubtitle}</Text> : null}
         {limbName ? <Text style={localStyles.armorItemNameTitle}>{limbName}</Text> : null}
       </View>
 
