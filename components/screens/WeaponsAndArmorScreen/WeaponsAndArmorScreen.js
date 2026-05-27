@@ -130,8 +130,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const fireRateBase = Number(displayWeapon.fire_rate ?? 0) || 0;
     const rangeValue = displayWeapon.range_name ?? displayWeapon.rangeName ?? tWeaponsAndArmorScreen('common.empty');
     const qualitiesValue = resolveWeaponQualities(displayWeapon.qualities) || tWeaponsAndArmorScreen('common.empty');
-    const mainAttr = displayWeapon.main_attr ?? 'AGI';
-    const mainSkill = displayWeapon.main_skill ?? 'SMALL_GUNS';
+    const mainAttr = displayWeapon.mainAttr ?? displayWeapon.main_attr ?? 'AGI';
+    const mainSkill = displayWeapon.mainSkill ?? displayWeapon.main_skill ?? 'SMALL_GUNS';
 
     const SKILL_ALIASES = {
       ATHLETICS: ['ATHLETICS', 'Атлетика', 'Athletics'],

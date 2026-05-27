@@ -43,7 +43,6 @@
     "id": "robot_weapon_flamethrower",
     "itemType": "weapon",
     "weaponSlots": 0,
-    "name": "Огнемёт",
     "weaponType": "Heavy",
     "damage": 3,
     "damageType": "fire",
@@ -71,7 +70,6 @@
     "id": "robot_weapon_circular_saw",
     "itemType": "weapon",
     "weaponSlots": 0,
-    "name": "Циркулярная пила",
     "weaponType": "Melee",
     "damage": 3,
     "damageType": "physical",
@@ -103,7 +101,6 @@
     "id": "robot_weapon_laser_cutter",
     "itemType": "weapon",
     "weaponSlots": 0,
-    "name": "Лазерный резак",
     "weaponType": "Energy",
     "damage": 4,
     "damageType": "energy",
@@ -129,7 +126,6 @@
     "id": "robot_weapon_auto_10mm",
     "itemType": "weapon",
     "weaponSlots": 0,
-    "name": "Автоматическая 10мм пушка",
     "weaponType": "Light",
     "damage": 4,
     "damageType": "physical",
@@ -156,7 +152,6 @@
   {
     "id": "robot_weapon_cryojet",
     "itemType": "weapon",
-    "name": "Криоструя",
     "weaponType": "Energy",
     "damage": 3,
     "damageType": "energy",
@@ -189,7 +184,6 @@
   {
     "id": "robot_weapon_shocker_arms",
     "itemType": "weapon",
-    "name": "Шоковые руки",
     "weaponType": "Melee",
     "damage": 4,
     "damageType": "energy",
@@ -215,7 +209,6 @@
   {
     "id": "robot_weapon_self_destruct",
     "itemType": "weapon",
-    "name": "Самоуничтожение",
     "weaponType": "Explosive",
     "damage": 6,
     "damageType": "energy",
@@ -238,7 +231,6 @@
   {
     "id": "robot_weapon_construction_claw",
     "itemType": "weapon",
-    "name": "Строительный коготь",
     "weaponType": "Unarmed",
     "damage": 4,
     "damageType": "physical",
@@ -266,7 +258,6 @@
   {
     "id": "robot_weapon_drill",
     "itemType": "weapon",
-    "name": "Дрель",
     "weaponType": "Unarmed",
     "damage": 5,
     "damageType": "physical",
@@ -297,7 +288,6 @@
   {
     "id": "robot_weapon_vice_grip",
     "itemType": "weapon",
-    "name": "Тиски",
     "weaponType": "Unarmed",
     "damage": 4,
     "damageType": "physical",
@@ -328,7 +318,6 @@
   {
     "id": "robot_weapon_mod_shock",
     "itemType": "weapon",
-    "name": "Модуль шока",
     "weaponType": "Melee",
     "damage": 0,
     "damageType": "energy",
@@ -354,7 +343,6 @@
   {
     "id": "robot_weapon_mod_stun",
     "itemType": "weapon",
-    "name": "Модуль оглушения",
     "weaponType": "Melee",
     "damage": 0,
     "damageType": "energy",
@@ -380,7 +368,6 @@
   {
     "id": "robot_weapon_assaultron_head_laser",
     "itemType": "weapon",
-    "name": "Лазер головы ассаултрона",
     "weaponType": "Energy",
     "damage": 5,
     "damageType": "energy",
@@ -412,7 +399,6 @@
   {
     "id": "robot_weapon_mesmetron",
     "itemType": "weapon",
-    "name": "Мезметрон",
     "weaponType": "Energy",
     "damage": 3,
     "damageType": "energy",
@@ -437,7 +423,6 @@
   {
     "id": "robot_weapon_claw",
     "itemType": "weapon",
-    "name": "Коготь",
     "weaponType": "Unarmed",
     "damage": 3,
     "damageType": "physical",
@@ -461,7 +446,6 @@
     "id": "robot_weapon_tesla_arm",
     "itemType": "weapon",
     "weaponSlots": 0,
-    "name": "Карабин Теслы",
     "weaponType": "Energy",
     "damage": 4,
     "damageType": "energy",
@@ -488,7 +472,6 @@
   {
     "id": "robot_weapon_smoke_claws",
     "itemType": "weapon",
-    "name": "Дымовые когти",
     "weaponType": "Small Guns",
     "damage": 4,
     "damageType": "poison",
