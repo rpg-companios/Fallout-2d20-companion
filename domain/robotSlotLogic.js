@@ -24,7 +24,7 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
   const limb = slotData?.limb;
 
   const limbName = limb != null
-    ? (limb.name ?? null)
+    ? t(`robotLimbs.${limb.id}`, limb.name ?? limb.id)
     : t('robotSlot.noLimb');
 
   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
