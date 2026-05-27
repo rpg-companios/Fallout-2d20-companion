@@ -11,7 +11,7 @@ const BODY_PLAN_SLOTS = {
   assaultron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
   sentryBot:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
   misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
-  robobrain:   ['head', 'body', 'leftArm', 'rightArm', 'chassis'],
+  robobrain:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
 };
 
 
@@ -98,7 +98,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   const slotKeys = getRobotSlotKeys(bodyPlan);
   const modules = [];
   const inventoryItems = [];
-  let pendingHeadBuiltinWeapon = null;
+  const pendingHeadBuiltinWeapons = [];
 
   const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
 
@@ -202,10 +202,12 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     // Оружие
     if (itype === 'weapon') {
       const weaponData = item._weapon ?? item;
-      // Встроенное в голову оружие — пропускаем, оно придёт через builtinWeapons головы
+
+      // Встроенное оружие в голову
       if (weaponData.builtinToHead) {
-        pendingHeadBuiltinWeapon = weaponData;
-        continue;
+        const weaponStats = resolveWeaponStats(weaponData.id || item.weaponId);
+        if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
+        continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
       }
       const armEntry = resolveArmEntry(weaponData.id ?? item.weaponId);
       if (armEntry) {
@@ -297,9 +299,16 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     }
   }
 
-  if (pendingHeadBuiltinWeapon && slots.head?.limb) {
+  if (pendingHeadBuiltinWeapons.length > 0 && slots.head?.limb) {
     const headLimb = slots.head.limb;
-    slots.head.limb = { ...headLimb, builtinWeapons: [{ ...pendingHeadBuiltinWeapon, isBuiltin: true }] };
+    const existingBuiltin = Array.isArray(headLimb.builtinWeapons) ? headLimb.builtinWeapons : [];
+    const mergedBuiltin = [...existingBuiltin];
+    for (const weaponStats of pendingHeadBuiltinWeapons) {
+      if (!mergedBuiltin.some((w) => w.id === weaponStats.id)) {
+        mergedBuiltin.push({ ...weaponStats, isBuiltin: true });
+      }
+    }
+    slots.head.limb = { ...headLimb, builtinWeapons: mergedBuiltin };
   }
 
   // Собираем оружия

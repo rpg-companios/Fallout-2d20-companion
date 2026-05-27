@@ -165,6 +165,23 @@ const formatAmmoSuffix = (ammo) => {
 
 // For robotArm entries with a builtinWeaponId, returns " + <weapon name>" so the
 // modal makes it visible that the arm carries a built-in weapon (e.g. manipulator).
+
+const ORIGIN_TO_ROBOT_BODY_PLAN = {
+  robobrain: 'robobrain',
+  protectron: 'protectron',
+  assaultron: 'assaultron',
+  misterHandy: 'misterHandy',
+  securitron: 'protectron',
+  sentryBot: 'sentryBot',
+};
+
+const resolveRobotBodyPlan = (character) => (
+  character?.trait?.modifiers?.robotBodyPlan
+  || character?.origin?.robotBodyPlan
+  || ORIGIN_TO_ROBOT_BODY_PLAN[character?.origin?.id]
+  || 'protectron'
+);
+
 const formatBuiltinWeaponSuffix = (entry) => {
   if (!entry || entry.itemType !== 'robotArm') return '';
   const builtinId = entry.builtinWeaponId;
@@ -239,9 +256,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     const isRobot = isRobotCharacter(character);
 
     if (isRobot) {
-      const bodyPlan = character?.trait?.modifiers?.robotBodyPlan
-        || character?.origin?.robotBodyPlan
-        || 'protectron';
+      const bodyPlan = resolveRobotBodyPlan(character);
       const robotCatalog = loadRobotCatalog();
       const { slots, weapons, modules, inventoryItems: robotInventory } = initRobotSlots(
         bodyPlan,

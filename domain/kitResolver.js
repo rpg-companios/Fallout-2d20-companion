@@ -170,6 +170,8 @@ export async function resolveWeaponItem(item) {
   return {
     ...item,
     _weapon: weaponData,
+    builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
+    builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
     _mods: mods,
     displayName,
     name: displayName,
