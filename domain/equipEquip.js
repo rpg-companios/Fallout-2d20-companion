@@ -1,26 +1,20 @@
 // domain/equipEquip.js
 // Pure functions for equip eligibility checks.
 // No React, no UI dependencies. All reason strings are i18n keys.
-//
-// Design principle: access is OPEN by default.
-// Restrictions are declared only on origins/traits that have them.
-// Currently restricted:
-//   - Robots  → can only wear robot armor
-//   - Mutants → can only wear mutant-tagged armor (mutantOnly: true)
-//     (currently raider armor from armor.json; a dedicated mutant armor file
-//      may be added later — the flag will remain the same)
 
 import { getAttributeValue } from './characterCreation';
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
+const ARMOR_POLICY = {
+  HUMANOID_FULL: 'humanoid_full',
+  SUPERMUTANT_RAIDER_ONLY: 'supermutant_raider_only',
+  ROBOT_ONLY: 'robot_only',
+};
 
 /** True if the armor item is robot-specific. */
 const isRobotArmor = (armorItem) =>
   Boolean(armorItem?.robotOnly || armorItem?.robotArmorType);
 
-/** True if the armor item is mutant-specific. */
+/** True if the armor item is mutant/raider restricted. */
 const isMutantArmor = (armorItem) => Boolean(armorItem?.mutantOnly);
 
 /** True if the weapon comes from robot weapons catalog. */
@@ -31,52 +25,51 @@ const isRobotOnlyWeapon = (weaponItem) =>
     || String(weaponItem?.id || '').startsWith('robot_arm_')
   );
 
-// ---------------------------------------------------------------------------
-// canEquipArmor
-// ---------------------------------------------------------------------------
+/**
+ * Robots may wear only decorative hats on top of their head.
+ * Explicitly excludes helmets/hoods/masks/caps-like protective headwear.
+ */
+const isRobotDecorativeHat = (clothingItem) => {
+  if (clothingItem?.clothingType !== 'headwear') return false;
+  const id = String(clothingItem?.id || '');
+
+  // Supported hat ids in current catalog.
+  return id === 'headwear_casual_hat'
+    || id === 'headwear_fancy_hat'
+    || id === 'headwear_bos_scribe_hat';
+};
+
+function getArmorPolicy(character) {
+  return character?.origin?.armorPolicy || ARMOR_POLICY.HUMANOID_FULL;
+}
 
 /**
  * Check whether a character can equip a given armor item.
  *
- * Rules:
- *  - Robot origin  → only robot armor. Everything else is blocked.
- *  - Mutant origin (isMutant: true on origin, or armorConstraint: 'mutantOnly' on trait)
- *                  → only mutant armor (mutantOnly: true). Everything else is blocked.
- *  - Everyone else → allowed by default; robot/mutant-tagged armor is blocked.
- *
- * @param {object} armorItem  - Armor item. Relevant flags: robotOnly, robotArmorType, mutantOnly.
- * @param {object} character  - { origin, trait }
- *   origin: { isRobot, isMutant }
- *   trait:  { modifiers: { armorConstraint } }
- * @returns {{ allowed: boolean, reason: string | null }}
+ * Policies:
+ *  - robot_only                -> only robot armor
+ *  - supermutant_raider_only   -> only mutant-tagged armor
+ *  - humanoid_full             -> standard + power armor, but no robot/mutant armor
  */
 export function canEquipArmor(armorItem, character) {
-  const { origin, trait } = character || {};
-
+  const policy = getArmorPolicy(character);
   const robotArmor = isRobotArmor(armorItem);
   const mutantArmor = isMutantArmor(armorItem);
 
-  const isRobotCharacter = Boolean(origin?.isRobot);
-  const isMutantCharacter =
-    Boolean(origin?.isMutant) || trait?.modifiers?.armorConstraint === 'mutantOnly';
-
-  // --- Robot character ---
-  if (isRobotCharacter) {
+  if (policy === ARMOR_POLICY.ROBOT_ONLY) {
     if (!robotArmor) {
       return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
     }
     return { allowed: true, reason: null };
   }
 
-  // --- Mutant character ---
-  if (isMutantCharacter) {
+  if (policy === ARMOR_POLICY.SUPERMUTANT_RAIDER_ONLY) {
     if (!mutantArmor) {
       return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
     }
     return { allowed: true, reason: null };
   }
 
-  // --- Everyone else: open by default, but robot/mutant gear is off-limits ---
   if (robotArmor) {
     return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
   }
@@ -87,25 +80,17 @@ export function canEquipArmor(armorItem, character) {
   return { allowed: true, reason: null };
 }
 
-// ---------------------------------------------------------------------------
-// canEquipWeapon
-// ---------------------------------------------------------------------------
-
 /**
  * Check whether a character can equip a given weapon item.
  *
  * Rules:
- *  - Robot-only weapon + non-robot character → blocked.
- *  - Standard weapon  + robot character      → blocked (needs manipulator; caller handles that).
- *  - Everything else                         → allowed.
- *
- * @param {object} weaponItem - Weapon item. Relevant fields: id, limbSlot.
- * @param {object} character  - { origin }
- * @returns {{ allowed: boolean, reason: string | null }}
+ *  - Robot-only weapon + non-robot policy character -> blocked.
+ *  - Standard weapon  + robot-only policy character -> blocked.
+ *  - Everything else                                -> allowed.
  */
 export function canEquipWeapon(weaponItem, character) {
-  const { origin } = character || {};
-  const isRobotCharacter = Boolean(origin?.isRobot);
+  const policy = getArmorPolicy(character);
+  const isRobotCharacter = policy === ARMOR_POLICY.ROBOT_ONLY;
   const isRobotWeapon = isRobotOnlyWeapon(weaponItem);
 
   if (isRobotWeapon && !isRobotCharacter) {
@@ -119,27 +104,12 @@ export function canEquipWeapon(weaponItem, character) {
   return { allowed: true, reason: null };
 }
 
-// ---------------------------------------------------------------------------
-// canEquipClothing
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether a character can equip a given clothing item.
- *
- * Rules:
- *  - Robot character → only clothing with canRobotWear: true is allowed.
- *  - Everyone else   → allowed by default.
- *
- * @param {object} clothingItem - Clothing item. Relevant flag: canRobotWear.
- * @param {object} character    - { origin }
- * @returns {{ allowed: boolean, reason: string | null }}
- */
 export function canEquipClothing(clothingItem, character) {
-  const { origin } = character || {};
-  const isRobotChar = Boolean(origin?.isRobot);
+  const policy = getArmorPolicy(character);
+  const isRobotChar = policy === ARMOR_POLICY.ROBOT_ONLY;
 
   if (isRobotChar) {
-    if (!clothingItem?.canRobotWear) {
+    if (!isRobotDecorativeHat(clothingItem)) {
       return { allowed: false, reason: 'equip.error.robotCannotWearClothing' };
     }
     return { allowed: true, reason: null };
@@ -148,36 +118,11 @@ export function canEquipClothing(clothingItem, character) {
   return { allowed: true, reason: null };
 }
 
-// ---------------------------------------------------------------------------
-// filterAvailableArmor
-// ---------------------------------------------------------------------------
-
-/**
- * Filter a list of armor items to only those the character can equip.
- *
- * @param {object[]} allArmor  - Array of armor items.
- * @param {object}   character - { origin, trait }.
- * @returns {object[]}
- */
 export function filterAvailableArmor(allArmor, character) {
   if (!Array.isArray(allArmor)) return [];
   return allArmor.filter((item) => canEquipArmor(item, character).allowed);
 }
 
-// ---------------------------------------------------------------------------
-// getCarryWeightLimit
-// ---------------------------------------------------------------------------
-
-/**
- * Calculate the carry weight limit for a character.
- *
- * Robots: fixed value from trait.modifiers.carryWeightFixed (default 150).
- * Everyone else: 150 + STR * multiplier
- *   (multiplier from trait.modifiers.carryWeightStrengthMultiplier, default 10).
- *
- * @param {object} character - { origin, trait, attributes }
- * @returns {number}
- */
 export function getCarryWeightLimit(character) {
   const { origin, trait, attributes } = character || {};
 
