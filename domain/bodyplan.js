@@ -1,5 +1,15 @@
 const bodyPlansRegistry = require('../data/bodyplans/bodyplans.json');
 
+/**
+ * Capability semantics:
+ * - canEquipWeapon: strict allowlist (default false)
+ * - canEquipArmor: slot can accept a defensive wearable layer in broad terms (default true)
+ *
+ * Concrete equipment families (armor/clothing/hats/robot plating/frame/etc.)
+ * are intentionally NOT decided at bodyplan level and must be constrained by
+ * origin/trait/item rules.
+ */
+
 const ROBOT_ORIGIN_TO_PLAN = {
   robobrain: 'robobrain',
   misterHandy: 'misterHandy',
