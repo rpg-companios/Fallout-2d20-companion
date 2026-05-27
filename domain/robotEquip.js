@@ -4,6 +4,22 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodypla
 // Pure functions for robot equipment logic.
 // No React, no UI dependencies. All reason strings are i18n keys.
 
+// ---------------------------------------------------------------------------
+// Slot schemas per body plan
+// ---------------------------------------------------------------------------
+
+const BODY_PLAN_SLOTS = {
+  protectron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+  assaultron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+  sentryBot:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+  misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
+  robobrain:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+};
+
+
+// ---------------------------------------------------------------------------
+// Простые хелперы
+// ---------------------------------------------------------------------------
 
 export function isRobotCharacter(character) {
   return Boolean(character?.origin?.isRobot);
@@ -114,7 +130,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   const slotKeys = getRobotSlotKeys(bodyPlan);
   const modules = [];
   const inventoryItems = [];
-  const deferredBuiltinWeapons = { head: [] };
+  const pendingHeadBuiltinWeapons = [];
 
   const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
 
@@ -217,19 +233,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       // Встроенное оружие в голову
       if (weaponData.builtinToHead) {
         const weaponStats = resolveWeaponStats(weaponData.id || item.weaponId);
-        if (weaponStats) {
-          if (slots.head?.limb) {
-            const headBuiltin = normalizeBuiltinWeapons(slots.head.limb, weaponsCatalog);
-            if (!headBuiltin.some((w) => w.id === weaponStats.id)) {
-              slots.head.limb = {
-                ...slots.head.limb,
-                builtinWeapons: [...headBuiltin, { ...weaponStats, weaponId: weaponStats.id, isBuiltin: true }],
-              };
-            }
-          } else {
-            deferredBuiltinWeapons.head.push(weaponStats);
-          }
-        }
+        if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
       }
       const armEntry = resolveArmEntry(weaponData.id ?? item.weaponId);
@@ -240,6 +244,25 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
           slots[targetKey].limb = {
             ...limbFromArm,
             name: weaponData.name || limbFromArm.name || limbFromArm.id,
+          };
+          slots[targetKey].heldWeapon = null;
+          continue;
+        }
+      }
+
+      // Fallback: robot weapon as limb even without explicit arms catalog entry.
+      if (String(weaponData.id || item.weaponId || '').startsWith('robot_weapon_')) {
+        const preferred = item.limbSlot;
+        const targetKey = (preferred && slotKeys.includes(preferred) && slots[preferred]?.limb == null)
+          ? preferred
+          : slotKeys.find((k) => k.toLowerCase().includes('arm') && slots[k]?.limb == null);
+        if (targetKey && slots[targetKey] !== undefined) {
+          slots[targetKey].limb = {
+            ...weaponData,
+            itemType: 'robotArm',
+            canHoldWeapons: false,
+            weaponSlots: 0,
+            builtinWeapons: buildBuiltinWeapons(weaponData).map((w) => ({ ...w, isBuiltin: true })),
           };
           slots[targetKey].heldWeapon = null;
           continue;
@@ -318,13 +341,13 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     }
   }
 
-  if (deferredBuiltinWeapons.head.length > 0 && slots.head?.limb) {
+  if (pendingHeadBuiltinWeapons.length > 0 && slots.head?.limb) {
     const headLimb = slots.head.limb;
-    const existingBuiltin = normalizeBuiltinWeapons(headLimb, weaponsCatalog);
+    const existingBuiltin = Array.isArray(headLimb.builtinWeapons) ? headLimb.builtinWeapons : [];
     const mergedBuiltin = [...existingBuiltin];
-    for (const weaponStats of deferredBuiltinWeapons.head) {
+    for (const weaponStats of pendingHeadBuiltinWeapons) {
       if (!mergedBuiltin.some((w) => w.id === weaponStats.id)) {
-        mergedBuiltin.push({ ...weaponStats, weaponId: weaponStats.id, isBuiltin: true });
+        mergedBuiltin.push({ ...weaponStats, isBuiltin: true });
       }
     }
     slots.head.limb = { ...headLimb, builtinWeapons: mergedBuiltin };
@@ -353,40 +376,44 @@ export function getBuiltinWeaponsFromSlots(slots) {
   if (!slots || typeof slots !== 'object') return [];
 
   const weapons = [];
-  const seenBuiltinById = new Set();
+  const seenIds = new Set();
+
+  const pushWeapon = (weapon, slotKey, limb, extra = {}) => {
+    if (!weapon) return;
+    const id = weapon.id;
+    if (id && seenIds.has(id)) return;
+    if (id) seenIds.add(id);
+    weapons.push({
+      ...weapon,
+      sourceSlot: slotKey,
+      sourceLimb: limb?.id,
+      ...extra,
+    });
+  };
 
   for (const [slotKey, slotData] of Object.entries(slots)) {
     if (!slotData) continue;
     const { limb, heldWeapon } = slotData;
 
-    // Встроенные оружия конечности
-    let builtinWeapons = normalizeBuiltinWeapons(limb);
-    if (builtinWeapons.length === 0 && (limb?.replacesArm || String(limb?.id || '').startsWith('robot_weapon_'))) {
-      builtinWeapons = [{ ...limb, id: limb.id, weaponId: limb.id, isBuiltin: true }];
-    }
-    if (builtinWeapons.length > 0) {
-      builtinWeapons.forEach((weapon) => {
-        if (seenBuiltinById.has(weapon.id)) return;
-        seenBuiltinById.add(weapon.id);
-        weapons.push({
-          ...weapon,
-          id: weapon.id || weapon.weaponId,
-          weaponId: weapon.weaponId || weapon.id,
-          sourceSlot: slotKey,
-          sourceLimb: limb.id,
-          isBuiltin: true,
-          ...(limb._builtinWeapon ?? {}),
-        });
-      });
+    if (heldWeapon) {
+      pushWeapon(heldWeapon, slotKey, limb);
+      continue;
     }
 
-    // Оружие в руке
-    if (heldWeapon) {
-      weapons.push({
-        ...heldWeapon,
-        weaponId: heldWeapon.weaponId || heldWeapon.id,
-        sourceSlot: slotKey,
+    if (Array.isArray(limb?.builtinWeapons) && limb.builtinWeapons.length > 0) {
+      limb.builtinWeapons.forEach((weapon) => {
+        pushWeapon(weapon, slotKey, limb, { isBuiltin: true, ...(limb._builtinWeapon ?? {}) });
       });
+      continue;
+    }
+
+    if (limb?.builtinWeaponId) {
+      pushWeapon({ id: limb.builtinWeaponId }, slotKey, limb, { isBuiltin: true });
+      continue;
+    }
+
+    if (limb?.builtinManipulator) {
+      pushWeapon({ id: limb.id }, slotKey, limb, { isManipulator: true, isBuiltin: true });
     }
   }
 
@@ -501,18 +528,16 @@ export function applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog = [
     [slotKey]: {
       ...slots[slotKey],
       limb: normalizedLimb,
-      // Keep held weapon if the new limb can hold weapons; otherwise clear it
       heldWeapon:
         normalizedLimb?.canHoldWeapons ? (slots[slotKey]?.heldWeapon ?? null) : null,
     },
   };
 
-  if (previousLimb) {
-    for (const [k, data] of Object.entries(updatedSlots)) {
-      if (k === slotKey) continue;
-      if (data?.limb === previousLimb) {
-        updatedSlots[k] = { ...data, limb: null, heldWeapon: null };
-      }
+  if ((slotKey === 'leftArm' || slotKey === 'rightArm') && slots.leftArm && slots.rightArm) {
+    const siblingKey = slotKey === 'leftArm' ? 'rightArm' : 'leftArm';
+    const oldLimb = slots[slotKey]?.limb;
+    if (oldLimb && slots[siblingKey]?.limb === oldLimb) {
+      updatedSlots[siblingKey] = { ...updatedSlots[siblingKey], limb: null, heldWeapon: null };
     }
   }
 

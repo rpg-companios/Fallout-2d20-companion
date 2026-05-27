@@ -26,7 +26,9 @@ const protectronManipulator = {
       damageType: 'physical',
       weaponType: 'Melee',
     }
-  ]
+  ],
+  canHoldWeapons: true,
+  weaponSlots: 1,
 };
 
 const laserGun = {
@@ -73,7 +75,7 @@ const robotCatalog = {
 
 // Mister Handy fixtures
 const manipulatorArm = {
-  id: 'robot_arm_manipulator',
+  id: 'robot_weapon_manipulator',
   itemType: 'robotArm',
   slot: 'left',
   builtinWeapons: [
@@ -175,7 +177,7 @@ describe('isRobotCharacter', () => {
 describe('getRobotSlotKeys', () => {
   it('returns protectron slots', () => {
     expect(getRobotSlotKeys('protectron')).toEqual([
-      'head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg',
+      'leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg',
     ]);
   });
 
@@ -187,7 +189,7 @@ describe('getRobotSlotKeys', () => {
 
   it('returns robobrain slots', () => {
     expect(getRobotSlotKeys('robobrain')).toEqual([
-      'head', 'body', 'leftArm', 'rightArm', 'chassis',
+      'leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg',
     ]);
   });
 
@@ -203,7 +205,7 @@ describe('getRobotSlotKeys', () => {
 describe('createEmptyRobotSlots', () => {
   it('creates all null fields for each protectron slot', () => {
     const slots = createEmptyRobotSlots('protectron');
-    const keys = ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
+    const keys = ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'];
     expect(Object.keys(slots)).toEqual(keys);
     for (const k of keys) {
       expect(slots[k]).toEqual({ limb: null, armor: null, plating: null, frame: null, heldWeapon: null });
@@ -284,14 +286,14 @@ describe('initRobotSlots — protectron_standard', () => {
     // The arm without a heldWeapon should contribute the manipulator
     const ids = weapons.map((w) => w.id);
     expect(ids).toContain('weapon_laser_gun');
-    expect(ids).toContain('robot_weapon_protectron_manipulator');
+    expect(ids).toContain('protectron_manipulator_punch');
   });
 
   it('adds builtinToHead weapons to equipped head weapon list', () => {
     const weaponBuiltinToHead = {
       id: 'robot_weapon_mesmetron',
       itemType: 'weapon',
-      builtinToHead: 'robot_head_protectron',
+      builtinToHead: true,
       damage: 5,
     };
     const { weapons } = initRobotSlots('protectron', [weaponBuiltinToHead], {
@@ -351,7 +353,7 @@ describe('initRobotSlots — mister_handy_assistant', () => {
   it('builds weapons array including the manipulator', () => {
     const { weapons } = initRobotSlots('misterHandy', resolvedItems, handyCatalog);
     const ids = weapons.map((w) => w.id);
-    expect(ids).toContain('robot_weapon_manipulator');
+    expect(ids).toContain('manipulator_punch');
   });
 
   it('each weapon has a sourceSlot set to an arm key', () => {
