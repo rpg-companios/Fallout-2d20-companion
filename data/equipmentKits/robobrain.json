@@ -57,6 +57,92 @@
       }
     ]
   },
+  "robobrain_nonordinary": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_mesmetron",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 14,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          { "itemId": "robot_arm_smoke_manipulator", "itemType": "robotArm", "slot": "left" },
+          { "weaponId": "robot_weapon_tesla_arm", "itemType": "weapon", "slot": "left" },
+          { "weaponId": "robot_weapon_flamethrower", "itemType": "weapon", "slot": "left" },
+          { "weaponId": "weapon_laser_gun", "itemType": "weapon", "slot": "left" },
+          { "weaponId": "weapon_sledgehammer", "itemType": "weapon", "slot": "left" }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          { "itemId": "robot_arm_smoke_manipulator", "itemType": "robotArm", "slot": "right" },
+          { "weaponId": "robot_weapon_tesla_arm", "itemType": "weapon", "slot": "right" },
+          { "weaponId": "robot_weapon_flamethrower", "itemType": "weapon", "slot": "right" },
+          { "weaponId": "weapon_laser_gun", "itemType": "weapon", "slot": "right" },
+          { "weaponId": "weapon_sledgehammer", "itemType": "weapon", "slot": "right" }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "ammoId": "ammo_energy_cell",
+            "itemType": "ammo",
+            "quantity": {
+              "base": 14,
+              "rollType": "rollCD",
+              "rollValue": 7,
+              "op": "+"
+            }
+          },
+          {
+            "ammoId": "ammo_flamer_fuel",
+            "itemType": "ammo",
+            "quantity": {
+              "base": 12,
+              "rollType": "rollCD",
+              "rollValue": 6,
+              "op": "+"
+            }
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 2,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "oddity",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
   "robobrain_us_army": {
     "items": [
       {
