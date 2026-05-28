@@ -257,6 +257,23 @@
     }
   },
   {
+    "id": "synth-more-than-human",
+    "originId": "synth",
+    "displayNameKey": "traits.synth.moreThanHuman.name",
+    "descriptionKey": "traits.synth.moreThanHuman.description",
+    "modifiers": {
+      "extraSkills": 1,
+      "immunities": ["radiation", "poison", "disease"],
+      "effects": [
+        "no_sleep_needed",
+        "no_eat_drink_needed",
+        "no_aging",
+        "synth_charisma_penalty_if_known",
+        "institute_codeword_incapacitation"
+      ]
+    }
+  },
+  {
     "id": "robobrain-robot-with-brains",
     "originId": "robobrain",
     "displayNameKey": "traits.robobrain.robotWithBrains.name",

@@ -109,6 +109,12 @@
         "description": "You may reroll 1d20 on any AGI check that depends on balance or flexibility. You can carry less than others."
       }
     },
+    "synth": {
+      "moreThanHuman": {
+        "name": "More Than Human",
+        "description": "Outwardly and mentally indistinguishable from a human, but biologically enhanced. Does not require sleep, food, or water, does not age, does not get sick, and is fully immune to poison, radiation, and disease.\n\nPros: +1 additional Tagged skill. Instead of sleeping, may spend the time crafting, reading, or light scouting.\n\nCons: If NPCs who know of their nature are not friendly to synths, the difficulty of all Charisma checks increases by 2. On a complication, NPCs become hostile or reputation drops. They have an Institute code phrase: upon hearing it, they become incapacitated and lose their identity until restored by the Institute."
+      }
+    },
     "misterHandy": {
       "robotMrHandy": {
         "name": "Robot Mr. Handy",
