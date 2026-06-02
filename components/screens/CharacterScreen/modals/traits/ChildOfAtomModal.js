@@ -1,15 +1,17 @@
 import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
-import { getTraitI18n } from '../../../../../domain/traits';
+import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 
 export const traitConfig = { originId: 'childOfAtom', modalType: 'info' };
 
 const ChildOfAtomModal = ({ visible, onSelect, onClose }) => {
-  const { name, description } = getTraitI18n('childofatom-radioactive-sponge');
+  const traitId = 'childofatom-radioactive-sponge';
+  const { name, description } = getTraitI18n(traitId);
 
   const handleConfirm = () => {
-    onSelect(name, { effects: ['Дополнительный перк', 'Сопротивление радиации 1', 'Принятие удара на себя', 'Накопление очков радиации'] });
+    const canonicalTrait = findTraitById(traitId);
+    onSelect(name, canonicalTrait?.modifiers || {});
   };
 
   return (

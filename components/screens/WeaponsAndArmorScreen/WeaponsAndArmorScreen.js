@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
-import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
+import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
 import { TRAITS } from '../CharacterScreen/logic/traitsData';
 import { isRobotCharacter } from '../../../domain/robotEquip';
 import { resolveBodyPlan } from '../../../domain/bodyplan';
@@ -14,6 +14,7 @@ import { applyArmorMods } from '../../../domain/modsEquip';
 import { getSkillDisplayName } from '../CharacterScreen/logic/characterScreenI18n';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
+import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { getRobotSlotKeys } from '../../../domain/robotEquip';
 
@@ -125,7 +126,6 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     // Канонический формат полей оружия
     const weaponName = displayWeapon.name ?? tWeaponsAndArmorScreen('common.empty');
     const damageType = resolveWeaponDamageType(displayWeapon.damage_type ?? displayWeapon.damageType);
-    const baseDamage = Number(displayWeapon.damage ?? 0) || 0;
     const effectsValue = displayWeapon.damage_effects ?? displayWeapon.damageEffects ?? tWeaponsAndArmorScreen('common.empty');
     const fireRateBase = Number(displayWeapon.fire_rate ?? 0) || 0;
     const rangeValue = displayWeapon.range_name ?? displayWeapon.rangeName ?? tWeaponsAndArmorScreen('common.empty');
@@ -170,11 +170,10 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const ncrInfantryWeaponIds = TRAITS['Пехотинец']?.modifiers?.ncrInfantryWeaponIds || [];
     const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
 
-    const damageWithNcr = hasTrait('Пехотинец') && isNcrInfantryWeapon ? baseDamage + 1 : baseDamage;
-    // Бонус ближнего боя применяется к UNARMED и Melee оружию (или если meleeBonusApplies: true)
-    const isMeleeType = ['Melee', 'Unarmed', 'MELEE_WEAPONS', 'UNARMED'].includes(displayWeapon?.weaponType ?? displayWeapon?.weapon_type ?? '');
-    const applyMeleeBonus = displayWeapon?.meleeBonusApplies === true || isMeleeType;
-    const visibleDamage = applyMeleeBonus ? damageWithNcr + (meleeBonus || 0) : damageWithNcr;
+    const damageWithNcr = hasTrait('Пехотинец') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
+    const weaponType = displayWeapon?.weaponType ?? displayWeapon?.weapon_type;
+    const appliesMeleeBonus = displayWeapon?.meleeBonusApplies === true || ['Melee', 'Unarmed'].includes(weaponType);
+    const visibleDamage = appliesMeleeBonus ? damageWithNcr + (Number(meleeBonus) || 0) : damageWithNcr;
 
     // Снижение базовой скорострельности на 1 при "Техника спуска" для стрелкового и энергооружия
     const equippedWeaponTypes = (equippedWeapons || [])
@@ -329,7 +328,6 @@ const WeaponsAndArmorScreen = () => {
     equippedRobotSlots,
     equipment,
     saveModifiedItem,
-    effects,
     activeTimedEffects,
     attributesSaved,
     trait,
@@ -337,17 +335,19 @@ const WeaponsAndArmorScreen = () => {
   } = useCharacter();
   const locale = useLocale();
 
+  const isRobot = isRobotCharacter({ origin, trait });
   const initiative = calculateInitiative(attributes);
   const defense = calculateDefense(attributes);
   const meleeBonus = calculateMeleeBonus(attributes, trait);
+  const meleeBonusValue = calculateMeleeBonusValue(attributes, trait);
   const maxHealth = attributesSaved ? calculateMaxHealth(attributes, level) : 0;
   const timedMaxHpBonus = getTimedMaxHpBonus(activeTimedEffects);
   const effectiveMaxHealth = maxHealth + timedMaxHpBonus;
   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
   
-  const isMisterHandyRobot = Boolean(trait?.modifiers?.isRobot && trait?.modifiers?.robotBodyPlan === 'misterHandy');
-  const hasRadImmunity = isMisterHandyRobot || effects.includes('Иммунитет к радиации');
-  const hasPoisonImmunity = effects.includes('Иммунитет к яду');
+  const characterForImmunities = { origin, trait };
+  const hasRadImmunity = hasRadiationImmunity(characterForImmunities);
+  const hasPoisonImmunityValue = hasPoisonImmunity(characterForImmunities);
   const hasTimedEffects = (activeTimedEffects || []).length > 0;
   const equipmentCatalog = getEquipmentCatalog(locale);
   const robotBodyUpgrade = findRobotBodyUpgrade(
@@ -439,7 +439,6 @@ const WeaponsAndArmorScreen = () => {
   };
 
   // Robot-specific state and handlers
-  const isRobot = isRobotCharacter({ origin, trait });
   const bodyPlan = resolveBodyPlan({ origin, trait }) || null;
   const [limbUpgradeModalVisible, setLimbUpgradeModalVisible] = useState(false);
   const [selectedLimbSlot, setSelectedLimbSlot] = useState(null);
@@ -561,7 +560,7 @@ const WeaponsAndArmorScreen = () => {
                     </View>
                   ) : null}
                 </StatBox>
-                <StatBox title={tWeaponsAndArmorScreen('stats.poisonResistance')} value={hasPoisonImmunity ? '∞' : '0'} />
+                <StatBox title={tWeaponsAndArmorScreen('stats.poisonResistance')} value={hasPoisonImmunityValue ? '∞' : '0'} />
                 <StatBox title={tWeaponsAndArmorScreen('stats.health')} max={effectiveMaxHealth}>
                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} />
                 </StatBox>
@@ -585,6 +584,7 @@ const WeaponsAndArmorScreen = () => {
                         onUpgradeLimb={handleOpenLimbUpgradeModal}
                         onOpenArmorPicker={handleOpenArmorPicker}
                         onWeaponPress={handleWeaponPress}
+                        hasRadImmunity={hasRadImmunity}
                       />
                     ))}
                   </View>
@@ -614,12 +614,14 @@ const WeaponsAndArmorScreen = () => {
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={false}
+                    meleeBonus={meleeBonusValue}
                   />
                   <WeaponCard
                     weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={false}
+                    meleeBonus={meleeBonusValue}
                   />
                 </View>
               ))}

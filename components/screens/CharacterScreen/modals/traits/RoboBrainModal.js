@@ -1,15 +1,17 @@
 import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
-import { getTraitI18n } from '../../../../../domain/traits';
+import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 
 export const traitConfig = { originId: 'robobrain', modalType: 'info' };
 
 const RoboBrainModal = ({ visible, onSelect, onClose }) => {
-  const { name, description } = getTraitI18n('robobrain-robot-with-brains');
+  const traitId = 'robobrain-robot-with-brains';
+  const { name, description } = getTraitI18n(traitId);
 
   const handleConfirm = () => {
-    onSelect(name, { effects: ['Иммунитет к радиации и ядам', 'Невозможность использования препаратов, еды, питья, отдыха', 'Ремонт для восстановления здоровья'] });
+    const canonicalTrait = findTraitById(traitId);
+    onSelect(name, canonicalTrait?.modifiers || {});
   };
 
   return (

@@ -1,30 +1,17 @@
 import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
-import { getTraitI18n } from '../../../../../domain/traits';
+import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 
 export const traitConfig = { originId: 'misterHandy', modalType: 'info' };
 
 const MisterHandyModal = ({ visible, onSelect, onClose }) => {
-  const { name, description } = getTraitI18n('misterhandy-robot-mr-handy');
+  const traitId = 'misterhandy-robot-mr-handy';
+  const { name, description } = getTraitI18n(traitId);
 
   const handleConfirm = () => {
-    onSelect(name, {
-      effects: ['Иммунитет к радиации', 'Иммунитет к яду', 'Нельзя использовать препараты, еду, питье, отдых', 'Ремонт для восстановления здоровья'],
-      carryWeightStrengthMultiplier: 0,
-      carryWeight: 0,
-      isRobot: true,
-      robotType: 'misterHandy',
-      robotBodyPlan: 'misterHandy',
-      robotRules: {
-        canSelfUseConsumables: false,
-        canUseConsumablesOnOthers: true,
-        canEquipStandardArmor: false,
-        canEquipPowerArmor: false,
-        carryWeightLimit: 150,
-        armorConstraints: []
-      }
-    });
+    const canonicalTrait = findTraitById(traitId);
+    onSelect(name, canonicalTrait?.modifiers || {});
   };
 
   return (

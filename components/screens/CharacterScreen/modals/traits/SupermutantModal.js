@@ -19,7 +19,8 @@ const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
       minLimits: { 'STR': 6, 'END': 6 },
       maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
       skillMaxValue: 4,
-      effects: ['Иммунитет к радиации', 'Иммунитет к яду', 'Нестареющий', 'Бесплодие', 'Ограниченная броня']
+      immunities: ['radiation', 'poison'],
+      armorConstraint: 'mutantOnly'
     });
   };
 

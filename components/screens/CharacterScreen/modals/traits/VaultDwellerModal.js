@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
-import { getTraitI18n } from '../../../../../domain/traits';
+import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 
 export const traitConfig = { originId: 'vaultDweller', modalType: 'choice' };
 
 const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
-  const { name, description } = getTraitI18n('vaultdweller-vault-kid');
+  const traitId = 'vaultdweller-vault-kid';
+  const { name, description } = getTraitI18n(traitId);
 
   const handleSelectSkill = (skill) => {
+    const canonicalTrait = findTraitById(traitId);
     onSelect(name, {
+      ...(canonicalTrait?.modifiers || {}),
       selectedExtraSkills: [skill],
-      effects: ['Снижение сложности проверок ВЫН', 'Сопротивление болезням', 'Восстановление очка удачи при осложнении']
     });
   };
 

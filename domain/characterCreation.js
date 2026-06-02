@@ -204,15 +204,19 @@ export const calculateDefense = (attributes) => {
     return agility >= 9 ? 2 : 1;
 };
 
-export const calculateMeleeBonus = (attributes, trait) => {
+export const calculateMeleeBonusValue = (attributes, trait) => {
     const strength = getAttributeValue(attributes, 'STR');
     let baseBonus = 0;
     if (strength >= 11) baseBonus = 3;
     else if (strength >= 9) baseBonus = 2;
     else if (strength >= 7) baseBonus = 1;
 
-    const traitBonus = trait?.modifiers?.meleeBonusDelta || 0;
-    const totalBonus = baseBonus + traitBonus;
+    const traitBonus = Number(trait?.modifiers?.meleeBonusDelta || 0);
+    return baseBonus + traitBonus;
+};
+
+export const calculateMeleeBonus = (attributes, trait) => {
+    const totalBonus = calculateMeleeBonusValue(attributes, trait);
     return totalBonus > 0 ? `+${totalBonus} {CD}` : '0';
 };
 
@@ -222,13 +226,41 @@ export const calculateMaxHealth = (attributes, level = 1) => {
     return endurance + luck + (level > 1 ? level - 1 : 0);
 };
 
-export const calculateCarryWeight = (attributes, trait) => {
+const toNumber = (value) => Number(value) || 0;
+
+const sumCarryWeightModifierFromItem = (item) => {
+    if (!item) return 0;
+    return toNumber(item.carryWeightModifier);
+};
+
+export const getEquipmentCarryWeightModifier = ({ equippedArmor, equippedRobotSlots } = {}) => {
+    let total = 0;
+
+    if (equippedArmor && typeof equippedArmor === 'object') {
+        Object.values(equippedArmor).forEach((slot) => {
+            total += sumCarryWeightModifierFromItem(slot?.armor);
+            total += sumCarryWeightModifierFromItem(slot?.clothing);
+        });
+    }
+
+    if (equippedRobotSlots && typeof equippedRobotSlots === 'object') {
+        Object.values(equippedRobotSlots).forEach((slot) => {
+            total += sumCarryWeightModifierFromItem(slot?.armor);
+            total += sumCarryWeightModifierFromItem(slot?.plating);
+            total += sumCarryWeightModifierFromItem(slot?.frame);
+        });
+    }
+
+    return total;
+};
+
+export const calculateCarryWeight = (attributes, trait, equipmentState = {}) => {
     const strength = getAttributeValue(attributes, 'STR');
-    const baseCarryWeight = 150;
+    const baseCarryWeight = trait?.modifiers?.carryWeightFixed ?? 150;
     const strengthMultiplier = trait?.modifiers?.carryWeightStrengthMultiplier ?? 10;
     const strengthBonus = strengthMultiplier * strength;
     const traitCarryWeightModifier = trait?.modifiers?.carryWeight || 0;
-    return baseCarryWeight + strengthBonus + traitCarryWeightModifier;
+    return baseCarryWeight + strengthBonus + traitCarryWeightModifier + getEquipmentCarryWeightModifier(equipmentState);
 };
 
 // ---------------------------------------------------------------------------

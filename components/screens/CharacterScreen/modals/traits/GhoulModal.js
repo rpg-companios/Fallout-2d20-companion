@@ -12,7 +12,9 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
     onSelect(name, {
       skillModifiers: { 'Выживание': 2 },
       forcedSkills: ['Выживание'],
-      extraSkills: 1
+      extraSkills: 1,
+      immunities: ['radiation'],
+      effects: ['radiation_healing', 'slow_aging', 'infertility', 'discrimination']
     });
   };
 
