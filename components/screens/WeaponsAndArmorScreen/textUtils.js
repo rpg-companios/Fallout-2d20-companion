@@ -3,6 +3,7 @@ import { Text, Image } from 'react-native';
 
 const iconMap = {
   '{CD}': require('../../../assets/CD.png'),
+  '{/CD}': require('../../../assets/CD.png'),
 };
 
 const iconRegex = new RegExp(`(${Object.keys(iconMap).join('|')})`, 'g');

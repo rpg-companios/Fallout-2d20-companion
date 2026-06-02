@@ -2,7 +2,7 @@
 // Pure functions for equip eligibility checks.
 // No React, no UI dependencies. All reason strings are i18n keys.
 
-import { getAttributeValue } from './characterCreation';
+import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
 
 const ARMOR_POLICY = {
   HUMANOID_FULL: 'humanoid_full',
@@ -127,10 +127,10 @@ export function getCarryWeightLimit(character) {
   const { origin, trait, attributes } = character || {};
 
   if (origin?.isRobot || trait?.modifiers?.isRobot) {
-    return trait?.modifiers?.carryWeightFixed ?? 150;
+    return (trait?.modifiers?.carryWeightFixed ?? 150) + getEquipmentCarryWeightModifier(character);
   }
 
   const str = getAttributeValue(attributes || [], 'STR');
   const multiplier = trait?.modifiers?.carryWeightStrengthMultiplier ?? 10;
-  return 150 + str * multiplier;
+  return 150 + str * multiplier + getEquipmentCarryWeightModifier(character);
 }

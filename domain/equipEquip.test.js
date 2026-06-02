@@ -1,5 +1,5 @@
 import { describe, it, expect, jest } from 'vitest';
-import { canEquipArmor } from './equipEquip';
+import { canEquipArmor, getCarryWeightLimit } from './equipEquip';
 
 describe('armor policy restrictions', () => {
   const robotArmor = { id: 'robot_armor_x', robotOnly: true };
@@ -23,5 +23,24 @@ describe('armor policy restrictions', () => {
     expect(canEquipArmor(robotArmor, character)).toEqual({ allowed: true, reason: null });
     expect(canEquipArmor(powerArmor, character).allowed).toBe(false);
     expect(canEquipArmor(mutantArmor, character).allowed).toBe(false);
+  });
+});
+
+
+describe('carry weight limits', () => {
+  it('keeps Assaultron robot carry weight fixed by strength and applies robot and standard armor modifiers', () => {
+    const character = {
+      origin: { id: 'assaultron', isRobot: true, armorPolicy: 'robot_only' },
+      trait: { modifiers: { isRobot: true, carryWeightFixed: 150, carryWeightStrengthMultiplier: 0 } },
+      attributes: [{ name: 'STR', value: 11 }],
+      equippedRobotSlots: {
+        body: { armor: { carryWeightModifier: 20 }, plating: { carryWeightModifier: -10 } },
+      },
+      equippedArmor: {
+        body: { armor: { carryWeightModifier: 5 } },
+      },
+    };
+
+    expect(getCarryWeightLimit(character)).toBe(165);
   });
 });

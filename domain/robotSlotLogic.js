@@ -15,11 +15,11 @@ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScr
  *
  * @param {string} slotKey
  * @param {object|null|undefined} slotData - { limb, armor, plating, frame, heldWeapon }
- * @param {object} callbacks - { onUpgradeLimb, onOpenArmorPicker, t }
+ * @param {object} callbacks - { onUpgradeLimb, onOpenArmorPicker, t, hasRadImmunity }
  * @returns {{ slotTitle: string, slotSubtitle: string, limbName: string|null, stats: object[] }}
  */
 export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
-  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen } = callbacks;
+  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen, hasRadImmunity = false } = callbacks;
 
   const limb = slotData?.limb;
 
@@ -49,7 +49,7 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
   });
   stats.push({
     label: t('armor.fields.radiation'),
-    value: radDR !== null ? String(radDR) : t('common.none'),
+    value: hasRadImmunity ? '∞' : (radDR !== null ? String(radDR) : t('common.none')),
     type: 'value',
   });
 

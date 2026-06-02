@@ -26,12 +26,14 @@ const RobotSlot = ({
   onUpgradeArmor,
   onOpenArmorPicker,
   onWeaponPress,
+  hasRadImmunity = false,
 }) => {
   const { slotTitle, slotSubtitle, limbName, stats } = buildRobotSlotStats(slotKey, slotData, {
     onUpgradeLimb,
     onUpgradeArmor,
     onOpenArmorPicker,
     onWeaponPress,
+    hasRadImmunity,
   });
 
   return (

@@ -1,30 +1,17 @@
 import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
-import { getTraitI18n } from '../../../../../domain/traits';
+import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 
 export const traitConfig = { originId: 'protectron', modalType: 'info' };
 
 const ProtectronModal = ({ visible, onSelect, onClose }) => {
-  const { name, description } = getTraitI18n('protectron-protect-or-destroy');
+  const traitId = 'protectron-protect-or-destroy';
+  const { name, description } = getTraitI18n(traitId);
 
   const handleConfirm = () => {
-    onSelect(name, {
-      effects: ['Переброс проверки на экологическую опасность', 'Иммунитет к болезням, радиации и ядам', 'Нельзя использовать препараты, еду, питье, отдых', 'Ремонт для восстановления здоровья'],
-      carryWeightStrengthMultiplier: 0,
-      carryWeight: 0,
-      isRobot: true,
-      robotType: 'protectron',
-      robotBodyPlan: 'protectron',
-      robotRules: {
-        canSelfUseConsumables: false,
-        canUseConsumablesOnOthers: true,
-        canEquipStandardArmor: false,
-        canEquipPowerArmor: false,
-        carryWeightLimit: 150,
-        armorConstraints: []
-      }
-    });
+    const canonicalTrait = findTraitById(traitId);
+    onSelect(name, canonicalTrait?.modifiers || {});
   };
 
   return (

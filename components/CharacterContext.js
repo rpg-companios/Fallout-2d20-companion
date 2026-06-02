@@ -82,7 +82,7 @@ export const CharacterProvider = ({ children }) => {
   const [skillsSaved, setSkillsSaved] = useState(false);
   const [selectedPerks, setSelectedPerks] = useState([]);
   const [carryWeight, setCarryWeight] = useState(
-    150 + 10 * getAttributeValue(attributes, 'STR'),
+    calculateCarryWeight(attributes, null),
   );
   const [meleeBonus, setMeleeBonus] = useState(0);
   const [initiative, setInitiative] = useState(0);
@@ -94,6 +94,10 @@ export const CharacterProvider = ({ children }) => {
   const characterIdRef = useRef(characterId);
   useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
   useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
+
+  useEffect(() => {
+    setCarryWeight(calculateCarryWeight(attributes, trait, { equippedArmor, equippedRobotSlots }));
+  }, [attributes, trait, equippedArmor, equippedRobotSlots]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -424,7 +428,7 @@ export const CharacterProvider = ({ children }) => {
     const newLuck = getLuckPoints(newAttributes, trait);
     setMaxLuckPoints(newLuck);
     setLuckPoints(prevLuck => Math.min(prevLuck, newLuck));
-    setCarryWeight(calculateCarryWeight(newAttributes, trait));
+    setCarryWeight(calculateCarryWeight(newAttributes, trait, { equippedArmor, equippedRobotSlots }));
     setMeleeBonus(calculateMeleeBonus(newAttributes, trait));
     setInitiative(calculateInitiative(newAttributes));
     setDefense(calculateDefense(newAttributes));

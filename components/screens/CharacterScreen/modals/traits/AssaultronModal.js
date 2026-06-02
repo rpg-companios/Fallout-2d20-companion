@@ -1,17 +1,17 @@
 import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
-import { getTraitI18n } from '../../../../../domain/traits';
+import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 
 export const traitConfig = { originId: 'assaultron', modalType: 'info' };
 
 const AssaultronModal = ({ visible, onSelect, onClose }) => {
-  const { name, description } = getTraitI18n('assaultron-designed-for-frontline');
+  const traitId = 'assaultron-designed-for-frontline';
+  const { name, description } = getTraitI18n(traitId);
 
   const handleConfirm = () => {
-    onSelect(name, {
-      effects: ['Иммунитет к болезням, радиации и ядам', 'Нельзя использовать препараты, еду, питье, отдых', 'Ремонт для восстановления здоровья', '+1 БК к рукопашным атакам', 'Встроенный лазер']
-    });
+    const canonicalTrait = findTraitById(traitId);
+    onSelect(name, canonicalTrait?.modifiers || {});
   };
 
   return (
