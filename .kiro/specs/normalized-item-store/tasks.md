@@ -13,11 +13,16 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 1. Set up project structure and core utilities
- - Create directory structure for store, resolvers, and migrations
- - _Requirements: 2.1, 2.2, 2.3_
+- [ ] 0. Install dependencies and project setup
+ - Install Zustand and configure project structure
+ - _Requirements: 8.3_
 
-- [ ] 1.1 Create directory structure
+- [ ] 0.1 Install Zustand
+  - Run `npm install zustand` or `npm install zustand @zustand/persist` for persistence middleware
+  - Verify installation with `npm list zustand`
+  - _Requirements: 8.3_
+
+- [ ] 0.2 Create directory structure
   - Create `src/store/` directory
   - Create `src/store/resolvers.js` for parameter calculation utilities
   - Create `src/store/migrations.js` for data migration functions
@@ -234,18 +239,25 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 9. Documentation and cleanup
- - Document the new architecture
- - Clean up migration code (optional, after stability confirmed)
+- [ ] 9. Install Zustand and cleanup old code
+ - Install Zustand dependency
+ - Remove old code that's no longer needed
  - _Requirements: 8.3_
 
-- [ ] 9.1 Documentation
+- [ ] 9.1 Install Zustand
+  - Run `npm install zustand` or `npm install zustand @zustand/persist` for persistence middleware
+  - Verify installation with `npm list zustand`
+  - _Requirements: 8.3_
+
+- [ ] 9.2 Remove deprecated files and code
+  - Delete `components/CharacterContext.js` after migration is complete (backup first)
+  - Remove `domain/attributeKeyUtils.js` if it's only used for character attributes (now in store)
+  - Remove `domain/equipEquip.js` if all equip logic is migrated to store actions
+  - Remove old migration scripts if they're no longer needed
+  - _Requirements: 8.3_
+
+- [ ] 9.3 Documentation
   - Add comment headers to `characterStore.js` explaining the architecture
   - Document action functions with JSDoc
   - Add `docs/architecture/normalized-store.md` with visual diagrams
-  - _Requirements: 8.3_
-
-- [ ] 9.2 Code cleanup (optional)
-  - Remove `normalizeCharacterState` / `denormalizeCharacterState` after migration stability confirmed
-  - Simplify CharacterContext to only use Zustand Store
   - _Requirements: 8.3_
