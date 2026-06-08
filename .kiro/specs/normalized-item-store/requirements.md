@@ -51,34 +51,49 @@ timedEffects: [{id: 'stimpak', damageResistance: 5, scenesLeft: 3}, ...] // от
 // Нормализованная модель (единый источник истины)
 state = {
   attributes: {
-    STR: { base: 5, modifiers: [{source: 'perk', value: 1}], total: 6 },
-    AGI: { base: 7, modifiers: [], total: 7 },
+    'STR': { base: 5, modifiers: [{source: 'perk-skill-boy', value: 1}], total: 6 },
+    'AGI': { base: 7, modifiers: [], total: 7 },
     // ...
   },
   skills: {
-    SMALL_GUNS: { base: 3, modifiers: [], total: 3 },
-    MEDICINE: { base: 0, modifiers: [{source: 'perk', value: 2}], total: 2 },
+    'SMALL_GUNS': { base: 3, modifiers: [], total: 3 },
+    'MEDICINE': { base: 0, modifiers: [{source: 'perk-lifeguard', value: 2}], total: 2 },
     // ...
   },
   items: {
-    'wep1': {
-      id: 'wep1',
-      name: 'Pistol',
+    '10mm-pistol': {
+      id: '10mm-pistol',
+      name: '10mm Pistol',
       equipped: true,
-      damage: { base: 15, modifiers: [{source: 'mod', value: 2}], total: 17 },
-      fireRate: { base: 30, modifiers: [{source: 'trait', value: -5}], total: 25 },
+      damage: { base: 15, modifiers: [{source: 'mod-suppressor', value: 2}], total: 17 },
+      fireRate: { base: 30, modifiers: [{source: 'trait-scavenger', value: -5}], total: 25 },
+      // ...
+    },
+    'power-armor': {
+      id: 'power-armor',
+      name: 'Power Armor',
+      equipped: false,
+      physicalDamageRating: { base: 35, modifiers: [{source: 'mod-reinforced-plates', value: 5}], total: 40 },
+      energyDamageRating: { base: 15, modifiers: [{source: 'mod-energy-shield', value: 10}], total: 25 },
       // ...
     },
     // ...
   },
   effects: {
-    'stimpak_1': {
-      id: 'stimpak_1',
+    'stimpak': {
+      id: 'stimpak',
       name: 'Stimpak',
       active: true,
       damageResistance: 5,
       maxHpBonus: 10,
       expiresAt: 1234567890,
+    },
+    'rad-x': {
+      id: 'rad-x',
+      name: 'Rad-X',
+      active: false,
+      radiationResistance: 20,
+      // ...
     },
     // ...
   },

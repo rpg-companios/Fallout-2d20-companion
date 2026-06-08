@@ -392,7 +392,7 @@ type Skill = {
 type ItemParameter = Parameter<number> | Parameter<string>;
 
 type Item = {
-  id: string;            // Уникальный ID экземпляра (например: 'weapon-instance-xxx')
+  id: string;            // Уникальный ID экземпляра (например: '10mm-pistol' или 'power-armor')
   
   // Базовые поля (копируются из catalog)
   name: string;
@@ -588,7 +588,9 @@ export const normalizeCharacterState = (data) => {
   const items = {};
   const allItems = [...(data.equipment?.items || []), ...(data.equippedWeapons || [])];
   allItems.forEach(item => {
-    const id = item.uniqueId || item.weaponId || item.code;
+    // Используем человекопонятный ID: '10mm-pistol' или 'power-armor'
+    // Для экземпляров оружия добавляем uniqueId если нужно: '10mm-pistol-instance-123'
+    const id = item.uniqueId || (item.weaponId ? item.weaponId : (item.code || item.Name));
     if (id) {
       items[id] = normalizeItem(item);
     }
@@ -597,6 +599,7 @@ export const normalizeCharacterState = (data) => {
   // Effects: activeTimedEffects → нормализованный словарь
   const effects = {};
   (data.activeTimedEffects || []).forEach(effect => {
+    // Используем человекопонятный ID: 'effect-stimpak-{timestamp}'
     effects[effect.id] = normalizeEffect(effect);
   });
   
