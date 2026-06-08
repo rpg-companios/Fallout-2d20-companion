@@ -36,12 +36,14 @@ const serializeState = (state) => ({
   modifiedItems: state.modifiedItems instanceof Map
     ? Array.from(state.modifiedItems.entries())
     : (Array.isArray(state.modifiedItems) ? state.modifiedItems : []),
+  schemaVersion: 1,
 });
 
 const deserializeState = (data) => ({
   ...data,
   origin: resolveOrigin(data.origin),
   modifiedItems: new Map(Array.isArray(data.modifiedItems) ? data.modifiedItems : []),
+  schemaVersion: data.schemaVersion ?? 0,
 });
 
 export const CharacterProvider = ({ children }) => {

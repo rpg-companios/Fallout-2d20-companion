@@ -13,16 +13,16 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 0. Install dependencies and project setup
+- [x] 0. Install dependencies and project setup
  - Install Zustand and configure project structure
  - _Requirements: 8.3_
 
-- [ ] 0.1 Install Zustand
+- [x] 0.1 Install Zustand
   - Run `npm install zustand @zustand/persist` to add Zustand as a project dependency
   - Verify installation with `npx expo start` (should not show import errors)
   - _Requirements: 8.3_
 
-- [ ] 0.2 Create directory structure
+- [x] 0.2 Create directory structure
   - Create `src/store/` directory
   - Create `src/store/resolvers.js` for parameter calculation utilities
   - Create `src/store/migrations.js` for data migration functions
@@ -31,59 +31,59 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 1. Implement resolvers and derived stats (pure functions)
+- [x] 1. Implement resolvers and derived stats (pure functions)
  - Create utilities for calculating parameter totals and derived stats
  - _Requirements: 2.1, 2.2, 3.4, 6.1, 6.2, 6.3_
 
-- [ ] 1.1 Implement attribute resolvers
+- [x] 1.1 Implement attribute resolvers
   - Write `calculateAttributeTotal(attribute)` — calculates `base + Σ(modifiers)`
   - Write `calculateSkillTotal(skill)` — calculates `base + Σ(modifiers)` for skills
   - Write `normalizeItemParameters(item)` — calculates `total` for all item parameters
   - _Requirements: 2.1, 2.2_
 
-- [ ] 1.2 Implement derived stats calculator
+- [x] 1.2 Implement derived stats calculator
   - Write `calculateDerivedStats(attributes, effects, trait)` — calculates `maxHealth`, `initiative`, `defense`, `meleeBonus`, `carryWeight`
   - Write `applyEffectToStats(stats, effect)` — applies effect parameters to stats
   - _Requirements: 3.4, 6.1, 6.2, 6.3_
 
-- [ ] 1.3 Create TypeScript type definitions (if applicable)
+- [x] 1.3 Create TypeScript type definitions (if applicable)
   - Define `Parameter<T>`, `ParameterModifier`, `Attribute`, `Skill`, `Item`, `Effect` types
   - Export types for use in store and components
   - _Requirements: 2.1, 2.2_
 
 ---
 
-- [ ] 2. Create Zustand Store with persistence
+- [x] 2. Create Zustand Store with persistence
  - Build the core store with actions for attributes, items, and effects
  - Integrate with localStorage for persistence
  - _Requirements: 1.1, 1.2, 4.1, 4.2_
 
-- [ ] 2.1 Create initial Zustand store structure
+- [x] 2.1 Create initial Zustand store structure
   - Write `src/store/characterStore.js` with basic structure
   - Define initial state: `{ attributes: {}, skills: {}, items: {}, effects: {} }`
   - Implement `create()` with `zustand/middleware` for devtools
   - _Requirements: 1.1, 4.1_
 
-- [ ] 2.2 Implement attribute actions
+- [x] 2.2 Implement attribute actions
   - Write `updateAttribute(attrId, delta)` — updates `base` and recalculates `total`
   - Write `addAttributeModifier(attrId, source, value, operation)`
   - Write `removeAttributeModifier(attrId, source)`
   - Implement `recalculateAll()` to trigger dependent calculations
   - _Requirements: 1.1, 3.1_
 
-- [ ] 2.3 Implement item actions
+- [x] 2.3 Implement item actions
   - Write `updateItem(itemId, patch)` — updates item and recalculates parameters
   - Write `equipItem(itemId)` — sets `equipped = true`
   - Write `unequipItem(itemId)` — sets `equipped = false`
   - _Requirements: 1.1, 3.1, 3.2, 5.1, 5.2_
 
-- [ ] 2.4 Implement effect actions
+- [x] 2.4 Implement effect actions
   - Write `addEffect(effect)` — adds active effect to store
   - Write `expireEffect(effectId)` — sets `active = false`
   - Write `pruneExpiredEffects()` — called periodically to remove expired effects
   - _Requirements: 1.1, 3.3, 5.3_
 
-- [ ] 2.5 Add localStorage persistence
+- [x] 2.5 Add localStorage persistence
   - Integrate `persist` middleware with partial state serialization
   - Define `partialize()` to save only `attributes`, `skills`, `items`, `effects`
   - Configure storage key (`character-store`)
@@ -91,27 +91,29 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 3. Implement migrations for existing data
- - Support loading old data format and converting to normalized state
- - Ensure backward compatibility with existing saved characters
+- [ ] 3. Implement migrations for existing data (single one-time conversion)
+ - Convert old data format to normalized state on first load only
+ - No backward compatibility or denormalization needed
  - _Requirements: 4.1, 4.2_
 
-- [ ] 3.1 Create `normalizeCharacterState(data)` function
-  - Convert `attributes: [{name, value}]` → `attributes: {id: {base, modifiers, total}}`
-  - Convert `skills: [{name, value}]` → `skills: {id: {base, modifiers, total}}`
-  - Convert `equipment.items + equippedWeapons` → `items: {id: normalizedItem}`
-  - Convert `activeTimedEffects` → `effects: {id: normalizedEffect}`
+- [x] 3.1 Add schema_version to saved data
+  - Update serializeState to include `schemaVersion: 1`
+  - Update deserializeState to read `schemaVersion`
   - _Requirements: 4.1_
 
-- [ ] 3.2 Create `denormalizeCharacterState(storeState)` function
-  - Convert normalized state back to old format for database save
-  - Extract `attributes`, `skills`, `equipment.items`, `equippedWeapons`, `activeTimedEffects`
-  - _Requirements: 4.2_
+- [x] 3.2 Create `normalizeCharacterState(data)` function
+  - Convert `attributes: [{name, value}]` → `attributes: {id: {base, modifiers[], total}}`
+  - Convert `skills: [{name, value}]` → `skills: {id: {base, modifiers[], total}}`
+  - Convert `equipment.items + equippedWeapons` → `items: {id: normalizedItem}`
+  - Convert `activeTimedEffects` → `effects: {id: normalizedEffect}`
+  - Return `{ ...normalizedState, schemaVersion: 1 }`
+  - _Requirements: 4.1_
 
-- [ ] 3.3 Test migration with sample data
-  - Create test data in old format
-  - Run `normalizeCharacterState()` → verify normalized state
-  - Run `denormalizeCharacterState()` → verify roundtrip to old format
+- [x] 3.3 Test migration with sample data
+  - Create test data in old format (attributes[], skills[], equipment, equippedWeapons, activeTimedEffects)
+  - Run `normalizeCharacterState()` → verify normalized state structure
+  - Verify schemaVersion is set to 1
+  - Verify all parameters have base/modifiers/total structure
   - _Requirements: 4.1, 4.2_
 
 ---
