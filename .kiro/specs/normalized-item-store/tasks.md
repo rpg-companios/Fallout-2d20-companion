@@ -18,8 +18,8 @@ The implementation will follow a test-driven approach, building incrementally fr
  - _Requirements: 8.3_
 
 - [ ] 0.1 Install Zustand
-  - Run `npm install zustand` or `npm install zustand @zustand/persist` for persistence middleware
-  - Verify installation with `npm list zustand`
+  - Run `npm install zustand @zustand/persist` to add Zustand as a project dependency
+  - Verify installation with `npx expo start` (should not show import errors)
   - _Requirements: 8.3_
 
 - [ ] 0.2 Create directory structure
@@ -29,18 +29,24 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Create `src/types/characterStore.d.ts` for TypeScript interfaces (if using TS)
   - _Requirements: 2.1, 2.2_
 
-- [ ] 1.2 Implement attribute resolvers (pure functions)
+---
+
+- [ ] 1. Implement resolvers and derived stats (pure functions)
+ - Create utilities for calculating parameter totals and derived stats
+ - _Requirements: 2.1, 2.2, 3.4, 6.1, 6.2, 6.3_
+
+- [ ] 1.1 Implement attribute resolvers
   - Write `calculateAttributeTotal(attribute)` — calculates `base + Σ(modifiers)`
   - Write `calculateSkillTotal(skill)` — calculates `base + Σ(modifiers)` for skills
   - Write `normalizeItemParameters(item)` — calculates `total` for all item parameters
   - _Requirements: 2.1, 2.2_
 
-- [ ] 1.3 Implement derived stats calculator
+- [ ] 1.2 Implement derived stats calculator
   - Write `calculateDerivedStats(attributes, effects, trait)` — calculates `maxHealth`, `initiative`, `defense`, `meleeBonus`, `carryWeight`
   - Write `applyEffectToStats(stats, effect)` — applies effect parameters to stats
   - _Requirements: 3.4, 6.1, 6.2, 6.3_
 
-- [ ] 1.4 Create TypeScript type definitions (if applicable)
+- [ ] 1.3 Create TypeScript type definitions (if applicable)
   - Define `Parameter<T>`, `ParameterModifier`, `Attribute`, `Skill`, `Item`, `Effect` types
   - Export types for use in store and components
   - _Requirements: 2.1, 2.2_
@@ -148,7 +154,7 @@ The implementation will follow a test-driven approach, building incrementally fr
  - Update InventoryScreen to use Zustand Store instead of local state
  - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 5.1 Create selectors for common queries
+- [ ] 5.1 Create utility functions for selecting data
   - Write `selectItemsByEquipped(state, equipped)` — filter items by `equipped` status
   - Write `selectItemsByType(state, itemType)` — filter by `itemType`
   - Write `selectAttributeTotal(state, attrId)` — get total value for attribute
@@ -239,24 +245,19 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 9. Install Zustand and cleanup old code
- - Install Zustand dependency
+- [ ] 9. Cleanup and documentation
  - Remove old code that's no longer needed
+ - Document the new architecture
  - _Requirements: 8.3_
 
-- [ ] 9.1 Install Zustand
-  - Run `npm install zustand` or `npm install zustand @zustand/persist` for persistence middleware
-  - Verify installation with `npm list zustand`
-  - _Requirements: 8.3_
-
-- [ ] 9.2 Remove deprecated files and code
+- [ ] 9.1 Remove deprecated files and code
   - Delete `components/CharacterContext.js` after migration is complete (backup first)
   - Remove `domain/attributeKeyUtils.js` if it's only used for character attributes (now in store)
   - Remove `domain/equipEquip.js` if all equip logic is migrated to store actions
   - Remove old migration scripts if they're no longer needed
   - _Requirements: 8.3_
 
-- [ ] 9.3 Documentation
+- [ ] 9.2 Documentation
   - Add comment headers to `characterStore.js` explaining the architecture
   - Document action functions with JSDoc
   - Add `docs/architecture/normalized-store.md` with visual diagrams
