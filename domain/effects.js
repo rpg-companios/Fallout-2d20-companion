@@ -69,7 +69,7 @@ const normalizeRemovalEffects = (list) => {
         .filter(Boolean);
 };
 
-const buildTimedEffect = ({ effectName, effectLabel, effectKind, scenes, sourceName, maxHpModifier, damageResistanceModifier }) => ({
+const buildTimedEffect = ({ effectName, effectLabel, effectKind, scenes, sourceName, maxHpModifier, damageResistanceModifier, damageModifier, apModifier }) => ({
     id: `${effectKind}-${effectName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     effectName,
     effectLabel,
@@ -81,6 +81,8 @@ const buildTimedEffect = ({ effectName, effectLabel, effectKind, scenes, sourceN
     scenesLeft: scenes,
     ...(maxHpModifier ? { maxHpModifier } : {}),
     ...(damageResistanceModifier ? { damageResistanceModifier } : {}),
+    ...(damageModifier ? { damageModifier } : {}),
+    ...(apModifier ? { apModifier } : {}),
 });
 
 const applyOrStackEffect = (activeEffects, newEffect) => {
@@ -263,6 +265,42 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
         }
     }
 
+    // damageModifier — timed-эффект на урон (Overdrive, Psycho и т.д.)
+    if (positiveEffectIsObject && positiveEffectRaw?.damageModifier && positiveDuration.scenes > 0) {
+        const mod = positiveEffectRaw.damageModifier;
+        const value = Number(mod?.value) || 0;
+        if (value !== 0) {
+            const effectName = `dmg:${mod.op}${value}`;
+            nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                effectName,
+                effectLabel: effectName,
+                effectKind: 'positive',
+                scenes: positiveDuration.scenes,
+                sourceName: name,
+                damageModifier: mod,
+            }));
+            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+        }
+    }
+
+    // apModifier — timed-эффект на очки действий (Buffjet, Ultra Jet и т.д.)
+    if (positiveEffectIsObject && positiveEffectRaw?.apModifier && positiveDuration.scenes > 0) {
+        const mod = positiveEffectRaw.apModifier;
+        const value = Number(mod?.value) || 0;
+        if (value !== 0) {
+            const effectName = `ap:${mod.op}${value}`;
+            nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                effectName,
+                effectLabel: effectName,
+                effectKind: 'positive',
+                scenes: positiveDuration.scenes,
+                sourceName: name,
+                apModifier: mod,
+            }));
+            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+        }
+    }
+
     // damageResistanceModifier — timed-эффект на сопротивление урону
     if (positiveEffectIsObject && positiveEffectRaw?.damageResistanceModifier && positiveDuration.scenes > 0) {
         const drMod = positiveEffectRaw.damageResistanceModifier;
@@ -420,6 +458,32 @@ export const getTimedDamageResistanceBonus = (activeEffects = []) =>
         return acc;
     }, {});
 
+/**
+ * Суммирует бонус к урону из активных timed-эффектов (Overdrive, Psycho и т.д.).
+ * Возвращает число — суммарный бонус к броску урона.
+ */
+export const getTimedDamageBonus = (activeEffects = []) =>
+    activeEffects.reduce((sum, effect) => {
+        if (!effect || effect.effectKind !== 'positive') return sum;
+        const mod = effect.damageModifier;
+        if (!mod) return sum;
+        const val = Number(mod.value) || 0;
+        return mod.op === '+' ? sum + val : sum - val;
+    }, 0);
+
+/**
+ * Суммирует бонус к очкам действий из активных timed-эффектов (Buffjet, Ultra Jet и т.д.).
+ * Возвращает число — суммарный бонус к AP.
+ */
+export const getTimedApBonus = (activeEffects = []) =>
+    activeEffects.reduce((sum, effect) => {
+        if (!effect || effect.effectKind !== 'positive') return sum;
+        const mod = effect.apModifier;
+        if (!mod) return sum;
+        const val = Number(mod.value) || 0;
+        return mod.op === '+' ? sum + val : sum - val;
+    }, 0);
+
 export const SCENE_RULES = {
     SCENE_DURATION_MINUTES,
 };
@@ -434,6 +498,8 @@ export default {
     getTimedAttributeModifiers,
     getTimedMaxHpBonus,
     getTimedDamageResistanceBonus,
+    getTimedDamageBonus,
+    getTimedApBonus,
     getInstantHealAmount,
     getEffectTimeText,
 };

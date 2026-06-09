@@ -501,6 +501,20 @@ const useCharacterStore = create(devtools(
           ammoId: item.ammoId,
           qualities: item.qualities,
           imageName: item.imageName,
+
+          // Consumable fields (chems, food, drinks) — preserved verbatim from catalog
+          positiveEffect: item.positiveEffect,
+          positiveEffectDuration: item.positiveEffectDuration,
+          positiveEffectLabel: item.positiveEffectLabel,
+          negativeEffect: item.negativeEffect,
+          negativeEffectDuration: item.negativeEffectDuration,
+          negativeEffectLabel: item.negativeEffectLabel,
+          addictionLevel: item.addictionLevel,
+
+          // Armor / outfit extra fields
+          protectedAreas: item.protectedAreas,
+          equippedSlots: item.equippedSlots,
+          equipInstanceId: item.equipInstanceId,
         };
         
         // Apply mod modifiers to parameters
