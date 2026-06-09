@@ -1,0 +1,2 @@
+- [Zustand selector infinite loops](zustand-selector-fix.md) — never pass inline arrow functions or `useShallow(inlineArrow)` to Zustand hooks; subscribe to raw state slice then derive with `useMemo` instead.
+- [Expo Web platform stubs](expo-web-stubs.md) — SQLiteAdapter and WASM-dependent modules must be stubbed via `.web.js` platform files; metro.config.js needs `unstable_conditionNames` to force CJS Zustand.

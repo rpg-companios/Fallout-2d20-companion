@@ -14,8 +14,9 @@ import {
   TextInput,
 } from "react-native";
 import { useCharacter } from "../../CharacterContext";
-import useCharacterStore from "../../src/store/characterStore";
-import { selectActiveTimedEffects } from "../../src/store/selectors";
+import useCharacterStore from "../../../src/store/characterStore";
+import { selectActiveTimedEffects } from "../../../src/store/selectors";
+import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import TraitSkillModal from "./modals/TraitSkillModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
@@ -293,7 +294,8 @@ export default function CharacterScreen() {
 
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
-  const activeTimedEffects = useCharacterStore(selectActiveTimedEffects);
+  const storeEffects = useCharacterStore((state) => state.effects);
+  const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
 
   const attributes = useMemo(() => {
     const fromStore = Object.values(storeAttributes);

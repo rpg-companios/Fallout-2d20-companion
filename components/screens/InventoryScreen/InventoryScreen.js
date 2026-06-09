@@ -3,6 +3,7 @@ import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity, 
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
+import { useShallow } from 'zustand/react/shallow';
 import CapsModal from './modals/CapsModal';
 import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
@@ -57,8 +58,9 @@ const InventoryScreen = () => {
     origin,
   } = useCharacter();
 
-  const inventoryItems = useCharacterStore((state) => selectItemsByEquipped(state, false));
-  const storeEquippedWeapons = useCharacterStore((state) => selectItemsByEquipped(state, true));
+  const storeItems = useCharacterStore((state) => state.items);
+  const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
+  const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
   const equipItem = useCharacterStore((state) => state.equipItem);
   const unequipItem = useCharacterStore((state) => state.unequipItem);
   const addNewItem = useCharacterStore((state) => state.addNewItem);

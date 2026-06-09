@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   selectItemsByEquipped,
   getEquippedArmor,
@@ -353,9 +354,10 @@ const WeaponsAndArmorScreen = () => {
     origin,
   } = useCharacter();
 
-  const storeEquippedWeapons = useCharacterStore((state) => selectItemsByEquipped(state, true));
-  const inventoryItems = useCharacterStore((state) => selectItemsByEquipped(state, false));
-  const storeEquippedArmor = useCharacterStore((state) => getEquippedArmor(state));
+  const storeItems = useCharacterStore((state) => state.items);
+  const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
+  const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
+  const storeEquippedArmor = useMemo(() => getEquippedArmor({ items: storeItems }), [storeItems]);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const unequipItem = useCharacterStore((state) => state.unequipItem);
 
@@ -378,7 +380,8 @@ const WeaponsAndArmorScreen = () => {
     return hasStoreArmor ? storeEquippedArmor : contextEquippedArmor;
   }, [storeEquippedArmor, contextEquippedArmor]);
 
-  const activeTimedEffects = useCharacterStore(selectActiveTimedEffects);
+  const storeEffects = useCharacterStore((state) => state.effects);
+  const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
   const locale = useLocale();
 
   const isRobot = isRobotCharacter({ origin, trait });
@@ -519,6 +522,7 @@ const WeaponsAndArmorScreen = () => {
   const renderArmorPart = (slotKey) => {
     // Проверяем является ли персонаж роботом
     const isRobot = trait?.modifiers?.isRobot || false;
+    const isMisterHandyRobot = bodyPlan === 'misterHandy';
     
     // Если робот и есть equippedRobotSlots, отображаем RobotSlot
     if (isRobot && equippedRobotSlots && equippedRobotSlots[slotKey]) {
