@@ -7,13 +7,141 @@ import {
   calculateAttributeTotal, 
   calculateSkillTotal, 
   normalizeItemParameters,
-  calculateDerivedStats 
+  calculateDerivedStats,
+  calculateParameterTotal
 } from './resolvers.js';
 
 import { normalizeForStore, denormalizeForSave } from './migrations.js';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+// Helper to get weapon mod by ID
+const getWeaponModById = (modId) => {
+  // This will be implemented when weapon mods data is available
+  return null;
+};
+
+/**
+ * Generate unique item ID based on weaponId and applied mods
+ * - No mods: weaponId (e.g., 'weapon_10mm_pistol')
+ * - With mods: weaponId_mods_mod1_mod2 (e.g., 'weapon_10mm_pistol_mods_mod_004_mod_017')
+ */
+const generateItemId = (weaponId, appliedMods = {}) => {
+  if (!weaponId) return generateId();
+  
+  const modIds = Object.entries(appliedMods)
+    .sort(([k1], [k2]) => k1.localeCompare(k2))
+    .map(([slot, modId]) => modId)
+    .join('_');
+  
+  return modIds ? `${weaponId}_mods_${modIds}` : weaponId;
+};
+
+/**
+ * Generate stackKey for stacking identical items
+ * - No mods: weaponId
+ * - With mods: weaponId_mods_mod1_mod2
+ */
+const generateStackKey = (weaponId, appliedMods = {}) => {
+  if (!weaponId) return generateId();
+  
+  const modIds = Object.entries(appliedMods)
+    .sort(([k1], [k2]) => k1.localeCompare(k2))
+    .map(([slot, modId]) => modId)
+    .join('_');
+  
+  return modIds ? `${weaponId}_mods_${modIds}` : weaponId;
+};
+
+/**
+ * Normalize a parameter value to Parameter<T> format
+ * @param {*} value - Raw parameter value (number or object)
+ * @param {Object} modifier - Optional modifier from mod
+ * @returns {Object} Normalized parameter object with {base, modifiers, total}
+ */
+const normalizeParameter = (value, modifier = null) => {
+  if (value === undefined || value === null) return undefined;
+  
+  const baseValue = typeof value === 'number' ? value : value?.base ?? 0;
+  
+  const parameter = {
+    base: baseValue,
+    modifiers: [],
+    total: baseValue,
+  };
+  
+  // Apply modifier if present
+  if (modifier && modifier.value !== undefined) {
+    const modValue = Number(modifier.value) || 0;
+    parameter.modifiers.push({
+      source: `mod_${modifier.id || 'unknown'}`,
+      value: modValue,
+      operation: modifier.op || '+',
+    });
+    // Recalculate total
+    parameter.total = calculateParameterTotal(baseValue, parameter.modifiers);
+  }
+  
+  return parameter;
+};
+
+/**
+ * Apply mod modifiers to item parameters
+ * @param {Object} item - Item with normalized parameters
+ * @param {Object} appliedMods - Map of slot -> modId
+ * @returns {Object} Item with updated parameters
+ */
+const applyModModifiers = (item, appliedMods = {}) => {
+  if (!item || Object.keys(appliedMods).length === 0) return item;
+  
+  const updatedItem = { ...item };
+  
+  // For each mod, apply its modifiers to the item parameters
+  Object.entries(appliedMods).forEach(([slot, modId]) => {
+    const mod = getWeaponModById(modId);
+    if (!mod) return;
+    
+    // Apply damage modifier
+    if (mod.damageModifier && updatedItem.damage) {
+      const modValue = Number(mod.damageModifier.value) || 0;
+      updatedItem.damage.modifiers.push({
+        source: `mod_${modId}`,
+        value: modValue,
+        operation: mod.damageModifier.op || '+',
+      });
+    }
+    
+    // Apply fireRate modifier
+    if (mod.fireRateModifier && updatedItem.fireRate) {
+      const modValue = Number(mod.fireRateModifier.value) || 0;
+      updatedItem.fireRate.modifiers.push({
+        source: `mod_${modId}`,
+        value: modValue,
+        operation: mod.fireRateModifier.op || '+',
+      });
+    }
+    
+    // Apply range modifier (if mod has range changes)
+    if (mod.rangeModifier && updatedItem.range) {
+      const modValue = Number(mod.rangeModifier.value) || 0;
+      updatedItem.range.modifiers.push({
+        source: `mod_${modId}`,
+        value: modValue,
+        operation: mod.rangeModifier.op || '+',
+      });
+    }
+    
+    // Apply damageType modifier (if mod changes damage type)
+    if (mod.damageType && updatedItem.damageType) {
+      // Damage type is a string, handled as base value
+      updatedItem.damageType.base = mod.damageType;
+      updatedItem.damageType.total = mod.damageType;
+    }
+  });
+  
+  return updatedItem;
+};
 
 // Helper to get trait, level, and equipment state from context (to be provided by components)
 const getCharacterContext = () => {
@@ -199,6 +327,99 @@ const useCharacterStore = create(devtools(
         
         set({ items });
         get().recalculateDerivedStats();
+      },
+      
+      /**
+       * Add a new item to the store
+       * Normalizes item ID and adds to items dictionary with equipped: false
+       * Handles uniqueId generation if not present
+       * Generates stackKey for stacking identical items (same weaponId + same appliedMods)
+       * Generates id based on weaponId + appliedMods: weaponId (no mods) or weaponId_mods_mod1_mod2 (with mods)
+       * Applies mods to parameters: damage.modifiers.push({source: 'mod_modId', value: modValue, operation: modOp})
+       * 
+       * @param {Object} item - Item data to add
+       * @param {string} item.weaponId - Base weapon ID (e.g., 'weapon_10mm_pistol')
+       * @param {Object} item.appliedMods - Map of slot -> modId (e.g., {Receiver: 'mod_004'})
+       * @param {boolean} [item.equipped=false] - Whether item is equipped (default: false)
+       * @param {number} [item.quantity=1] - Stack quantity (default: 1)
+       */
+      addNewItem: (item) => {
+        const state = get();
+        const items = { ...state.items };
+        
+        if (!item) {
+          console.warn('addNewItem: item is null or undefined');
+          return;
+        }
+        
+        // Get weaponId from item
+        const weaponId = item.weaponId || item.id || item.code;
+        
+        if (!weaponId) {
+          console.warn('addNewItem: item missing weaponId, id, or code field');
+          return;
+        }
+        
+        // Get applied mods
+        const appliedMods = item.appliedMods || {};
+        
+        // Generate unique ID for this item instance
+        const itemId = item.uniqueId || generateItemId(weaponId, appliedMods);
+        
+        // Generate stackKey for stacking identical items
+        const stackKey = generateStackKey(weaponId, appliedMods);
+        
+        // Normalize item data with parameters
+        const normalizedItem = {
+          id: itemId,
+          weaponId: weaponId,
+          name: item.name || item.weaponName || item.Name || weaponId,
+          itemType: item.itemType || 'weapon',
+          equipped: item.equipped || false,
+          quantity: item.quantity || 1,
+          stackKey: stackKey,
+          appliedMods: appliedMods,
+          
+          // Normalize parameters (damage, fireRate, etc.)
+          damage: normalizeParameter(item.damage, item.damageModifier),
+          fireRate: normalizeParameter(item.fireRate, item.fireRateModifier),
+          range: normalizeParameter(item.range, item.rangeModifier),
+          damageType: normalizeParameter(item.damageType, item.damageTypeModifier),
+          
+          // Armor parameters
+          physicalDamageRating: normalizeParameter(
+            item.physicalDamageRating, 
+            item.physicalDamageRatingModifier
+          ),
+          energyDamageRating: normalizeParameter(
+            item.energyDamageRating, 
+            item.energyDamageRatingModifier
+          ),
+          radiationDamageRating: normalizeParameter(
+            item.radiationDamageRating, 
+            item.radiationDamageRatingModifier
+          ),
+          
+          // Copy other fields
+          code: item.code,
+          cost: item.cost,
+          rarity: item.rarity,
+          weight: item.weight,
+          ammoId: item.ammoId,
+          qualities: item.qualities,
+          imageName: item.imageName,
+        };
+        
+        // Apply mod modifiers to parameters
+        const finalItem = applyModModifiers(normalizedItem, appliedMods);
+        
+        // Add item to store
+        items[itemId] = normalizeItemParameters(finalItem);
+        
+        set({ items });
+        get().recalculateDerivedStats();
+        
+        return itemId;
       },
       
       // --- Actions: Effects ---

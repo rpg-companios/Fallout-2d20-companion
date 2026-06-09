@@ -12,6 +12,27 @@
 
 ---
 
+## Источники базовых значений
+
+Каждое поле `base` в модели имеет четкий источник данных. Модификаторы (черты, перки, моды, эффекты) не меняют `base`, а только добавляются в `modifiers[]`:
+
+| Параметр | Источник базового значения |
+|----------|--------------------------|
+| `attributes.STR.base` | Сохраненное значение атрибута + бонусы от происхождения/черты (через `domain/characterCreation`) |
+| `attributes.END.base` | Сохраненное значение атрибута |
+| `skills.SMALL_GUNS.base` | Сохраненное значение навыка + 2 если навык тегнут (создан как "выбранный") |
+| `items[...].damage.base` | Значение из `data/equipment/weapons.json` (поле `damage`) |
+| `items[...].fireRate.base` | Значение из `data/equipment/weapons.json` (поле `fireRate`) |
+| `items[...].range.base` | Значение из `data/equipment/weapons.json` (поле `range`) |
+| `items[...].qualities` | Массив из `data/equipment/weapons.json` (поле `qualities`) |
+| `items[...].physicalDamageRating.base` | База от происхождения/черты + значение из `data/equipment/armor.json` |
+| `effects[...].maxHpBonus` | Значение из `positiveEffect.maxHpModifier` расходника |
+| `effects[...].damageResistance` | Значение из `positiveEffect.damageResistanceModifier` расходника |
+
+**Принцип:** `base` — это исходное значение, которое не меняется при применении эффектов. `total = base + Σ(modifiers)`.
+
+---
+
 ## Архитектура
 
 ```
@@ -363,9 +384,9 @@ export const applyEffectToStats = (stats, effect) => {
 // src/types/characterStore.ts
 
 type Parameter<T = number> = {
-  base: T;
+  base: T;               // Базовое значение (источник зависит от типа параметра)
   modifiers: ParameterModifier[];
-  total: T;
+  total: T;              // Итоговое значение (base + Σmodifiers)
 };
 
 type ParameterModifier = {
@@ -377,14 +398,14 @@ type ParameterModifier = {
 
 type Attribute = {
   id: string;            // Например: 'STR', 'END', 'PER', 'AGI', 'INT', 'CHA', 'LCK'
-  base: number;
+  base: number;          // База: сохраненное значение + бонусы от происхождения/черты
   modifiers: ParameterModifier[];
   total: number;
 };
 
 type Skill = {
   id: string;            // Например: 'SMALL_GUNS', 'MEDICINE', 'ATHLETICS'
-  base: number;
+  base: number;          // База: сохраненное значение + 2 если тегнут
   modifiers: ParameterModifier[];
   total: number;
 };
@@ -392,32 +413,36 @@ type Skill = {
 type ItemParameter = Parameter<number> | Parameter<string>;
 
 type Item = {
-  id: string;            // Уникальный ID экземпляра (например: '10mm-pistol' или 'power-armor')
-  
-  // Базовые поля (копируются из catalog)
-  name: string;
+  id: string;            // Уникальный ID экземпляра (например: 'weapon_10mm_pistol' или 'weapon_10mm_pistol_mods_mod_004_mod_017')
+  weaponId?: string;     // Базовый ID оружия (например: 'weapon_10mm_pistol')
+  name: string;          // Название (может меняться при установке модов)
   itemType: string;      // 'weapon', 'armor', 'clothing', 'chem', etc.
   
   // Состояние
   equipped: boolean;
-  stackKey?: string;     // Для стекирования
-  quantity?: number;
+  quantity?: number;     // Для стакирования одинаковых предметов
   
-  // Параметры оружия
-  weaponId?: string;
-  damage?: ItemParameter;
-  fireRate?: ItemParameter;
-  range?: ItemParameter;
-  qualities?: string;
+  // Сигнатура модов для идентификации уникальных вариантов
+  appliedMods?: Record<string, string>;  // slot -> modId
   
-  // Параметры брони
+  // stackKey — используется для объединения одинаковых предметов в пачки
+  // Для оружия без модов: stackKey = weaponId
+  // Для оружия с модами: stackKey = 'weaponId_mods_mod_004_mod_017'
+  stackKey?: string;
+  
+  // Параметры оружия (нормализованные)
+  // base берется из data/equipment/weapons.json
+  damage?: ItemParameter;           // База: damage из JSON
+  fireRate?: ItemParameter;         // База: fireRate из JSON
+  range?: ItemParameter;            // База: range из JSON (C/M/L/E)
+  qualities?: string;               // База: массив qualityId из JSON
+  
+  // Параметры брони (нормализованные)
+  // base берется из происхождения/черты + armor.json
   protectedAreas?: string[];
-  physicalDamageRating?: ItemParameter;
-  energyDamageRating?: ItemParameter;
-  radiationDamageRating?: ItemParameter;
-  
-  // Моды
-  appliedMods?: Record<string, string>;  // modId -> slot
+  physicalDamageRating?: ItemParameter;  // База: physicalDamageRating из JSON
+  energyDamageRating?: ItemParameter;    // База: energyDamageRating из JSON
+  radiationDamageRating?: ItemParameter; // База: radiationDamageRating из JSON
 };
 
 type Effect = {
@@ -588,18 +613,31 @@ export const normalizeCharacterState = (data) => {
   const items = {};
   const allItems = [...(data.equipment?.items || []), ...(data.equippedWeapons || [])];
   allItems.forEach(item => {
-    // Используем человекопонятный ID: '10mm-pistol' или 'power-armor'
-    // Для экземпляров оружия добавляем uniqueId если нужно: '10mm-pistol-instance-123'
-    const id = item.uniqueId || (item.weaponId ? item.weaponId : (item.code || item.Name));
-    if (id) {
-      items[id] = normalizeItem(item);
-    }
+    // Генерируем ID на основе weaponId и appliedMods
+    // ID без модов: weaponId (например: 'weapon_10mm_pistol')
+    // ID с модами: weaponId_mods_modReceiver_modBarrel (например: 'weapon_10mm_pistol_mods_mod_004_mod_017')
+    const weaponId = item.weaponId || item.id || item.code;
+    const appliedMods = item.appliedMods || {};
+    const modIds = Object.entries(appliedMods)
+      .sort(([k1], [k2]) => k1.localeCompare(k2))
+      .map(([slot, modId]) => modId)
+      .join('_');
+    
+    const id = item.uniqueId || (modIds ? `${weaponId}_mods_${modIds}` : weaponId);
+    
+    // Генерируем stackKey для стакирования
+    const stackKey = modIds ? `${weaponId}_mods_${modIds}` : weaponId;
+    
+    items[id] = normalizeItem({
+      ...item,
+      id,
+      stackKey,
+    });
   });
   
   // Effects: activeTimedEffects → нормализованный словарь
   const effects = {};
   (data.activeTimedEffects || []).forEach(effect => {
-    // Используем человекопонятный ID: 'effect-stimpak-{timestamp}'
     effects[effect.id] = normalizeEffect(effect);
   });
   

@@ -61,20 +61,71 @@ state = {
     // ...
   },
   items: {
-    '10mm-pistol': {
-      id: '10mm-pistol',
+    // Оружие БЕЗ модов — базовое имя (ID = weaponId из data/equipment/weapons.json)
+    'weapon_10mm_pistol': {
+      id: 'weapon_10mm_pistol',
       name: '10mm Pistol',
-      equipped: true,
-      damage: { base: 15, modifiers: [{source: 'mod-suppressor', value: 2}], total: 17 },
-      fireRate: { base: 30, modifiers: [{source: 'trait-scavenger', value: -5}], total: 25 },
+      equipped: false,
+      damage: { base: 4, modifiers: [], total: 4 },
+      fireRate: { base: 2, modifiers: [], total: 2 },
+      weaponId: 'weapon_10mm_pistol',
+      appliedMods: {},
       // ...
     },
+    
+    // Оружие С модами — уникальный ID с сигнатурой модов
+    // ID формируется как: weaponId_mods_modId1_modId2_...
+    'weapon_10mm_pistol_mods_mod_004_mod_017': {
+      id: 'weapon_10mm_pistol_mods_mod_004_mod_017',
+      name: 'Автоматический 10мм-пистолет с длинным стволом',  // ← моды меняют название!
+      equipped: false,
+      damage: { base: 4, modifiers: [{source: 'mod_004', value: 1, operation: '+'}], total: 5 },  // ← моды меняют урон!
+      fireRate: { base: 2, modifiers: [], total: 2 },  // ← мод_004 не меняет скорострельность
+      weaponId: 'weapon_10mm_pistol',
+      appliedMods: {
+        'Receiver': 'mod_004',
+        'Barrel': 'mod_017'
+      },
+      // ...
+    },
+    
+    // Два одинаковых оружия с одинаковыми модами — одна пачка
+    'weapon_10mm_pistol_mods_mod_004_mod_017_2': {
+      id: 'weapon_10mm_pistol_mods_mod_004_mod_017_2',
+      name: 'Автоматический 10мм-пистолет с длинным стволом',
+      equipped: false,
+      damage: { base: 4, modifiers: [{source: 'mod_004', value: 1, operation: '+'}], total: 5 },
+      fireRate: { base: 2, modifiers: [], total: 2 },
+      weaponId: 'weapon_10mm_pistol',
+      appliedMods: {
+        'Receiver': 'mod_004',
+        'Barrel': 'mod_017'
+      },
+      stackKey: 'weapon_10mm_pistol_mods_mod_004_mod_017',  // ← для стакирования
+      quantity: 2,  // ← две штуки в одной пачке!
+      // ...
+    },
+    
+    // Экипированное оружие — тоже с модами, но equipped: true
+    'weapon_10mm_pistol_mods_mod_004_equipped_1': {
+      id: 'weapon_10mm_pistol_mods_mod_004_equipped_1',
+      name: 'Автоматический 10мм-пистолет',
+      equipped: true,
+      damage: { base: 4, modifiers: [{source: 'mod_004', value: 1, operation: '+'}], total: 5 },
+      fireRate: { base: 2, modifiers: [], total: 2 },
+      weaponId: 'weapon_10mm_pistol',
+      appliedMods: {
+        'Receiver': 'mod_004'
+      },
+      // ...
+    },
+    
     'power-armor': {
       id: 'power-armor',
       name: 'Power Armor',
       equipped: false,
-      physicalDamageRating: { base: 35, modifiers: [{source: 'mod-reinforced-plates', value: 5}], total: 40 },
-      energyDamageRating: { base: 15, modifiers: [{source: 'mod-energy-shield', value: 10}], total: 25 },
+      physicalDamageRating: { base: 35, modifiers: [{source: 'mod_std_laminate', value: 1, operation: '+'}], total: 36 },
+      energyDamageRating: { base: 15, modifiers: [{source: 'mod_std_laminate', value: 1, operation: '+'}], total: 16 },
       // ...
     },
     // ...
@@ -129,6 +180,58 @@ state = {
 3. WHEN предмет хранится THEN он SHALL быть в словаре `items[id]` с вложенными параметрами (например, `damage: {base, modifiers[], total}`), а не просто объектом.
 4. WHEN эффект хранится THEN он SHALL быть в словаре `effects[id]` с информацией о параметрах, которые он изменяет (например, `damageResistance: 5`, `maxHpBonus: 10`).
 
+### Требование 2.1: Уникальные ID для предметов с модами
+
+**User Story:** Как пользователь, я хочу, чтобы оружие с разными модами было разным предметом, а оружие с одинаковыми модами стакалось в одну пачку.
+
+#### Acceptance Criteria
+
+1. WHEN оружие добавляется в инвентарь без модов THEN его ID SHALL быть просто `weaponId` (например: `weapon_10mm_pistol`).
+2. WHEN оружие добавляется в инвентарь с модами THEN его ID SHALL содержать сигнатуру модов: `weaponId_mods_modReceiver_modBarrel_modGrip`.
+3. IF два предмета имеют одинаковый `weaponId` и одинаковый набор модов (одинаковые `appliedMods`) THEN они SHALL иметь одинаковый `stackKey` и SHALL объединяться в одну пачку с `quantity > 1`.
+4. WHEN оружие экипируется THEN его ID SHALL остаться прежним (не создаваться заново), только `equipped` SHALL меняться на `true`.
+5. WHEN оружие снято с экипировки THEN его ID SHALL остаться прежним, только `equipped` SHALL меняться на `false`.
+
+### Требование 2.2: Модификации меняют параметры предмета
+
+**User Story:** Как пользователь, я хочу, чтобы модификации оружия меняли его характеристики (урон, скорострельность, качество, тип урона и т.д.) и это было видно во всех экранах.
+
+#### Acceptance Criteria
+
+1. WHEN модификация добавляется к оружию THEN её эффекты (например, `damageModifier: {op: '+', value: 1}`) SHALL добавляться в `damage.modifiers[]`.
+2. WHEN модификация добавляется к оружию THEN её эффекты на `qualityChanges` SHALL добавляться в `qualities` предмета (с изменением названия через префикс мода).
+3. WHEN оружие отображается в инвентаре или на экране экипировки THEN его `damage.total`, `fireRate.total`, `qualities` SHALL отражать применённые моды.
+4. WHEN модальное окно модификаций открывается для оружия THEN оно SHALL показывать уже установленные моды из `appliedMods`.
+5. WHEN новый мод устанавливается THEN он SHALL добавляться в `appliedMods`, а соответствующий модификатор — в `damage.modifiers[]` и `qualities`.
+6. WHEN моды меняют название оружия (например, добавляют префикс "автоматический" к "10mm Pistol") THEN `items[id].name` SHALL обновляться с учетом всех префиксов модов.
+
+### Требование 2.3: Модификации для всех типов предметов
+
+**User Story:** Как пользователь, я хочу, чтобы модификации оружия меняли его характеристики (урон, скорострельность, название) и это было видно во всех экранах.
+
+#### Acceptance Criteria
+
+1. WHEN модификация добавляется к оружию THEN её эффекты (например, `damageModifier: {op: '-', value: 1}`) SHALL добавляться в `damage.modifiers[]`.
+2. WHEN оружие отображается в инвентаре или на экране экипировки THEN его `damage.total` SHALL отражать применённые моды.
+3. WHEN моды меняют название оружия (например, "10mm Pistol" → "10mm Submachine Gun") THEN `items[id].name` SHALL обновляться.
+4. WHEN модальное окно модификаций открывается для оружия THEN оно SHALL показывать уже установленные моды из `appliedMods`.
+5. WHEN новый мод устанавливается THEN он SHALL добавляться в `appliedMods`, а соответствующий модификатор — в `damage.modifiers[]`.
+
+---
+
+### Требование 2.3: Модификации для всех типов предметов
+
+**User Story:** Как пользователь, я хочу, чтобы модификации работали одинаково для всех типов предметов: оружие, броня, гранаты, энергооружие, оружие роботов.
+
+#### Acceptance Criteria
+
+1. WHEN оружие ближнего боя (меч, дубинка) получает мод THEN его параметры (урон, качество) SHALL обновляться, даже если у него нет `fireRate`.
+2. WHEN энергооружие (плазменный карabiner) получает мод THEN его параметры (урон, тип урона, скорострельность) SHALL обновляться.
+3. WHEN оружие робота получает мод THEN его параметры SHALL обновляться через ту же систему `appliedMods` и `damage.modifiers`.
+4. WHEN граната получает мод THEN её параметры (взрыв, радиус, урон) SHALL обновляться.
+5. WHEN броня получает мод THEN её `physicalDamageRating`, `energyDamageRating`, `radiationDamageRating` SHALL обновляться через `statModifiers`.
+6. WHEN название предмета меняется при модификации (например, "автоматический 10mm-пистолет") THEN `items[id].name` SHALL обновляться автоматически.
+
 ---
 
 ### Требование 3: Единый поток обновления всех параметров
@@ -141,6 +244,36 @@ state = {
 2. WHEN пользователь применяет перк, увеличивающий атрибут THEN `applyPerk` НЕ SHALL мутировать `attributes` напрямую, а SHALL добавить модификатор в `attributes[attrId].modifiers[]` и пересчитать `total`.
 3. WHEN timed-эффект истекает THEN `pruneExpiredTimedEffects` НЕ SHALL просто удалять эффект, а SHALL обновить `effect.active = false` и триггерить пересчет зависимых параметров.
 4. WHEN эффект применяется (например, расходник) THEN результат SHALL обновлять объект в `effects[id]`, а не возвращать локальный результат без сохранения.
+
+---
+
+### Требование 2.4: Источники базовых значений
+
+**User Story:** Как разработчик, я хочу, чтобы каждое поле `base` в модели имело четкий источник данных, чтобы база и модификаторы не смешивались.
+
+#### Acceptance Criteria
+
+1. WHEN атрибут (например, STR) хранится THEN его `base` SHALL браться из:
+   - Для новых персонажей: минимальное значение (обычно 4) + бонусы от происхождения/черты
+   - После сохранения: сохраненное значение атрибута (база = сохраненное значение)
+   - При применении/отмене перка: модификатор добавляется в `modifiers[]`, а `base` остается неизменным
+2. WHEN навык (например, SMALL_GUNS) хранится THEN его `base` SHALL браться из:
+   - Для новых навыков: 0 или 2 (если навык отмечен tag)
+   - После сохранения: сохраненное значение навыка
+   - При применении эффекта: модификатор добавляется в `modifiers[]`, а `base` остается неизменным
+3. WHEN урон оружия (например, damage) хранится THEN его `base` SHALL браться из:
+   - JSON-файла `data/equipment/weapons.json` (поле `damage`)
+   - Если моды применялись: `base` остается исходное из JSON, моды добавляются в `modifiers[]`
+4. WHEN сопротивление урону (например, physicalDamageRating) хранится THEN его `base` SHALL браться из:
+   - Базовое значение от происхождения и черты (через `domain/characterCreation`)
+   - Базовое значение от брони (поле `physicalDamageRating` из `data/equipment/armor.json`)
+   - Моды брони добавляют в `modifiers[]`, не меняя `base`
+5. WHEN дистанция оружия хранится THEN её `base` SHALL браться из:
+   - JSON-файла `data/equipment/weapons.json` (поле `range`)
+   - Если мод меняет дистанцию: модификатор добавляется в `range.modifiers[]`
+6. WHEN тип урона оружия хранится THEN его `base` SHALL браться из:
+   - JSON-файла `data/equipment/weapons.json` (поле `damageType`)
+   - Если мод меняет тип урона: модификатор добавляется в `damageType.modifiers[]`
 
 ---
 

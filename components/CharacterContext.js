@@ -17,6 +17,9 @@ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanc
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 import { isRobotCharacter } from '../domain/robotEquip';
 
+// Zustand Store integration (Task 4.1)
+import useCharacterStore from '../src/store/characterStore';
+
 const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
 
 const CharacterContext = createContext();
@@ -556,4 +559,78 @@ export const CharacterProvider = ({ children }) => {
 
 export const useCharacter = () => {
   return useContext(CharacterContext);
+};
+
+// --- Wrapper Hooks for Zustand Store (Task 4.1) ---
+
+/**
+ * Hook to access character attributes through Zustand Store
+ * @param {string} attrId - Attribute ID (e.g., 'STR', 'END', 'PER')
+ * @returns {Object} Attribute with base, modifiers, and total
+ */
+export const useCharacterAttribute = (attrId) => {
+  const attribute = useCharacterStore((state) => state.attributes[attrId]);
+  
+  // Warn if attribute doesn't exist (should be created on load)
+  if (!attribute) {
+    console.warn(`[useCharacterAttribute] Attribute ${attrId} not found in store`);
+  }
+  
+  return attribute;
+};
+
+/**
+ * Hook to access character items through Zustand Store
+ * @param {string} itemId - Item ID
+ * @returns {Object} Item object with all parameters
+ */
+export const useCharacterItem = (itemId) => {
+  const item = useCharacterStore((state) => state.items[itemId]);
+  
+  // Warn if item doesn't exist
+  if (!item) {
+    console.warn(`[useCharacterItem] Item ${itemId} not found in store`);
+  }
+  
+  return item;
+};
+
+/**
+ * Hook to access active effects through Zustand Store
+ * @param {string} effectId - Effect ID
+ * @returns {Object} Effect object with parameters
+ */
+export const useCharacterEffect = (effectId) => {
+  const effect = useCharacterStore((state) => state.effects[effectId]);
+  
+  // Warn if effect doesn't exist
+  if (!effect) {
+    console.warn(`[useCharacterEffect] Effect ${effectId} not found in store`);
+  }
+  
+  return effect;
+};
+
+/**
+ * Hook to get all attributes from Zustand Store
+ * @returns {Object} Dictionary of all attributes
+ */
+export const useCharacterAttributes = () => {
+  return useCharacterStore((state) => state.attributes);
+};
+
+/**
+ * Hook to get all items from Zustand Store
+ * @returns {Object} Dictionary of all items
+ */
+export const useCharacterItems = () => {
+  return useCharacterStore((state) => state.items);
+};
+
+/**
+ * Hook to get all active effects from Zustand Store
+ * @returns {Object} Dictionary of all active effects
+ */
+export const useCharacterEffects = () => {
+  return useCharacterStore((state) => state.effects);
 };

@@ -118,35 +118,53 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 4. Integrate Zustand Store with CharacterContext
- - Gradually migrate CharacterContext to use Zustand Store
- - Keep old API side-by-side for backward compatibility
- - _Requirements: 4.3, 4.4_
+- [x] 4. Integrate Zustand Store with CharacterContext
 
-- [ ] 4.1 Import Zustand Store into CharacterContext
+
+ - Migrate CharacterContext to use Zustand Store while keeping old API as deprecated
+ - _Requirements: 4.3, 4.4, 8.3_
+
+- [x] 4.1 Import Zustand Store into CharacterContext
+
+
+
+
   - Import `useCharacterStore` from `src/store/characterStore.js`
   - Create wrapper hooks: `useCharacterAttribute`, `useCharacterItem`, `useCharacterEffect`
   - _Requirements: 4.3, 4.4_
 
-- [ ] 4.2 Update `commitAttributeChanges` to use Zustand Store
+- [ ] 4.2 Update `commitAttributeChanges` and `handleSelectKit` to use Zustand Store
   - Replace `setAttributes(newAttributes)` with `updateAttribute(attrId, delta)`
+  - Update `handleSelectKit` in CharacterScreen to call `addNewItem(item)` for each item in `kit.items`
   - Add deprecation warning in console for old API
   - _Requirements: 4.3_
 
 - [ ] 4.3 Update item management functions
   - Replace `setEquippedWeapons(prev => [...prev, newWeapon])` with `equipItem(itemId)`
   - Replace `setModifiedItems()` with `updateItem(itemId, patch)`
-  - Add deprecation warnings
+  - Add deprecation warnings (console.warn)
   - _Requirements: 4.3, 4.4_
+
+- [x] 4.3.1 Add `addNewItem(item)` action to Zustand Store
+
+
+
+
+  - Write `addNewItem(item)` action that normalizes item ID and adds to `items` dictionary with `equipped: false`
+  - Handle uniqueId generation if not present
+  - Generate `stackKey` for stacking identical items (same weaponId + same appliedMods)
+  - Generate `id` based on weaponId + appliedMods: `weaponId` (no mods) or `weaponId_mods_mod1_mod2` (with mods)
+  - Apply mods to parameters: `damage.modifiers.push({source: 'mod_modId', value: modValue, operation: modOp})`
+  - _Requirements: 4.3, 4.4, 2.1, 2.2_
 
 - [ ] 4.4 Add migration on load
   - In `loadCharacter()`, call `normalizeCharacterState(data)` to convert old format
-  - Call `dispatch(setNormalizedState(normalizedState))` to populate Zustand Store
+  - Populate Zustand Store with normalized state
   - _Requirements: 4.1_
 
 - [ ] 4.5 Add migration on save
   - In `saveCharacter()`, call `denormalizeCharacterState()` to convert to old format
-  - Save denormalized state to database (for compatibility)
+  - Save denormalized state to database (for compatibility with old format)
   - _Requirements: 4.2_
 
 ---
@@ -168,6 +186,8 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Replace `equippedWeapons` with `useSelector(state => selectItemsByEquipped(state, true))`
   - Update `handleEquipWeapon` to call `equipItem(itemId)` instead of `setEquippedWeapons`
   - Update `handleUnequipWeapon` to call `unequipItem(itemId)` instead of removing from array
+  - Update `handleAddItem` (from modals) to call `addNewItem(item)` instead of `updateInventoryItems`
+  - Update `handleConfirmBuy` (BuyItemModal) to call `addNewItem(item)` instead of `handleAddItem`
   - _Requirements: 1.2, 3.2, 7.4_
 
 - [ ] 5.3 Update CharacterScreen to use Zustand Store for attributes/skills

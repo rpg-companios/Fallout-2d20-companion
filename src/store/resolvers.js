@@ -34,6 +34,14 @@ export const calculateItemParameterTotal = (parameter) => {
   }, base);
 };
 
+// Export for use in characterStore.js
+export const calculateParameterTotal = (base, modifiers = []) => {
+  return modifiers.reduce((total, mod) => {
+    const value = Number(mod.value) || 0;
+    return mod.operation === '+' ? total + value : total - value;
+  }, base);
+};
+
 // Пример применения к предмету
 export const normalizeItemParameters = (item) => {
   if (!item) return item;
