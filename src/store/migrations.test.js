@@ -4,6 +4,7 @@
 import { describe, expect, test } from 'vitest';
 import { 
   normalizeCharacterState, 
+  denormalizeCharacterState,
   denormalizeForSave,
   normalizeForStore 
 } from './migrations.js';
@@ -113,15 +114,16 @@ describe('normalizeCharacterState', () => {
     
     const result = normalizeCharacterState(data);
     
-    expect(result.effects).toEqual({
-      'stimpak-1': {
-        id: 'stimpak-1',
-        name: 'Stimpak',
-        type: 'positive',
-        active: true,
-        parameters: [],
-        scenesLeft: 3,
-      },
+    expect(result.effects['stimpak-1']).toMatchObject({
+      id: 'stimpak-1',
+      name: 'Stimpak',
+      effectName: 'Stimpak',
+      effectLabel: 'Stimpak',
+      effectKind: 'positive',
+      type: 'positive',
+      active: true,
+      parameters: [],
+      scenesLeft: 3,
     });
     expect(result.schemaVersion).toBe(1);
   });
@@ -139,6 +141,19 @@ describe('normalizeCharacterState', () => {
     const result = normalizeCharacterState(data);
     
     expect(result.items['weapon_10mm_pistol'].equipped).toBe(true);
+  });
+});
+
+describe('denormalizeCharacterState', () => {
+  test('should be an alias for denormalizeForSave', () => {
+    const storeState = {
+      attributes: { STR: { id: 'STR', base: 5, modifiers: [], total: 5 } },
+      skills: {},
+      items: {},
+      effects: {},
+    };
+
+    expect(denormalizeCharacterState(storeState)).toEqual(denormalizeForSave(storeState));
   });
 });
 

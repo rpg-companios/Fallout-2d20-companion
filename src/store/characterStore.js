@@ -12,6 +12,7 @@ import {
 } from './resolvers.js';
 
 import { normalizeForStore, denormalizeForSave } from './migrations.js';
+import { legacyEffectToStore } from './effectsSync.js';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -536,7 +537,7 @@ const useCharacterStore = create(devtools(
         };
         
         set({ effects });
-        get().recalculateDerivedStats();
+        get().triggerDependentCalculations();
       },
       
       /**
@@ -559,7 +560,24 @@ const useCharacterStore = create(devtools(
         };
         
         set({ effects });
-        get().recalculateDerivedStats();
+        get().triggerDependentCalculations();
+      },
+
+      /**
+       * Update an existing effect (e.g. scenesLeft after advancing scene)
+       */
+      updateEffect: (effectId, patch) => {
+        const state = get();
+        const effects = { ...state.effects };
+
+        if (!effects[effectId]) {
+          console.warn(`Effect ${effectId} not found`);
+          return;
+        }
+
+        effects[effectId] = { ...effects[effectId], ...patch };
+        set({ effects });
+        get().triggerDependentCalculations();
       },
       
       /**
@@ -579,8 +597,15 @@ const useCharacterStore = create(devtools(
         
         if (Object.keys(activeEffects).length !== Object.keys(effects).length) {
           set({ effects: activeEffects });
-          get().recalculateDerivedStats();
+          get().triggerDependentCalculations();
         }
+      },
+
+      /**
+       * Recalculate derived stats when effects or equipment change
+       */
+      triggerDependentCalculations: () => {
+        get().recalculateDerivedStats();
       },
       
       // --- Helper Actions ---

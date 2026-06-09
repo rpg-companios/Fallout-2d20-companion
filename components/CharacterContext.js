@@ -19,6 +19,8 @@ import { isRobotCharacter } from '../domain/robotEquip';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
+import { denormalizeCharacterState } from '../src/store/migrations.js';
+import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
 const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
 
@@ -48,6 +50,18 @@ const deserializeState = (data) => ({
   modifiedItems: new Map(Array.isArray(data.modifiedItems) ? data.modifiedItems : []),
   schemaVersion: data.schemaVersion ?? 0,
 });
+
+const mergeSnapshotWithStoreData = (snapshot) => {
+  const legacyData = denormalizeCharacterState(useCharacterStore.getState());
+  return {
+    ...snapshot,
+    attributes: legacyData.attributes ?? snapshot.attributes,
+    skills: legacyData.skills ?? snapshot.skills,
+    equipment: legacyData.equipment ?? snapshot.equipment,
+    equippedWeapons: legacyData.equippedWeapons ?? snapshot.equippedWeapons,
+    activeTimedEffects: legacyData.activeTimedEffects ?? snapshot.activeTimedEffects,
+  };
+};
 
 export const CharacterProvider = ({ children }) => {
   const [characterName, setCharacterName] = useState('');
@@ -166,22 +180,7 @@ export const CharacterProvider = ({ children }) => {
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const snapshot = buildSnapshot();
-        
-        // Task 4.5: Add migration on save
-        // Convert normalized store data to old format for backward compatibility
-        const normalizedData = useCharacterStore.getState().exportToLegacyData();
-        
-        // Merge normalized data with snapshot (normalized data takes precedence for attributes, skills, items, effects)
-        const mergedData = {
-          ...snapshot,
-          attributes: normalizedData.attributes ?? snapshot.attributes,
-          skills: normalizedData.skills ?? snapshot.skills,
-          equipment: normalizedData.equipment ?? snapshot.equipment,
-          equippedWeapons: normalizedData.equippedWeapons ?? snapshot.equippedWeapons,
-          activeTimedEffects: normalizedData.activeTimedEffects ?? snapshot.activeTimedEffects,
-        };
-        
-        const serialized = serializeState(mergedData);
+        const serialized = serializeState(mergeSnapshotWithStoreData(snapshot));
         await db.saveCharacter(
           characterIdRef.current,
           snapshot.characterName,
@@ -212,22 +211,7 @@ export const CharacterProvider = ({ children }) => {
 
       const snapshot = buildSnapshot();
       const snapshotWithName = { ...snapshot, characterName: name };
-
-      // Task 4.5: Add migration on save
-      // Convert normalized store data to old format for backward compatibility
-      const normalizedData = useCharacterStore.getState().exportToLegacyData();
-      
-      // Merge normalized data with snapshot (normalized data takes precedence for attributes, skills, items, effects)
-      const mergedData = {
-        ...snapshotWithName,
-        attributes: normalizedData.attributes ?? snapshotWithName.attributes,
-        skills: normalizedData.skills ?? snapshotWithName.skills,
-        equipment: normalizedData.equipment ?? snapshotWithName.equipment,
-        equippedWeapons: normalizedData.equippedWeapons ?? snapshotWithName.equippedWeapons,
-        activeTimedEffects: normalizedData.activeTimedEffects ?? snapshotWithName.activeTimedEffects,
-      };
-
-      const serialized = serializeState(mergedData);
+      const serialized = serializeState(mergeSnapshotWithStoreData(snapshotWithName));
 
       await db.saveCharacter(
         id,
@@ -400,10 +384,15 @@ export const CharacterProvider = ({ children }) => {
       positiveEffectType: typeof item?.positiveEffect,
     });
 
-    // 1. Timed-эффекты
-    const normalizedCurrent = pruneExpiredTimedEffects(activeTimedEffects);
+    // 1. Timed-эффекты через Zustand Store
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
     const timedResult = applyConsumableToEffects(item, normalizedCurrent.effects);
     const normalizedResult = pruneExpiredTimedEffects(timedResult.effects);
+    syncTimedEffectsToStore(normalizedResult.effects, store);
     setActiveTimedEffects(normalizedResult.effects);
 
     // 2. removeCondition (аддиктол, антибиотики)
@@ -434,9 +423,14 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const applyConsumableTimedEffects = (item) => {
-    const normalizedCurrent = pruneExpiredTimedEffects(activeTimedEffects);
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
     const result = applyConsumableToEffects(item, normalizedCurrent.effects);
     const normalizedResult = pruneExpiredTimedEffects(result.effects);
+    syncTimedEffectsToStore(normalizedResult.effects, store);
     setActiveTimedEffects(normalizedResult.effects);
 
     if (normalizedResult.effects.length > 0) {
@@ -455,10 +449,27 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const advanceScene = () => {
-    const normalizedCurrent = pruneExpiredTimedEffects(activeTimedEffects);
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
     const { effects: nextEffects, expired } = advanceEffectsByScene(normalizedCurrent.effects);
+    expired.forEach((effect) => store.expireEffect(effect.id));
+
+    nextEffects.forEach((effect) => {
+      if (store.effects[effect.id]) {
+        store.updateEffect(effect.id, {
+          scenesLeft: effect.scenesLeft,
+          expiresAt: effect.expiresAt,
+          durationMs: effect.durationMs,
+        });
+      }
+    });
+
     setActiveTimedEffects(nextEffects);
-    setSceneCounter(prev => prev + 1);
+    setSceneCounter((prev) => prev + 1);
+    store.triggerDependentCalculations();
     return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
   };
 

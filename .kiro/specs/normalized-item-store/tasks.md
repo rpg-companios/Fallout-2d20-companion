@@ -180,7 +180,7 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Populate Zustand Store with normalized state
   - _Requirements: 4.1_
 
-- [ ] 4.5 Add migration on save
+- [x] 4.5 Add migration on save
 
 
 
@@ -190,19 +190,19 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 5. Create screen selectors and update InventoryScreen
+- [x] 5. Create screen selectors and update InventoryScreen
  - Implement selectors to get filtered/derived data from Zustand Store
  - Update InventoryScreen to use Zustand Store instead of local state
  - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 5.1 Create utility functions for selecting data
+- [x] 5.1 Create utility functions for selecting data
   - Write `selectItemsByEquipped(state, equipped)` — filter items by `equipped` status
   - Write `selectItemsByType(state, itemType)` — filter by `itemType`
   - Write `selectAttributeTotal(state, attrId)` — get total value for attribute
   - Write `selectSkillTotal(state, skillId)` — get total value for skill
   - _Requirements: 7.1, 7.4_
 
-- [ ] 5.2 Update InventoryScreen to use Zustand Store
+- [x] 5.2 Update InventoryScreen to use Zustand Store
   - Replace `equipment?.items` with `useSelector(state => selectItemsByEquipped(state, false))`
   - Replace `equippedWeapons` with `useSelector(state => selectItemsByEquipped(state, true))`
   - Update `handleEquipWeapon` to call `equipItem(itemId)` instead of `setEquippedWeapons`
@@ -211,7 +211,7 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Update `handleConfirmBuy` (BuyItemModal) to call `addNewItem(item)` instead of `handleAddItem`
   - _Requirements: 1.2, 3.2, 7.4_
 
-- [ ] 5.3 Update CharacterScreen to use Zustand Store for attributes/skills
+- [x] 5.3 Update CharacterScreen to use Zustand Store for attributes/skills
   - Replace `attributes` with `useSelector(state => Object.values(state.attributes))`
   - Replace `skills` with `useSelector(state => Object.values(state.skills))`
   - Update `handleChangeAttribute` to call `updateAttribute(attrId, delta)`
@@ -219,41 +219,41 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 6. Update WeaponsAndArmorScreen
+- [x] 6. Update WeaponsAndArmorScreen
  - Update WeaponsAndArmorScreen to use Zustand Store for items
  - Verify real-time updates when items are modified in InventoryScreen
  - _Requirements: 6.4, 7.2_
 
-- [ ] 6.1 Update WeaponsAndArmorScreen to use Zustand Store
+- [x] 6.1 Update WeaponsAndArmorScreen to use Zustand Store
   - Replace `equippedWeapons` with `useSelector(state => selectItemsByEquipped(state, true))`
   - Replace `equippedArmor` with `useSelector(state => getEquippedArmor(state))`
   - Update `handleApplyModification` to call `updateItem(itemId, modifiedItem)`
   - _Requirements: 6.4, 7.2_
 
-- [ ] 6.2 Test real-time updates
+- [x] 6.2 Test real-time updates
   - Equip weapon in InventoryScreen → verify it appears in WeaponsAndArmorScreen
   - Modify weapon in WeaponsAndArmorScreen → verify damage/fireRate change in real-time
   - _Requirements: 6.4_
 
 ---
 
-- [ ] 7. Update effects integration
+- [x] 7. Update effects integration
  - Implement full effects flow with automatic parameter recalculation
  - Verify effects apply/retract parameters correctly
  - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 7.1 Implement effects application
+- [x] 7.1 Implement effects application
   - Update `applyConsumableFull` to call `addEffect(effect)` instead of `setActiveTimedEffects`
   - Update `advanceScene` to call `expireEffect(effectId)` instead of `setActiveTimedEffects`
   - Implement `triggerDependentCalculations()` in Zustand Store
   - _Requirements: 5.1, 5.2_
 
-- [ ] 7.2 Update resolvers for effects
+- [x] 7.2 Update resolvers for effects
   - Update `calculateDerivedStats` to use `getTimedMaxHpBonus(effects)` from Zustand Store
   - Update `calculateDerivedStats` to use `getTimedDamageResistanceBonus(effects)` from Zustand Store
   - _Requirements: 5.3_
 
-- [ ] 7.3 Test effects flow
+- [x] 7.3 Test effects flow
   - Apply stimpak → verify maxHp bonus is added to derived stats
   - Wait for effect to expire → verify maxHp bonus is removed
   - Apply perk with attribute bonus → verify attribute total updates

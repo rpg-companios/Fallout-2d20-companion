@@ -190,9 +190,14 @@ export const normalizeEffects = (activeTimedEffects = []) => {
     result[effect.id] = {
       id: effect.id,
       name: effect.effectLabel || effect.effectName || 'Unnamed Effect',
+      effectName: effect.effectName,
+      effectLabel: effect.effectLabel,
+      effectKind: effect.effectKind,
       type: effect.effectKind || 'positive',
       active: true,
       parameters: [],
+      maxHpModifier: effect.maxHpModifier,
+      damageResistanceModifier: effect.damageResistanceModifier,
       createdAt: effect.createdAt,
       expiresAt: effect.expiresAt,
       durationMs: effect.durationMs,
@@ -291,10 +296,16 @@ export const denormalizeEffects = (effectsDict = {}) => {
     .filter(effect => effect.active)
     .map(effect => ({
       id: effect.id,
-      effectName: effect.name,
-      effectLabel: effect.name,
-      effectKind: effect.type,
+      effectName: effect.effectName ?? effect.name,
+      effectLabel: effect.effectLabel ?? effect.name,
+      effectKind: effect.effectKind ?? effect.type,
+      maxHpModifier: effect.maxHpModifier,
+      damageResistanceModifier: effect.damageResistanceModifier,
+      createdAt: effect.createdAt,
+      expiresAt: effect.expiresAt,
+      durationMs: effect.durationMs,
       scenesLeft: effect.scenesLeft || 0,
+      sourceName: effect.sourceName,
     }));
 };
 
@@ -311,4 +322,11 @@ export const denormalizeForSave = (storeState = {}) => {
     equippedWeapons,
     activeTimedEffects: denormalizeEffects(storeState.effects || {}),
   };
+};
+
+/**
+ * Alias for denormalizeForSave to match naming convention
+ */
+export const denormalizeCharacterState = (storeState = {}) => {
+  return denormalizeForSave(storeState);
 };

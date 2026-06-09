@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
+import useCharacterStore from '../../../src/store/characterStore';
+import {
+  selectItemsByEquipped,
+  getEquippedArmor,
+  storeItemToWeaponDisplay,
+  weaponModPatchToStore,
+  selectActiveTimedEffects,
+} from '../../../src/store/selectors';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
 import { TRAITS } from '../CharacterScreen/logic/traitsData';
 import { isRobotCharacter } from '../../../domain/robotEquip';
@@ -106,8 +114,8 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
 
 
 
-const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false }) => {
-    const { hasTrait, attributes, skills, equippedWeapons } = useCharacter();
+const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+    const { hasTrait, attributes, skills } = useCharacter();
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -317,22 +325,60 @@ const findRobotBodyUpgrade = (catalog, robotBodyPlan, inventoryItems = []) => {
 
 // --- Main Component ---
 
+const resolveStoreItemId = (weapon) => {
+  const items = useCharacterStore.getState().items;
+  if (weapon?.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
+  if (weapon?.id && items[weapon.id]) return weapon.id;
+  return Object.values(items).find(
+    (item) => item.equipped && (
+      item.uniqueId === weapon?.uniqueId
+      || item.id === weapon?.id
+      || item.weaponId === weapon?.weaponId
+    ),
+  )?.id;
+};
+
 const WeaponsAndArmorScreen = () => {
   const {
     attributes,
     level,
-    equippedWeapons,
+    equippedWeapons: contextEquippedWeapons,
     setEquippedWeapons,
-    equippedArmor,
+    equippedArmor: contextEquippedArmor,
     setEquippedArmor,
     equippedRobotSlots,
-    equipment,
     saveModifiedItem,
-    activeTimedEffects,
     attributesSaved,
     trait,
     origin,
   } = useCharacter();
+
+  const storeEquippedWeapons = useCharacterStore((state) => selectItemsByEquipped(state, true));
+  const inventoryItems = useCharacterStore((state) => selectItemsByEquipped(state, false));
+  const storeEquippedArmor = useCharacterStore((state) => getEquippedArmor(state));
+  const updateItem = useCharacterStore((state) => state.updateItem);
+  const unequipItem = useCharacterStore((state) => state.unequipItem);
+
+  const equippedWeaponsForDisplay = useMemo(() => {
+    const fromStore = storeEquippedWeapons
+      .filter((item) => item.itemType === 'weapon')
+      .map(storeItemToWeaponDisplay);
+    const robotExtras = (contextEquippedWeapons || []).filter(
+      (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
+    );
+    const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id));
+    const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id));
+    return [...fromStore, ...extras];
+  }, [storeEquippedWeapons, contextEquippedWeapons]);
+
+  const equippedArmor = useMemo(() => {
+    const hasStoreArmor = Object.values(storeEquippedArmor).some(
+      (slot) => slot.armor || slot.clothing,
+    );
+    return hasStoreArmor ? storeEquippedArmor : contextEquippedArmor;
+  }, [storeEquippedArmor, contextEquippedArmor]);
+
+  const activeTimedEffects = useCharacterStore(selectActiveTimedEffects);
   const locale = useLocale();
 
   const isRobot = isRobotCharacter({ origin, trait });
@@ -353,9 +399,11 @@ const WeaponsAndArmorScreen = () => {
   const robotBodyUpgrade = findRobotBodyUpgrade(
     equipmentCatalog,
     trait?.modifiers?.robotBodyPlan,
-    equipment?.items || [],
+    inventoryItems,
   );
-  const localizedEquippedWeapons = equippedWeapons.map((weapon) => findLocalizedWeapon(equipmentCatalog, weapon));
+  const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
+    (weapon) => findLocalizedWeapon(equipmentCatalog, weapon),
+  );
 
   const weaponFingerprint = (w) => {
     if (!w) return null;
@@ -395,24 +443,32 @@ const WeaponsAndArmorScreen = () => {
     setSelectedWeaponForModification(null);
   };
 
-  const handleApplyModification = (modifiedWeapon) => {
+  const handleApplyModification = useCallback((modifiedWeapon) => {
     handleCloseModificationModal();
+    const itemId = resolveStoreItemId(selectedWeaponForModification);
+
+    if (itemId) {
+      updateItem(itemId, weaponModPatchToStore(modifiedWeapon));
+      return;
+    }
+
     saveModifiedItem(selectedWeaponForModification, modifiedWeapon);
-
-    // Обновляем массив экипированного оружия
-    const newEquippedWeapons = equippedWeapons.map(w =>
-      (w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId) 
-        ? modifiedWeapon 
+    setEquippedWeapons((prev) => prev.map((w) => (
+      w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId
+        ? modifiedWeapon
         : w
-    );
-    setEquippedWeapons(newEquippedWeapons);
-  };
+    )));
+  }, [selectedWeaponForModification, updateItem, saveModifiedItem, setEquippedWeapons]);
 
-  // Снять оружие (только для не-встроенного оружия, Requirement 13.5–13.6)
-  const handleUnequipWeapon = (weapon) => {
+  const handleUnequipWeapon = useCallback((weapon) => {
     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
+    const itemId = resolveStoreItemId(weapon);
+    if (itemId) {
+      unequipItem(itemId);
+      return;
+    }
     setEquippedWeapons((prev) => prev.filter((w) => w !== weapon));
-  };
+  }, [unequipItem, setEquippedWeapons]);
   const handleOpenArmorModal = (slotKey, mode = 'armor') => {
     const item = mode === 'clothing' ? equippedArmor?.[slotKey]?.clothing : equippedArmor?.[slotKey]?.armor;
     if (!item) return;
@@ -615,6 +671,7 @@ const WeaponsAndArmorScreen = () => {
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={false}
                     meleeBonus={meleeBonusValue}
+                    equippedWeapons={equippedWeaponsForDisplay}
                   />
                   <WeaponCard
                     weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
@@ -622,6 +679,7 @@ const WeaponsAndArmorScreen = () => {
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={false}
                     meleeBonus={meleeBonusValue}
+                    equippedWeapons={equippedWeaponsForDisplay}
                   />
                 </View>
               ))}

@@ -42,18 +42,28 @@ export const calculateParameterTotal = (base, modifiers = []) => {
   }, base);
 };
 
+const coerceToParameter = (value) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'number') {
+    return { base: value, modifiers: [], total: value };
+  }
+  if (typeof value === 'object') return value;
+  return value;
+};
+
 // Пример применения к предмету
 export const normalizeItemParameters = (item) => {
   if (!item) return item;
 
   const normalized = { ...item };
 
-  // Пересчет параметров оружия
-  if (normalized.damage) {
+  if (normalized.damage !== undefined) {
+    normalized.damage = coerceToParameter(normalized.damage);
     normalized.damage.total = calculateItemParameterTotal(normalized.damage);
   }
 
-  if (normalized.fireRate) {
+  if (normalized.fireRate !== undefined) {
+    normalized.fireRate = coerceToParameter(normalized.fireRate);
     normalized.fireRate.total = calculateItemParameterTotal(normalized.fireRate);
   }
 
@@ -95,6 +105,8 @@ import {
   getTimedDamageResistanceBonus,
 } from '../../domain/effects.js';
 
+import { effectsDictToLegacyArray } from './effectsSync.js';
+
 /**
  * Calculate derived stats from attributes, effects, and trait
  * @param {Object} attributes - Normalized attributes object
@@ -111,8 +123,7 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     value: attr.base,
   }));
 
-  // Convert normalized effects to array format for compatibility
-  const effectsArray = Object.values(effects).filter(effect => effect.active);
+  const effectsArray = effectsDictToLegacyArray(effects);
 
   const stats = {
     maxHealth: { base: 0, modifiers: [], total: 0 },
@@ -120,6 +131,11 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     defense: { base: 0, modifiers: [], total: 0 },
     meleeBonus: { base: 0, modifiers: [], total: 0 },
     carryWeight: { base: 0, modifiers: [], total: 0 },
+    damageResistance: {
+      physical: { base: 0, modifiers: [], total: 0 },
+      energy: { base: 0, modifiers: [], total: 0 },
+      radiation: { base: 0, modifiers: [], total: 0 },
+    },
   };
 
   // Max Health: END + LCK + level
@@ -136,6 +152,19 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   }
   
   stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+
+  const drBonus = getTimedDamageResistanceBonus(effectsArray);
+  ['physical', 'energy', 'radiation'].forEach((type) => {
+    const bonus = drBonus[type] || 0;
+    if (bonus !== 0) {
+      stats.damageResistance[type].modifiers.push({
+        source: 'timedEffects',
+        value: bonus,
+        operation: '+',
+      });
+      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
+    }
+  });
   
   // Initiative: PER + AGI
   stats.initiative.base = calculateInitiative(attributesArray);

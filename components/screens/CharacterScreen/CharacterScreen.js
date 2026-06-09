@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useCharacter } from "../../CharacterContext";
 import useCharacterStore from "../../src/store/characterStore";
+import { selectActiveTimedEffects } from "../../src/store/selectors";
 import OriginModal from "./modals/OriginModal";
 import TraitSkillModal from "./modals/TraitSkillModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
@@ -253,9 +254,9 @@ export default function CharacterScreen() {
     saveCharacter,
     level,
     setLevel,
-    attributes,
+    attributes: contextAttributes,
     setAttributes,
-    skills,
+    skills: contextSkills,
     setSkills,
     selectedSkills,
     setSelectedSkills,
@@ -271,7 +272,6 @@ export default function CharacterScreen() {
     setEquipment,
     effects,
     setEffects,
-    activeTimedEffects,
     caps,
     setCaps,
     setCurrentHealth,
@@ -290,6 +290,28 @@ export default function CharacterScreen() {
     setEquippedRobotSlots,
     setEquippedRobotModules,
   } = useCharacter();
+
+  const storeAttributes = useCharacterStore((state) => state.attributes);
+  const storeSkills = useCharacterStore((state) => state.skills);
+  const activeTimedEffects = useCharacterStore(selectActiveTimedEffects);
+
+  const attributes = useMemo(() => {
+    const fromStore = Object.values(storeAttributes);
+    if (fromStore.length > 0) {
+      return fromStore.map((attr) => ({ name: attr.id, value: attr.base }));
+    }
+    return contextAttributes;
+  }, [storeAttributes, contextAttributes]);
+
+  const skills = useMemo(() => {
+    if (Object.keys(storeSkills).length > 0) {
+      return ALL_SKILLS.map((skill) => {
+        const stored = storeSkills[skill.name];
+        return stored ? { name: skill.name, value: stored.base } : { ...skill };
+      });
+    }
+    return contextSkills;
+  }, [storeSkills, contextSkills]);
 
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
@@ -619,6 +641,11 @@ export default function CharacterScreen() {
         if (capForThis !== undefined) {
           nextVal = Math.min(nextVal, capForThis);
         }
+        const store = useCharacterStore.getState();
+        if (!store.skills[skill.name]) {
+          store.loadFromLegacyData({ skills });
+        }
+        store.updateSkill(skill.name, delta);
         newSkills[index] = { ...skill, value: nextVal };
       }
       return newSkills;
@@ -626,17 +653,22 @@ export default function CharacterScreen() {
   };
 
   const handleChangeAttribute = (index, delta) => {
+    const attr = attributes[index];
+    const { min, max } = getAttributeLimits(trait, attr.name);
+    const newValue = attr.value + delta;
+
+    if (newValue < min || newValue > max) return;
+    if (delta > 0 && remainingInitialPoints <= 0) return;
+
+    const store = useCharacterStore.getState();
+    if (!store.attributes[attr.name]) {
+      store.loadFromLegacyData({ attributes });
+    }
+    store.updateAttribute(attr.name, delta);
+
     setAttributes((prev) => {
       const newAttributes = [...prev];
-      const attr = newAttributes[index];
-      const { min, max } = getAttributeLimits(trait, attr.name);
-
-      const newValue = attr.value + delta;
-      if (newValue >= min && newValue <= max) {
-        if (delta > 0 && remainingInitialPoints <= 0) return prev;
-        newAttributes[index] = { ...attr, value: newValue };
-      }
-
+      newAttributes[index] = { ...newAttributes[index], value: newValue };
       return newAttributes;
     });
   };
