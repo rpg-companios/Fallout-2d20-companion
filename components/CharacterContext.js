@@ -1,9 +1,9 @@
 import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import * as db from '../db';
-import { 
-  createInitialAttributes, 
-  ALL_SKILLS, 
-  getLuckPoints, 
+import {
+  createInitialAttributes,
+  ALL_SKILLS,
+  getLuckPoints,
   calculateMaxHealth,
   calculateInitiative,
   calculateDefense,
@@ -56,7 +56,7 @@ export const CharacterProvider = ({ children }) => {
 
   const [level, setLevel] = useState(1);
   const [attributes, setAttributes] = useState(createInitialAttributes());
-  const [skills, setSkills] = useState(ALL_SKILLS.map(s => ({...s, value: 0})));
+  const [skills, setSkills] = useState(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [extraTaggedSkills, setExtraTaggedSkills] = useState([]);
   const [forcedSelectedSkills, setForcedSelectedSkills] = useState([]);
@@ -166,7 +166,22 @@ export const CharacterProvider = ({ children }) => {
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const snapshot = buildSnapshot();
-        const serialized = serializeState(snapshot);
+        
+        // Task 4.5: Add migration on save
+        // Convert normalized store data to old format for backward compatibility
+        const normalizedData = useCharacterStore.getState().exportToLegacyData();
+        
+        // Merge normalized data with snapshot (normalized data takes precedence for attributes, skills, items, effects)
+        const mergedData = {
+          ...snapshot,
+          attributes: normalizedData.attributes ?? snapshot.attributes,
+          skills: normalizedData.skills ?? snapshot.skills,
+          equipment: normalizedData.equipment ?? snapshot.equipment,
+          equippedWeapons: normalizedData.equippedWeapons ?? snapshot.equippedWeapons,
+          activeTimedEffects: normalizedData.activeTimedEffects ?? snapshot.activeTimedEffects,
+        };
+        
+        const serialized = serializeState(mergedData);
         await db.saveCharacter(
           characterIdRef.current,
           snapshot.characterName,
@@ -197,7 +212,22 @@ export const CharacterProvider = ({ children }) => {
 
       const snapshot = buildSnapshot();
       const snapshotWithName = { ...snapshot, characterName: name };
-      const serialized = serializeState(snapshotWithName);
+
+      // Task 4.5: Add migration on save
+      // Convert normalized store data to old format for backward compatibility
+      const normalizedData = useCharacterStore.getState().exportToLegacyData();
+      
+      // Merge normalized data with snapshot (normalized data takes precedence for attributes, skills, items, effects)
+      const mergedData = {
+        ...snapshotWithName,
+        attributes: normalizedData.attributes ?? snapshotWithName.attributes,
+        skills: normalizedData.skills ?? snapshotWithName.skills,
+        equipment: normalizedData.equipment ?? snapshotWithName.equipment,
+        equippedWeapons: normalizedData.equippedWeapons ?? snapshotWithName.equippedWeapons,
+        activeTimedEffects: normalizedData.activeTimedEffects ?? snapshotWithName.activeTimedEffects,
+      };
+
+      const serialized = serializeState(mergedData);
 
       await db.saveCharacter(
         id,
@@ -227,7 +257,7 @@ export const CharacterProvider = ({ children }) => {
       setCharacterName(data.characterName || '');
       setLevel(data.level ?? 1);
       setAttributes(data.attributes || createInitialAttributes());
-      setSkills(data.skills || ALL_SKILLS.map(s => ({...s, value: 0})));
+      setSkills(data.skills || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
       setSelectedSkills(data.selectedSkills || []);
       setExtraTaggedSkills(data.extraTaggedSkills || []);
       setForcedSelectedSkills(data.forcedSelectedSkills || []);
@@ -276,6 +306,11 @@ export const CharacterProvider = ({ children }) => {
       setChemDosesLog(
         (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < 24 * 60 * 60 * 1000)
       );
+      
+      // Task 4.4: Migrate old format data to Zustand Store
+      // This normalizes attributes, skills, items, and effects into the store
+      useCharacterStore.getState().loadFromLegacyData(data);
+      
       setIsSaved(true);
       isSavedRef.current = true;
       characterIdRef.current = id;
@@ -428,7 +463,28 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const commitAttributeChanges = (newAttributes, pointsSpent) => {
-    setAttributes(newAttributes);
+    console.warn(
+      '[CharacterContext] commitAttributeChanges is deprecated. Use Zustand Store actions instead: updateAttribute(attrId, delta)'
+    );
+
+    // Calculate deltas from current attributes to new attributes
+    const currentAttributesArray = attributes;
+    const currentAttributesMap = {};
+    currentAttributesArray.forEach(attr => {
+      currentAttributesMap[attr.name] = attr.value;
+    });
+
+    newAttributes.forEach(newAttr => {
+      const currentAttr = currentAttributesMap[newAttr.name];
+      const delta = newAttr.value - (currentAttr || 0);
+
+      if (delta !== 0) {
+        // Use Zustand Store action
+        useCharacterStore.getState().updateAttribute(newAttr.name, delta);
+      }
+    });
+
+    // Update other state fields
     setAvailablePerkAttributePoints(prev => prev - pointsSpent);
     const newLuck = getLuckPoints(newAttributes, trait);
     setMaxLuckPoints(newLuck);
@@ -444,7 +500,7 @@ export const CharacterProvider = ({ children }) => {
   const resetCharacter = (preserveOrigin = false) => {
     const initialAttributes = createInitialAttributes();
     setAttributes(initialAttributes);
-    setSkills(ALL_SKILLS.map(s => ({...s, value: 0})));
+    setSkills(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
     setSelectedSkills([]);
     setExtraTaggedSkills([]);
     setForcedSelectedSkills([]);
@@ -570,12 +626,12 @@ export const useCharacter = () => {
  */
 export const useCharacterAttribute = (attrId) => {
   const attribute = useCharacterStore((state) => state.attributes[attrId]);
-  
+
   // Warn if attribute doesn't exist (should be created on load)
   if (!attribute) {
     console.warn(`[useCharacterAttribute] Attribute ${attrId} not found in store`);
   }
-  
+
   return attribute;
 };
 
@@ -586,12 +642,12 @@ export const useCharacterAttribute = (attrId) => {
  */
 export const useCharacterItem = (itemId) => {
   const item = useCharacterStore((state) => state.items[itemId]);
-  
+
   // Warn if item doesn't exist
   if (!item) {
     console.warn(`[useCharacterItem] Item ${itemId} not found in store`);
   }
-  
+
   return item;
 };
 
@@ -602,12 +658,12 @@ export const useCharacterItem = (itemId) => {
  */
 export const useCharacterEffect = (effectId) => {
   const effect = useCharacterStore((state) => state.effects[effectId]);
-  
+
   // Warn if effect doesn't exist
   if (!effect) {
     console.warn(`[useCharacterEffect] Effect ${effectId} not found in store`);
   }
-  
+
   return effect;
 };
 

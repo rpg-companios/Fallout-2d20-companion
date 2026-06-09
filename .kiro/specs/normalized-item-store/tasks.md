@@ -77,6 +77,15 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Write `unequipItem(itemId)` — sets `equipped = false`
   - _Requirements: 1.1, 3.1, 3.2, 5.1, 5.2_
 
+- [x] 2.3.1 Implement skill actions
+
+
+
+  - Write `updateSkill(skillId, delta)` — updates skill base and recalculates total
+  - Write `addSkillModifier(skillId, source, value, operation)` — adds modifier to skill
+  - Write `removeSkillModifier(skillId, source)` — removes modifier from skill
+  - _Requirements: 2.1, 2.2, 3.1_
+
 - [x] 2.4 Implement effect actions
   - Write `addEffect(effect)` — adds active effect to store
   - Write `expireEffect(effectId)` — sets `active = false`
@@ -91,7 +100,7 @@ The implementation will follow a test-driven approach, building incrementally fr
 
 ---
 
-- [ ] 3. Implement migrations for existing data (single one-time conversion)
+- [x] 3. Implement migrations for existing data (single one-time conversion)
  - Convert old data format to normalized state on first load only
  - No backward compatibility or denormalization needed
  - _Requirements: 4.1, 4.2_
@@ -133,13 +142,19 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Create wrapper hooks: `useCharacterAttribute`, `useCharacterItem`, `useCharacterEffect`
   - _Requirements: 4.3, 4.4_
 
-- [ ] 4.2 Update `commitAttributeChanges` and `handleSelectKit` to use Zustand Store
+- [x] 4.2 Update `commitAttributeChanges` and `handleSelectKit` to use Zustand Store
+
+
+
+
+
+
   - Replace `setAttributes(newAttributes)` with `updateAttribute(attrId, delta)`
   - Update `handleSelectKit` in CharacterScreen to call `addNewItem(item)` for each item in `kit.items`
   - Add deprecation warning in console for old API
   - _Requirements: 4.3_
 
-- [ ] 4.3 Update item management functions
+- [x] 4.3 Update item management functions
   - Replace `setEquippedWeapons(prev => [...prev, newWeapon])` with `equipItem(itemId)`
   - Replace `setModifiedItems()` with `updateItem(itemId, patch)`
   - Add deprecation warnings (console.warn)
@@ -157,12 +172,18 @@ The implementation will follow a test-driven approach, building incrementally fr
   - Apply mods to parameters: `damage.modifiers.push({source: 'mod_modId', value: modValue, operation: modOp})`
   - _Requirements: 4.3, 4.4, 2.1, 2.2_
 
-- [ ] 4.4 Add migration on load
+- [x] 4.4 Add migration on load
+
+
+
   - In `loadCharacter()`, call `normalizeCharacterState(data)` to convert old format
   - Populate Zustand Store with normalized state
   - _Requirements: 4.1_
 
 - [ ] 4.5 Add migration on save
+
+
+
   - In `saveCharacter()`, call `denormalizeCharacterState()` to convert to old format
   - Save denormalized state to database (for compatibility with old format)
   - _Requirements: 4.2_

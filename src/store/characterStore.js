@@ -260,6 +260,98 @@ const useCharacterStore = create(devtools(
         get().recalculateDerivedStats();
       },
       
+      // --- Actions: Skills ---
+      
+      /**
+       * Update a skill's base value
+       * @param {string} skillId - Skill ID (e.g., 'SMALL_GUNS', 'MEDICINE')
+       * @param {number} delta - Change to apply to base value
+       */
+      updateSkill: (skillId, delta) => {
+        const state = get();
+        const skills = { ...state.skills };
+        
+        if (!skills[skillId]) {
+          console.warn(`Skill ${skillId} not found`);
+          return;
+        }
+        
+        // Create a copy of the skill and update base value
+        const updatedSkill = {
+          ...skills[skillId],
+          base: (skills[skillId].base || 0) + delta,
+        };
+        
+        // Recalculate total
+        updatedSkill.total = calculateSkillTotal(updatedSkill);
+        skills[skillId] = updatedSkill;
+        
+        set({ skills });
+        get().recalculateDerivedStats();
+      },
+      
+      /**
+       * Add a modifier to a skill
+       * @param {string} skillId - Skill ID
+       * @param {string} source - Source of the modifier (effect, perk, etc.)
+       * @param {number} value - Modifier value
+       * @param {string} operation - Operation: '+' (add) or '-' (subtract)
+       */
+      addSkillModifier: (skillId, source, value, operation = '+') => {
+        const state = get();
+        const skills = { ...state.skills };
+        
+        if (!skills[skillId]) {
+          console.warn(`Skill ${skillId} not found`);
+          return;
+        }
+        
+        // Create a copy of the skill
+        const updatedSkill = { ...skills[skillId] };
+        
+        // Add the new modifier
+        updatedSkill.modifiers = [
+          ...(updatedSkill.modifiers || []),
+          { source, value, operation }
+        ];
+        
+        // Recalculate total
+        updatedSkill.total = calculateSkillTotal(updatedSkill);
+        skills[skillId] = updatedSkill;
+        
+        set({ skills });
+        get().recalculateDerivedStats();
+      },
+      
+      /**
+       * Remove a modifier from a skill
+       * @param {string} skillId - Skill ID
+       * @param {string} source - Source ID to remove
+       */
+      removeSkillModifier: (skillId, source) => {
+        const state = get();
+        const skills = { ...state.skills };
+        
+        if (!skills[skillId]) {
+          console.warn(`Skill ${skillId} not found`);
+          return;
+        }
+        
+        // Create a copy of the skill
+        const updatedSkill = { ...skills[skillId] };
+        
+        // Remove modifiers with matching source
+        updatedSkill.modifiers = (updatedSkill.modifiers || [])
+          .filter(mod => mod.source !== source);
+        
+        // Recalculate total
+        updatedSkill.total = calculateSkillTotal(updatedSkill);
+        skills[skillId] = updatedSkill;
+        
+        set({ skills });
+        get().recalculateDerivedStats();
+      },
+      
       // --- Actions: Items ---
       
       /**

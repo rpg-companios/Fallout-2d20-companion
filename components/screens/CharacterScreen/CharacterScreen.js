@@ -14,6 +14,7 @@ import {
   TextInput,
 } from "react-native";
 import { useCharacter } from "../../CharacterContext";
+import useCharacterStore from "../../src/store/characterStore";
 import OriginModal from "./modals/OriginModal";
 import TraitSkillModal from "./modals/TraitSkillModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
@@ -418,15 +419,32 @@ export default function CharacterScreen() {
   };
 
   const handleSelectKit = (kit) => {
+    console.warn(
+      '[CharacterScreen] handleSelectKit is deprecated. Use Zustand Store addNewItem for equipment items.'
+    );
+
+    // 1. Add kit items to Zustand Store
+    // Note: This assumes kit.items contains item data with weaponId, appliedMods, etc.
+    // If items need to be equipped, set equipped: true in addNewItem
+    if (kit.items && Array.isArray(kit.items)) {
+      kit.items.forEach(item => {
+        // Use Zustand Store to add item
+        useCharacterStore.getState().addNewItem(item);
+      });
+    }
+
+    // 2. Set equipment metadata
     setEquipment({
       name: kit.name,
       weight: kit.weight,
       price: kit.price,
       items: kit.items,
     });
+    
+    // 3. Update caps
     setCaps((prev) => prev + (kit.caps || 0));
 
-    // Robot: apply slot/weapon/module state from initRobotSlots
+    // 4. Robot: apply slot/weapon/module state from initRobotSlots
     if (kit.robotSlots) {
       setEquippedRobotSlots(kit.robotSlots);
       setEquippedRobotModules(kit.robotModules || []);
