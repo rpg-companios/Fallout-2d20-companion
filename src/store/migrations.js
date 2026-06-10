@@ -78,8 +78,8 @@ export const normalizeItems = (equipment = {}, equippedWeapons = []) => {
   inventoryItems.forEach(item => {
     if (!item) return;
     
-    // ID предмета - это item.id из catalog
-    const itemId = item.id;
+    // ID предмета — предпочитаем item.id, но принимаем любой доступный идентификатор
+    const itemId = item.id || item.weaponId || item.itemId || item.armorId || item.clothingId || item.code;
     if (!itemId) return;
     
     // Determine if item is equipped (для брони/одежды в equipment.items)
@@ -126,8 +126,8 @@ export const normalizeItems = (equipment = {}, equippedWeapons = []) => {
   equippedWeapons.forEach(item => {
     if (!item) return;
     
-    // ID предмета - это item.id из catalog
-    const itemId = item.id;
+    // ID предмета — предпочитаем item.id, но принимаем любой доступный идентификатор
+    const itemId = item.id || item.weaponId || item.itemId || item.armorId || item.clothingId || item.code;
     if (!itemId) return;
     
     // Если предмет уже есть в словаре (из equipment.items), обновляем его
