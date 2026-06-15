@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById, getWeaponMods } from '../../../../db/Database';
 import { declinePrefix } from '../../../../domain/modsEquip';
+import { shiftRange } from '../../../../domain/range';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities } from '../../../../domain/weaponDisplay';
 import styles from '../../../../styles/WeaponModificationModal.styles';
@@ -144,13 +145,13 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     cost += toNumber(mod.cost);
   }
 
-  const RANGE_ORDER = ['Close', 'Medium', 'Long', 'Extreme'];
+  // Range is an ordinal scale; mods shift it by net steps (rangeShift), clamped
+  // to Close..Extreme. Canonical logic lives in domain/range.js.
   const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
-  const currentRangeName = String(baseWeapon.range_name ?? 'Close').trim();
-  const currentRangeKey = currentRangeName;
-  const currentRangeIndex = Math.max(0, RANGE_ORDER.indexOf(currentRangeKey));
-  const nextRangeIndex = Math.max(0, Math.min(RANGE_ORDER.length - 1, currentRangeIndex + rangeShift));
-  const range_name_key = RANGE_ORDER[nextRangeIndex];
+  const { name: range_name_key } = shiftRange(
+    baseWeapon.range_name ?? baseWeapon.range_index ?? baseWeapon.range ?? 'Close',
+    rangeShift,
+  );
   const range_name = rangeNames[range_name_key] || range_name_key;
   const qualitiesValue = qualities.size
     ? JSON.stringify(Array.from(qualities).map(id => ({ qualityId: id })))

@@ -2,6 +2,8 @@
 // Weapon and armor modification logic.
 // Pure functions — no React, no UI dependencies.
 
+import { clampRangeIndex, indexToRangeName } from './range.js';
+
 // ---------------------------------------------------------------------------
 // WEAPON MODIFICATIONS
 // ---------------------------------------------------------------------------
@@ -70,10 +72,11 @@ export const applyModification = (weapon, modification) => {
     // --- range ---
     const rm = modification.rangeModifier;
     if (rm) {
-        // range_index is a 0-based integer; range_name is the display key resolved by UI
+        // range is ordinal (Close..Extreme); mods shift by steps and clamp to the scale.
         const base = Number(result.range_index ?? 0);
         const next = rm.op === '-' ? base - rm.value : base + rm.value;
-        result.range_index = Math.max(0, next);
+        result.range_index = clampRangeIndex(next);
+        result.range_name = indexToRangeName(result.range_index);
     }
 
     // --- ammo override ---
@@ -146,9 +149,11 @@ export const removeModificationEffects = (weapon, modification) => {
 
     const rm = modification.rangeModifier;
     if (rm) {
+        // Reverse of applyModification: a '-' mod is undone by '+' and vice-versa.
         const base = Number(result.range_index ?? 0);
         const next = rm.op === '-' ? base + rm.value : base - rm.value;
-        result.range_index = Math.max(0, next);
+        result.range_index = clampRangeIndex(next);
+        result.range_name = indexToRangeName(result.range_index);
     }
 
     const qc = modification.qualityChanges;

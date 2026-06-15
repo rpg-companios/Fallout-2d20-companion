@@ -162,8 +162,9 @@ const applyModModifiers = (item, appliedMods = {}) => {
       });
     }
     
-    // Apply range modifier (if mod has range changes)
-    if (mod.rangeModifier && updatedItem.range) {
+    // Apply range modifier (if mod has range changes).
+    // range is a plain value now; only push a modifier if it is in Parameter shape.
+    if (mod.rangeModifier && updatedItem.range && Array.isArray(updatedItem.range.modifiers)) {
       const modValue = Number(mod.rangeModifier.value) || 0;
       updatedItem.range.modifiers.push({
         source: `mod_${modId}`,
@@ -171,12 +172,11 @@ const applyModModifiers = (item, appliedMods = {}) => {
         operation: mod.rangeModifier.op || '+',
       });
     }
-    
-    // Apply damageType modifier (if mod changes damage type)
-    if (mod.damageType && updatedItem.damageType) {
-      // Damage type is a string, handled as base value
-      updatedItem.damageType.base = mod.damageType;
-      updatedItem.damageType.total = mod.damageType;
+
+    // Apply damageType modifier (if mod changes damage type). damageType is a plain
+    // string; just overwrite it.
+    if (mod.damageType) {
+      updatedItem.damageType = mod.damageType;
     }
   });
   
@@ -529,11 +529,15 @@ const useCharacterStore = create(devtools(
           stackKey: stackKey,
           appliedMods: appliedMods,
           
-          // Normalize parameters (damage, fireRate, etc.)
+          // Normalize numeric parameters (damage, fireRate, etc.)
           damage: normalizeParameter(item.damage, item.damageModifier),
           fireRate: normalizeParameter(item.fireRate, item.fireRateModifier),
-          range: normalizeParameter(item.range, item.rangeModifier),
-          damageType: normalizeParameter(item.damageType, item.damageTypeModifier),
+          // range / damageType are descriptive values (e.g. "Medium", "Physical"),
+          // NOT numeric stats. Keeping them as plain values avoids (a) corrupting
+          // string values into {base:0} and (b) React error #31 when a screen renders
+          // the value directly. See docs/architecture/zustand-diagnosis.md (range/damageType fix).
+          range: item.range,
+          damageType: item.damageType,
           
           // Armor parameters
           physicalDamageRating: normalizeParameter(

@@ -452,6 +452,10 @@ export default function CharacterScreen() {
     // If items need to be equipped, set equipped: true in addNewItem
     if (kit.items && Array.isArray(kit.items)) {
       kit.items.forEach(item => {
+        // Currency (caps) is not an inventory item — it is tracked separately via
+        // setCaps below. Skip it so it never hits addNewItem (which would warn about
+        // a missing id field).
+        if (item?.itemType === 'currency' || item?.type === 'currency') return;
         // Use Zustand Store to add item
         useCharacterStore.getState().addNewItem(item);
       });

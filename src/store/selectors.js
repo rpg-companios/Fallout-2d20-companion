@@ -2,6 +2,7 @@
 // Pure selector functions for reading data from the normalized character store
 
 import { effectsDictToLegacyArray } from './effectsSync.js';
+import { resolveWeaponRangeFields } from '../../domain/range.js';
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
@@ -116,8 +117,9 @@ export const weaponModPatchToStore = (modifiedWeapon) => {
  */
 export const storeItemToWeaponDisplay = (item) => {
   const flat = flattenItemParams(item);
-  const rangeName = flat.range_name ?? flat.rangeName
-    ?? (typeof flat.range === 'string' ? flat.range : undefined);
+  // Resolve the ordinal range scale (catalog letter 'C'/'M'/'L'/'E' → canonical
+  // name/index) so display + mod-step math share one representation. See domain/range.js.
+  const { range_index, range_name } = resolveWeaponRangeFields(flat);
 
   return {
     ...flat,
@@ -125,8 +127,9 @@ export const storeItemToWeaponDisplay = (item) => {
     fire_rate: flat.fireRate ?? flat.fire_rate,
     damage_type: flat.damageType ?? flat.damage_type,
     damage_effects: flat.damageEffects ?? flat.damage_effects,
-    range_name: rangeName,
-    rangeName,
+    range_index,
+    range_name,
+    rangeName: range_name,
     weapon_type: flat.weaponType ?? flat.weapon_type,
     ammoId: flat.ammoId ?? flat.ammo_id,
   };
