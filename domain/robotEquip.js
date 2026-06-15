@@ -5,16 +5,10 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodypla
 // No React, no UI dependencies. All reason strings are i18n keys.
 
 // ---------------------------------------------------------------------------
-// Slot schemas per body plan
+// Slot schemas
 // ---------------------------------------------------------------------------
-
-const BODY_PLAN_SLOTS = {
-  protectron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
-  assaultron:  ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
-  sentryBot:   ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
-  misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
-  robobrain:   ['leftArm', 'head', 'rightArm', 'body', 'chassis'],
-};
+// NOTE: Slot lists are the single source of truth in data/bodyplans/bodyplans.json
+// and are read via getRobotSlotKeys()/getBodyPlan(). Do not hardcode them here.
 
 
 // ---------------------------------------------------------------------------

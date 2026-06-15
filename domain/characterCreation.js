@@ -263,6 +263,46 @@ export const calculateCarryWeight = (attributes, trait, equipmentState = {}) => 
     return baseCarryWeight + strengthBonus + traitCarryWeightModifier + getEquipmentCarryWeightModifier(equipmentState);
 };
 
+/**
+ * Robot carry-weight rule.
+ *
+ * Roboты считают переносимый вес ИНАЧЕ, чем люди:
+ *   carryWeight = базаТела + сумма(carryWeightModifier со всех слоёв брони)
+ * где базаТела — `carryWeight` установленного корпуса (слот body/chassis/thruster),
+ * с фоллбэком на trait.carryWeightFixed (по умолчанию 150).
+ *
+ * STR, перки и химия НЕ влияют на переносимый вес робота — только корпус и броня.
+ *
+ * @param {object} robotSlots - { [slotKey]: { limb, armor, plating, frame } }
+ * @param {object} trait
+ * @returns {number}
+ */
+export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
+    const fallbackBase = trait?.modifiers?.carryWeightFixed ?? 150;
+
+    // База от корпуса: ищем слот тела (body / chassis / thruster) с limb.carryWeight.
+    let bodyBase = null;
+    if (robotSlots && typeof robotSlots === 'object') {
+        for (const [slotKey, slotData] of Object.entries(robotSlots)) {
+            const key = String(slotKey).toLowerCase();
+            const isBodySlot = key === 'body' || key === 'chassis' || key === 'thruster';
+            const limbCarry = slotData?.limb?.carryWeight;
+            if (isBodySlot && limbCarry != null && Number.isFinite(Number(limbCarry))) {
+                bodyBase = toNumber(limbCarry);
+                break;
+            }
+        }
+    }
+
+    const base = bodyBase != null ? bodyBase : fallbackBase;
+
+    // Модификаторы только от брони/обшивки/рамы робо-слотов (без снаряжения людей).
+    const armorModifier = getEquipmentCarryWeightModifier({ equippedRobotSlots: robotSlots });
+
+    return base + armorModifier;
+};
+
+
 // ---------------------------------------------------------------------------
 // Origin utilities
 // ---------------------------------------------------------------------------

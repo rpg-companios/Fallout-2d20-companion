@@ -98,6 +98,7 @@ import {
   calculateDefense,
   calculateMeleeBonusValue,
   calculateCarryWeight,
+  calculateRobotCarryWeight,
 } from '../../domain/characterCreation.js';
 
 import {
@@ -178,8 +179,15 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   stats.meleeBonus.base = calculateMeleeBonusValue(attributesArray, trait);
   stats.meleeBonus.total = calculateAttributeTotal(stats.meleeBonus);
   
-  // Carry Weight: STR-based + trait + equipment
-  stats.carryWeight.base = calculateCarryWeight(attributesArray, trait, equipmentState);
+  // Carry Weight:
+  //  - Roboты: база от корпуса + модификаторы брони (STR/перки/химия не влияют)
+  //  - Остальные: STR-based + trait + снаряжение
+  const robotSlots = equipmentState.robotSlots || equipmentState.equippedRobotSlots || null;
+  if (equipmentState.isRobot) {
+    stats.carryWeight.base = calculateRobotCarryWeight(robotSlots || {}, trait);
+  } else {
+    stats.carryWeight.base = calculateCarryWeight(attributesArray, trait, equipmentState);
+  }
   stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
   
   return stats;

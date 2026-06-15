@@ -193,8 +193,10 @@ describe('getRobotSlotKeys', () => {
     ]);
   });
 
-  it('falls back to protectron for unknown body plan', () => {
-    expect(getRobotSlotKeys('unknown')).toEqual(getRobotSlotKeys('protectron'));
+  it('falls back to humanoid for unknown body plan', () => {
+    // Slot lists are data-driven (data/bodyplans/bodyplans.json). An unknown
+    // plan resolves to the humanoid default rather than a hardcoded robot plan.
+    expect(getRobotSlotKeys('unknown')).toEqual(getRobotSlotKeys('humanoid'));
   });
 });
 
@@ -208,7 +210,19 @@ describe('createEmptyRobotSlots', () => {
     const keys = ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'];
     expect(Object.keys(slots)).toEqual(keys);
     for (const k of keys) {
-      expect(slots[k]).toEqual({ limb: null, armor: null, plating: null, frame: null, heldWeapon: null });
+      // Each slot has the three armour layers, a limb, a held weapon, and a
+      // capabilities descriptor (canEquipWeapon/canEquipArmor) derived from the body plan.
+      expect(slots[k]).toMatchObject({
+        limb: null,
+        armor: null,
+        plating: null,
+        frame: null,
+        heldWeapon: null,
+      });
+      expect(slots[k].capabilities).toEqual({
+        canEquipWeapon: expect.any(Boolean),
+        canEquipArmor: expect.any(Boolean),
+      });
     }
   });
 });

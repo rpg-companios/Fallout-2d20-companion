@@ -16,6 +16,7 @@ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../do
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 import { isRobotCharacter } from '../domain/robotEquip';
+import { resolveBodyPlan } from '../domain/bodyplan';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
@@ -81,8 +82,38 @@ export const CharacterProvider = ({ children }) => {
   const [activeTimedEffects, setActiveTimedEffects] = useState([]);
   const [sceneCounter, setSceneCounter] = useState(0);
   const [equippedWeapons, setEquippedWeapons] = useState([]);
-  const [equippedRobotSlots, setEquippedRobotSlots] = useState(null);
-  const [equippedRobotModules, setEquippedRobotModules] = useState([]);
+  const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
+  const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+
+  // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+  // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
+  // sync while ALSO writing through to the store. Screens keep calling the same
+  // setter name; data flows into one place (Fix #2, Step 3). Functional updates
+  // (prev => next) are preserved.
+  const setEquippedRobotSlots = useCallback((updater) => {
+    setEquippedRobotSlotsRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // mirror into the store slice
+      useCharacterStore.getState().loadRobotState({
+        bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
+        slots: next || {},
+        modules: useCharacterStore.getState().robot?.modules ?? [],
+      });
+      return next;
+    });
+  }, []);
+
+  const setEquippedRobotModules = useCallback((updater) => {
+    setEquippedRobotModulesRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      useCharacterStore.getState().loadRobotState({
+        bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
+        slots: useCharacterStore.getState().robot?.slots ?? {},
+        modules: next || [],
+      });
+      return next;
+    });
+  }, []);
   const [equippedArmor, setEquippedArmor] = useState({
     head: { armor: null, clothing: null },
     body: { armor: null, clothing: null },
@@ -114,8 +145,54 @@ export const CharacterProvider = ({ children }) => {
   useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
   useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
 
+  // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
+  // Производные значения (carryWeight, meleeBonus, defense, initiative …)
+  // считаются ОДИН раз внутри Zustand-стора (calculateDerivedStats) и читаются
+  // обратно сюда, чтобы не было двух источников правды.
+  //
+  // Здесь мы лишь прокидываем в стор актуальные trait / level / экипировку
+  // (раньше стор считал их с заглушкой trait:null, level:1 — баг #4),
+  // а также подстраховываемся, заполняя dict атрибутов из массива Context,
+  // если он ещё пуст (новый несохранённый персонаж).
   useEffect(() => {
-    setCarryWeight(calculateCarryWeight(attributes, trait, { equippedArmor, equippedRobotSlots }));
+    const store = useCharacterStore.getState();
+
+    // Подсев атрибутов в стор, если dict пуст, но в Context уже есть значения.
+    const dictEmpty = Object.keys(store.attributes || {}).length === 0;
+    const arrayHasValues = Array.isArray(attributes) && attributes.length > 0;
+    if (dictEmpty && arrayHasValues) {
+      store.loadFromLegacyData({ attributes });
+    }
+
+    // Прокидываем реальный контекст → корректный пересчёт derivedStats.
+    // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
+    const isRobot = isRobotCharacter({ origin, trait });
+    store.setCharacterContext({
+      trait,
+      level,
+      isRobot,
+      equipmentState: { equippedArmor, equippedRobotSlots, isRobot },
+    });
+  }, [attributes, trait, level, origin, equippedArmor, equippedRobotSlots]);
+
+  // Подписываемся на derivedStats стора и зеркалим их в локальный стейт,
+  // чтобы все экраны, читающие carryWeight/meleeBonus/defense/initiative из
+  // useCharacter(), получали ЕДИНОЕ каноническое значение из стора.
+  useEffect(() => {
+    const applyDerived = (derivedStats) => {
+      if (!derivedStats) return;
+      const num = (p, fallback) =>
+        typeof p === 'number' ? p : (p && typeof p.total === 'number' ? p.total : fallback);
+      setCarryWeight(num(derivedStats.carryWeight, calculateCarryWeight(attributes, trait, { equippedArmor, equippedRobotSlots })));
+      setMeleeBonus(num(derivedStats.meleeBonus, 0));
+      setInitiative(num(derivedStats.initiative, 0));
+      setDefense(num(derivedStats.defense, 1));
+    };
+    // применить сразу + подписаться на дальнейшие изменения
+    applyDerived(useCharacterStore.getState().derivedStats);
+    const unsub = useCharacterStore.subscribe((state) => applyDerived(state.derivedStats));
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attributes, trait, equippedArmor, equippedRobotSlots]);
 
   useEffect(() => {
@@ -263,6 +340,13 @@ export const CharacterProvider = ({ children }) => {
         }
       }
       setEquippedWeapons(migratedWeapons);
+      // Seed the store's robot body plan first so derived carry-weight resolves
+      // correctly, then mirror slots/modules through the wrapped setters.
+      useCharacterStore.getState().loadRobotState({
+        bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
+        slots: data.equippedRobotSlots ?? {},
+        modules: data.equippedRobotModules ?? [],
+      });
       setEquippedRobotSlots(data.equippedRobotSlots ?? null);
       setEquippedRobotModules(data.equippedRobotModules ?? []);
       setEquippedArmor(data.equippedArmor || {
@@ -527,6 +611,7 @@ export const CharacterProvider = ({ children }) => {
     setActiveTimedEffects([]);
     setSceneCounter(0);
     setEquippedWeapons([]);
+    useCharacterStore.getState().resetRobot();
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
     setEquippedArmor({
@@ -700,4 +785,23 @@ export const useCharacterItems = () => {
  */
 export const useCharacterEffects = () => {
   return useCharacterStore((state) => state.effects);
+};
+
+// ── Robot selectors (read-only) — экраны читают робо-состояние из стора ──────
+// Используйте эти хуки вместо чтения equippedRobotSlots/Modules из useCharacter(),
+// чтобы UI реактивно обновлялся из единого источника правды и не мутировал данные.
+
+/** Все слоты робота { [slotKey]: SlotData }. */
+export const useRobotSlots = () => {
+  return useCharacterStore((state) => state.robot?.slots || {});
+};
+
+/** Установленные модули робота. */
+export const useRobotModules = () => {
+  return useCharacterStore((state) => state.robot?.modules || []);
+};
+
+/** Текущий body plan робота (e.g. 'protectron'). */
+export const useRobotBodyPlan = () => {
+  return useCharacterStore((state) => state.robot?.bodyPlan ?? null);
 };

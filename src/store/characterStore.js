@@ -39,7 +39,8 @@
  */
 
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { devtools, persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   calculateAttributeTotal, 
   calculateSkillTotal, 
@@ -50,6 +51,7 @@ import {
 
 import { normalizeForStore, denormalizeForSave } from './migrations.js';
 import { legacyEffectToStore } from './effectsSync.js';
+import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -202,9 +204,15 @@ const useCharacterStore = create(devtools(
       items: {},
       effects: {},
       derivedStats: {}, // Calculated derived stats
-      
+
+      // Robot equipment slice (slots / modules / bodyPlan). See robotSlice.js.
+      ...createInitialRobotState(),
+
       // Status flags (not part of persistence)
       isEffectsProcessing: false,
+
+      // --- Actions: Robot equipment (delegated to robotSlice) ---
+      ...createRobotActions(set, get),
       
       // --- Actions: Attributes ---
       
@@ -729,22 +737,33 @@ const useCharacterStore = create(devtools(
       recalculateDerivedStats: (options = {}) => {
         const state = get();
         const { attributes, effects } = state;
-        
-        // Merge provided options with defaults
+
+        // Merge provided options with the last context pushed via setCharacterContext,
+        // falling back to defaults. (Previously this used a stub that always returned
+        // trait:null/level:1 — see Fix #4.)
         const context = {
           ...getCharacterContext(),
+          ...(state._characterContext || {}),
           ...options,
         };
-        
+
+        // Inject robot equipment so robot carry-weight is computed from the body/armor
+        // (the robot slice is the single source of truth — Fix #2).
+        const equipmentState = {
+          ...(context.equipmentState || {}),
+          isRobot: Boolean(context.isRobot ?? context.equipmentState?.isRobot),
+          robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
+        };
+
         // Calculate derived stats
         const derivedStats = calculateDerivedStats(
           attributes,
           effects,
           context.trait,
           context.level,
-          context.equipmentState
+          equipmentState
         );
-        
+
         set({ derivedStats });
       },
       
@@ -788,11 +807,16 @@ const useCharacterStore = create(devtools(
     }),
     {
       name: 'character-store',
+      // Storage adapter — works on both React Native (AsyncStorage) and web
+      // (react-native-web maps AsyncStorage onto window.localStorage).
+      // Без этого на native localStorage отсутствует и персист молча не работает.
+      storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         attributes: state.attributes,
         skills: state.skills,
         items: state.items,
         effects: state.effects,
+        robot: state.robot,
         schemaVersion: 1,
       }),
       // On rehydrate, ensure all totals are recalculated
