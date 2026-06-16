@@ -40,6 +40,7 @@ import {
   MAX_ATTRIBUTE,
   getCanonicalAttributeKey,
   normalizeAttributeMap,
+  getTraitAttributeBonus,
 } from "../../../domain/characterCreation";
 import {
   getSkillDisplayName,
@@ -746,17 +747,17 @@ export default function CharacterScreen() {
       const newAttrMods = normalizeAttributeMap(
         newTrait?.modifiers?.attributes || {},
       );
-      // Сначала отменяем старые модификаторы
+      // Сначала отменяем старые модификаторы (поддержка обеих форм: число и {baseBonus,...})
       let tempAttrs = currentAttributes.map((attr) => ({
         ...attr,
         value:
-          attr.value - (oldAttrMods[getCanonicalAttributeKey(attr.name)] || 0),
+          attr.value - getTraitAttributeBonus(oldAttrMods[getCanonicalAttributeKey(attr.name)]),
       }));
       // Затем применяем новые
       return tempAttrs.map((attr) => ({
         ...attr,
         value:
-          attr.value + (newAttrMods[getCanonicalAttributeKey(attr.name)] || 0),
+          attr.value + getTraitAttributeBonus(newAttrMods[getCanonicalAttributeKey(attr.name)]),
       }));
     });
 

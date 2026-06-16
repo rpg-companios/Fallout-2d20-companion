@@ -103,13 +103,42 @@ export function createInitialAttributes() {
     ];
 }
 
+// Trait attribute modifiers come in two shapes in data:
+//   1) number               → e.g. attributes.STR = 2        (flat bonus)
+//   2) object               → e.g. attributes.STR = { baseBonus: 2, min: 6, max: 12 }
+// These helpers read both shapes uniformly.
+
+/** Numeric starting bonus a trait gives to an attribute (0 if none). */
+export const getTraitAttributeBonus = (entry) => {
+    if (entry == null) return 0;
+    if (typeof entry === 'number') return entry;
+    if (typeof entry === 'object') return Number(entry.baseBonus ?? entry.bonus ?? 0) || 0;
+    return 0;
+};
+
+/** { min, max } a trait entry declares for an attribute, or {} if none. */
+const getTraitAttributeMinMax = (entry) => {
+    if (entry && typeof entry === 'object') {
+        const out = {};
+        if (entry.min != null) out.min = Number(entry.min);
+        if (entry.max != null) out.max = Number(entry.max);
+        return out;
+    }
+    return {};
+};
+
 export const getAttributeLimits = (trait, attrName) => {
     const normalizedName = getCanonicalAttributeKey(attrName);
+    // Explicit per-trait limit maps (legacy shape).
     const minLimits = normalizeAttributeMap(trait?.modifiers?.minLimits);
     const maxLimits = normalizeAttributeMap(trait?.modifiers?.maxLimits);
+    // Per-attribute object shape (e.g. supermutant: attributes.STR = {min, max}).
+    const attrEntries = normalizeAttributeMap(trait?.modifiers?.attributes);
+    const fromAttr = getTraitAttributeMinMax(attrEntries?.[normalizedName]);
+
     return {
-        min: minLimits?.[normalizedName] ?? BASE_MIN_ATTRIBUTE,
-        max: maxLimits?.[normalizedName] ?? BASE_MAX_ATTRIBUTE,
+        min: minLimits?.[normalizedName] ?? fromAttr.min ?? BASE_MIN_ATTRIBUTE,
+        max: maxLimits?.[normalizedName] ?? fromAttr.max ?? BASE_MAX_ATTRIBUTE,
     };
 };
 
@@ -124,7 +153,10 @@ export function getRemainingAttributePoints(attributes, trait) {
     let bonusFromTrait = 0;
     if (trait?.modifiers?.attributes) {
         bonusFromTrait = Object.values(trait.modifiers.attributes).reduce(
-            (sum, val) => (val > 0 ? sum + val : sum),
+            (sum, val) => {
+                const bonus = getTraitAttributeBonus(val);
+                return bonus > 0 ? sum + bonus : sum;
+            },
             0,
         );
     }

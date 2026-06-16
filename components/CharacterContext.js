@@ -12,6 +12,7 @@ import {
   getAttributeValue,
 } from '../domain/characterCreation';
 import { loadOriginsData } from '../domain/traits';
+import { ORIGINS as ENRICHED_ORIGINS } from './screens/CharacterScreen/logic/originsData';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
@@ -26,15 +27,22 @@ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/
 const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
 
 const CharacterContext = createContext();
-const ORIGINS = loadOriginsData();
+const BARE_ORIGINS = loadOriginsData();
 
-const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+// Используем ОБОГАЩЁННЫЙ список origins (с image и equipmentKits) из originsData,
+// чтобы при загрузке сохранёнки восстанавливались картинка и комплекты (#5: «нет картинки»).
+// Фоллбэк на bare loadOriginsData(), если обогащённого нет.
 const resolveOrigin = (storedOrigin) => {
   if (!storedOrigin) return null;
   const id = typeof storedOrigin === 'string' ? storedOrigin : storedOrigin.id;
-  return ORIGINS.find((origin) => origin.id === id) || null;
+  return (
+    ENRICHED_ORIGINS.find((origin) => origin.id === id) ||
+    BARE_ORIGINS.find((origin) => origin.id === id) ||
+    null
+  );
 };
+
+const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 const serializeState = (state) => ({
   ...state,
@@ -52,15 +60,25 @@ const deserializeState = (data) => ({
   schemaVersion: data.schemaVersion ?? 0,
 });
 
+// Берём данные из стора ТОЛЬКО если они реально заполнены. denormalize* возвращает
+// пустой массив [] при пустом сторе, а `[] ?? snapshot` оставляет [] (массив не nullish)
+// и затирает реальные атрибуты/навыки снапшота → сохранёнка теряла данные (#5).
+const preferFilled = (storeVal, snapshotVal) => {
+  if (storeVal == null) return snapshotVal;
+  if (Array.isArray(storeVal)) return storeVal.length > 0 ? storeVal : snapshotVal;
+  if (typeof storeVal === 'object') return Object.keys(storeVal).length > 0 ? storeVal : snapshotVal;
+  return storeVal;
+};
+
 const mergeSnapshotWithStoreData = (snapshot) => {
   const legacyData = denormalizeCharacterState(useCharacterStore.getState());
   return {
     ...snapshot,
-    attributes: legacyData.attributes ?? snapshot.attributes,
-    skills: legacyData.skills ?? snapshot.skills,
-    equipment: legacyData.equipment ?? snapshot.equipment,
-    equippedWeapons: legacyData.equippedWeapons ?? snapshot.equippedWeapons,
-    activeTimedEffects: legacyData.activeTimedEffects ?? snapshot.activeTimedEffects,
+    attributes: preferFilled(legacyData.attributes, snapshot.attributes),
+    skills: preferFilled(legacyData.skills, snapshot.skills),
+    equipment: preferFilled(legacyData.equipment, snapshot.equipment),
+    equippedWeapons: preferFilled(legacyData.equippedWeapons, snapshot.equippedWeapons),
+    activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
   };
 };
 
