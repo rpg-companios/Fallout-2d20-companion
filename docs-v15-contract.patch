@@ -1,0 +1,593 @@
+diff --git a/docs/architecture/modifiers-vision.md b/docs/architecture/modifiers-vision.md
+new file mode 100644
+index 0000000..fd646ce
+--- /dev/null
++++ b/docs/architecture/modifiers-vision.md
+@@ -0,0 +1,51 @@
++# Видение: единая система модификаторов (черновик, НЕ реализовано)
++
++## Принцип (от владельца)
++«Любое окно с данными в программе подвержено влиянию модификаторов, даже сами
++модификаторы подвержены другим модификаторам.»
++
++То есть: **всё значение в игре = базовое значение + стек модификаторов → итог.**
++Источников модификаторов много, они складываются, и могут влиять друг на друга.
++
++## Что УЖЕ есть (зародыш)
++В Zustand-сторе атрибуты/навыки/предметы уже хранятся как
++`Parameter = { base, modifiers: [...], total }` (см. src/store/resolvers.js,
++characterStore.js). Это фактически фундамент будущей системы — но:
++- применяется не ко всему (производные, химия, черты вливаются разными путями);
++- источники (черты, перки, эффекты, экипировка) НЕ приводятся к единому виду модификатора.
++
++## Целевая идея (предварительно)
++Единый тип модификатора, самоописательный:
++```jsonc
++{
++  source: "trait:supermutant",      // кто наложил (для снятия/трассировки)
++  target: "attribute.STR",          // на что влияет (путь к значению)
++  kind:   "add" | "set" | "min" | "max" | "mult" | "flag" | "immunity" | ...,
++  value:  2,
++  priority: 0,                      // порядок применения (модификаторы на модификаторы)
++  condition?: {...}                 // опционально: когда активен
++}
++```
++Источники (черты, перки, эффекты, экипировка, химия) выдают **массив таких модификаторов**.
++Движок собирает все активные → группирует по target → применяет по kind/priority → total.
++
++## Почему это большой проект (честно)
++- Затрагивает ВСЁ: атрибуты, навыки, производные (вес/HP/защита/инициатива/удача),
++  параметры предметов, иммунитеты, лимиты, кол-во тегов/перков.
++- Требует: единый реестр target-путей, порядок применения (add vs set vs mult vs min/max),
++  разрешение «модификатор на модификатор», трассировку источников (чтобы снимать при смене черты).
++- Миграция данных трейтов/перков/эффектов в новый вид.
++- Это отдельный крупный этап — проектировать тщательно, не наскоком.
++
++## Текущее решение по трейтам (временно, осознанно)
++Формат `attributes.STR = { baseBonus, min, max }` оставлен как есть (фикс #6 его поддерживает).
++Это смешение «эффект + ограничение» в одном поле — в будущей системе разложится на
++два модификатора (`kind:add` и `kind:min/max`). Пока не трогаем.
++
++## Когда возьмёмся — порядок
++1. Спроектировать схему модификатора + список target-путей (согласовать с владельцем).
++2. Расширить Parameter-модель/резолверы на все значения.
++3. Привести источники (черты→modifiers[], перки→, эффекты→, экипировка→) к единому виду.
++4. Миграция данных + тесты + трассировка источников.
++
++Связано с: normalized-store.md (Parameter), weapon-difficulty-plan.md (модификаторы оружия).
+diff --git a/docs/architecture/post-db-issues-triage.md b/docs/architecture/post-db-issues-triage.md
+new file mode 100644
+index 0000000..ecc8f0d
+--- /dev/null
++++ b/docs/architecture/post-db-issues-triage.md
+@@ -0,0 +1,54 @@
++# Триаж 6 проблем после применения БД-патча
++
++Дата: 2026-06-16. После применения refactor(db) (902368b).
++
++## Главный вывод
++БД-рефактор работает (каталог читается, моды грузятся, комплекты попадают).
++Из 6 проблем **НИ ОДНА не вызвана БД-рефактором напрямую** — это давние баги, до которых
++ты дошёл при тестировании, плюс задачи из ещё не сделанного рефактора рук.
++
++| # | Проблема | Причина | Связь с БД | Класс |
++|---|----------|---------|-----------|-------|
++| 1 | Параметры оружия на месте | — | — | ✅ работает |
++| 2 | Гипнотрон пропадает при модификации лазера (робомозг) | Встроенное оружие головы теряется при пересборке списка оружия — тот же баг, что манипулятор+лазер | Нет | Рефактор рук (Шаги 5–8) |
++| 3 | Предметы двоятся в инвентаре | stackKey не совпадает у одинаковых предметов → каждый «новый», ИЛИ предмет виден и в инвентаре, и в экипировке | Нет | Отдельный баг инвентаря |
++| 4 | Комплекты попадают | — | — | ✅ работает |
++| 5 | Сохранёнки теряют атрибуты/навыки/картинку | `mergeSnapshotWithStoreData`: `legacyData.attributes ?? snapshot` — но denormalize возвращает `[]` (не null) при пустом сторе → `[] ?? x` = `[]`, затирает реальные данные | Нет (логика save/migrations не менялась) | Баг сохранения |
++| 6 | Супермутанту нельзя поднять Силу выше 4 | `getAttributeLimits` читает `modifiers.minLimits/maxLimits`, а трейт хранит лимиты в `modifiers.attributes.STR.{min,max}` → фоллбэк на BASE_MAX=10 и BASE_MIN=4; baseBonus тоже не применяется при создании | Нет | Баг создания персонажа |
++
++## Детали и предлагаемые фиксы
++
++### #6 Супермутант (Сила) — простой, изолированный
++Данные трейта: `modifiers.attributes.STR = { baseBonus:2, min:6, max:12 }`.
++Код `getAttributeLimits` смотрит `modifiers.minLimits[STR]` / `maxLimits[STR]` — их нет → 4/10.
++**Фикс:** в `getAttributeLimits` дополнительно читать `modifiers.attributes[attr]?.min/max`
++(приоритет: minLimits/maxLimits → attributes.{x}.min/max → BASE). Проверить и применение
++`baseBonus` при выборе трейта (стартовое значение Силы должно стать 6).
++Риск: низкий. Только домен характера.
++
++### #5 Сохранёнки теряют данные — важный, но осторожный
++`[] ?? snapshot.attributes` сохраняет пустой массив. 
++**Фикс:** менять на «брать store-данные только если они НЕ пустые»:
++`legacyData.attributes?.length ? legacyData.attributes : snapshot.attributes` (и так же skills,
++equipment, equippedWeapons). Это чинит затирание.
++Про «картинку»: проверить отдельно — где хранится изображение origin и попадает ли в snapshot
++(возможно, image вообще не в снапшоте). Нужно уточнение/проверка.
++Риск: средний (трогает save/load). Обязательно тест на round-trip save→load.
++
++### #3 Двоение предметов — нужно воспроизвести точечно
++`handleAddItem` стекает по `stackKey`. Двоение = либо `getStackKey` даёт разные ключи
++одинаковым предметам, либо предмет показывается в двух списках (инвентарь + экипировка).
++**Нужно:** какой именно предмет двоился (оружие/броня/хлам?), и двоится в инвентаре или
++между инвентарём и «надето». Без этого — гадание.
++
++### #2 Гипнотрон / встроенное оружие головы — войдёт в рефактор рук
++Тот же корень, что протектрон манипулятор+лазер: при пересборке списка атак встроенное
++оружие (головы/руки) теряется. Чистая модель `weaponIds` (Шаги 5–8) решает это системно.
++
++## Рекомендованный порядок (атомарно, по одному)
++1. **#6** супермутант — маленький изолированный фикс + тест.
++2. **#5** сохранёнки — фикс затирания + round-trip тест (важно для данных).
++3. **#3** двоение — сначала воспроизвести (нужны детали), потом фикс.
++4. **#2** + рефактор рук (Шаги 5–8) — системно, отдельным крупным патчем.
++
++Каждый — отдельный патч, отдельный коммит, прогон тестов.
+diff --git a/docs/schema/00-overview.md b/docs/schema/00-overview.md
+new file mode 100644
+index 0000000..fc29ee3
+--- /dev/null
++++ b/docs/schema/00-overview.md
+@@ -0,0 +1,37 @@
++# v1.5 — Контракт данных (источник правды для рефакторинга)
++
++Это **контракт**: поля здесь — одновременно ИСТОЧНИК изменений (что движок читает)
++и ЦЕЛЬ изменений (к чему приводим данные). Любая правка кода/данных сверяется с этим
++документом. Перед кодом — обновляем контракт.
++
++## Принципы
++- Данные — в JSON (`data/`), логика — в `domain/`, состояние — в Zustand, экраны — отдельно, i18n — отдельно.
++- Каждый файл схемы описывает ОДНУ сущность: origins, traits, attributes, skills, derived, kits…
++- Архивируем старое **поэтапно**: заменили блок логики → старое в `old_logic/`. Не ломаем рабочее на полпути.
++- Будущее (не сейчас): единая система модификаторов (см. ../architecture/modifiers-vision.md).
++
++## Порядок работ (согласован с владельцем)
++1. **Origins** — типы персонажей + базовые правила по типу.  ← начинаем здесь
++2. **Traits** — какие модификаторы, на что влияют.
++3. **Attributes & Skills** — что на них влияет.
++4. **Derived** — производные характеристики.
++5. **Equipment kits** — комплекты снаряжения.
++
++## Статус каждой части
++| Часть | Файл схемы | Статус |
++|---|---|---|
++| Обзор | 00-overview.md | ✅ |
++| Origins | 01-origins.md | ✅ типы/иммунитеты решены (❓ securitron) |
++| Armor rules | 01b-armor-rules.md | ✅ whitelist на origin (❓ C/D/E мелкие) |
++| Traits | 02-traits.md | ✅ T-1/T-4 решены (❓ T-2/T-3 не блок.) |
++| Attributes/Skills | 03-attributes-skills.md | ✅ источники расписаны (❓ AS-1..3) |
++| Derived | 04-derived.md | ✅ формулы зафиксированы (❓ D-1 гуль) |
++| Kits | 05-equipment-kits.md | ✅ формат зафиксирован (❓ K-1..3) |
++
++Контракт ПОЛНЫЙ. Открытые ❓ — мелкие/не блокируют старт кода по origins.
++
++## Условные обозначения в схемах
++- ✅ ЕСТЬ — поле уже в данных сейчас.
++- 🆕 НОВОЕ — предлагается ввести.
++- ❓ РЕШЕНИЕ — нужно слово владельца (не выдумываем).
++- 🔁 МИГРАЦИЯ — поле меняет форму/имя относительно текущего.
+diff --git a/docs/schema/01-origins.md b/docs/schema/01-origins.md
+new file mode 100644
+index 0000000..e46f0b0
+--- /dev/null
++++ b/docs/schema/01-origins.md
+@@ -0,0 +1,106 @@
++# Схема: Origins (происхождения)
++
++Файл данных: `data/origins/origins.json` (17 ориджинов).
++i18n имён: `i18n/*/data/system/origins.json` (через `tOrigin(id)`).
++Картинки: `components/screens/CharacterScreen/logic/originsData.js` (ORIGIN_IMAGES).
++
++## Текущее состояние (факт)
++Поля сейчас: `id, displayNameKey, traitIds, equipmentKitIds, bodyPlan, armorPolicy,
++isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
++
++Тип персонажа сейчас РАЗМАЗАН по булевым: `isRobot`, `isMutant` + `armorPolicy` + `canWear*`.
++Нет единого `characterType`. Картинка добавляется отдельно в originsData.js (не в JSON).
++
++## Целевая модель v1.5
++
++### Главное поле — тип персонажа 🆕🔁
++```jsonc
++"characterType": "human" | "mutant" | "robot" | "cyborg" | "ghoul"
++```
++Заменяет `isRobot`/`isMutant` (их можно вычислять из characterType для обратной совместимости
++на переходный период). Тип определяет НАБОР правил (см. ниже).
++
++### Маппинг текущих ориджинов → characterType (по данным)
++| origin id | сейчас | → characterType |
++|---|---|---|
++| brotherhood, ncr, minuteman, childOfAtom, vaultDweller, survivor, brotherhoodOutcast, shadow, savage | humanoid | **human** |
++| superMutant | isMutant | **mutant** |
++| ghoul | humanoid | **ghoul** |
++| synth | humanoid | **cyborg** ❓ (подтвердить) |
++| robobrain, securitron, assaultron, misterHandy, protectron | isRobot | **robot** |
++
++✅ РЕШЕНО: shadow → **mutant**, synth → **cyborg**, savage → **human**.
++❓ РЕШЕНИЕ-4 (открыто): `securitron` body_plan=protectron — норм или своя схема слотов? (позже)
++
++### Итоговый маппинг characterType (с учётом решений)
++- human: brotherhood, ncr, minuteman, childOfAtom, vaultDweller, survivor, brotherhoodOutcast, savage
++- mutant: superMutant, shadow
++- ghoul: ghoul
++- cyborg: synth
++- robot: robobrain, securitron, assaultron, misterHandy, protectron
++
++### Поля ориджина (целевые)
++```jsonc
++{
++  "id": "superMutant",                 // ✅ стабильный id
++  "displayNameKey": "origins.superMutant.name", // ✅ i18n
++  "characterType": "mutant",           // 🆕 тип → набор правил
++  "image": "super_mutant.png",         // 🔁 перенести в JSON (сейчас в originsData.js) ❓
++  "traitIds": [...],                   // ✅
++  "equipmentKitIds": [...],            // ✅
++  "bodyPlan": "humanoid",              // ✅ (для роботов = протектрон/штурмотрон/...)
++  // правила брони — см. ниже, возможно выводятся из characterType
++  "armorPolicy": "...",                // ✅ пока оставить, потом, возможно, из типа
++}
++```
++
++## Правила ПО ТИПУ персонажа (то, что ты описал)
++
++| Тип | Атрибуты | Броня | Иммунитеты | Особое |
++|---|---|---|---|---|
++| **human** | стандартные (4, лимиты 4–10) | standard | — | почти всё готово |
++| **mutant** | STR/END +2, лимиты 6–12; CHA/INT max 6 | raider/mutant only | radiation, poison | superMutant, shadow |
++| **robot** | ✅ как у людей (4, лимиты 4–10) | robot only (броня/обшивка/рама) | disease, radiation, poison | вес от корпуса; запрет химии; слоты-конечности |
++| **ghoul** | стандартные | standard | radiation (иммун) + **радиация ЛЕЧИТ HP** | вместо урона от радиации — восстановление HP |
++| **cyborg** (synth) | стандартные (пока) | standard (пока) | ❓ позже | «плюшки» — ❓ позже, не блокирует |
++
++✅ РЕШЕНО:
++- robot атрибуты = как у людей.
++- ghoul: радиация ЛЕЧИТ (вместо урона → восстановление HP). Деталь формулы — уточнить при derived/effects.
++- cyborg: пока стандартные правила; уникальные плюшки добавим позже (не блокирует старт).
++
++### Политика брони — ГИБРИД (рекомендация архитектора, принять/изменить)
++`characterType` задаёт ДЕФОЛТ политики брони; опциональное поле переопределяет для исключений.
++Три булевых (`canWearStandardArmor/RobotArmor/MutantArmor`) → схлопываются в одну политику.
++```jsonc
++"armorPolicy": "standard" | "raiderOnly" | "robotOnly"   // по умолчанию из characterType
++// дефолты по типу:
++//   human  → standard
++//   mutant → raiderOnly
++//   robot  → robotOnly
++//   ghoul  → standard
++//   cyborg → standard
++// На ориджине пишем armorPolicy ТОЛЬКО если отличается от дефолта типа.
++```
++❓ РЕШЕНИЕ-8: подтвердить гибрид (дефолт из типа + поле-исключение).
++
++## Иммунитеты по типу (из T-1)
++`characterType` задаёт БАЗОВЫЕ иммунитеты автоматически (origin может добавить свои):
++- robot → disease, radiation, poison
++- mutant → radiation, poison
++- ghoul → radiation (+ радиация ЛЕЧИТ, см. derived/effects)
++- human, cyborg → нет базовых (cyborg — плюшки позже)
++Это убирает нужду в `trait.isRobot` (был только ради робо-иммунитетов) и ручных списках.
++Поле `origin.immunities: [...]` — опциональное дополнение к базовым по типу.
++
++## Где это читается в коде (для будущей миграции)
++- `domain/bodyplan.js` — resolveBodyPlan (origin.robotBodyPlan / origin.bodyPlan / id-map)
++- `domain/robotEquip.js` — isRobotCharacter = origin.isRobot
++- `domain/immunities.js` — ROBOT_IMMUNITIES + trait.immunities
++- `domain/characterCreation.js` — стартовые атрибуты/лимиты
++- `components/.../originsData.js` — image + equipmentKits enrich
++- `components/CharacterContext.js` — resolveOrigin
++
++## Что НЕ делаем на этом шаге
++Только фиксируем контракт origins + получаем РЕШЕНИЯ 1–8. Код не трогаем,
++пока схема не утверждена.
+diff --git a/docs/schema/01b-armor-rules.md b/docs/schema/01b-armor-rules.md
+new file mode 100644
+index 0000000..c931854
+--- /dev/null
++++ b/docs/schema/01b-armor-rules.md
+@@ -0,0 +1,66 @@
++# Схема: Правила ношения брони (allow/deny rules)
++
++Модель от владельца (заменяет старые `armorPolicy` / `canWear*` булевы).
++Броня — ГИБКАЯ система правил, а не один флаг политики.
++
++## Факты из данных
++- Категории брони (`data/equipment/armor.json`, top-level keys):
++  `raiderArmor, leatherArmor, metalArmor, combatArmor, synthArmor, vaultSecurityArmor`.
++  Каждая имеет tiers: `standard, sturdy, heavy`.
++- Power armor: отдельный файл `data/equipment/powerArmor.json`.
++- Робо-броня: `data/equipment/robot/armor.json`, обшивка/рама: `armor_plating.json`, `frames.json`.
++- Текущий движок: `domain/equipEquip.js` (policy: humanoid_full / supermutant_raider_only / robot_only;
++  читает теги `armorItem.robotOnly` / `mutantOnly`).
++
++## Целевая модель: правила брони (УТВЕРЖДЕНО владельцем)
++
++Правила живут **в origin** (`origin.armorRules`). Логика:
++- **Нет `armorRules`** → дефолт: разрешена ВСЯ броня, КРОМЕ робо-брони.
++- **Есть `armorRules`** → разрешено строго то, что в правилах (whitelist, тонкая настройка).
++
++`allow` = whitelist: «этому персонажу можно носить вот это» — всё, или конкретные
++категории, или конкретные id. Это НЕ «открыть поверх запрета», а прямое перечисление
++разрешённого. Сложные deny/приоритеты НЕ нужны.
++
++```jsonc
++// origin.armorRules (опционально)
++"armorRules": {
++  "source": "human" | "robot",     // источник брони (людская / робо)
++  "value": "all"                    // что разрешено:
++        // "all"                      — вся броня этого источника
++        // ["leatherArmor"]           — только эти КАТЕГОРИИ
++        // ["armor_leather_chest_001"]— только эти id
++}
++```
++❓ может ли быть НЕСКОЛЬКО правил (массив)? напр. робо-броня + декоративные шляпы.
++   Предлагаю: `armorRules` — массив объектов выше. Подтвердить.
++
++### Примеры
++```jsonc
++// human (НЕТ armorRules) → дефолт: вся броня кроме робо
++// superMutant
++"armorRules": [{ "source": "human", "value": ["raiderArmor"] }]
++// robot
++"armorRules": [{ "source": "robot", "value": "all" }]
++// персонаж-снайпер «только лёгкая броня»
++"armorRules": [{ "source": "human", "value": ["leatherArmor"] }]
++```
++
++### Что схлопывается
++- `canWearStandardArmor/RobotArmor/MutantArmor` (3 булевых) → armorRules (или дефолт).
++- `armorPolicy` (enum) → armorRules (или дефолт).
++- `trait.modifiers.armorConstraint: 'mutantOnly'` → правило, переносимое в origin/трейт.
++
++## Решено
++✅ A: правила живут в origin; нет правил → вся броня кроме робо.
++✅ B: allow = whitelist (тонкая настройка), сложные deny/приоритеты не нужны.
++
++## Открытые (можно позже, не блокируют traits)
++❓ armorRules — массив правил (несколько источников) или одно? (предложен массив)
++❓ C: робо-«источник» включает обшивку/раму или это отдельные слои?
++❓ D: декоративные шляпы роботам — отдельное правило или частный случай в коде?
++❓ E: power armor — категория human-брони или отдельный источник?
++
++## Что НЕ делаем сейчас
++Только контракт. Код `equipEquip.js` переведём на правила позже, отдельным шагом,
++когда схема брони утверждена (вопросы A–E закрыты).
+diff --git a/docs/schema/02-traits.md b/docs/schema/02-traits.md
+new file mode 100644
+index 0000000..34a0e1e
+--- /dev/null
++++ b/docs/schema/02-traits.md
+@@ -0,0 +1,92 @@
++# Схема: Traits (черты)
++
++Файл данных: `data/traits/traits.json` (24 черты).
++Структура черты: `{ id, originId, displayNameKey, descriptionKey, modifiers: {...} }`.
++Мульти-черта: ориджин-черта со `subTraitIds` (ncr, survivor) собирает под-черты.
++
++## Все модификаторы сейчас (факт) — сгруппированы по влиянию
++
++### A. Атрибуты
++| ключ | пример | назначение |
++|---|---|---|
++| `attributes` | `{STR:{baseBonus:2,min:6,max:12}}` | бонус + лимиты атрибута (🔁 объектная форма — см. #6) |
++| `attributePointsBonus` | `2` | доп. очки распределения |
++
++### B. Навыки
++| ключ | пример | назначение |
++|---|---|---|
++| `forcedSkills` | `["energy_weapons","science"]` | обязательные теги |
++| `extraSkills` | `1` | +N доп. тегов на выбор |
++| `skillModifiers` | `{survival:2}` | +N к конкретному навыку |
++| `skillMaxValue` | `4` | потолок значения навыка |
++
++### C. Перки
++| `extraPerks` | `1` | +N перк-слотов |
++
++### D. Производные / ресурсы
++| `carryWeightFixed` | `225` | фикс. переносимый вес |
++| `carryWeightStrengthMultiplier` | `0` | множитель STR для веса (0 = STR не влияет) |
++| `luckMaxDelta` | `-1` | сдвиг максимума удачи |
++| `meleeBonusDelta` | `1` | сдвиг бонуса ближнего боя |
++
++### E. Иммунитеты / сопротивления / эффекты
++| `immunities` | `["radiation","poison"]` | иммунитеты |
++| `radiationResistance` | `1` | сопротивление радиации |
++| `effects` | `["radiation_healing","slow_aging",...]` | именованные эффекты-флаги |
++
++### F. Броня
++| `armorConstraint` | `"mutantOnly"` | 🔁 → переедет в armorRules (см. 01b) |
++
++### G. Робот-специфика (🔁 дублирует origin!)
++| `isRobot` | `true` | дубль origin.isRobot |
++| `robotBodyPlan` | `"misterHandy"` | дубль origin.bodyPlan |
++| `robotType` | `"misterHandy"` | дубль |
++| `robotRules` | `{canSelfUseConsumables:false,...}` | правила робота (химия/броня) |
++
++### H. Структура / прочее
++| `isMultiTrait` | `true` | это ориджин-черта с под-чертами |
++| `subTraitIds` | `[...]` | id под-черт |
++| `ncrInfantryWeaponIds` | `[...]` | спец-механика NCR (бонус урона) |
++
++## Проблемы (то, что унифицируем)
++1. 🔁 `attributes` объектная форма мешает «эффект»+«лимит» (см. modifiers-vision.md).
++2. 🔁 Робот-поля в чертах ДУБЛИРУЮТ origin (isRobot/robotBodyPlan/robotType).
++   Решение: робот-сущность определяется ОРИДЖИНОМ (characterType=robot, bodyPlan на origin);
++   черта НЕ должна заново объявлять «я робот».
++3. 🔁 `armorConstraint` → armorRules (origin), см. 01b.
++4. 🔁 `robotRules` (canSelfUseConsumables, canEquip...) — это правила ТИПА robot,
++   логичнее на уровне characterType/origin, не в каждой робо-черте.
++5. `effects` — пока флаги-строки; в будущем → модификаторы (modifiers-vision.md).
++
++## Решения нужны
++❓ T-1: робот-поля (isRobot/robotBodyPlan/robotType/robotRules) — убрать из черт и
++   определять из origin.characterType/bodyPlan? (рекомендую ДА — убирает дубль)
++❓ T-2: `ncrInfantryWeaponIds` — частная механика. Оставить как есть или обобщить
++   («черта даёт бонус урона к списку оружия»)?
++❓ T-3: `skillModifiers` ключи — это canonical (`survival`) или локализованные? унифицировать ключи навыков.
++❓ T-4: формат `attributes` оставляем (как в #6) до системы модификаторов, или
++   сразу разложить на `attributeBonus` + `attributeLimits`?
++
++## Решения (утверждено владельцем)
++
++✅ T-1: Робот-поля УБРАТЬ из черт. Робот определяется ОРИДЖИНОМ:
++   - `origin.characterType: "robot"` → автоматически даёт набор робо-иммунитетов
++     (disease/radiation/poison). Раньше для этого был `isRobot` — больше не нужен.
++   - `origin.bodyPlan` — одно поле (убрать дубли robotBodyPlan/robotType).
++   - Иммунитеты — на ОРИДЖИНЕ (тип даёт базовые; origin может дополнить).
++   - `robotRules` (canSelfUseConsumables и т.п.) → правила ТИПА robot (origin/тип), не в чертах.
++
++✅ T-4: Разложить на ДВА независимых вида модификатора (это РАЗНЫЕ механики!):
++   - **бонус к значению**: `attributeBonus: { STR: 2 }` (+/- к атрибуту)
++   - **модификатор лимитов (дельта)**: `attributeLimits: { STR: { min: 6, max: 12 } }`
++   Важное правило (от владельца): перк типа «Интенсивные тренировки» даёт +1 ОЧКО
++   (распределяемый бонус), но игрок НЕ может выйти за лимит, ЕСЛИ нет отдельного
++   модификатора лимита. «Прибавить значение» и «расширить потолок» — независимы.
++   → текущая объектная форма `attributes.STR={baseBonus,min,max}` мигрирует в эти два поля.
++
++❓ T-2 (открыто, не блокирует): `ncrInfantryWeaponIds` — частная механика или обобщить
++   до «бонус урона к списку оружия».
++❓ T-3 (открыто, не блокирует): ключи навыков (`survival`) привести к canonical (ALL_SKILL_KEYS).
++
++## Что НЕ делаем сейчас
++Только контракт черт. Реализация — после origins.
+diff --git a/docs/schema/03-attributes-skills.md b/docs/schema/03-attributes-skills.md
+new file mode 100644
+index 0000000..2469252
+--- /dev/null
++++ b/docs/schema/03-attributes-skills.md
+@@ -0,0 +1,53 @@
++# Схема: Attributes & Skills
++
++## Атрибуты
++Канонические ключи: `STR, END, PER, AGI, INT, CHA, LCK` (S.P.E.C.I.A.L., порядок в коде свой).
++База: значение 4, лимиты 4–10 (BASE_MIN/MAX), очков на распределение: 12 (DISTRIBUTION_POINTS).
++
++### Модель значения (уже в Zustand)
++`Parameter = { base, modifiers: [{source, value, operation}], total }`.
++Это фундамент будущей единой системы модификаторов (modifiers-vision.md).
++
++### Что влияет на атрибут (источники)
++| источник | вид | поле/правило |
++|---|---|---|
++| распределение игрока | base | в пределах лимитов |
++| origin/трейт: бонус | `attributeBonus: {STR:2}` | +/- к значению (T-4) |
++| origin/трейт: лимиты | `attributeLimits: {STR:{min,max}}` | сдвиг потолка/пола (T-4) |
++| доп. очки | `attributePointsBonus: N` | больше очков распределения |
++| перки (будущее) | bonus / limit | напр. «Интенсивные тренировки» +1 очко |
++| эффекты/химия (будущее) | временный modifier | напр. Buffout +STR на время |
++
++Правило (от владельца): «бонус значения» и «расширение лимита» независимы — нельзя
++поднять атрибут выше лимита без отдельного модификатора лимита.
++
++### Лимиты — порядок источников (из #6)
++`attributeLimits` (трейт/ориджин) → BASE (4..10). Несколько источников лимитов —
++берём самый «широкий»? ❓ AS-1: как складывать несколько модификаторов лимита (max из max? сумма дельт?).
++
++## Навыки
++Канонические ключи: ALL_SKILL_KEYS (ATHLETICS, BARTER, BIG_GUNS, ENERGY_WEAPONS,
++EXPLOSIVES, LOCKPICK, MEDICINE, MELEE_WEAPONS, PILOT, REPAIR, SCIENCE, SMALL_GUNS,
++SNEAK, SPEECH, SURVIVAL, THROWING, UNARMED).
++⚠️ Сейчас навыки в коде местами идентифицируются ЛОКАЛИЗОВАННЫМ именем (рус.). Цель:
++перейти на canonical-ключи везде (T-3).
++
++База: очки навыков = INT + 9 + (level-1). Тег даёт стартовые 2. Потолок = skillMaxValue (по умолч. 6; на 1 уровне ≤3).
++
++### Что влияет на навык (источники)
++| источник | поле |
++|---|---|
++| распределение игрока | base (в пределах потолка) |
++| тег (selected/extra/forced) | стартовые +2 |
++| трейт: обязательные теги | `forcedSkills: [...]` |
++| трейт: доп. теги | `extraSkills: N` |
++| трейт: бонус к навыку | `skillModifiers: {SURVIVAL: 2}` (ключи → canonical, T-3) |
++| трейт: потолок | `skillMaxValue: N` |
++
++## Решения
++❓ AS-1: складывание нескольких модификаторов лимита атрибута.
++❓ AS-2 (=T-3): мигрировать ключи навыков на canonical везде (данные + код).
++❓ AS-3: `skillModifiers` — это бонус к VALUE или к потолку? (сейчас трактуется как +value)
++
++## Что НЕ делаем сейчас
++Контракт. Реализация — после origins (по порядку из 00-overview).
+diff --git a/docs/schema/04-derived.md b/docs/schema/04-derived.md
+new file mode 100644
+index 0000000..8ed3160
+--- /dev/null
++++ b/docs/schema/04-derived.md
+@@ -0,0 +1,37 @@
++# Схема: Derived (производные характеристики)
++
++Считаются ОТ атрибутов/уровня/экипировки/эффектов. В Zustand хранятся как Parameter
++(`{base, modifiers, total}`), считаются в `calculateDerivedStats` (src/store/resolvers.js),
++формулы — в `domain/characterCreation.js`.
++
++## Производные (факт) и формулы
++| величина | формула (база) | зависит от | особое |
++|---|---|---|---|
++| maxHealth | END + LCK + (level-1) | END, LCK, level | + timed-эффекты |
++| initiative | PER + AGI | PER, AGI | |
++| defense | AGI ≥ 9 ? 2 : 1 | AGI | |
++| meleeBonus | STR-ступени (7→+1,9→+2,11→+3) + trait.meleeBonusDelta | STR, trait | |
++| carryWeight (human) | base(trait.carryWeightFixed=150) + STR×mult(10) + mods брони | STR, trait, броня | STR влияет |
++| carryWeight (robot) | corpus.carryWeight + mods брони | корпус, броня | STR НЕ влияет (✅ сделано) |
++| damageResistance | physical/energy/radiation | броня + timed-эффекты | |
++
++## Что на них влияет (источники модификаторов)
++- атрибуты (см. 03) → пересчёт base.
++- trait/origin: meleeBonusDelta, carryWeightFixed, carryWeightStrengthMultiplier, luckMaxDelta.
++- экипировка: carryWeightModifier, DR от брони.
++- timed-эффекты (химия): maxHP, DR (уже в коде через getTimed*).
++- **ghoul: радиация ЛЕЧИТ** (вместо урона) → влияет на health-ресурс ❓ D-1 формула.
++
++## Тип-специфика
++- robot carryWeight = от корпуса (✅).
++- ghoul health vs радиация ❓ D-1: радиация добавляет HP? до maxHP? есть ли «перелечивание»?
++- mutant/cyborg: производные пока стандартные.
++
++## Решения
++❓ D-1: точная механика «радиация лечит гуля» (сколько HP, ограничения).
++❓ D-2: должны ли ВСЕ производные стать Parameter с источниками-модификаторами
++   (под будущую систему) или пока формулы как есть? (рекомендую: оставить формулы,
++   мигрировать вместе с большой системой модификаторов).
++
++## Что НЕ делаем сейчас
++Контракт. Формулы менять не нужно (работают). Документ — ориентир.
+diff --git a/docs/schema/05-equipment-kits.md b/docs/schema/05-equipment-kits.md
+new file mode 100644
+index 0000000..25d7fe7
+--- /dev/null
++++ b/docs/schema/05-equipment-kits.md
+@@ -0,0 +1,43 @@
++# Схема: Equipment Kits (комплекты снаряжения)
++
++Файлы: `data/equipmentKits/*.json` (по ориджинам/фракциям).
++Структура: `{ <kitId>: { items: [ ...entries ] } }`.
++
++## Формат записи комплекта (факт)
++Каждый entry:
++```jsonc
++{
++  "type": "fixed",                 // тип записи: сейчас встречается 'fixed'
++  "itemType": "weapon|robotArm|robotHead|robotBody|robotLeg|plating|module|misc|currency|...",
++  "itemId": "robot_head_protectron",   // ИЛИ weaponId / armorId — зависит от itemType
++  "slot": "left|right",            // опц. (для рук/оружия роботов)
++  "weaponId": "weapon_laser_gun",  // для оружия
++  "ammo": { "ammoId": "...", "quantity": {...} }, // опц.
++  "requiresWeaponId": "..."        // (роботы) — будет пересмотрено в редизайне рук
++}
++```
++
++## Поток (факт)
++Kit JSON → `resolveKitItems` (domain/kitResolver) → разрешение из каталога (JSON!) →
++`flattenKitItems`/`toInventoryItems` (EquipmentKitModal) → `summarizeItems` →
++`CharacterScreen.handleSelectKit` → `addNewItem` (стор) / robot → `initRobotSlots`.
++
++## itemType, встречающиеся в данных
++`weapon, robotArm, robotHead, robotBody, robotLeg, plating, module, misc, currency`.
++- `currency` (крышки) — НЕ инвентарный предмет, идёт в caps (есть гард в handleSelectKit).
++
++## Связи с другими схемами
++- Робо-части кита (`robotArm` и т.д.) → раскладываются по слотам робота
++  (см. ../architecture/robot-arms-redesign.md — будущий weaponIds-редизайн).
++- `requiresWeaponId` (лазер на манипуляторе) — в редизайне рук заменится на
++  «рука несёт несколько weaponIds» (решение владельца).
++
++## Решения
++❓ K-1: нужны ли НЕ-fixed записи (выбор/рандом)? сейчас только `type:"fixed"`.
++   (в EquipmentKitModal есть flattenKitItems с выбором — проверить, какие type бывают).
++❓ K-2: унифицировать идентификатор предмета (itemId vs weaponId vs armorId) → один `id`?
++   (перекликается с canonical-id из normalized-store.md).
++❓ K-3: валюта — всегда `itemType:"currency"`? стандартизировать поле количества.
++
++## Что НЕ делаем сейчас
++Контракт. Реализация kits — последняя в порядке (после origins/traits/attrs/derived).
