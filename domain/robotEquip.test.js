@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isRobotCharacter,
   getRobotSlotKeys,
   createEmptyRobotSlots,
   initRobotSlots,
@@ -144,31 +143,8 @@ const handyCatalog = {
 };
 
 // ---------------------------------------------------------------------------
-// isRobotCharacter
+// isRobotCharacter — moved to domain/origins.js (tested in domain/origins.test.js)
 // ---------------------------------------------------------------------------
-
-describe('isRobotCharacter', () => {
-  it('returns true when origin.isRobot is true', () => {
-    expect(isRobotCharacter({ origin: { isRobot: true } })).toBe(true);
-  });
-
-  it('returns false when origin.isRobot is false', () => {
-    expect(isRobotCharacter({ origin: { isRobot: false } })).toBe(false);
-  });
-
-  it('returns false when origin.isRobot is absent', () => {
-    expect(isRobotCharacter({ origin: {} })).toBe(false);
-  });
-
-  it('returns false when origin is absent', () => {
-    expect(isRobotCharacter({})).toBe(false);
-  });
-
-  it('returns false for null/undefined character', () => {
-    expect(isRobotCharacter(null)).toBe(false);
-    expect(isRobotCharacter(undefined)).toBe(false);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // getRobotSlotKeys
@@ -554,7 +530,6 @@ describe('applyLimbReplacement', () => {
     expect(updated.leftArm.heldWeapon).toBeNull();
   });
 
-
   it('removes sibling slot limb when replacing dual-slot arm kits', () => {
     const slots = createEmptyRobotSlots('protectron');
     const dual = { id: 'robot_shocker_arms', canHoldWeapons: false };
@@ -632,7 +607,6 @@ describe('getBuiltinWeaponsFromSlots', () => {
     expect(ids).toContain('pistol');
   });
 
-
   it('deduplicates identical builtin attacks from two manipulator arms', () => {
     const slots = createEmptyRobotSlots('protectron');
     const sharedAttacks = [
@@ -701,7 +675,7 @@ describe('canEquipWeaponToSlot', () => {
 // ---------------------------------------------------------------------------
 
 describe('canReplaceLimb', () => {
-  const character = { origin: { robotBodyPlan: 'protectron' } };
+  const character = { origin: { characterType: 'robot', bodyPlan: 'protectron' } };
 
   it('allows a limb with matching compatibleBodyPlans', () => {
     const limb = { id: 'arm', compatibleBodyPlans: ['protectron', 'assaultron'] };

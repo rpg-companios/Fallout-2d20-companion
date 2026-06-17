@@ -1,0 +1,1928 @@
+From 49367f505830e5e0335ca7e73bf2c65b05dd08cf Mon Sep 17 00:00:00 2001
+From: Refactor Bot <refactor@fallout-2d20.local>
+Date: Wed, 17 Jun 2026 05:03:32 +0000
+Subject: [PATCH] =?UTF-8?q?refactor(origins):=20=D0=B2=D0=BD=D0=B5=D0=B4?=
+ =?UTF-8?q?=D1=80=D0=B5=D0=BD=D0=B8=D0=B5=20characterType=20=D0=BF=D0=BE?=
+ =?UTF-8?q?=20=D0=BA=D0=BE=D0=BD=D1=82=D1=80=D0=B0=D0=BA=D1=82=D1=83=20doc?=
+ =?UTF-8?q?s/schema/01-origins.md?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- data/origins/origins.json: новый shape (characterType ∈ {human,mutant,robot,cyborg,ghoul},
+  поле image; удалены isRobot/isMutant/canWear*/armorPolicy)
+- data/traits/traits.json: удалён modifiers.isRobot из 4 робо-трейтов
+- domain/origins.js (новый): единый источник CHARACTER_TYPES, ARMOR_POLICIES,
+  getCharacterType, предикаты, getArmorPolicy, getBodyPlan, tOrigin,
+  loadOriginsData/loadEnrichedOrigins/findEnrichedOrigin
+- domain/traits.js: вычищены origins-зависимости
+- domain/robotEquip.js: удалён isRobotCharacter, canReplaceLimb читает origin.bodyPlan
+- domain/bodyplan.js: resolveBodyPlan читает origin.bodyPlan
+- domain/equipEquip.js: использует ARMOR_POLICIES/getArmorPolicy/isRobotCharacter из origins
+- domain/immunities.js: упрощён, убран ROBOT_IMMUNITIES, читает origin.immunities + trait.immunities
+- components/screens/CharacterScreen/logic/originsData.js: удалён
+- EquipmentKitModal: убран ORIGIN_TO_ROBOT_BODY_PLAN, использует getBodyPlan
+- InventoryScreen: убран локальный override isRobotCharacter
+- WeaponsAndArmorScreen: renderArmorPart использует isRobotCharacter({ origin, trait })
+- CharacterContext/CharacterScreen/HomeScreen: импорты переключены на domain/origins
+- Тесты: equipEquip/immunities фикстуры на characterType; robotEquip убраны isRobotCharacter тесты
+- Новые тесты domain/origins.test.js
+- docs/schema/01-origins.md: дополнен (image, immunities, deviation про type-derived базы)
+
+Известное отклонение от контракта: type-derived базовые иммунитеты НЕ используются,
+иммунитеты — явные списки origin.immunities + trait.immunities (по решению владельца).
+---
+ components/CharacterContext.js                |  16 +-
+ .../CharacterScreen/CharacterScreen.js        |   4 +-
+ .../CharacterScreen/logic/originsData.js      |  46 ----
+ .../modals/EquipmentKitModal.js               |  18 +-
+ components/screens/HomeScreen/HomeScreen.js   |   4 +-
+ .../InventoryScreen/InventoryScreen.js        |  35 +--
+ .../WeaponsAndArmorScreen.js                  |   4 +-
+ data/origins/origins.json                     | 194 ++++++---------
+ data/traits/traits.json                       | 140 +++++++++--
+ docs/schema/01-origins.md                     |  36 ++-
+ domain/bodyplan.js                            |   4 +-
+ domain/equipEquip.js                          |  36 ++-
+ domain/equipEquip.test.js                     |  14 +-
+ domain/immunities.js                          |  28 ++-
+ domain/immunities.test.js                     |  27 +-
+ domain/origins.js                             | 176 +++++++++++++
+ domain/origins.test.js                        | 234 ++++++++++++++++++
+ domain/robotEquip.js                          |  10 +-
+ domain/robotEquip.test.js                     |  30 +--
+ domain/traits.js                              |  29 +--
+ 20 files changed, 734 insertions(+), 351 deletions(-)
+ delete mode 100644 components/screens/CharacterScreen/logic/originsData.js
+ create mode 100644 domain/origins.js
+ create mode 100644 domain/origins.test.js
+
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 4c75ea5..6ab31e0 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -11,12 +11,11 @@ import {
+   calculateCarryWeight,
+   getAttributeValue,
+ } from '../domain/characterCreation';
+-import { loadOriginsData } from '../domain/traits';
+-import { ORIGINS as ENRICHED_ORIGINS } from './screens/CharacterScreen/logic/originsData';
++import { loadOriginsData, findEnrichedOrigin } from '../domain/origins';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+-import { isRobotCharacter } from '../domain/robotEquip';
++import { isRobotCharacter } from '../domain/origins';
+ import { resolveBodyPlan } from '../domain/bodyplan';
+ 
+ // Zustand Store integration (Task 4.1)
+@@ -29,17 +28,12 @@ const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: '
+ const CharacterContext = createContext();
+ const BARE_ORIGINS = loadOriginsData();
+ 
+-// Используем ОБОГАЩЁННЫЙ список origins (с image и equipmentKits) из originsData,
+-// чтобы при загрузке сохранёнки восстанавливались картинка и комплекты (#5: «нет картинки»).
+-// Фоллбэк на bare loadOriginsData(), если обогащённого нет.
++// Resolve saved-character origin through the single source of truth:
++// domain/origins.findEnrichedOrigin(id) returns the origin enriched with image + equipmentKits.
+ const resolveOrigin = (storedOrigin) => {
+   if (!storedOrigin) return null;
+   const id = typeof storedOrigin === 'string' ? storedOrigin : storedOrigin.id;
+-  return (
+-    ENRICHED_ORIGINS.find((origin) => origin.id === id) ||
+-    BARE_ORIGINS.find((origin) => origin.id === id) ||
+-    null
+-  );
++  return findEnrichedOrigin(id) || BARE_ORIGINS.find((origin) => origin.id === id) || null;
+ };
+ 
+ const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index f785279..26b941e 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -20,7 +20,7 @@ import { useShallow } from 'zustand/react/shallow';
+ import OriginModal from "./modals/OriginModal";
+ import TraitSkillModal from "./modals/TraitSkillModal";
+ import EquipmentKitModal from "./modals/EquipmentKitModal";
+-import { ORIGINS } from "./logic/originsData";
++import { loadEnrichedOrigins } from "../../../domain/origins";
+ import { loadTraitsData } from "../../../domain/traits";
+ import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
+ import {
+@@ -1322,7 +1322,7 @@ export default function CharacterScreen() {
+ 
+         <OriginModal
+           isVisible={isOriginModalVisible}
+-          origins={ORIGINS}
++          origins={loadEnrichedOrigins()}
+           selectedOrigin={selectedOrigin}
+           onSelectOrigin={setSelectedOrigin}
+           onClose={() => {
+diff --git a/components/screens/CharacterScreen/logic/originsData.js b/components/screens/CharacterScreen/logic/originsData.js
+deleted file mode 100644
+index e20088a..0000000
+--- a/components/screens/CharacterScreen/logic/originsData.js
++++ /dev/null
+@@ -1,46 +0,0 @@
+-import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+-import { loadOriginsData, tOrigin } from '../../../../domain/traits';
+-
+-const ORIGIN_IMAGES = {
+-  brotherhood: require('../../../../assets/origins/brotherhood_of_steel.png'),
+-  ncr: require('../../../../assets/origins/ncr_citizen.png'),
+-  minuteman: require('../../../../assets/origins/minuteman.png'),
+-  childOfAtom: require('../../../../assets/origins/child_of_atom.png'),
+-  vaultDweller: require('../../../../assets/origins/vault_dweller.png'),
+-  protectron: require('../../../../assets/origins/protectron.png'),
+-  survivor: require('../../../../assets/origins/survivor.png'),
+-  securitron: require('../../../../assets/origins/securitron.png'),
+-  ghoul: require('../../../../assets/origins/ghoul.png'),
+-  assaultron: require('../../../../assets/origins/assaultron.png'),
+-  superMutant: require('../../../../assets/origins/super_mutant.png'),
+-  misterHandy: require('../../../../assets/origins/mister_handy.png'),
+-  brotherhoodOutcast: require('../../../../assets/origins/brotherhood_outcast.png'),
+-  shadow: require('../../../../assets/origins/shadow.png'),
+-  synth: require('../../../../assets/origins/synth.png'),
+-  robobrain: require('../../../../assets/origins/robobrain.png'),
+-  savage: require('../../../../assets/origins/savage.png'),
+-};
+-
+-const { equipmentKits: equipmentKitGroups } = getEquipmentCatalog();
+-
+-// Build ORIGINS from data/origins/origins.json — single source of truth for origin ids/structure.
+-// Names come from i18n via tOrigin(id). Equipment kits come from equipmentKits.json.
+-export const ORIGINS = loadOriginsData().map((origin) => {
+-  const kitIds = origin.equipmentKitIds || [];
+-  const equipmentKits = kitIds
+-    .map((kitId) => ({ id: kitId, ...(equipmentKitGroups[kitId] || {}) }))
+-    .filter((kit) => Array.isArray(kit.items));
+-
+-  return {
+-    id: origin.id,
+-    name: tOrigin(origin.id),
+-    image: ORIGIN_IMAGES[origin.id] || null,
+-    isRobot: origin.isRobot || false,
+-    isMutant: origin.isMutant || false,
+-    canWearStandardArmor: origin.canWearStandardArmor ?? true,
+-    canWearRobotArmor: origin.canWearRobotArmor ?? false,
+-    canWearMutantArmor: origin.canWearMutantArmor ?? false,
+-    traitIds: origin.traitIds || [],
+-    equipmentKits,
+-  };
+-});
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 3e2140b..f2bf5b9 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -1,8 +1,8 @@
+ import { useState, useEffect } from 'react';
+ import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+ import { resolveKitItems } from '../../../../domain/kitResolver';
+-import { isRobotCharacter, initRobotSlots } from '../../../../domain/robotEquip';
+-import { resolveBodyPlan } from '../../../../domain/bodyplan';
++import { initRobotSlots } from '../../../../domain/robotEquip';
++import { isRobotCharacter, getBodyPlan } from '../../../../domain/origins';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import styles from '../../../../styles/EquipmentKitModal.styles';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+@@ -168,20 +168,8 @@ const formatAmmoSuffix = (ammo) => {
+ // For robotArm entries with a builtinWeaponId, returns " + <weapon name>" so the
+ // modal makes it visible that the arm carries a built-in weapon (e.g. manipulator).
+ 
+-const ORIGIN_TO_ROBOT_BODY_PLAN = {
+-  robobrain: 'robobrain',
+-  protectron: 'protectron',
+-  assaultron: 'assaultron',
+-  misterHandy: 'misterHandy',
+-  securitron: 'protectron',
+-  sentryBot: 'sentryBot',
+-};
+-
+ const resolveRobotBodyPlan = (character) => (
+-  character?.trait?.modifiers?.robotBodyPlan
+-  || character?.origin?.robotBodyPlan
+-  || ORIGIN_TO_ROBOT_BODY_PLAN[character?.origin?.id]
+-  || 'protectron'
++  getBodyPlan(character) || 'protectron'
+ );
+ 
+ const formatBuiltinWeaponSuffix = (entry) => {
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 284fac2..9410ca9 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -15,7 +15,7 @@ import {
+ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+ import { useCharacter } from '../../CharacterContext';
+-import { ORIGINS } from '../CharacterScreen/logic/originsData';
++import { findEnrichedOrigin } from '../../../domain/origins';
+ import { setCurrentLocale, useLocale } from '../../../i18n/locale';
+ import { tHomeScreen } from './logic/homeScreenI18n';
+ import * as db from '../../../db';
+@@ -31,7 +31,7 @@ import styles from '../../../styles/HomeScreen.styles';
+ 
+ const getOriginImage = (originName) => {
+   if (!originName) return null;
+-  const found = ORIGINS.find(o => o.id === originName);
++  const found = findEnrichedOrigin(originName);
+   return found ? found.image : null;
+ };
+ 
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 02e351c..ede7c44 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -13,7 +13,8 @@ import { getInstantHealAmount } from '../../../domain/effects';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+-import { isRobotCharacter as checkIsRobotCharacter, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
++import { isRobotCharacter } from '../../../domain/origins';
++import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+ 
+ const PARAM_FIELDS = [
+@@ -190,7 +191,11 @@ const InventoryScreen = () => {
+     || equippedRobotBodyPart?.robotBodyPlan
+     || null;
+ 
+-  const isRobotCharacter = checkIsRobotCharacter({ origin }) || Boolean(trait?.modifiers?.isRobot || robotBodyPlan);
++  // isRobot now reads origin.characterType directly via domain/origins.js.
++  // The previous local override (trait.modifiers.isRobot || robotBodyPlan) is gone:
++  //   - trait.modifiers.isRobot was removed from all 4 robot traits in this refactor
++  //   - robotBodyPlan alone doesn't imply robot (it's a body shape, not the archetype)
++  const isRobot = isRobotCharacter({ origin, trait });
+   const robotBodyUpgrade = useMemo(() => {
+     if (!robotBodyPlan) return null;
+     const parts = Array.isArray(equipmentCatalog?.robotPartsUpgrade) ? equipmentCatalog.robotPartsUpgrade : [];
+@@ -218,10 +223,10 @@ const InventoryScreen = () => {
+ 
+   // Проверяем наличие руки с canHoldWeapons в слотах робота (Requirement 7.2)
+   const robotHasHoldingArm = useMemo(() => {
+-    if (!isRobotCharacter) return true;
++    if (!isRobot) return true;
+     const slots = equippedRobotSlots || {};
+     return Object.values(slots).some((slotData) => slotData?.limb?.canHoldWeapons === true);
+-  }, [isRobotCharacter, equippedRobotSlots]);
++  }, [isRobot, equippedRobotSlots]);
+   const isPowerArmorItem = (item) => {
+     const category = String(item?.category || item?.armorCategoryKey || '').toLowerCase();
+     const name = String(getItemName(item) || '').toLowerCase();
+@@ -356,7 +361,7 @@ const InventoryScreen = () => {
+     });
+ 
+     const applyToSelf = () => {
+-      if (isRobotCharacter) {
++      if (isRobot) {
+         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle', 'Ограничение робота'), tInventory('screen.alerts.robotCannotSelfUseMessage', 'Роботы не могут применять еду, напитки и препараты на себя.'));
+         return;
+       }
+@@ -565,7 +570,7 @@ const InventoryScreen = () => {
+     const weaponQualities = String(displayWeapon?.qualities || '').toLowerCase();
+     const isTwoHandedWeapon = ['двуруч', 'two-handed', 'two handed'].some((token) => weaponQualities.includes(token));
+     
+-    if (isRobotCharacter && isRobotOnlyItem(displayWeapon) && Array.isArray(robotBodyUpgrade?.allowedRobotWeaponIds)) {
++    if (isRobot && isRobotOnlyItem(displayWeapon) && Array.isArray(robotBodyUpgrade?.allowedRobotWeaponIds)) {
+       const allowedWeaponIds = robotBodyUpgrade.allowedRobotWeaponIds;
+       if (displayWeapon?.id && !allowedWeaponIds.includes(displayWeapon.id)) {
+         showAlert(
+@@ -576,11 +581,11 @@ const InventoryScreen = () => {
+       }
+     }
+ 
+-    if (isRobotOnlyItem(displayWeapon) && !isRobotCharacter) {
++    if (isRobotOnlyItem(displayWeapon) && !isRobot) {
+       showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotOnlyWeaponMessage', 'Это оружие могут использовать только роботы.'));
+       return;
+     }
+-    if (isRobotCharacter && isRobotLimbWeapon(displayWeapon)) {
++    if (isRobot && isRobotLimbWeapon(displayWeapon)) {
+       const armDef = resolveRobotArmFromWeapon(displayWeapon);
+       if (!armDef) return;
+       const slots = equippedRobotSlots || {};
+@@ -617,7 +622,7 @@ const InventoryScreen = () => {
+       if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
+       return;
+     }
+-    if (!isRobotOnlyItem(displayWeapon) && isRobotCharacter) {
++    if (!isRobotOnlyItem(displayWeapon) && isRobot) {
+       // Robot equip flow: check for arm slot with canHoldWeapons (Requirement 7.2, 7.6)
+       const slots = equippedRobotSlots || {};
+       const armWithHoldCapability = Object.entries(slots).find(([_key, slotData]) => {
+@@ -749,14 +754,14 @@ const InventoryScreen = () => {
+ 
+   const handleEquipArmor = (itemToEquip) => {
+     const currentEquipped = equippedArmor;
+-    if (isRobotCharacter && !isRobotOnlyItem(itemToEquip)) {
++    if (isRobot && !isRobotOnlyItem(itemToEquip)) {
+       const isAllowedClothing = itemToEquip.itemType === 'clothing' && itemToEquip.canRobotWear === true;
+       if (!isAllowedClothing) {
+         showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
+         return;
+       }
+     }
+-    if (isRobotCharacter && isPowerArmorItem(itemToEquip)) {
++    if (isRobot && isPowerArmorItem(itemToEquip)) {
+       showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
+       return;
+     }
+@@ -973,7 +978,7 @@ const InventoryScreen = () => {
+             const itemName = getItemName(flatItem);
+             
+             // Скрываем предметы-конечности из инвентаря для роботов (Requirement 7.1)
+-            if (isRobotCharacter && isRobotLimbItem(flatItem)) {
++            if (isRobot && isRobotLimbItem(flatItem)) {
+               return null;
+             }
+ 
+@@ -1009,7 +1014,7 @@ const InventoryScreen = () => {
+         .filter(Boolean);
+ 
+     return [...equippedItemsList, ...inventoryItemsList];
+-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobotCharacter]);
++  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot]);
+ 
+   const renderTableHeader = () => {
+     return (
+@@ -1040,7 +1045,7 @@ const InventoryScreen = () => {
+     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
+     const isBuiltinOrManipulator = Boolean(item?.isBuiltin || item?.isManipulator);
+     // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
+-    const hideEquipButton = isRobotCharacter
++    const hideEquipButton = isRobot
+       && item.itemType === 'weapon'
+       && !item.isEquipped
+       && !robotHasHoldingArm
+@@ -1090,7 +1095,7 @@ const InventoryScreen = () => {
+               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+           )}
+ 
+-          {isConsumable && !item.isEquipped && !isRobotCharacter && (
++          {isConsumable && !item.isEquipped && !isRobot && (
+               <TouchableOpacity 
+                   style={[styles.actionButton, styles.applyButton]} 
+                   onPress={() => handleApplyConsumable(localizedDisplayItem)}>
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index b906fc7..3c6f865 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -12,7 +12,7 @@ import {
+ } from '../../../src/store/selectors';
+ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
+ import { TRAITS } from '../CharacterScreen/logic/traitsData';
+-import { isRobotCharacter } from '../../../domain/robotEquip';
++import { isRobotCharacter } from '../../../domain/origins';
+ import { resolveBodyPlan } from '../../../domain/bodyplan';
+ import styles from '../../../styles/CharacterScreen.styles';
+ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
+@@ -521,7 +521,7 @@ const WeaponsAndArmorScreen = () => {
+ 
+   const renderArmorPart = (slotKey) => {
+     // Проверяем является ли персонаж роботом
+-    const isRobot = trait?.modifiers?.isRobot || false;
++    const isRobot = isRobotCharacter({ origin, trait });
+     const isMisterHandyRobot = bodyPlan === 'misterHandy';
+     
+     // Если робот и есть equippedRobotSlots, отображаем RobotSlot
+diff --git a/data/origins/origins.json b/data/origins/origins.json
+index 96ab1d0..a7b9859 100644
+--- a/data/origins/origins.json
++++ b/data/origins/origins.json
+@@ -2,27 +2,23 @@
+   {
+     "id": "brotherhood",
+     "displayNameKey": "origins.brotherhood.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "brotherhood_of_steel",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "brotherhood-chain-that-binds"
+     ],
+     "equipmentKitIds": [
+       "brotherhood_initiate",
+       "brotherhood_scribe"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "ncr",
+     "displayNameKey": "origins.ncr.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "ncr_citizen",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "ncr-resident"
+     ],
+@@ -30,68 +26,56 @@
+       "ncr_infantry",
+       "ncr_caravaneer",
+       "ncr_marksman"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "minuteman",
+     "displayNameKey": "origins.minuteman.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "minuteman",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "minuteman-peoples-militia"
+     ],
+     "equipmentKitIds": [
+       "minuteman_shooter",
+       "minuteman_skirmisher"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "childOfAtom",
+     "displayNameKey": "origins.childOfAtom.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "child_of_atom",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "childofatom-radioactive-sponge"
+     ],
+     "equipmentKitIds": [
+       "atom_missionary",
+       "atom_zealot"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "vaultDweller",
+     "displayNameKey": "origins.vaultDweller.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "vault_dweller",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "vaultdweller-vault-kid"
+     ],
+     "equipmentKitIds": [
+       "vault_security",
+       "vault_resident"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "ghoul",
+     "displayNameKey": "origins.ghoul.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "ghoul",
++    "image": "ghoul",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "ghoul-necrotic-posthuman"
+     ],
+@@ -101,17 +85,14 @@
+       "wastelander_wanderer",
+       "wastelander_raider",
+       "wastelander_trader"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "survivor",
+     "displayNameKey": "origins.survivor.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "survivor",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "survivor-survivor"
+     ],
+@@ -121,52 +102,42 @@
+       "wastelander_wanderer",
+       "wastelander_raider",
+       "wastelander_trader"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "superMutant",
+     "displayNameKey": "origins.superMutant.name",
+-    "isRobot": false,
+-    "isMutant": true,
+-    "canWearStandardArmor": false,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": true,
++    "characterType": "mutant",
++    "image": "super_mutant",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "supermutant-forced-evolution"
+     ],
+     "equipmentKitIds": [
+       "supermutant_bruiser",
+       "supermutant_skirmisher"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "supermutant_raider_only"
++    ]
+   },
+   {
+     "id": "brotherhoodOutcast",
+     "displayNameKey": "origins.brotherhoodOutcast.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "brotherhood_outcast",
++    "bodyPlan": "humanoid",
+     "traitIds": [
+       "brotherhoodoutcast-chain-that-breaks"
+     ],
+     "equipmentKitIds": [
+       "outcast_former_knight",
+       "outcast_former_scribe"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "robobrain",
+     "displayNameKey": "origins.robobrain.name",
+-    "isRobot": true,
+-    "canWearStandardArmor": false,
+-    "canWearRobotArmor": true,
+-    "canWearMutantArmor": false,
++    "characterType": "robot",
++    "image": "robobrain",
++    "bodyPlan": "robobrain",
+     "traitIds": [
+       "robobrain-robot-with-brains"
+     ],
+@@ -174,47 +145,38 @@
+       "robobrain_servomechanizmy",
+       "robobrain_us_army",
+       "robobrain_nonordinary"
+-    ],
+-    "bodyPlan": "robobrain",
+-    "armorPolicy": "robot_only"
++    ]
+   },
+   {
+     "id": "securitron",
+     "displayNameKey": "origins.securitron.name",
+-    "isRobot": true,
+-    "canWearStandardArmor": false,
+-    "canWearRobotArmor": true,
+-    "canWearMutantArmor": false,
++    "characterType": "robot",
++    "image": "securitron",
++    "bodyPlan": "protectron",
+     "traitIds": [],
+     "equipmentKitIds": [
+       "default_caps_only"
+-    ],
+-    "bodyPlan": "protectron",
+-    "armorPolicy": "robot_only"
++    ]
+   },
+   {
+     "id": "assaultron",
+     "displayNameKey": "origins.assaultron.name",
+-    "isRobot": true,
+-    "canWearStandardArmor": false,
+-    "canWearRobotArmor": true,
+-    "canWearMutantArmor": false,
++    "characterType": "robot",
++    "image": "assaultron",
++    "bodyPlan": "assaultron",
+     "traitIds": [
+       "assaultron-designed-for-frontline"
+     ],
+     "equipmentKitIds": [
+       "default_caps_only"
+-    ],
+-    "bodyPlan": "assaultron",
+-    "armorPolicy": "robot_only"
++    ]
+   },
+   {
+     "id": "misterHandy",
+     "displayNameKey": "origins.misterHandy.name",
+-    "isRobot": true,
+-    "canWearStandardArmor": false,
+-    "canWearRobotArmor": true,
+-    "canWearMutantArmor": false,
++    "characterType": "robot",
++    "image": "mister_handy",
++    "bodyPlan": "misterHandy",
+     "traitIds": [
+       "misterhandy-robot-mr-handy"
+     ],
+@@ -224,17 +186,14 @@
+       "mister_handy_nanny",
+       "mister_handy_medic",
+       "mister_handy_farmer"
+-    ],
+-    "bodyPlan": "misterHandy",
+-    "armorPolicy": "robot_only"
++    ]
+   },
+   {
+     "id": "protectron",
+     "displayNameKey": "origins.protectron.name",
+-    "isRobot": true,
+-    "canWearStandardArmor": false,
+-    "canWearRobotArmor": true,
+-    "canWearMutantArmor": false,
++    "characterType": "robot",
++    "image": "protectron",
++    "bodyPlan": "protectron",
+     "traitIds": [
+       "protectron-protect-or-destroy"
+     ],
+@@ -245,50 +204,41 @@
+       "protectron_nukatron",
+       "protectron_worker",
+       "protectron_model_x"
+-    ],
+-    "bodyPlan": "protectron",
+-    "armorPolicy": "robot_only"
++    ]
+   },
+   {
+     "id": "shadow",
+     "displayNameKey": "origins.shadow.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "mutant",
++    "image": "shadow",
++    "bodyPlan": "humanoid",
+     "traitIds": [],
+     "equipmentKitIds": [
+       "default_caps_only"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "synth",
+     "displayNameKey": "origins.synth.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
+-    "traitIds": ["synth-more-than-human"],
++    "characterType": "cyborg",
++    "image": "synth",
++    "bodyPlan": "humanoid",
++    "traitIds": [
++      "synth-more-than-human"
++    ],
+     "equipmentKitIds": [
+       "default_caps_only"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   },
+   {
+     "id": "savage",
+     "displayNameKey": "origins.savage.name",
+-    "isRobot": false,
+-    "canWearStandardArmor": true,
+-    "canWearRobotArmor": false,
+-    "canWearMutantArmor": false,
++    "characterType": "human",
++    "image": "savage",
++    "bodyPlan": "humanoid",
+     "traitIds": [],
+     "equipmentKitIds": [
+       "default_caps_only"
+-    ],
+-    "bodyPlan": "humanoid",
+-    "armorPolicy": "humanoid_full"
++    ]
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index 5f93609..0e1d379 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -6,7 +6,11 @@
+     "descriptionKey": "traits.brotherhood.chainThatBinds.description",
+     "modifiers": {
+       "extraSkills": 1,
+-      "forcedSkills": ["energy_weapons", "science", "repair"]
++      "forcedSkills": [
++        "energy_weapons",
++        "science",
++        "repair"
++      ]
+     }
+   },
+   {
+@@ -16,7 +20,11 @@
+     "descriptionKey": "traits.brotherhoodOutcast.chainThatBreaks.description",
+     "modifiers": {
+       "extraSkills": 1,
+-      "forcedSkills": ["energy_weapons", "science", "repair"]
++      "forcedSkills": [
++        "energy_weapons",
++        "science",
++        "repair"
++      ]
+     }
+   },
+   {
+@@ -26,13 +34,28 @@
+     "descriptionKey": "traits.superMutant.forcedEvolution.description",
+     "modifiers": {
+       "attributes": {
+-        "STR": { "baseBonus": 2, "min": 6, "max": 12 },
+-        "END": { "baseBonus": 2, "min": 6, "max": 12 },
+-        "CHA": { "max": 6 },
+-        "INT": { "max": 6 }
++        "STR": {
++          "baseBonus": 2,
++          "min": 6,
++          "max": 12
++        },
++        "END": {
++          "baseBonus": 2,
++          "min": 6,
++          "max": 12
++        },
++        "CHA": {
++          "max": 6
++        },
++        "INT": {
++          "max": 6
++        }
+       },
+       "skillMaxValue": 4,
+-      "immunities": ["radiation", "poison"],
++      "immunities": [
++        "radiation",
++        "poison"
++      ],
+       "armorConstraint": "mutantOnly"
+     }
+   },
+@@ -45,8 +68,15 @@
+       "skillModifiers": {
+         "survival": 2
+       },
+-      "immunities": ["radiation"],
+-      "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"]
++      "immunities": [
++        "radiation"
++      ],
++      "effects": [
++        "radiation_healing",
++        "slow_aging",
++        "infertility",
++        "discrimination"
++      ]
+     }
+   },
+   {
+@@ -56,8 +86,16 @@
+     "descriptionKey": "traits.minuteman.peoplesMilitia.description",
+     "modifiers": {
+       "extraSkills": 1,
+-      "forcedSkills": ["energy_weapons", "small_guns"],
+-      "effects": ["improved_caravans", "base_defense_4", "cover_dr_bonus", "outnumbered_damage_bonus"]
++      "forcedSkills": [
++        "energy_weapons",
++        "small_guns"
++      ],
++      "effects": [
++        "improved_caravans",
++        "base_defense_4",
++        "cover_dr_bonus",
++        "outnumbered_damage_bonus"
++      ]
+     }
+   },
+   {
+@@ -68,7 +106,11 @@
+     "modifiers": {
+       "extraPerks": 1,
+       "radiationResistance": 1,
+-      "effects": ["extra_perk_level_1", "radiation_absorption", "radiation_melee_charge"]
++      "effects": [
++        "extra_perk_level_1",
++        "radiation_absorption",
++        "radiation_melee_charge"
++      ]
+     }
+   },
+   {
+@@ -78,7 +120,11 @@
+     "descriptionKey": "traits.vaultDweller.vaultKid.description",
+     "modifiers": {
+       "extraSkills": 1,
+-      "effects": ["reduced_end_check_difficulty", "disease_resistance", "luck_restore_on_complication"]
++      "effects": [
++        "reduced_end_check_difficulty",
++        "disease_resistance",
++        "luck_restore_on_complication"
++      ]
+     }
+   },
+   {
+@@ -87,10 +133,13 @@
+     "displayNameKey": "traits.protectron.protectOrDestroy.name",
+     "descriptionKey": "traits.protectron.protectOrDestroy.description",
+     "modifiers": {
+-      "immunities": ["disease", "radiation", "poison"],
++      "immunities": [
++        "disease",
++        "radiation",
++        "poison"
++      ],
+       "carryWeightFixed": 225,
+       "carryWeightStrengthMultiplier": 0,
+-      "isRobot": true,
+       "robotRules": {
+         "canSelfUseConsumables": false,
+         "canUseConsumablesOnOthers": false,
+@@ -98,7 +147,12 @@
+         "canEquipPowerArmor": false,
+         "maxRobotMods": 2
+       },
+-      "effects": ["hazard_reroll", "no_consumables_food_rest", "repair_to_heal", "model_check_discount"]
++      "effects": [
++        "hazard_reroll",
++        "no_consumables_food_rest",
++        "repair_to_heal",
++        "model_check_discount"
++      ]
+     }
+   },
+   {
+@@ -107,17 +161,25 @@
+     "displayNameKey": "traits.assaultron.designedForFrontline.name",
+     "descriptionKey": "traits.assaultron.designedForFrontline.description",
+     "modifiers": {
+-      "immunities": ["disease", "radiation", "poison"],
++      "immunities": [
++        "disease",
++        "radiation",
++        "poison"
++      ],
+       "carryWeightFixed": 150,
+       "carryWeightStrengthMultiplier": 0,
+-      "isRobot": true,
+       "meleeBonusDelta": 1,
+       "robotRules": {
+         "canSelfUseConsumables": false,
+         "canEquipStandardArmor": false,
+         "canEquipPowerArmor": false
+       },
+-      "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"]
++      "effects": [
++        "no_consumables_food_rest",
++        "repair_to_heal",
++        "built_in_laser",
++        "self_destruct"
++      ]
+     }
+   },
+   {
+@@ -149,7 +211,13 @@
+     "displayNameKey": "traits.ncr.infantryman.name",
+     "descriptionKey": "traits.ncr.infantryman.description",
+     "modifiers": {
+-      "ncrInfantryWeaponIds": ["weapon_submachine_gun", "weapon_black_powder_rifle", "weapon_assault_rifle", "weapon_frag_grenade", "weapon_combat_knife"]
++      "ncrInfantryWeaponIds": [
++        "weapon_submachine_gun",
++        "weapon_black_powder_rifle",
++        "weapon_assault_rifle",
++        "weapon_frag_grenade",
++        "weapon_combat_knife"
++      ]
+     }
+   },
+   {
+@@ -239,10 +307,12 @@
+     "displayNameKey": "traits.misterHandy.robotMrHandy.name",
+     "descriptionKey": "traits.misterHandy.robotMrHandy.description",
+     "modifiers": {
+-      "immunities": ["radiation", "poison"],
++      "immunities": [
++        "radiation",
++        "poison"
++      ],
+       "carryWeightFixed": 150,
+       "carryWeightStrengthMultiplier": 0,
+-      "isRobot": true,
+       "robotType": "misterHandy",
+       "robotBodyPlan": "misterHandy",
+       "robotRules": {
+@@ -253,7 +323,12 @@
+         "carryWeightLimit": 150,
+         "armorConstraints": []
+       },
+-      "effects": ["no_consumables_food_rest", "repair_to_heal", "hover_movement", "360_vision"]
++      "effects": [
++        "no_consumables_food_rest",
++        "repair_to_heal",
++        "hover_movement",
++        "360_vision"
++      ]
+     }
+   },
+   {
+@@ -263,7 +338,11 @@
+     "descriptionKey": "traits.synth.moreThanHuman.description",
+     "modifiers": {
+       "extraSkills": 1,
+-      "immunities": ["radiation", "poison", "disease"],
++      "immunities": [
++        "radiation",
++        "poison",
++        "disease"
++      ],
+       "effects": [
+         "no_sleep_needed",
+         "no_eat_drink_needed",
+@@ -279,10 +358,17 @@
+     "displayNameKey": "traits.robobrain.robotWithBrains.name",
+     "descriptionKey": "traits.robobrain.robotWithBrains.description",
+     "modifiers": {
+-      "immunities": ["radiation", "poison"],
++      "immunities": [
++        "radiation",
++        "poison"
++      ],
+       "carryWeightFixed": 150,
+-      "isRobot": true,
+-      "effects": ["no_consumables_food_rest", "repair_to_heal", "ir_vision", "ignore_darkness_penalty"]
++      "effects": [
++        "no_consumables_food_rest",
++        "repair_to_heal",
++        "ir_vision",
++        "ignore_darkness_penalty"
++      ]
+     }
+   }
+ ]
+diff --git a/docs/schema/01-origins.md b/docs/schema/01-origins.md
+index e46f0b0..d0434af 100644
+--- a/docs/schema/01-origins.md
++++ b/docs/schema/01-origins.md
+@@ -45,15 +45,25 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
+   "id": "superMutant",                 // ✅ стабильный id
+   "displayNameKey": "origins.superMutant.name", // ✅ i18n
+   "characterType": "mutant",           // 🆕 тип → набор правил
+-  "image": "super_mutant.png",         // 🔁 перенести в JSON (сейчас в originsData.js) ❓
++  "image": "super_mutant",             // 🆕 basename PNG-ассета (без расширения)
+   "traitIds": [...],                   // ✅
+   "equipmentKitIds": [...],            // ✅
+   "bodyPlan": "humanoid",              // ✅ (для роботов = протектрон/штурмотрон/...)
+-  // правила брони — см. ниже, возможно выводятся из characterType
+-  "armorPolicy": "...",                // ✅ пока оставить, потом, возможно, из типа
++  // опциональные поля (только когда отличается от дефолта):
++  "armorPolicy": "raiderOnly",         // 🔁 override дефолта типа; пишем ТОЛЬКО если отличается
++  "immunities": ["radiation"],         // 🆕 явный список (если есть — объединяется с trait.immunities)
++  // опционально для будущей итерации (03-attributes-skills.md):
++  // "attributeBonus":   { "AGI": 1 },
++  // "attributeLimits":  { "AGI": { "min": 6, "max": 12 } }
+ }
+ ```
+ 
++> **Реализация v1** (коммиты после `f5a9eef`):
++> - `image` перенесён из `components/screens/CharacterScreen/logic/originsData.js` в JSON
++> - `armorPolicy` у всех 17 ориджинов совпадает с дефолтом типа → поле в JSON опущено
++> - `origin.immunities` поле определено в схеме, но ни один origin пока не объявляет явно
++>   (все иммунитеты приходят из `trait.immunities`)
++
+ ## Правила ПО ТИПУ персонажа (то, что ты описал)
+ 
+ | Тип | Атрибуты | Броня | Иммунитеты | Особое |
+@@ -84,14 +94,18 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
+ ```
+ ❓ РЕШЕНИЕ-8: подтвердить гибрид (дефолт из типа + поле-исключение).
+ 
+-## Иммунитеты по типу (из T-1)
+-`characterType` задаёт БАЗОВЫЕ иммунитеты автоматически (origin может добавить свои):
+-- robot → disease, radiation, poison
+-- mutant → radiation, poison
+-- ghoul → radiation (+ радиация ЛЕЧИТ, см. derived/effects)
+-- human, cyborg → нет базовых (cyborg — плюшки позже)
+-Это убирает нужду в `trait.isRobot` (был только ради робо-иммунитетов) и ручных списках.
+-Поле `origin.immunities: [...]` — опциональное дополнение к базовым по типу.
++## Иммунитеты
++
++> **Deviation в реализации v1** (по решению владельца): type-derived базы **НЕ используются**.
++> Иммунитеты — явные списки: `origin.immunities` (если есть) объединяются с `trait.immunities`.
++
++Иммунитеты приходят из явных списков:
++- `origin.immunities: [...]` (опциональное поле, если origin его объявляет)
++- `trait.immunities: [...]` (уже работает для большинства трейтов)
++
++Броня/химия как источник иммунитетов — отдельная задача (вне v1).
++
++Это упрощение убирает нужду в `trait.isRobot` (флаг удалён из всех 4 робо-трейтов в реализации v1).
+ 
+ ## Где это читается в коде (для будущей миграции)
+ - `domain/bodyplan.js` — resolveBodyPlan (origin.robotBodyPlan / origin.bodyPlan / id-map)
+diff --git a/domain/bodyplan.js b/domain/bodyplan.js
+index 856e02d..23636b2 100644
+--- a/domain/bodyplan.js
++++ b/domain/bodyplan.js
+@@ -22,7 +22,9 @@ export function resolveBodyPlan(character) {
+   const traitPlan = character?.trait?.modifiers?.robotBodyPlan;
+   if (traitPlan && bodyPlansRegistry[traitPlan]) return traitPlan;
+ 
+-  const originPlan = character?.origin?.robotBodyPlan;
++  // After the characterType refactor: origin stores its bodyPlan directly
++  // in `origin.bodyPlan` (was `origin.robotBodyPlan` in older data).
++  const originPlan = character?.origin?.bodyPlan;
+   if (originPlan && bodyPlansRegistry[originPlan]) return originPlan;
+ 
+   const originId = character?.origin?.id;
+diff --git a/domain/equipEquip.js b/domain/equipEquip.js
+index 8b894a6..b4ca288 100644
+--- a/domain/equipEquip.js
++++ b/domain/equipEquip.js
+@@ -1,14 +1,12 @@
+ // domain/equipEquip.js
+ // Pure functions for equip eligibility checks.
+ // No React, no UI dependencies. All reason strings are i18n keys.
++//
++// Armor policy and character archetype now live in domain/origins.js
++// (characterType drives the default policy; origin.armorPolicy overrides).
+ 
+ import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
+-
+-const ARMOR_POLICY = {
+-  HUMANOID_FULL: 'humanoid_full',
+-  SUPERMUTANT_RAIDER_ONLY: 'supermutant_raider_only',
+-  ROBOT_ONLY: 'robot_only',
+-};
++import { ARMOR_POLICIES, getArmorPolicy, isRobotCharacter } from './origins';
+ 
+ /** True if the armor item is robot-specific. */
+ const isRobotArmor = (armorItem) =>
+@@ -39,31 +37,27 @@ const isRobotDecorativeHat = (clothingItem) => {
+     || id === 'headwear_bos_scribe_hat';
+ };
+ 
+-function getArmorPolicy(character) {
+-  return character?.origin?.armorPolicy || ARMOR_POLICY.HUMANOID_FULL;
+-}
+-
+ /**
+  * Check whether a character can equip a given armor item.
+  *
+  * Policies:
+- *  - robot_only                -> only robot armor
+- *  - supermutant_raider_only   -> only mutant-tagged armor
+- *  - humanoid_full             -> standard + power armor, but no robot/mutant armor
++ *  - robotOnly             -> only robot armor
++ *  - raiderOnly            -> only mutant-tagged armor
++ *  - standard              -> standard + power armor, but no robot/mutant armor
+  */
+ export function canEquipArmor(armorItem, character) {
+   const policy = getArmorPolicy(character);
+   const robotArmor = isRobotArmor(armorItem);
+   const mutantArmor = isMutantArmor(armorItem);
+ 
+-  if (policy === ARMOR_POLICY.ROBOT_ONLY) {
++  if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+     if (!robotArmor) {
+       return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+     }
+     return { allowed: true, reason: null };
+   }
+ 
+-  if (policy === ARMOR_POLICY.SUPERMUTANT_RAIDER_ONLY) {
++  if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+     if (!mutantArmor) {
+       return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+     }
+@@ -90,14 +84,14 @@ export function canEquipArmor(armorItem, character) {
+  */
+ export function canEquipWeapon(weaponItem, character) {
+   const policy = getArmorPolicy(character);
+-  const isRobotCharacter = policy === ARMOR_POLICY.ROBOT_ONLY;
++  const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
+   const isRobotWeapon = isRobotOnlyWeapon(weaponItem);
+ 
+-  if (isRobotWeapon && !isRobotCharacter) {
++  if (isRobotWeapon && !isRobotChar) {
+     return { allowed: false, reason: 'equip.error.robotOnlyWeapon' };
+   }
+ 
+-  if (!isRobotWeapon && isRobotCharacter) {
++  if (!isRobotWeapon && isRobotChar) {
+     return { allowed: false, reason: 'equip.error.robotCannotUseStandardWeapon' };
+   }
+ 
+@@ -106,7 +100,7 @@ export function canEquipWeapon(weaponItem, character) {
+ 
+ export function canEquipClothing(clothingItem, character) {
+   const policy = getArmorPolicy(character);
+-  const isRobotChar = policy === ARMOR_POLICY.ROBOT_ONLY;
++  const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
+ 
+   if (isRobotChar) {
+     if (!isRobotDecorativeHat(clothingItem)) {
+@@ -124,9 +118,9 @@ export function filterAvailableArmor(allArmor, character) {
+ }
+ 
+ export function getCarryWeightLimit(character) {
+-  const { origin, trait, attributes } = character || {};
++  const { trait, attributes } = character || {};
+ 
+-  if (origin?.isRobot || trait?.modifiers?.isRobot) {
++  if (isRobotCharacter(character)) {
+     return (trait?.modifiers?.carryWeightFixed ?? 150) + getEquipmentCarryWeightModifier(character);
+   }
+ 
+diff --git a/domain/equipEquip.test.js b/domain/equipEquip.test.js
+index 28dd797..bc67630 100644
+--- a/domain/equipEquip.test.js
++++ b/domain/equipEquip.test.js
+@@ -1,4 +1,4 @@
+-import { describe, it, expect, jest } from 'vitest';
++import { describe, it, expect } from 'vitest';
+ import { canEquipArmor, getCarryWeightLimit } from './equipEquip';
+ 
+ describe('armor policy restrictions', () => {
+@@ -6,20 +6,20 @@ describe('armor policy restrictions', () => {
+   const mutantArmor = { id: 'raider_mutant_x', mutantOnly: true };
+   const powerArmor = { id: 'power_armor_t45' };
+ 
+-  it.each(['human', 'ghoul', 'synth'])('%s can equip power armor', (originId) => {
+-    const character = { origin: { id: originId, armorPolicy: 'humanoid_full' } };
++  it.each(['brotherhood', 'ghoul', 'synth'])('%s can equip power armor', (originId) => {
++    const character = { origin: { id: originId, characterType: originId === 'synth' ? 'cyborg' : originId === 'ghoul' ? 'ghoul' : 'human' } };
+     expect(canEquipArmor(powerArmor, character)).toEqual({ allowed: true, reason: null });
+   });
+ 
+   it('superMutant can equip only raider/mutant armor', () => {
+-    const character = { origin: { id: 'superMutant', armorPolicy: 'supermutant_raider_only' } };
++    const character = { origin: { id: 'superMutant', characterType: 'mutant' } };
+     expect(canEquipArmor(mutantArmor, character)).toEqual({ allowed: true, reason: null });
+     expect(canEquipArmor(powerArmor, character).allowed).toBe(false);
+     expect(canEquipArmor(robotArmor, character).allowed).toBe(false);
+   });
+ 
+   it.each(['robobrain', 'misterHandy', 'protectron', 'assaultron'])('%s can equip only robot armor', (originId) => {
+-    const character = { origin: { id: originId, armorPolicy: 'robot_only' } };
++    const character = { origin: { id: originId, characterType: 'robot' } };
+     expect(canEquipArmor(robotArmor, character)).toEqual({ allowed: true, reason: null });
+     expect(canEquipArmor(powerArmor, character).allowed).toBe(false);
+     expect(canEquipArmor(mutantArmor, character).allowed).toBe(false);
+@@ -30,8 +30,8 @@ describe('armor policy restrictions', () => {
+ describe('carry weight limits', () => {
+   it('keeps Assaultron robot carry weight fixed by strength and applies robot and standard armor modifiers', () => {
+     const character = {
+-      origin: { id: 'assaultron', isRobot: true, armorPolicy: 'robot_only' },
+-      trait: { modifiers: { isRobot: true, carryWeightFixed: 150, carryWeightStrengthMultiplier: 0 } },
++      origin: { id: 'assaultron', characterType: 'robot', bodyPlan: 'assaultron' },
++      trait: { modifiers: { carryWeightFixed: 150, carryWeightStrengthMultiplier: 0 } },
+       attributes: [{ name: 'STR', value: 11 }],
+       equippedRobotSlots: {
+         body: { armor: { carryWeightModifier: 20 }, plating: { carryWeightModifier: -10 } },
+diff --git a/domain/immunities.js b/domain/immunities.js
+index 314cb65..fb10fc7 100644
+--- a/domain/immunities.js
++++ b/domain/immunities.js
+@@ -1,18 +1,34 @@
+ // domain/immunities.js
+-// Pure helpers for origin/trait immunity checks.
++// Pure helpers for immunity checks.
++//
++// Immunities are an explicit list per character. No type-derived base.
++// Sources checked (in order):
++//   - character.origin.immunities (optional; if present, list)
++//   - character.trait.immunities (optional; if present, list)
++// Future: equipment / consumables / perks (out of scope here).
+ 
+-import { isRobotCharacter } from './robotEquip';
+-
+-const ROBOT_IMMUNITIES = new Set(['disease', 'radiation', 'poison']);
++import { isRobotCharacter } from './origins';
+ 
++/**
++ * Returns the list of immunities granted by a trait.
++ * @returns {string[]} e.g. ['radiation', 'poison']
++ */
+ export const getTraitImmunities = (trait) => (
+   Array.isArray(trait?.modifiers?.immunities) ? trait.modifiers.immunities : []
+ );
+ 
++/**
++ * Returns the list of immunities declared on an origin (if any).
++ */
++export const getOriginImmunities = (origin) => (
++  Array.isArray(origin?.immunities) ? origin.immunities : []
++);
++
+ export const hasDamageImmunity = (character, immunityType) => {
+   if (!immunityType) return false;
+-  if (isRobotCharacter(character) && ROBOT_IMMUNITIES.has(immunityType)) return true;
+-  return getTraitImmunities(character?.trait).includes(immunityType);
++  if (getOriginImmunities(character?.origin).includes(immunityType)) return true;
++  if (getTraitImmunities(character?.trait).includes(immunityType)) return true;
++  return false;
+ };
+ 
+ export const hasRadiationImmunity = (character) => hasDamageImmunity(character, 'radiation');
+diff --git a/domain/immunities.test.js b/domain/immunities.test.js
+index f8fc85c..a6af89b 100644
+--- a/domain/immunities.test.js
++++ b/domain/immunities.test.js
+@@ -2,19 +2,38 @@ import { describe, expect, it } from 'vitest';
+ import { hasDamageImmunity, hasPoisonImmunity, hasRadiationImmunity } from './immunities.js';
+ 
+ describe('immunity helpers', () => {
+-  it('grants radiation and poison immunity to any robot origin', () => {
+-    const character = { origin: { id: 'assaultron', isRobot: true }, trait: null };
++  it('reads immunities declared on origin.immunities', () => {
++    const character = {
++      origin: { id: 'assaultron', characterType: 'robot', immunities: ['disease', 'radiation', 'poison'] },
++      trait: null,
++    };
+     expect(hasRadiationImmunity(character)).toBe(true);
+     expect(hasPoisonImmunity(character)).toBe(true);
++    expect(hasDamageImmunity(character, 'disease')).toBe(true);
+   });
+ 
+-  it('reads non-robot immunities from trait modifiers', () => {
++  it('reads immunities from trait.immunities for non-robot origins', () => {
+     const character = {
+-      origin: { id: 'superMutant', isRobot: false },
++      origin: { id: 'superMutant', characterType: 'mutant' },
+       trait: { modifiers: { immunities: ['radiation', 'poison'] } },
+     };
+     expect(hasDamageImmunity(character, 'radiation')).toBe(true);
+     expect(hasDamageImmunity(character, 'poison')).toBe(true);
+     expect(hasDamageImmunity(character, 'disease')).toBe(false);
+   });
++
++  it('merges origin.immunities with trait.immunities (additive, no double-counting)', () => {
++    const character = {
++      origin: { id: 'ghoul', characterType: 'ghoul', immunities: ['radiation'] },
++      trait: { modifiers: { immunities: ['radiation'] } },
++    };
++    // Single hit even though both lists contain 'radiation'.
++    expect(hasRadiationImmunity(character)).toBe(true);
++  });
++
++  it('returns false for unknown immunity type', () => {
++    const character = { origin: { id: 'brotherhood', characterType: 'human' }, trait: null };
++    expect(hasDamageImmunity(character, 'radiation')).toBe(false);
++    expect(hasDamageImmunity(character, 'poison')).toBe(false);
++  });
+ });
+diff --git a/domain/origins.js b/domain/origins.js
+new file mode 100644
+index 0000000..d3509e3
+--- /dev/null
++++ b/domain/origins.js
+@@ -0,0 +1,176 @@
++// domain/origins.js
++// Single source of truth for origins:
++//  - characterType (archetype) and derived rules (armor policy, body plan)
++//  - i18n name lookup
++//  - raw + enriched loaders (the latter for UI: adds image + equipmentKits)
++//
++// Per docs/schema/01-origins.md (zustand-robot branch):
++//  - characterType ∈ {human, mutant, robot, cyborg, ghoul}
++//  - armorPolicy defaults from characterType; origin.armorPolicy overrides only when different
++//  - No type-derived immunities (user decision: immunities are explicit lists per origin/trait)
++//
++// Image assets stay snake_case (filenames), colocated here because require() cannot live in JSON.
++
++import originsJson from '../data/origins/origins.json';
++import ruOrigins from '../i18n/ru-RU/data/system/origins.json';
++import enOrigins from '../i18n/en-EN/data/system/origins.json';
++import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import { getCurrentLocale } from '../i18n/locale';
++
++// ---------------------------------------------------------------------------
++// Public constants
++// ---------------------------------------------------------------------------
++
++export const CHARACTER_TYPES = Object.freeze({
++  HUMAN: 'human',
++  MUTANT: 'mutant',
++  ROBOT: 'robot',
++  CYBORG: 'cyborg',
++  GHOUL: 'ghoul',
++});
++
++export const ARMOR_POLICIES = Object.freeze({
++  STANDARD: 'standard',
++  RAIDER_ONLY: 'raiderOnly',
++  ROBOT_ONLY: 'robotOnly',
++});
++
++// Per-characterType default armor policy.
++// Origin can override via origin.armorPolicy (rare; shadow doesn't anymore).
++const DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE = Object.freeze({
++  [CHARACTER_TYPES.HUMAN]:  ARMOR_POLICIES.STANDARD,
++  [CHARACTER_TYPES.MUTANT]: ARMOR_POLICIES.RAIDER_ONLY,
++  [CHARACTER_TYPES.ROBOT]:  ARMOR_POLICIES.ROBOT_ONLY,
++  [CHARACTER_TYPES.GHOUL]:  ARMOR_POLICIES.STANDARD,
++  [CHARACTER_TYPES.CYBORG]: ARMOR_POLICIES.STANDARD,
++});
++
++const ORIGIN_DICTIONARIES = { 'ru-RU': ruOrigins, 'en-EN': enOrigins };
++
++// ---------------------------------------------------------------------------
++// Image assets (colocated with data, as require() cannot live in JSON)
++// ---------------------------------------------------------------------------
++
++const getOriginImage = (originId) => {
++  switch (originId) {
++    case 'brotherhood':         return require('../assets/origins/brotherhood_of_steel.png');
++    case 'ncr':                 return require('../assets/origins/ncr_citizen.png');
++    case 'minuteman':           return require('../assets/origins/minuteman.png');
++    case 'childOfAtom':         return require('../assets/origins/child_of_atom.png');
++    case 'vaultDweller':        return require('../assets/origins/vault_dweller.png');
++    case 'protectron':          return require('../assets/origins/protectron.png');
++    case 'survivor':            return require('../assets/origins/survivor.png');
++    case 'securitron':          return require('../assets/origins/securitron.png');
++    case 'ghoul':               return require('../assets/origins/ghoul.png');
++    case 'assaultron':          return require('../assets/origins/assaultron.png');
++    case 'superMutant':         return require('../assets/origins/super_mutant.png');
++    case 'misterHandy':         return require('../assets/origins/mister_handy.png');
++    case 'brotherhoodOutcast':  return require('../assets/origins/brotherhood_outcast.png');
++    case 'shadow':              return require('../assets/origins/shadow.png');
++    case 'synth':               return require('../assets/origins/synth.png');
++    case 'robobrain':           return require('../assets/origins/robobrain.png');
++    case 'savage':              return require('../assets/origins/savage.png');
++    default:                    return null;
++  }
++};
++
++// ---------------------------------------------------------------------------
++// Pure archetype logic
++// ---------------------------------------------------------------------------
++
++/**
++ * Returns the character's archetype. Reads from `origin.characterType`.
++ * Falls back to HUMAN when origin/characterType is absent.
++ */
++export function getCharacterType(character) {
++  const type = character?.origin?.characterType;
++  return type ?? CHARACTER_TYPES.HUMAN;
++}
++
++export const isHumanCharacter  = (character) => getCharacterType(character) === CHARACTER_TYPES.HUMAN;
++export const isMutantCharacter = (character) => getCharacterType(character) === CHARACTER_TYPES.MUTANT;
++export const isRobotCharacter  = (character) => getCharacterType(character) === CHARACTER_TYPES.ROBOT;
++export const isCyborgCharacter = (character) => getCharacterType(character) === CHARACTER_TYPES.CYBORG;
++export const isGhoulCharacter  = (character) => getCharacterType(character) === CHARACTER_TYPES.GHOUL;
++
++/**
++ * Returns armor policy for a character.
++ * Priority: origin.armorPolicy (if present) → characterType default.
++ */
++export function getArmorPolicy(character) {
++  const override = character?.origin?.armorPolicy;
++  if (override) return override;
++  return DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE[getCharacterType(character)]
++    ?? ARMOR_POLICIES.STANDARD;
++}
++
++/**
++ * Returns the body plan.
++ * - For robot origins: origin.bodyPlan (mandatory in data).
++ * - Otherwise: 'humanoid'.
++ */
++export function getBodyPlan(character) {
++  if (isRobotCharacter(character)) {
++    return character?.origin?.bodyPlan ?? null;
++  }
++  return 'humanoid';
++}
++
++// ---------------------------------------------------------------------------
++// i18n
++// ---------------------------------------------------------------------------
++
++/**
++ * Returns the localized display name for an origin by its id.
++ */
++export function tOrigin(id) {
++  if (!id) return '';
++  const locale = getCurrentLocale();
++  const dict = ORIGIN_DICTIONARIES[locale] || ruOrigins;
++  return dict[id] || id;
++}
++
++// ---------------------------------------------------------------------------
++// Loaders (raw + enriched)
++// ---------------------------------------------------------------------------
++
++/**
++ * Returns the raw origins array from data/origins/origins.json.
++ * Synchronous; JSON is bundled at build time.
++ */
++export function loadOriginsData() {
++  return originsJson;
++}
++
++/**
++ * Enriched origins for UI: id + name + image + characterType + traitIds +
++ * equipmentKitIds + resolved equipmentKits (from equipmentCatalog).
++ */
++export function loadEnrichedOrigins() {
++  const { equipmentKits: kitGroups } = getEquipmentCatalog();
++  return originsJson.map((origin) => {
++    const kitIds = origin.equipmentKitIds || [];
++    const equipmentKits = kitIds
++      .map((kitId) => ({ id: kitId, ...(kitGroups[kitId] || {}) }))
++      .filter((kit) => Array.isArray(kit.items));
++    return {
++      id: origin.id,
++      characterType: origin.characterType,
++      name: tOrigin(origin.id),
++      image: getOriginImage(origin.id),
++      traitIds: origin.traitIds || [],
++      equipmentKitIds: origin.equipmentKitIds || [],
++      equipmentKits,
++      bodyPlan: origin.bodyPlan ?? null,
++      armorPolicy: origin.armorPolicy ?? null,
++    };
++  });
++}
++
++/**
++ * Returns the enriched origin object for a given id, or null if not found.
++ */
++export function findEnrichedOrigin(originId) {
++  if (!originId) return null;
++  return loadEnrichedOrigins().find((o) => o.id === originId) || null;
++}
+diff --git a/domain/origins.test.js b/domain/origins.test.js
+new file mode 100644
+index 0000000..4673571
+--- /dev/null
++++ b/domain/origins.test.js
+@@ -0,0 +1,234 @@
++import { describe, it, expect } from 'vitest';
++import {
++  CHARACTER_TYPES,
++  ARMOR_POLICIES,
++  getCharacterType,
++  isHumanCharacter,
++  isMutantCharacter,
++  isRobotCharacter,
++  isCyborgCharacter,
++  isGhoulCharacter,
++  getArmorPolicy,
++  getBodyPlan,
++  tOrigin,
++  loadOriginsData,
++  loadEnrichedOrigins,
++  findEnrichedOrigin,
++} from './origins.js';
++
++describe('CHARACTER_TYPES constants', () => {
++  it('exposes the five canonical types', () => {
++    expect(CHARACTER_TYPES).toEqual({
++      HUMAN: 'human',
++      MUTANT: 'mutant',
++      ROBOT: 'robot',
++      CYBORG: 'cyborg',
++      GHOUL: 'ghoul',
++    });
++  });
++
++  it('exposes the three armor policies in camelCase', () => {
++    expect(ARMOR_POLICIES).toEqual({
++      STANDARD: 'standard',
++      RAIDER_ONLY: 'raiderOnly',
++      ROBOT_ONLY: 'robotOnly',
++    });
++  });
++});
++
++describe('getCharacterType', () => {
++  it('returns origin.characterType when present', () => {
++    expect(getCharacterType({ origin: { characterType: 'robot' } })).toBe('robot');
++    expect(getCharacterType({ origin: { characterType: 'mutant' } })).toBe('mutant');
++  });
++
++  it('falls back to human when origin is absent', () => {
++    expect(getCharacterType({})).toBe('human');
++  });
++
++  it('falls back to human when characterType is absent', () => {
++    expect(getCharacterType({ origin: {} })).toBe('human');
++  });
++
++  it('returns human for null/undefined', () => {
++    expect(getCharacterType(null)).toBe('human');
++    expect(getCharacterType(undefined)).toBe('human');
++  });
++});
++
++describe('archetype predicates', () => {
++  it('isHumanCharacter / isMutantCharacter / isRobotCharacter / isCyborgCharacter / isGhoulCharacter', () => {
++    expect(isHumanCharacter({ origin: { characterType: 'human' } })).toBe(true);
++    expect(isMutantCharacter({ origin: { characterType: 'mutant' } })).toBe(true);
++    expect(isRobotCharacter({ origin: { characterType: 'robot' } })).toBe(true);
++    expect(isCyborgCharacter({ origin: { characterType: 'cyborg' } })).toBe(true);
++    expect(isGhoulCharacter({ origin: { characterType: 'ghoul' } })).toBe(true);
++  });
++
++  it('returns false for non-matching types', () => {
++    const human = { origin: { characterType: 'human' } };
++    expect(isRobotCharacter(human)).toBe(false);
++    expect(isMutantCharacter(human)).toBe(false);
++    expect(isCyborgCharacter(human)).toBe(false);
++    expect(isGhoulCharacter(human)).toBe(false);
++  });
++
++  it('handles null/undefined safely', () => {
++    expect(isRobotCharacter(null)).toBe(false);
++    expect(isRobotCharacter(undefined)).toBe(false);
++    expect(isRobotCharacter({})).toBe(false);
++  });
++});
++
++describe('getArmorPolicy', () => {
++  it('returns type default when origin.armorPolicy is absent', () => {
++    expect(getArmorPolicy({ origin: { characterType: 'human' } })).toBe('standard');
++    expect(getArmorPolicy({ origin: { characterType: 'mutant' } })).toBe('raiderOnly');
++    expect(getArmorPolicy({ origin: { characterType: 'robot' } })).toBe('robotOnly');
++    expect(getArmorPolicy({ origin: { characterType: 'ghoul' } })).toBe('standard');
++    expect(getArmorPolicy({ origin: { characterType: 'cyborg' } })).toBe('standard');
++  });
++
++  it('origin.armorPolicy overrides the type default', () => {
++    expect(getArmorPolicy({ origin: { characterType: 'mutant', armorPolicy: 'standard' } })).toBe('standard');
++  });
++
++  it('falls back to standard when characterType is missing', () => {
++    expect(getArmorPolicy({})).toBe('standard');
++  });
++});
++
++describe('getBodyPlan', () => {
++  it('returns origin.bodyPlan for robot origins', () => {
++    expect(getBodyPlan({ origin: { characterType: 'robot', bodyPlan: 'protectron' } })).toBe('protectron');
++    expect(getBodyPlan({ origin: { characterType: 'robot', bodyPlan: 'robobrain' } })).toBe('robobrain');
++    expect(getBodyPlan({ origin: { characterType: 'robot', bodyPlan: 'misterHandy' } })).toBe('misterHandy');
++    expect(getBodyPlan({ origin: { characterType: 'robot', bodyPlan: 'assaultron' } })).toBe('assaultron');
++  });
++
++  it('returns humanoid for non-robot origins', () => {
++    expect(getBodyPlan({ origin: { characterType: 'human' } })).toBe('humanoid');
++    expect(getBodyPlan({ origin: { characterType: 'mutant' } })).toBe('humanoid');
++    expect(getBodyPlan({ origin: { characterType: 'ghoul' } })).toBe('humanoid');
++    expect(getBodyPlan({ origin: { characterType: 'cyborg' } })).toBe('humanoid');
++  });
++
++  it('returns humanoid for missing origin', () => {
++    expect(getBodyPlan({})).toBe('humanoid');
++  });
++});
++
++describe('tOrigin', () => {
++  it('returns empty string for missing id', () => {
++    expect(tOrigin('')).toBe('');
++    expect(tOrigin(null)).toBe('');
++    expect(tOrigin(undefined)).toBe('');
++  });
++
++  it('falls back to id when translation is missing', () => {
++    expect(tOrigin('unknown_origin_id')).toBe('unknown_origin_id');
++  });
++});
++
++describe('loadOriginsData', () => {
++  it('returns the full raw origins array (17 entries)', () => {
++    const origins = loadOriginsData();
++    expect(Array.isArray(origins)).toBe(true);
++    expect(origins).toHaveLength(17);
++  });
++
++  it('every origin has the new shape (characterType, image, no legacy fields)', () => {
++    const origins = loadOriginsData();
++    for (const o of origins) {
++      expect(typeof o.id).toBe('string');
++      expect(typeof o.characterType).toBe('string');
++      expect(typeof o.image).toBe('string');
++      expect(Array.isArray(o.traitIds)).toBe(true);
++      expect(Array.isArray(o.equipmentKitIds)).toBe(true);
++      expect(o.isRobot).toBeUndefined();
++      expect(o.isMutant).toBeUndefined();
++      expect(o.canWearStandardArmor).toBeUndefined();
++      expect(o.canWearRobotArmor).toBeUndefined();
++      expect(o.canWearMutantArmor).toBeUndefined();
++      expect(o.armorPolicy).toBeUndefined();
++    }
++  });
++
++  it('every characterType is one of the five canonical values', () => {
++    const origins = loadOriginsData();
++    const allowed = new Set(Object.values(CHARACTER_TYPES));
++    for (const o of origins) {
++      expect(allowed.has(o.characterType)).toBe(true);
++    }
++  });
++
++  it('maps all 17 origin ids to the correct characterType per contract', () => {
++    const origins = loadOriginsData();
++    const byId = Object.fromEntries(origins.map((o) => [o.id, o.characterType]));
++    expect(byId.brotherhood).toBe('human');
++    expect(byId.ncr).toBe('human');
++    expect(byId.minuteman).toBe('human');
++    expect(byId.childOfAtom).toBe('human');
++    expect(byId.vaultDweller).toBe('human');
++    expect(byId.survivor).toBe('human');
++    expect(byId.brotherhoodOutcast).toBe('human');
++    expect(byId.savage).toBe('human');
++    expect(byId.superMutant).toBe('mutant');
++    expect(byId.shadow).toBe('mutant'); // shadow = mutant (per contract)
++    expect(byId.ghoul).toBe('ghoul');
++    expect(byId.synth).toBe('cyborg');
++    expect(byId.robobrain).toBe('robot');
++    expect(byId.securitron).toBe('robot');
++    expect(byId.assaultron).toBe('robot');
++    expect(byId.misterHandy).toBe('robot');
++    expect(byId.protectron).toBe('robot');
++  });
++
++  it('robot origins all have a specific bodyPlan', () => {
++    const origins = loadOriginsData().filter((o) => o.characterType === 'robot');
++    for (const o of origins) {
++      expect(['robobrain', 'protectron', 'assaultron', 'misterHandy']).toContain(o.bodyPlan);
++    }
++  });
++});
++
++describe('loadEnrichedOrigins', () => {
++  it('returns enriched origins with name, image, equipmentKits', () => {
++    const enriched = loadEnrichedOrigins();
++    expect(enriched).toHaveLength(17);
++    for (const o of enriched) {
++      expect(typeof o.id).toBe('string');
++      expect(typeof o.name).toBe('string');
++      expect(o.characterType).toBeTruthy();
++      expect(o.image).toBeTruthy();
++      expect(Array.isArray(o.traitIds)).toBe(true);
++      expect(Array.isArray(o.equipmentKitIds)).toBe(true);
++      expect(Array.isArray(o.equipmentKits)).toBe(true);
++    }
++  });
++
++  it('every origin has at least one equipment kit', () => {
++    const enriched = loadEnrichedOrigins();
++    for (const o of enriched) {
++      expect(o.equipmentKits.length).toBeGreaterThan(0);
++    }
++  });
++});
++
++describe('findEnrichedOrigin', () => {
++  it('returns enriched origin for known id', () => {
++    const brotherhood = findEnrichedOrigin('brotherhood');
++    expect(brotherhood?.id).toBe('brotherhood');
++    expect(brotherhood?.characterType).toBe('human');
++  });
++
++  it('returns null for unknown id', () => {
++    expect(findEnrichedOrigin('nonexistent')).toBeNull();
++  });
++
++  it('returns null for empty/null input', () => {
++    expect(findEnrichedOrigin('')).toBeNull();
++    expect(findEnrichedOrigin(null)).toBeNull();
++    expect(findEnrichedOrigin(undefined)).toBeNull();
++  });
++});
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 77b3d7f..8123f2a 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -3,6 +3,8 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodypla
+ // domain/robotEquip.js
+ // Pure functions for robot equipment logic.
+ // No React, no UI dependencies. All reason strings are i18n keys.
++//
++// NOTE: `isRobotCharacter` moved to domain/origins.js (reads origin.characterType).
+ 
+ // ---------------------------------------------------------------------------
+ // Slot schemas
+@@ -15,9 +17,7 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodypla
+ // Простые хелперы
+ // ---------------------------------------------------------------------------
+ 
+-export function isRobotCharacter(character) {
+-  return Boolean(character?.origin?.isRobot);
+-}
++// (isRobotCharacter is in domain/origins.js now.)
+ 
+ export function getRobotSlotKeys(bodyPlan) {
+   const plan = getBodyPlan(bodyPlan) || getBodyPlan('humanoid');
+@@ -458,7 +458,7 @@ export function canEquipRobotArmor(armorItem, slotKey, layer, slots) {
+  *
+  * @param {string} slotKey
+  * @param {object} newLimb - { compatibleBodyPlans?: string[], defaultForBodyPlan?: string }
+- * @param {object} character - { origin: { robotBodyPlan } }
++ * @param {object} character - { origin: { bodyPlan } }
+  * @returns {{ allowed: boolean, reason: string | null }}
+  */
+ export function canReplaceLimb(slotKey, newLimb, character) {
+@@ -466,7 +466,7 @@ export function canReplaceLimb(slotKey, newLimb, character) {
+     return { allowed: false, reason: 'equip.error.noLimb' };
+   }
+ 
+-  const bodyPlan = character?.origin?.robotBodyPlan;
++  const bodyPlan = character?.origin?.bodyPlan;
+ 
+   const compatiblePlans = newLimb.compatibleBodyPlans;
+   const defaultPlan = newLimb.defaultForBodyPlan;
+diff --git a/domain/robotEquip.test.js b/domain/robotEquip.test.js
+index 60b7448..6c2bc68 100644
+--- a/domain/robotEquip.test.js
++++ b/domain/robotEquip.test.js
+@@ -1,6 +1,5 @@
+ import { describe, it, expect } from 'vitest';
+ import {
+-  isRobotCharacter,
+   getRobotSlotKeys,
+   createEmptyRobotSlots,
+   initRobotSlots,
+@@ -144,32 +143,9 @@ const handyCatalog = {
+ };
+ 
+ // ---------------------------------------------------------------------------
+-// isRobotCharacter
++// isRobotCharacter — moved to domain/origins.js (tested in domain/origins.test.js)
+ // ---------------------------------------------------------------------------
+ 
+-describe('isRobotCharacter', () => {
+-  it('returns true when origin.isRobot is true', () => {
+-    expect(isRobotCharacter({ origin: { isRobot: true } })).toBe(true);
+-  });
+-
+-  it('returns false when origin.isRobot is false', () => {
+-    expect(isRobotCharacter({ origin: { isRobot: false } })).toBe(false);
+-  });
+-
+-  it('returns false when origin.isRobot is absent', () => {
+-    expect(isRobotCharacter({ origin: {} })).toBe(false);
+-  });
+-
+-  it('returns false when origin is absent', () => {
+-    expect(isRobotCharacter({})).toBe(false);
+-  });
+-
+-  it('returns false for null/undefined character', () => {
+-    expect(isRobotCharacter(null)).toBe(false);
+-    expect(isRobotCharacter(undefined)).toBe(false);
+-  });
+-});
+-
+ // ---------------------------------------------------------------------------
+ // getRobotSlotKeys
+ // ---------------------------------------------------------------------------
+@@ -554,7 +530,6 @@ describe('applyLimbReplacement', () => {
+     expect(updated.leftArm.heldWeapon).toBeNull();
+   });
+ 
+-
+   it('removes sibling slot limb when replacing dual-slot arm kits', () => {
+     const slots = createEmptyRobotSlots('protectron');
+     const dual = { id: 'robot_shocker_arms', canHoldWeapons: false };
+@@ -632,7 +607,6 @@ describe('getBuiltinWeaponsFromSlots', () => {
+     expect(ids).toContain('pistol');
+   });
+ 
+-
+   it('deduplicates identical builtin attacks from two manipulator arms', () => {
+     const slots = createEmptyRobotSlots('protectron');
+     const sharedAttacks = [
+@@ -701,7 +675,7 @@ describe('canEquipWeaponToSlot', () => {
+ // ---------------------------------------------------------------------------
+ 
+ describe('canReplaceLimb', () => {
+-  const character = { origin: { robotBodyPlan: 'protectron' } };
++  const character = { origin: { characterType: 'robot', bodyPlan: 'protectron' } };
+ 
+   it('allows a limb with matching compatibleBodyPlans', () => {
+     const limb = { id: 'arm', compatibleBodyPlans: ['protectron', 'assaultron'] };
+diff --git a/domain/traits.js b/domain/traits.js
+index a49fb1c..62f0ec1 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -1,13 +1,13 @@
+ // domain/traits.js
+ // Pure trait logic: loading data, reading modifiers, display helpers.
+ // No React, no UI dependencies. All identifiers and code in English.
++//
++// Origins-related helpers (loadOriginsData, tOrigin) have moved to
++// domain/origins.js — see that module.
+ 
+ import traitsJson from '../data/traits/traits.json';
+-import originsJson from '../data/origins/origins.json';
+ import ruTraits from '../i18n/ru-RU/data/system/traits.json';
+ import enTraits from '../i18n/en-EN/data/system/traits.json';
+-import ruOrigins from '../i18n/ru-RU/data/system/origins.json';
+-import enOrigins from '../i18n/en-EN/data/system/origins.json';
+ import { getCurrentLocale } from '../i18n/locale';
+ 
+ const TRAIT_DICTIONARIES = {
+@@ -15,11 +15,6 @@ const TRAIT_DICTIONARIES = {
+   'en-EN': enTraits,
+ };
+ 
+-const ORIGIN_DICTIONARIES = {
+-  'ru-RU': ruOrigins,
+-  'en-EN': enOrigins,
+-};
+-
+ /**
+  * Resolves a dot-separated i18n key like "traits.brotherhood.chainThatBinds.name"
+  * against the current locale's traits dictionary.
+@@ -37,16 +32,6 @@ export function tTrait(key) {
+   return typeof current === 'string' ? current : key;
+ }
+ 
+-/**
+- * Returns the localized display name for an origin by its id.
+- */
+-export function tOrigin(id) {
+-  if (!id) return '';
+-  const locale = getCurrentLocale();
+-  const dict = ORIGIN_DICTIONARIES[locale] || ruOrigins;
+-  return dict[id] || id;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Data loaders
+ // ---------------------------------------------------------------------------
+@@ -59,14 +44,6 @@ export function loadTraitsData() {
+   return traitsJson;
+ }
+ 
+-/**
+- * Returns the full origins array from data/origins/origins.json.
+- * Synchronous — JSON is bundled at build time.
+- */
+-export function loadOriginsData() {
+-  return originsJson;
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Trait lookup helpers
+ // ---------------------------------------------------------------------------
+-- 
+2.47.3
+

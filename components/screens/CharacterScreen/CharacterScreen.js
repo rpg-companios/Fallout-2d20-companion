@@ -20,7 +20,7 @@ import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import TraitSkillModal from "./modals/TraitSkillModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
-import { ORIGINS } from "./logic/originsData";
+import { loadEnrichedOrigins } from "../../../domain/origins";
 import { loadTraitsData } from "../../../domain/traits";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
@@ -1322,7 +1322,7 @@ export default function CharacterScreen() {
 
         <OriginModal
           isVisible={isOriginModalVisible}
-          origins={ORIGINS}
+          origins={loadEnrichedOrigins()}
           selectedOrigin={selectedOrigin}
           onSelectOrigin={setSelectedOrigin}
           onClose={() => {

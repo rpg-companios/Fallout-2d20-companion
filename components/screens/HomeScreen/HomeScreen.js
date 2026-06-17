@@ -15,7 +15,7 @@ import {
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCharacter } from '../../CharacterContext';
-import { ORIGINS } from '../CharacterScreen/logic/originsData';
+import { findEnrichedOrigin } from '../../../domain/origins';
 import { setCurrentLocale, useLocale } from '../../../i18n/locale';
 import { tHomeScreen } from './logic/homeScreenI18n';
 import * as db from '../../../db';
@@ -31,7 +31,7 @@ import styles from '../../../styles/HomeScreen.styles';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
-  const found = ORIGINS.find(o => o.id === originName);
+  const found = findEnrichedOrigin(originName);
   return found ? found.image : null;
 };
 

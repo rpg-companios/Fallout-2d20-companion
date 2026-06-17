@@ -11,12 +11,11 @@ import {
   calculateCarryWeight,
   getAttributeValue,
 } from '../domain/characterCreation';
-import { loadOriginsData } from '../domain/traits';
-import { ORIGINS as ENRICHED_ORIGINS } from './screens/CharacterScreen/logic/originsData';
+import { loadOriginsData, findEnrichedOrigin } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
-import { isRobotCharacter } from '../domain/robotEquip';
+import { isRobotCharacter } from '../domain/origins';
 import { resolveBodyPlan } from '../domain/bodyplan';
 
 // Zustand Store integration (Task 4.1)
@@ -29,17 +28,12 @@ const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: '
 const CharacterContext = createContext();
 const BARE_ORIGINS = loadOriginsData();
 
-// Используем ОБОГАЩЁННЫЙ список origins (с image и equipmentKits) из originsData,
-// чтобы при загрузке сохранёнки восстанавливались картинка и комплекты (#5: «нет картинки»).
-// Фоллбэк на bare loadOriginsData(), если обогащённого нет.
+// Resolve saved-character origin through the single source of truth:
+// domain/origins.findEnrichedOrigin(id) returns the origin enriched with image + equipmentKits.
 const resolveOrigin = (storedOrigin) => {
   if (!storedOrigin) return null;
   const id = typeof storedOrigin === 'string' ? storedOrigin : storedOrigin.id;
-  return (
-    ENRICHED_ORIGINS.find((origin) => origin.id === id) ||
-    BARE_ORIGINS.find((origin) => origin.id === id) ||
-    null
-  );
+  return findEnrichedOrigin(id) || BARE_ORIGINS.find((origin) => origin.id === id) || null;
 };
 
 const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

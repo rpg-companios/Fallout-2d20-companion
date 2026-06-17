@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
-import { isRobotCharacter, initRobotSlots } from '../../../../domain/robotEquip';
-import { resolveBodyPlan } from '../../../../domain/bodyplan';
+import { initRobotSlots } from '../../../../domain/robotEquip';
+import { isRobotCharacter, getBodyPlan } from '../../../../domain/origins';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import styles from '../../../../styles/EquipmentKitModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
@@ -168,20 +168,8 @@ const formatAmmoSuffix = (ammo) => {
 // For robotArm entries with a builtinWeaponId, returns " + <weapon name>" so the
 // modal makes it visible that the arm carries a built-in weapon (e.g. manipulator).
 
-const ORIGIN_TO_ROBOT_BODY_PLAN = {
-  robobrain: 'robobrain',
-  protectron: 'protectron',
-  assaultron: 'assaultron',
-  misterHandy: 'misterHandy',
-  securitron: 'protectron',
-  sentryBot: 'sentryBot',
-};
-
 const resolveRobotBodyPlan = (character) => (
-  character?.trait?.modifiers?.robotBodyPlan
-  || character?.origin?.robotBodyPlan
-  || ORIGIN_TO_ROBOT_BODY_PLAN[character?.origin?.id]
-  || 'protectron'
+  getBodyPlan(character) || 'protectron'
 );
 
 const formatBuiltinWeaponSuffix = (entry) => {

@@ -6,7 +6,11 @@
     "descriptionKey": "traits.brotherhood.chainThatBinds.description",
     "modifiers": {
       "extraSkills": 1,
-      "forcedSkills": ["energy_weapons", "science", "repair"]
+      "forcedSkills": [
+        "energy_weapons",
+        "science",
+        "repair"
+      ]
     }
   },
   {
@@ -16,7 +20,11 @@
     "descriptionKey": "traits.brotherhoodOutcast.chainThatBreaks.description",
     "modifiers": {
       "extraSkills": 1,
-      "forcedSkills": ["energy_weapons", "science", "repair"]
+      "forcedSkills": [
+        "energy_weapons",
+        "science",
+        "repair"
+      ]
     }
   },
   {
@@ -26,13 +34,28 @@
     "descriptionKey": "traits.superMutant.forcedEvolution.description",
     "modifiers": {
       "attributes": {
-        "STR": { "baseBonus": 2, "min": 6, "max": 12 },
-        "END": { "baseBonus": 2, "min": 6, "max": 12 },
-        "CHA": { "max": 6 },
-        "INT": { "max": 6 }
+        "STR": {
+          "baseBonus": 2,
+          "min": 6,
+          "max": 12
+        },
+        "END": {
+          "baseBonus": 2,
+          "min": 6,
+          "max": 12
+        },
+        "CHA": {
+          "max": 6
+        },
+        "INT": {
+          "max": 6
+        }
       },
       "skillMaxValue": 4,
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "armorConstraint": "mutantOnly"
     }
   },
@@ -45,8 +68,15 @@
       "skillModifiers": {
         "survival": 2
       },
-      "immunities": ["radiation"],
-      "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"]
+      "immunities": [
+        "radiation"
+      ],
+      "effects": [
+        "radiation_healing",
+        "slow_aging",
+        "infertility",
+        "discrimination"
+      ]
     }
   },
   {
@@ -56,8 +86,16 @@
     "descriptionKey": "traits.minuteman.peoplesMilitia.description",
     "modifiers": {
       "extraSkills": 1,
-      "forcedSkills": ["energy_weapons", "small_guns"],
-      "effects": ["improved_caravans", "base_defense_4", "cover_dr_bonus", "outnumbered_damage_bonus"]
+      "forcedSkills": [
+        "energy_weapons",
+        "small_guns"
+      ],
+      "effects": [
+        "improved_caravans",
+        "base_defense_4",
+        "cover_dr_bonus",
+        "outnumbered_damage_bonus"
+      ]
     }
   },
   {
@@ -68,7 +106,11 @@
     "modifiers": {
       "extraPerks": 1,
       "radiationResistance": 1,
-      "effects": ["extra_perk_level_1", "radiation_absorption", "radiation_melee_charge"]
+      "effects": [
+        "extra_perk_level_1",
+        "radiation_absorption",
+        "radiation_melee_charge"
+      ]
     }
   },
   {
@@ -78,7 +120,11 @@
     "descriptionKey": "traits.vaultDweller.vaultKid.description",
     "modifiers": {
       "extraSkills": 1,
-      "effects": ["reduced_end_check_difficulty", "disease_resistance", "luck_restore_on_complication"]
+      "effects": [
+        "reduced_end_check_difficulty",
+        "disease_resistance",
+        "luck_restore_on_complication"
+      ]
     }
   },
   {
@@ -87,10 +133,13 @@
     "displayNameKey": "traits.protectron.protectOrDestroy.name",
     "descriptionKey": "traits.protectron.protectOrDestroy.description",
     "modifiers": {
-      "immunities": ["disease", "radiation", "poison"],
+      "immunities": [
+        "disease",
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 225,
       "carryWeightStrengthMultiplier": 0,
-      "isRobot": true,
       "robotRules": {
         "canSelfUseConsumables": false,
         "canUseConsumablesOnOthers": false,
@@ -98,7 +147,12 @@
         "canEquipPowerArmor": false,
         "maxRobotMods": 2
       },
-      "effects": ["hazard_reroll", "no_consumables_food_rest", "repair_to_heal", "model_check_discount"]
+      "effects": [
+        "hazard_reroll",
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "model_check_discount"
+      ]
     }
   },
   {
@@ -107,17 +161,25 @@
     "displayNameKey": "traits.assaultron.designedForFrontline.name",
     "descriptionKey": "traits.assaultron.designedForFrontline.description",
     "modifiers": {
-      "immunities": ["disease", "radiation", "poison"],
+      "immunities": [
+        "disease",
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
-      "isRobot": true,
       "meleeBonusDelta": 1,
       "robotRules": {
         "canSelfUseConsumables": false,
         "canEquipStandardArmor": false,
         "canEquipPowerArmor": false
       },
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "built_in_laser",
+        "self_destruct"
+      ]
     }
   },
   {
@@ -149,7 +211,13 @@
     "displayNameKey": "traits.ncr.infantryman.name",
     "descriptionKey": "traits.ncr.infantryman.description",
     "modifiers": {
-      "ncrInfantryWeaponIds": ["weapon_submachine_gun", "weapon_black_powder_rifle", "weapon_assault_rifle", "weapon_frag_grenade", "weapon_combat_knife"]
+      "ncrInfantryWeaponIds": [
+        "weapon_submachine_gun",
+        "weapon_black_powder_rifle",
+        "weapon_assault_rifle",
+        "weapon_frag_grenade",
+        "weapon_combat_knife"
+      ]
     }
   },
   {
@@ -239,10 +307,12 @@
     "displayNameKey": "traits.misterHandy.robotMrHandy.name",
     "descriptionKey": "traits.misterHandy.robotMrHandy.description",
     "modifiers": {
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
-      "isRobot": true,
       "robotType": "misterHandy",
       "robotBodyPlan": "misterHandy",
       "robotRules": {
@@ -253,7 +323,12 @@
         "carryWeightLimit": 150,
         "armorConstraints": []
       },
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "hover_movement", "360_vision"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "hover_movement",
+        "360_vision"
+      ]
     }
   },
   {
@@ -263,7 +338,11 @@
     "descriptionKey": "traits.synth.moreThanHuman.description",
     "modifiers": {
       "extraSkills": 1,
-      "immunities": ["radiation", "poison", "disease"],
+      "immunities": [
+        "radiation",
+        "poison",
+        "disease"
+      ],
       "effects": [
         "no_sleep_needed",
         "no_eat_drink_needed",
@@ -279,10 +358,17 @@
     "displayNameKey": "traits.robobrain.robotWithBrains.name",
     "descriptionKey": "traits.robobrain.robotWithBrains.description",
     "modifiers": {
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
-      "isRobot": true,
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "ir_vision", "ignore_darkness_penalty"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "ir_vision",
+        "ignore_darkness_penalty"
+      ]
     }
   }
 ]

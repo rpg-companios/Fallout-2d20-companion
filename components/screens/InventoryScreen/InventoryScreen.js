@@ -13,7 +13,8 @@ import { getInstantHealAmount } from '../../../domain/effects';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { isRobotCharacter as checkIsRobotCharacter, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+import { isRobotCharacter } from '../../../domain/origins';
+import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
 import styles from '../../../styles/InventoryScreen.styles';
 
 const PARAM_FIELDS = [
@@ -190,7 +191,11 @@ const InventoryScreen = () => {
     || equippedRobotBodyPart?.robotBodyPlan
     || null;
 
-  const isRobotCharacter = checkIsRobotCharacter({ origin }) || Boolean(trait?.modifiers?.isRobot || robotBodyPlan);
+  // isRobot now reads origin.characterType directly via domain/origins.js.
+  // The previous local override (trait.modifiers.isRobot || robotBodyPlan) is gone:
+  //   - trait.modifiers.isRobot was removed from all 4 robot traits in this refactor
+  //   - robotBodyPlan alone doesn't imply robot (it's a body shape, not the archetype)
+  const isRobot = isRobotCharacter({ origin, trait });
   const robotBodyUpgrade = useMemo(() => {
     if (!robotBodyPlan) return null;
     const parts = Array.isArray(equipmentCatalog?.robotPartsUpgrade) ? equipmentCatalog.robotPartsUpgrade : [];
@@ -218,10 +223,10 @@ const InventoryScreen = () => {
 
   // Проверяем наличие руки с canHoldWeapons в слотах робота (Requirement 7.2)
   const robotHasHoldingArm = useMemo(() => {
-    if (!isRobotCharacter) return true;
+    if (!isRobot) return true;
     const slots = equippedRobotSlots || {};
     return Object.values(slots).some((slotData) => slotData?.limb?.canHoldWeapons === true);
-  }, [isRobotCharacter, equippedRobotSlots]);
+  }, [isRobot, equippedRobotSlots]);
   const isPowerArmorItem = (item) => {
     const category = String(item?.category || item?.armorCategoryKey || '').toLowerCase();
     const name = String(getItemName(item) || '').toLowerCase();
@@ -356,7 +361,7 @@ const InventoryScreen = () => {
     });
 
     const applyToSelf = () => {
-      if (isRobotCharacter) {
+      if (isRobot) {
         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle', 'Ограничение робота'), tInventory('screen.alerts.robotCannotSelfUseMessage', 'Роботы не могут применять еду, напитки и препараты на себя.'));
         return;
       }
@@ -565,7 +570,7 @@ const InventoryScreen = () => {
     const weaponQualities = String(displayWeapon?.qualities || '').toLowerCase();
     const isTwoHandedWeapon = ['двуруч', 'two-handed', 'two handed'].some((token) => weaponQualities.includes(token));
     
-    if (isRobotCharacter && isRobotOnlyItem(displayWeapon) && Array.isArray(robotBodyUpgrade?.allowedRobotWeaponIds)) {
+    if (isRobot && isRobotOnlyItem(displayWeapon) && Array.isArray(robotBodyUpgrade?.allowedRobotWeaponIds)) {
       const allowedWeaponIds = robotBodyUpgrade.allowedRobotWeaponIds;
       if (displayWeapon?.id && !allowedWeaponIds.includes(displayWeapon.id)) {
         showAlert(
@@ -576,11 +581,11 @@ const InventoryScreen = () => {
       }
     }
 
-    if (isRobotOnlyItem(displayWeapon) && !isRobotCharacter) {
+    if (isRobotOnlyItem(displayWeapon) && !isRobot) {
       showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotOnlyWeaponMessage', 'Это оружие могут использовать только роботы.'));
       return;
     }
-    if (isRobotCharacter && isRobotLimbWeapon(displayWeapon)) {
+    if (isRobot && isRobotLimbWeapon(displayWeapon)) {
       const armDef = resolveRobotArmFromWeapon(displayWeapon);
       if (!armDef) return;
       const slots = equippedRobotSlots || {};
@@ -617,7 +622,7 @@ const InventoryScreen = () => {
       if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
       return;
     }
-    if (!isRobotOnlyItem(displayWeapon) && isRobotCharacter) {
+    if (!isRobotOnlyItem(displayWeapon) && isRobot) {
       // Robot equip flow: check for arm slot with canHoldWeapons (Requirement 7.2, 7.6)
       const slots = equippedRobotSlots || {};
       const armWithHoldCapability = Object.entries(slots).find(([_key, slotData]) => {
@@ -749,14 +754,14 @@ const InventoryScreen = () => {
 
   const handleEquipArmor = (itemToEquip) => {
     const currentEquipped = equippedArmor;
-    if (isRobotCharacter && !isRobotOnlyItem(itemToEquip)) {
+    if (isRobot && !isRobotOnlyItem(itemToEquip)) {
       const isAllowedClothing = itemToEquip.itemType === 'clothing' && itemToEquip.canRobotWear === true;
       if (!isAllowedClothing) {
         showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
         return;
       }
     }
-    if (isRobotCharacter && isPowerArmorItem(itemToEquip)) {
+    if (isRobot && isPowerArmorItem(itemToEquip)) {
       showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
       return;
     }
@@ -973,7 +978,7 @@ const InventoryScreen = () => {
             const itemName = getItemName(flatItem);
             
             // Скрываем предметы-конечности из инвентаря для роботов (Requirement 7.1)
-            if (isRobotCharacter && isRobotLimbItem(flatItem)) {
+            if (isRobot && isRobotLimbItem(flatItem)) {
               return null;
             }
 
@@ -1009,7 +1014,7 @@ const InventoryScreen = () => {
         .filter(Boolean);
 
     return [...equippedItemsList, ...inventoryItemsList];
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobotCharacter]);
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot]);
 
   const renderTableHeader = () => {
     return (
@@ -1040,7 +1045,7 @@ const InventoryScreen = () => {
     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
     const isBuiltinOrManipulator = Boolean(item?.isBuiltin || item?.isManipulator);
     // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
-    const hideEquipButton = isRobotCharacter
+    const hideEquipButton = isRobot
       && item.itemType === 'weapon'
       && !item.isEquipped
       && !robotHasHoldingArm
@@ -1090,7 +1095,7 @@ const InventoryScreen = () => {
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
           )}
 
-          {isConsumable && !item.isEquipped && !isRobotCharacter && (
+          {isConsumable && !item.isEquipped && !isRobot && (
               <TouchableOpacity 
                   style={[styles.actionButton, styles.applyButton]} 
                   onPress={() => handleApplyConsumable(localizedDisplayItem)}>

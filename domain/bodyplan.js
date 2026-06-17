@@ -22,7 +22,9 @@ export function resolveBodyPlan(character) {
   const traitPlan = character?.trait?.modifiers?.robotBodyPlan;
   if (traitPlan && bodyPlansRegistry[traitPlan]) return traitPlan;
 
-  const originPlan = character?.origin?.robotBodyPlan;
+  // After the characterType refactor: origin stores its bodyPlan directly
+  // in `origin.bodyPlan` (was `origin.robotBodyPlan` in older data).
+  const originPlan = character?.origin?.bodyPlan;
   if (originPlan && bodyPlansRegistry[originPlan]) return originPlan;
 
   const originId = character?.origin?.id;

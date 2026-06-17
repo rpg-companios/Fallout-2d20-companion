@@ -1,14 +1,12 @@
 // domain/equipEquip.js
 // Pure functions for equip eligibility checks.
 // No React, no UI dependencies. All reason strings are i18n keys.
+//
+// Armor policy and character archetype now live in domain/origins.js
+// (characterType drives the default policy; origin.armorPolicy overrides).
 
 import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
-
-const ARMOR_POLICY = {
-  HUMANOID_FULL: 'humanoid_full',
-  SUPERMUTANT_RAIDER_ONLY: 'supermutant_raider_only',
-  ROBOT_ONLY: 'robot_only',
-};
+import { ARMOR_POLICIES, getArmorPolicy, isRobotCharacter } from './origins';
 
 /** True if the armor item is robot-specific. */
 const isRobotArmor = (armorItem) =>
@@ -39,31 +37,27 @@ const isRobotDecorativeHat = (clothingItem) => {
     || id === 'headwear_bos_scribe_hat';
 };
 
-function getArmorPolicy(character) {
-  return character?.origin?.armorPolicy || ARMOR_POLICY.HUMANOID_FULL;
-}
-
 /**
  * Check whether a character can equip a given armor item.
  *
  * Policies:
- *  - robot_only                -> only robot armor
- *  - supermutant_raider_only   -> only mutant-tagged armor
- *  - humanoid_full             -> standard + power armor, but no robot/mutant armor
+ *  - robotOnly             -> only robot armor
+ *  - raiderOnly            -> only mutant-tagged armor
+ *  - standard              -> standard + power armor, but no robot/mutant armor
  */
 export function canEquipArmor(armorItem, character) {
   const policy = getArmorPolicy(character);
   const robotArmor = isRobotArmor(armorItem);
   const mutantArmor = isMutantArmor(armorItem);
 
-  if (policy === ARMOR_POLICY.ROBOT_ONLY) {
+  if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
     if (!robotArmor) {
       return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
     }
     return { allowed: true, reason: null };
   }
 
-  if (policy === ARMOR_POLICY.SUPERMUTANT_RAIDER_ONLY) {
+  if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
     if (!mutantArmor) {
       return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
     }
@@ -90,14 +84,14 @@ export function canEquipArmor(armorItem, character) {
  */
 export function canEquipWeapon(weaponItem, character) {
   const policy = getArmorPolicy(character);
-  const isRobotCharacter = policy === ARMOR_POLICY.ROBOT_ONLY;
+  const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
   const isRobotWeapon = isRobotOnlyWeapon(weaponItem);
 
-  if (isRobotWeapon && !isRobotCharacter) {
+  if (isRobotWeapon && !isRobotChar) {
     return { allowed: false, reason: 'equip.error.robotOnlyWeapon' };
   }
 
-  if (!isRobotWeapon && isRobotCharacter) {
+  if (!isRobotWeapon && isRobotChar) {
     return { allowed: false, reason: 'equip.error.robotCannotUseStandardWeapon' };
   }
 
@@ -106,7 +100,7 @@ export function canEquipWeapon(weaponItem, character) {
 
 export function canEquipClothing(clothingItem, character) {
   const policy = getArmorPolicy(character);
-  const isRobotChar = policy === ARMOR_POLICY.ROBOT_ONLY;
+  const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
 
   if (isRobotChar) {
     if (!isRobotDecorativeHat(clothingItem)) {
@@ -124,9 +118,9 @@ export function filterAvailableArmor(allArmor, character) {
 }
 
 export function getCarryWeightLimit(character) {
-  const { origin, trait, attributes } = character || {};
+  const { trait, attributes } = character || {};
 
-  if (origin?.isRobot || trait?.modifiers?.isRobot) {
+  if (isRobotCharacter(character)) {
     return (trait?.modifiers?.carryWeightFixed ?? 150) + getEquipmentCarryWeightModifier(character);
   }
 

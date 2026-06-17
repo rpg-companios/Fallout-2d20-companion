@@ -3,6 +3,8 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodypla
 // domain/robotEquip.js
 // Pure functions for robot equipment logic.
 // No React, no UI dependencies. All reason strings are i18n keys.
+//
+// NOTE: `isRobotCharacter` moved to domain/origins.js (reads origin.characterType).
 
 // ---------------------------------------------------------------------------
 // Slot schemas
@@ -15,9 +17,7 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodypla
 // Простые хелперы
 // ---------------------------------------------------------------------------
 
-export function isRobotCharacter(character) {
-  return Boolean(character?.origin?.isRobot);
-}
+// (isRobotCharacter is in domain/origins.js now.)
 
 export function getRobotSlotKeys(bodyPlan) {
   const plan = getBodyPlan(bodyPlan) || getBodyPlan('humanoid');
@@ -458,7 +458,7 @@ export function canEquipRobotArmor(armorItem, slotKey, layer, slots) {
  *
  * @param {string} slotKey
  * @param {object} newLimb - { compatibleBodyPlans?: string[], defaultForBodyPlan?: string }
- * @param {object} character - { origin: { robotBodyPlan } }
+ * @param {object} character - { origin: { bodyPlan } }
  * @returns {{ allowed: boolean, reason: string | null }}
  */
 export function canReplaceLimb(slotKey, newLimb, character) {
@@ -466,7 +466,7 @@ export function canReplaceLimb(slotKey, newLimb, character) {
     return { allowed: false, reason: 'equip.error.noLimb' };
   }
 
-  const bodyPlan = character?.origin?.robotBodyPlan;
+  const bodyPlan = character?.origin?.bodyPlan;
 
   const compatiblePlans = newLimb.compatibleBodyPlans;
   const defaultPlan = newLimb.defaultForBodyPlan;

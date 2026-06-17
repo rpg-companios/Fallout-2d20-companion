@@ -12,7 +12,7 @@ import {
 } from '../../../src/store/selectors';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
 import { TRAITS } from '../CharacterScreen/logic/traitsData';
-import { isRobotCharacter } from '../../../domain/robotEquip';
+import { isRobotCharacter } from '../../../domain/origins';
 import { resolveBodyPlan } from '../../../domain/bodyplan';
 import styles from '../../../styles/CharacterScreen.styles';
 import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
@@ -521,7 +521,7 @@ const WeaponsAndArmorScreen = () => {
 
   const renderArmorPart = (slotKey) => {
     // Проверяем является ли персонаж роботом
-    const isRobot = trait?.modifiers?.isRobot || false;
+    const isRobot = isRobotCharacter({ origin, trait });
     const isMisterHandyRobot = bodyPlan === 'misterHandy';
     
     // Если робот и есть equippedRobotSlots, отображаем RobotSlot

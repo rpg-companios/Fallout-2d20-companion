@@ -2,27 +2,23 @@
   {
     "id": "brotherhood",
     "displayNameKey": "origins.brotherhood.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "brotherhood_of_steel",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "brotherhood-chain-that-binds"
     ],
     "equipmentKitIds": [
       "brotherhood_initiate",
       "brotherhood_scribe"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "ncr",
     "displayNameKey": "origins.ncr.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "ncr_citizen",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "ncr-resident"
     ],
@@ -30,68 +26,56 @@
       "ncr_infantry",
       "ncr_caravaneer",
       "ncr_marksman"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "minuteman",
     "displayNameKey": "origins.minuteman.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "minuteman",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "minuteman-peoples-militia"
     ],
     "equipmentKitIds": [
       "minuteman_shooter",
       "minuteman_skirmisher"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "childOfAtom",
     "displayNameKey": "origins.childOfAtom.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "child_of_atom",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "childofatom-radioactive-sponge"
     ],
     "equipmentKitIds": [
       "atom_missionary",
       "atom_zealot"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "vaultDweller",
     "displayNameKey": "origins.vaultDweller.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "vault_dweller",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "vaultdweller-vault-kid"
     ],
     "equipmentKitIds": [
       "vault_security",
       "vault_resident"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "ghoul",
     "displayNameKey": "origins.ghoul.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "ghoul",
+    "image": "ghoul",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "ghoul-necrotic-posthuman"
     ],
@@ -101,17 +85,14 @@
       "wastelander_wanderer",
       "wastelander_raider",
       "wastelander_trader"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "survivor",
     "displayNameKey": "origins.survivor.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "survivor",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "survivor-survivor"
     ],
@@ -121,52 +102,42 @@
       "wastelander_wanderer",
       "wastelander_raider",
       "wastelander_trader"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "superMutant",
     "displayNameKey": "origins.superMutant.name",
-    "isRobot": false,
-    "isMutant": true,
-    "canWearStandardArmor": false,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": true,
+    "characterType": "mutant",
+    "image": "super_mutant",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "supermutant-forced-evolution"
     ],
     "equipmentKitIds": [
       "supermutant_bruiser",
       "supermutant_skirmisher"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "supermutant_raider_only"
+    ]
   },
   {
     "id": "brotherhoodOutcast",
     "displayNameKey": "origins.brotherhoodOutcast.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "brotherhood_outcast",
+    "bodyPlan": "humanoid",
     "traitIds": [
       "brotherhoodoutcast-chain-that-breaks"
     ],
     "equipmentKitIds": [
       "outcast_former_knight",
       "outcast_former_scribe"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "robobrain",
     "displayNameKey": "origins.robobrain.name",
-    "isRobot": true,
-    "canWearStandardArmor": false,
-    "canWearRobotArmor": true,
-    "canWearMutantArmor": false,
+    "characterType": "robot",
+    "image": "robobrain",
+    "bodyPlan": "robobrain",
     "traitIds": [
       "robobrain-robot-with-brains"
     ],
@@ -174,47 +145,38 @@
       "robobrain_servomechanizmy",
       "robobrain_us_army",
       "robobrain_nonordinary"
-    ],
-    "bodyPlan": "robobrain",
-    "armorPolicy": "robot_only"
+    ]
   },
   {
     "id": "securitron",
     "displayNameKey": "origins.securitron.name",
-    "isRobot": true,
-    "canWearStandardArmor": false,
-    "canWearRobotArmor": true,
-    "canWearMutantArmor": false,
+    "characterType": "robot",
+    "image": "securitron",
+    "bodyPlan": "protectron",
     "traitIds": [],
     "equipmentKitIds": [
       "default_caps_only"
-    ],
-    "bodyPlan": "protectron",
-    "armorPolicy": "robot_only"
+    ]
   },
   {
     "id": "assaultron",
     "displayNameKey": "origins.assaultron.name",
-    "isRobot": true,
-    "canWearStandardArmor": false,
-    "canWearRobotArmor": true,
-    "canWearMutantArmor": false,
+    "characterType": "robot",
+    "image": "assaultron",
+    "bodyPlan": "assaultron",
     "traitIds": [
       "assaultron-designed-for-frontline"
     ],
     "equipmentKitIds": [
       "default_caps_only"
-    ],
-    "bodyPlan": "assaultron",
-    "armorPolicy": "robot_only"
+    ]
   },
   {
     "id": "misterHandy",
     "displayNameKey": "origins.misterHandy.name",
-    "isRobot": true,
-    "canWearStandardArmor": false,
-    "canWearRobotArmor": true,
-    "canWearMutantArmor": false,
+    "characterType": "robot",
+    "image": "mister_handy",
+    "bodyPlan": "misterHandy",
     "traitIds": [
       "misterhandy-robot-mr-handy"
     ],
@@ -224,17 +186,14 @@
       "mister_handy_nanny",
       "mister_handy_medic",
       "mister_handy_farmer"
-    ],
-    "bodyPlan": "misterHandy",
-    "armorPolicy": "robot_only"
+    ]
   },
   {
     "id": "protectron",
     "displayNameKey": "origins.protectron.name",
-    "isRobot": true,
-    "canWearStandardArmor": false,
-    "canWearRobotArmor": true,
-    "canWearMutantArmor": false,
+    "characterType": "robot",
+    "image": "protectron",
+    "bodyPlan": "protectron",
     "traitIds": [
       "protectron-protect-or-destroy"
     ],
@@ -245,50 +204,41 @@
       "protectron_nukatron",
       "protectron_worker",
       "protectron_model_x"
-    ],
-    "bodyPlan": "protectron",
-    "armorPolicy": "robot_only"
+    ]
   },
   {
     "id": "shadow",
     "displayNameKey": "origins.shadow.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "mutant",
+    "image": "shadow",
+    "bodyPlan": "humanoid",
     "traitIds": [],
     "equipmentKitIds": [
       "default_caps_only"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "synth",
     "displayNameKey": "origins.synth.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
-    "traitIds": ["synth-more-than-human"],
+    "characterType": "cyborg",
+    "image": "synth",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "synth-more-than-human"
+    ],
     "equipmentKitIds": [
       "default_caps_only"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   },
   {
     "id": "savage",
     "displayNameKey": "origins.savage.name",
-    "isRobot": false,
-    "canWearStandardArmor": true,
-    "canWearRobotArmor": false,
-    "canWearMutantArmor": false,
+    "characterType": "human",
+    "image": "savage",
+    "bodyPlan": "humanoid",
     "traitIds": [],
     "equipmentKitIds": [
       "default_caps_only"
-    ],
-    "bodyPlan": "humanoid",
-    "armorPolicy": "humanoid_full"
+    ]
   }
 ]

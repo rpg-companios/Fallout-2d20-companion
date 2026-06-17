@@ -45,14 +45,24 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
   "id": "superMutant",                 // ✅ стабильный id
   "displayNameKey": "origins.superMutant.name", // ✅ i18n
   "characterType": "mutant",           // 🆕 тип → набор правил
-  "image": "super_mutant.png",         // 🔁 перенести в JSON (сейчас в originsData.js) ❓
+  "image": "super_mutant",             // 🆕 basename PNG-ассета (без расширения)
   "traitIds": [...],                   // ✅
   "equipmentKitIds": [...],            // ✅
   "bodyPlan": "humanoid",              // ✅ (для роботов = протектрон/штурмотрон/...)
-  // правила брони — см. ниже, возможно выводятся из characterType
-  "armorPolicy": "...",                // ✅ пока оставить, потом, возможно, из типа
+  // опциональные поля (только когда отличается от дефолта):
+  "armorPolicy": "raiderOnly",         // 🔁 override дефолта типа; пишем ТОЛЬКО если отличается
+  "immunities": ["radiation"],         // 🆕 явный список (если есть — объединяется с trait.immunities)
+  // опционально для будущей итерации (03-attributes-skills.md):
+  // "attributeBonus":   { "AGI": 1 },
+  // "attributeLimits":  { "AGI": { "min": 6, "max": 12 } }
 }
 ```
+
+> **Реализация v1** (коммиты после `f5a9eef`):
+> - `image` перенесён из `components/screens/CharacterScreen/logic/originsData.js` в JSON
+> - `armorPolicy` у всех 17 ориджинов совпадает с дефолтом типа → поле в JSON опущено
+> - `origin.immunities` поле определено в схеме, но ни один origin пока не объявляет явно
+>   (все иммунитеты приходят из `trait.immunities`)
 
 ## Правила ПО ТИПУ персонажа (то, что ты описал)
 
@@ -84,14 +94,18 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
 ```
 ❓ РЕШЕНИЕ-8: подтвердить гибрид (дефолт из типа + поле-исключение).
 
-## Иммунитеты по типу (из T-1)
-`characterType` задаёт БАЗОВЫЕ иммунитеты автоматически (origin может добавить свои):
-- robot → disease, radiation, poison
-- mutant → radiation, poison
-- ghoul → radiation (+ радиация ЛЕЧИТ, см. derived/effects)
-- human, cyborg → нет базовых (cyborg — плюшки позже)
-Это убирает нужду в `trait.isRobot` (был только ради робо-иммунитетов) и ручных списках.
-Поле `origin.immunities: [...]` — опциональное дополнение к базовым по типу.
+## Иммунитеты
+
+> **Deviation в реализации v1** (по решению владельца): type-derived базы **НЕ используются**.
+> Иммунитеты — явные списки: `origin.immunities` (если есть) объединяются с `trait.immunities`.
+
+Иммунитеты приходят из явных списков:
+- `origin.immunities: [...]` (опциональное поле, если origin его объявляет)
+- `trait.immunities: [...]` (уже работает для большинства трейтов)
+
+Броня/химия как источник иммунитетов — отдельная задача (вне v1).
+
+Это упрощение убирает нужду в `trait.isRobot` (флаг удалён из всех 4 робо-трейтов в реализации v1).
 
 ## Где это читается в коде (для будущей миграции)
 - `domain/bodyplan.js` — resolveBodyPlan (origin.robotBodyPlan / origin.bodyPlan / id-map)

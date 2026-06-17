@@ -1,23 +1,18 @@
 // domain/traits.js
 // Pure trait logic: loading data, reading modifiers, display helpers.
 // No React, no UI dependencies. All identifiers and code in English.
+//
+// Origins-related helpers (loadOriginsData, tOrigin) have moved to
+// domain/origins.js — see that module.
 
 import traitsJson from '../data/traits/traits.json';
-import originsJson from '../data/origins/origins.json';
 import ruTraits from '../i18n/ru-RU/data/system/traits.json';
 import enTraits from '../i18n/en-EN/data/system/traits.json';
-import ruOrigins from '../i18n/ru-RU/data/system/origins.json';
-import enOrigins from '../i18n/en-EN/data/system/origins.json';
 import { getCurrentLocale } from '../i18n/locale';
 
 const TRAIT_DICTIONARIES = {
   'ru-RU': ruTraits,
   'en-EN': enTraits,
-};
-
-const ORIGIN_DICTIONARIES = {
-  'ru-RU': ruOrigins,
-  'en-EN': enOrigins,
 };
 
 /**
@@ -37,16 +32,6 @@ export function tTrait(key) {
   return typeof current === 'string' ? current : key;
 }
 
-/**
- * Returns the localized display name for an origin by its id.
- */
-export function tOrigin(id) {
-  if (!id) return '';
-  const locale = getCurrentLocale();
-  const dict = ORIGIN_DICTIONARIES[locale] || ruOrigins;
-  return dict[id] || id;
-}
-
 // ---------------------------------------------------------------------------
 // Data loaders
 // ---------------------------------------------------------------------------
@@ -57,14 +42,6 @@ export function tOrigin(id) {
  */
 export function loadTraitsData() {
   return traitsJson;
-}
-
-/**
- * Returns the full origins array from data/origins/origins.json.
- * Synchronous — JSON is bundled at build time.
- */
-export function loadOriginsData() {
-  return originsJson;
 }
 
 // ---------------------------------------------------------------------------
