@@ -46,11 +46,14 @@ function* walkSkillRefs(node, path = '$') {
     if (SKILL_STRING_FIELDS.has(k) && typeof v === 'string') {
       yield { path: here, field: k, value: v, kind: 'string' };
     } else if (SKILL_LIST_FIELDS.has(k) && Array.isArray(v)) {
-      v.forEach((x, i) => {
+      // NB: must use for-of, not v.forEach(...) — `yield` cannot cross an
+      // arrow-function boundary inside the generator.
+      for (let i = 0; i < v.length; i++) {
+        const x = v[i];
         if (typeof x === 'string') {
           yield { path: `${here}[${i}]`, field: k, value: x, kind: 'list-item' };
         }
-      });
+      }
     } else if (SKILL_MAP_FIELDS.has(k) && v && typeof v === 'object') {
       for (const kk of Object.keys(v)) {
         yield { path: `${here}.${kk}`, field: k, value: kk, kind: 'map-key' };
