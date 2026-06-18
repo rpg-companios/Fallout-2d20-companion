@@ -100,6 +100,14 @@ describe('no localized skill literals in code logic', () => {
     'Выживание', 'Метание', 'Рукопашная',
   ];
 
+  // Files that legitimately contain these literals because they refer to
+  // something OTHER than the skill identity (e.g. robot-limb stat labels:
+  // "Ближний бой" labels `limb.melee` — a robot-arm stat, NOT the
+  // MELEE_WEAPONS skill).
+  const FILE_WHITELIST = new Set([
+    'components/screens/CharacterScreen/modals/LimbUpgradeModal.js',
+  ]);
+
   function collectSourceFiles(dir) {
     const out = [];
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -118,17 +126,29 @@ describe('no localized skill literals in code logic', () => {
     return out;
   }
 
+  /**
+   * Strip line- and block-comments so docs/examples don't trip the linter.
+   * Preserves URL-like `://` so we don't accidentally eat string contents.
+   */
+  function stripComments(src) {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, '')     // /* ... */ (incl. JSDoc)
+      .replace(/(^|[^:\\])\/\/.*$/gm, '$1'); // // ...   (skip "://")
+  }
+
   it('no Russian skill display names appear as string literals in logic code', () => {
     const sourceFiles = collectSourceFiles(ROOT);
     const offences = [];
     for (const file of sourceFiles) {
-      const text = readFileSync(file, 'utf-8');
+      const rel = file.replace(ROOT + '/', '');
+      if (FILE_WHITELIST.has(rel)) continue;
+      const text = stripComments(readFileSync(file, 'utf-8'));
       for (const ru of FORBIDDEN_RU) {
         // match only quoted occurrences ("...", '...', `...`)
         const pattern = new RegExp(`['"\`]${ru}['"\`]`, 'g');
         const m = text.match(pattern);
         if (m) {
-          offences.push(`${file.replace(ROOT + '/', '')}: ${m.length}× literal ${JSON.stringify(ru)}`);
+          offences.push(`${rel}: ${m.length}× literal ${JSON.stringify(ru)}`);
         }
       }
     }
