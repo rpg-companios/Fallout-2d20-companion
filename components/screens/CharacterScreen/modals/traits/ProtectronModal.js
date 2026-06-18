@@ -11,7 +11,7 @@ const ProtectronModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     const canonicalTrait = findTraitById(traitId);
-    onSelect(name, canonicalTrait?.modifiers || {});
+    onSelect('protectron-protect-or-destroy', name, canonicalTrait?.modifiers || {});
   };
 
   return (

@@ -727,10 +727,14 @@ export default function CharacterScreen() {
     }
   };
 
-  const handleSelectTrait = (traitName, newModifiersFromModal) => {
+  const handleSelectTrait = (traitIds, traitName, newModifiersFromModal) => {
+    // traitIds — массив canonical id (string | string[]); для multi-trait (Survivor) это массив.
     // traitName — локализованное имя черты из модала
     // Комбинируем с модификаторами из модального окна
+    const ids = Array.isArray(traitIds) ? traitIds : [traitIds];
     const newTrait = {
+      ids,
+      id: ids[0], // primary id (для hasTrait-by-id lookup)
       name: traitName,
       modifiers: {
         ...(newModifiersFromModal || {}),

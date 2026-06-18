@@ -11,7 +11,7 @@ const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
 
   const handleSelectSkill = (skill) => {
     const canonicalTrait = findTraitById(traitId);
-    onSelect(name, {
+    onSelect(traitId, name, {
       ...(canonicalTrait?.modifiers || {}),
       selectedExtraSkills: [skill],
     });

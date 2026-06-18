@@ -98,7 +98,7 @@ const SurvivorModal = ({
       ? `${originLabel}: ${selectedNames.join(' + ')}`
       : `${originLabel}: ${selectedNames[0]} + 1 перк`;
 
-    onSelect(traitTitle, {
+    onSelect(selectedIds, traitTitle, {
       ...mergedModifiers,
       selectedTraitNames: selectedNames,
       selectedTraitIds: selectedIds,

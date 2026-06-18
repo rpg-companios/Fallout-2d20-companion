@@ -179,7 +179,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const ncrInfantryWeaponIds = TRAITS['Пехотинец']?.modifiers?.ncrInfantryWeaponIds || [];
     const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
 
-    const damageWithNcr = hasTrait('Пехотинец') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
+    const damageWithNcr = hasTrait('ncr-infantryman') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
     const weaponType = displayWeapon?.weaponType ?? displayWeapon?.weapon_type;
     const appliesMeleeBonus = displayWeapon?.meleeBonusApplies === true || ['Melee', 'Unarmed'].includes(weaponType);
     const visibleDamage = appliesMeleeBonus ? damageWithNcr + (Number(meleeBonus) || 0) : damageWithNcr;
@@ -193,7 +193,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const isLightOrEnergy = (weapon?.itemType === 'weapon') && (
       weapon.weapon_type === 'Light' || weapon.weapon_type === 'Energy'
     );
-    const fireRateWithTrait = hasTrait('Техника спуска') && hasLightAndEnergyEquipped && isLightOrEnergy
+    const fireRateWithTrait = hasTrait('ncr-technique-of-descent') && hasLightAndEnergyEquipped && isLightOrEnergy
       ? Math.max(0, fireRateBase - 1)
       : fireRateBase;
 

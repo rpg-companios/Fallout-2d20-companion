@@ -11,7 +11,7 @@ const ChildOfAtomModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     const canonicalTrait = findTraitById(traitId);
-    onSelect(name, canonicalTrait?.modifiers || {});
+    onSelect('childofatom-radioactive-sponge', name, canonicalTrait?.modifiers || {});
   };
 
   return (

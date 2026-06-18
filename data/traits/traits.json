@@ -370,5 +370,41 @@
         "ignore_darkness_penalty"
       ]
     }
+  },
+  {
+    "id": "shadow",
+    "originId": "shadow",
+    "displayNameKey": "traits.shadow.shadow.name",
+    "descriptionKey": "traits.shadow.shadow.description",
+    "modifiers": {
+      "attributeBonus": {
+        "STR": 2,
+        "END": 2
+      },
+      "attributeLimits": {
+        "STR": {
+          "min": 6,
+          "max": 12
+        },
+        "END": {
+          "min": 6,
+          "max": 12
+        },
+        "CHA": {
+          "max": 8
+        },
+        "INT": {
+          "max": 8
+        }
+      },
+      "skillMaxValue": 4,
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
+      "effects": [
+        "stealth_boy_addiction"
+      ]
+    }
   }
 ]

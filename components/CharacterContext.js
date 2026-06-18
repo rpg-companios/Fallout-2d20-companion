@@ -694,11 +694,12 @@ export const CharacterProvider = ({ children }) => {
     meleeBonus,
     initiative,
     defense,
-    hasTrait: (traitName) => !!(
-      trait &&
-      (
-        trait.name === traitName ||
-        (Array.isArray(trait?.modifiers?.selectedTraitNames) && trait.modifiers.selectedTraitNames.includes(traitName))
+    // Canonical id only. No alias/fallback to localized name.
+    // Single-trait: trait.id matches. Multi-trait (NCR/Survivor): trait.ids[] contains it.
+    hasTrait: (id) => !!(
+      trait && (
+        trait.id === id ||
+        (Array.isArray(trait?.ids) && trait.ids.includes(id))
       )
     ),
     getItemId,

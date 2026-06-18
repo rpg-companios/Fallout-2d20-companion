@@ -126,6 +126,12 @@
         "name": "Robot with Brains",
         "description": "You are a robot with a human brain as your central processor. You have visual sensors capable of detecting the visual spectrum and infrared radiation. You are immune to radiation and poison, but cannot use chems or benefit from food, drink, or rest."
       }
+    },
+    "shadow": {
+      "shadow": {
+        "name": "Shadow",
+        "description": "Your initial Strength and Endurance scores increase by +2 each, and your maximum Strength and Endurance scores increase to 12, but your maximum Intelligence and Charisma scores decrease to 8. You cannot have a rank higher than 4 in any skill. You are completely immune to radiation and poison damage.\n\nYour height is over two meters; your body is bulky and muscular, and your skin is blue. You do not appear to age, but you are infertile. You may only wear armor that was made for super mutants.\n\nYou can easily become addicted to Stealth Boy; its prolonged use has dealt enormous damage to your psyche and mental health. Whenever you use Stealth Boy, roll 1 {CD} per dose you took this session. If any effects come up, you get the following symptoms:\n\nStealth Boy Addiction: A failed addiction check makes you addicted to Stealth Boy. The difficulty of Perception and Intelligence tests increases by +2, and Charisma tests by +1, until cured."
+      }
     }
   }
 }

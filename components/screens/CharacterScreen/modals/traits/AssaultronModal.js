@@ -11,7 +11,7 @@ const AssaultronModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     const canonicalTrait = findTraitById(traitId);
-    onSelect(name, canonicalTrait?.modifiers || {});
+    onSelect('assaultron-designed-for-frontline', name, canonicalTrait?.modifiers || {});
   };
 
   return (

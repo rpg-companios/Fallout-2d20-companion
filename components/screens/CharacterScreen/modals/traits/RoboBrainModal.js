@@ -11,7 +11,7 @@ const RoboBrainModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     const canonicalTrait = findTraitById(traitId);
-    onSelect(name, canonicalTrait?.modifiers || {});
+    onSelect('robobrain-robot-with-brains', name, canonicalTrait?.modifiers || {});
   };
 
   return (

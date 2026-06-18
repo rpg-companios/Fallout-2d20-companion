@@ -212,7 +212,9 @@
     "characterType": "mutant",
     "image": "shadow",
     "bodyPlan": "humanoid",
-    "traitIds": [],
+    "traitIds": [
+      "shadow"
+    ],
     "equipmentKitIds": [
       "default_caps_only"
     ]

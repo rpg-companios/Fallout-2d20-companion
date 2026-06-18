@@ -12,7 +12,7 @@ const BrotherhoodModal = ({ visible, onSelect, onClose }) => {
   const { name: traitName, description } = getTraitI18n('brotherhood-chain-that-binds');
 
   const handleConfirm = () => {
-    onSelect(traitName, {
+    onSelect('brotherhood-chain-that-binds', traitName, {
       forcedSkills: selectedSkill ? [selectedSkill] : [],
       extraSkills: 1
     });

@@ -13,7 +13,7 @@ const MinutemanModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     if (!selectedSkill) return;
-    onSelect(traitName, {
+    onSelect('minuteman-peoples-militia', traitName, {
       forcedSkills: [selectedSkill],
       extraSkills: 1,
     });

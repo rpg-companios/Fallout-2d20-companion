@@ -11,7 +11,7 @@ const MisterHandyModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     const canonicalTrait = findTraitById(traitId);
-    onSelect(name, canonicalTrait?.modifiers || {});
+    onSelect('misterhandy-robot-mr-handy', name, canonicalTrait?.modifiers || {});
   };
 
   return (

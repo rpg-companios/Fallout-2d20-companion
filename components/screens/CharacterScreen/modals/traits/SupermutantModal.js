@@ -14,7 +14,7 @@ const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
       return;
     }
 
-    onSelect(name, {
+    onSelect('supermutant-forced-evolution', name, {
       attributes: { 'STR': 2, 'END': 2 },
       minLimits: { 'STR': 6, 'END': 6 },
       maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },

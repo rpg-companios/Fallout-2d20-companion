@@ -9,7 +9,7 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
   const { name, description } = getTraitI18n('ghoul-necrotic-posthuman');
 
   const handleConfirm = () => {
-    onSelect(name, {
+    onSelect('ghoul-necrotic-posthuman', name, {
       skillModifiers: { 'Выживание': 2 },
       forcedSkills: ['Выживание'],
       extraSkills: 1,

@@ -11,7 +11,7 @@ const OutcastBrotherhoodModal = ({ visible, onSelect, onClose }) => {
   const { name: traitName, description } = getTraitI18n('brotherhoodoutcast-chain-that-breaks');
 
   const handleConfirm = () => {
-    onSelect(traitName, {
+    onSelect('brotherhoodoutcast-chain-that-breaks', traitName, {
       forcedSkills: selectedSkill ? [selectedSkill] : [],
       extraSkills: 1
     });
