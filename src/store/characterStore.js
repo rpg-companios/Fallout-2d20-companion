@@ -453,16 +453,24 @@ const useCharacterStore = create(devtools(
       unequipItem: (itemId) => {
         const state = get();
         const items = { ...state.items };
-        
+
         if (!items[itemId]) {
           console.warn(`Item ${itemId} not found`);
           return;
         }
-        
+
+        // Locked items (e.g. robot built-ins delivered by an equipment kit)
+        // cannot be unequipped via the normal flow. They are released only
+        // when the limb that holds them is swapped — see robotEquip.js.
+        if (items[itemId].locked) {
+          console.warn(`Item ${itemId} is locked (robot built-in); refuse to unequip.`);
+          return;
+        }
+
         // Create a copy of the item and set equipped to false
         const updatedItem = { ...items[itemId], equipped: false };
         items[itemId] = updatedItem;
-        
+
         set({ items });
         get().recalculateDerivedStats();
       },
@@ -525,6 +533,10 @@ const useCharacterStore = create(devtools(
           name: item.name || item.weaponName || item.Name || weaponId,
           itemType: item.itemType || 'weapon',
           equipped: item.equipped || false,
+          // `locked: true` marks items that came from a robot kit. They are
+          // equipped at character creation and cannot be removed via the normal
+          // unequip flow — only by swapping the limb that holds them.
+          locked: Boolean(item.locked),
           quantity: item.quantity || 1,
           stackKey: stackKey,
           appliedMods: appliedMods,

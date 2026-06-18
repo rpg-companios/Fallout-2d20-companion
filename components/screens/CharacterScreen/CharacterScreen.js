@@ -446,21 +446,29 @@ export default function CharacterScreen() {
   };
 
   const handleSelectKit = (kit) => {
-    console.warn(
-      '[CharacterScreen] handleSelectKit is deprecated. Use Zustand Store addNewItem for equipment items.'
-    );
+    // Robots vs humans:
+    //   - Humans: kit items go to inventory UNEQUIPPED (`equipped: false`).
+    //     Player equips them manually via the WeaponsAndArmor / Inventory screen.
+    //   - Robots: kit items go to inventory EQUIPPED + LOCKED
+    //     (`equipped: true, locked: true`). They cannot be unequipped via the
+    //     normal flow — only by swapping the robot limb that holds them.
+    //
+    // `kit.robotSlots` is the marker that EquipmentKitModal sets for robot
+    // characters (see modals/EquipmentKitModal.js handleSelectKit).
+    const isRobot = Boolean(kit.robotSlots);
 
     // 1. Add kit items to Zustand Store
-    // Note: This assumes kit.items contains item data with weaponId, appliedMods, etc.
-    // If items need to be equipped, set equipped: true in addNewItem
     if (kit.items && Array.isArray(kit.items)) {
       kit.items.forEach(item => {
         // Currency (caps) is not an inventory item — it is tracked separately via
         // setCaps below. Skip it so it never hits addNewItem (which would warn about
         // a missing id field).
         if (item?.itemType === 'currency' || item?.type === 'currency') return;
-        // Use Zustand Store to add item
-        useCharacterStore.getState().addNewItem(item);
+        useCharacterStore.getState().addNewItem({
+          ...item,
+          equipped: isRobot ? true : false,
+          locked:   isRobot ? true : false,
+        });
       });
     }
 
