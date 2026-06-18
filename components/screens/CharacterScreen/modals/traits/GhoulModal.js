@@ -10,8 +10,8 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     onSelect('ghoul-necrotic-posthuman', name, {
-      skillModifiers: { 'Выживание': 2 },
-      forcedSkills: ['Выживание'],
+      skillModifiers: { SURVIVAL: 2 },
+      forcedSkills: ['SURVIVAL'],
       extraSkills: 1,
       immunities: ['radiation'],
       effects: ['radiation_healing', 'slow_aging', 'infertility', 'discrimination']

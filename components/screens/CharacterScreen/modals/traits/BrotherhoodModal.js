@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { getTraitI18n } from '../../../../../domain/traits';
+import { getSkillDisplayName } from '../logic/characterScreenI18n';
 
 export const traitConfig = { originId: 'brotherhood', modalType: 'choice' };
 
-const SELECTABLE_SKILLS = ['Энергооружие', 'Наука', 'Ремонт'];
+// Canonical SKILL keys (UPPER_SNAKE_CASE). Rendered via getSkillDisplayName().
+const SELECTABLE_SKILLS = ['ENERGY_WEAPONS', 'SCIENCE', 'REPAIR'];
 
 const BrotherhoodModal = ({ visible, onSelect, onClose }) => {
   const [selectedSkill, setSelectedSkill] = useState(null);
@@ -43,7 +45,7 @@ const BrotherhoodModal = ({ visible, onSelect, onClose }) => {
               ]}
               onPress={() => setSelectedSkill(skill)}
             >
-              <Text style={styles.buttonText}>{skill}</Text>
+              <Text style={styles.buttonText}>{getSkillDisplayName(skill)}</Text>
             </TouchableOpacity>
           ))}
 

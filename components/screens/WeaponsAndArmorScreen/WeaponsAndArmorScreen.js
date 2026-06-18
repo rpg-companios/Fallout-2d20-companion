@@ -11,7 +11,7 @@ import {
   selectActiveTimedEffects,
 } from '../../../src/store/selectors';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
-import { TRAITS } from '../CharacterScreen/logic/traitsData';
+import { findTraitById } from '../../../domain/traits';
 import { isRobotCharacter } from '../../../domain/origins';
 import { resolveBodyPlan } from '../../../domain/bodyplan';
 import styles from '../../../styles/CharacterScreen.styles';
@@ -20,7 +20,6 @@ import { renderTextWithIcons } from './textUtils';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { applyArmorMods } from '../../../domain/modsEquip';
-import { getSkillDisplayName } from '../CharacterScreen/logic/characterScreenI18n';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
 import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
@@ -142,41 +141,17 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const mainAttr = displayWeapon.mainAttr ?? displayWeapon.main_attr ?? 'AGI';
     const mainSkill = displayWeapon.mainSkill ?? displayWeapon.main_skill ?? 'SMALL_GUNS';
 
-    const SKILL_ALIASES = {
-      ATHLETICS: ['ATHLETICS', 'Атлетика', 'Athletics'],
-      BARTER: ['BARTER', 'Бартер', 'Barter'],
-      BIG_GUNS: ['BIG_GUNS', 'Тяжелое оружие', 'Тяжёлое оружие', 'Big Guns'],
-      ENERGY_WEAPONS: ['ENERGY_WEAPONS', 'Энергооружие', 'Energy Weapons'],
-      EXPLOSIVES: ['EXPLOSIVES', 'Взрывчатка', 'Explosives'],
-      LOCKPICK: ['LOCKPICK', 'Отмычки', 'Lockpick'],
-      MEDICINE: ['MEDICINE', 'Медицина', 'Medicine'],
-      MELEE_WEAPONS: ['MELEE_WEAPONS', 'Ближний бой', 'Melee Weapons'],
-      PILOT: ['PILOT', 'Управление ТС', 'Pilot'],
-      REPAIR: ['REPAIR', 'Ремонт', 'Repair'],
-      SCIENCE: ['SCIENCE', 'Наука', 'Science'],
-      SMALL_GUNS: ['SMALL_GUNS', 'Стрелковое оружие', 'Small Guns'],
-      SNEAK: ['SNEAK', 'Скрытность', 'Sneak'],
-      SPEECH: ['SPEECH', 'Красноречие', 'Speech'],
-      SURVIVAL: ['SURVIVAL', 'Выживание', 'Survival'],
-      THROWING: ['THROWING', 'Метание', 'Throwing'],
-      UNARMED: ['UNARMED', 'Рукопашная', 'Unarmed'],
-    };
-
-    const findSkillValue = (skillKeyOrName) => {
-      const canonical = SKILL_ALIASES[skillKeyOrName] ? skillKeyOrName : Object.keys(SKILL_ALIASES).find((key) =>
-        SKILL_ALIASES[key].includes(skillKeyOrName),
-      );
-
-      const aliases = SKILL_ALIASES[canonical] || [skillKeyOrName, getSkillDisplayName(skillKeyOrName)];
-      return skills?.find((s) => aliases.includes(s.name))?.value ?? 0;
-    };
+    // Skill identity is canonical UPPER_SNAKE_CASE (SKILL_CATALOG_ORDER).
+    // No localized aliases — skills[].name on main is already the canonical key.
+    const findSkillValue = (skillKey) =>
+      skills?.find((s) => s.name === skillKey)?.value ?? 0;
 
     const attrValue = getAttributeValue(attributes, mainAttr) ?? 0;
     const skillValue = findSkillValue(mainSkill);
     const successValue = attrValue + skillValue;
   
-    // Бонус урона для НКР "Пехотинец"
-    const ncrInfantryWeaponIds = TRAITS['Пехотинец']?.modifiers?.ncrInfantryWeaponIds || [];
+    // Бонус урона для НКР "Пехотинец" (canonical trait id: 'ncr-infantryman')
+    const ncrInfantryWeaponIds = findTraitById('ncr-infantryman')?.modifiers?.ncrInfantryWeaponIds || [];
     const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
 
     const damageWithNcr = hasTrait('ncr-infantryman') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);

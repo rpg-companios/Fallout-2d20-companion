@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
 import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+import { getSkillDisplayName } from '../logic/characterScreenI18n';
 
 export const traitConfig = { originId: 'vaultDweller', modalType: 'choice' };
 
@@ -37,7 +38,7 @@ const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
                 style={[styles.modalButton, styles.skillOption]}
                 onPress={() => handleSelectSkill(skill.name)}
                 >
-                <Text style={styles.buttonText}>{skill.name}</Text>
+                <Text style={styles.buttonText}>{getSkillDisplayName(skill.name)}</Text>
                 </TouchableOpacity>
             ))}
           </ScrollView>

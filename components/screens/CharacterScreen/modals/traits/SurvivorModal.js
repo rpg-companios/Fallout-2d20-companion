@@ -21,7 +21,8 @@ const NCR_TRAIT_IDS = [
   'ncr-brahmin-baron',
 ];
 
-const goodSoulGroup = ['Красноречие', 'Медицина', 'Ремонт', 'Наука', 'Бартер'];
+// Canonical SKILL keys (UPPER_SNAKE_CASE). Mirrors ncr-good-soul.modifiers.goodSoulSkills.
+const goodSoulGroup = ['SPEECH', 'MEDICINE', 'REPAIR', 'SCIENCE', 'BARTER'];
 
 const SurvivorModal = ({
   visible,

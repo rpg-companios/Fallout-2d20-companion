@@ -1,8 +1,7 @@
 // domain/characterCreation.js
 // Pure character creation logic: attributes, skills, derived stats.
-// No React, no UI dependencies. Imports only static i18n JSON for skill name catalog.
-
-import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
+// No React, no UI dependencies. No locale literals — skill identity is the
+// canonical UPPER_SNAKE_CASE key from SKILL_CATALOG_ORDER below.
 
 // ---------------------------------------------------------------------------
 // Attribute key utilities (from attributeKeyUtils.js)
@@ -80,10 +79,11 @@ const SKILL_CATALOG_ORDER = [
 // ALL_SKILL_KEYS — canonical keys for use in new code
 export const ALL_SKILL_KEYS = SKILL_CATALOG_ORDER;
 
-// ALL_SKILLS — uses Russian display names as identifiers (legacy stable IDs)
-const _skillsCatalog = ruCharacterScreen.skillsCatalog || {};
+// ALL_SKILLS — `name` is the canonical SKILL key (UPPER_SNAKE_CASE).
+// For display, callers use getSkillDisplayName(name) / tCharacterScreen(`skillsCatalog.${name}`).
+// Single source of truth for skill identity. No aliases, no localized literals.
 export const ALL_SKILLS = SKILL_CATALOG_ORDER.map((key) => ({
-    name: _skillsCatalog[key] || key,
+    name: key,
     value: 0,
 }));
 

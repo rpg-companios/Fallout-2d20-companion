@@ -7,9 +7,9 @@
     "modifiers": {
       "extraSkills": 1,
       "forcedSkills": [
-        "energy_weapons",
-        "science",
-        "repair"
+        "ENERGY_WEAPONS",
+        "SCIENCE",
+        "REPAIR"
       ]
     }
   },
@@ -21,9 +21,9 @@
     "modifiers": {
       "extraSkills": 1,
       "forcedSkills": [
-        "energy_weapons",
-        "science",
-        "repair"
+        "ENERGY_WEAPONS",
+        "SCIENCE",
+        "REPAIR"
       ]
     }
   },
@@ -66,7 +66,7 @@
     "descriptionKey": "traits.ghoul.necroticPosthuman.description",
     "modifiers": {
       "skillModifiers": {
-        "survival": 2
+        "SURVIVAL": 2
       },
       "immunities": [
         "radiation"
@@ -87,8 +87,8 @@
     "modifiers": {
       "extraSkills": 1,
       "forcedSkills": [
-        "energy_weapons",
-        "small_guns"
+        "ENERGY_WEAPONS",
+        "SMALL_GUNS"
       ],
       "effects": [
         "improved_caravans",

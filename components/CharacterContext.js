@@ -1,8 +1,10 @@
 import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import * as db from '../db';
+import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
 import {
   createInitialAttributes,
   ALL_SKILLS,
+  ALL_SKILL_KEYS,
   getLuckPoints,
   calculateMaxHealth,
   calculateInitiative,
@@ -11,6 +13,23 @@ import {
   calculateCarryWeight,
   getAttributeValue,
 } from '../domain/characterCreation';
+
+// One-time migration: legacy saves stored skills with Russian display names as
+// `skill.name` (e.g. "Ремонт"). After the canonical-id refactor, identity is
+// the UPPER_SNAKE_CASE key (e.g. "REPAIR"). This bridge runs only at load.
+const RU_SKILL_NAME_TO_KEY = Object.entries(ruCharacterScreen?.skillsCatalog || {}).reduce(
+  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
+  {},
+);
+const migrateSkillsToCanonical = (rawSkills) => {
+  if (!Array.isArray(rawSkills)) return null;
+  return rawSkills.map((s) => {
+    if (!s || typeof s.name !== 'string') return s;
+    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
+    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
+    return canonical ? { ...s, name: canonical } : s;
+  });
+};
 import { loadOriginsData, findEnrichedOrigin } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
@@ -330,7 +349,7 @@ export const CharacterProvider = ({ children }) => {
       setCharacterName(data.characterName || '');
       setLevel(data.level ?? 1);
       setAttributes(data.attributes || createInitialAttributes());
-      setSkills(data.skills || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+      setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
       setSelectedSkills(data.selectedSkills || []);
       setExtraTaggedSkills(data.extraTaggedSkills || []);
       setForcedSelectedSkills(data.forcedSelectedSkills || []);

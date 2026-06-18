@@ -53,8 +53,10 @@ import { getTimedAttributeModifiers } from "../../../domain/effects";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
+// Canonical SKILL keys (UPPER_SNAKE_CASE) for the NCR "Good Soul" group.
+// Mirrors ncr-good-soul.modifiers.goodSoulSkills from data/traits/traits.json.
+// For display use getSkillDisplayName(key) at the render site.
 const GOOD_SOUL_SKILL_KEYS = ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"];
-const getGoodSoulSkillNames = () => GOOD_SOUL_SKILL_KEYS.map((key) => tCharacterScreen(`skillsCatalog.${key}`, key));
 
 const ImageSection = ({ origin }) => {
   const defaultImage = require("../../../assets/bg1.png");
@@ -520,7 +522,7 @@ export default function CharacterScreen() {
     }
 
     // Good Soul special handling
-    const goodSoulGroup = getGoodSoulSkillNames();
+    const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
     const isGoodSoul =
       Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
       trait.modifiers.goodSoulSelectedSkills.length > 0;
@@ -633,7 +635,7 @@ export default function CharacterScreen() {
         extraTaggedSkills.includes(skill.name);
 
       // Ограничение от "Добрая Душа": навыки из группы capped 4, кроме двух бонусных
-      const goodSoulGroup = getGoodSoulSkillNames();
+      const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
       const isGoodSoul =
         Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
         trait.modifiers.goodSoulSelectedSkills.length > 0;
@@ -835,7 +837,7 @@ export default function CharacterScreen() {
     }
   };
 
-  const goodSoulGroup = getGoodSoulSkillNames();
+  const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
 
   const toggleGoodSoulPick = (skill) => {
     setGoodSoulPicks((prev) => {
@@ -1263,7 +1265,7 @@ export default function CharacterScreen() {
                 </View>
 
                 {(() => {
-                  const goodSoulGroupSkills = getGoodSoulSkillNames();
+                  const goodSoulGroupSkills = GOOD_SOUL_SKILL_KEYS;
                   const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
                   const isGoodSoulActive = Array.isArray(goodSoulSelected) && goodSoulSelected.length > 0;
                   return skills.map((skill, index) => {
@@ -1389,7 +1391,7 @@ export default function CharacterScreen() {
                     ]}
                     onPress={() => toggleGoodSoulPick(skill)}
                   >
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{skill}</Text>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{getSkillDisplayName(skill)}</Text>
                   </TouchableOpacity>
                 );
               })}
