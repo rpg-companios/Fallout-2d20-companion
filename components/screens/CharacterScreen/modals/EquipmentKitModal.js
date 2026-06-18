@@ -65,6 +65,7 @@ const getOptionKey = (option, optionIndex) => {
 const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
   if (!entry) return [];
 
+  // 'choice' — player picks ONE of N options (currently UI default = first).
   if (entry.type === 'choice') {
     const key = toChoiceKey(kitId, itemIndex);
     const options = Array.isArray(entry.items) ? entry.items : [];
@@ -74,6 +75,28 @@ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
     if (!selectedOption) return [];
     if (selectedOption.group) return selectedOption.group;
     return [selectedOption];
+  }
+
+  // 'pick' — player picks Y of N options. UI for the selection is not built
+  // yet, so for now we collapse it to the first `pickCount` options (or all of
+  // them when pickCount is missing). This keeps existing data flowing through
+  // the resolver; replace with a real picker UI in a follow-up task.
+  if (entry.type === 'pick') {
+    const options = Array.isArray(entry.items) ? entry.items : [];
+    const count = Number.isFinite(entry.pickCount) && entry.pickCount > 0
+      ? Math.min(entry.pickCount, options.length)
+      : options.length;
+    return options.slice(0, count);
+  }
+
+  // 'rollTable' — kitResolver already rolled it into a real item (or several).
+  // It returns the primary item as `entry` itself and any additional rolls in
+  // `entry._extraItems`. Flatten them all into the kit's item list.
+  if (entry.type === 'rollTable') {
+    const extras = Array.isArray(entry._extraItems) ? entry._extraItems : [];
+    // Strip the marker fields so downstream code treats this as a normal item.
+    const { type: _t, _extraItems, roll, tableId, ...primary } = entry;
+    return [primary, ...extras];
   }
 
   return [entry];

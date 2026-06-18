@@ -697,7 +697,10 @@ const InventoryScreen = () => {
   };
 
   const handleUnequipWeapon = (weapon, slot) => {
-    if (weapon?.isBuiltin || weapon?.isManipulator) {
+    // Locked items (robot built-ins from kits) cannot be unequipped from the
+    // inventory UI. They are released only by swapping the limb that holds
+    // them. The corresponding 'unequip' button is hidden at the render site.
+    if (weapon?.isBuiltin || weapon?.isManipulator || weapon?.locked) {
       return;
     }
 
@@ -1050,8 +1053,12 @@ const InventoryScreen = () => {
       && !item.isEquipped
       && !robotHasHoldingArm
       && !isRobotLimbWeapon(item);
-    // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия
-    const hideActionButton = item.isEquipped && item.itemType === 'weapon' && isBuiltinOrManipulator;
+    // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия,
+    // а также для locked-предметов (комплекты роботов — снять можно только сменой конечности).
+    const hideActionButton = item.isEquipped && (
+      (item.itemType === 'weapon' && isBuiltinOrManipulator)
+      || item.locked
+    );
 
     const handleActionPress = () => {
         if (item.isEquipped) {

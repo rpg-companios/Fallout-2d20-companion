@@ -192,12 +192,17 @@ export async function resolveNonWeaponItem(item) {
     const count = resolveTableRollCount(item.roll);
     const tableId = ROLL_TABLE_TAG[item.tableId] || item.tableId;
     const resolvedItems = await resolveRandomLootByRoll(tableId, count);
+    // Preserve each rolled item's native itemType (chem/weapon/armor/clothing/misc)
+    // so addNewItem stores them under the right inventory category. Previously
+    // every roll result was tagged itemType: 'loot', which made inventory
+    // categorization meaningless.
     if (resolvedItems.length > 1) {
-      return { ...resolvedItems[0], _extraItems: resolvedItems.slice(1), itemType: 'loot' };
+      return { ...resolvedItems[0], _extraItems: resolvedItems.slice(1) };
     }
     if (resolvedItems.length === 1) {
-      return { ...resolvedItems[0], itemType: 'loot' };
+      return { ...resolvedItems[0] };
     }
+    // Empty roll (table miss) — keep 'loot' placeholder so it's visible in UI.
     return { ...item, name: `${count}d20<${tableId}>`, itemType: 'loot' };
   }
 
