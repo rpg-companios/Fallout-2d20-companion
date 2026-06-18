@@ -19,14 +19,16 @@ const ROBOT_ORIGIN_TO_PLAN = {
 };
 
 export function resolveBodyPlan(character) {
-  const traitPlan = character?.trait?.modifiers?.robotBodyPlan;
-  if (traitPlan && bodyPlansRegistry[traitPlan]) return traitPlan;
-
-  // After the characterType refactor: origin stores its bodyPlan directly
-  // in `origin.bodyPlan` (was `origin.robotBodyPlan` in older data).
+  // Source of truth (per docs/schema/02-traits.md T-1): origin.bodyPlan.
+  // The legacy fallback `trait.modifiers.robotBodyPlan` has been removed —
+  // trait-level robot duplicates (robotBodyPlan/robotType/robotRules) were
+  // dropped from data/traits/traits.json in the same refactor.
   const originPlan = character?.origin?.bodyPlan;
   if (originPlan && bodyPlansRegistry[originPlan]) return originPlan;
 
+  // Defensive fallback: legacy origins without `bodyPlan` but with a known
+  // robot `id` (e.g. older saves). Can be removed once all live saves carry
+  // an explicit origin.bodyPlan.
   const originId = character?.origin?.id;
   if (originId && ROBOT_ORIGIN_TO_PLAN[originId] && bodyPlansRegistry[ROBOT_ORIGIN_TO_PLAN[originId]]) {
     return ROBOT_ORIGIN_TO_PLAN[originId];

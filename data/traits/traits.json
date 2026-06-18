@@ -137,13 +137,6 @@
       ],
       "carryWeightFixed": 225,
       "carryWeightStrengthMultiplier": 0,
-      "robotRules": {
-        "canSelfUseConsumables": false,
-        "canUseConsumablesOnOthers": false,
-        "canEquipStandardArmor": false,
-        "canEquipPowerArmor": false,
-        "maxRobotMods": 2
-      },
       "effects": [
         "hazard_reroll",
         "no_consumables_food_rest",
@@ -166,11 +159,6 @@
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
       "meleeBonusDelta": 1,
-      "robotRules": {
-        "canSelfUseConsumables": false,
-        "canEquipStandardArmor": false,
-        "canEquipPowerArmor": false
-      },
       "effects": [
         "no_consumables_food_rest",
         "repair_to_heal",
@@ -310,16 +298,6 @@
       ],
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
-      "robotType": "misterHandy",
-      "robotBodyPlan": "misterHandy",
-      "robotRules": {
-        "canSelfUseConsumables": false,
-        "canUseConsumablesOnOthers": true,
-        "canEquipStandardArmor": false,
-        "canEquipPowerArmor": false,
-        "carryWeightLimit": 150,
-        "armorConstraints": []
-      },
       "effects": [
         "no_consumables_food_rest",
         "repair_to_heal",

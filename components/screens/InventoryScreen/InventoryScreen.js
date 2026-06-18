@@ -187,7 +187,9 @@ const InventoryScreen = () => {
     ) || null;
   }, [inventoryItems]);
 
-  const robotBodyPlan = trait?.modifiers?.robotBodyPlan
+  // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
+  // Legacy trait.modifiers.robotBodyPlan was dropped from data.
+  const robotBodyPlan = origin?.bodyPlan
     || equippedRobotBodyPart?.robotBodyPlan
     || null;
 

@@ -376,7 +376,9 @@ const WeaponsAndArmorScreen = () => {
   const equipmentCatalog = getEquipmentCatalog(locale);
   const robotBodyUpgrade = findRobotBodyUpgrade(
     equipmentCatalog,
-    trait?.modifiers?.robotBodyPlan,
+    // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
+    // Legacy trait.modifiers.robotBodyPlan was dropped from data.
+    origin?.bodyPlan,
     inventoryItems,
   );
   const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
