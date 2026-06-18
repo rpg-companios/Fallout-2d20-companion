@@ -21,7 +21,7 @@ const ROOT = resolve(__dirname, '..');
 
 const SKILL_STRING_FIELDS = new Set(['skill', 'requiredSkill', 'mainSkill']);
 const SKILL_LIST_FIELDS = new Set(['forcedSkills', 'goodSoulSkills', 'selectedExtraSkills']);
-const SKILL_MAP_FIELDS = new Set(['skillModifiers']);
+const SKILL_MAP_FIELDS = new Set([]); // 'skillModifiers' upraved — see docs/schema/03 AS-3.
 
 /** Recursively collect all *.json files under a directory */
 function collectJsonFiles(dir) {

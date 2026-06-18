@@ -10,7 +10,8 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
 
   const handleConfirm = () => {
     onSelect('ghoul-necrotic-posthuman', name, {
-      skillModifiers: { SURVIVAL: 2 },
+      // forcedSkills + tag → автоматически +2 к Survival и подсветка extra-tagged.
+      // 'skillModifiers' (бонус к рангу навыка) — упразднён (см. docs/schema/03).
       forcedSkills: ['SURVIVAL'],
       extraSkills: 1,
       immunities: ['radiation'],

@@ -1,37 +1,48 @@
 # Схема: Derived (производные характеристики)
 
-Считаются ОТ атрибутов/уровня/экипировки/эффектов. В Zustand хранятся как Parameter
-(`{base, modifiers, total}`), считаются в `calculateDerivedStats` (src/store/resolvers.js),
-формулы — в `domain/characterCreation.js`.
+Считаются от атрибутов / уровня / экипировки / эффектов. В Zustand хранятся
+как `Parameter = {base, modifiers, total}` ✅, считаются в
+`calculateDerivedStats` (`src/store/resolvers.js`); базовые формулы — в
+`domain/characterCreation.js`.
 
-## Производные (факт) и формулы
-| величина | формула (база) | зависит от | особое |
-|---|---|---|---|
-| maxHealth | END + LCK + (level-1) | END, LCK, level | + timed-эффекты |
-| initiative | PER + AGI | PER, AGI | |
-| defense | AGI ≥ 9 ? 2 : 1 | AGI | |
-| meleeBonus | STR-ступени (7→+1,9→+2,11→+3) + trait.meleeBonusDelta | STR, trait | |
-| carryWeight (human) | base(trait.carryWeightFixed=150) + STR×mult(10) + mods брони | STR, trait, броня | STR влияет |
-| carryWeight (robot) | corpus.carryWeight + mods брони | корпус, броня | STR НЕ влияет (✅ сделано) |
-| damageResistance | physical/energy/radiation | броня + timed-эффекты | |
+## Производные и формулы
 
-## Что на них влияет (источники модификаторов)
-- атрибуты (см. 03) → пересчёт base.
-- trait/origin: meleeBonusDelta, carryWeightFixed, carryWeightStrengthMultiplier, luckMaxDelta.
-- экипировка: carryWeightModifier, DR от брони.
-- timed-эффекты (химия): maxHP, DR (уже в коде через getTimed*).
-- **ghoul: радиация ЛЕЧИТ** (вместо урона) → влияет на health-ресурс ❓ D-1 формула.
+| величина | формула (база) | зависит от | особое | статус |
+|---|---|---|---|---|
+| `maxHealth` | `END + LCK + (level-1)` | END, LCK, level | + timed-эффекты (`getTimedMaxHpBonus`) | ✅ |
+| `initiative` | `PER + AGI` | PER, AGI | | ✅ |
+| `defense` | `AGI ≥ 9 ? 2 : 1` | AGI | | ✅ |
+| `meleeBonus` | STR-ступени (7→+1, 9→+2, 11→+3) + `trait.meleeBonusDelta` | STR, trait | | ✅ |
+| `carryWeight` (human) | `(trait.carryWeightFixed ?? 150) + STR × (trait.carryWeightStrengthMultiplier ?? 10) + mods брони` | STR, trait, броня | STR влияет | ✅ |
+| `carryWeight` (robot) | `corpus.carryWeight + mods брони` | корпус, броня | STR **не** влияет | ✅ |
+| `damageResistance` | physical / energy / radiation | броня + timed-эффекты (`getTimedDamageResistanceBonus`) | | ✅ |
+
+## Источники модификаторов
+- **атрибуты** (см. 03) → пересчёт `base`. ✅
+- **trait / origin**: `meleeBonusDelta`, `carryWeightFixed`,
+  `carryWeightStrengthMultiplier`, `luckMaxDelta`. ✅
+- **экипировка**: `carryWeightModifier`, DR от брони. ✅
+- **timed-эффекты** (химия): `maxHP`, DR. ✅
+- **ghoul: радиация ЛЕЧИТ** (вместо урона) — ☐ см. D-1.
 
 ## Тип-специфика
-- robot carryWeight = от корпуса (✅).
-- ghoul health vs радиация ❓ D-1: радиация добавляет HP? до maxHP? есть ли «перелечивание»?
-- mutant/cyborg: производные пока стандартные.
+- robot `carryWeight` = от корпуса. ✅
+- ghoul: радиация лечит ☐ D-1 — см. ниже.
+- mutant/cyborg: производные стандартные. ✅
 
 ## Решения
-❓ D-1: точная механика «радиация лечит гуля» (сколько HP, ограничения).
-❓ D-2: должны ли ВСЕ производные стать Parameter с источниками-модификаторами
-   (под будущую систему) или пока формулы как есть? (рекомендую: оставить формулы,
-   мигрировать вместе с большой системой модификаторов).
 
-## Что НЕ делаем сейчас
-Контракт. Формулы менять не нужно (работают). Документ — ориентир.
+### ✅ D-2 (Parameter shape для derived)
+Закрыто. Все derived в `calculateDerivedStats` уже имеют форму
+`{ base, modifiers, total }` (`src/store/resolvers.js:130-191`).
+Timed-эффекты добавляются как `modifier` с `source: 'timedEffects'`.
+
+### ☐ D-1 (механика «радиация лечит гуля»)
+Не реализовано. В `GhoulModal` есть метка `effects: ['radiation_healing', ...]`,
+но кода под флаг `radiation_healing` нет. Нужно решение:
+- сколько HP даёт каждое попадание радиации (1:1? фиксированно?);
+- лечит до `maxHP` или может превышать («over-heal»);
+- влияет ли на радиационный счётчик персонажа.
+
+Отдельная задача — реализация в `domain/effects.js` (там уже есть
+инфраструктура `applyConsumableToEffects` / timed-effect tracking).
