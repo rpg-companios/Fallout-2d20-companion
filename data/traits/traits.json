@@ -188,7 +188,12 @@
     "originId": "ncr",
     "displayNameKey": "traits.ncr.goodSoul.name",
     "descriptionKey": "traits.ncr.goodSoul.description",
-    "modifiers": {}
+    "modifiers": {
+      "skillPickChoice": {
+        "count": 2,
+        "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"]
+      }
+    }
   },
   {
     "id": "ncr-infantryman",
@@ -196,12 +201,17 @@
     "displayNameKey": "traits.ncr.infantryman.name",
     "descriptionKey": "traits.ncr.infantryman.description",
     "modifiers": {
-      "ncrInfantryWeaponIds": [
-        "weapon_submachine_gun",
-        "weapon_black_powder_rifle",
-        "weapon_assault_rifle",
-        "weapon_frag_grenade",
-        "weapon_combat_knife"
+      "weaponDamageBonus": [
+        {
+          "weaponIds": [
+            "weapon_submachine_gun",
+            "weapon_black_powder_rifle",
+            "weapon_assault_rifle",
+            "weapon_frag_grenade",
+            "weapon_combat_knife"
+          ],
+          "bonus": 1
+        }
       ]
     }
   },
@@ -210,21 +220,27 @@
     "originId": "ncr",
     "displayNameKey": "traits.ncr.homeOnTheRange.name",
     "descriptionKey": "traits.ncr.homeOnTheRange.description",
-    "modifiers": {}
+    "modifiers": {
+      "effects": ["home_on_the_range_label"]
+    }
   },
   {
     "id": "ncr-technique-of-descent",
     "originId": "ncr",
     "displayNameKey": "traits.ncr.techniqueOfDescent.name",
     "descriptionKey": "traits.ncr.techniqueOfDescent.description",
-    "modifiers": {}
+    "modifiers": {
+      "effects": ["technique_of_descent_label"]
+    }
   },
   {
     "id": "ncr-brahmin-baron",
     "originId": "ncr",
     "displayNameKey": "traits.ncr.brahminBaron.name",
     "descriptionKey": "traits.ncr.brahminBaron.description",
-    "modifiers": {}
+    "modifiers": {
+      "effects": ["brahmin_baron_label"]
+    }
   },
   {
     "id": "survivor-survivor",
@@ -256,7 +272,9 @@
     "originId": "survivor",
     "displayNameKey": "traits.survivor.quickShot.name",
     "descriptionKey": "traits.survivor.quickShot.description",
-    "modifiers": {}
+    "modifiers": {
+      "effects": ["quick_shot_label"]
+    }
   },
   {
     "id": "survivor-gifted",

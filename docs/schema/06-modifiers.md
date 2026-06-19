@@ -138,23 +138,27 @@
   **контракт**: ровно через него будут реализованы перки/chem'ы, дающие +N к
   конкретному навыку. Реализация — через общий агрегатор (§ 3).
 
-#### `skillBonusChoice` 🟡
-- **Тип:** `{ amount: number, from: string[] | "any" }`.
-- **Источники:** perk, chem-effect (будущее).
-- **Поведение:** «+N к навыку **на выбор игрока**». При выборе перка/применении chem'а
-  открывается модалка выбора одного навыка из списка `from` (или из любого
-  `"any"` = ALL_SKILL_KEYS); итог записывается как `skillModifiers: { CHOSEN: amount }`
-  на инстансе перка/эффекта.
-- **Оператор:** см. `skillModifiers` (результат превращается в него).
-- **Пример (перк «+2 к любому навыку»):**
+#### `skillPickChoice` 🟡
+- **Тип:** `{ count: number, from: string[] | "any" }`.
+- **Источники:** trait (`ncr-good-soul`), perk, chem-effect.
+- **Поведение:** игрок выбирает `count` навыков из `from` (canonical UPPER_SNAKE_CASE
+  или `"any"` = весь `ALL_SKILL_KEYS`). Результат запоминается на инстансе трейта/перка
+  и используется как **extra-tagged**-набор (даёт стартовые +2 и подсветку).
+- **Пример (NCR Good Soul, 2 из 5):**
   ```jsonc
-  "skillBonusChoice": { "amount": 2, "from": "any" }
+  "skillPickChoice": {
+    "count": 2,
+    "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"]
+  }
   ```
-- **Пример (перк «+2 к одному из 3 боевых»):**
+- **Пример (перк «1 из любого боевого»):**
   ```jsonc
-  "skillBonusChoice": { "amount": 2, "from": ["SMALL_GUNS", "ENERGY_WEAPONS", "BIG_GUNS"] }
+  "skillPickChoice": { "count": 1, "from": ["SMALL_GUNS", "ENERGY_WEAPONS", "BIG_GUNS"] }
   ```
-- **Статус:** 🟡 формат фиксируется как контракт. Данных и UI пока нет.
+- **Статус:** 🟡 поле есть в данных (`ncr-good-soul`); UI-пикер пока в долге
+  (см. `07-trait-debt.md`). До появления пикера хардкод
+  `GOOD_SOUL_SKILL_KEYS` в `CharacterScreen.js` читается как fallback,
+  но источник истины — это поле.
 
 #### `skillMaxValue` ✅
 - **Тип:** `number` (по умолчанию 6).

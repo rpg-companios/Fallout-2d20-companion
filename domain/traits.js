@@ -210,3 +210,63 @@ export function getTraitI18n(id) {
 export function getTraitDisplayDescription(trait) {
   return getTraitDescriptionKey(trait);
 }
+
+// ---------------------------------------------------------------------------
+// weaponDamageBonus — universal modifier
+// ---------------------------------------------------------------------------
+//
+// Contract: see docs/schema/06-modifiers.md § 1.7 (`weaponDamageBonus`).
+//
+// Shape on a source (trait / perk / chem effect):
+//   "modifiers": {
+//     "weaponDamageBonus": [
+//       { "weaponIds": ["weapon_a","weapon_b"], "bonus": 1 },
+//       { "weaponId":  "weapon_c",              "bonus": 2 },
+//       { "skillKey":  "BIG_GUNS",              "bonus": -1 }
+//     ]
+//   }
+//
+// Matching rules per record:
+//   - weaponIds: weapon.id ∈ weaponIds
+//   - weaponId:  weapon.id === weaponId
+//   - skillKey:  weapon.mainSkill === skillKey  (canonical UPPER_SNAKE_CASE)
+// At least one rule must match for the record to apply. Multiple matching
+// records inside one source are summed (additive). bonus may be negative.
+
+const matchesWeapon = (rule, weapon) => {
+  if (!rule || !weapon) return false;
+  if (Array.isArray(rule.weaponIds) && weapon.id != null && rule.weaponIds.includes(weapon.id)) return true;
+  if (rule.weaponId != null && weapon.id === rule.weaponId) return true;
+  if (rule.skillKey != null && weapon.mainSkill === rule.skillKey) return true;
+  return false;
+};
+
+/**
+ * Damage bonus contributed by a single source (trait / perk / chem effect)
+ * for a given weapon. Returns 0 when there are no matching records.
+ */
+export function getWeaponDamageBonus(source, weapon) {
+  const rules = source?.modifiers?.weaponDamageBonus;
+  if (!Array.isArray(rules) || rules.length === 0) return 0;
+  let total = 0;
+  for (const rule of rules) {
+    if (matchesWeapon(rule, weapon)) {
+      total += Number(rule.bonus) || 0;
+    }
+  }
+  return total;
+}
+
+/**
+ * Sum of weaponDamageBonus contributions across multiple active sources
+ * (trait + sub-traits + perks + chem effects, ...). Each source is read
+ * independently and the bonuses are added together.
+ */
+export function getWeaponDamageBonusFromSources(sources, weapon) {
+  if (!Array.isArray(sources) || sources.length === 0) return 0;
+  let total = 0;
+  for (const source of sources) {
+    total += getWeaponDamageBonus(source, weapon);
+  }
+  return total;
+}

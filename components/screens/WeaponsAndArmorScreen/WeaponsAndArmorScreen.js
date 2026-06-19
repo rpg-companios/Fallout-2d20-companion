@@ -11,7 +11,7 @@ import {
   selectActiveTimedEffects,
 } from '../../../src/store/selectors';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
-import { findTraitById } from '../../../domain/traits';
+import { findTraitById, getWeaponDamageBonusFromSources } from '../../../domain/traits';
 import { isRobotCharacter } from '../../../domain/origins';
 import { resolveBodyPlan } from '../../../domain/bodyplan';
 import styles from '../../../styles/CharacterScreen.styles';
@@ -115,7 +115,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
 
 
 const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
-    const { hasTrait, attributes, skills } = useCharacter();
+    const { hasTrait, attributes, skills, trait } = useCharacter();
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -150,11 +150,30 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const skillValue = findSkillValue(mainSkill);
     const successValue = attrValue + skillValue;
   
-    // Бонус урона для НКР "Пехотинец" (canonical trait id: 'ncr-infantryman')
-    const ncrInfantryWeaponIds = findTraitById('ncr-infantryman')?.modifiers?.ncrInfantryWeaponIds || [];
-    const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
-
-    const damageWithNcr = hasTrait('ncr-infantryman') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
+    // weaponDamageBonus — универсальный путь: сумма по всем активным источникам
+    // (parent trait + выбранные sub-trait'ы NCR/Survivor + в будущем перки/chem).
+    // См. docs/schema/06-modifiers.md § 1.7.
+    const weaponDamageSources = [];
+    if (trait) {
+      const parent = findTraitById(trait.id) || trait;
+      if (parent) weaponDamageSources.push(parent);
+      const subIds = Array.isArray(trait?.ids) ? trait.ids
+                   : Array.isArray(trait?.modifiers?.subTraitIds) ? trait.modifiers.subTraitIds
+                   : [];
+      for (const sid of subIds) {
+        if (sid && sid !== trait.id) {
+          const sub = findTraitById(sid);
+          if (sub) weaponDamageSources.push(sub);
+        }
+      }
+    }
+    const weaponMatch = displayWeapon
+      ? { id: displayWeapon.id ?? displayWeapon.weaponId, mainSkill: displayWeapon.mainSkill }
+      : null;
+    const weaponDamageBonusValue = weaponMatch
+      ? getWeaponDamageBonusFromSources(weaponDamageSources, weaponMatch)
+      : 0;
+    const damageWithNcr = Number(displayWeapon.damage ?? 0) + weaponDamageBonusValue;
     const weaponType = displayWeapon?.weaponType ?? displayWeapon?.weapon_type;
     const appliesMeleeBonus = displayWeapon?.meleeBonusApplies === true || ['Melee', 'Unarmed'].includes(weaponType);
     const visibleDamage = appliesMeleeBonus ? damageWithNcr + (Number(meleeBonus) || 0) : damageWithNcr;

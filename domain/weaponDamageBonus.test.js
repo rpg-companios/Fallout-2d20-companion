@@ -71,13 +71,10 @@ describe('getWeaponDamageBonusFromSources (universal: trait + perk + chem)', () 
 });
 
 describe('weaponDamageBonus on actual NCR traits', () => {
-  it('ncr-resident grants +1 to listed weaponIds', async () => {
-    const traits = (await import('../data/traits/traits.json')).default;
-    const ncrResident = traits.find((t) => t.id === 'ncr-resident');
-    expect(ncrResident.modifiers.weaponDamageBonus).toBeDefined();
-    const bonus = getWeaponDamageBonus(ncrResident, { id: ncrResident.modifiers.weaponDamageBonus[0].weaponIds[0], mainSkill: 'SMALL_GUNS' });
-    expect(bonus).toBeGreaterThan(0);
-  });
+  // Per owner's design: ncr-resident is a MULTI-TRAIT CONTAINER with no
+  // mechanical effect of its own. Only the chosen sub-traits (e.g.
+  // ncr-infantryman) carry numeric bonuses. An earlier test that asserted
+  // a self-bonus on ncr-resident has been removed.
 
   it('ncr-infantryman has its own weaponDamageBonus', async () => {
     const traits = (await import('../data/traits/traits.json')).default;

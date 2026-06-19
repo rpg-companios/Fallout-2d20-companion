@@ -84,9 +84,46 @@
    модификатора лимита. «Прибавить значение» и «расширить потолок» — независимы.
    → текущая объектная форма `attributes.STR={baseBonus,min,max}` мигрирует в эти два поля.
 
-❓ T-2 (открыто, не блокирует): `ncrInfantryWeaponIds` — частная механика или обобщить
-   до «бонус урона к списку оружия».
-❓ T-3 (открыто, не блокирует): ключи навыков (`survival`) привести к canonical (ALL_SKILL_KEYS).
+✅ T-2: `ncrInfantryWeaponIds` обобщён в универсальное поле `weaponDamageBonus`
+   (см. `docs/schema/06-modifiers.md` § 1.7). Движок суммирует бонусы из всех
+   активных источников (parent trait + sub-traits NCR/Survivor + будущие перки/chem)
+   через `getWeaponDamageBonusFromSources` из `domain/traits.js`.
+✅ T-3: все skill-ключи в данных и коде — canonical UPPER_SNAKE_CASE. Защита от
+   регрессии: `domain/contract.skills.test.js`.
 
 ## Что НЕ делаем сейчас
 Только контракт черт. Реализация — после origins.
+
+
+## Effects как метки для UI
+
+Часть черт не несёт числовой механики — они дают **подпись в UI** (например, на
+экране оружия и брони, в активных эффектах). Для них используется единая шина
+`modifiers.effects: string[]`. Каждая строка — id флага, по которому UI ищет:
+- локализованный текст в i18n (`labels.<effect_id>`),
+- опционально — UI-правила (например `no_consumables_food_rest` → скрыть кнопку
+  «применить препарат»).
+
+Часть флагов **в будущем** станет настоящей механикой
+(см. `07-trait-debt.md`): `radiation_absorption`, `stealth_boy_addiction`,
+`self_destruct`, `built_in_laser` и др. Сейчас они — метки.
+
+## Контракт `skillPickChoice` (новое поле)
+
+Для черт вроде `ncr-good-soul` («отметьте 2 навыка из 5») — задекларировано
+поле:
+
+```jsonc
+"modifiers": {
+  "skillPickChoice": {
+    "count": 2,
+    "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"]
+  }
+}
+```
+
+Семантика: игрок выбирает `count` навыков из списка `from` (canonical
+SKILL keys); UI-пикер пока в долге (`07-trait-debt.md`). До его появления
+поле читается как «приоритетные кандидаты в extra-tagged» — это вытесняет
+хардкод `GOOD_SOUL_SKILL_KEYS` из `CharacterScreen.js` (вынос — отдельной
+правкой UI).
