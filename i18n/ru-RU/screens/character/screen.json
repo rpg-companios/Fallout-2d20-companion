@@ -19,7 +19,24 @@
     "available": "Доступно",
     "pointsShort": "очков",
     "extraTaggedSkills": "Дополнительные навыки от черты",
-    "extraSlotsAvailable": "Доступно дополнительных слотов"
+    "extraSlotsAvailable": "Доступно дополнительных слотов",
+    "onePerk": "1 перк",
+    "unknownItem": "Неизвестный предмет",
+    "capsShort": "крышек",
+    "pcsShort": "шт.",
+    "physDR": "ФЗ",
+    "enrgDR": "ЭЗ",
+    "carry": "Груз",
+    "requires": "Требует: ",
+    "plating": "Обшивка",
+    "armor": "Броня",
+    "frame": "Рама",
+    "mind": "Разум",
+    "other": "Прочее",
+    "body": "Корпус",
+    "carryWeight": "Грузоподъёмность",
+    "rarity": "Редкость",
+    "complexity": "Сложность"
   },
   "buttons": {
     "save": "Сохранить",
@@ -29,7 +46,13 @@
     "continue": "Продолжить",
     "confirm": "Подтвердить",
     "yesReset": "Да, сбросить",
-    "select": "Выбрать"
+    "select": "Выбрать",
+    "ok": "Хорошо",
+    "understood": "Понятно",
+    "selectTrait": "Выбрать черту",
+    "confirmSelection": "Подтвердить выбор",
+    "close": "Закрыть",
+    "apply": "Применить"
   },
   "placeholders": {
     "selectNone": "Не выбрано",
@@ -89,10 +112,44 @@
         "misc": "Разное"
       },
       "title": "Выберите комплект снаряжения"
+    },
+    "origins": {
+      "survivorTitle": "Черта происхождения «Выживший»",
+      "ncrTitle": "Черта происхождения «Житель НКР»"
+    },
+    "survivor": {
+      "twoTraits": "2 черты",
+      "twoTraitsDesc": "Любая комбинация: 2 Выжившего, 2 НКР или 1+1",
+      "oneTraitOnePerk": "1 черта и 1 перк",
+      "selectTwoTraitsHint": "Выберите 2 черты в любой комбинации.",
+      "survivorTraitsList": "Список черт Выжившего",
+      "ncrTraitsList": "Список черт НКР"
+    },
+    "armor": {
+      "upgradePlating": "Улучшить обшивку",
+      "upgradeArmor": "Улучшить броню",
+      "upgradeFrame": "Улучшить раму",
+      "noItems": "Нет доступных предметов"
+    },
+    "limb": {
+      "upgradeLimb": "Модернизировать конечность",
+      "noLimbs": "Нет доступных конечностей"
     }
   },
   "origins": {
-    "brotherhoodOfSteel": "Братство Стали"
+    "brotherhoodOfSteel": "Братство Стали",
+    "assaultron": "Штурмотрон",
+    "childOfAtom": "Дитя Атома",
+    "ghoul": "Гуль",
+    "minuteman": "Минитмен",
+    "misterHandy": "Мистер Помощник",
+    "ncr": "Житель НКР",
+    "brotherhoodOutcast": "Изгой Братства Стали",
+    "protectron": "Протектрон",
+    "robobrain": "Робомозг",
+    "supermutant": "Супермутант",
+    "survivor": "Выживший",
+    "vaultDweller": "Обитатель убежища"
   },
   "attributes": {
     "STR": "СИЛ",

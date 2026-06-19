@@ -3,6 +3,8 @@ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
 import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
 import { getSkillDisplayName } from '../../logic/characterScreenI18n';
+import { tCharacterScreen } from '../../logic/characterScreenI18n';
+
 
 export const traitConfig = { originId: 'vaultDweller', modalType: 'choice' };
 
@@ -27,7 +29,7 @@ const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Обитатель убежища</Text>
+          <Text style={styles.modalTitle}>{tCharacterScreen('origins.vaultDweller')}</Text>
           <Text style={styles.traitName}>{name}</Text>
           {renderTextWithIcons(description, styles.modalText)}
           
@@ -47,7 +49,7 @@ const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
             style={[styles.modalButton, styles.cancelButton]}
             onPress={onClose}
           >
-            <Text style={styles.buttonText}>Отмена</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </View>

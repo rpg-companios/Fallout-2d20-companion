@@ -35,6 +35,8 @@ import enRobotHeads from '../../../../i18n/en-EN/data/equipment/robot/robotheads
 import enRobotBody  from '../../../../i18n/en-EN/data/equipment/robot/robotbody.json';
 import enRobotLegs  from '../../../../i18n/en-EN/data/equipment/robot/robotlegs.json';
 import enRobotWeapons from '../../../../i18n/en-EN/data/equipment/robot/weapons.json';
+import { tCharacterScreen } from '../logic/characterScreenI18n';
+
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -158,18 +160,18 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
       {limb.name}
     </Text>
     <View style={styles.statsContainer}>
-      {limb.melee   !== undefined && <StatRow label="Ближний бой" value={limb.melee} />}
-      {limb.guns    !== undefined && <StatRow label="Стрельба"    value={limb.guns} />}
-      {limb.mind    !== undefined && <StatRow label="Разум"       value={limb.mind} />}
-      {limb.other   !== undefined && <StatRow label="Прочее"      value={limb.other} />}
-      {limb.body    !== undefined && <StatRow label="Корпус"      value={limb.body} />}
-      {limb.carryWeight !== undefined && <StatRow label="Грузоподъёмность" value={limb.carryWeight} />}
-      {limb.rarity  !== undefined && <StatRow label="Редкость"    value={limb.rarity} />}
-      {limb.complexity !== undefined && <StatRow label="Сложность" value={limb.complexity} />}
+      {limb.melee   !== undefined && <StatRow label={tCharacterScreen("skillsCatalog.MELEE_WEAPONS", "Melee Weapons")} value={limb.melee} />}
+      {limb.guns    !== undefined && <StatRow label={tCharacterScreen("skillsCatalog.SMALL_GUNS", "Small Guns")}    value={limb.guns} />}
+      {limb.mind    !== undefined && <StatRow label={tCharacterScreen("labels.mind", "Mind")}       value={limb.mind} />}
+      {limb.other   !== undefined && <StatRow label={tCharacterScreen("labels.other", "Other")}      value={limb.other} />}
+      {limb.body    !== undefined && <StatRow label={tCharacterScreen("labels.body", "Body")}      value={limb.body} />}
+      {limb.carryWeight !== undefined && <StatRow label={tCharacterScreen("labels.carryWeight", "Carry Weight")} value={limb.carryWeight} />}
+      {limb.rarity  !== undefined && <StatRow label={tCharacterScreen("labels.rarity", "Rarity")}    value={limb.rarity} />}
+      {limb.complexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity", "Complexity")} value={limb.complexity} />}
     </View>
     {Array.isArray(limb.perksRequired) && limb.perksRequired.length > 0 && (
       <Text style={styles.perksRequired}>
-        Требует: {limb.perksRequired.join(', ')}
+        {tCharacterScreen("labels.requires", "Requires: ")}{limb.perksRequired.join(', ')}
       </Text>
     )}
   </TouchableOpacity>
@@ -242,10 +244,10 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) 
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.container} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>Модернизировать конечность</Text>
+          <Text style={styles.title}>{tCharacterScreen("modals.limb.upgradeLimb", "Upgrade Limb")}</Text>
 
           {compatibleLimbs.length === 0 ? (
-            <Text style={styles.emptyText}>Нет доступных конечностей</Text>
+            <Text style={styles.emptyText}>{tCharacterScreen("modals.limb.noLimbs", "No limbs available")}</Text>
           ) : (
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
               {compatibleLimbs.map((limb) => {
@@ -263,7 +265,7 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) 
           )}
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Закрыть</Text>
+            <Text style={styles.closeButtonText}>{tCharacterScreen('buttons.close')}</Text>
           </TouchableOpacity>
         </Pressable>
       </Pressable>

@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
 import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
+import { tCharacterScreen } from '../../logic/characterScreenI18n';
+
 
 export const traitConfig = { originId: 'survivor', modalType: 'choice' };
 
@@ -28,8 +30,8 @@ const SurvivorModal = ({
   visible,
   onSelect,
   onClose,
-  modalTitle = 'Черта происхождения «Выживший»',
-  originLabel = 'Выживший',
+  modalTitle = tCharacterScreen('modals.origins.survivorTitle'),
+  originLabel = tCharacterScreen('origins.survivor'),
 }) => {
   const [selectionMode, setSelectionMode] = useState(null);
   const [survivorTrait, setSurvivorTrait] = useState(null);
@@ -97,7 +99,7 @@ const SurvivorModal = ({
 
     const traitTitle = selectionMode === 'two_traits'
       ? `${originLabel}: ${selectedNames.join(' + ')}`
-      : `${originLabel}: ${selectedNames[0]} + 1 перк`;
+      : `${originLabel}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk', '1 perk');
 
     onSelect(selectedIds, traitTitle, {
       ...mergedModifiers,
@@ -149,14 +151,14 @@ const SurvivorModal = ({
                 style={[styles.modalButton, styles.skillOption]}
                 onPress={() => { setSurvivorTrait([]); setNcrTrait([]); setSelectionMode('two_traits'); }}
               >
-                <Text style={styles.buttonText}>2 черты</Text>
-                <Text style={styles.descriptionText}>Любая комбинация: 2 Выжившего, 2 НКР или 1+1</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('modals.survivor.twoTraits')}</Text>
+                <Text style={styles.descriptionText}>{tCharacterScreen('modals.survivor.twoTraitsDesc')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.skillOption]}
                 onPress={() => setSelectionMode('trait_and_perk')}
               >
-                <Text style={styles.buttonText}>1 черта и 1 перк</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('modals.survivor.oneTraitOnePerk')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -164,9 +166,9 @@ const SurvivorModal = ({
           {selectionMode && (
             <ScrollView style={{ width: '100%', maxHeight: 360 }}>
               {selectionMode === 'two_traits' && (
-                <Text style={styles.hintText}>Выберите 2 черты в любой комбинации.</Text>
+                <Text style={styles.hintText}>{tCharacterScreen('modals.survivor.selectTwoTraitsHint')}</Text>
               )}
-              <Text style={styles.sectionTitle}>Список черт Выжившего</Text>
+              <Text style={styles.sectionTitle}>{tCharacterScreen('modals.survivor.survivorTraitsList')}</Text>
               {traitCatalog.survivor.map((trait) =>
                 renderTraitButton(
                   { ...trait, isSelected: selectionMode === 'trait_and_perk' ? singleTraitPick === trait.id : isPicked(trait.id, survivorTrait || []) },
@@ -175,7 +177,7 @@ const SurvivorModal = ({
                   ncrTrait || [],
                 )
               )}
-              <Text style={styles.sectionTitle}>Список черт НКР</Text>
+              <Text style={styles.sectionTitle}>{tCharacterScreen('modals.survivor.ncrTraitsList')}</Text>
               {traitCatalog.ncr.map((trait) =>
                 renderTraitButton(
                   { ...trait, isSelected: selectionMode === 'trait_and_perk' ? singleTraitPick === trait.id : isPicked(trait.id, ncrTrait || []) },
@@ -193,14 +195,14 @@ const SurvivorModal = ({
               disabled={!canConfirm()}
               onPress={handleConfirm}
             >
-              <Text style={styles.buttonText}>Подтвердить выбор</Text>
+              <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirmSelection')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
             style={[styles.modalButton, styles.cancelButton]}
             onPress={() => { resetState(); onClose(); }}
           >
-            <Text style={styles.buttonText}>Отмена</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </View>

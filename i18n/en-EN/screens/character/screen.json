@@ -19,7 +19,24 @@
     "available": "Available",
     "pointsShort": "points",
     "extraTaggedSkills": "Extra trait skills",
-    "extraSlotsAvailable": "Extra slots available"
+    "extraSlotsAvailable": "Extra slots available",
+    "onePerk": "1 perk",
+    "unknownItem": "Unknown item",
+    "capsShort": "caps",
+    "pcsShort": "pcs.",
+    "physDR": "Phys DR",
+    "enrgDR": "Enrg DR",
+    "carry": "Carry",
+    "requires": "Requires: ",
+    "plating": "Plating",
+    "armor": "Armor",
+    "frame": "Frame",
+    "mind": "Mind",
+    "other": "Other",
+    "body": "Body",
+    "carryWeight": "Carry Weight",
+    "rarity": "Rarity",
+    "complexity": "Complexity"
   },
   "buttons": {
     "save": "Save",
@@ -29,7 +46,13 @@
     "continue": "Continue",
     "confirm": "Confirm",
     "yesReset": "Yes, reset",
-    "select": "Select"
+    "select": "Select",
+    "ok": "OK",
+    "understood": "Understood",
+    "selectTrait": "Select Trait",
+    "confirmSelection": "Confirm Selection",
+    "close": "Close",
+    "apply": "Apply"
   },
   "placeholders": {
     "selectNone": "Not selected",
@@ -89,10 +112,44 @@
         "misc": "Misc"
       },
       "title": "Select equipment kit"
+    },
+    "origins": {
+      "survivorTitle": "Origin Trait «Survivor»",
+      "ncrTitle": "Origin Trait «NCR Citizen»"
+    },
+    "survivor": {
+      "twoTraits": "2 traits",
+      "twoTraitsDesc": "Any combination: 2 Survivor, 2 NCR, or 1+1",
+      "oneTraitOnePerk": "1 trait and 1 perk",
+      "selectTwoTraitsHint": "Select 2 traits in any combination.",
+      "survivorTraitsList": "Survivor Traits List",
+      "ncrTraitsList": "NCR Traits List"
+    },
+    "armor": {
+      "upgradePlating": "Upgrade Plating",
+      "upgradeArmor": "Upgrade Armor",
+      "upgradeFrame": "Upgrade Frame",
+      "noItems": "No items available"
+    },
+    "limb": {
+      "upgradeLimb": "Upgrade Limb",
+      "noLimbs": "No limbs available"
     }
   },
   "origins": {
-    "brotherhoodOfSteel": "Brotherhood of Steel"
+    "brotherhoodOfSteel": "Brotherhood of Steel",
+    "assaultron": "Assaultron",
+    "childOfAtom": "Child of Atom",
+    "ghoul": "Ghoul",
+    "minuteman": "Minuteman",
+    "misterHandy": "Mister Handy",
+    "ncr": "NCR Citizen",
+    "brotherhoodOutcast": "Brotherhood Outcast",
+    "protectron": "Protectron",
+    "robobrain": "Robobrain",
+    "supermutant": "Supermutant",
+    "survivor": "Survivor",
+    "vaultDweller": "Vault Dweller"
   },
   "attributes": {
     "STR": "STR",

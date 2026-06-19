@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { getCurrentLocale } from '../../../../i18n/locale';
 import ArmorLayerModal from './ArmorLayerModal';
+import { tCharacterScreen } from '../logic/characterScreenI18n';
+
 
 const LAYER_COLORS = {
   plating: '#4a90d9',
@@ -32,17 +34,17 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
   const layers = [
     {
       key: 'plating',
-      label: isRu ? 'Обшивка' : 'Plating',
+      label: tCharacterScreen('labels.plating', 'Plating'),
       current: currentPlating?.name || null,
     },
     {
       key: 'armor',
-      label: isRu ? 'Броня' : 'Armor',
+      label: tCharacterScreen('labels.armor', 'Armor'),
       current: currentArmor?.name || null,
     },
     {
       key: 'frame',
-      label: isRu ? 'Рама' : 'Frame',
+      label: tCharacterScreen('labels.frame', 'Frame'),
       current: currentFrame?.name || null,
     },
   ];
@@ -59,7 +61,7 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
       >
         <Pressable style={styles.overlay} onPress={onClose}>
           <Pressable style={styles.container} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.title}>{isRu ? 'Броня' : 'Armor'}</Text>
+            <Text style={styles.title}>{tCharacterScreen('labels.armor', 'Armor')}</Text>
 
             {layers.map((layer) => (
               <TouchableOpacity
@@ -71,7 +73,7 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
                 <View style={[styles.layerDot, { backgroundColor: LAYER_COLORS[layer.key] }]} />
                 <Text style={styles.layerLabel}>{layer.label}</Text>
                 <Text style={styles.layerCurrent} numberOfLines={1}>
-                  {layer.current || (isRu ? '—' : '—')}
+                  {layer.current || ('—')}
                 </Text>
                 <Text style={styles.layerArrow}>›</Text>
               </TouchableOpacity>

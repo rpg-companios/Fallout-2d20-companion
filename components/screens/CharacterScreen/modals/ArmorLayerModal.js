@@ -29,6 +29,8 @@ import ruFrames  from '../../../../i18n/ru-RU/data/equipment/robot/frames.json';
 import enPlating from '../../../../i18n/en-EN/data/equipment/robot/plating.json';
 import enArmor   from '../../../../i18n/en-EN/data/equipment/robot/armor.json';
 import enFrames  from '../../../../i18n/en-EN/data/equipment/robot/frames.json';
+import { tCharacterScreen } from '../logic/characterScreenI18n';
+
 
 // ---------------------------------------------------------------------------
 // Layer colors (matches RobotSlot.js)
@@ -90,10 +92,10 @@ const getArmorCatalogForLayer = (layer, locale) => {
 /** Layer-specific modal title */
 const getLayerTitle = (layer, locale) => {
   const isRu = locale === 'ru-RU';
-  if (layer === 'plating') return isRu ? 'Улучшить обшивку' : 'Upgrade Plating';
-  if (layer === 'armor')   return isRu ? 'Улучшить броню'   : 'Upgrade Armor';
-  if (layer === 'frame')   return isRu ? 'Улучшить раму'    : 'Upgrade Frame';
-  return isRu ? 'Улучшить броню' : 'Upgrade Armor';
+  if (layer === 'plating') return tCharacterScreen('modals.armor.upgradePlating', 'Upgrade Plating');
+  if (layer === 'armor')   return tCharacterScreen('modals.armor.upgradeArmor', 'Upgrade Armor');
+  if (layer === 'frame')   return tCharacterScreen('modals.armor.upgradeFrame', 'Upgrade Frame');
+  return tCharacterScreen('modals.armor.upgradeArmor', 'Upgrade Armor');
 };
 
 // ---------------------------------------------------------------------------
@@ -125,18 +127,18 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress, locale }) => {
       </Text>
       <View style={styles.statsContainer}>
         {dr.physical !== undefined && (
-          <StatRow label={isRu ? 'ФЗ' : 'Phys DR'} value={dr.physical} />
+          <StatRow label={tCharacterScreen('labels.physDR', 'Phys DR')} value={dr.physical} />
         )}
         {dr.energy !== undefined && (
-          <StatRow label={isRu ? 'ЭЗ' : 'Enrg DR'} value={dr.energy} />
+          <StatRow label={tCharacterScreen('labels.enrgDR', 'Enrg DR')} value={dr.energy} />
         )}
         {item.carryWeightModifier !== undefined && item.carryWeightModifier !== 0 && (
-          <StatRow label={isRu ? 'Груз' : 'Carry'} value={item.carryWeightModifier > 0 ? `+${item.carryWeightModifier}` : item.carryWeightModifier} />
+          <StatRow label={tCharacterScreen('labels.carry', 'Carry')} value={item.carryWeightModifier > 0 ? `+${item.carryWeightModifier}` : item.carryWeightModifier} />
         )}
       </View>
       {item.perkRequired && (
         <Text style={styles.perkRequired}>
-          {isRu ? 'Требует: ' : 'Requires: '}{item.perkRequired}
+          {tCharacterScreen('labels.requires', 'Requires: ')}{item.perkRequired}
         </Text>
       )}
       {item.special ? (
@@ -213,7 +215,7 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
 
           {compatibleItems.length === 0 && !currentItem ? (
             <Text style={styles.emptyText}>
-              {isRu ? 'Нет доступных предметов' : 'No items available'}
+              {tCharacterScreen('modals.armor.noItems', 'No items available')}
             </Text>
           ) : (
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
@@ -235,13 +237,13 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
 
           <TouchableOpacity style={[styles.closeButton, { backgroundColor: layerColor, marginHorizontal: 12 }]} onPress={handleApply}>
             <Text style={styles.closeButtonText}>
-              {isRu ? 'Применить' : 'Apply'}
+              {tCharacterScreen('buttons.apply', 'Apply')}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>
-              {isRu ? 'Закрыть' : 'Close'}
+              {tCharacterScreen('buttons.close', 'Close')}
             </Text>
           </TouchableOpacity>
         </Pressable>

@@ -2,6 +2,8 @@ import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { getTraitI18n } from '../../../../../domain/traits';
+import { tCharacterScreen } from '../../logic/characterScreenI18n';
+
 
 export const traitConfig = { originId: 'superMutant', modalType: 'info' };
 
@@ -33,7 +35,7 @@ const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Супермутант</Text>
+          <Text style={styles.modalTitle}>{tCharacterScreen('origins.supermutant')}</Text>
           <Text style={styles.traitName}>{name}</Text>
           
           {renderTextWithIcons(description, styles.modalText)}
@@ -42,7 +44,7 @@ const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
             style={[styles.modalButton, styles.confirmButton]}
             onPress={handleConfirm}
           >
-            <Text style={styles.buttonText}>{infoOnly ? 'Понятно' : 'Выбрать черту'}</Text>
+            <Text style={styles.buttonText}>{infoOnly ? tCharacterScreen('buttons.understood') : tCharacterScreen('buttons.selectTrait')}</Text>
           </TouchableOpacity>
         </View>
       </View>

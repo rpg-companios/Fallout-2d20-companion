@@ -2,6 +2,8 @@ import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+import { tCharacterScreen } from '../../logic/characterScreenI18n';
+
 
 export const traitConfig = { originId: 'protectron', modalType: 'info' };
 
@@ -23,14 +25,14 @@ const ProtectronModal = ({ visible, onSelect, onClose }) => {
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Протектрон</Text>
+          <Text style={styles.modalTitle}>{tCharacterScreen('origins.protectron')}</Text>
           <Text style={styles.traitName}>{name}</Text>
           {renderTextWithIcons(description, styles.modalText)}
           <TouchableOpacity
             style={[styles.modalButton, styles.confirmButton]}
             onPress={handleConfirm}
           >
-            <Text style={styles.buttonText}>Хорошо</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
           </TouchableOpacity>
         </View>
       </View>

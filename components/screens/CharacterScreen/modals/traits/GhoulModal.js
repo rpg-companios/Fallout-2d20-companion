@@ -2,8 +2,10 @@ import React from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { getTraitI18n } from '../../../../../domain/traits';
+import { tCharacterScreen } from '../../logic/characterScreenI18n';
 
-export const traitConfig = { originId: 'ghoul', traitName: 'Некротический постчеловек', modalType: 'info' };
+
+export const traitConfig = { originId: 'ghoul', modalType: 'info' };
 
 const GhoulModal = ({ visible, onSelect, onClose }) => {
   const { name, description } = getTraitI18n('ghoul-necrotic-posthuman');
@@ -23,11 +25,11 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Гуль</Text>
+          <Text style={styles.modalTitle}>{tCharacterScreen('origins.ghoul')}</Text>
           <Text style={styles.traitName}>{name}</Text>
           {renderTextWithIcons(description, styles.modalText)}
           <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleConfirm}>
-            <Text style={styles.buttonText}>Хорошо</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
           </TouchableOpacity>
         </View>
       </View>

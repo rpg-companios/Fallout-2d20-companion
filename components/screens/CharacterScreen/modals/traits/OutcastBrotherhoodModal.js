@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { getTraitI18n } from '../../../../../domain/traits';
 import { getSkillDisplayName } from '../../logic/characterScreenI18n';
+import { tCharacterScreen } from '../../logic/characterScreenI18n';
+
 
 export const traitConfig = { originId: 'brotherhoodOutcast', modalType: 'choice' };
 
@@ -24,7 +26,7 @@ const OutcastBrotherhoodModal = ({ visible, onSelect, onClose }) => {
     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Изгой Братства Стали</Text>
+          <Text style={styles.modalTitle}>{tCharacterScreen('origins.brotherhoodOutcast')}</Text>
           <Text style={styles.traitName}>{traitName}</Text>
           <Text style={styles.modalText}>{description}</Text>
 
@@ -43,7 +45,7 @@ const OutcastBrotherhoodModal = ({ visible, onSelect, onClose }) => {
             onPress={handleConfirm}
             disabled={!selectedSkill}
           >
-            <Text style={styles.buttonText}>Выбрать</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.select')}</Text>
           </TouchableOpacity>
         </View>
       </View>

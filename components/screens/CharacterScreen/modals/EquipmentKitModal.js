@@ -171,20 +171,20 @@ const summarizeItems = (items) => {
   return { finalItems, totalCaps, weight, price };
 };
 
-const getDisplayName = (item) => item.displayName || item.Название || item.name || item.itemId || item.weaponId || 'Неизвестный предмет';
+const getDisplayName = (item) => item.displayName || item.Название || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem', 'Unknown item');
 
 
 const formatQuantitySuffix = (item) => {
   const qty = Number(item?.quantity || 0);
   if (!qty || qty <= 1) return '';
-  if (item?.itemType === 'currency') return ` (${qty} крышек)`;
-  return ` (${qty} шт.)`;
+  if (item?.itemType === 'currency') return ` (${qty} ${tCharacterScreen('labels.capsShort', 'caps')})`;
+  return ` (${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')})`;
 };
 
 const formatAmmoSuffix = (ammo) => {
   if (!ammo) return '';
   const qty = Number(ammo.quantity || 0);
-  const qtyText = qty > 0 ? `${qty} шт.` : '0 шт.';
+  const qtyText = qty > 0 ? `${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')}` : `0 ${tCharacterScreen('labels.pcsShort', 'pcs.')}`;
   return ` (${qtyText} ${ammo.name})`;
 };
 
@@ -409,7 +409,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
                         })}
 
                         <TouchableOpacity style={styles.selectButton} onPress={() => handleSelectKit(kit)}>
-                          <Text style={styles.selectButtonText}>Выбрать</Text>
+                          <Text style={styles.selectButtonText}>{tCharacterScreen('buttons.select')}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -420,7 +420,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
           )}
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Закрыть</Text>
+            <Text style={styles.closeButtonText}>{tCharacterScreen('buttons.close')}</Text>
           </TouchableOpacity>
         </View>
       </View>
