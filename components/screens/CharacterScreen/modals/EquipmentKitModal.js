@@ -226,6 +226,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
             try {
               return await resolveKitItems(kit);
             } catch (error) {
+              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error, 'stack:', error?.stack);
               console.warn('Не удалось разрешить комплект снаряжения, используется исходный набор:', kit?.id, error);
               return kit;
             }

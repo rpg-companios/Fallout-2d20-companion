@@ -1,0 +1,379 @@
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index d5a8d16..2ef81ba 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -642,6 +642,12 @@ export const CharacterProvider = ({ children }) => {
+     setActiveTimedEffects([]);
+     setSceneCounter(0);
+     setEquippedWeapons([]);
++    useCharacterStore.setState({
++      attributes: {},
++      skills: {},
++      items: {},
++      effects: {},
++    });
+     useCharacterStore.getState().resetRobot();
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index f3cd53b..1a3fcd0 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -18,7 +18,6 @@ import useCharacterStore from "../../../src/store/characterStore";
+ import { selectActiveTimedEffects } from "../../../src/store/selectors";
+ import { useShallow } from 'zustand/react/shallow';
+ import OriginModal from "./modals/OriginModal";
+-import TraitSkillModal from "./modals/TraitSkillModal";
+ import EquipmentKitModal from "./modals/EquipmentKitModal";
+ import { loadEnrichedOrigins } from "../../../domain/origins";
+ import { loadTraitsData } from "../../../domain/traits";
+@@ -320,7 +319,6 @@ export default function CharacterScreen() {
+ 
+   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
+   const [selectedOrigin, setSelectedOrigin] = useState(null);
+-  const [showTraitSkillModal, setShowTraitSkillModal] = useState(false);
+   const [isTraitModalVisible, setIsTraitModalVisible] = useState(false);
+   const [isEquipmentKitModalVisible, setIsEquipmentKitModalVisible] =
+     useState(false);
+@@ -503,7 +501,7 @@ export default function CharacterScreen() {
+   };
+ 
+   const handleToggleSkill = (skillName) => {
+-    if (!canDistributeSkills && !showTraitSkillModal) {
++    if (!canDistributeSkills) {
+       showAlert(tCharacterScreen("alerts.warningTitle", "Warning"), tCharacterScreen("errors.saveAttributesFirst", "Distribute and save attributes first."));
+       return;
+     }
+@@ -753,26 +751,35 @@ export default function CharacterScreen() {
+ 
+     const oldTrait = trait; // Запоминаем старую черту
+ 
+-    // Атомарно обновляем все состояния, отменяя старые и применяя новые модификаторы
+-    setAttributes((currentAttributes) => {
+-      const oldAttrMods = normalizeAttributeMap(
+-        oldTrait?.modifiers?.attributes || {},
++    // Вычисляем новые значения атрибутов (отменяем старые бонусы черты и применяем новые)
++    const oldAttrMods = normalizeAttributeMap(
++      oldTrait?.modifiers?.attributes || {},
++    );
++    const newAttrMods = normalizeAttributeMap(
++      newTrait?.modifiers?.attributes || {},
++    );
++    const nextAttributes = attributes.map((attr) => {
++      const oldBonus = getTraitAttributeBonus(
++        oldAttrMods[getCanonicalAttributeKey(attr.name)],
+       );
+-      const newAttrMods = normalizeAttributeMap(
+-        newTrait?.modifiers?.attributes || {},
++      const newBonus = getTraitAttributeBonus(
++        newAttrMods[getCanonicalAttributeKey(attr.name)],
+       );
+-      // Сначала отменяем старые модификаторы (поддержка обеих форм: число и {baseBonus,...})
+-      let tempAttrs = currentAttributes.map((attr) => ({
+-        ...attr,
+-        value:
+-          attr.value - getTraitAttributeBonus(oldAttrMods[getCanonicalAttributeKey(attr.name)]),
+-      }));
+-      // Затем применяем новые
+-      return tempAttrs.map((attr) => ({
+-        ...attr,
+-        value:
+-          attr.value + getTraitAttributeBonus(newAttrMods[getCanonicalAttributeKey(attr.name)]),
+-      }));
++      return { ...attr, value: attr.value - oldBonus + newBonus };
++    });
++    setAttributes(nextAttributes);
++
++    // Синхронизируем атрибуты в Zustand store, иначе CharacterScreen продолжит
++    // читать старые значения из store и remaining points будут считаться неверно.
++    const store = useCharacterStore.getState();
++    const storeAttributes = store.attributes || {};
++    nextAttributes.forEach((attr) => {
++      const storeAttr = storeAttributes[attr.name];
++      const storeValue = storeAttr?.base ?? 4;
++      const delta = attr.value - storeValue;
++      if (delta !== 0) {
++        store.updateAttribute(attr.name, delta);
++      }
+     });
+ 
+     const oldForcedSkills = oldTrait?.modifiers?.forcedSkills || [];
+@@ -910,26 +917,6 @@ export default function CharacterScreen() {
+     }
+   };
+ 
+-  const handleTraitSkillSelect = (skill) => {
+-    setForcedSelectedSkills((prev) => [...new Set([...prev, skill])]);
+-    setSelectedSkills((prev) => [...new Set([...prev, skill])]);
+-
+-    setSkills((prev) => {
+-      const skillIndex = prev.findIndex((s) => s.name === skill);
+-      if (skillIndex > -1) {
+-        const newSkills = [...prev];
+-        const currentSkill = newSkills[skillIndex];
+-        if (currentSkill.value < 2) {
+-          newSkills[skillIndex] = { ...currentSkill, value: 2 };
+-        }
+-        return newSkills;
+-      }
+-      return prev;
+-    });
+-
+-    setShowTraitSkillModal(false);
+-  };
+-
+   const handleSpendLuckPoint = () => {
+     if (luckPoints > 0) {
+       setLuckPoints((prev) => prev - 1);
+@@ -1304,7 +1291,7 @@ export default function CharacterScreen() {
+                         onIncrease={() => handleChangeSkillValue(index, 1)}
+                         onDecrease={() => handleChangeSkillValue(index, -1)}
+                         rowStyle={rowStyle}
+-                        disabled={!canDistributeSkills && !showTraitSkillModal}
++                        disabled={!canDistributeSkills}
+                         trait={trait}
+                         italic={isGoodSoulCapped}
+                         increaseDisabled={skillPointsLeft <= 0}
+@@ -1358,13 +1345,6 @@ export default function CharacterScreen() {
+           onConfirm={confirmReset}
+         />
+ 
+-        <TraitSkillModal
+-          visible={showTraitSkillModal && !!trait}
+-          trait={trait}
+-          onSelect={handleTraitSkillSelect}
+-          onCancel={() => setShowTraitSkillModal(false)}
+-        />
+-
+         <EquipmentKitModal
+           visible={isEquipmentKitModalVisible}
+           onClose={() => setIsEquipmentKitModalVisible(false)}
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index c8857d2..b6c24f6 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -226,6 +226,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+             try {
+               return await resolveKitItems(kit);
+             } catch (error) {
++              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error, 'stack:', error?.stack);
+               console.warn('Не удалось разрешить комплект снаряжения, используется исходный набор:', kit?.id, error);
+               return kit;
+             }
+diff --git a/components/screens/CharacterScreen/modals/TraitSkillModal.js b/components/screens/CharacterScreen/modals/TraitSkillModal.js
+deleted file mode 100644
+index 1d19e33..0000000
+--- a/components/screens/CharacterScreen/modals/TraitSkillModal.js
++++ /dev/null
+@@ -1,52 +0,0 @@
+-import React from 'react';
+-import { View, Text, TouchableOpacity, Modal } from 'react-native';
+-import { tCharacterScreen } from '../logic/characterScreenI18n';
+-import styles from '../../../../styles/TraitSkillModal.styles';
+-
+-const TraitSkillModal = ({ 
+-  visible, 
+-  trait, 
+-  onSelect, 
+-  onCancel 
+-}) => {
+-  // Показываем модальное окно только если черта существует И принадлежит Братству Стали
+-  if (!trait || trait.origin !== tCharacterScreen('origins.brotherhoodOfSteel', 'Brotherhood of Steel')) return null;
+-
+-  return (
+-    <Modal
+-      animationType="fade"
+-      transparent={true}
+-      visible={visible}
+-      onRequestClose={onCancel}
+-    >
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('modals.traitSkill.title', 'Select extra skill')}</Text>
+-          
+-          {trait.description && (
+-            <Text style={styles.modalText}>{trait.description}</Text>
+-          )}
+-
+-          {trait.forcedSkills?.map(skill => (
+-            <TouchableOpacity
+-              key={skill}
+-              style={[styles.modalButton, styles.skillOption]}
+-              onPress={() => onSelect(skill)}
+-            >
+-              <Text style={styles.buttonText}>{skill}</Text>
+-            </TouchableOpacity>
+-          ))}
+-
+-          <TouchableOpacity
+-            style={[styles.modalButton, styles.cancelButton]}
+-            onPress={onCancel}
+-          >
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel', 'Cancel')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-export default TraitSkillModal;
+diff --git a/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js b/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
+index 37b8c72..0be89c8 100644
+--- a/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
++++ b/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
+@@ -2,7 +2,7 @@ import React, { useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+ import { getTraitI18n } from '../../../../../domain/traits';
+-import { getSkillDisplayName } from '../logic/characterScreenI18n';
++import { getSkillDisplayName } from '../../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'brotherhood', modalType: 'choice' };
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/MinutemanModal.js b/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
+index 8019bcf..837d1e6 100644
+--- a/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
++++ b/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
+@@ -2,7 +2,7 @@ import React, { useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+ import { getTraitI18n } from '../../../../../domain/traits';
+-import { getSkillDisplayName } from '../logic/characterScreenI18n';
++import { getSkillDisplayName } from '../../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'minuteman', traitName: 'Народное ополчение', modalType: 'choice' };
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js b/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
+index 85aeb0e..86403ea 100644
+--- a/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
++++ b/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
+@@ -1,7 +1,7 @@
+ import React, { useState } from 'react';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+ import { getTraitI18n } from '../../../../../domain/traits';
+-import { getSkillDisplayName } from '../logic/characterScreenI18n';
++import { getSkillDisplayName } from '../../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'brotherhoodOutcast', modalType: 'choice' };
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js b/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
+index 6e74dd2..b0ff796 100644
+--- a/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
++++ b/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
+@@ -2,7 +2,7 @@ import React, { useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+ import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+-import { getSkillDisplayName } from '../logic/characterScreenI18n';
++import { getSkillDisplayName } from '../../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'vaultDweller', modalType: 'choice' };
+ 
+diff --git a/docs/schema/07-trait-debt.md b/docs/schema/07-trait-debt.md
+index 1c37110..dd54302 100644
+--- a/docs/schema/07-trait-debt.md
++++ b/docs/schema/07-trait-debt.md
+@@ -138,3 +138,78 @@ UI рендерит локализованную подпись из i18n (`labe
+ - `survivor.effects`: список ещё не пройден.
+ 
+ Когда делать: по мере необходимости в UI.
++
++---
++
++## 8. Trait-модалки: единый источник данных и отсутствующие модалки
++
++Статус: **отложенный рефакторинг**, не блокирует текущий flow.
++
++### 8.1. Хардкод модификаторов в модалках
++
++Сейчас большинство trait-модалок в `components/screens/CharacterScreen/modals/traits/`
++задают модификаторы вручную вместо чтения из `data/traits/traits.json`.
++
++Пример: `SupermutantModal.js` хардкодит
++```js
++attributes: { 'STR': 2, 'END': 2 },
++minLimits: { 'STR': 6, 'END': 6 },
++maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
++```
++Хотя в `data/traits/traits.json` у `supermutant-forced-evolution` уже есть
++корректный объект `attributes: { STR: { baseBonus, min, max }, ... }`.
++
++Это создаёт дублирование и риск рассинхронизации.
++
++Цель: все модалки (кроме особых случаев) должны брать модификаторы из
++`findTraitById(origin.traitIds[0])?.modifiers` и передавать их в
++`CharacterScreen.handleSelectTrait()` без изменений.
++
++### 8.2. Отсутствующие модалки
++
++Для origins `shadow` и `synth` есть трейты в данных, но нет
++соответствующих модалок в `components/screens/CharacterScreen/modals/traits/index.js`.
++При выборе этих origin кнопка «Черта» открывает пустоту — trait выбрать
++невозможно.
++
++Нужно создать:
++- `ShadowModal.js`
++- `SynthModal.js`
++
++и зарегистрировать их в `TRAIT_MODALS` / `TRAIT_CONFIGS` в `index.js`.
++
++Пока отложено: `shadow` и `synth` — неиграбельные origins до реализации
++модалок.
++
++### 8.3. Целевая архитектура (рекомендация)
++
++Вместо 13+ отдельных модалок с хардкодом лучше прийти к гибриду:
++
++- `GenericTraitModal.js` — одна модалка для всех «info-only» трейтов
++  (Supermutant, Ghoul, Protectron, Assaultron, MisterHandy, RoboBrain,
++  VaultDweller, Minuteman, ChildOfAtom, OutcastBrotherhood, Shadow, Synth).
++  Читает имя/описание/модификаторы из `data/traits/traits.json`.
++
++- `SkillChoiceModal.js` — параметризуемая модалка выбора 1 навыка из
++  списка, управляемая `trait.modifiers.forcedSkills` и `extraSkills`.
++  Используется для `brotherhood` и, возможно, других трейтов с
++  `skillPickChoice`/`forcedSkills`.
++
++- `MultiTraitModal.js` — модалка выбора 2 черт (Survivor/NCR). Показывает
++  `subTraitIds` из `ncr-resident` / `survivor-survivor` и даёт выбрать
++  комбинацию. Сейчас `SurvivorModal.js` + `NcrCitizenModal.js` решают
++  это локально — это допустимо, но их тоже можно свести к параметризуемой
++  `MultiTraitModal`.
++
++- `GoodSoulPickerModal.js` — вынести inline-выбор 2 навыков из
++  `CharacterScreen.js` в отдельную модалку, управляемую
++  `trait.modifiers.skillPickChoice` (см. § 5).
++
++Преимущества:
++- Единый источник правды — `data/traits/traits.json`.
++- Добавить новый origin = добавить строку в JSON, не писать новый `.js`.
++- Меньше дублирования и меньше риска рассинхронизации модификаторов.
++
++Когда делать: отдельным этапом после стабилизации текущего flow.
++Текущие модалки пока оставляем как есть (кроме удаления устаревшего
++`TraitSkillModal.js`).
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index bb093b4..c98527a 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -252,7 +252,18 @@ async function resolveEntry(entry) {
+ }
+ 
+ export async function resolveKitItems(kit) {
+-  const entries = await Promise.all((kit.items || []).map(resolveEntry));
++  console.log('[resolveKitItems] start kitId:', kit?.id, 'raw items count:', kit?.items?.length);
++  const entries = await Promise.all((kit.items || []).map(async (entry, index) => {
++    try {
++      const resolved = await resolveEntry(entry);
++      const label = resolved?.displayName || resolved?.name || resolved?.itemId || resolved?.weaponId || JSON.stringify(resolved).slice(0, 60);
++      console.log('[resolveKitItems] entry', index, 'type:', entry?.type, 'itemType:', entry?.itemType, 'resolved label:', label);
++      return resolved;
++    } catch (err) {
++      console.error('[resolveKitItems] FAILED entry', index, 'type:', entry?.type, 'itemType:', entry?.itemType, 'error:', err?.message || err);
++      throw err;
++    }
++  }));
+ 
+   const flatEntries = [];
+   for (const entry of entries) {

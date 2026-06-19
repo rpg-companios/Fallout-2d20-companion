@@ -755,26 +755,35 @@ export default function CharacterScreen() {
 
     const oldTrait = trait; // Запоминаем старую черту
 
-    // Атомарно обновляем все состояния, отменяя старые и применяя новые модификаторы
-    setAttributes((currentAttributes) => {
-      const oldAttrMods = normalizeAttributeMap(
-        oldTrait?.modifiers?.attributes || {},
+    // Вычисляем новые значения атрибутов (отменяем старые бонусы черты и применяем новые)
+    const oldAttrMods = normalizeAttributeMap(
+      oldTrait?.modifiers?.attributes || {},
+    );
+    const newAttrMods = normalizeAttributeMap(
+      newTrait?.modifiers?.attributes || {},
+    );
+    const nextAttributes = attributes.map((attr) => {
+      const oldBonus = getTraitAttributeBonus(
+        oldAttrMods[getCanonicalAttributeKey(attr.name)],
       );
-      const newAttrMods = normalizeAttributeMap(
-        newTrait?.modifiers?.attributes || {},
+      const newBonus = getTraitAttributeBonus(
+        newAttrMods[getCanonicalAttributeKey(attr.name)],
       );
-      // Сначала отменяем старые модификаторы (поддержка обеих форм: число и {baseBonus,...})
-      let tempAttrs = currentAttributes.map((attr) => ({
-        ...attr,
-        value:
-          attr.value - getTraitAttributeBonus(oldAttrMods[getCanonicalAttributeKey(attr.name)]),
-      }));
-      // Затем применяем новые
-      return tempAttrs.map((attr) => ({
-        ...attr,
-        value:
-          attr.value + getTraitAttributeBonus(newAttrMods[getCanonicalAttributeKey(attr.name)]),
-      }));
+      return { ...attr, value: attr.value - oldBonus + newBonus };
+    });
+    setAttributes(nextAttributes);
+
+    // Синхронизируем атрибуты в Zustand store, иначе CharacterScreen продолжит
+    // читать старые значения из store и remaining points будут считаться неверно.
+    const store = useCharacterStore.getState();
+    const storeAttributes = store.attributes || {};
+    nextAttributes.forEach((attr) => {
+      const storeAttr = storeAttributes[attr.name];
+      const storeValue = storeAttr?.base ?? 4;
+      const delta = attr.value - storeValue;
+      if (delta !== 0) {
+        store.updateAttribute(attr.name, delta);
+      }
     });
 
     const oldForcedSkills = oldTrait?.modifiers?.forcedSkills || [];
