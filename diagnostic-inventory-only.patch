@@ -1,0 +1,74 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index f3cd53b..f4cd013 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -458,11 +458,14 @@ export default function CharacterScreen() {
+     const isRobot = Boolean(kit.robotSlots);
+ 
+     // 1. Add kit items to Zustand Store
++    console.log('[handleSelectKit] kit.items count:', kit.items?.length, 'isRobot:', isRobot);
+     if (kit.items && Array.isArray(kit.items)) {
+       kit.items.forEach(item => {
+         // Currency (caps) is not an inventory item — it is tracked separately via
+         // setCaps below. Skip it so it never hits addNewItem (which would warn about
+         // a missing id field).
++        console.log('[handleSelectKit] candidate item:', item?.name, 'itemType:', item?.itemType,
++          'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
+         if (item?.itemType === 'currency' || item?.type === 'currency') return;
+         useCharacterStore.getState().addNewItem({
+           ...item,
+@@ -470,6 +473,7 @@ export default function CharacterScreen() {
+           locked:   isRobot ? true : false,
+         });
+       });
++      console.log('[handleSelectKit] store items after add:', Object.keys(useCharacterStore.getState().items));
+     }
+ 
+     // 2. Set equipment metadata
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 22e55ac..c94aaaf 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -501,6 +501,8 @@ const useCharacterStore = create(devtools(
+       addNewItem: (item) => {
+         const state = get();
+         const items = { ...state.items };
++        console.log('[addNewItem] received:', item?.name, 'itemType:', item?.itemType,
++          'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
+         
+         if (!item) {
+           console.warn('addNewItem: item is null or undefined');
+@@ -516,6 +518,7 @@ const useCharacterStore = create(devtools(
+           console.warn('addNewItem: item missing any known id field', item);
+           return;
+         }
++        console.log('[addNewItem] canonical id:', weaponId);
+         
+         // Get applied mods
+         const appliedMods = item.appliedMods || {};
+@@ -595,6 +598,7 @@ const useCharacterStore = create(devtools(
+         // Add item to store
+         items[itemId] = normalizeItemParameters(finalItem);
+         
++        console.log('[addNewItem] stored under key:', itemId, 'equipped:', finalItem.equipped, 'itemType:', finalItem.itemType);
+         set({ items });
+         get().recalculateDerivedStats();
+         
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index 1dd01f8..485d301 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -141,9 +141,12 @@ export const storeItemToWeaponDisplay = (item) => {
+  * @param {boolean} equipped - true for equipped items, false for inventory
+  */
+ export const selectItemsByEquipped = (state, equipped) => {
+-  return Object.values(state.items || {}).filter(
++  const matched = Object.values(state.items || {}).filter(
+     (item) => Boolean(item.equipped) === equipped,
+   );
++  console.log('[selectItemsByEquipped] total items:', Object.keys(state.items || {}).length,
++    'equipped filter:', equipped, 'matched:', matched.length);
++  return matched;
+ };
+ 
+ /**

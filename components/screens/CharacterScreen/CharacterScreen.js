@@ -18,7 +18,6 @@ import useCharacterStore from "../../../src/store/characterStore";
 import { selectActiveTimedEffects } from "../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
-import TraitSkillModal from "./modals/TraitSkillModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins } from "../../../domain/origins";
 import { loadTraitsData } from "../../../domain/traits";
@@ -320,7 +319,6 @@ export default function CharacterScreen() {
 
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
-  const [showTraitSkillModal, setShowTraitSkillModal] = useState(false);
   const [isTraitModalVisible, setIsTraitModalVisible] = useState(false);
   const [isEquipmentKitModalVisible, setIsEquipmentKitModalVisible] =
     useState(false);
@@ -458,11 +456,14 @@ export default function CharacterScreen() {
     const isRobot = Boolean(kit.robotSlots);
 
     // 1. Add kit items to Zustand Store
+    console.log('[handleSelectKit] kit.items count:', kit.items?.length, 'isRobot:', isRobot);
     if (kit.items && Array.isArray(kit.items)) {
       kit.items.forEach(item => {
         // Currency (caps) is not an inventory item — it is tracked separately via
         // setCaps below. Skip it so it never hits addNewItem (which would warn about
         // a missing id field).
+        console.log('[handleSelectKit] candidate item:', item?.name, 'itemType:', item?.itemType,
+          'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
         if (item?.itemType === 'currency' || item?.type === 'currency') return;
         useCharacterStore.getState().addNewItem({
           ...item,
@@ -470,6 +471,7 @@ export default function CharacterScreen() {
           locked:   isRobot ? true : false,
         });
       });
+      console.log('[handleSelectKit] store items after add:', Object.keys(useCharacterStore.getState().items));
     }
 
     // 2. Set equipment metadata
@@ -503,7 +505,7 @@ export default function CharacterScreen() {
   };
 
   const handleToggleSkill = (skillName) => {
-    if (!canDistributeSkills && !showTraitSkillModal) {
+    if (!canDistributeSkills) {
       showAlert(tCharacterScreen("alerts.warningTitle", "Warning"), tCharacterScreen("errors.saveAttributesFirst", "Distribute and save attributes first."));
       return;
     }
@@ -910,26 +912,6 @@ export default function CharacterScreen() {
     }
   };
 
-  const handleTraitSkillSelect = (skill) => {
-    setForcedSelectedSkills((prev) => [...new Set([...prev, skill])]);
-    setSelectedSkills((prev) => [...new Set([...prev, skill])]);
-
-    setSkills((prev) => {
-      const skillIndex = prev.findIndex((s) => s.name === skill);
-      if (skillIndex > -1) {
-        const newSkills = [...prev];
-        const currentSkill = newSkills[skillIndex];
-        if (currentSkill.value < 2) {
-          newSkills[skillIndex] = { ...currentSkill, value: 2 };
-        }
-        return newSkills;
-      }
-      return prev;
-    });
-
-    setShowTraitSkillModal(false);
-  };
-
   const handleSpendLuckPoint = () => {
     if (luckPoints > 0) {
       setLuckPoints((prev) => prev - 1);
@@ -1304,7 +1286,7 @@ export default function CharacterScreen() {
                         onIncrease={() => handleChangeSkillValue(index, 1)}
                         onDecrease={() => handleChangeSkillValue(index, -1)}
                         rowStyle={rowStyle}
-                        disabled={!canDistributeSkills && !showTraitSkillModal}
+                        disabled={!canDistributeSkills}
                         trait={trait}
                         italic={isGoodSoulCapped}
                         increaseDisabled={skillPointsLeft <= 0}
@@ -1356,13 +1338,6 @@ export default function CharacterScreen() {
           visible={showResetWarning}
           onCancel={cancelReset}
           onConfirm={confirmReset}
-        />
-
-        <TraitSkillModal
-          visible={showTraitSkillModal && !!trait}
-          trait={trait}
-          onSelect={handleTraitSkillSelect}
-          onCancel={() => setShowTraitSkillModal(false)}
         />
 
         <EquipmentKitModal

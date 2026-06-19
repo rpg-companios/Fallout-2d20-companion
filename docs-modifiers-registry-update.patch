@@ -1,0 +1,627 @@
+From 7bdc9e38db834727dc7d71225f7396f54cc50223 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 18 Jun 2026 10:07:14 +0000
+Subject: [PATCH] docs(schema/06): fill gaps in modifiers registry + status
+ markers + perks/aggregator contract
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+What changed in docs/schema/06-modifiers.md:
+
+- Every modifier entry now carries an explicit implementation status:
+  ✅ implemented & used, 🟡 implemented/contract but unused, ⚠️ described
+  but engine doesn't read it (debt), 🗑 legacy/forbidden in new data.
+
+- Added 7 modifier fields that exist in data but were missing from the
+  registry: 'armorConstraint', 'carryWeightFixed' (was implied via
+  'carryWeightLimit'), 'ncrInfantryWeaponIds' (tagged legacy → migrates
+  to 'weaponDamageBonus'), 'robotBodyPlan', 'robotRules', 'robotType',
+  'attributes' (legacy form). Each placed in the right section (new
+  § 1.9 for robot-specific, new § 1.10 for legacy).
+
+- Marked 'skillModifiers' as ⚠️: engine does not read it yet. Removed
+  the 'TODO: T-3 → canonical' notes that were stale (canonical is done).
+  Added explicit contract: this is THE field for 'perk gives +N to a
+  skill' / 'chem gives +N to a skill'.
+
+- Added new contract entries that don't exist in data yet but fix the
+  open design questions the owner asked:
+    * 'skillBonusChoice' 🟡 — 'perk gives +N to a skill of the player's
+      choice' (resolves to skillModifiers on the active perk instance).
+    * 'attributePointsBonus' ⚠️ — clearly noted that the perk
+      'Intense Training' currently works through a hardcoded check on
+      the Russian name in PerksAndTraitsScreen.js (and even reads a
+      non-existent perk.modifiers.attributeBonus). This is the debt to
+      retire when the aggregator lands.
+
+- Clarified that the 'weaponDamageBonus' contract is asserted by the
+  existing test suite (domain/weaponDamageBonus.test.js) but the
+  matching readers in domain/traits.js are not yet implemented — the
+  tests are red until that lands.
+
+- Removed stale '(TODO T-3 → canonical)' notes on forcedSkills and
+  skillModifiers — canonical UPPER_SNAKE_CASE is now enforced by
+  domain/contract.skills.test.js.
+
+- New § 3.2 introduces the contract for a single aggregator function:
+  domain/modifiers.js#aggregateModifiers(sources) — the only place that
+  walks origin / trait / active perks / active chem effects and produces
+  a merged map. No consumer code is allowed to read trait.modifiers.X
+  or perk.modifiers.X directly outside this module. Today's fragmented
+  readers (getTraitAttributeBonus, getRemainingAttributePoints, …) are
+  documented as transitional.
+
+- New § 3.3 gives ready-to-use recipes for the owner's two concrete
+  questions: 'how to write a perk that gives +N to a skill' and 'will
+  Intense Training work with the new format' — both reduce to
+  modifiers: { skillModifiers: {...} } / { attributePointsBonus: N }
+  once the aggregator lands.
+
+No code changes. This is the contract that the upcoming
+domain/modifiers.js refactor will implement against.
+---
+ docs/schema/06-modifiers.md | 434 ++++++++++++++++++++++++++----------
+ 1 file changed, 313 insertions(+), 121 deletions(-)
+
+diff --git a/docs/schema/06-modifiers.md b/docs/schema/06-modifiers.md
+index 2e473a4..0ecdbd5 100644
+--- a/docs/schema/06-modifiers.md
++++ b/docs/schema/06-modifiers.md
+@@ -1,8 +1,9 @@
+ # Схема: Modifiers (модификаторы) — универсальный каталог
+ 
+ > Этот документ — **каталог всех известных модификаторов**: что каждый делает, где живёт,
+-> как применяется. Цель — любой ИИ или человек может заглянуть сюда, понять существующие
+-> модификаторы, и спроектировать новый (или повторно использовать готовый) по тому же шаблону.
++> как применяется, и реализован ли он на сегодня. Цель — любой человек/агент может
++> заглянуть сюда, понять существующие модификаторы и спроектировать новый (или повторно
++> использовать готовый) по тому же шаблону.
+ 
+ ## 0. Что такое модификатор
+ 
+@@ -14,163 +15,263 @@
+ - Имеют **одну** точку истины: либо поле на трейте, либо на ориджине, либо на перке,
+   и т.д. Дубликаты между источниками — недопустимы (см. T-1 в `02-traits.md`).
+ - Имеют **описанный приоритет** при коллизии (что перебивает что).
++- Числовые операторы — **только additive** (`+`, `-`). Мультипликативных (`*`, `/`)
++  пока нет; если появится — вводить осознанно вместе с правилом приоритета (см. § 2).
+ 
+ Источники модификаторов (все живут в `modifiers: { ... }`):
+ 
+ | Источник | Где живёт | Когда применяется |
+ |---|---|---|
+ | `Origin` | `data/origins/origins.json` | на персонаже всегда (если origin выбран) |
+-| `Trait` | `data/traits/traits.json` | после выбора трейты (только выбранной) |
+-| `Perk` | (будущее) | после выбора перка |
+-| `Consumable effect` | (будущее) | во время действия эффекта (на сцене) |
++| `Trait` | `data/traits/traits.json` | после выбора трейта |
++| `Perk` | `data/perks/perks.json` | после выбора перка (см. § 3 — пока без `modifiers`) |
++| `Consumable effect` (chem/food/drink) | `data/consumables/*.json` | во время действия эффекта |
+ | `Item` (броня/оружие) | `data/equipment/{armor,weapons,robot}.json` | пока предмет экипирован |
+ 
+ Все модификаторы выше **одинаковы по форме** (`{key: value}`), но **различаются по
+-приоритету** при слиянии (см. раздел «Приоритеты» в конце).
++приоритету** при слиянии (см. § 2 «Приоритеты»).
++
++### Легенда статусов
++
++В каждом поле ниже стоит маркер реализации:
++
++- ✅ — **реализовано** в `domain/*` и **используется** в данных.
++- 🟡 — **реализовано**, но в текущих данных не встречается (зарезервировано).
++- ⚠️ — **описано в данных** или встречается, но **движок не читает** (TODO: имплементация).
++- 🗑 — **legacy** форма; в данных может встречаться, но в новых записях запрещено,
++  будет мигрировано.
+ 
+ ## 1. Каталог модификаторов
+ 
+-Формат записи: **key** — тип значения — scope — источник — поведение.
++Формат записи каждого поля:
++- **Тип** значения.
++- **Источники** — где разрешено: origin / trait / perk / chem / item.
++- **Поведение** — как движок применяет.
++- **Оператор** — additive по умолчанию (числа складываются), если не сказано иное.
++- **Пример** — `"key": value` с пояснением.
++- **Статус** — маркер реализации.
+ 
+ ### 1.1. Атрибуты
+ 
+-#### `attributeBonus`
+-- **Тип:** `{ [ATTR]: number }` где `ATTR ∈ {STR,END,PER,AGI,INT,CHA,LCK}`, `number` может быть отрицательным.
+-- **Где:** trait, perk.
++#### `attributeBonus` ✅
++- **Тип:** `{ [ATTR]: number }` где `ATTR ∈ {STR,END,PER,AGI,INT,CHA,LCK}`. Число может быть отрицательным.
++- **Источники:** trait, perk (целевое), chem-effect (целевое).
+ - **Поведение:** +N к базовому значению атрибута. Бонус и лимит независимы — трейт
+   может дать бонус без лимита.
++- **Оператор:** additive (все источники складываются).
+ - **Пример:**
+   ```jsonc
+-  "attributeBonus": { "STR": 2, "END": 2 }
++  "attributeBonus": { "STR": 2, "END": 2 }  // +2 к STR и +2 к END
+   ```
++- **Статус:** ✅ читается из trait (`getTraitAttributeBonus`); 🟡 для perk/chem — поле допустимо, но активных источников нет.
+ 
+-#### `attributeLimits`
++#### `attributeLimits` ✅
+ - **Тип:** `{ [ATTR]: { min?: number, max?: number } }`.
+-- **Где:** trait, perk.
+-- **Поведение:** расширяет нижнюю/верхнюю границу атрибута. min/max могут быть
+-  заданы независимо (`{ max: 6 }` — только верхняя граница).
++- **Источники:** trait, perk (целевое).
++- **Поведение:** расширяет нижнюю/верхнюю границу атрибута. `min`/`max` можно задать
++  независимо (`{ max: 6 }` — только верхняя граница).
++- **Оператор:** при нескольких источниках — пока N/A (только один источник существует);
++  правило когда появится: «самый широкий» = `min` из всех `min`, `max` из всех `max`.
+ - **Пример:**
+   ```jsonc
+   "attributeLimits": { "STR": { "min": 6, "max": 12 }, "CHA": { "max": 6 } }
+   ```
++- **Статус:** ✅ trait.
+ 
+-#### `attributePointsBonus`
++#### `attributePointsBonus` ⚠️
+ - **Тип:** `number`.
+-- **Где:** trait, perk.
++- **Источники:** trait, perk (целевое — критично для перка «Интенсивные тренировки»).
+ - **Поведение:** +N очков распределения сверх базовых 12.
++- **Оператор:** additive из всех активных источников.
++- **Пример:**
++  ```jsonc
++  "attributePointsBonus": 1  // +1 очко атрибута к 12 базовым
++  ```
++- **Статус:** ✅ читается из **trait** (`getRemainingAttributePoints`).
++  ⚠️ Из **perk** — НЕ читается через универсальный путь: для перка «Интенсивные
++  тренировки» сейчас работает хардкод по русскому имени в
++  `components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js`, который к тому же
++  пытается прочитать `perk.modifiers?.attributeBonus`, которого в данных перка нет
++  (срабатывает fallback `|| 1`). Это **долг**: перевести на чтение
++  `perk.modifiers.attributePointsBonus` через общий агрегатор (см. § 3 ниже).
+ 
+ ### 1.2. Навыки
+ 
+-#### `forcedSkills`
+-- **Тип:** `string[]` (имена навыков — локализованные сейчас, TODO T-3 → canonical).
+-- **Где:** trait.
+-- **Поведение:** навыки из списка становятся тегами (стартовое значение 2).
++#### `forcedSkills` ✅
++- **Тип:** `string[]` — canonical SKILL keys (UPPER_SNAKE_CASE из `ALL_SKILL_KEYS`).
++- **Источники:** trait.
++- **Поведение:** перечисленные навыки становятся теговыми со стартовым значением 2,
++  помечены как extra-tagged (особый цвет в UI).
++- **Оператор:** union списков.
++- **Пример:**
++  ```jsonc
++  "forcedSkills": ["SURVIVAL"]  // гарантированный extra-tagged навык
++  ```
++- **Статус:** ✅.
+ 
+-#### `extraSkills`
++#### `extraSkills` ✅
+ - **Тип:** `number`.
+-- **Где:** trait.
+-- **Поведение:** +N дополнительных тегов на выбор игрока.
+-
+-#### `skillModifiers`
+-- **Тип:** `{ [skillName]: number }` (TODO T-3 → canonical keys).
+-- **Где:** trait.
+-- **Поведение:** +N к значению навыка.
++- **Источники:** trait.
++- **Поведение:** +N дополнительных тегов на выбор игрока (сверх базовых 3).
++- **Оператор:** additive из всех активных источников.
++- **Пример:**
++  ```jsonc
++  "extraSkills": 1
++  ```
++- **Статус:** ✅.
++
++#### `skillModifiers` ⚠️
++- **Тип:** `{ [SKILL]: number }` — canonical SKILL keys.
++- **Источники:** trait, perk, chem-effect.
++- **Поведение:** **+N к рангу навыка** (постоянный модификатор поверх распределения
++  игрока). Семантика: персонаж может **раскачать** навык на +N выше, чем дал бы
++  только distribution. Лимит навыка (`skillMaxValue`) при этом не сдвигается.
++- **Оператор:** additive из всех активных источников.
++- **Пример (перк, гарантированный +2 к Energy Weapons):**
++  ```jsonc
++  "skillModifiers": { "ENERGY_WEAPONS": 2 }
++  ```
++- **Статус:** ⚠️ движок **сейчас не читает** это поле в расчёте навыка
++  (`canChangeSkillValue` / `validateSkills` смотрят только `skillMaxValue`).
++  В данных используется в **0** местах — у Ghoul оно было дублем (`forcedSkills`
++  уже даёт +2 через теговую механику), снято в коммите cleanup. Поле описано как
++  **контракт**: ровно через него будут реализованы перки/chem'ы, дающие +N к
++  конкретному навыку. Реализация — через общий агрегатор (§ 3).
++
++#### `skillBonusChoice` 🟡
++- **Тип:** `{ amount: number, from: string[] | "any" }`.
++- **Источники:** perk, chem-effect (будущее).
++- **Поведение:** «+N к навыку **на выбор игрока**». При выборе перка/применении chem'а
++  открывается модалка выбора одного навыка из списка `from` (или из любого
++  `"any"` = ALL_SKILL_KEYS); итог записывается как `skillModifiers: { CHOSEN: amount }`
++  на инстансе перка/эффекта.
++- **Оператор:** см. `skillModifiers` (результат превращается в него).
++- **Пример (перк «+2 к любому навыку»):**
++  ```jsonc
++  "skillBonusChoice": { "amount": 2, "from": "any" }
++  ```
++- **Пример (перк «+2 к одному из 3 боевых»):**
++  ```jsonc
++  "skillBonusChoice": { "amount": 2, "from": ["SMALL_GUNS", "ENERGY_WEAPONS", "BIG_GUNS"] }
++  ```
++- **Статус:** 🟡 формат фиксируется как контракт. Данных и UI пока нет.
+ 
+-#### `skillMaxValue`
++#### `skillMaxValue` ✅
+ - **Тип:** `number` (по умолчанию 6).
+-- **Где:** trait.
+-- **Поведение:** верхняя граница навыка; на 1 уровне ≤ 3.
++- **Источники:** trait.
++- **Поведение:** общий верхний потолок для всех навыков; на 1 уровне дополнительно ≤ 3.
++- **Оператор:** при нескольких источниках — берётся максимум (расширяет, не сужает).
++- **Пример:**
++  ```jsonc
++  "skillMaxValue": 4  // Shadow: потолок навыков = 4
++  ```
++- **Статус:** ✅.
+ 
+ ### 1.3. Перки
+ 
+-#### `extraPerks` / `extraPerkSlots`
++#### `extraPerks` / `extraPerkSlots` ✅
+ - **Тип:** `number`.
+-- **Где:** trait.
++- **Источники:** trait.
+ - **Поведение:** +N перк-слотов на выбор.
++- **Оператор:** additive.
++- **Статус:** ✅.
+ 
+ ### 1.4. Carry weight (переносимый вес)
+ 
+-#### `carryWeightLimit`
+-- **Тип:** `number`.
+-- **Где:** **trait (робот)** И **body catalog** (`data/equipment/robot/robotbody.json`).
+-- **Поведение:** базовый лимит переносимого веса **для роботов**. Один ключ в обоих
+-  источниках — body конкретизирует/перебивает trait:
+-  1. Если в слоте тела (`body`/`chassis`/`thruster`) есть `limb.carryWeightLimit` → это.
+-  2. Иначе `trait.modifiers.carryWeightLimit` (по умолчанию 150).
+-- **Пример (trait):**
+-  ```jsonc
+-  "carryWeightLimit": 225  // протекрон в базе несёт 225
+-  ```
+-- **Пример (body):**
++#### `carryWeightFixed` ✅
++- **Тип:** `number` (по умолчанию 150).
++- **Источники:** trait (human + robot).
++- **Поведение:** базовый лимит переносимого веса до применения формулы STR.
++  - Для **human**: итог = `carryWeightFixed + STR × carryWeightStrengthMultiplier + armor_mods`.
++  - Для **robot**: итог = `(body.carryWeight ?? carryWeightFixed) + armor_mods` (STR не влияет).
++- **Пример:**
+   ```jsonc
+-  "carryWeightLimit": 200  // конкретный корпус несёт 200
++  "carryWeightFixed": 150
+   ```
++- **Статус:** ✅ читается в `domain/equipEquip.js` и `calculateCarryWeight`.
+ 
+-#### `carryWeightStrengthMultiplier`
++#### `carryWeightStrengthMultiplier` ✅
+ - **Тип:** `number` (по умолчанию 10).
+-- **Где:** trait (human).
++- **Источники:** trait (human).
+ - **Поведение:** множитель STR в формуле веса для людей:
+   `weight = base + STR × multiplier + armor_mods`.
++- **Пример:**
++  ```jsonc
++  "carryWeightStrengthMultiplier": 0   // супермутант: STR не влияет
++  ```
++- **Статус:** ✅.
+ 
+-#### `carryWeight` *(legacy, additive)*
++#### `carryWeightLimit` 🗑
+ - **Тип:** `number`.
+-- **Где:** trait (human, опц., сейчас не используется ни одним трейтом).
+-- **Поведение:** +N к базовому лимиту **поверх** формулы (отдельный аддитивный модификатор).
+-  **Семантически отличается от `carryWeightLimit`** (которое = база для роботов).
+-- **TODO:** переименовать в `carryWeightBonus` для ясности.
++- **Источники:** ранее trait+body для роботов.
++- **Статус:** 🗑 legacy. В новых данных не использовать — заменено на пару
++  `carryWeightFixed` (trait) + `carryWeight` на корпусе робота (`data/equipment/robot/robotbody.json`).
+ 
+-#### `carryWeightModifier` *(на предметах)*
++#### `carryWeightModifier` *(на предметах)* ✅
+ - **Тип:** `number` (может быть отрицательным).
+ - **Где:** armor, clothing, plating/frame/robot armor (catalog).
+-- **Поведение:** +N к итоговому carry weight **для конкретного слота** (надевается).
++- **Поведение:** +N к итоговому carry weight за надетый предмет.
++- **Оператор:** additive по слотам.
++- **Статус:** ✅.
+ 
+ ### 1.5. Производные / ресурсы
+ 
+-#### `luckMaxDelta`
++#### `luckMaxDelta` ✅
+ - **Тип:** `number` (может быть отрицательным).
+-- **Где:** trait.
++- **Источники:** trait, perk (целевое).
+ - **Поведение:** сдвиг максимума очков удачи.
++- **Оператор:** additive.
++- **Статус:** ✅ trait.
+ 
+-#### `meleeBonusDelta`
++#### `meleeBonusDelta` ✅
+ - **Тип:** `number` (может быть отрицательным).
+-- **Где:** trait.
+-- **Поведение:** +N к бонусу ближнего боя (сверх STR-ступеней).
++- **Источники:** trait, perk (целевое).
++- **Поведение:** +N к бонусу ближнего боя (сверх STR-ступеней 7→+1, 9→+2, 11→+3).
++- **Оператор:** additive.
++- **Статус:** ✅ trait.
+ 
+ ### 1.6. Иммунитеты / сопротивления / эффекты
+ 
+-#### `immunities`
+-- **Тип:** `string[]` (значения: `'disease'`, `'radiation'`, `'poison'`, ...).
+-- **Где:** **trait**, **origin** (`origin.immunities` — опц.).
+-- **Поведение:** явный список иммунитетов. Если есть — добавляются к проверке
+-  иммунитетов персонажа. **Не type-derived** (см. отклонение в `01-origins.md`).
++#### `immunities` ✅
++- **Тип:** `string[]` (значения: `'disease'`, `'radiation'`, `'poison'`, …).
++- **Источники:** trait, origin.
++- **Поведение:** явный список иммунитетов. Не type-derived (см. отклонение в `01-origins.md`).
++- **Оператор:** union множеств; повторы не дублируются.
+ - **Пример:**
+   ```jsonc
+   "immunities": ["radiation", "poison"]
+   ```
++- **Статус:** ✅.
+ 
+-#### `radiationResistance`
++#### `radiationResistance` ✅
+ - **Тип:** `number`.
+-- **Где:** trait.
+-- **Поведение:** сопротивление радиации (не иммунитет, а снижение урона).
+-
+-#### `effects`
+-- **Тип:** `string[]` (именованные флаги).
+-- **Где:** trait.
+-- **Поведение:** именованный эффект-флаг. Семантика зависит от самого флага.
+-- **TODO (отдельная задача):** аудит 28+ эффектов (`slow_aging` уже дропнут как мусор).
++- **Источники:** trait, perk (целевое).
++- **Поведение:** сопротивление радиации (снижение урона, не иммунитет).
++- **Оператор:** additive.
++- **Статус:** ✅ trait.
++
++#### `effects` ⚠️
++- **Тип:** `string[]` — именованные флаги (например `'radiation_healing'`,
++  `'stealth_boy_addiction'`, `'no_aging'`).
++- **Источники:** trait, perk (целевое), chem-effect.
++- **Поведение:** именованный эффект-флаг. Семантика определяется самим флагом
++  (реализуется в `domain/effects.js`).
++- **Статус:** ⚠️ список флагов растёт без аудита. Часть флагов имеют реализацию
++  (`radiation_healing` — ☐ см. D-1 в `04-derived.md`), часть — заглушки. **TODO:**
++  отдельный аудит всех флагов + единый реестр.
+ 
+ ### 1.7. Универсальные модификаторы (трейт / перк / химия)
+ 
+ Эти модификаторы **применимы в любом источнике** (трейт, перк, эффект химии) и
+ движок суммирует их из всех активных источников.
+ 
+-#### `weaponDamageBonus`
++#### `weaponDamageBonus` 🟡
+ - **Тип:** `Array<{ weaponIds?: string[], weaponId?: string, skillKey?: string, bonus: number }>`.
+-- **Где:** trait, perk, consumable effect (в будущем).
++- **Источники:** trait, perk, consumable effect.
+ - **Поведение:** запись матчит оружие по `weaponIds[]`, `weaponId` или `skillKey`
+-  (UPPER_SNAKE_CASE из `ALL_SKILL_KEYS`). При совпадении прибавляет `bonus` (может
+-  быть отрицательным — штраф). Несколько записей в массиве суммируются для одного
+-  оружия. Движок суммирует из всех активных источников через `getWeaponDamageBonusFromSources`.
++  (UPPER_SNAKE_CASE). При совпадении прибавляет `bonus`. Несколько записей
++  суммируются. Движок суммирует из всех источников через
++  `getWeaponDamageBonusFromSources` (по тестам в `domain/weaponDamageBonus.test.js`).
+ - **Пример:**
+   ```jsonc
+   "weaponDamageBonus": [
+@@ -178,67 +279,158 @@
+     { "skillKey": "BIG_GUNS", "bonus": -1 }
+   ]
+   ```
++- **Статус:** 🟡 функция `getWeaponDamageBonus` / `getWeaponDamageBonusFromSources` —
++  ожидается тестами, **но реализации в `domain/traits.js` нет**, тесты падают.
++  В данных используется только `ncrInfantryWeaponIds` (legacy). **TODO:**
++  реализовать функции + мигрировать `ncrInfantryWeaponIds` → `weaponDamageBonus`.
++
++#### `ncrInfantryWeaponIds` 🗑
++- **Тип:** `string[]`.
++- **Источники:** trait (`ncr-infantryman`).
++- **Поведение:** прибавляет +1 к урону для перечисленных оружий (читается напрямую
++  в `WeaponsAndArmorScreen.js`).
++- **Статус:** 🗑 legacy. План: заменить на `weaponDamageBonus`.
+ 
+ ### 1.8. Структурные (метаданные трейта)
+ 
+-#### `isMultiTrait`
++#### `isMultiTrait` ✅
+ - **Тип:** `boolean`.
+-- **Где:** trait.
++- **Источники:** trait.
+ - **Поведение:** маркер «это контейнер с под-чертами» (NCR, Survivor, Savage).
+ 
+-#### `subTraitIds`
++#### `subTraitIds` ✅
+ - **Тип:** `string[]`.
+-- **Где:** trait (multi-trait).
++- **Источники:** trait (multi-trait).
+ - **Поведение:** список id под-черт для выбора.
+ 
+-#### `goodSoulSkills`
+-- **Тип:** `string[]` (canonical skill keys).
+-- **Где:** trait (`ncr-good-soul`).
++#### `goodSoulSkills` 🟡
++- **Тип:** `string[]` — canonical SKILL keys.
++- **Источники:** trait (`ncr-good-soul`).
+ - **Поведение:** список навыков, которые Good Soul даёт на выбор. Источник истины
+-  для `goodSoulGroup` (раньше хардкодился в `SurvivorModal.js`).
++  для `goodSoulGroup`.
++- **Статус:** 🟡 описано в контракте; в текущих данных у `ncr-good-soul`
++  это поле отсутствует, в коде используется хардкод-массив
++  `GOOD_SOUL_SKILL_KEYS` в `CharacterScreen.js`. **TODO:** перенести в данные
++  и читать из `findTraitById('ncr-good-soul').modifiers.goodSoulSkills`.
+ 
+-## 2. Приоритеты при коллизии
++### 1.9. Робото-специфика (только для трейтов роботов)
+ 
+-Если один и тот же атрибут модифицируется несколькими источниками одновременно:
++#### `armorConstraint` ✅
++- **Тип:** `string` — например `"mutantOnly"`.
++- **Источники:** trait (например, super mutant).
++- **Поведение:** ограничивает, какую броню можно надевать.
++- **Статус:** ✅.
+ 
+-| Сценарий | Приоритет |
+-|---|---|
+-| **Атрибуты** (attributeBonus, attributeLimits) | additive — все источники складываются (если не противоречат) |
+-| **Иммунитеты** | additive (union множеств) — повторы не дублируются |
+-| **Иммунитеты по типу** | ❌ НЕ применяется (отклонение от `01-origins.md`); только явные списки |
+-| **Carry weight limit (робот)** | body.carryWeightLimit → trait.carryWeightLimit → 150 |
+-| **Carry weight limit (human)** | база = 150 + STR × multiplier (multiplier из trait) + additive `carryWeight` |
+-| **Carry weight modifier (предмет)** | additive per slot (броня + одежда для людей; plating/armor/frame для робо-слотов) |
+-| **weaponDamageBonus** | additive — все активные источники суммируются |
+-| **skillMaxValue** | берётся максимум (расширяет потолок, не сужает) |
+-| **forcedSkills / subTraitIds** | union |
++#### `robotBodyPlan` ✅
++- **Тип:** `string` — id плана тела (`"protectron"`, `"assaultron"`, …).
++- **Источники:** trait (робот).
++- **Поведение:** задаёт схему слотов робота.
+ 
+-## 3. Шаблон: как добавить новый модификатор
++#### `robotRules` ✅
++- **Тип:** `object` — настройки правил робота.
++- **Источники:** trait.
+ 
+-Если нужно ввести новый модификатор (например, `criticalHitBonus`):
++#### `robotType` ✅
++- **Тип:** `string`.
++- **Источники:** trait.
+ 
+-1. **Опиши в этом документе** (раздел 1.x):
+-   - Имя ключа (camelCase).
+-   - Тип значения.
+-   - Где живёт (trait / perk / origin / item / chem effect).
+-   - Поведение (как движок применяет).
+-   - Приоритет при коллизии (раздел 2).
++### 1.10. Legacy-формы (запрещены в новых данных)
+ 
+-2. **Добавь в `data/...`** — фикстуры, использующие модификатор.
++#### `attributes` 🗑
++- **Тип:** `{ [ATTR]: number | object }` — старая форма, смешивавшая бонус и лимиты.
++- **Статус:** 🗑 legacy. Заменено на пару `attributeBonus` + `attributeLimits`.
+ 
+-3. **Добавь хелпер в `domain/`** — чистую функцию (например, `getCriticalHitBonus(character)`).
+-
+-4. **Добавь тест в `domain/*.test.js`** — поведение функции, edge cases.
++## 2. Приоритеты при коллизии
+ 
+-5. **Используй в UI / резолверах** через хелпер.
++Если один и тот же атрибут модифицируется несколькими источниками одновременно:
+ 
+-6. **Если нужен UI-текст** — вынеси в i18n (`i18n/{locale}/...`), не хардкодь.
++| Сценарий | Приоритет |
++|---|---|
++| **Атрибуты** (`attributeBonus`, `attributeLimits`) | additive — все источники складываются (если не противоречат) |
++| **Иммунитеты** | additive (union множеств) — повторы не дублируются |
++| **Иммунитеты по типу** | ❌ НЕ применяется (отклонение от `01-origins.md`); только явные списки |
++| **Carry weight base (робот)** | `body.carryWeight` → `trait.carryWeightFixed` → 150 |
++| **Carry weight base (human)** | `trait.carryWeightFixed (=150) + STR × multiplier + additive item mods` |
++| **Carry weight modifier (предмет)** | additive per slot |
++| **`weaponDamageBonus`** | additive — все активные источники суммируются |
++| **`skillModifiers`** | additive — все активные источники суммируются |
++| **`attributePointsBonus`** | additive (trait + все активные перки) |
++| **`skillMaxValue`** | берётся максимум (расширяет потолок, не сужает) |
++| **`forcedSkills` / `subTraitIds` / `goodSoulSkills`** | union |
++
++## 3. Шаблон: как добавить новый модификатор и единый агрегатор
++
++### 3.1. Шаги для нового поля
++
++1. **Опиши в § 1.x** этого документа:
++   имя ключа (camelCase), тип, источники, поведение, оператор, пример, статус.
++2. **Добавь в данные** (`data/traits/...`, `data/perks/...`, ...) — фикстуры.
++3. **Реализуй в `domain/`** — чистая функция-читатель/агрегатор.
++4. **Добавь тест** в `domain/*.test.js`.
++5. **Используй в UI / резолверах** через хелпер, не напрямую.
++
++### 3.2. Единый агрегатор (контракт; реализация TBD)
++
++Целевая архитектура: один-единственный «слой чтения», который принимает массив
++**активных источников** персонажа и возвращает объединённую таблицу модификаторов.
++
++```js
++// domain/modifiers.js (планируется)
++export function aggregateModifiers(sources) {
++  // sources: [originMods, traitMods, ...activePerkMods, ...activeChemMods]
++  // returns: { attributeBonus, attributeLimits, attributePointsBonus,
++  //            skillModifiers, skillMaxValue, weaponDamageBonus,
++  //            immunities, effects, ... } — уже сложенные по правилам § 2
++}
++```
++
++Все «потребители» (расчёт атрибутов, навыков, потолков, очков распределения,
++бонусов урона) идут через этот агрегатор. **Никаких** прямых обращений к
++`trait.modifiers.X` / `perk.modifiers.X` в коде вне `domain/modifiers.js`.
++
++Текущее состояние: агрегатора нет, есть фрагментарные читатели (`getTraitAttributeBonus`,
++`getRemainingAttributePoints` и т.п.), каждый смотрит только в `trait`. Перки
++не интегрированы (см. ⚠️ у `attributePointsBonus`). **TODO:** ввести агрегатор
++одним рефактором + миграция читателей.
++
++### 3.3. Как перку дать +N к навыку (готовый рецепт)
++
++После реализации § 3.2 — это будет одна запись в `data/perks/perks.json`:
++
++```jsonc
++{
++  "id": "gunNut",
++  "nameKey": "perks.gunNut.name",
++  "maxRanks": 4,
++  "prerequisites": { "special": { "INT": 5 }, "level": 1 },
++  "effectKey": "perks.gunNut.effect",
++  "modifiers": {
++    // на каждый ранг — +1 к Repair и +1 к Science; agg() умножит на rank
++    "skillModifiers": { "REPAIR": 1, "SCIENCE": 1 }
++  }
++}
++```
++
++И в `data/perks/perks.json` для «Интенсивных тренировок»:
++
++```jsonc
++{
++  "id": "intenseTraining",
++  "nameKey": "perks.intenseTraining.name",
++  "maxRanks": 10,
++  "prerequisites": { "level": 2, "levelIncreasePerRank": 2 },
++  "effectKey": "perks.intenseTraining.effect",
++  "modifiers": { "attributePointsBonus": 1 }
++}
++```
++
++После этого хардкод по русскому имени `"ИНТЕНСИВНЫЕ ТРЕНИРОВКИ"` в
++`PerksAndTraitsScreen.js` удаляется.
+ 
+ ## 4. Связь с будущей системой модификаторов
+ 
+-Этот каталог — **текущее состояние** декларативных правил. Долгосрочная цель
+-(см. `docs/architecture/modifiers-vision.md`) — единая система модификаторов
+-с `source` / `target` / `kind` / `priority` и полным трассированием.
+-
+-До тех пор этот документ — **контракт** между data и движком. Любое поле в
+-`modifiers: { ... }` любого источника должно быть описано здесь.
++Этот каталог — **контракт уровня данных**. Долгосрочная архитектурная цель
++(см. `docs/architecture/modifiers-vision.md`) — единая runtime-система с
++`source` / `target` / `kind` / `priority` и полным трассированием. До неё этот
++документ — единственный источник истины: любое поле в `modifiers: { ... }`
++любого источника должно быть описано здесь.
+-- 
+2.47.3
+

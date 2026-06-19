@@ -1,0 +1,149 @@
+From 9b1b364d67eb071ba57f1311b08d370a1d987718 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 18 Jun 2026 09:10:59 +0000
+Subject: [PATCH] fix(kit): rollTable expansion, pick stub, hide unequip button
+ for locked
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Three small fixes building on fix-kit-equipped-locked:
+
+1) rollTable items now actually reach the inventory.
+   - EquipmentKitModal.entryToList: when kitResolver returns a resolved
+     rollTable entry (it already rolled the dice and produced a real
+     item), expand it — the primary item plus any `_extraItems` —
+     into a flat list, stripping the type/_extraItems/roll/tableId
+     marker fields. Without this, rollTable entries got dropped by
+     toInventoryItems because they kept their .type === 'rollTable'.
+   - domain/kitResolver.js: stop forcibly retagging resolved roll
+     results as itemType:'loot'. Preserve the native itemType
+     (chem/weapon/armor/clothing/misc) so addNewItem stores them in
+     the correct inventory category. The 'loot' tag is kept only for
+     empty rolls (table miss), as a visible placeholder.
+
+2) 'pick' entry type — logic stub (data may use it now).
+   EquipmentKitModal.entryToList now recognizes type:'pick' and
+   returns the first `pickCount` options (or all of them if
+   pickCount is missing). This lets the data layer start using
+   'pick' immediately; a real picker UI (player chooses y of n) is
+   a follow-up.
+
+3) Locked items: hide the 'unequip' button instead of letting it
+   no-op silently.
+   - InventoryScreen: hideActionButton now also covers locked items;
+     handleUnequipWeapon early-returns on .locked as a defensive
+     guard. WeaponsAndArmorScreen already passes onUnequip={null}
+     for robots, so no change there.
+
+Effect:
+  - robobrain_servomechanizmy / minuteman / etc. kits with rollTable
+    now show trinkets/food/etc. in inventory, properly categorized.
+  - data designers can author { type:'pick', pickCount: 2, items: [...] }
+    today; UI will pick the first 2 until the picker lands.
+  - robot kit items show no 'unequip' button in the inventory.
+---
+ .../modals/EquipmentKitModal.js               | 23 +++++++++++++++++++
+ .../InventoryScreen/InventoryScreen.js        | 13 ++++++++---
+ domain/kitResolver.js                         |  9 ++++++--
+ 3 files changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index f2bf5b9..c8857d2 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -65,6 +65,7 @@ const getOptionKey = (option, optionIndex) => {
+ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
+   if (!entry) return [];
+ 
++  // 'choice' — player picks ONE of N options (currently UI default = first).
+   if (entry.type === 'choice') {
+     const key = toChoiceKey(kitId, itemIndex);
+     const options = Array.isArray(entry.items) ? entry.items : [];
+@@ -76,6 +77,28 @@ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
+     return [selectedOption];
+   }
+ 
++  // 'pick' — player picks Y of N options. UI for the selection is not built
++  // yet, so for now we collapse it to the first `pickCount` options (or all of
++  // them when pickCount is missing). This keeps existing data flowing through
++  // the resolver; replace with a real picker UI in a follow-up task.
++  if (entry.type === 'pick') {
++    const options = Array.isArray(entry.items) ? entry.items : [];
++    const count = Number.isFinite(entry.pickCount) && entry.pickCount > 0
++      ? Math.min(entry.pickCount, options.length)
++      : options.length;
++    return options.slice(0, count);
++  }
++
++  // 'rollTable' — kitResolver already rolled it into a real item (or several).
++  // It returns the primary item as `entry` itself and any additional rolls in
++  // `entry._extraItems`. Flatten them all into the kit's item list.
++  if (entry.type === 'rollTable') {
++    const extras = Array.isArray(entry._extraItems) ? entry._extraItems : [];
++    // Strip the marker fields so downstream code treats this as a normal item.
++    const { type: _t, _extraItems, roll, tableId, ...primary } = entry;
++    return [primary, ...extras];
++  }
++
+   return [entry];
+ };
+ 
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index ede7c44..d6f0cfe 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -697,7 +697,10 @@ const InventoryScreen = () => {
+   };
+ 
+   const handleUnequipWeapon = (weapon, slot) => {
+-    if (weapon?.isBuiltin || weapon?.isManipulator) {
++    // Locked items (robot built-ins from kits) cannot be unequipped from the
++    // inventory UI. They are released only by swapping the limb that holds
++    // them. The corresponding 'unequip' button is hidden at the render site.
++    if (weapon?.isBuiltin || weapon?.isManipulator || weapon?.locked) {
+       return;
+     }
+ 
+@@ -1050,8 +1053,12 @@ const InventoryScreen = () => {
+       && !item.isEquipped
+       && !robotHasHoldingArm
+       && !isRobotLimbWeapon(item);
+-    // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия
+-    const hideActionButton = item.isEquipped && item.itemType === 'weapon' && isBuiltinOrManipulator;
++    // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия,
++    // а также для locked-предметов (комплекты роботов — снять можно только сменой конечности).
++    const hideActionButton = item.isEquipped && (
++      (item.itemType === 'weapon' && isBuiltinOrManipulator)
++      || item.locked
++    );
+ 
+     const handleActionPress = () => {
+         if (item.isEquipped) {
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index ae91b50..bb093b4 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -192,12 +192,17 @@ export async function resolveNonWeaponItem(item) {
+     const count = resolveTableRollCount(item.roll);
+     const tableId = ROLL_TABLE_TAG[item.tableId] || item.tableId;
+     const resolvedItems = await resolveRandomLootByRoll(tableId, count);
++    // Preserve each rolled item's native itemType (chem/weapon/armor/clothing/misc)
++    // so addNewItem stores them under the right inventory category. Previously
++    // every roll result was tagged itemType: 'loot', which made inventory
++    // categorization meaningless.
+     if (resolvedItems.length > 1) {
+-      return { ...resolvedItems[0], _extraItems: resolvedItems.slice(1), itemType: 'loot' };
++      return { ...resolvedItems[0], _extraItems: resolvedItems.slice(1) };
+     }
+     if (resolvedItems.length === 1) {
+-      return { ...resolvedItems[0], itemType: 'loot' };
++      return { ...resolvedItems[0] };
+     }
++    // Empty roll (table miss) — keep 'loot' placeholder so it's visible in UI.
+     return { ...item, name: `${count}d20<${tableId}>`, itemType: 'loot' };
+   }
+ 
+-- 
+2.47.3
+

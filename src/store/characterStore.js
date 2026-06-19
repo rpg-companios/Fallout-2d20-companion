@@ -501,6 +501,8 @@ const useCharacterStore = create(devtools(
       addNewItem: (item) => {
         const state = get();
         const items = { ...state.items };
+        console.log('[addNewItem] received:', item?.name, 'itemType:', item?.itemType,
+          'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
         
         if (!item) {
           console.warn('addNewItem: item is null or undefined');
@@ -516,6 +518,7 @@ const useCharacterStore = create(devtools(
           console.warn('addNewItem: item missing any known id field', item);
           return;
         }
+        console.log('[addNewItem] canonical id:', weaponId);
         
         // Get applied mods
         const appliedMods = item.appliedMods || {};
@@ -595,6 +598,7 @@ const useCharacterStore = create(devtools(
         // Add item to store
         items[itemId] = normalizeItemParameters(finalItem);
         
+        console.log('[addNewItem] stored under key:', itemId, 'equipped:', finalItem.equipped, 'itemType:', finalItem.itemType);
         set({ items });
         get().recalculateDerivedStats();
         

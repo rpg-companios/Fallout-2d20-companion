@@ -1,0 +1,371 @@
+From 545207acef583f82b98d0da9a2f1b64598f46c86 Mon Sep 17 00:00:00 2001
+From: Shadow Migration <patch@local>
+Date: Thu, 18 Jun 2026 06:38:02 +0000
+Subject: [PATCH] feat(shadow): full Shadow trait + hasTrait canonical
+ migration
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Shadow trait (per owner's full description):
+- data/traits/traits.json: added 'shadow' trait with:
+  * attributeBonus: { STR: 2, END: 2 }
+  * attributeLimits: { STR/END: 6..12, CHA/INT: max 8 }
+  * skillMaxValue: 4 (hard cap on all skills)
+  * immunities: radiation, poison
+  * effects: ['stealth_boy_addiction'] (placeholder; see effects.js)
+- i18n/{ru-RU,en-EN}/data/system/traits.json: full Shadow description.
+- data/origins/origins.json: shadow.traitIds = ['shadow'].
+
+hasTrait migration to canonical id (PATCH 1/2 + 2/2 merged):
+- All 14 trait modals: onSelect(name, mods) -> onSelect(traitId, name, mods).
+- SurvivorModal (multi-trait): onSelect(selectedIds[], name, mods).
+- CharacterScreen.handleSelectTrait already accepts ids on main.
+- CharacterContext.hasTrait: canonical-only, NO legacy fallback to
+  trait.name / selectedTraitNames (per project rule: no aliases at runtime).
+- WeaponsAndArmorScreen.js:
+  hasTrait('Техника спуска') -> hasTrait('ncr-technique-of-descent')
+  hasTrait('Пехотинец')      -> hasTrait('ncr-infantryman')
+
+trait.name stays as-is (localized display only).
+trait.id is canonical (logic only). Two separate roles, not aliased.
+---
+ components/CharacterContext.js                | 11 +++---
+ .../CharacterScreen/CharacterScreen.js        |  6 +++-
+ .../modals/traits/AssaultronModal.js          |  2 +-
+ .../modals/traits/BrotherhoodModal.js         |  2 +-
+ .../modals/traits/ChildOfAtomModal.js         |  2 +-
+ .../modals/traits/GhoulModal.js               |  2 +-
+ .../modals/traits/MinutemanModal.js           |  2 +-
+ .../modals/traits/MisterHandyModal.js         |  2 +-
+ .../modals/traits/OutcastBrotherhoodModal.js  |  2 +-
+ .../modals/traits/ProtectronModal.js          |  2 +-
+ .../modals/traits/RoboBrainModal.js           |  2 +-
+ .../modals/traits/SupermutantModal.js         |  2 +-
+ .../modals/traits/SurvivorModal.js            |  2 +-
+ .../modals/traits/VaultDwellerModal.js        |  2 +-
+ .../WeaponsAndArmorScreen.js                  |  4 +--
+ data/origins/origins.json                     |  4 ++-
+ data/traits/traits.json                       | 36 +++++++++++++++++++
+ i18n/en-EN/data/system/traits.json            |  6 ++++
+ i18n/ru-RU/data/system/traits.json            |  6 ++++
+ 19 files changed, 76 insertions(+), 21 deletions(-)
+
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 6ab31e0..e73afac 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -694,11 +694,12 @@ export const CharacterProvider = ({ children }) => {
+     meleeBonus,
+     initiative,
+     defense,
+-    hasTrait: (traitName) => !!(
+-      trait &&
+-      (
+-        trait.name === traitName ||
+-        (Array.isArray(trait?.modifiers?.selectedTraitNames) && trait.modifiers.selectedTraitNames.includes(traitName))
++    // Canonical id only. No alias/fallback to localized name.
++    // Single-trait: trait.id matches. Multi-trait (NCR/Survivor): trait.ids[] contains it.
++    hasTrait: (id) => !!(
++      trait && (
++        trait.id === id ||
++        (Array.isArray(trait?.ids) && trait.ids.includes(id))
+       )
+     ),
+     getItemId,
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 26b941e..4c9f06c 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -727,10 +727,14 @@ export default function CharacterScreen() {
+     }
+   };
+ 
+-  const handleSelectTrait = (traitName, newModifiersFromModal) => {
++  const handleSelectTrait = (traitIds, traitName, newModifiersFromModal) => {
++    // traitIds — массив canonical id (string | string[]); для multi-trait (Survivor) это массив.
+     // traitName — локализованное имя черты из модала
+     // Комбинируем с модификаторами из модального окна
++    const ids = Array.isArray(traitIds) ? traitIds : [traitIds];
+     const newTrait = {
++      ids,
++      id: ids[0], // primary id (для hasTrait-by-id lookup)
+       name: traitName,
+       modifiers: {
+         ...(newModifiersFromModal || {}),
+diff --git a/components/screens/CharacterScreen/modals/traits/AssaultronModal.js b/components/screens/CharacterScreen/modals/traits/AssaultronModal.js
+index aeb1059..20944e8 100644
+--- a/components/screens/CharacterScreen/modals/traits/AssaultronModal.js
++++ b/components/screens/CharacterScreen/modals/traits/AssaultronModal.js
+@@ -11,7 +11,7 @@ const AssaultronModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     const canonicalTrait = findTraitById(traitId);
+-    onSelect(name, canonicalTrait?.modifiers || {});
++    onSelect('assaultron-designed-for-frontline', name, canonicalTrait?.modifiers || {});
+   };
+ 
+   return (
+diff --git a/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js b/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
+index 94f1bf7..813d23d 100644
+--- a/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
++++ b/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
+@@ -12,7 +12,7 @@ const BrotherhoodModal = ({ visible, onSelect, onClose }) => {
+   const { name: traitName, description } = getTraitI18n('brotherhood-chain-that-binds');
+ 
+   const handleConfirm = () => {
+-    onSelect(traitName, {
++    onSelect('brotherhood-chain-that-binds', traitName, {
+       forcedSkills: selectedSkill ? [selectedSkill] : [],
+       extraSkills: 1
+     });
+diff --git a/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js b/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js
+index 66521bd..53cb49b 100644
+--- a/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js
++++ b/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js
+@@ -11,7 +11,7 @@ const ChildOfAtomModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     const canonicalTrait = findTraitById(traitId);
+-    onSelect(name, canonicalTrait?.modifiers || {});
++    onSelect('childofatom-radioactive-sponge', name, canonicalTrait?.modifiers || {});
+   };
+ 
+   return (
+diff --git a/components/screens/CharacterScreen/modals/traits/GhoulModal.js b/components/screens/CharacterScreen/modals/traits/GhoulModal.js
+index 0a1c671..d0e6344 100644
+--- a/components/screens/CharacterScreen/modals/traits/GhoulModal.js
++++ b/components/screens/CharacterScreen/modals/traits/GhoulModal.js
+@@ -9,7 +9,7 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
+   const { name, description } = getTraitI18n('ghoul-necrotic-posthuman');
+ 
+   const handleConfirm = () => {
+-    onSelect(name, {
++    onSelect('ghoul-necrotic-posthuman', name, {
+       skillModifiers: { 'Выживание': 2 },
+       forcedSkills: ['Выживание'],
+       extraSkills: 1,
+diff --git a/components/screens/CharacterScreen/modals/traits/MinutemanModal.js b/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
+index 1968f0d..335b5c9 100644
+--- a/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
++++ b/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
+@@ -13,7 +13,7 @@ const MinutemanModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     if (!selectedSkill) return;
+-    onSelect(traitName, {
++    onSelect('minuteman-peoples-militia', traitName, {
+       forcedSkills: [selectedSkill],
+       extraSkills: 1,
+     });
+diff --git a/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js b/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js
+index 93e2ccc..91debd3 100644
+--- a/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js
++++ b/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js
+@@ -11,7 +11,7 @@ const MisterHandyModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     const canonicalTrait = findTraitById(traitId);
+-    onSelect(name, canonicalTrait?.modifiers || {});
++    onSelect('misterhandy-robot-mr-handy', name, canonicalTrait?.modifiers || {});
+   };
+ 
+   return (
+diff --git a/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js b/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
+index 3d684d7..dcfda3e 100644
+--- a/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
++++ b/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
+@@ -11,7 +11,7 @@ const OutcastBrotherhoodModal = ({ visible, onSelect, onClose }) => {
+   const { name: traitName, description } = getTraitI18n('brotherhoodoutcast-chain-that-breaks');
+ 
+   const handleConfirm = () => {
+-    onSelect(traitName, {
++    onSelect('brotherhoodoutcast-chain-that-breaks', traitName, {
+       forcedSkills: selectedSkill ? [selectedSkill] : [],
+       extraSkills: 1
+     });
+diff --git a/components/screens/CharacterScreen/modals/traits/ProtectronModal.js b/components/screens/CharacterScreen/modals/traits/ProtectronModal.js
+index dcdd149..21c4ece 100644
+--- a/components/screens/CharacterScreen/modals/traits/ProtectronModal.js
++++ b/components/screens/CharacterScreen/modals/traits/ProtectronModal.js
+@@ -11,7 +11,7 @@ const ProtectronModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     const canonicalTrait = findTraitById(traitId);
+-    onSelect(name, canonicalTrait?.modifiers || {});
++    onSelect('protectron-protect-or-destroy', name, canonicalTrait?.modifiers || {});
+   };
+ 
+   return (
+diff --git a/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js b/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js
+index 7f9a92b..0941be2 100644
+--- a/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js
++++ b/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js
+@@ -11,7 +11,7 @@ const RoboBrainModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     const canonicalTrait = findTraitById(traitId);
+-    onSelect(name, canonicalTrait?.modifiers || {});
++    onSelect('robobrain-robot-with-brains', name, canonicalTrait?.modifiers || {});
+   };
+ 
+   return (
+diff --git a/components/screens/CharacterScreen/modals/traits/SupermutantModal.js b/components/screens/CharacterScreen/modals/traits/SupermutantModal.js
+index 759e300..5c7c259 100644
+--- a/components/screens/CharacterScreen/modals/traits/SupermutantModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SupermutantModal.js
+@@ -14,7 +14,7 @@ const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
+       return;
+     }
+ 
+-    onSelect(name, {
++    onSelect('supermutant-forced-evolution', name, {
+       attributes: { 'STR': 2, 'END': 2 },
+       minLimits: { 'STR': 6, 'END': 6 },
+       maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
+diff --git a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+index 4eefae4..85c6c03 100644
+--- a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+@@ -98,7 +98,7 @@ const SurvivorModal = ({
+       ? `${originLabel}: ${selectedNames.join(' + ')}`
+       : `${originLabel}: ${selectedNames[0]} + 1 перк`;
+ 
+-    onSelect(traitTitle, {
++    onSelect(selectedIds, traitTitle, {
+       ...mergedModifiers,
+       selectedTraitNames: selectedNames,
+       selectedTraitIds: selectedIds,
+diff --git a/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js b/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
+index 77971a0..940f616 100644
+--- a/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
++++ b/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
+@@ -11,7 +11,7 @@ const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
+ 
+   const handleSelectSkill = (skill) => {
+     const canonicalTrait = findTraitById(traitId);
+-    onSelect(name, {
++    onSelect(traitId, name, {
+       ...(canonicalTrait?.modifiers || {}),
+       selectedExtraSkills: [skill],
+     });
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 3c6f865..ddbd97f 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -179,7 +179,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+     const ncrInfantryWeaponIds = TRAITS['Пехотинец']?.modifiers?.ncrInfantryWeaponIds || [];
+     const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
+ 
+-    const damageWithNcr = hasTrait('Пехотинец') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
++    const damageWithNcr = hasTrait('ncr-infantryman') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
+     const weaponType = displayWeapon?.weaponType ?? displayWeapon?.weapon_type;
+     const appliesMeleeBonus = displayWeapon?.meleeBonusApplies === true || ['Melee', 'Unarmed'].includes(weaponType);
+     const visibleDamage = appliesMeleeBonus ? damageWithNcr + (Number(meleeBonus) || 0) : damageWithNcr;
+@@ -193,7 +193,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+     const isLightOrEnergy = (weapon?.itemType === 'weapon') && (
+       weapon.weapon_type === 'Light' || weapon.weapon_type === 'Energy'
+     );
+-    const fireRateWithTrait = hasTrait('Техника спуска') && hasLightAndEnergyEquipped && isLightOrEnergy
++    const fireRateWithTrait = hasTrait('ncr-technique-of-descent') && hasLightAndEnergyEquipped && isLightOrEnergy
+       ? Math.max(0, fireRateBase - 1)
+       : fireRateBase;
+ 
+diff --git a/data/origins/origins.json b/data/origins/origins.json
+index a7b9859..5ed676c 100644
+--- a/data/origins/origins.json
++++ b/data/origins/origins.json
+@@ -212,7 +212,9 @@
+     "characterType": "mutant",
+     "image": "shadow",
+     "bodyPlan": "humanoid",
+-    "traitIds": [],
++    "traitIds": [
++      "shadow"
++    ],
+     "equipmentKitIds": [
+       "default_caps_only"
+     ]
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index 0e1d379..7f86e7b 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -370,5 +370,41 @@
+         "ignore_darkness_penalty"
+       ]
+     }
++  },
++  {
++    "id": "shadow",
++    "originId": "shadow",
++    "displayNameKey": "traits.shadow.shadow.name",
++    "descriptionKey": "traits.shadow.shadow.description",
++    "modifiers": {
++      "attributeBonus": {
++        "STR": 2,
++        "END": 2
++      },
++      "attributeLimits": {
++        "STR": {
++          "min": 6,
++          "max": 12
++        },
++        "END": {
++          "min": 6,
++          "max": 12
++        },
++        "CHA": {
++          "max": 8
++        },
++        "INT": {
++          "max": 8
++        }
++      },
++      "skillMaxValue": 4,
++      "immunities": [
++        "radiation",
++        "poison"
++      ],
++      "effects": [
++        "stealth_boy_addiction"
++      ]
++    }
+   }
+ ]
+diff --git a/i18n/en-EN/data/system/traits.json b/i18n/en-EN/data/system/traits.json
+index 7d01516..376e9ea 100644
+--- a/i18n/en-EN/data/system/traits.json
++++ b/i18n/en-EN/data/system/traits.json
+@@ -126,6 +126,12 @@
+         "name": "Robot with Brains",
+         "description": "You are a robot with a human brain as your central processor. You have visual sensors capable of detecting the visual spectrum and infrared radiation. You are immune to radiation and poison, but cannot use chems or benefit from food, drink, or rest."
+       }
++    },
++    "shadow": {
++      "shadow": {
++        "name": "Shadow",
++        "description": "Your initial Strength and Endurance scores increase by +2 each, and your maximum Strength and Endurance scores increase to 12, but your maximum Intelligence and Charisma scores decrease to 8. You cannot have a rank higher than 4 in any skill. You are completely immune to radiation and poison damage.\n\nYour height is over two meters; your body is bulky and muscular, and your skin is blue. You do not appear to age, but you are infertile. You may only wear armor that was made for super mutants.\n\nYou can easily become addicted to Stealth Boy; its prolonged use has dealt enormous damage to your psyche and mental health. Whenever you use Stealth Boy, roll 1 {CD} per dose you took this session. If any effects come up, you get the following symptoms:\n\nStealth Boy Addiction: A failed addiction check makes you addicted to Stealth Boy. The difficulty of Perception and Intelligence tests increases by +2, and Charisma tests by +1, until cured."
++      }
+     }
+   }
+ }
+diff --git a/i18n/ru-RU/data/system/traits.json b/i18n/ru-RU/data/system/traits.json
+index b517c91..0c682af 100644
+--- a/i18n/ru-RU/data/system/traits.json
++++ b/i18n/ru-RU/data/system/traits.json
+@@ -126,6 +126,12 @@
+         "name": "Робот с мозгами",
+         "description": "Вы — робот с человеческим мозгом в качестве центрального процессора. У вас есть зрительные сенсоры, способные обнаруживать визуальный спектр и инфракрасное излучение. Вы также невосприимчивы к радиации и ядам, но не можете использовать препараты, а также получать пользу от еды, питья или отдыха."
+       }
++    },
++    "shadow": {
++      "shadow": {
++        "name": "Тень",
++        "description": "Ваши начальные атрибуты Силы и Выносливости увеличиваются на +2 каждый, а ваша максимальная Сила и Выносливость увеличиваются до 12, но ваш максимальный Интеллект и Харизма уменьшаются до 8. Вы не можете иметь ранг выше 4-го в любом из навыков. Вы полностью невосприимчивы к урону от радиации и яда.\n\nВаш рост более двух метров в высоту; ваше тело громоздкое и мускулистое, а ваша кожа синяя. Вы, кажется, не стареете, но вы бесплодны. Вы можете носить только броню, которая была сделана для супермутантов.\n\nВы можете легко стать зависимым от Стелс-боя, его длительное использование нанесло огромный урон вашей психике и ментальному здоровью. Всякий раз, когда вы используете Стелс-бой, вы бросаете 1 {CD} за каждую дозу, которую вы приняли в этой сессии. Если выпадают какие-либо эффекты, вы получаете следующие симптомы:\n\nЗависимость от Стелс-боя: Неудавшийся проверка на зависимость делает вас зависимым от Стелс-боя. Сложность тестов на восприятие и интеллект повышается на +2, а тестов на харизму на +1, пока не вылечитесь."
++      }
+     }
+   }
+ }
+-- 
+2.47.3
+

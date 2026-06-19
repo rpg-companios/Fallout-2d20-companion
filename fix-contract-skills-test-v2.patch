@@ -1,0 +1,85 @@
+From f389c68cf303ad5ae64606a03be102d66131f338 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 18 Jun 2026 07:54:39 +0000
+Subject: [PATCH] =?UTF-8?q?fix(tests):=20contract.skills=20=E2=80=94=20ign?=
+ =?UTF-8?q?ore=20comments=20+=20whitelist=20LimbUpgradeModal?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The 'no localized skill literals' guard triggered three false positives:
+
+  1) components/CharacterContext.js  — 'Ремонт' inside a // comment that
+     documents the legacy-save migration bridge.
+  2) components/screens/CharacterScreen/logic/characterScreenI18n.js
+     — 'Стрелковое оружие' inside a /* ... */ JSDoc example for
+     getSkillDisplayName('SMALL_GUNS').
+  3) components/screens/CharacterScreen/modals/LimbUpgradeModal.js
+     — 'Ближний бой' is a UI label for the robot-arm stat `limb.melee`,
+     which has nothing to do with the MELEE_WEAPONS skill identity.
+
+Fix:
+- Pre-strip line- and block-comments before scanning (URL-like '://' is
+  preserved so we don't eat string contents).
+- Add FILE_WHITELIST for LimbUpgradeModal.js (genuine non-skill use of
+  the literal). Documented inline why each entry is allowed.
+
+Verified: scans 115 source files, 0 offences.
+---
+ domain/contract.skills.test.js | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/domain/contract.skills.test.js b/domain/contract.skills.test.js
+index 9416966..95c96f0 100644
+--- a/domain/contract.skills.test.js
++++ b/domain/contract.skills.test.js
+@@ -100,6 +100,14 @@ describe('no localized skill literals in code logic', () => {
+     'Выживание', 'Метание', 'Рукопашная',
+   ];
+ 
++  // Files that legitimately contain these literals because they refer to
++  // something OTHER than the skill identity (e.g. robot-limb stat labels:
++  // "Ближний бой" labels `limb.melee` — a robot-arm stat, NOT the
++  // MELEE_WEAPONS skill).
++  const FILE_WHITELIST = new Set([
++    'components/screens/CharacterScreen/modals/LimbUpgradeModal.js',
++  ]);
++
+   function collectSourceFiles(dir) {
+     const out = [];
+     for (const entry of readdirSync(dir, { withFileTypes: true })) {
+@@ -118,17 +126,29 @@ describe('no localized skill literals in code logic', () => {
+     return out;
+   }
+ 
++  /**
++   * Strip line- and block-comments so docs/examples don't trip the linter.
++   * Preserves URL-like `://` so we don't accidentally eat string contents.
++   */
++  function stripComments(src) {
++    return src
++      .replace(/\/\*[\s\S]*?\*\//g, '')     // /* ... */ (incl. JSDoc)
++      .replace(/(^|[^:\\])\/\/.*$/gm, '$1'); // // ...   (skip "://")
++  }
++
+   it('no Russian skill display names appear as string literals in logic code', () => {
+     const sourceFiles = collectSourceFiles(ROOT);
+     const offences = [];
+     for (const file of sourceFiles) {
+-      const text = readFileSync(file, 'utf-8');
++      const rel = file.replace(ROOT + '/', '');
++      if (FILE_WHITELIST.has(rel)) continue;
++      const text = stripComments(readFileSync(file, 'utf-8'));
+       for (const ru of FORBIDDEN_RU) {
+         // match only quoted occurrences ("...", '...', `...`)
+         const pattern = new RegExp(`['"\`]${ru}['"\`]`, 'g');
+         const m = text.match(pattern);
+         if (m) {
+-          offences.push(`${file.replace(ROOT + '/', '')}: ${m.length}× literal ${JSON.stringify(ru)}`);
++          offences.push(`${rel}: ${m.length}× literal ${JSON.stringify(ru)}`);
+         }
+       }
+     }
+-- 
+2.47.3
+

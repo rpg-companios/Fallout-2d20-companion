@@ -1,0 +1,2624 @@
+From 1e01761885ffa7799a448c72e1e5eeda50c1bf29 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 18 Jun 2026 07:01:04 +0000
+Subject: [PATCH] refactor(skills): canonical UPPER_SNAKE_CASE everywhere
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Skill identity is now the canonical UPPER_SNAKE_CASE key
+(SKILL_CATALOG_ORDER / ALL_SKILL_KEYS). Localized names exist only at the
+render boundary via getSkillDisplayName(key).
+
+Data (data/**/*.json):
+- armor_mods.json, uniq_armor_mods.json, weapon_mods.json: 'Repair' /
+  '?Repair' / 'Repair ' / 'Science' -> 'REPAIR' / 'SCIENCE' (single source).
+- robot/{robotarms,robotbody,robotheads,robotlegs,weapon_mods_assaultron_laser}.json:
+  'Repair' / 'Science' -> 'REPAIR' / 'SCIENCE'.
+- traits.json: forcedSkills 'energy_weapons'|'science'|'repair'|'small_guns'
+  -> 'ENERGY_WEAPONS'|'SCIENCE'|'REPAIR'|'SMALL_GUNS';
+  skillModifiers key 'survival' -> 'SURVIVAL'.
+- Empty '' kept (means 'no skill required').
+
+Domain (domain/characterCreation.js):
+- ALL_SKILLS[i].name is the canonical key (was: Russian display name).
+- Dropped import of ruCharacterScreen — no locale literals in pure logic.
+
+Display layer:
+- characterScreenI18n.js: getSkillDisplayName(SKILL_KEY) — canonical-only
+  input, no RU_SKILL_TO_KEY alias bridge.
+- All trait modals (Brotherhood, OutcastBrotherhood, Minuteman, Ghoul,
+  Survivor, VaultDweller) now hold canonical SKILL keys in
+  SELECTABLE_SKILLS / forcedSkills / skillModifiers / goodSoulGroup, and
+  render labels via getSkillDisplayName(key).
+- CharacterScreen.js: GOOD_SOUL_SKILL_KEYS is the single constant, no more
+  getGoodSoulSkillNames() locale mapping; render via getSkillDisplayName.
+
+WeaponsAndArmorScreen:
+- Dropped 17-line SKILL_ALIASES bridge (RU/EN/UPPER fan-out). findSkillValue
+  now compares against canonical key directly.
+- TRAITS['Пехотинец'] -> findTraitById('ncr-infantryman').
+
+Persistence (back-compat):
+- CharacterContext.loadCharacter runs migrateSkillsToCanonical() on legacy
+  saves that stored skill.name as Russian display strings — one-time
+  rewrite to UPPER_SNAKE_CASE on load. After this PR the bridge may be
+  removed in a follow-up once all live saves are migrated.
+
+Contract test (domain/contract.skills.test.js):
+- Asserts every skill reference in data/**/*.json is in ALL_SKILL_KEYS
+  (or empty '').
+- Asserts no Russian skill display literals appear in code logic
+  (i18n catalogs excluded — that's the only allowed home for locale strings).
+
+This eliminates the five-form chaos: 'REPAIR' / 'Repair' / 'repair' /
+'?Repair' / 'Ремонт' all collapsed to canonical 'REPAIR'.
+---
+ components/CharacterContext.js                |  21 +-
+ .../CharacterScreen/CharacterScreen.js        |  14 +-
+ .../logic/characterScreenI18n.js              |  22 +-
+ .../modals/traits/BrotherhoodModal.js         |   6 +-
+ .../modals/traits/GhoulModal.js               |   4 +-
+ .../modals/traits/MinutemanModal.js           |   6 +-
+ .../modals/traits/OutcastBrotherhoodModal.js  |   6 +-
+ .../modals/traits/SurvivorModal.js            |   3 +-
+ .../modals/traits/VaultDwellerModal.js        |   3 +-
+ .../WeaponsAndArmorScreen.js                  |  39 +--
+ data/equipment/armor_mods.json                |  30 +-
+ data/equipment/robot/robotarms.json           |  18 +-
+ data/equipment/robot/robotbody.json           |  10 +-
+ data/equipment/robot/robotheads.json          |  12 +-
+ data/equipment/robot/robotlegs.json           |  10 +-
+ .../robot/weapon_mods_assaultron_laser.json   |   8 +-
+ data/equipment/uniq_armor_mods.json           |  44 +--
+ data/equipment/weapon_mods.json               | 298 +++++++++---------
+ data/traits/traits.json                       |  18 +-
+ domain/characterCreation.js                   |  12 +-
+ domain/contract.skills.test.js                | 139 ++++++++
+ 21 files changed, 432 insertions(+), 291 deletions(-)
+ create mode 100644 domain/contract.skills.test.js
+
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index e73afac..d5a8d16 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1,8 +1,10 @@
+ import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
+ import * as db from '../db';
++import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
+ import {
+   createInitialAttributes,
+   ALL_SKILLS,
++  ALL_SKILL_KEYS,
+   getLuckPoints,
+   calculateMaxHealth,
+   calculateInitiative,
+@@ -11,6 +13,23 @@ import {
+   calculateCarryWeight,
+   getAttributeValue,
+ } from '../domain/characterCreation';
++
++// One-time migration: legacy saves stored skills with Russian display names as
++// `skill.name` (e.g. "Ремонт"). After the canonical-id refactor, identity is
++// the UPPER_SNAKE_CASE key (e.g. "REPAIR"). This bridge runs only at load.
++const RU_SKILL_NAME_TO_KEY = Object.entries(ruCharacterScreen?.skillsCatalog || {}).reduce(
++  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
++  {},
++);
++const migrateSkillsToCanonical = (rawSkills) => {
++  if (!Array.isArray(rawSkills)) return null;
++  return rawSkills.map((s) => {
++    if (!s || typeof s.name !== 'string') return s;
++    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
++    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
++    return canonical ? { ...s, name: canonical } : s;
++  });
++};
+ import { loadOriginsData, findEnrichedOrigin } from '../domain/origins';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
+@@ -330,7 +349,7 @@ export const CharacterProvider = ({ children }) => {
+       setCharacterName(data.characterName || '');
+       setLevel(data.level ?? 1);
+       setAttributes(data.attributes || createInitialAttributes());
+-      setSkills(data.skills || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
++      setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+       setSelectedSkills(data.selectedSkills || []);
+       setExtraTaggedSkills(data.extraTaggedSkills || []);
+       setForcedSelectedSkills(data.forcedSelectedSkills || []);
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 4c9f06c..38dc5a7 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -53,8 +53,10 @@ import { getTimedAttributeModifiers } from "../../../domain/effects";
+ 
+ // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
+ const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
++// Canonical SKILL keys (UPPER_SNAKE_CASE) for the NCR "Good Soul" group.
++// Mirrors ncr-good-soul.modifiers.goodSoulSkills from data/traits/traits.json.
++// For display use getSkillDisplayName(key) at the render site.
+ const GOOD_SOUL_SKILL_KEYS = ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"];
+-const getGoodSoulSkillNames = () => GOOD_SOUL_SKILL_KEYS.map((key) => tCharacterScreen(`skillsCatalog.${key}`, key));
+ 
+ const ImageSection = ({ origin }) => {
+   const defaultImage = require("../../../assets/bg1.png");
+@@ -520,7 +522,7 @@ export default function CharacterScreen() {
+     }
+ 
+     // Good Soul special handling
+-    const goodSoulGroup = getGoodSoulSkillNames();
++    const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
+     const isGoodSoul =
+       Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
+       trait.modifiers.goodSoulSelectedSkills.length > 0;
+@@ -633,7 +635,7 @@ export default function CharacterScreen() {
+         extraTaggedSkills.includes(skill.name);
+ 
+       // Ограничение от "Добрая Душа": навыки из группы capped 4, кроме двух бонусных
+-      const goodSoulGroup = getGoodSoulSkillNames();
++      const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
+       const isGoodSoul =
+         Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
+         trait.modifiers.goodSoulSelectedSkills.length > 0;
+@@ -835,7 +837,7 @@ export default function CharacterScreen() {
+     }
+   };
+ 
+-  const goodSoulGroup = getGoodSoulSkillNames();
++  const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
+ 
+   const toggleGoodSoulPick = (skill) => {
+     setGoodSoulPicks((prev) => {
+@@ -1263,7 +1265,7 @@ export default function CharacterScreen() {
+                 </View>
+ 
+                 {(() => {
+-                  const goodSoulGroupSkills = getGoodSoulSkillNames();
++                  const goodSoulGroupSkills = GOOD_SOUL_SKILL_KEYS;
+                   const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
+                   const isGoodSoulActive = Array.isArray(goodSoulSelected) && goodSoulSelected.length > 0;
+                   return skills.map((skill, index) => {
+@@ -1389,7 +1391,7 @@ export default function CharacterScreen() {
+                     ]}
+                     onPress={() => toggleGoodSoulPick(skill)}
+                   >
+-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{skill}</Text>
++                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{getSkillDisplayName(skill)}</Text>
+                   </TouchableOpacity>
+                 );
+               })}
+diff --git a/components/screens/CharacterScreen/logic/characterScreenI18n.js b/components/screens/CharacterScreen/logic/characterScreenI18n.js
+index bdc81f4..25bb95b 100644
+--- a/components/screens/CharacterScreen/logic/characterScreenI18n.js
++++ b/components/screens/CharacterScreen/logic/characterScreenI18n.js
+@@ -7,12 +7,6 @@ const DICTIONARIES = {
+   "en-EN": enCharacterScreen,
+ };
+ 
+-const RU_SKILLS = ruCharacterScreen?.skillsCatalog || {};
+-const RU_SKILL_TO_KEY = Object.entries(RU_SKILLS).reduce((acc, [key, value]) => {
+-  acc[value] = key;
+-  return acc;
+-}, {});
+-
+ export const tCharacterScreen = (path, fallback = "") => {
+   const parts = path.split(".");
+   const locale = getCurrentLocale();
+@@ -26,12 +20,16 @@ export const tCharacterScreen = (path, fallback = "") => {
+   return current;
+ };
+ 
+-export const getSkillDisplayName = (skillName) => {
++/**
++ * Returns the localized display name for a canonical SKILL key
++ * (UPPER_SNAKE_CASE, e.g. 'SMALL_GUNS' → 'Стрелковое оружие').
++ * The input is always a canonical key — no alias bridge, no fallback to
++ * localized names. If unknown, returns the key itself (visible regression
++ * signal during dev).
++ */
++export const getSkillDisplayName = (skillKey) => {
++  if (!skillKey) return "";
+   const locale = getCurrentLocale();
+-  if (locale === "ru-RU") return skillName;
+-
+   const dict = DICTIONARIES[locale] || ruCharacterScreen;
+-  const catalog = dict?.skillsCatalog || {};
+-  const skillKey = RU_SKILL_TO_KEY[skillName] || skillName;
+-  return catalog?.[skillKey] || skillName;
++  return dict?.skillsCatalog?.[skillKey] || skillKey;
+ };
+diff --git a/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js b/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
+index 813d23d..37b8c72 100644
+--- a/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
++++ b/components/screens/CharacterScreen/modals/traits/BrotherhoodModal.js
+@@ -2,10 +2,12 @@ import React, { useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+ import { getTraitI18n } from '../../../../../domain/traits';
++import { getSkillDisplayName } from '../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'brotherhood', modalType: 'choice' };
+ 
+-const SELECTABLE_SKILLS = ['Энергооружие', 'Наука', 'Ремонт'];
++// Canonical SKILL keys (UPPER_SNAKE_CASE). Rendered via getSkillDisplayName().
++const SELECTABLE_SKILLS = ['ENERGY_WEAPONS', 'SCIENCE', 'REPAIR'];
+ 
+ const BrotherhoodModal = ({ visible, onSelect, onClose }) => {
+   const [selectedSkill, setSelectedSkill] = useState(null);
+@@ -43,7 +45,7 @@ const BrotherhoodModal = ({ visible, onSelect, onClose }) => {
+               ]}
+               onPress={() => setSelectedSkill(skill)}
+             >
+-              <Text style={styles.buttonText}>{skill}</Text>
++              <Text style={styles.buttonText}>{getSkillDisplayName(skill)}</Text>
+             </TouchableOpacity>
+           ))}
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/GhoulModal.js b/components/screens/CharacterScreen/modals/traits/GhoulModal.js
+index d0e6344..b3353ff 100644
+--- a/components/screens/CharacterScreen/modals/traits/GhoulModal.js
++++ b/components/screens/CharacterScreen/modals/traits/GhoulModal.js
+@@ -10,8 +10,8 @@ const GhoulModal = ({ visible, onSelect, onClose }) => {
+ 
+   const handleConfirm = () => {
+     onSelect('ghoul-necrotic-posthuman', name, {
+-      skillModifiers: { 'Выживание': 2 },
+-      forcedSkills: ['Выживание'],
++      skillModifiers: { SURVIVAL: 2 },
++      forcedSkills: ['SURVIVAL'],
+       extraSkills: 1,
+       immunities: ['radiation'],
+       effects: ['radiation_healing', 'slow_aging', 'infertility', 'discrimination']
+diff --git a/components/screens/CharacterScreen/modals/traits/MinutemanModal.js b/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
+index 335b5c9..8019bcf 100644
+--- a/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
++++ b/components/screens/CharacterScreen/modals/traits/MinutemanModal.js
+@@ -2,10 +2,12 @@ import React, { useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+ import { getTraitI18n } from '../../../../../domain/traits';
++import { getSkillDisplayName } from '../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'minuteman', traitName: 'Народное ополчение', modalType: 'choice' };
+ 
+-const SELECTABLE_SKILLS = ['Стрелковое оружие', 'Выживание', 'Красноречие'];
++// Canonical SKILL keys (UPPER_SNAKE_CASE). Rendered via getSkillDisplayName().
++const SELECTABLE_SKILLS = ['SMALL_GUNS', 'SURVIVAL', 'SPEECH'];
+ 
+ const MinutemanModal = ({ visible, onSelect, onClose }) => {
+   const [selectedSkill, setSelectedSkill] = useState(null);
+@@ -43,7 +45,7 @@ const MinutemanModal = ({ visible, onSelect, onClose }) => {
+               ]}
+               onPress={() => setSelectedSkill(skill)}
+             >
+-              <Text style={styles.buttonText}>{skill}</Text>
++              <Text style={styles.buttonText}>{getSkillDisplayName(skill)}</Text>
+             </TouchableOpacity>
+           ))}
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js b/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
+index dcfda3e..85aeb0e 100644
+--- a/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
++++ b/components/screens/CharacterScreen/modals/traits/OutcastBrotherhoodModal.js
+@@ -1,10 +1,12 @@
+ import React, { useState } from 'react';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+ import { getTraitI18n } from '../../../../../domain/traits';
++import { getSkillDisplayName } from '../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'brotherhoodOutcast', modalType: 'choice' };
+ 
+-const SELECTABLE_SKILLS = ['Энергооружие', 'Наука', 'Ремонт'];
++// Canonical SKILL keys (UPPER_SNAKE_CASE). Rendered via getSkillDisplayName().
++const SELECTABLE_SKILLS = ['ENERGY_WEAPONS', 'SCIENCE', 'REPAIR'];
+ 
+ const OutcastBrotherhoodModal = ({ visible, onSelect, onClose }) => {
+   const [selectedSkill, setSelectedSkill] = useState(null);
+@@ -32,7 +34,7 @@ const OutcastBrotherhoodModal = ({ visible, onSelect, onClose }) => {
+               style={[styles.modalButton, styles.skillOption, selectedSkill === skill && styles.selectedSkillOption]}
+               onPress={() => setSelectedSkill(skill)}
+             >
+-              <Text style={styles.buttonText}>{skill}</Text>
++              <Text style={styles.buttonText}>{getSkillDisplayName(skill)}</Text>
+             </TouchableOpacity>
+           ))}
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+index 85c6c03..898a83f 100644
+--- a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+@@ -21,7 +21,8 @@ const NCR_TRAIT_IDS = [
+   'ncr-brahmin-baron',
+ ];
+ 
+-const goodSoulGroup = ['Красноречие', 'Медицина', 'Ремонт', 'Наука', 'Бартер'];
++// Canonical SKILL keys (UPPER_SNAKE_CASE). Mirrors ncr-good-soul.modifiers.goodSoulSkills.
++const goodSoulGroup = ['SPEECH', 'MEDICINE', 'REPAIR', 'SCIENCE', 'BARTER'];
+ 
+ const SurvivorModal = ({
+   visible,
+diff --git a/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js b/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
+index 940f616..6e74dd2 100644
+--- a/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
++++ b/components/screens/CharacterScreen/modals/traits/VaultDwellerModal.js
+@@ -2,6 +2,7 @@ import React, { useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+ import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
++import { getSkillDisplayName } from '../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'vaultDweller', modalType: 'choice' };
+ 
+@@ -37,7 +38,7 @@ const VaultDwellerModal = ({ visible, onSelect, onClose, skills }) => {
+                 style={[styles.modalButton, styles.skillOption]}
+                 onPress={() => handleSelectSkill(skill.name)}
+                 >
+-                <Text style={styles.buttonText}>{skill.name}</Text>
++                <Text style={styles.buttonText}>{getSkillDisplayName(skill.name)}</Text>
+                 </TouchableOpacity>
+             ))}
+           </ScrollView>
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index ddbd97f..da2d77c 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -11,7 +11,7 @@ import {
+   selectActiveTimedEffects,
+ } from '../../../src/store/selectors';
+ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
+-import { TRAITS } from '../CharacterScreen/logic/traitsData';
++import { findTraitById } from '../../../domain/traits';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { resolveBodyPlan } from '../../../domain/bodyplan';
+ import styles from '../../../styles/CharacterScreen.styles';
+@@ -20,7 +20,6 @@ import { renderTextWithIcons } from './textUtils';
+ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { applyArmorMods } from '../../../domain/modsEquip';
+-import { getSkillDisplayName } from '../CharacterScreen/logic/characterScreenI18n';
+ import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
+ import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
+ import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
+@@ -142,41 +141,17 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+     const mainAttr = displayWeapon.mainAttr ?? displayWeapon.main_attr ?? 'AGI';
+     const mainSkill = displayWeapon.mainSkill ?? displayWeapon.main_skill ?? 'SMALL_GUNS';
+ 
+-    const SKILL_ALIASES = {
+-      ATHLETICS: ['ATHLETICS', 'Атлетика', 'Athletics'],
+-      BARTER: ['BARTER', 'Бартер', 'Barter'],
+-      BIG_GUNS: ['BIG_GUNS', 'Тяжелое оружие', 'Тяжёлое оружие', 'Big Guns'],
+-      ENERGY_WEAPONS: ['ENERGY_WEAPONS', 'Энергооружие', 'Energy Weapons'],
+-      EXPLOSIVES: ['EXPLOSIVES', 'Взрывчатка', 'Explosives'],
+-      LOCKPICK: ['LOCKPICK', 'Отмычки', 'Lockpick'],
+-      MEDICINE: ['MEDICINE', 'Медицина', 'Medicine'],
+-      MELEE_WEAPONS: ['MELEE_WEAPONS', 'Ближний бой', 'Melee Weapons'],
+-      PILOT: ['PILOT', 'Управление ТС', 'Pilot'],
+-      REPAIR: ['REPAIR', 'Ремонт', 'Repair'],
+-      SCIENCE: ['SCIENCE', 'Наука', 'Science'],
+-      SMALL_GUNS: ['SMALL_GUNS', 'Стрелковое оружие', 'Small Guns'],
+-      SNEAK: ['SNEAK', 'Скрытность', 'Sneak'],
+-      SPEECH: ['SPEECH', 'Красноречие', 'Speech'],
+-      SURVIVAL: ['SURVIVAL', 'Выживание', 'Survival'],
+-      THROWING: ['THROWING', 'Метание', 'Throwing'],
+-      UNARMED: ['UNARMED', 'Рукопашная', 'Unarmed'],
+-    };
+-
+-    const findSkillValue = (skillKeyOrName) => {
+-      const canonical = SKILL_ALIASES[skillKeyOrName] ? skillKeyOrName : Object.keys(SKILL_ALIASES).find((key) =>
+-        SKILL_ALIASES[key].includes(skillKeyOrName),
+-      );
+-
+-      const aliases = SKILL_ALIASES[canonical] || [skillKeyOrName, getSkillDisplayName(skillKeyOrName)];
+-      return skills?.find((s) => aliases.includes(s.name))?.value ?? 0;
+-    };
++    // Skill identity is canonical UPPER_SNAKE_CASE (SKILL_CATALOG_ORDER).
++    // No localized aliases — skills[].name on main is already the canonical key.
++    const findSkillValue = (skillKey) =>
++      skills?.find((s) => s.name === skillKey)?.value ?? 0;
+ 
+     const attrValue = getAttributeValue(attributes, mainAttr) ?? 0;
+     const skillValue = findSkillValue(mainSkill);
+     const successValue = attrValue + skillValue;
+   
+-    // Бонус урона для НКР "Пехотинец"
+-    const ncrInfantryWeaponIds = TRAITS['Пехотинец']?.modifiers?.ncrInfantryWeaponIds || [];
++    // Бонус урона для НКР "Пехотинец" (canonical trait id: 'ncr-infantryman')
++    const ncrInfantryWeaponIds = findTraitById('ncr-infantryman')?.modifiers?.ncrInfantryWeaponIds || [];
+     const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
+ 
+     const damageWithNcr = hasTrait('ncr-infantryman') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
+diff --git a/data/equipment/armor_mods.json b/data/equipment/armor_mods.json
+index f304962..bff1b57 100644
+--- a/data/equipment/armor_mods.json
++++ b/data/equipment/armor_mods.json
+@@ -14,7 +14,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 5
+@@ -54,7 +54,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 10
+@@ -94,7 +94,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 15
+@@ -128,7 +128,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 1
+@@ -167,7 +167,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 3
+@@ -206,7 +206,7 @@
+     ],
+     "complexity": 5,
+     "requiredPerk": "Бронник 3",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 7
+@@ -245,7 +245,7 @@
+     ],
+     "complexity": 5,
+     "requiredPerk": "Бронник 4, Наука! 2",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 9
+@@ -284,7 +284,7 @@
+     ],
+     "complexity": 5,
+     "requiredPerk": "Бронник 4",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 9
+@@ -323,7 +323,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 1
+@@ -362,7 +362,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 1
+@@ -401,7 +401,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 2",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 1
+@@ -440,7 +440,7 @@
+     ],
+     "complexity": 4,
+     "requiredPerk": "Бронник 3",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 1
+@@ -479,7 +479,7 @@
+     ],
+     "complexity": 5,
+     "requiredPerk": "Бронник 4",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 3
+@@ -518,7 +518,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 1
+@@ -557,7 +557,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 2",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 2
+diff --git a/data/equipment/robot/robotarms.json b/data/equipment/robot/robotarms.json
+index 9030f28..634c450 100644
+--- a/data/equipment/robot/robotarms.json
++++ b/data/equipment/robot/robotarms.json
+@@ -11,7 +11,7 @@
+     ],
+     "complexity": 2,
+     "perksRequired": [],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 0,
+     "weaponSlots": 1,
+     "canHoldWeapons": true,
+@@ -32,7 +32,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 0,
+     "weaponSlots": 1,
+     "canHoldWeapons": true,
+@@ -51,7 +51,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "melee": 2,
+     "guns": 2,
+@@ -75,7 +75,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "melee": 3,
+     "guns": 1,
+@@ -99,7 +99,7 @@
+     "perksRequired": [
+       "Robotics Expert 2"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "melee": 5,
+     "guns": 5,
+@@ -123,7 +123,7 @@
+       "Robotics Expert 2",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "melee": 5,
+     "guns": 3,
+@@ -148,7 +148,7 @@
+       "Robotics Expert 2",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "melee": 2,
+     "guns": 4,
+@@ -173,7 +173,7 @@
+       "Robotics Expert 3",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "melee": 4,
+     "guns": 5,
+@@ -359,7 +359,7 @@
+       "Robotics Expert 2",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "melee": 2,
+     "guns": 4,
+diff --git a/data/equipment/robot/robotbody.json b/data/equipment/robot/robotbody.json
+index 170f473..abf0d44 100644
+--- a/data/equipment/robot/robotbody.json
++++ b/data/equipment/robot/robotbody.json
+@@ -14,7 +14,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "body": 5,
+     "carryWeight": 150,
+@@ -40,7 +40,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "body": 5,
+     "carryWeight": 225,
+@@ -66,7 +66,7 @@
+     "perksRequired": [
+       "Robotics Expert 2"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "body": 9,
+     "carryWeight": 150,
+@@ -91,7 +91,7 @@
+       "Robotics Expert 2",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "body": 6,
+     "carryWeight": 150,
+@@ -119,7 +119,7 @@
+       "Robotics Expert 3",
+       "Science! 2"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "body": 10,
+     "carryWeight": 225,
+diff --git a/data/equipment/robot/robotheads.json b/data/equipment/robot/robotheads.json
+index 9508fc7..97662d0 100644
+--- a/data/equipment/robot/robotheads.json
++++ b/data/equipment/robot/robotheads.json
+@@ -9,7 +9,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "mind": 5,
+     "other": 2,
+@@ -29,7 +29,7 @@
+       "Robotics Expert 1",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "mind": null,
+     "other": null,
+@@ -49,7 +49,7 @@
+       "Robotics Expert 2",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "mind": 6,
+     "other": 4,
+@@ -69,7 +69,7 @@
+       "Robotics Expert 2",
+       "Science! 2"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "mind": 6,
+     "other": 4,
+@@ -89,7 +89,7 @@
+       "Robotics Expert 2",
+       "Science! 3"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "mind": 7,
+     "other": 3,
+@@ -111,7 +111,7 @@
+       "Robotics Expert 2",
+       "Science! 2"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "mind": 6,
+     "other": 4,
+diff --git a/data/equipment/robot/robotlegs.json b/data/equipment/robot/robotlegs.json
+index c71b69e..18e6f6a 100644
+--- a/data/equipment/robot/robotlegs.json
++++ b/data/equipment/robot/robotlegs.json
+@@ -10,7 +10,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "physicalDR": 2,
+     "energyDR": 2,
+@@ -28,7 +28,7 @@
+     "perksRequired": [
+       "Robotics Expert 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "physicalDR": 2,
+     "energyDR": 1,
+@@ -46,7 +46,7 @@
+     "perksRequired": [
+       "Robotics Expert 2"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "physicalDR": 3,
+     "energyDR": 2,
+@@ -65,7 +65,7 @@
+       "Robotics Expert 2",
+       "Science! 1"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 1,
+     "physicalDR": 2,
+     "energyDR": 2,
+@@ -84,7 +84,7 @@
+       "Armorer 1",
+       "Robotics Expert 3"
+     ],
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": 2,
+     "physicalDR": 4,
+     "energyDR": 3,
+diff --git a/data/equipment/robot/weapon_mods_assaultron_laser.json b/data/equipment/robot/weapon_mods_assaultron_laser.json
+index 1f3386a..0a06986 100644
+--- a/data/equipment/robot/weapon_mods_assaultron_laser.json
++++ b/data/equipment/robot/weapon_mods_assaultron_laser.json
+@@ -8,7 +8,7 @@
+     "ammoPerShotDelta": 1,
+     "complexity": null,
+     "perksRequired": ["Robotics Expert 1", "Science! 1"],
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": 2
+   },
+   {
+@@ -20,7 +20,7 @@
+     "ammoPerShotDelta": 2,
+     "complexity": null,
+     "perksRequired": ["Robotics Expert 1", "Science! 1"],
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": 3
+   },
+   {
+@@ -32,7 +32,7 @@
+     "ammoPerShotDelta": 3,
+     "complexity": null,
+     "perksRequired": ["Robotics Expert 1", "Science! 2"],
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": 4
+   },
+   {
+@@ -44,7 +44,7 @@
+     "ammoPerShotDelta": 4,
+     "complexity": null,
+     "perksRequired": ["Robotics Expert 1", "Science! 3"],
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": 5
+   }
+ ]
+diff --git a/data/equipment/uniq_armor_mods.json b/data/equipment/uniq_armor_mods.json
+index 70a94e4..b7ec72c 100644
+--- a/data/equipment/uniq_armor_mods.json
++++ b/data/equipment/uniq_armor_mods.json
+@@ -11,7 +11,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 3
+@@ -48,7 +48,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 6
+@@ -85,7 +85,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 9
+@@ -122,7 +122,7 @@
+     ],
+     "complexity": 4,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 12
+@@ -159,7 +159,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 5
+@@ -196,7 +196,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 10
+@@ -233,7 +233,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 15
+@@ -270,7 +270,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 20
+@@ -312,7 +312,7 @@
+     ],
+     "complexity": 4,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 25
+@@ -349,7 +349,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 10
+@@ -386,7 +386,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 20
+@@ -423,7 +423,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 25
+@@ -465,7 +465,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 30
+@@ -502,7 +502,7 @@
+     ],
+     "complexity": 4,
+     "requiredPerk": "Бронник 2",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 40
+@@ -539,7 +539,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 15
+@@ -576,7 +576,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 15
+@@ -618,7 +618,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 30
+@@ -655,7 +655,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 45
+@@ -692,7 +692,7 @@
+     ],
+     "complexity": 1,
+     "requiredPerk": "",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 5
+@@ -729,7 +729,7 @@
+     ],
+     "complexity": 2,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 10
+@@ -766,7 +766,7 @@
+     ],
+     "complexity": 3,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 15
+@@ -803,7 +803,7 @@
+     ],
+     "complexity": 4,
+     "requiredPerk": "Бронник 1",
+-    "requiredSkill": "Repair",
++    "requiredSkill": "REPAIR",
+     "costModifier": {
+       "op": "+",
+       "value": 20
+diff --git a/data/equipment/weapon_mods.json b/data/equipment/weapon_mods.json
+index 87b3b2d..d5e0613 100644
+--- a/data/equipment/weapon_mods.json
++++ b/data/equipment/weapon_mods.json
+@@ -6,7 +6,7 @@
+     "complexity": 3,
+     "perk1": "?Gun Nut 1",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 4 Uncommon x 2",
+     "cost": 30,
+@@ -31,7 +31,7 @@
+     "complexity": 4,
+     "perk1": "?Gun Nut 2",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 5 Uncommon x 3",
+     "cost": 35,
+@@ -59,7 +59,7 @@
+     "complexity": 3,
+     "perk1": "?Gun Nut 1",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 4 Uncommon x 2",
+     "cost": 27,
+@@ -84,7 +84,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 20,
+@@ -115,7 +115,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 25,
+@@ -146,7 +146,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 35,
+@@ -176,7 +176,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 25,
+@@ -206,7 +206,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 30,
+@@ -245,7 +245,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 20,
+@@ -271,7 +271,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 20,
+@@ -296,7 +296,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 40,
+@@ -319,7 +319,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 19,
+@@ -341,7 +341,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 30,
+@@ -364,7 +364,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 75,
+@@ -389,7 +389,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 0,
+@@ -415,7 +415,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 10,
+@@ -438,7 +438,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 20,
+@@ -469,7 +469,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 35,
+@@ -501,7 +501,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 36,
+@@ -534,7 +534,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 3,
+@@ -561,7 +561,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 37,
+@@ -582,7 +582,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 15,
+@@ -609,7 +609,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Common",
+     "materials": "?Common x 5 Uncommon x 3",
+     "cost": -3,
+@@ -642,7 +642,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Common",
+     "materials": "?Common x 4 Uncommon x 2",
+     "cost": 8,
+@@ -671,7 +671,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 23,
+@@ -698,7 +698,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 6,
+@@ -722,7 +722,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 10,
+@@ -753,7 +753,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 10,
+@@ -788,7 +788,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 20,
+@@ -826,7 +826,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 3,
+@@ -866,7 +866,7 @@
+     "complexity": 5,
+     "perk1": "?Science! 2",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 40,
+@@ -893,7 +893,7 @@
+     "complexity": 2,
+     "perk1": "?Science! 1",
+     "perk2": "",
+-    "skill": "?Repair",
++    "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 3",
+     "cost": 35,
+@@ -918,7 +918,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 14,
+@@ -954,7 +954,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 11,
+@@ -987,7 +987,7 @@
+     "complexity": 4,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 29,
+@@ -1023,7 +1023,7 @@
+     "complexity": 4,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 38,
+@@ -1059,7 +1059,7 @@
+     "complexity": 5,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 50,
+@@ -1099,7 +1099,7 @@
+     "complexity": 5,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Repair ",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 59,
+@@ -1137,7 +1137,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 10,
+@@ -1166,7 +1166,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 15,
+@@ -1196,7 +1196,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 30,
+@@ -1228,7 +1228,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 45,
+@@ -1260,7 +1260,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 30,
+@@ -1285,7 +1285,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 35,
+@@ -1312,7 +1312,7 @@
+     "complexity": 3,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 30,
+@@ -1337,7 +1337,7 @@
+     "complexity": 4,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 35,
+@@ -1366,7 +1366,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 4,
+@@ -1394,7 +1394,7 @@
+     "complexity": 3,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 8,
+@@ -1422,7 +1422,7 @@
+     "complexity": 4,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 12,
+@@ -1450,7 +1450,7 @@
+     "complexity": 5,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 16,
+@@ -1478,7 +1478,7 @@
+     "complexity": 3,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 6,
+@@ -1505,7 +1505,7 @@
+     "complexity": 3,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 31,
+@@ -1536,7 +1536,7 @@
+     "complexity": 4,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 24,
+@@ -1573,7 +1573,7 @@
+     "complexity": 4,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 26,
+@@ -1596,7 +1596,7 @@
+     "complexity": 4,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 30,
+@@ -1632,7 +1632,7 @@
+     "complexity": 5,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 35,
+@@ -1675,7 +1675,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 10,
+@@ -1703,7 +1703,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 10,
+@@ -1736,7 +1736,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 15,
+@@ -1764,7 +1764,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 20,
+@@ -1800,7 +1800,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 3,
+@@ -1836,7 +1836,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 14,
+@@ -1862,7 +1862,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 11,
+@@ -1888,7 +1888,7 @@
+     "complexity": 4,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 29,
+@@ -1918,7 +1918,7 @@
+     "complexity": 4,
+     "perk1": "Science! 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 38,
+@@ -1948,7 +1948,7 @@
+     "complexity": 5,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 50,
+@@ -1982,7 +1982,7 @@
+     "complexity": 5,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 59,
+@@ -2012,7 +2012,7 @@
+     "complexity": 4,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 15,
+@@ -2053,7 +2053,7 @@
+     "complexity": 4,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 20,
+@@ -2076,7 +2076,7 @@
+     "complexity": 4,
+     "perk1": "Science! 1",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 25,
+@@ -2105,7 +2105,7 @@
+     "complexity": 6,
+     "perk1": "Science! 4",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 72,
+@@ -2130,7 +2130,7 @@
+     "complexity": 5,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 30,
+@@ -2157,7 +2157,7 @@
+     "complexity": 6,
+     "perk1": "Science! 4",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 60,
+@@ -2188,7 +2188,7 @@
+     "complexity": 3,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 59,
+@@ -2209,7 +2209,7 @@
+     "complexity": 3,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 28,
+@@ -2232,7 +2232,7 @@
+     "complexity": 3,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 28,
+@@ -2253,7 +2253,7 @@
+     "complexity": 4,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 34,
+@@ -2274,7 +2274,7 @@
+     "complexity": 3,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 22,
+@@ -2295,7 +2295,7 @@
+     "complexity": 4,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 47,
+@@ -2322,7 +2322,7 @@
+     "complexity": 6,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 19,
+@@ -2345,7 +2345,7 @@
+     "complexity": 4,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 57,
+@@ -2368,7 +2368,7 @@
+     "complexity": 4,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 94,
+@@ -2389,7 +2389,7 @@
+     "complexity": 6,
+     "perk1": "Science! 3",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 132,
+@@ -2416,7 +2416,7 @@
+     "complexity": 7,
+     "perk1": "Science! 4",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 8 Uncommon x 6 Rare x 4",
+     "cost": 357,
+@@ -2445,7 +2445,7 @@
+     "complexity": 7,
+     "perk1": "Science! 4",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Uncommon",
+     "materials": "Common x 8 Uncommon x 6 Rare x 4",
+     "cost": 169,
+@@ -2468,7 +2468,7 @@
+     "complexity": 4,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Science",
++    "skill": "SCIENCE",
+     "rarity": "Common",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 22,
+@@ -2496,7 +2496,7 @@
+     "complexity": 3,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 20,
+@@ -2517,7 +2517,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 40,
+@@ -2538,7 +2538,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 5,
+@@ -2561,7 +2561,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 2",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 70,
+@@ -2584,7 +2584,7 @@
+     "complexity": 7,
+     "perk1": "Gun Nut 3",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 8 Uncommon x 6 Rare x 4",
+     "cost": 130,
+@@ -2607,7 +2607,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 45,
+@@ -2636,7 +2636,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 75,
+@@ -2661,7 +2661,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 68,
+@@ -2684,7 +2684,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2 ",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 5,
+@@ -2707,7 +2707,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 143,
+@@ -2728,7 +2728,7 @@
+     "complexity": 5,
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 218,
+@@ -2749,7 +2749,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 143,
+@@ -2772,7 +2772,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 4",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 248,
+@@ -2799,7 +2799,7 @@
+     "complexity": 6,
+     "perk1": "Gun Nut 2",
+     "perk2": "Science! 2",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 7 Uncommon x 5 Rare x 3",
+     "cost": 293,
+@@ -2822,7 +2822,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 30,
+@@ -2845,7 +2845,7 @@
+     "complexity": 4,
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 60,
+@@ -2869,7 +2869,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 25,
+@@ -2892,7 +2892,7 @@
+     "complexity": 4,
+     "perk1": "Blacksmith 2",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 50,
+@@ -2913,7 +2913,7 @@
+     "complexity": 5,
+     "perk1": "Blacksmith 3",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 75,
+@@ -2940,7 +2940,7 @@
+     "complexity": 5,
+     "perk1": "Blacksmith 3",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 100,
+@@ -2967,7 +2967,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 12,
+@@ -2994,7 +2994,7 @@
+     "complexity": 4,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 18,
+@@ -3025,7 +3025,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 12,
+@@ -3052,7 +3052,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 15,
+@@ -3079,7 +3079,7 @@
+     "complexity": 5,
+     "perk1": "Blacksmith 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 25,
+@@ -3132,7 +3132,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmtih 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 10,
+@@ -3159,7 +3159,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 5,
+@@ -3184,7 +3184,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 7,
+@@ -3213,7 +3213,7 @@
+     "complexity": 2,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 3",
+     "cost": 7,
+@@ -3241,7 +3241,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 10,
+@@ -3263,7 +3263,7 @@
+     "complexity": 4,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 12,
+@@ -3291,7 +3291,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 6,
+@@ -3319,7 +3319,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 9,
+@@ -3340,7 +3340,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 10,
+@@ -3367,7 +3367,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 4,
+@@ -3395,7 +3395,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 11,
+@@ -3416,7 +3416,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 9,
+@@ -3443,7 +3443,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 12,
+@@ -3464,7 +3464,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 13,
+@@ -3492,7 +3492,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 22,
+@@ -3513,7 +3513,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 2,
+@@ -3541,7 +3541,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3568,7 +3568,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3596,7 +3596,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3623,7 +3623,7 @@
+     "complexity": 4,
+     "perk1": "Blacksmith 2",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 15,
+@@ -3644,7 +3644,7 @@
+     "complexity": 4,
+     "perk1": "Blacksmith 2",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 30,
+@@ -3671,7 +3671,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 18,
+@@ -3699,7 +3699,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 30,
+@@ -3720,7 +3720,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 180,
+@@ -3741,7 +3741,7 @@
+     "complexity": 5,
+     "perk1": "Blacksmith 3",
+     "perk2": "Science! 1",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 360,
+@@ -3768,7 +3768,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 12,
+@@ -3795,7 +3795,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3823,7 +3823,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3851,7 +3851,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3875,7 +3875,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 4,
+@@ -3903,7 +3903,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 7,
+@@ -3924,7 +3924,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 22,
+@@ -3951,7 +3951,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3974,7 +3974,7 @@
+     "complexity": 1,
+     "perk1": "",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Common",
+     "materials": "Common x 2",
+     "cost": 3,
+@@ -3998,7 +3998,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 4,
+@@ -4026,7 +4026,7 @@
+     "complexity": 2,
+     "perk1": "Blacksmith 1",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 3",
+     "cost": 5,
+@@ -4053,7 +4053,7 @@
+     "complexity": 3,
+     "perk1": "Blacksmith 2",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 45,
+@@ -4081,7 +4081,7 @@
+     "complexity": 4,
+     "perk1": "Blacksmith 3",
+     "perk2": "",
+-    "skill": "Repair",
++    "skill": "REPAIR",
+     "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 100,
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index 7f86e7b..0a7446b 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -7,9 +7,9 @@
+     "modifiers": {
+       "extraSkills": 1,
+       "forcedSkills": [
+-        "energy_weapons",
+-        "science",
+-        "repair"
++        "ENERGY_WEAPONS",
++        "SCIENCE",
++        "REPAIR"
+       ]
+     }
+   },
+@@ -21,9 +21,9 @@
+     "modifiers": {
+       "extraSkills": 1,
+       "forcedSkills": [
+-        "energy_weapons",
+-        "science",
+-        "repair"
++        "ENERGY_WEAPONS",
++        "SCIENCE",
++        "REPAIR"
+       ]
+     }
+   },
+@@ -66,7 +66,7 @@
+     "descriptionKey": "traits.ghoul.necroticPosthuman.description",
+     "modifiers": {
+       "skillModifiers": {
+-        "survival": 2
++        "SURVIVAL": 2
+       },
+       "immunities": [
+         "radiation"
+@@ -87,8 +87,8 @@
+     "modifiers": {
+       "extraSkills": 1,
+       "forcedSkills": [
+-        "energy_weapons",
+-        "small_guns"
++        "ENERGY_WEAPONS",
++        "SMALL_GUNS"
+       ],
+       "effects": [
+         "improved_caravans",
+diff --git a/domain/characterCreation.js b/domain/characterCreation.js
+index a252097..8cfde31 100644
+--- a/domain/characterCreation.js
++++ b/domain/characterCreation.js
+@@ -1,8 +1,7 @@
+ // domain/characterCreation.js
+ // Pure character creation logic: attributes, skills, derived stats.
+-// No React, no UI dependencies. Imports only static i18n JSON for skill name catalog.
+-
+-import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
++// No React, no UI dependencies. No locale literals — skill identity is the
++// canonical UPPER_SNAKE_CASE key from SKILL_CATALOG_ORDER below.
+ 
+ // ---------------------------------------------------------------------------
+ // Attribute key utilities (from attributeKeyUtils.js)
+@@ -80,10 +79,11 @@ const SKILL_CATALOG_ORDER = [
+ // ALL_SKILL_KEYS — canonical keys for use in new code
+ export const ALL_SKILL_KEYS = SKILL_CATALOG_ORDER;
+ 
+-// ALL_SKILLS — uses Russian display names as identifiers (legacy stable IDs)
+-const _skillsCatalog = ruCharacterScreen.skillsCatalog || {};
++// ALL_SKILLS — `name` is the canonical SKILL key (UPPER_SNAKE_CASE).
++// For display, callers use getSkillDisplayName(name) / tCharacterScreen(`skillsCatalog.${name}`).
++// Single source of truth for skill identity. No aliases, no localized literals.
+ export const ALL_SKILLS = SKILL_CATALOG_ORDER.map((key) => ({
+-    name: _skillsCatalog[key] || key,
++    name: key,
+     value: 0,
+ }));
+ 
+diff --git a/domain/contract.skills.test.js b/domain/contract.skills.test.js
+new file mode 100644
+index 0000000..c03faa5
+--- /dev/null
++++ b/domain/contract.skills.test.js
+@@ -0,0 +1,139 @@
++/**
++ * Contract: skill identity is canonical UPPER_SNAKE_CASE everywhere.
++ *
++ * Source of truth: `ALL_SKILL_KEYS` (from `domain/characterCreation.js`),
++ * which mirrors the keys of `i18n/ru-RU/screens/character/screen.json#skillsCatalog`.
++ *
++ * Rule: any field in `data/**\/*.json` that names a skill MUST be either:
++ *   - empty string `""` (means "no skill required"), or
++ *   - a member of `ALL_SKILL_KEYS`.
++ *
++ * Locale strings (`"Ремонт"`, `"Repair"`, `"Энергооружие"`) and lowercase
++ * variants (`"repair"`, `"energy_weapons"`) are forbidden in data and code logic.
++ * Display happens at the render boundary via `getSkillDisplayName(SKILL_KEY)`.
++ */
++import { describe, it, expect } from 'vitest';
++import { readdirSync, readFileSync, statSync } from 'fs';
++import { join, resolve } from 'path';
++import { ALL_SKILL_KEYS } from './characterCreation.js';
++
++const ROOT = resolve(__dirname, '..');
++
++const SKILL_STRING_FIELDS = new Set(['skill', 'requiredSkill', 'mainSkill']);
++const SKILL_LIST_FIELDS = new Set(['forcedSkills', 'goodSoulSkills', 'selectedExtraSkills']);
++const SKILL_MAP_FIELDS = new Set(['skillModifiers']);
++
++/** Recursively collect all *.json files under a directory */
++function collectJsonFiles(dir) {
++  const out = [];
++  for (const entry of readdirSync(dir, { withFileTypes: true })) {
++    const full = join(dir, entry.name);
++    if (entry.isDirectory()) out.push(...collectJsonFiles(full));
++    else if (entry.name.endsWith('.json')) out.push(full);
++  }
++  return out;
++}
++
++/** Walk JSON and emit { path, field, value } for every skill-typed value. */
++function* walkSkillRefs(node, path = '$') {
++  if (Array.isArray(node)) {
++    for (let i = 0; i < node.length; i++) yield* walkSkillRefs(node[i], `${path}[${i}]`);
++    return;
++  }
++  if (!node || typeof node !== 'object') return;
++  for (const [k, v] of Object.entries(node)) {
++    const here = `${path}.${k}`;
++    if (SKILL_STRING_FIELDS.has(k) && typeof v === 'string') {
++      yield { path: here, field: k, value: v, kind: 'string' };
++    } else if (SKILL_LIST_FIELDS.has(k) && Array.isArray(v)) {
++      v.forEach((x, i) => {
++        if (typeof x === 'string') {
++          yield { path: `${here}[${i}]`, field: k, value: x, kind: 'list-item' };
++        }
++      });
++    } else if (SKILL_MAP_FIELDS.has(k) && v && typeof v === 'object') {
++      for (const kk of Object.keys(v)) {
++        yield { path: `${here}.${kk}`, field: k, value: kk, kind: 'map-key' };
++      }
++    }
++    yield* walkSkillRefs(v, here);
++  }
++}
++
++describe('skills are canonical UPPER_SNAKE_CASE across all data/*.json', () => {
++  const dataDir = join(ROOT, 'data');
++  const files = collectJsonFiles(dataDir);
++
++  it('every skill reference is in ALL_SKILL_KEYS (or empty string)', () => {
++    const failures = [];
++    for (const file of files) {
++      let json;
++      try { json = JSON.parse(readFileSync(file, 'utf-8')); }
++      catch { continue; }
++      for (const ref of walkSkillRefs(json)) {
++        if (ref.value === '') continue; // empty allowed (= no requirement)
++        if (!ALL_SKILL_KEYS.includes(ref.value)) {
++          failures.push(`${file.replace(ROOT + '/', '')} ${ref.path} (${ref.field}): ${JSON.stringify(ref.value)}`);
++        }
++      }
++    }
++    if (failures.length) {
++      throw new Error(
++        `Non-canonical skill references found (must be UPPER_SNAKE_CASE from ALL_SKILL_KEYS):\n  - ` +
++        failures.join('\n  - '),
++      );
++    }
++  });
++});
++
++describe('no localized skill literals in code logic', () => {
++  // We scan JS/TS files (excluding tests, node_modules, i18n catalog) for
++  // forbidden Russian skill strings. The only allowed place for them is
++  // i18n/*/screens/character/screen.json#skillsCatalog (the source of truth).
++  const FORBIDDEN_RU = [
++    'Атлетика', 'Бартер', 'Тяжелое оружие', 'Тяжёлое оружие', 'Энергооружие',
++    'Взрывчатка', 'Отмычки', 'Медицина', 'Ближний бой', 'Управление ТС',
++    'Ремонт', 'Наука', 'Стрелковое оружие', 'Скрытность', 'Красноречие',
++    'Выживание', 'Метание', 'Рукопашная',
++  ];
++
++  function collectSourceFiles(dir) {
++    const out = [];
++    for (const entry of readdirSync(dir, { withFileTypes: true })) {
++      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
++      const full = join(dir, entry.name);
++      if (entry.isDirectory()) {
++        // skip locale catalogs (source of truth lives there)
++        if (full.includes('/i18n/')) continue;
++        // skip test snapshots/fixtures
++        if (full.includes('/__tests__/')) continue;
++        out.push(...collectSourceFiles(full));
++      } else if (/\.(js|jsx|ts|tsx)$/.test(entry.name) && !entry.name.endsWith('.test.js')) {
++        out.push(full);
++      }
++    }
++    return out;
++  }
++
++  it('no Russian skill display names appear as string literals in logic code', () => {
++    const sourceFiles = collectSourceFiles(ROOT);
++    const offences = [];
++    for (const file of sourceFiles) {
++      const text = readFileSync(file, 'utf-8');
++      for (const ru of FORBIDDEN_RU) {
++        // match only quoted occurrences ("...", '...', `...`)
++        const pattern = new RegExp(`['"\`]${ru}['"\`]`, 'g');
++        const m = text.match(pattern);
++        if (m) {
++          offences.push(`${file.replace(ROOT + '/', '')}: ${m.length}× literal ${JSON.stringify(ru)}`);
++        }
++      }
++    }
++    if (offences.length) {
++      throw new Error(
++        `Forbidden localized skill literal(s) in code (use canonical SKILL keys + getSkillDisplayName):\n  - ` +
++        offences.join('\n  - '),
++      );
++    }
++  });
++});
+-- 
+2.47.3
+

@@ -1,0 +1,574 @@
+From 866c0680bf0d0978c35d6ff0f30062057b005be4 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Fri, 19 Jun 2026 06:18:13 +0000
+Subject: [PATCH] feat(traits): close T-2/T-3 + skillPickChoice +
+ effects-as-labels contract
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Closes the remaining open questions in docs/schema/02-traits.md and
+fills the data gaps the owner pointed out during the traits audit.
+
+Apply ORDER: this patch goes AFTER refactor-traits-T1-drop-robot-dups
+(which removes legacy robotRules/robotType/robotBodyPlan from data and
+the trait.modifiers.robotBodyPlan fallback in code). Patches do not
+touch the same lines, but the T-1 patch is the architectural pre-req.
+
+Data (data/traits/traits.json):
+  - ncr-infantryman: ncrInfantryWeaponIds → weaponDamageBonus
+    [{ weaponIds: [...5...], bonus: 1 }]. Same 5 weapons as before.
+  - ncr-good-soul: modifiers were {}. Now carries the contract
+    skillPickChoice: { count: 2, from: ['SPEECH','MEDICINE','REPAIR',
+    'SCIENCE','BARTER'] } — source of truth for what is currently
+    hardcoded as GOOD_SOUL_SKILL_KEYS in CharacterScreen.js.
+  - ncr-home-on-the-range, ncr-technique-of-descent, ncr-brahmin-baron,
+    survivor-quick-shot: modifiers were {}. Added effects: ['<label_id>']
+    so the UI has an anchor to render their localized labels (no
+    mechanical effect, per owner). The label ids are intentionally
+    *_label-suffixed to make the UI-only nature explicit.
+  - ncr-resident: stays a pure container ({ isMultiTrait, subTraitIds }).
+    No self weaponDamageBonus — only chosen sub-traits carry bonuses.
+
+domain/traits.js:
+  - getWeaponDamageBonus(source, weapon): sum of matching records
+    inside one source. Matches by weaponIds[], weaponId, or skillKey
+    (canonical UPPER_SNAKE_CASE). bonus may be negative.
+  - getWeaponDamageBonusFromSources(sources, weapon): additive over
+    all active sources (parent trait + sub-traits + future perks/chem).
+
+components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js:
+  - WeaponCard pulls 'trait' from useCharacter().
+  - Hardcoded NCR-Infantryman branch replaced by the universal path
+    through getWeaponDamageBonusFromSources([parent, ...subTraits]).
+    Future perks/chem with weaponDamageBonus will be picked up the
+    same way — no further UI changes needed.
+
+domain/weaponDamageBonus.test.js:
+  - Removed the assertion that demanded a self-bonus on ncr-resident.
+    Per owner: resident is a multi-trait container with no mechanical
+    effect of its own. The test was added in commit 5fe99a1 without
+    owner approval.
+
+docs/schema/02-traits.md:
+  - T-2 marked ✅ (weaponDamageBonus contract + impl).
+  - T-3 marked ✅ (canonical UPPER_SNAKE_CASE everywhere — closed
+    earlier by refactor-skills-canonical, just updating status).
+  - New §: 'Effects как метки для UI' — explains the contract for
+    string-flag labels (vs real mechanics).
+  - New §: 'Контракт skillPickChoice' — picker-data field.
+
+docs/schema/06-modifiers.md:
+  - skillBonusChoice (the previous draft) replaced by the actual
+    field used in data: skillPickChoice { count, from }. Status 🟡
+    (data present in ncr-good-soul; picker UI is in 07-trait-debt).
+
+docs/schema/07-trait-debt.md (new):
+  - Single source of truth for what is currently a label and needs
+    a real implementation later. 7 chapters:
+      1. Radiation counter (ghoul healing + child-of-atom charge).
+      2. Stealth Boy addiction (shadow).
+      3. weaponDifficultyHint (UI warnings: infantryman / technique
+         of descent).
+      4. UI rules left over from robotRules (no_consumables_food_rest,
+         armor whitelists → origin.armorRules).
+      5. Real picker UI for skillPickChoice (ncr-good-soul).
+      6. Built-in weapons & robot attacks (built_in_laser,
+         self_destruct).
+      7. Numbers that still need owner input (minuteman effects, etc).
+
+Verified by in-process simulation (no vitest available in sandbox):
+20/20 assertions pass — including the data tests on ncr-infantryman,
+the explicit absence of a self-bonus on ncr-resident, and the
+skillPickChoice shape on ncr-good-soul.
+---
+ .../WeaponsAndArmorScreen.js                  |  33 ++++-
+ data/traits/traits.json                       |  40 +++--
+ docs/schema/02-traits.md                      |  43 +++++-
+ docs/schema/06-modifiers.md                   |  30 ++--
+ docs/schema/07-trait-debt.md                  | 140 ++++++++++++++++++
+ domain/traits.js                              |  60 ++++++++
+ domain/weaponDamageBonus.test.js              |  11 +-
+ 7 files changed, 316 insertions(+), 41 deletions(-)
+ create mode 100644 docs/schema/07-trait-debt.md
+
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index da2d77c..2460b76 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -11,7 +11,7 @@ import {
+   selectActiveTimedEffects,
+ } from '../../../src/store/selectors';
+ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../domain/characterCreation';
+-import { findTraitById } from '../../../domain/traits';
++import { findTraitById, getWeaponDamageBonusFromSources } from '../../../domain/traits';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { resolveBodyPlan } from '../../../domain/bodyplan';
+ import styles from '../../../styles/CharacterScreen.styles';
+@@ -115,7 +115,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
+ 
+ 
+ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+-    const { hasTrait, attributes, skills } = useCharacter();
++    const { hasTrait, attributes, skills, trait } = useCharacter();
+     if (!weapon) {
+       return (
+         <View style={localStyles.weaponCardContainer}>
+@@ -150,11 +150,30 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+     const skillValue = findSkillValue(mainSkill);
+     const successValue = attrValue + skillValue;
+   
+-    // Бонус урона для НКР "Пехотинец" (canonical trait id: 'ncr-infantryman')
+-    const ncrInfantryWeaponIds = findTraitById('ncr-infantryman')?.modifiers?.ncrInfantryWeaponIds || [];
+-    const isNcrInfantryWeapon = displayWeapon && ncrInfantryWeaponIds.includes(displayWeapon.id ?? displayWeapon.weaponId);
+-
+-    const damageWithNcr = hasTrait('ncr-infantryman') && isNcrInfantryWeapon ? Number(displayWeapon.damage ?? 0) + 1 : Number(displayWeapon.damage ?? 0);
++    // weaponDamageBonus — универсальный путь: сумма по всем активным источникам
++    // (parent trait + выбранные sub-trait'ы NCR/Survivor + в будущем перки/chem).
++    // См. docs/schema/06-modifiers.md § 1.7.
++    const weaponDamageSources = [];
++    if (trait) {
++      const parent = findTraitById(trait.id) || trait;
++      if (parent) weaponDamageSources.push(parent);
++      const subIds = Array.isArray(trait?.ids) ? trait.ids
++                   : Array.isArray(trait?.modifiers?.subTraitIds) ? trait.modifiers.subTraitIds
++                   : [];
++      for (const sid of subIds) {
++        if (sid && sid !== trait.id) {
++          const sub = findTraitById(sid);
++          if (sub) weaponDamageSources.push(sub);
++        }
++      }
++    }
++    const weaponMatch = displayWeapon
++      ? { id: displayWeapon.id ?? displayWeapon.weaponId, mainSkill: displayWeapon.mainSkill }
++      : null;
++    const weaponDamageBonusValue = weaponMatch
++      ? getWeaponDamageBonusFromSources(weaponDamageSources, weaponMatch)
++      : 0;
++    const damageWithNcr = Number(displayWeapon.damage ?? 0) + weaponDamageBonusValue;
+     const weaponType = displayWeapon?.weaponType ?? displayWeapon?.weapon_type;
+     const appliesMeleeBonus = displayWeapon?.meleeBonusApplies === true || ['Melee', 'Unarmed'].includes(weaponType);
+     const visibleDamage = appliesMeleeBonus ? damageWithNcr + (Number(meleeBonus) || 0) : damageWithNcr;
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index 145ef08..dbe9aa8 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -200,7 +200,12 @@
+     "originId": "ncr",
+     "displayNameKey": "traits.ncr.goodSoul.name",
+     "descriptionKey": "traits.ncr.goodSoul.description",
+-    "modifiers": {}
++    "modifiers": {
++      "skillPickChoice": {
++        "count": 2,
++        "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"]
++      }
++    }
+   },
+   {
+     "id": "ncr-infantryman",
+@@ -208,12 +213,17 @@
+     "displayNameKey": "traits.ncr.infantryman.name",
+     "descriptionKey": "traits.ncr.infantryman.description",
+     "modifiers": {
+-      "ncrInfantryWeaponIds": [
+-        "weapon_submachine_gun",
+-        "weapon_black_powder_rifle",
+-        "weapon_assault_rifle",
+-        "weapon_frag_grenade",
+-        "weapon_combat_knife"
++      "weaponDamageBonus": [
++        {
++          "weaponIds": [
++            "weapon_submachine_gun",
++            "weapon_black_powder_rifle",
++            "weapon_assault_rifle",
++            "weapon_frag_grenade",
++            "weapon_combat_knife"
++          ],
++          "bonus": 1
++        }
+       ]
+     }
+   },
+@@ -222,21 +232,27 @@
+     "originId": "ncr",
+     "displayNameKey": "traits.ncr.homeOnTheRange.name",
+     "descriptionKey": "traits.ncr.homeOnTheRange.description",
+-    "modifiers": {}
++    "modifiers": {
++      "effects": ["home_on_the_range_label"]
++    }
+   },
+   {
+     "id": "ncr-technique-of-descent",
+     "originId": "ncr",
+     "displayNameKey": "traits.ncr.techniqueOfDescent.name",
+     "descriptionKey": "traits.ncr.techniqueOfDescent.description",
+-    "modifiers": {}
++    "modifiers": {
++      "effects": ["technique_of_descent_label"]
++    }
+   },
+   {
+     "id": "ncr-brahmin-baron",
+     "originId": "ncr",
+     "displayNameKey": "traits.ncr.brahminBaron.name",
+     "descriptionKey": "traits.ncr.brahminBaron.description",
+-    "modifiers": {}
++    "modifiers": {
++      "effects": ["brahmin_baron_label"]
++    }
+   },
+   {
+     "id": "survivor-survivor",
+@@ -268,7 +284,9 @@
+     "originId": "survivor",
+     "displayNameKey": "traits.survivor.quickShot.name",
+     "descriptionKey": "traits.survivor.quickShot.description",
+-    "modifiers": {}
++    "modifiers": {
++      "effects": ["quick_shot_label"]
++    }
+   },
+   {
+     "id": "survivor-gifted",
+diff --git a/docs/schema/02-traits.md b/docs/schema/02-traits.md
+index 34a0e1e..dbdb33f 100644
+--- a/docs/schema/02-traits.md
++++ b/docs/schema/02-traits.md
+@@ -84,9 +84,46 @@
+    модификатора лимита. «Прибавить значение» и «расширить потолок» — независимы.
+    → текущая объектная форма `attributes.STR={baseBonus,min,max}` мигрирует в эти два поля.
+ 
+-❓ T-2 (открыто, не блокирует): `ncrInfantryWeaponIds` — частная механика или обобщить
+-   до «бонус урона к списку оружия».
+-❓ T-3 (открыто, не блокирует): ключи навыков (`survival`) привести к canonical (ALL_SKILL_KEYS).
++✅ T-2: `ncrInfantryWeaponIds` обобщён в универсальное поле `weaponDamageBonus`
++   (см. `docs/schema/06-modifiers.md` § 1.7). Движок суммирует бонусы из всех
++   активных источников (parent trait + sub-traits NCR/Survivor + будущие перки/chem)
++   через `getWeaponDamageBonusFromSources` из `domain/traits.js`.
++✅ T-3: все skill-ключи в данных и коде — canonical UPPER_SNAKE_CASE. Защита от
++   регрессии: `domain/contract.skills.test.js`.
+ 
+ ## Что НЕ делаем сейчас
+ Только контракт черт. Реализация — после origins.
++
++
++## Effects как метки для UI
++
++Часть черт не несёт числовой механики — они дают **подпись в UI** (например, на
++экране оружия и брони, в активных эффектах). Для них используется единая шина
++`modifiers.effects: string[]`. Каждая строка — id флага, по которому UI ищет:
++- локализованный текст в i18n (`labels.<effect_id>`),
++- опционально — UI-правила (например `no_consumables_food_rest` → скрыть кнопку
++  «применить препарат»).
++
++Часть флагов **в будущем** станет настоящей механикой
++(см. `07-trait-debt.md`): `radiation_absorption`, `stealth_boy_addiction`,
++`self_destruct`, `built_in_laser` и др. Сейчас они — метки.
++
++## Контракт `skillPickChoice` (новое поле)
++
++Для черт вроде `ncr-good-soul` («отметьте 2 навыка из 5») — задекларировано
++поле:
++
++```jsonc
++"modifiers": {
++  "skillPickChoice": {
++    "count": 2,
++    "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"]
++  }
++}
++```
++
++Семантика: игрок выбирает `count` навыков из списка `from` (canonical
++SKILL keys); UI-пикер пока в долге (`07-trait-debt.md`). До его появления
++поле читается как «приоритетные кандидаты в extra-tagged» — это вытесняет
++хардкод `GOOD_SOUL_SKILL_KEYS` из `CharacterScreen.js` (вынос — отдельной
++правкой UI).
+diff --git a/docs/schema/06-modifiers.md b/docs/schema/06-modifiers.md
+index 0ecdbd5..f98b49f 100644
+--- a/docs/schema/06-modifiers.md
++++ b/docs/schema/06-modifiers.md
+@@ -138,23 +138,27 @@
+   **контракт**: ровно через него будут реализованы перки/chem'ы, дающие +N к
+   конкретному навыку. Реализация — через общий агрегатор (§ 3).
+ 
+-#### `skillBonusChoice` 🟡
+-- **Тип:** `{ amount: number, from: string[] | "any" }`.
+-- **Источники:** perk, chem-effect (будущее).
+-- **Поведение:** «+N к навыку **на выбор игрока**». При выборе перка/применении chem'а
+-  открывается модалка выбора одного навыка из списка `from` (или из любого
+-  `"any"` = ALL_SKILL_KEYS); итог записывается как `skillModifiers: { CHOSEN: amount }`
+-  на инстансе перка/эффекта.
+-- **Оператор:** см. `skillModifiers` (результат превращается в него).
+-- **Пример (перк «+2 к любому навыку»):**
++#### `skillPickChoice` 🟡
++- **Тип:** `{ count: number, from: string[] | "any" }`.
++- **Источники:** trait (`ncr-good-soul`), perk, chem-effect.
++- **Поведение:** игрок выбирает `count` навыков из `from` (canonical UPPER_SNAKE_CASE
++  или `"any"` = весь `ALL_SKILL_KEYS`). Результат запоминается на инстансе трейта/перка
++  и используется как **extra-tagged**-набор (даёт стартовые +2 и подсветку).
++- **Пример (NCR Good Soul, 2 из 5):**
+   ```jsonc
+-  "skillBonusChoice": { "amount": 2, "from": "any" }
++  "skillPickChoice": {
++    "count": 2,
++    "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"]
++  }
+   ```
+-- **Пример (перк «+2 к одному из 3 боевых»):**
++- **Пример (перк «1 из любого боевого»):**
+   ```jsonc
+-  "skillBonusChoice": { "amount": 2, "from": ["SMALL_GUNS", "ENERGY_WEAPONS", "BIG_GUNS"] }
++  "skillPickChoice": { "count": 1, "from": ["SMALL_GUNS", "ENERGY_WEAPONS", "BIG_GUNS"] }
+   ```
+-- **Статус:** 🟡 формат фиксируется как контракт. Данных и UI пока нет.
++- **Статус:** 🟡 поле есть в данных (`ncr-good-soul`); UI-пикер пока в долге
++  (см. `07-trait-debt.md`). До появления пикера хардкод
++  `GOOD_SOUL_SKILL_KEYS` в `CharacterScreen.js` читается как fallback,
++  но источник истины — это поле.
+ 
+ #### `skillMaxValue` ✅
+ - **Тип:** `number` (по умолчанию 6).
+diff --git a/docs/schema/07-trait-debt.md b/docs/schema/07-trait-debt.md
+new file mode 100644
+index 0000000..1c37110
+--- /dev/null
++++ b/docs/schema/07-trait-debt.md
+@@ -0,0 +1,140 @@
++# Долги по чертам (то, что отложено после T-1/T-2/T-3)
++
++Этот файл — **сводный реестр** конкретных game-механик, которые **сейчас
++описаны строкой-меткой в `trait.modifiers.effects`**, но настоящей логики
++под собой не имеют. Каждая запись фиксирует: что нужно реализовать,
++от чего зависит, чем сейчас представлено.
++
++Принцип: пока механики нет — `effects: ['<id>']` это **флаг для UI-лейбла**.
++UI рендерит локализованную подпись из i18n (`labels.<id>`). Когда дойдут
++руки до реализации — оставляем `effects`-флаг как UI-якорь и добавляем
++рядом реальные модификаторы или новые поля.
++
++---
++
++## 1. Радиационный счётчик (radiation counter)
++
++Затрагивает: `ghoul`, `childOfAtom`, и **всех остальных** персонажей
++(механика урона/штрафа от накопленной радиации).
++
++Текущие флаги:
++- `ghoul.effects`: `radiation_healing` — гуль исцеляется от радиации
++  («1 ОЗ за каждые 3 пункта радиационного урона», см. описание в i18n).
++- `childofatom.effects`: `radiation_absorption`, `radiation_melee_charge`
++  — это **части одной механики**: ребёнок атома накапливает радиацию и
++  тратит её на новую атаку.
++
++Что нужно для реализации:
++- Поле `radiationCounter` в Zustand-стейте (число, ± события).
++- Формула: «обычный персонаж без иммунитета теряет maxHP равный значению
++  счётчика»; гуль — обратное (heal); ребёнок атома — буфер для атаки.
++- UI: счётчик в шапке экрана оружия/брони (`+/-` контролы).
++- Новое оружие/атака для child-of-atom на основе очков радиации.
++
++Когда делать: вместе с экраном оружия/брони (там естественное место для UI).
++
++---
++
++## 2. Зависимость от Stealth Boy
++
++Затрагивает: `shadow`.
++
++Текущий флаг: `shadow.effects`: `stealth_boy_addiction`.
++
++Это **новая механика эффекта**, не лейбл. Логика:
++- использование Stealth Boy → бросок зависимости (по правилам Fallout-2d20);
++- провал → штрафы к Perception/Intelligence/Charisma.
++
++Когда делать: вместе с системой chem-effects / consumables.
++
++---
++
++## 3. UI-предупреждения «диапазон сложности» (weaponDifficultyHint)
++
++Затрагивает: `ncr-infantryman` (плохо знаком с `ENERGY_WEAPONS` / `BIG_GUNS`),
++`ncr-technique-of-descent` (наоборот — может реролл на дальнобойке) и др.
++
++По решению владельца это **не механический модификатор**, а **подпись
++в карточке оружия**: «⚠️ +2 к сложности» или «🎲 можешь перебросить 1d20».
++
++Что нужно:
++- Новое поле `weaponDifficultyHint: [{ skillKey, weaponIds?, hintI18nKey }]`
++  на трейте.
++- В `WeaponCard` (`WeaponsAndArmorScreen`) собрать активные хинты от
++  parent + sub-traits + perks и рендерить под статами оружия.
++
++Когда делать: вместе с UI-итерацией экрана оружия и брони.
++
++---
++
++## 4. UI-правила из бывшего `robotRules`
++
++Удалено из данных (см. `refactor-traits-T1-drop-robot-dups`), но
++**семантика осталась нужна**:
++
++- `no_consumables_food_rest` (флаг на роботах) → **скрыть кнопку
++  «применить препарат» / «съесть» / «выпить»** в инвентаре, когда
++  персонаж — робот.
++- `canEquipStandardArmor: false`, `canEquipPowerArmor: false` →
++  переедут в `origin.armorRules` (см. `01b-armor-rules.md`,
++  открытые C/D/E).
++
++Когда делать: вместе с реализацией `armorRules` (закрытие 01b).
++
++---
++
++## 5. Picker UI для `skillPickChoice`
++
++Затрагивает: `ncr-good-soul` (выбери 2 из 5).
++
++Поле `skillPickChoice` уже в данных
++(см. `06-modifiers.md` § 1.2). Сейчас в `CharacterScreen.js` есть хардкод
++`GOOD_SOUL_SKILL_KEYS` и логика «отметить как extra-tagged» — она
++работает по факту, но **читает не из данных, а из хардкода**.
++
++Что нужно:
++- Trait-модалка для good-soul (по аналогии с `BrotherhoodModal`),
++  которая показывает 5 вариантов и даёт выбрать 2.
++- В `CharacterScreen.handleSelectTrait` читать `skillPickChoice` из
++  активного трейта и применять `extraTaggedSkills` соответственно.
++- Удалить хардкод `GOOD_SOUL_SKILL_KEYS`.
++
++Когда делать: в рамках UI-итерации траит-модалок (там уже есть
++`pick` в логике китов — теперь то же самое для трейтов).
++
++---
++
++## 6. Built-in weapons и атаки роботов
++
++Затрагивает: `assaultron` (`built_in_laser`, `self_destruct`),
++`robobrain` (`ir_vision`, `ignore_darkness_penalty`),
++`misterHandy` (`hover_movement`, `360_vision`).
++
++Большая часть — лейблы. Но **два пункта — это реальные оружия/атаки**:
++
++- `built_in_laser` (assaultron) — в head-слот ставится оружие
++  «головной лазер» с конкретными статами; должно отображаться в
++  карточке оружия экрана.
++- `self_destruct` (assaultron) — это оружие/атака; нужны данные
++  оружия + правила использования.
++
++Когда делать: вместе с экраном оружия (роботы) и расширением
++каталога robot-weapons.
++
++---
++
++## 7. Залейте сюда конкретные числа
++
++Несколько эффектов **ждут конкретного числа** от владельца — их пока
++не реализовать без уточнения:
++
++- `minuteman.effects`: `improved_caravans`, `base_defense_4`,
++  `cover_dr_bonus`, `outnumbered_damage_bonus` — что именно каждый
++  делает в числе?
++- `protectron.effects`: `model_check_discount` — какая скидка и на
++  что?
++- `vaultdweller.effects`: `luck_restore_on_complication` — сколько
++  очков удачи восстанавливается и при каких complication?
++- `survivor.effects`: список ещё не пройден.
++
++Когда делать: по мере необходимости в UI.
+diff --git a/domain/traits.js b/domain/traits.js
+index 62f0ec1..65aca71 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -210,3 +210,63 @@ export function getTraitI18n(id) {
+ export function getTraitDisplayDescription(trait) {
+   return getTraitDescriptionKey(trait);
+ }
++
++// ---------------------------------------------------------------------------
++// weaponDamageBonus — universal modifier
++// ---------------------------------------------------------------------------
++//
++// Contract: see docs/schema/06-modifiers.md § 1.7 (`weaponDamageBonus`).
++//
++// Shape on a source (trait / perk / chem effect):
++//   "modifiers": {
++//     "weaponDamageBonus": [
++//       { "weaponIds": ["weapon_a","weapon_b"], "bonus": 1 },
++//       { "weaponId":  "weapon_c",              "bonus": 2 },
++//       { "skillKey":  "BIG_GUNS",              "bonus": -1 }
++//     ]
++//   }
++//
++// Matching rules per record:
++//   - weaponIds: weapon.id ∈ weaponIds
++//   - weaponId:  weapon.id === weaponId
++//   - skillKey:  weapon.mainSkill === skillKey  (canonical UPPER_SNAKE_CASE)
++// At least one rule must match for the record to apply. Multiple matching
++// records inside one source are summed (additive). bonus may be negative.
++
++const matchesWeapon = (rule, weapon) => {
++  if (!rule || !weapon) return false;
++  if (Array.isArray(rule.weaponIds) && weapon.id != null && rule.weaponIds.includes(weapon.id)) return true;
++  if (rule.weaponId != null && weapon.id === rule.weaponId) return true;
++  if (rule.skillKey != null && weapon.mainSkill === rule.skillKey) return true;
++  return false;
++};
++
++/**
++ * Damage bonus contributed by a single source (trait / perk / chem effect)
++ * for a given weapon. Returns 0 when there are no matching records.
++ */
++export function getWeaponDamageBonus(source, weapon) {
++  const rules = source?.modifiers?.weaponDamageBonus;
++  if (!Array.isArray(rules) || rules.length === 0) return 0;
++  let total = 0;
++  for (const rule of rules) {
++    if (matchesWeapon(rule, weapon)) {
++      total += Number(rule.bonus) || 0;
++    }
++  }
++  return total;
++}
++
++/**
++ * Sum of weaponDamageBonus contributions across multiple active sources
++ * (trait + sub-traits + perks + chem effects, ...). Each source is read
++ * independently and the bonuses are added together.
++ */
++export function getWeaponDamageBonusFromSources(sources, weapon) {
++  if (!Array.isArray(sources) || sources.length === 0) return 0;
++  let total = 0;
++  for (const source of sources) {
++    total += getWeaponDamageBonus(source, weapon);
++  }
++  return total;
++}
+diff --git a/domain/weaponDamageBonus.test.js b/domain/weaponDamageBonus.test.js
+index d0ac177..c3eb325 100644
+--- a/domain/weaponDamageBonus.test.js
++++ b/domain/weaponDamageBonus.test.js
+@@ -71,13 +71,10 @@ describe('getWeaponDamageBonusFromSources (universal: trait + perk + chem)', ()
+ });
+ 
+ describe('weaponDamageBonus on actual NCR traits', () => {
+-  it('ncr-resident grants +1 to listed weaponIds', async () => {
+-    const traits = (await import('../data/traits/traits.json')).default;
+-    const ncrResident = traits.find((t) => t.id === 'ncr-resident');
+-    expect(ncrResident.modifiers.weaponDamageBonus).toBeDefined();
+-    const bonus = getWeaponDamageBonus(ncrResident, { id: ncrResident.modifiers.weaponDamageBonus[0].weaponIds[0], mainSkill: 'SMALL_GUNS' });
+-    expect(bonus).toBeGreaterThan(0);
+-  });
++  // Per owner's design: ncr-resident is a MULTI-TRAIT CONTAINER with no
++  // mechanical effect of its own. Only the chosen sub-traits (e.g.
++  // ncr-infantryman) carry numeric bonuses. An earlier test that asserted
++  // a self-bonus on ncr-resident has been removed.
+ 
+   it('ncr-infantryman has its own weaponDamageBonus', async () => {
+     const traits = (await import('../data/traits/traits.json')).default;
+-- 
+2.47.3
+

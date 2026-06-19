@@ -138,3 +138,78 @@ UI рендерит локализованную подпись из i18n (`labe
 - `survivor.effects`: список ещё не пройден.
 
 Когда делать: по мере необходимости в UI.
+
+---
+
+## 8. Trait-модалки: единый источник данных и отсутствующие модалки
+
+Статус: **отложенный рефакторинг**, не блокирует текущий flow.
+
+### 8.1. Хардкод модификаторов в модалках
+
+Сейчас большинство trait-модалок в `components/screens/CharacterScreen/modals/traits/`
+задают модификаторы вручную вместо чтения из `data/traits/traits.json`.
+
+Пример: `SupermutantModal.js` хардкодит
+```js
+attributes: { 'STR': 2, 'END': 2 },
+minLimits: { 'STR': 6, 'END': 6 },
+maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
+```
+Хотя в `data/traits/traits.json` у `supermutant-forced-evolution` уже есть
+корректный объект `attributes: { STR: { baseBonus, min, max }, ... }`.
+
+Это создаёт дублирование и риск рассинхронизации.
+
+Цель: все модалки (кроме особых случаев) должны брать модификаторы из
+`findTraitById(origin.traitIds[0])?.modifiers` и передавать их в
+`CharacterScreen.handleSelectTrait()` без изменений.
+
+### 8.2. Отсутствующие модалки
+
+Для origins `shadow` и `synth` есть трейты в данных, но нет
+соответствующих модалок в `components/screens/CharacterScreen/modals/traits/index.js`.
+При выборе этих origin кнопка «Черта» открывает пустоту — trait выбрать
+невозможно.
+
+Нужно создать:
+- `ShadowModal.js`
+- `SynthModal.js`
+
+и зарегистрировать их в `TRAIT_MODALS` / `TRAIT_CONFIGS` в `index.js`.
+
+Пока отложено: `shadow` и `synth` — неиграбельные origins до реализации
+модалок.
+
+### 8.3. Целевая архитектура (рекомендация)
+
+Вместо 13+ отдельных модалок с хардкодом лучше прийти к гибриду:
+
+- `GenericTraitModal.js` — одна модалка для всех «info-only» трейтов
+  (Supermutant, Ghoul, Protectron, Assaultron, MisterHandy, RoboBrain,
+  VaultDweller, Minuteman, ChildOfAtom, OutcastBrotherhood, Shadow, Synth).
+  Читает имя/описание/модификаторы из `data/traits/traits.json`.
+
+- `SkillChoiceModal.js` — параметризуемая модалка выбора 1 навыка из
+  списка, управляемая `trait.modifiers.forcedSkills` и `extraSkills`.
+  Используется для `brotherhood` и, возможно, других трейтов с
+  `skillPickChoice`/`forcedSkills`.
+
+- `MultiTraitModal.js` — модалка выбора 2 черт (Survivor/NCR). Показывает
+  `subTraitIds` из `ncr-resident` / `survivor-survivor` и даёт выбрать
+  комбинацию. Сейчас `SurvivorModal.js` + `NcrCitizenModal.js` решают
+  это локально — это допустимо, но их тоже можно свести к параметризуемой
+  `MultiTraitModal`.
+
+- `GoodSoulPickerModal.js` — вынести inline-выбор 2 навыков из
+  `CharacterScreen.js` в отдельную модалку, управляемую
+  `trait.modifiers.skillPickChoice` (см. § 5).
+
+Преимущества:
+- Единый источник правды — `data/traits/traits.json`.
+- Добавить новый origin = добавить строку в JSON, не писать новый `.js`.
+- Меньше дублирования и меньше риска рассинхронизации модификаторов.
+
+Когда делать: отдельным этапом после стабилизации текущего flow.
+Текущие модалки пока оставляем как есть (кроме удаления устаревшего
+`TraitSkillModal.js`).

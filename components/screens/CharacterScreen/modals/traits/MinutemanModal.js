@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { getTraitI18n } from '../../../../../domain/traits';
-import { getSkillDisplayName } from '../logic/characterScreenI18n';
+import { getSkillDisplayName } from '../../logic/characterScreenI18n';
 
 export const traitConfig = { originId: 'minuteman', traitName: 'Народное ополчение', modalType: 'choice' };
 

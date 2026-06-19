@@ -253,7 +253,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
     }
 
@@ -263,7 +263,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
     }
 
@@ -274,7 +274,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
     }
 
@@ -287,7 +287,7 @@ const InventoryScreen = () => {
       const result = {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
       console.log('[resolveLocalizedItem] chem result:', result.id, 'positiveEffect:', result.positiveEffect);
       return result;
@@ -299,7 +299,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
     }
 
@@ -309,7 +309,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
     }
 
@@ -319,7 +319,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.name || item.id,
+        name: item.name || base.name || item.id,
       };
     }
 
@@ -332,7 +332,7 @@ const InventoryScreen = () => {
     return {
       ...base,
       ...item,
-      name: base.name || item.name || item.id,
+      name: item.name || base.name || item.id,
     };
   };
 

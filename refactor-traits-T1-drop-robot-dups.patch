@@ -1,0 +1,169 @@
+From f7a9d452d608a55bed1d572fb04e0312b10faab5 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 18 Jun 2026 10:46:46 +0000
+Subject: [PATCH] =?UTF-8?q?refactor(traits):=20finish=20T-1=20=E2=80=94=20?=
+ =?UTF-8?q?drop=20dead=20robot-*=20duplicates=20from=20trait.modifiers?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Per docs/schema/02-traits.md T-1 (owner-approved): origin is the single
+source of truth for robot identity. Trait-level robot-* fields are
+duplicates that drift from origin and clutter the modifier registry.
+
+Audit before this patch:
+  - trait.modifiers.robotRules:     read in 0 places (dead).
+  - trait.modifiers.robotType:      read in 0 places (dead).
+  - trait.modifiers.robotBodyPlan:  read in 3 places — but origin.bodyPlan
+                                    is already populated for ALL 5 robot
+                                    origins, so the trait copy was just
+                                    a legacy fallback.
+  - trait.modifiers.isRobot:        already removed in a previous pass;
+                                    only mentioned in stale comments.
+
+Data (data/traits/traits.json), 3 traits cleaned:
+  - protectron-protect-or-destroy:  remove robotRules block.
+  - assaultron-designed-for-frontline: remove robotRules block.
+  - misterhandy-robot-mr-handy:     remove robotType + robotBodyPlan +
+                                    robotRules.
+
+About robotRules specifically (owner's call):
+  Fields like canEquipStandardArmor/canEquipPowerArmor will be re-modeled
+  through origin.armorRules once docs/schema/01b is closed (open C/D/E).
+  Fields like canSelfUseConsumables/canUseConsumablesOnOthers had no
+  readers and would have stayed as 'true'-by-default anyway — re-introduce
+  only with a real implementation + explicit deviation in data. Storing
+  'true for everyone' just bloats the data and obscures whether the value
+  is a deliberate rule or copy-paste.
+
+Code:
+  - domain/bodyplan.js #resolveBodyPlan:
+      drop legacy fallback . Single source
+      of truth is origin.bodyPlan; defensive ROBOT_ORIGIN_TO_PLAN keeps
+      working for old saves without origin.bodyPlan.
+
+  - components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js:
+      findRobotBodyUpgrade(...) now reads origin?.bodyPlan instead of
+      trait?.modifiers?.robotBodyPlan. origin is already in scope.
+
+  - components/screens/InventoryScreen/InventoryScreen.js:
+      robotBodyPlan now resolves to origin?.bodyPlan first; the
+      equippedRobotBodyPart?.robotBodyPlan fallback stays for in-flight
+      body-swap UX. origin is already in scope.
+
+Verified: bodyplan.js syntax OK; data/traits/traits.json still valid JSON;
+no readers of trait.modifiers.robotBodyPlan/robotType/robotRules outside
+comments.
+---
+ .../InventoryScreen/InventoryScreen.js        |  4 +++-
+ .../WeaponsAndArmorScreen.js                  |  4 +++-
+ data/traits/traits.json                       | 22 -------------------
+ domain/bodyplan.js                            | 12 +++++-----
+ 4 files changed, 13 insertions(+), 29 deletions(-)
+
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index d6f0cfe..382a9f1 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -187,7 +187,9 @@ const InventoryScreen = () => {
+     ) || null;
+   }, [inventoryItems]);
+ 
+-  const robotBodyPlan = trait?.modifiers?.robotBodyPlan
++  // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
++  // Legacy trait.modifiers.robotBodyPlan was dropped from data.
++  const robotBodyPlan = origin?.bodyPlan
+     || equippedRobotBodyPart?.robotBodyPlan
+     || null;
+ 
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index da2d77c..421a12d 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -376,7 +376,9 @@ const WeaponsAndArmorScreen = () => {
+   const equipmentCatalog = getEquipmentCatalog(locale);
+   const robotBodyUpgrade = findRobotBodyUpgrade(
+     equipmentCatalog,
+-    trait?.modifiers?.robotBodyPlan,
++    // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
++    // Legacy trait.modifiers.robotBodyPlan was dropped from data.
++    origin?.bodyPlan,
+     inventoryItems,
+   );
+   const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index 145ef08..3f37fd1 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -137,13 +137,6 @@
+       ],
+       "carryWeightFixed": 225,
+       "carryWeightStrengthMultiplier": 0,
+-      "robotRules": {
+-        "canSelfUseConsumables": false,
+-        "canUseConsumablesOnOthers": false,
+-        "canEquipStandardArmor": false,
+-        "canEquipPowerArmor": false,
+-        "maxRobotMods": 2
+-      },
+       "effects": [
+         "hazard_reroll",
+         "no_consumables_food_rest",
+@@ -166,11 +159,6 @@
+       "carryWeightFixed": 150,
+       "carryWeightStrengthMultiplier": 0,
+       "meleeBonusDelta": 1,
+-      "robotRules": {
+-        "canSelfUseConsumables": false,
+-        "canEquipStandardArmor": false,
+-        "canEquipPowerArmor": false
+-      },
+       "effects": [
+         "no_consumables_food_rest",
+         "repair_to_heal",
+@@ -310,16 +298,6 @@
+       ],
+       "carryWeightFixed": 150,
+       "carryWeightStrengthMultiplier": 0,
+-      "robotType": "misterHandy",
+-      "robotBodyPlan": "misterHandy",
+-      "robotRules": {
+-        "canSelfUseConsumables": false,
+-        "canUseConsumablesOnOthers": true,
+-        "canEquipStandardArmor": false,
+-        "canEquipPowerArmor": false,
+-        "carryWeightLimit": 150,
+-        "armorConstraints": []
+-      },
+       "effects": [
+         "no_consumables_food_rest",
+         "repair_to_heal",
+diff --git a/domain/bodyplan.js b/domain/bodyplan.js
+index 23636b2..72bdce7 100644
+--- a/domain/bodyplan.js
++++ b/domain/bodyplan.js
+@@ -19,14 +19,16 @@ const ROBOT_ORIGIN_TO_PLAN = {
+ };
+ 
+ export function resolveBodyPlan(character) {
+-  const traitPlan = character?.trait?.modifiers?.robotBodyPlan;
+-  if (traitPlan && bodyPlansRegistry[traitPlan]) return traitPlan;
+-
+-  // After the characterType refactor: origin stores its bodyPlan directly
+-  // in `origin.bodyPlan` (was `origin.robotBodyPlan` in older data).
++  // Source of truth (per docs/schema/02-traits.md T-1): origin.bodyPlan.
++  // The legacy fallback `trait.modifiers.robotBodyPlan` has been removed —
++  // trait-level robot duplicates (robotBodyPlan/robotType/robotRules) were
++  // dropped from data/traits/traits.json in the same refactor.
+   const originPlan = character?.origin?.bodyPlan;
+   if (originPlan && bodyPlansRegistry[originPlan]) return originPlan;
+ 
++  // Defensive fallback: legacy origins without `bodyPlan` but with a known
++  // robot `id` (e.g. older saves). Can be removed once all live saves carry
++  // an explicit origin.bodyPlan.
+   const originId = character?.origin?.id;
+   if (originId && ROBOT_ORIGIN_TO_PLAN[originId] && bodyPlansRegistry[ROBOT_ORIGIN_TO_PLAN[originId]]) {
+     return ROBOT_ORIGIN_TO_PLAN[originId];
+-- 
+2.47.3
+

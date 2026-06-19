@@ -141,9 +141,12 @@ export const storeItemToWeaponDisplay = (item) => {
  * @param {boolean} equipped - true for equipped items, false for inventory
  */
 export const selectItemsByEquipped = (state, equipped) => {
-  return Object.values(state.items || {}).filter(
+  const matched = Object.values(state.items || {}).filter(
     (item) => Boolean(item.equipped) === equipped,
   );
+  console.log('[selectItemsByEquipped] total items:', Object.keys(state.items || {}).length,
+    'equipped filter:', equipped, 'matched:', matched.length);
+  return matched;
 };
 
 /**

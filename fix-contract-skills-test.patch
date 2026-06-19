@@ -1,0 +1,42 @@
+From 6e7779e7d7abd81e2fd5b1b36c280528ab68ce1a Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 18 Jun 2026 07:48:16 +0000
+Subject: [PATCH] fix(tests): yield cannot cross arrow-fn boundary in
+ walkSkillRefs
+
+Replace v.forEach((x, i) => { yield ... }) with a plain for-loop inside
+the generator. The previous form caused a parse error at file-load time
+(rolldown/vite SSR transform) and vitest reported '(0 test)' instead of
+running any assertions.
+
+Verified by direct generator emulation: scans 43 data/*.json files and
+finds no non-canonical skill references (all REPAIR/SCIENCE/... canonical
+after the canonical-skills refactor patch).
+---
+ domain/contract.skills.test.js | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/domain/contract.skills.test.js b/domain/contract.skills.test.js
+index c03faa5..9416966 100644
+--- a/domain/contract.skills.test.js
++++ b/domain/contract.skills.test.js
+@@ -46,11 +46,14 @@ function* walkSkillRefs(node, path = '$') {
+     if (SKILL_STRING_FIELDS.has(k) && typeof v === 'string') {
+       yield { path: here, field: k, value: v, kind: 'string' };
+     } else if (SKILL_LIST_FIELDS.has(k) && Array.isArray(v)) {
+-      v.forEach((x, i) => {
++      // NB: must use for-of, not v.forEach(...) — `yield` cannot cross an
++      // arrow-function boundary inside the generator.
++      for (let i = 0; i < v.length; i++) {
++        const x = v[i];
+         if (typeof x === 'string') {
+           yield { path: `${here}[${i}]`, field: k, value: x, kind: 'list-item' };
+         }
+-      });
++      }
+     } else if (SKILL_MAP_FIELDS.has(k) && v && typeof v === 'object') {
+       for (const kk of Object.keys(v)) {
+         yield { path: `${here}.${kk}`, field: k, value: kk, kind: 'map-key' };
+-- 
+2.47.3
+
