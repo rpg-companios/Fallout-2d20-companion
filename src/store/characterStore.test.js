@@ -2,11 +2,16 @@
 // Simple test to verify store functionality
 
 import { describe, expect, test, beforeEach } from 'vitest';
+import useCharacterStore from './characterStore.js';
 
 // Mock the store for testing (in real usage we'd import the actual store)
 // This test demonstrates the expected behavior
 
 describe('CharacterStore', () => {
+  beforeEach(() => {
+    useCharacterStore.getState().resetCharacterStore();
+  });
+
   test('should have initial state', () => {
     // Initial state should have empty dictionaries
     const expectedInitialState = {
@@ -146,6 +151,43 @@ describe('CharacterStore', () => {
     expect(Object.keys(prunedEffects)).toHaveLength(1);
     expect(prunedEffects['effect-1']).toBeDefined();
     expect(prunedEffects['effect-2']).toBeUndefined();
+  });
+
+  test('resetCharacterStore clears previous character data from the working cache', () => {
+    useCharacterStore.getState().loadFromLegacyData({
+      attributes: [{ name: 'STR', value: 9 }],
+      skills: [{ name: 'SMALL_GUNS', value: 3 }],
+      equipment: [{ id: 'weapon_10mm_pistol', name: '10mm Pistol' }],
+      activeTimedEffects: [{ id: 'chem_buffout', active: true }],
+    });
+
+    expect(useCharacterStore.getState().attributes.STR.base).toBe(9);
+    expect(Object.keys(useCharacterStore.getState().skills)).toContain('SMALL_GUNS');
+
+    useCharacterStore.getState().resetCharacterStore();
+
+    expect(useCharacterStore.getState().attributes).toEqual({});
+    expect(useCharacterStore.getState().skills).toEqual({});
+    expect(useCharacterStore.getState().items).toEqual({});
+    expect(useCharacterStore.getState().effects).toEqual({});
+    expect(useCharacterStore.getState().robot.slots).toEqual({});
+  });
+
+  test('resetCharacterStore can seed fresh defaults for a new character', () => {
+    useCharacterStore.getState().loadFromLegacyData({
+      attributes: [{ name: 'STR', value: 9 }],
+      skills: [{ name: 'SMALL_GUNS', value: 3 }],
+    });
+
+    useCharacterStore.getState().resetCharacterStore({
+      attributes: [{ name: 'STR', value: 4 }],
+      skills: [{ name: 'SMALL_GUNS', value: 0 }],
+    });
+
+    expect(useCharacterStore.getState().attributes.STR.base).toBe(4);
+    expect(useCharacterStore.getState().skills.SMALL_GUNS.base).toBe(0);
+    expect(useCharacterStore.getState().items).toEqual({});
+    expect(useCharacterStore.getState().effects).toEqual({});
   });
 });
 

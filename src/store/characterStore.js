@@ -815,6 +815,30 @@ const useCharacterStore = create(devtools(
         set(normalizedState);
         get().recalculateAll();
       },
+
+      /**
+       * Reset all per-character Zustand data before starting a new character.
+       *
+       * The store is a working cache for the currently opened character, while
+       * characters themselves are saved in the app DB. Seed default attributes
+       * and skills immediately so queued React effects from the previously
+       * opened character cannot refill an empty store with stale values.
+       */
+      resetCharacterStore: (legacyDefaults = {}) => {
+        const normalizedDefaults = normalizeForStore(legacyDefaults);
+
+        set({
+          attributes: normalizedDefaults.attributes || {},
+          skills: normalizedDefaults.skills || {},
+          items: {},
+          effects: {},
+          derivedStats: {},
+          _characterContext: undefined,
+          ...createInitialRobotState(),
+        });
+
+        get().recalculateAll();
+      },
       
       /**
        * Экспортировать данные в старый формат для сохранения в БД

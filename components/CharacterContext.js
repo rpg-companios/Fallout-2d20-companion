@@ -625,8 +625,9 @@ export const CharacterProvider = ({ children }) => {
 
   const resetCharacter = (preserveOrigin = false) => {
     const initialAttributes = createInitialAttributes();
+    const initialSkills = ALL_SKILLS.map(s => ({ ...s, value: 0 }));
     setAttributes(initialAttributes);
-    setSkills(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+    setSkills(initialSkills);
     setSelectedSkills([]);
     setExtraTaggedSkills([]);
     setForcedSelectedSkills([]);
@@ -642,13 +643,11 @@ export const CharacterProvider = ({ children }) => {
     setActiveTimedEffects([]);
     setSceneCounter(0);
     setEquippedWeapons([]);
-    useCharacterStore.setState({
-      attributes: {},
-      skills: {},
-      items: {},
-      effects: {},
+    useCharacterStore.persist?.clearStorage?.();
+    useCharacterStore.getState().resetCharacterStore({
+      attributes: initialAttributes,
+      skills: initialSkills,
     });
-    useCharacterStore.getState().resetRobot();
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
     setEquippedArmor({
