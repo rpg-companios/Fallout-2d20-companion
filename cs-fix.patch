@@ -1,0 +1,201 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index fa73a75..097cb84 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -526,12 +526,123 @@ export default function CharacterScreen() {
+       skillMax = Math.min(skillMax, 3);
+     }
+ 
+-    // Good Soul special handling
++    // SkillPickChoice handling
+     const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++    const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++    const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
++    const isBonusFromPick = isSkillPickActive && skillPickSelected.includes(skillName);
++
++    // Get trait extra skill info
++    const extraSkillsFromTrait =
++      trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
++    const traitForcedSkills = trait?.forcedSkills || [];
++
++    // Check if this skill can be selected as an extra skill
++    const canSelectAsExtra =
++      extraSkillsFromTrait > 0 &&
++      (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
++
++    if (!isCurrentlySelected) {
++      // SELECTING A NEW SKILL
++
++      // Check skill max limit
++      if (currentSkill.value + 2 > skillMax) {
++        showError(
++          tCharacterScreen("errors.skillTagExceedsMaxRank", "Tagging this skill will exceed max rank ({skillMax}). Lower it first.").replace("{skillMax}", String(skillMax)),
++        );
++        return;
++      }
++
++      // Handle Good Soul bonus skills (don't count toward main or extra limits)
++      if (isBonusFromPick) {
++        // This is handled by trait modal, should not reach here normally
++        return;
++      }
++
++      // Forced skills go to extra pool
++      if (isForcedSkill) {
++        setExtraTaggedSkills((prev) => [...prev, skillName]);
++      }
++      // Try main skills first (max 3)
++      else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
++        setSelectedSkills((prev) => [...prev, skillName]);
++      }
++      // Try extra skills if available
++      else if (
++        canSelectAsExtra &&
++        extraTaggedSkills.length < extraSkillsFromTrait
++      ) {
++        setExtraTaggedSkills((prev) => [...prev, skillName]);
++      }
++      // No slots available
++      else {
++        const extraText = canSelectAsExtra
++          ? `\n\n${tCharacterScreen("labels.extraSlotsAvailable", "Extra slots available")}: ${extraSkillsFromTrait - extraTaggedSkills.length}`
++          : "";
++        showError(
++          tCharacterScreen("errors.maxBaseSkills", "You can choose a maximum of {count} base skills.{extraText}").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
++        );
++        return;
++      }
++
++      // Apply +2 to skill value
++      setSkills((prev) =>
++        prev.map((s, i) => {
++          if (i !== skillIndex) return s;
++          let next = s.value + 2;
++          // Good Soul group cap
++      if (isSkillPickActive && skillPickGroup.includes(s.name) && !skillPickSelected.includes(s.name)) {
++            next = Math.min(next, 4);
++          }
++          return { ...s, value: next };
++        }),
++      );
++    } else {
++      // DESELECTING A SKILL
++
++      // Remove from appropriate pool
++      if (isInMainSkills) {
++        setSelectedSkills((prev) => prev.filter((s) => s !== skillName));
++      }
++      if (isInExtraSkills) {
++        setExtraTaggedSkills((prev) => prev.filter((s) => s !== skillName));
++      }
++
++      // Apply -2 to skill value
++      setSkills((prev) =>
++        prev.map((s, i) => {
++          if (i !== skillIndex) return s;
++          return { ...s, value: Math.max(0, s.value - 2) };
++        }),
++      );
++    }
++  };
++
++  const handleChangeSkillValue = (index, delta) => {
++    if (!attributesSaved) {
++      showAlert(tCharacterScreen("errors.saveAttributesFirstSimple", "Save attributes first."));
++      return;
++    }
++
++    if (delta > 0 && skillPointsLeft <= 0) {
++      showError(tCharacterScreen("errors.noSkillPointsLeft", "You have no skill points left to distribute."));
++      return;
++    }
++
++    setSkills((prev) => {
++      const newSkills = [...prev];
++      const skill = newSkills[index];
++      const isTagged =
++        selectedSkills.includes(skill.name) ||
++        extraTaggedSkills.includes(skill.name);
++
++      // Ограничение от skillPickChoice: навыки из группы capped 4, кроме отмеченных
++      const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
+       const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
+       const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+-      const isInGroup = skillPickGroup.includes(skill?.name || skillName);
+-      const isBonus = isSkillPickActive && skillPickSelected.includes(skill?.name || skillName);
++      
++      const isInGroup = skillPickGroup.includes(skill.name);
++      const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
+       const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
+ 
+       if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
+@@ -728,7 +839,7 @@ export default function CharacterScreen() {
+     setTrait(newTrait);
+     setIsTraitModalVisible(false);
+ 
+-    // Если черта «Добрая Душа» — открываем отдельное окно выбора 2 навыков
++    // Если в черте есть выбор навыков по контракту skillPickChoice
+     if (newTrait?.modifiers?.skillPickChoice) {
+       setSkillPicks([]);
+       setSkillPickerVisible(true);
+@@ -744,28 +855,29 @@ export default function CharacterScreen() {
+     });
+   };
+ 
+-  const confirmSkillPick = () => {
++  const handleConfirmSkillPick = () => {
+     const maxCount = trait?.modifiers?.skillPickChoice?.count || 2;
+     if (skillPicks.length !== maxCount) return;
+     const picks = [...skillPicks];
+ 
+     setTrait((prev) => {
+       if (!prev) return prev;
+-      return {
+-        ...prev,
+-        modifiers: {
+-          ...prev.modifiers,
+-          skillPickSelected: picks,
+-        },
++      const prevMods = prev.modifiers || {};
++      const newMods = {
++        ...prevMods,
++        skillPickSelected: picks,
++        forcedSkills: [...new Set([...(prevMods.forcedSkills || []), ...picks])],
++        extraSkills: (prevMods.extraSkills || 0) + picks.length,
+       };
++      return { ...prev, modifiers: newMods };
+     });
+ 
+-    setExtraTaggedSkills((prev) => {
+-      const fromGroup = trait?.modifiers?.skillPickChoice?.from || [];
+-      const filtered = prev.filter((s) => !fromGroup.includes(s));
+-      return [...new Set([...filtered, ...picks])];
+-    });
+-
++    setForcedSelectedSkills((prev) => [...new Set([...prev, ...picks])]);
++    setExtraTaggedSkills((prev) => [...new Set([...prev, ...picks])]);
++    setSkills((prev) =>
++      prev.map((s) => (picks.includes(s.name) && s.value < 2 ? { ...s, value: 2 } : s))
++    );
++    setSkillPicks([]);
+     setSkillPickerVisible(false);
+   };
+ 
+@@ -1234,7 +1346,7 @@ export default function CharacterScreen() {
+           character={{ origin, trait }}
+         />
+ 
+-        {/* Модальное окно для выбора 2 навыков «Доброй Души» */}
++        {/* Модальное окно для выбора навыков по контракту skillPickChoice */}
+         <Modal
+           animationType="fade"
+           transparent={true}
+@@ -1271,7 +1383,7 @@ export default function CharacterScreen() {
+                   { marginTop: 10 },
+                 ]}
+                 disabled={skillPicks.length !== (trait?.modifiers?.skillPickChoice?.count || 2)}
+-                onPress={handleConfirmGoodSoulSkills}
++                onPress={handleConfirmSkillPick}
+               >
+                 <Text style={styles.buttonText}>{tCharacterScreen("buttons.confirm", "Confirm")}</Text>
+               </TouchableOpacity>
