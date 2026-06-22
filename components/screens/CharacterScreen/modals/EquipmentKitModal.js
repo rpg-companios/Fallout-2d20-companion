@@ -64,6 +64,11 @@ const getOptionKey = (option, optionIndex) => {
 
 const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
   if (!entry) return [];
+  
+  // Recursively handle nested arrays (e.g., from 'group' items inside 'choice' resolving)
+  if (Array.isArray(entry)) {
+    return entry.flatMap((e, i) => entryToList(e, selectedChoices, kitId, `${itemIndex}-${i}`));
+  }
 
   // 'choice' — player picks ONE of N options (currently UI default = first).
   if (entry.type === 'choice') {
@@ -150,7 +155,7 @@ const toInventoryItems = (entries) => {
 
 const summarizeItems = (items) => {
   const totalCaps = items.reduce((acc, item) => {
-    if (item.itemType === 'currency' && item.name === 'Крышки') {
+    if (item.itemType === 'currency' || item.itemType === 'currency_ncr' || item.name === 'Крышки') {
       return acc + (item.quantity || 0);
     }
     return acc;

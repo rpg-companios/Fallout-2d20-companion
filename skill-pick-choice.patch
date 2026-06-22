@@ -1,0 +1,216 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index d0e4830..a808546 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -52,11 +52,6 @@ import { getTimedAttributeModifiers } from "../../../domain/effects";
+ 
+ // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
+ const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
+-// Canonical SKILL keys (UPPER_SNAKE_CASE) for the NCR "Good Soul" group.
+-// Mirrors ncr-good-soul.modifiers.goodSoulSkills from data/traits/traits.json.
+-// For display use getSkillDisplayName(key) at the render site.
+-const GOOD_SOUL_SKILL_KEYS = ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"];
+-
+ const ImageSection = ({ origin }) => {
+   const defaultImage = require("../../../assets/bg1.png");
+   return (
+@@ -325,8 +320,8 @@ export default function CharacterScreen() {
+ 
+   const [showResetWarning, setShowResetWarning] = useState(false);
+   const [resetType, setResetType] = useState(null);
+-  const [goodSoulPickerVisible, setGoodSoulPickerVisible] = useState(false);
+-  const [goodSoulPicks, setGoodSoulPicks] = useState([]);
++  const [skillPickerVisible, setSkillPickerVisible] = useState(false);
++  const [skillPicks, setSkillPicks] = useState([]);
+ 
+   // Состояние для временного распределения очков атрибутов от перков
+   const [tempAttributes, setTempAttributes] = useState(null);
+@@ -644,16 +639,14 @@ export default function CharacterScreen() {
+         selectedSkills.includes(skill.name) ||
+         extraTaggedSkills.includes(skill.name);
+ 
+-      // Ограничение от "Добрая Душа": навыки из группы capped 4, кроме двух бонусных
+-      const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
+-      const isGoodSoul =
+-        Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
+-        trait.modifiers.goodSoulSelectedSkills.length > 0;
+-      const isInGroup = goodSoulGroup.includes(skill.name);
+-      const isBonus =
+-        isGoodSoul &&
+-        (trait?.modifiers?.goodSoulSelectedSkills || []).includes(skill.name);
+-      const capForThis = isGoodSoul && isInGroup && !isBonus ? 4 : undefined;
++      // Ограничение от skillPickChoice: навыки из группы capped 4, кроме отмеченных
++      const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++      const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++      const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
++      
++      const isInGroup = skillPickGroup.includes(skill.name);
++      const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
++      const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
+ 
+       if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
+         let nextVal = skill.value + delta;
+@@ -850,9 +843,9 @@ export default function CharacterScreen() {
+     setIsTraitModalVisible(false);
+ 
+     // Если черта «Добрая Душа» — открываем отдельное окно выбора 2 навыков
+-    if (newTrait?.modifiers?.goodSoulPending) {
+-      setGoodSoulPicks([]);
+-      setGoodSoulPickerVisible(true);
++    if (newTrait?.modifiers?.skillPickChoice) {
++      setSkillPicks([]);
++      setSkillPickerVisible(true);
+     }
+   };
+ 
+@@ -1264,21 +1257,21 @@ export default function CharacterScreen() {
+                 </View>
+ 
+                 {(() => {
+-                  const goodSoulGroupSkills = GOOD_SOUL_SKILL_KEYS;
+-                  const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
+-                  const isGoodSoulActive = Array.isArray(goodSoulSelected) && goodSoulSelected.length > 0;
++                  const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++                  const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++                  const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+                   return skills.map((skill, index) => {
+                     const isTagged =
+                       selectedSkills.includes(skill.name) ||
+                       extraTaggedSkills.includes(skill.name);
+                     const isForced =
+                       forcedSelectedSkills.includes(skill.name) && isTagged;
+-                    const isGoodSoulCapped =
+-                      isGoodSoulActive &&
+-                      goodSoulGroupSkills.includes(skill.name) &&
+-                      !goodSoulSelected.includes(skill.name);
++                    const isSkillPickCapped =
++                      isSkillPickActive &&
++                      skillPickGroup.includes(skill.name) &&
++                      !skillPickSelected.includes(skill.name);
+                     const baseMax = level === 1 ? 3 : 6;
+-                    const maxValue = isGoodSoulCapped ? Math.min(baseMax, 4) : baseMax;
++                    const maxValue = isSkillPickCapped ? Math.min(baseMax, 4) : baseMax;
+                     const isMaxReached = skill.value >= maxValue;
+                     const rowStyle =
+                       index % 2 === 0 ? styles.evenRow : styles.oddRow;
+@@ -1297,7 +1290,7 @@ export default function CharacterScreen() {
+                         rowStyle={rowStyle}
+                         disabled={!canDistributeSkills}
+                         trait={trait}
+-                        italic={isGoodSoulCapped}
++                        italic={isSkillPickCapped}
+                         increaseDisabled={skillPointsLeft <= 0}
+                       />
+                     );
+diff --git a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+index 8d97447..8512f52 100644
+--- a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+@@ -23,9 +23,6 @@ const NCR_TRAIT_IDS = [
+   'ncr-brahmin-baron',
+ ];
+ 
+-// Canonical SKILL keys (UPPER_SNAKE_CASE). Mirrors ncr-good-soul.modifiers.goodSoulSkills.
+-const goodSoulGroup = ['SPEECH', 'MEDICINE', 'REPAIR', 'SCIENCE', 'BARTER'];
+-
+ const SurvivorModal = ({
+   visible,
+   onSelect,
+@@ -92,11 +89,6 @@ const SurvivorModal = ({
+       mergedModifiers.extraPerkSlots = (mergedModifiers.extraPerkSlots || 0) + 1;
+     }
+ 
+-    if (selectedIds.includes('ncr-good-soul')) {
+-      mergedModifiers.goodSoulPending = true;
+-      mergedModifiers.goodSoulGroup = [...goodSoulGroup];
+-    }
+-
+     const traitTitle = selectionMode === 'two_traits'
+       ? `${originLabel}: ${selectedNames.join(' + ')}`
+       : `${originLabel}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk', '1 perk');
+diff --git a/docs/schema/07-trait-debt.md b/docs/schema/07-trait-debt.md
+index dd54302..39f4b2a 100644
+--- a/docs/schema/07-trait-debt.md
++++ b/docs/schema/07-trait-debt.md
+@@ -83,24 +83,13 @@ UI рендерит локализованную подпись из i18n (`labe
+ 
+ ---
+ 
+-## 5. Picker UI для `skillPickChoice`
++## 5. Picker UI для `skillPickChoice` ✅
+ 
+-Затрагивает: `ncr-good-soul` (выбери 2 из 5).
++Затрагивает: `ncr-good-soul` (выбери 2 из 5) и любые будущие черты с выбором.
+ 
+-Поле `skillPickChoice` уже в данных
+-(см. `06-modifiers.md` § 1.2). Сейчас в `CharacterScreen.js` есть хардкод
+-`GOOD_SOUL_SKILL_KEYS` и логика «отметить как extra-tagged» — она
+-работает по факту, но **читает не из данных, а из хардкода**.
+-
+-Что нужно:
+-- Trait-модалка для good-soul (по аналогии с `BrotherhoodModal`),
+-  которая показывает 5 вариантов и даёт выбрать 2.
+-- В `CharacterScreen.handleSelectTrait` читать `skillPickChoice` из
+-  активного трейта и применять `extraTaggedSkills` соответственно.
+-- Удалить хардкод `GOOD_SOUL_SKILL_KEYS`.
+-
+-Когда делать: в рамках UI-итерации траит-модалок (там уже есть
+-`pick` в логике китов — теперь то же самое для трейтов).
++Поле `skillPickChoice` читается из `data/traits/traits.json`.
++Хардкод `GOOD_SOUL_SKILL_KEYS` удалён.
++Универсальный Picker UI внедрён в `CharacterScreen.js` и динамически рендерит варианты. Ограничение на развитие невыбранных навыков из списка до 4 ранга также переведено на универсальные рельсы.
+ 
+ ---
+ 
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index b10403c..d2b3e88 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -94,10 +94,6 @@
+     "maxSkillRank": "Error: maximum skill rank is {maxRank}"
+   },
+   "modals": {
+-    "goodSoul": {
+-      "title": "Good Soul: choose 2 skills",
+-      "description": "Choose two skills from the group. They will be marked as extra."
+-    },
+     "origin": {
+       "title": "Select origin"
+     },
+@@ -134,6 +130,10 @@
+     "limb": {
+       "upgradeLimb": "Upgrade Limb",
+       "noLimbs": "No limbs available"
++    },
++    "skillPick": {
++      "title": "Choose skills",
++      "description": "Choose skills from the provided group. They will be marked as extra."
+     }
+   },
+   "origins": {
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index eb6d511..cde688f 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -94,10 +94,6 @@
+     "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
+   },
+   "modals": {
+-    "goodSoul": {
+-      "title": "Добрая Душа: выберите 2 навыка",
+-      "description": "Выберите два навыка из группы. Они будут отмечены как дополнительные."
+-    },
+     "origin": {
+       "title": "Выберите происхождение"
+     },
+@@ -134,6 +130,10 @@
+     "limb": {
+       "upgradeLimb": "Модернизировать конечность",
+       "noLimbs": "Нет доступных конечностей"
++    },
++    "skillPick": {
++      "title": "Выберите навыки",
++      "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные."
+     }
+   },
+   "origins": {

@@ -94,10 +94,6 @@
     "maxSkillRank": "Error: maximum skill rank is {maxRank}"
   },
   "modals": {
-    "goodSoul": {
-      "title": "Good Soul: choose 2 skills",
-      "description": "Choose two skills from the group. They will be marked as extra."
-    },
     "origin": {
       "title": "Select origin"
     },
@@ -134,6 +130,10 @@
     "limb": {
       "upgradeLimb": "Upgrade Limb",
       "noLimbs": "No limbs available"
+    },
+    "skillPick": {
+      "title": "Choose skills",
+      "description": "Choose skills from the provided group. They will be marked as extra."
     }
   },
   "origins": {
@@ -149,7 +149,9 @@
     "robobrain": "Robobrain",
     "supermutant": "Supermutant",
     "survivor": "Survivor",
-    "vaultDweller": "Vault Dweller"
+    "vaultDweller": "Vault Dweller",
+    "shadow": "Shadow",
+    "synth": "Synth"
   },
   "attributes": {
     "STR": "STR",

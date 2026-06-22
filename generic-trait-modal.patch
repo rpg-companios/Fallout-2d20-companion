@@ -1,0 +1,1056 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index d0e4830..bab4bb1 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -52,11 +52,6 @@ import { getTimedAttributeModifiers } from "../../../domain/effects";
+ 
+ // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
+ const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
+-// Canonical SKILL keys (UPPER_SNAKE_CASE) for the NCR "Good Soul" group.
+-// Mirrors ncr-good-soul.modifiers.goodSoulSkills from data/traits/traits.json.
+-// For display use getSkillDisplayName(key) at the render site.
+-const GOOD_SOUL_SKILL_KEYS = ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"];
+-
+ const ImageSection = ({ origin }) => {
+   const defaultImage = require("../../../assets/bg1.png");
+   return (
+@@ -325,8 +320,8 @@ export default function CharacterScreen() {
+ 
+   const [showResetWarning, setShowResetWarning] = useState(false);
+   const [resetType, setResetType] = useState(null);
+-  const [goodSoulPickerVisible, setGoodSoulPickerVisible] = useState(false);
+-  const [goodSoulPicks, setGoodSoulPicks] = useState([]);
++  const [skillPickerVisible, setSkillPickerVisible] = useState(false);
++  const [skillPicks, setSkillPicks] = useState([]);
+ 
+   // Состояние для временного распределения очков атрибутов от перков
+   const [tempAttributes, setTempAttributes] = useState(null);
+@@ -644,16 +639,14 @@ export default function CharacterScreen() {
+         selectedSkills.includes(skill.name) ||
+         extraTaggedSkills.includes(skill.name);
+ 
+-      // Ограничение от "Добрая Душа": навыки из группы capped 4, кроме двух бонусных
+-      const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
+-      const isGoodSoul =
+-        Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
+-        trait.modifiers.goodSoulSelectedSkills.length > 0;
+-      const isInGroup = goodSoulGroup.includes(skill.name);
+-      const isBonus =
+-        isGoodSoul &&
+-        (trait?.modifiers?.goodSoulSelectedSkills || []).includes(skill.name);
+-      const capForThis = isGoodSoul && isInGroup && !isBonus ? 4 : undefined;
++      // Ограничение от skillPickChoice: навыки из группы capped 4, кроме отмеченных
++      const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++      const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++      const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
++      
++      const isInGroup = skillPickGroup.includes(skill.name);
++      const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
++      const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
+ 
+       if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
+         let nextVal = skill.value + delta;
+@@ -850,9 +843,9 @@ export default function CharacterScreen() {
+     setIsTraitModalVisible(false);
+ 
+     // Если черта «Добрая Душа» — открываем отдельное окно выбора 2 навыков
+-    if (newTrait?.modifiers?.goodSoulPending) {
+-      setGoodSoulPicks([]);
+-      setGoodSoulPickerVisible(true);
++    if (newTrait?.modifiers?.skillPickChoice) {
++      setSkillPicks([]);
++      setSkillPickerVisible(true);
+     }
+   };
+ 
+@@ -1264,21 +1257,21 @@ export default function CharacterScreen() {
+                 </View>
+ 
+                 {(() => {
+-                  const goodSoulGroupSkills = GOOD_SOUL_SKILL_KEYS;
+-                  const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
+-                  const isGoodSoulActive = Array.isArray(goodSoulSelected) && goodSoulSelected.length > 0;
++                  const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++                  const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++                  const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+                   return skills.map((skill, index) => {
+                     const isTagged =
+                       selectedSkills.includes(skill.name) ||
+                       extraTaggedSkills.includes(skill.name);
+                     const isForced =
+                       forcedSelectedSkills.includes(skill.name) && isTagged;
+-                    const isGoodSoulCapped =
+-                      isGoodSoulActive &&
+-                      goodSoulGroupSkills.includes(skill.name) &&
+-                      !goodSoulSelected.includes(skill.name);
++                    const isSkillPickCapped =
++                      isSkillPickActive &&
++                      skillPickGroup.includes(skill.name) &&
++                      !skillPickSelected.includes(skill.name);
+                     const baseMax = level === 1 ? 3 : 6;
+-                    const maxValue = isGoodSoulCapped ? Math.min(baseMax, 4) : baseMax;
++                    const maxValue = isSkillPickCapped ? Math.min(baseMax, 4) : baseMax;
+                     const isMaxReached = skill.value >= maxValue;
+                     const rowStyle =
+                       index % 2 === 0 ? styles.evenRow : styles.oddRow;
+@@ -1297,7 +1290,7 @@ export default function CharacterScreen() {
+                         rowStyle={rowStyle}
+                         disabled={!canDistributeSkills}
+                         trait={trait}
+-                        italic={isGoodSoulCapped}
++                        italic={isSkillPickCapped}
+                         increaseDisabled={skillPointsLeft <= 0}
+                       />
+                     );
+@@ -1411,6 +1404,7 @@ export default function CharacterScreen() {
+             onSelect={handleSelectTrait}
+             currentTrait={trait}
+             skills={skills}
++            origin={origin}
+           />
+         )}
+       </SafeAreaView>
+diff --git a/components/screens/CharacterScreen/modals/traits/AssaultronModal.js b/components/screens/CharacterScreen/modals/traits/AssaultronModal.js
+deleted file mode 100644
+index 8a4cd51..0000000
+--- a/components/screens/CharacterScreen/modals/traits/AssaultronModal.js
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+-import { tCharacterScreen } from '../../logic/characterScreenI18n';
+-
+-
+-export const traitConfig = { originId: 'assaultron', modalType: 'info' };
+-
+-const AssaultronModal = ({ visible, onSelect, onClose }) => {
+-  const traitId = 'assaultron-designed-for-frontline';
+-  const { name, description } = getTraitI18n(traitId);
+-
+-  const handleConfirm = () => {
+-    const canonicalTrait = findTraitById(traitId);
+-    onSelect('assaultron-designed-for-frontline', name, canonicalTrait?.modifiers || {});
+-  };
+-
+-  return (
+-    <Modal
+-      animationType="fade"
+-      transparent={true}
+-      visible={visible}
+-      onRequestClose={onClose}
+-    >
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.assaultron')}</Text>
+-          <Text style={styles.traitName}>{name}</Text>
+-          {renderTextWithIcons(description, styles.modalText)}
+-          <TouchableOpacity
+-            style={[styles.modalButton, styles.confirmButton]}
+-            onPress={handleConfirm}
+-          >
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-    modalOverlay: {
+-        flex: 1,
+-        justifyContent: 'center',
+-        alignItems: 'center',
+-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+-    },
+-    modalContainer: {
+-        width: '80%',
+-        backgroundColor: 'white',
+-        borderRadius: 10,
+-        padding: 20,
+-        alignItems: 'center',
+-    },
+-    modalTitle: {
+-        fontSize: 18,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#333'
+-    },
+-    traitName: {
+-        fontSize: 16,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#2196F3'
+-    },
+-    modalText: {
+-        fontSize: 14,
+-        marginBottom: 20,
+-        textAlign: 'center',
+-        lineHeight: 20,
+-        color: '#555'
+-    },
+-    modalButton: {
+-        padding: 12,
+-        marginVertical: 5,
+-        borderRadius: 6,
+-        alignItems: 'center',
+-        width: '100%',
+-    },
+-    confirmButton: {
+-        backgroundColor: '#4CAF50',
+-        marginTop: 10
+-    },
+-    buttonText: {
+-        color: 'white',
+-        fontWeight: 'bold',
+-        fontSize: 16
+-    },
+-});
+-
+-export default AssaultronModal; 
+\ No newline at end of file
+diff --git a/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js b/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js
+deleted file mode 100644
+index ed81e2b..0000000
+--- a/components/screens/CharacterScreen/modals/traits/ChildOfAtomModal.js
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+-import { tCharacterScreen } from '../../logic/characterScreenI18n';
+-
+-
+-export const traitConfig = { originId: 'childOfAtom', modalType: 'info' };
+-
+-const ChildOfAtomModal = ({ visible, onSelect, onClose }) => {
+-  const traitId = 'childofatom-radioactive-sponge';
+-  const { name, description } = getTraitI18n(traitId);
+-
+-  const handleConfirm = () => {
+-    const canonicalTrait = findTraitById(traitId);
+-    onSelect('childofatom-radioactive-sponge', name, canonicalTrait?.modifiers || {});
+-  };
+-
+-  return (
+-    <Modal
+-      animationType="fade"
+-      transparent={true}
+-      visible={visible}
+-      onRequestClose={onClose}
+-    >
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.childOfAtom')}</Text>
+-          <Text style={styles.traitName}>{name}</Text>
+-          {renderTextWithIcons(description, styles.modalText)}
+-          <TouchableOpacity
+-            style={[styles.modalButton, styles.confirmButton]}
+-            onPress={handleConfirm}
+-          >
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-    modalOverlay: {
+-        flex: 1,
+-        justifyContent: 'center',
+-        alignItems: 'center',
+-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+-    },
+-    modalContainer: {
+-        width: '80%',
+-        backgroundColor: 'white',
+-        borderRadius: 10,
+-        padding: 20,
+-        alignItems: 'center',
+-    },
+-    modalTitle: {
+-        fontSize: 18,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#333'
+-    },
+-    traitName: {
+-        fontSize: 16,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#2196F3'
+-    },
+-    modalText: {
+-        fontSize: 14,
+-        marginBottom: 20,
+-        textAlign: 'center',
+-        lineHeight: 20,
+-        color: '#555'
+-    },
+-    modalButton: {
+-        padding: 12,
+-        marginVertical: 5,
+-        borderRadius: 6,
+-        alignItems: 'center',
+-        width: '100%',
+-    },
+-    confirmButton: {
+-        backgroundColor: '#4CAF50',
+-        marginTop: 10
+-    },
+-    buttonText: {
+-        color: 'white',
+-        fontWeight: 'bold',
+-        fontSize: 16
+-    },
+-});
+-
+-export default ChildOfAtomModal; 
+\ No newline at end of file
+diff --git a/components/screens/CharacterScreen/modals/traits/SupermutantModal.js b/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+similarity index 53%
+rename from components/screens/CharacterScreen/modals/traits/SupermutantModal.js
+rename to components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+index c1d592a..c4be69e 100644
+--- a/components/screens/CharacterScreen/modals/traits/SupermutantModal.js
++++ b/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+@@ -1,30 +1,43 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
++import React, { useMemo } from 'react';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { getTraitI18n } from '../../../../../domain/traits';
++import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
++import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { tCharacterScreen } from '../../logic/characterScreenI18n';
+ 
++export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originIdForConfig }) => {
++  // We can either get the origin from props (if rendering dynamically) 
++  // or fallback to the config originId if wrapped.
++  const actualOriginId = origin?.id || originIdForConfig;
++  
++  // Safe fallback if origin is missing but modal somehow renders
++  const fallbackTraitId = \`\${actualOriginId}-trait\`; 
++  
++  // A standard origin has traitIds[0].
++  const traitId = origin?.traitIds?.[0] || fallbackTraitId;
+ 
+-export const traitConfig = { originId: 'superMutant', modalType: 'info' };
+-
+-const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
+-  const { name, description } = getTraitI18n('supermutant-forced-evolution');
++  const { name, description } = getTraitI18n(traitId);
+ 
+   const handleConfirm = () => {
+-    if (infoOnly) {
+-      onClose();
+-      return;
+-    }
++    const canonicalTrait = findTraitById(traitId);
++    onSelect(traitId, name, canonicalTrait?.modifiers || {});
++  };
+ 
+-    onSelect('supermutant-forced-evolution', name, {
+-      attributes: { 'STR': 2, 'END': 2 },
+-      minLimits: { 'STR': 6, 'END': 6 },
+-      maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
+-      skillMaxValue: 4,
+-      immunities: ['radiation', 'poison'],
+-      armorConstraint: 'mutantOnly'
+-    });
++  // Safe localized title based on origin ID
++  // It handles simple naming convention: "origins.assaultron" etc.
++  const titleKeys = {
++    assaultron: 'assaultron',
++    childOfAtom: 'childOfAtom',
++    ghoul: 'ghoul',
++    misterHandy: 'misterHandy',
++    protectron: 'protectron',
++    robobrain: 'robobrain',
++    superMutant: 'supermutant',
++    synth: 'synth',
++    shadow: 'shadow'
+   };
++  
++  const titleKey = titleKeys[actualOriginId] || actualOriginId;
++  const modalTitle = tCharacterScreen(\`origins.\${titleKey}\`, name || 'Trait');
+ 
+   return (
+     <Modal
+@@ -35,16 +48,14 @@ const SupermutantModal = ({ visible, onSelect, onClose, infoOnly = false }) => {
+     >
+       <View style={styles.modalOverlay}>
+         <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.supermutant')}</Text>
++          <Text style={styles.modalTitle}>{modalTitle}</Text>
+           <Text style={styles.traitName}>{name}</Text>
+-          
+           {renderTextWithIcons(description, styles.modalText)}
+-          
+           <TouchableOpacity
+             style={[styles.modalButton, styles.confirmButton]}
+             onPress={handleConfirm}
+           >
+-            <Text style={styles.buttonText}>{infoOnly ? tCharacterScreen('buttons.understood') : tCharacterScreen('buttons.selectTrait')}</Text>
++            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok', 'OK')}</Text>
+           </TouchableOpacity>
+         </View>
+       </View>
+@@ -78,19 +89,6 @@ const styles = StyleSheet.create({
+     marginBottom: 10,
+     color: '#2196F3'
+   },
+-  section: {
+-    width: '100%',
+-    marginBottom: 15,
+-    paddingBottom: 15,
+-    borderBottomWidth: 1,
+-    borderBottomColor: '#e0e0e0'
+-  },
+-  sectionTitle: {
+-    fontSize: 16,
+-    fontWeight: '600',
+-    marginBottom: 5,
+-    color: '#333'
+-  },
+   modalText: {
+     fontSize: 14,
+     marginBottom: 20,
+@@ -105,9 +103,6 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     width: '100%',
+   },
+-  skillOption: {
+-    backgroundColor: '#2196F3',
+-  },
+   confirmButton: {
+     backgroundColor: '#4CAF50',
+     marginTop: 10
+@@ -119,4 +114,4 @@ const styles = StyleSheet.create({
+   },
+ });
+ 
+-export default SupermutantModal; 
+\ No newline at end of file
++export default GenericTraitModal;
+diff --git a/components/screens/CharacterScreen/modals/traits/GhoulModal.js b/components/screens/CharacterScreen/modals/traits/GhoulModal.js
+deleted file mode 100644
+index e22fa04..0000000
+--- a/components/screens/CharacterScreen/modals/traits/GhoulModal.js
++++ /dev/null
+@@ -1,51 +0,0 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { getTraitI18n } from '../../../../../domain/traits';
+-import { tCharacterScreen } from '../../logic/characterScreenI18n';
+-
+-
+-export const traitConfig = { originId: 'ghoul', modalType: 'info' };
+-
+-const GhoulModal = ({ visible, onSelect, onClose }) => {
+-  const { name, description } = getTraitI18n('ghoul-necrotic-posthuman');
+-
+-  const handleConfirm = () => {
+-    onSelect('ghoul-necrotic-posthuman', name, {
+-      // forcedSkills + tag → автоматически +2 к Survival и подсветка extra-tagged.
+-      // 'skillModifiers' (бонус к рангу навыка) — упразднён (см. docs/schema/03).
+-      forcedSkills: ['SURVIVAL'],
+-      extraSkills: 1,
+-      immunities: ['radiation'],
+-      effects: ['radiation_healing', 'slow_aging', 'infertility', 'discrimination']
+-    });
+-  };
+-
+-  return (
+-    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.ghoul')}</Text>
+-          <Text style={styles.traitName}>{name}</Text>
+-          {renderTextWithIcons(description, styles.modalText)}
+-          <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleConfirm}>
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-    modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+-    modalContainer: { width: '80%', backgroundColor: 'white', borderRadius: 10, padding: 20, alignItems: 'center' },
+-    modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#333' },
+-    traitName: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: '#2196F3' },
+-    modalText: { fontSize: 14, marginBottom: 20, textAlign: 'center', lineHeight: 20, color: '#555' },
+-    modalButton: { padding: 12, marginVertical: 5, borderRadius: 6, alignItems: 'center', width: '100%' },
+-    confirmButton: { backgroundColor: '#4CAF50', marginTop: 10 },
+-    buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+-});
+-
+-export default GhoulModal;
+diff --git a/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js b/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js
+deleted file mode 100644
+index 98bb73b..0000000
+--- a/components/screens/CharacterScreen/modals/traits/MisterHandyModal.js
++++ /dev/null
+@@ -1,46 +0,0 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+-import { tCharacterScreen } from '../../logic/characterScreenI18n';
+-
+-
+-export const traitConfig = { originId: 'misterHandy', modalType: 'info' };
+-
+-const MisterHandyModal = ({ visible, onSelect, onClose }) => {
+-  const traitId = 'misterhandy-robot-mr-handy';
+-  const { name, description } = getTraitI18n(traitId);
+-
+-  const handleConfirm = () => {
+-    const canonicalTrait = findTraitById(traitId);
+-    onSelect('misterhandy-robot-mr-handy', name, canonicalTrait?.modifiers || {});
+-  };
+-
+-  return (
+-    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.misterHandy')}</Text>
+-          <Text style={styles.traitName}>{name}</Text>
+-          {renderTextWithIcons(description, styles.modalText)}
+-          <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleConfirm}>
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+-  modalContainer: { width: '80%', backgroundColor: 'white', borderRadius: 10, padding: 20, alignItems: 'center' },
+-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#333' },
+-  traitName: { fontSize: 16, fontWeight: 'bold', marginBottom: 10, color: '#2196F3' },
+-  modalText: { fontSize: 14, marginBottom: 20, textAlign: 'center', lineHeight: 20, color: '#555' },
+-  modalButton: { padding: 12, marginVertical: 5, borderRadius: 6, alignItems: 'center', width: '100%' },
+-  confirmButton: { backgroundColor: '#4CAF50', marginTop: 10 },
+-  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+-});
+-
+-export default MisterHandyModal;
+diff --git a/components/screens/CharacterScreen/modals/traits/ProtectronModal.js b/components/screens/CharacterScreen/modals/traits/ProtectronModal.js
+deleted file mode 100644
+index 8cfec29..0000000
+--- a/components/screens/CharacterScreen/modals/traits/ProtectronModal.js
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+-import { tCharacterScreen } from '../../logic/characterScreenI18n';
+-
+-
+-export const traitConfig = { originId: 'protectron', modalType: 'info' };
+-
+-const ProtectronModal = ({ visible, onSelect, onClose }) => {
+-  const traitId = 'protectron-protect-or-destroy';
+-  const { name, description } = getTraitI18n(traitId);
+-
+-  const handleConfirm = () => {
+-    const canonicalTrait = findTraitById(traitId);
+-    onSelect('protectron-protect-or-destroy', name, canonicalTrait?.modifiers || {});
+-  };
+-
+-  return (
+-    <Modal
+-      animationType="fade"
+-      transparent={true}
+-      visible={visible}
+-      onRequestClose={onClose}
+-    >
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.protectron')}</Text>
+-          <Text style={styles.traitName}>{name}</Text>
+-          {renderTextWithIcons(description, styles.modalText)}
+-          <TouchableOpacity
+-            style={[styles.modalButton, styles.confirmButton]}
+-            onPress={handleConfirm}
+-          >
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-    modalOverlay: {
+-        flex: 1,
+-        justifyContent: 'center',
+-        alignItems: 'center',
+-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+-    },
+-    modalContainer: {
+-        width: '80%',
+-        backgroundColor: 'white',
+-        borderRadius: 10,
+-        padding: 20,
+-        alignItems: 'center',
+-    },
+-    modalTitle: {
+-        fontSize: 18,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#333'
+-    },
+-    traitName: {
+-        fontSize: 16,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#2196F3'
+-    },
+-    modalText: {
+-        fontSize: 14,
+-        marginBottom: 20,
+-        textAlign: 'center',
+-        lineHeight: 20,
+-        color: '#555'
+-    },
+-    modalButton: {
+-        padding: 12,
+-        marginVertical: 5,
+-        borderRadius: 6,
+-        alignItems: 'center',
+-        width: '100%',
+-    },
+-    confirmButton: {
+-        backgroundColor: '#4CAF50',
+-        marginTop: 10
+-    },
+-    buttonText: {
+-        color: 'white',
+-        fontWeight: 'bold',
+-        fontSize: 16
+-    },
+-});
+-
+-export default ProtectronModal; 
+\ No newline at end of file
+diff --git a/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js b/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js
+deleted file mode 100644
+index 3ca92ba..0000000
+--- a/components/screens/CharacterScreen/modals/traits/RoboBrainModal.js
++++ /dev/null
+@@ -1,94 +0,0 @@
+-import React from 'react';
+-import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+-import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+-import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
+-import { tCharacterScreen } from '../../logic/characterScreenI18n';
+-
+-
+-export const traitConfig = { originId: 'robobrain', modalType: 'info' };
+-
+-const RoboBrainModal = ({ visible, onSelect, onClose }) => {
+-  const traitId = 'robobrain-robot-with-brains';
+-  const { name, description } = getTraitI18n(traitId);
+-
+-  const handleConfirm = () => {
+-    const canonicalTrait = findTraitById(traitId);
+-    onSelect('robobrain-robot-with-brains', name, canonicalTrait?.modifiers || {});
+-  };
+-
+-  return (
+-    <Modal
+-      animationType="fade"
+-      transparent={true}
+-      visible={visible}
+-      onRequestClose={onClose}
+-    >
+-      <View style={styles.modalOverlay}>
+-        <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tCharacterScreen('origins.robobrain')}</Text>
+-          <Text style={styles.traitName}>{name}</Text>
+-          {renderTextWithIcons(description, styles.modalText)}
+-          <TouchableOpacity
+-            style={[styles.modalButton, styles.confirmButton]}
+-            onPress={handleConfirm}
+-          >
+-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.ok')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      </View>
+-    </Modal>
+-  );
+-};
+-
+-const styles = StyleSheet.create({
+-    modalOverlay: {
+-        flex: 1,
+-        justifyContent: 'center',
+-        alignItems: 'center',
+-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+-    },
+-    modalContainer: {
+-        width: '80%',
+-        backgroundColor: 'white',
+-        borderRadius: 10,
+-        padding: 20,
+-        alignItems: 'center',
+-    },
+-    modalTitle: {
+-        fontSize: 18,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#333'
+-    },
+-    traitName: {
+-        fontSize: 16,
+-        fontWeight: 'bold',
+-        marginBottom: 10,
+-        color: '#2196F3'
+-    },
+-    modalText: {
+-        fontSize: 14,
+-        marginBottom: 20,
+-        textAlign: 'center',
+-        lineHeight: 20,
+-        color: '#555'
+-    },
+-    modalButton: {
+-        padding: 12,
+-        marginVertical: 5,
+-        borderRadius: 6,
+-        alignItems: 'center',
+-        width: '100%',
+-    },
+-    confirmButton: {
+-        backgroundColor: '#4CAF50',
+-        marginTop: 10
+-    },
+-    buttonText: {
+-        color: 'white',
+-        fontWeight: 'bold',
+-        fontSize: 16
+-    },
+-});
+-
+-export default RoboBrainModal;
+\ No newline at end of file
+diff --git a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+index 8d97447..8512f52 100644
+--- a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+@@ -23,9 +23,6 @@ const NCR_TRAIT_IDS = [
+   'ncr-brahmin-baron',
+ ];
+ 
+-// Canonical SKILL keys (UPPER_SNAKE_CASE). Mirrors ncr-good-soul.modifiers.goodSoulSkills.
+-const goodSoulGroup = ['SPEECH', 'MEDICINE', 'REPAIR', 'SCIENCE', 'BARTER'];
+-
+ const SurvivorModal = ({
+   visible,
+   onSelect,
+@@ -92,11 +89,6 @@ const SurvivorModal = ({
+       mergedModifiers.extraPerkSlots = (mergedModifiers.extraPerkSlots || 0) + 1;
+     }
+ 
+-    if (selectedIds.includes('ncr-good-soul')) {
+-      mergedModifiers.goodSoulPending = true;
+-      mergedModifiers.goodSoulGroup = [...goodSoulGroup];
+-    }
+-
+     const traitTitle = selectionMode === 'two_traits'
+       ? `${originLabel}: ${selectedNames.join(' + ')}`
+       : `${originLabel}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk', '1 perk');
+diff --git a/components/screens/CharacterScreen/modals/traits/index.js b/components/screens/CharacterScreen/modals/traits/index.js
+index ebe441a..60fa4b8 100644
+--- a/components/screens/CharacterScreen/modals/traits/index.js
++++ b/components/screens/CharacterScreen/modals/traits/index.js
+@@ -1,48 +1,69 @@
+ import BrotherhoodModal, { traitConfig as brotherhoodConfig } from './BrotherhoodModal';
+-import SupermutantModal, { traitConfig as supermutantConfig } from './SupermutantModal';
+-import GhoulModal, { traitConfig as ghoulConfig } from './GhoulModal';
+ import MinutemanModal, { traitConfig as minutemanConfig } from './MinutemanModal';
+-import ChildOfAtomModal, { traitConfig as childOfAtomConfig } from './ChildOfAtomModal';
+ import VaultDwellerModal, { traitConfig as vaultDwellerConfig } from './VaultDwellerModal';
+-import ProtectronModal, { traitConfig as protectronConfig } from './ProtectronModal';
+-import AssaultronModal, { traitConfig as assaultronConfig } from './AssaultronModal';
+ import NcrCitizenModal, { traitConfig as ncrCitizenConfig } from './NcrCitizenModal';
+ import SurvivorModal, { traitConfig as survivorConfig } from './SurvivorModal';
+ import OutcastBrotherhoodModal, { traitConfig as outcastConfig } from './OutcastBrotherhoodModal';
+-import RoboBrainModal, { traitConfig as robobrainConfig } from './RoboBrainModal';
+-import MisterHandyModal, { traitConfig as misterHandyConfig } from './MisterHandyModal';
++
++import GenericTraitModal from './GenericTraitModal';
++import React from 'react';
++
++// A small wrapper to pass the fixed originId down to GenericTraitModal
++// just in case 'origin' prop is missing, though CharacterScreen now passes it.
++const createGenericModal = (originId) => {
++  return (props) => <GenericTraitModal {...props} originIdForConfig={originId} />;
++};
++
++// Generic "info-only" configs
++const supermutantConfig = { originId: 'superMutant', modalType: 'info' };
++const ghoulConfig = { originId: 'ghoul', modalType: 'info' };
++const childOfAtomConfig = { originId: 'childOfAtom', modalType: 'info' };
++const protectronConfig = { originId: 'protectron', modalType: 'info' };
++const assaultronConfig = { originId: 'assaultron', modalType: 'info' };
++const robobrainConfig = { originId: 'robobrain', modalType: 'info' };
++const misterHandyConfig = { originId: 'misterHandy', modalType: 'info' };
++const shadowConfig = { originId: 'shadow', modalType: 'info' };
++const synthConfig = { originId: 'synth', modalType: 'info' };
+ 
+ // Keyed by origin id (from data/origins/origins.json)
+ export const TRAIT_MODALS = {
++  // Custom Modals
+   [brotherhoodConfig.originId]: BrotherhoodModal,
+-  [supermutantConfig.originId]: SupermutantModal,
+-  [ghoulConfig.originId]: GhoulModal,
+   [minutemanConfig.originId]: MinutemanModal,
+-  [childOfAtomConfig.originId]: ChildOfAtomModal,
+   [vaultDwellerConfig.originId]: VaultDwellerModal,
+-  [protectronConfig.originId]: ProtectronModal,
+-  [assaultronConfig.originId]: AssaultronModal,
+   [ncrCitizenConfig.originId]: NcrCitizenModal,
+   [survivorConfig.originId]: SurvivorModal,
+   [outcastConfig.originId]: OutcastBrotherhoodModal,
+-  [robobrainConfig.originId]: RoboBrainModal,
+-  [misterHandyConfig.originId]: MisterHandyModal,
++
++  // Generic Modals
++  [supermutantConfig.originId]: createGenericModal(supermutantConfig.originId),
++  [ghoulConfig.originId]: createGenericModal(ghoulConfig.originId),
++  [childOfAtomConfig.originId]: createGenericModal(childOfAtomConfig.originId),
++  [protectronConfig.originId]: createGenericModal(protectronConfig.originId),
++  [assaultronConfig.originId]: createGenericModal(assaultronConfig.originId),
++  [robobrainConfig.originId]: createGenericModal(robobrainConfig.originId),
++  [misterHandyConfig.originId]: createGenericModal(misterHandyConfig.originId),
++  [shadowConfig.originId]: createGenericModal(shadowConfig.originId),
++  [synthConfig.originId]: createGenericModal(synthConfig.originId),
+ };
+ 
+ export const TRAIT_CONFIGS = {
+   [brotherhoodConfig.originId]: brotherhoodConfig,
++  [minutemanConfig.originId]: minutemanConfig,
++  [vaultDwellerConfig.originId]: vaultDwellerConfig,
++  [ncrCitizenConfig.originId]: ncrCitizenConfig,
++  [survivorConfig.originId]: survivorConfig,
++  [outcastConfig.originId]: outcastConfig,
++
+   [supermutantConfig.originId]: supermutantConfig,
+   [ghoulConfig.originId]: ghoulConfig,
+-  [minutemanConfig.originId]: minutemanConfig,
+   [childOfAtomConfig.originId]: childOfAtomConfig,
+-  [vaultDwellerConfig.originId]: vaultDwellerConfig,
+   [protectronConfig.originId]: protectronConfig,
+   [assaultronConfig.originId]: assaultronConfig,
+-  [ncrCitizenConfig.originId]: ncrCitizenConfig,
+-  [survivorConfig.originId]: SurvivorModal,
+-  [outcastConfig.originId]: outcastConfig,
+   [robobrainConfig.originId]: robobrainConfig,
+   [misterHandyConfig.originId]: misterHandyConfig,
++  [shadowConfig.originId]: shadowConfig,
++  [synthConfig.originId]: synthConfig,
+ };
+ 
+ export const getTraitModalComponent = (originId) => TRAIT_MODALS[originId] || null;
+diff --git a/docs/schema/07-trait-debt.md b/docs/schema/07-trait-debt.md
+index dd54302..710a09e 100644
+--- a/docs/schema/07-trait-debt.md
++++ b/docs/schema/07-trait-debt.md
+@@ -83,24 +83,13 @@ UI рендерит локализованную подпись из i18n (`labe
+ 
+ ---
+ 
+-## 5. Picker UI для `skillPickChoice`
++## 5. Picker UI для `skillPickChoice` ✅
+ 
+-Затрагивает: `ncr-good-soul` (выбери 2 из 5).
++Затрагивает: `ncr-good-soul` (выбери 2 из 5) и любые будущие черты с выбором.
+ 
+-Поле `skillPickChoice` уже в данных
+-(см. `06-modifiers.md` § 1.2). Сейчас в `CharacterScreen.js` есть хардкод
+-`GOOD_SOUL_SKILL_KEYS` и логика «отметить как extra-tagged» — она
+-работает по факту, но **читает не из данных, а из хардкода**.
+-
+-Что нужно:
+-- Trait-модалка для good-soul (по аналогии с `BrotherhoodModal`),
+-  которая показывает 5 вариантов и даёт выбрать 2.
+-- В `CharacterScreen.handleSelectTrait` читать `skillPickChoice` из
+-  активного трейта и применять `extraTaggedSkills` соответственно.
+-- Удалить хардкод `GOOD_SOUL_SKILL_KEYS`.
+-
+-Когда делать: в рамках UI-итерации траит-модалок (там уже есть
+-`pick` в логике китов — теперь то же самое для трейтов).
++Поле `skillPickChoice` читается из `data/traits/traits.json`.
++Хардкод `GOOD_SOUL_SKILL_KEYS` удалён.
++Универсальный Picker UI внедрён в `CharacterScreen.js` и динамически рендерит варианты. Ограничение на развитие невыбранных навыков из списка до 4 ранга также переведено на универсальные рельсы.
+ 
+ ---
+ 
+@@ -145,71 +134,14 @@ UI рендерит локализованную подпись из i18n (`labe
+ 
+ Статус: **отложенный рефакторинг**, не блокирует текущий flow.
+ 
+-### 8.1. Хардкод модификаторов в модалках
+-
+-Сейчас большинство trait-модалок в `components/screens/CharacterScreen/modals/traits/`
+-задают модификаторы вручную вместо чтения из `data/traits/traits.json`.
+-
+-Пример: `SupermutantModal.js` хардкодит
+-```js
+-attributes: { 'STR': 2, 'END': 2 },
+-minLimits: { 'STR': 6, 'END': 6 },
+-maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
+-```
+-Хотя в `data/traits/traits.json` у `supermutant-forced-evolution` уже есть
+-корректный объект `attributes: { STR: { baseBonus, min, max }, ... }`.
+-
+-Это создаёт дублирование и риск рассинхронизации.
+-
+-Цель: все модалки (кроме особых случаев) должны брать модификаторы из
+-`findTraitById(origin.traitIds[0])?.modifiers` и передавать их в
+-`CharacterScreen.handleSelectTrait()` без изменений.
+-
+-### 8.2. Отсутствующие модалки
+-
+-Для origins `shadow` и `synth` есть трейты в данных, но нет
+-соответствующих модалок в `components/screens/CharacterScreen/modals/traits/index.js`.
+-При выборе этих origin кнопка «Черта» открывает пустоту — trait выбрать
+-невозможно.
+-
+-Нужно создать:
+-- `ShadowModal.js`
+-- `SynthModal.js`
+-
+-и зарегистрировать их в `TRAIT_MODALS` / `TRAIT_CONFIGS` в `index.js`.
+-
+-Пока отложено: `shadow` и `synth` — неиграбельные origins до реализации
+-модалок.
+-
+-### 8.3. Целевая архитектура (рекомендация)
+-
+-Вместо 13+ отдельных модалок с хардкодом лучше прийти к гибриду:
+-
+-- `GenericTraitModal.js` — одна модалка для всех «info-only» трейтов
+-  (Supermutant, Ghoul, Protectron, Assaultron, MisterHandy, RoboBrain,
+-  VaultDweller, Minuteman, ChildOfAtom, OutcastBrotherhood, Shadow, Synth).
+-  Читает имя/описание/модификаторы из `data/traits/traits.json`.
++### 8.1. Хардкод модификаторов в модалках ✅
+ 
+-- `SkillChoiceModal.js` — параметризуемая модалка выбора 1 навыка из
+-  списка, управляемая `trait.modifiers.forcedSkills` и `extraSkills`.
+-  Используется для `brotherhood` и, возможно, других трейтов с
+-  `skillPickChoice`/`forcedSkills`.
++Решено. Внедрён `GenericTraitModal.js`, который автоматически берёт модификаторы из `findTraitById(origin.traitIds[0])?.modifiers` и передаёт их дальше. Все старые info-модалки с хардкодом удалены.
+ 
+-- `MultiTraitModal.js` — модалка выбора 2 черт (Survivor/NCR). Показывает
+-  `subTraitIds` из `ncr-resident` / `survivor-survivor` и даёт выбрать
+-  комбинацию. Сейчас `SurvivorModal.js` + `NcrCitizenModal.js` решают
+-  это локально — это допустимо, но их тоже можно свести к параметризуемой
+-  `MultiTraitModal`.
++### 8.2. Отсутствующие модалки ✅
+ 
+-- `GoodSoulPickerModal.js` — вынести inline-выбор 2 навыков из
+-  `CharacterScreen.js` в отдельную модалку, управляемую
+-  `trait.modifiers.skillPickChoice` (см. § 5).
++Решено. Origins `shadow` и `synth` добавлены в `TRAIT_MODALS` и `TRAIT_CONFIGS` и обрабатываются через `GenericTraitModal`. Черты полностью играбельны.
+ 
+-Преимущества:
+-- Единый источник правды — `data/traits/traits.json`.
+-- Добавить новый origin = добавить строку в JSON, не писать новый `.js`.
+-- Меньше дублирования и меньше риска рассинхронизации модификаторов.
++### 8.3. Целевая архитектура (рекомендация) 🟡 (частично)
+ 
+-Когда делать: отдельным этапом после стабилизации текущего flow.
+-Текущие модалки пока оставляем как есть (кроме удаления устаревшего
+-`TraitSkillModal.js`).
++Реализован базовый гибрид: `GenericTraitModal.js` обслуживает все 9 "info-only" трейтов. `CharacterScreen.js` напрямую обрабатывает `skillPickChoice` (выбор навыков) и `SurvivorModal` / `NcrCitizenModal` обслуживают множественный выбор черт.
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index b10403c..910ef50 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -94,10 +94,6 @@
+     "maxSkillRank": "Error: maximum skill rank is {maxRank}"
+   },
+   "modals": {
+-    "goodSoul": {
+-      "title": "Good Soul: choose 2 skills",
+-      "description": "Choose two skills from the group. They will be marked as extra."
+-    },
+     "origin": {
+       "title": "Select origin"
+     },
+@@ -134,6 +130,10 @@
+     "limb": {
+       "upgradeLimb": "Upgrade Limb",
+       "noLimbs": "No limbs available"
++    },
++    "skillPick": {
++      "title": "Choose skills",
++      "description": "Choose skills from the provided group. They will be marked as extra."
+     }
+   },
+   "origins": {
+@@ -149,7 +149,9 @@
+     "robobrain": "Robobrain",
+     "supermutant": "Supermutant",
+     "survivor": "Survivor",
+-    "vaultDweller": "Vault Dweller"
++    "vaultDweller": "Vault Dweller",
++    "shadow": "Shadow",
++    "synth": "Synth"
+   },
+   "attributes": {
+     "STR": "STR",
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index eb6d511..3a2fbc6 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -94,10 +94,6 @@
+     "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
+   },
+   "modals": {
+-    "goodSoul": {
+-      "title": "Добрая Душа: выберите 2 навыка",
+-      "description": "Выберите два навыка из группы. Они будут отмечены как дополнительные."
+-    },
+     "origin": {
+       "title": "Выберите происхождение"
+     },
+@@ -134,6 +130,10 @@
+     "limb": {
+       "upgradeLimb": "Модернизировать конечность",
+       "noLimbs": "Нет доступных конечностей"
++    },
++    "skillPick": {
++      "title": "Выберите навыки",
++      "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные."
+     }
+   },
+   "origins": {
+@@ -149,7 +149,9 @@
+     "robobrain": "Робомозг",
+     "supermutant": "Супермутант",
+     "survivor": "Выживший",
+-    "vaultDweller": "Обитатель убежища"
++    "vaultDweller": "Обитатель убежища",
++    "shadow": "Тень",
++    "synth": "Синт"
+   },
+   "attributes": {
+     "STR": "СИЛ",
