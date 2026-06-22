@@ -23,9 +23,6 @@ const NCR_TRAIT_IDS = [
   'ncr-brahmin-baron',
 ];
 
-// Canonical SKILL keys (UPPER_SNAKE_CASE). Mirrors ncr-good-soul.modifiers.goodSoulSkills.
-const goodSoulGroup = ['SPEECH', 'MEDICINE', 'REPAIR', 'SCIENCE', 'BARTER'];
-
 const SurvivorModal = ({
   visible,
   onSelect,
@@ -90,11 +87,6 @@ const SurvivorModal = ({
 
     if (selectionMode === 'trait_and_perk') {
       mergedModifiers.extraPerkSlots = (mergedModifiers.extraPerkSlots || 0) + 1;
-    }
-
-    if (selectedIds.includes('ncr-good-soul')) {
-      mergedModifiers.goodSoulPending = true;
-      mergedModifiers.goodSoulGroup = [...goodSoulGroup];
     }
 
     const traitTitle = selectionMode === 'two_traits'

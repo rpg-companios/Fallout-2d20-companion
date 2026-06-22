@@ -32,9 +32,12 @@ function normalizeModRow(row) {
     // canonical DB fields only
     weight: row.weight ?? 0,
     cost: row.cost ?? 0,
-    // Prefer canonical legacy effect tokens from `effects` for deterministic parsing/rendering.
-    // Localized `effectDescription` may omit values or use different grammar.
-    effectDescription: row.effects ?? row.effectDescription ?? row.effect_description ?? '',
+    // Localized description for UI
+    effectDescription: row.effectsLegacy ?? row.effectDescription ?? row.effect_description ?? row.effects ?? '',
+    damageModifier: row.damageModifier,
+    fireRateModifier: row.fireRateModifier,
+    rangeModifier: row.rangeModifier,
+    qualityChanges: row.qualityChanges,
   };
 }
 
@@ -109,38 +112,38 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     String(rawQualities).split(',').map(q => q.trim()).filter(q => q && q !== '–').forEach(q => qualities.add(q));
   }
 
-  // Минимальный парсер Effects из seed-данных, напр:
-  // "plus 1 CD Damage, plus 2 Fire Rate"
-  // "minus 1 CD Damage, plus 1 Fire Rate"
-  // Если не распознали — просто сохраняем описание.
+  // Применяем структурированные модификаторы из JSON
   const extraEffectsText = [];
   for (const mod of selectedMods) {
     const eff = String(mod.effectDescription || '');
     if (eff) extraEffectsText.push(eff);
 
-    const dmgPlus = eff.match(/plus\s+(\d+)\s+CD\s+Damage/i) || eff.match(/(?:урон)\s*\+(\d+)\s*БК/i);
-    const dmgMinus = eff.match(/minus\s+(\d+)\s+CD\s+Damage/i) || eff.match(/(?:урон)\s*-(\d+)\s*БК/i);
-    if (dmgPlus) damage += Number(dmgPlus[1]);
-    if (dmgMinus) damage -= Number(dmgMinus[1]);
-    const dmgSet = eff.match(/set\s+(\d+)\s+CD\s+Damage/i);
-    if (dmgSet) damage = Number(dmgSet[1]);
+    if (mod.damageModifier) {
+      if (mod.damageModifier.op === '+') damage += Number(mod.damageModifier.value);
+      if (mod.damageModifier.op === '-') damage -= Number(mod.damageModifier.value);
+      if (mod.damageModifier.op === 'set') damage = Number(mod.damageModifier.value);
+    }
 
-    const frPlus = eff.match(/plus\s+(\d+)\s+Fire\s+Rate/i) || eff.match(/(?:скорострельность)\s*\+(\d+)/i);
-    const frMinus = eff.match(/minus\s+(\d+)\s+Fire\s+Rate/i) || eff.match(/(?:скорострельность)\s*-(\d+)/i);
-    if (frPlus) fire_rate += Number(frPlus[1]);
-    if (frMinus) fire_rate -= Number(frMinus[1]);
+    if (mod.fireRateModifier) {
+      if (mod.fireRateModifier.op === '+') fire_rate += Number(mod.fireRateModifier.value);
+      if (mod.fireRateModifier.op === '-') fire_rate -= Number(mod.fireRateModifier.value);
+      if (mod.fireRateModifier.op === 'set') fire_rate = Number(mod.fireRateModifier.value);
+    }
 
-    const rangePlus = eff.match(/plus\s+(\d+)\s+Range/i);
-    const rangeMinus = eff.match(/minus\s+(\d+)\s+Range/i);
-    if (rangePlus) rangeShift += Number(rangePlus[1]);
-    if (rangeMinus) rangeShift -= Number(rangeMinus[1]);
+    if (mod.rangeModifier) {
+      if (mod.rangeModifier.op === '+') rangeShift += Number(mod.rangeModifier.value);
+      if (mod.rangeModifier.op === '-') rangeShift -= Number(mod.rangeModifier.value);
+    }
 
-    const gainMatches = [...eff.matchAll(/gain\s+([^,]+)/gi)];
-    gainMatches.forEach(([, q]) => qualities.add(String(q).trim()));
-    const loseMatches = [...eff.matchAll(/lose\s+([^,]+)/gi)];
-    loseMatches.forEach(([, q]) => qualities.delete(String(q).trim()));
+    if (mod.qualityChanges && Array.isArray(mod.qualityChanges)) {
+      for (const qc of mod.qualityChanges) {
+        const qName = qc.value ? `${qc.name} ${qc.value}` : qc.name;
+        if (qc.op === 'gain') qualities.add(qName);
+        if (qc.op === 'lose') qualities.delete(qName);
+      }
+    }
 
-    // Вес/цена модов (если есть)
+    // Вес/цена модов
     weight += toNumber(mod.weight);
     cost += toNumber(mod.cost);
   }

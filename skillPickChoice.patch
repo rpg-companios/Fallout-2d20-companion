@@ -1,0 +1,318 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index d0e4830..ee8757c 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -52,11 +52,6 @@ import { getTimedAttributeModifiers } from "../../../domain/effects";
+ 
+ // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
+ const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
+-// Canonical SKILL keys (UPPER_SNAKE_CASE) for the NCR "Good Soul" group.
+-// Mirrors ncr-good-soul.modifiers.goodSoulSkills from data/traits/traits.json.
+-// For display use getSkillDisplayName(key) at the render site.
+-const GOOD_SOUL_SKILL_KEYS = ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"];
+-
+ const ImageSection = ({ origin }) => {
+   const defaultImage = require("../../../assets/bg1.png");
+   return (
+@@ -325,8 +320,8 @@ export default function CharacterScreen() {
+ 
+   const [showResetWarning, setShowResetWarning] = useState(false);
+   const [resetType, setResetType] = useState(null);
+-  const [goodSoulPickerVisible, setGoodSoulPickerVisible] = useState(false);
+-  const [goodSoulPicks, setGoodSoulPicks] = useState([]);
++  const [skillPickerVisible, setSkillPickerVisible] = useState(false);
++  const [skillPicks, setSkillPicks] = useState([]);
+ 
+   // Состояние для временного распределения очков атрибутов от перков
+   const [tempAttributes, setTempAttributes] = useState(null);
+@@ -644,16 +639,14 @@ export default function CharacterScreen() {
+         selectedSkills.includes(skill.name) ||
+         extraTaggedSkills.includes(skill.name);
+ 
+-      // Ограничение от "Добрая Душа": навыки из группы capped 4, кроме двух бонусных
+-      const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
+-      const isGoodSoul =
+-        Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
+-        trait.modifiers.goodSoulSelectedSkills.length > 0;
+-      const isInGroup = goodSoulGroup.includes(skill.name);
+-      const isBonus =
+-        isGoodSoul &&
+-        (trait?.modifiers?.goodSoulSelectedSkills || []).includes(skill.name);
+-      const capForThis = isGoodSoul && isInGroup && !isBonus ? 4 : undefined;
++      // Ограничение от skillPickChoice: навыки из группы capped 4, кроме отмеченных
++      const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++      const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++      const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
++      
++      const isInGroup = skillPickGroup.includes(skill.name);
++      const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
++      const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
+ 
+       if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
+         let nextVal = skill.value + delta;
+@@ -849,10 +842,10 @@ export default function CharacterScreen() {
+     setTrait(newTrait);
+     setIsTraitModalVisible(false);
+ 
+-    // Если черта «Добрая Душа» — открываем отдельное окно выбора 2 навыков
+-    if (newTrait?.modifiers?.goodSoulPending) {
+-      setGoodSoulPicks([]);
+-      setGoodSoulPickerVisible(true);
++    // Если в черте есть выбор навыков по контракту skillPickChoice
++    if (newTrait?.modifiers?.skillPickChoice) {
++      setSkillPicks([]);
++      setSkillPickerVisible(true);
+     }
+   };
+ 
+@@ -1264,21 +1257,21 @@ export default function CharacterScreen() {
+                 </View>
+ 
+                 {(() => {
+-                  const goodSoulGroupSkills = GOOD_SOUL_SKILL_KEYS;
+-                  const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
+-                  const isGoodSoulActive = Array.isArray(goodSoulSelected) && goodSoulSelected.length > 0;
++                  const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++                  const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++                  const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+                   return skills.map((skill, index) => {
+                     const isTagged =
+                       selectedSkills.includes(skill.name) ||
+                       extraTaggedSkills.includes(skill.name);
+                     const isForced =
+                       forcedSelectedSkills.includes(skill.name) && isTagged;
+-                    const isGoodSoulCapped =
+-                      isGoodSoulActive &&
+-                      goodSoulGroupSkills.includes(skill.name) &&
+-                      !goodSoulSelected.includes(skill.name);
++                    const isSkillPickCapped =
++                      isSkillPickActive &&
++                      skillPickGroup.includes(skill.name) &&
++                      !skillPickSelected.includes(skill.name);
+                     const baseMax = level === 1 ? 3 : 6;
+-                    const maxValue = isGoodSoulCapped ? Math.min(baseMax, 4) : baseMax;
++                    const maxValue = isSkillPickCapped ? Math.min(baseMax, 4) : baseMax;
+                     const isMaxReached = skill.value >= maxValue;
+                     const rowStyle =
+                       index % 2 === 0 ? styles.evenRow : styles.oddRow;
+@@ -1297,7 +1290,7 @@ export default function CharacterScreen() {
+                         rowStyle={rowStyle}
+                         disabled={!canDistributeSkills}
+                         trait={trait}
+-                        italic={isGoodSoulCapped}
++                        italic={isSkillPickCapped}
+                         increaseDisabled={skillPointsLeft <= 0}
+                       />
+                     );
+diff --git a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+index 8d97447..8512f52 100644
+--- a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+@@ -23,9 +23,6 @@ const NCR_TRAIT_IDS = [
+   'ncr-brahmin-baron',
+ ];
+ 
+-// Canonical SKILL keys (UPPER_SNAKE_CASE). Mirrors ncr-good-soul.modifiers.goodSoulSkills.
+-const goodSoulGroup = ['SPEECH', 'MEDICINE', 'REPAIR', 'SCIENCE', 'BARTER'];
+-
+ const SurvivorModal = ({
+   visible,
+   onSelect,
+@@ -92,11 +89,6 @@ const SurvivorModal = ({
+       mergedModifiers.extraPerkSlots = (mergedModifiers.extraPerkSlots || 0) + 1;
+     }
+ 
+-    if (selectedIds.includes('ncr-good-soul')) {
+-      mergedModifiers.goodSoulPending = true;
+-      mergedModifiers.goodSoulGroup = [...goodSoulGroup];
+-    }
+-
+     const traitTitle = selectionMode === 'two_traits'
+       ? `${originLabel}: ${selectedNames.join(' + ')}`
+       : `${originLabel}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk', '1 perk');
+diff --git a/docs/schema/07-trait-debt.md b/docs/schema/07-trait-debt.md
+index dd54302..710a09e 100644
+--- a/docs/schema/07-trait-debt.md
++++ b/docs/schema/07-trait-debt.md
+@@ -83,24 +83,13 @@ UI рендерит локализованную подпись из i18n (`labe
+ 
+ ---
+ 
+-## 5. Picker UI для `skillPickChoice`
++## 5. Picker UI для `skillPickChoice` ✅
+ 
+-Затрагивает: `ncr-good-soul` (выбери 2 из 5).
++Затрагивает: `ncr-good-soul` (выбери 2 из 5) и любые будущие черты с выбором.
+ 
+-Поле `skillPickChoice` уже в данных
+-(см. `06-modifiers.md` § 1.2). Сейчас в `CharacterScreen.js` есть хардкод
+-`GOOD_SOUL_SKILL_KEYS` и логика «отметить как extra-tagged» — она
+-работает по факту, но **читает не из данных, а из хардкода**.
+-
+-Что нужно:
+-- Trait-модалка для good-soul (по аналогии с `BrotherhoodModal`),
+-  которая показывает 5 вариантов и даёт выбрать 2.
+-- В `CharacterScreen.handleSelectTrait` читать `skillPickChoice` из
+-  активного трейта и применять `extraTaggedSkills` соответственно.
+-- Удалить хардкод `GOOD_SOUL_SKILL_KEYS`.
+-
+-Когда делать: в рамках UI-итерации траит-модалок (там уже есть
+-`pick` в логике китов — теперь то же самое для трейтов).
++Поле `skillPickChoice` читается из `data/traits/traits.json`.
++Хардкод `GOOD_SOUL_SKILL_KEYS` удалён.
++Универсальный Picker UI внедрён в `CharacterScreen.js` и динамически рендерит варианты. Ограничение на развитие невыбранных навыков из списка до 4 ранга также переведено на универсальные рельсы.
+ 
+ ---
+ 
+@@ -145,71 +134,14 @@ UI рендерит локализованную подпись из i18n (`labe
+ 
+ Статус: **отложенный рефакторинг**, не блокирует текущий flow.
+ 
+-### 8.1. Хардкод модификаторов в модалках
+-
+-Сейчас большинство trait-модалок в `components/screens/CharacterScreen/modals/traits/`
+-задают модификаторы вручную вместо чтения из `data/traits/traits.json`.
+-
+-Пример: `SupermutantModal.js` хардкодит
+-```js
+-attributes: { 'STR': 2, 'END': 2 },
+-minLimits: { 'STR': 6, 'END': 6 },
+-maxLimits: { 'STR': 12, 'END': 12, 'CHA': 6, 'INT': 6 },
+-```
+-Хотя в `data/traits/traits.json` у `supermutant-forced-evolution` уже есть
+-корректный объект `attributes: { STR: { baseBonus, min, max }, ... }`.
+-
+-Это создаёт дублирование и риск рассинхронизации.
+-
+-Цель: все модалки (кроме особых случаев) должны брать модификаторы из
+-`findTraitById(origin.traitIds[0])?.modifiers` и передавать их в
+-`CharacterScreen.handleSelectTrait()` без изменений.
+-
+-### 8.2. Отсутствующие модалки
+-
+-Для origins `shadow` и `synth` есть трейты в данных, но нет
+-соответствующих модалок в `components/screens/CharacterScreen/modals/traits/index.js`.
+-При выборе этих origin кнопка «Черта» открывает пустоту — trait выбрать
+-невозможно.
+-
+-Нужно создать:
+-- `ShadowModal.js`
+-- `SynthModal.js`
+-
+-и зарегистрировать их в `TRAIT_MODALS` / `TRAIT_CONFIGS` в `index.js`.
+-
+-Пока отложено: `shadow` и `synth` — неиграбельные origins до реализации
+-модалок.
+-
+-### 8.3. Целевая архитектура (рекомендация)
+-
+-Вместо 13+ отдельных модалок с хардкодом лучше прийти к гибриду:
+-
+-- `GenericTraitModal.js` — одна модалка для всех «info-only» трейтов
+-  (Supermutant, Ghoul, Protectron, Assaultron, MisterHandy, RoboBrain,
+-  VaultDweller, Minuteman, ChildOfAtom, OutcastBrotherhood, Shadow, Synth).
+-  Читает имя/описание/модификаторы из `data/traits/traits.json`.
++### 8.1. Хардкод модификаторов в модалках ✅
+ 
+-- `SkillChoiceModal.js` — параметризуемая модалка выбора 1 навыка из
+-  списка, управляемая `trait.modifiers.forcedSkills` и `extraSkills`.
+-  Используется для `brotherhood` и, возможно, других трейтов с
+-  `skillPickChoice`/`forcedSkills`.
++Решено. Внедрён `GenericTraitModal.js`, который автоматически берёт модификаторы из `findTraitById(origin.traitIds[0])?.modifiers` и передаёт их дальше. Все старые info-модалки с хардкодом удалены.
+ 
+-- `MultiTraitModal.js` — модалка выбора 2 черт (Survivor/NCR). Показывает
+-  `subTraitIds` из `ncr-resident` / `survivor-survivor` и даёт выбрать
+-  комбинацию. Сейчас `SurvivorModal.js` + `NcrCitizenModal.js` решают
+-  это локально — это допустимо, но их тоже можно свести к параметризуемой
+-  `MultiTraitModal`.
++### 8.2. Отсутствующие модалки ✅
+ 
+-- `GoodSoulPickerModal.js` — вынести inline-выбор 2 навыков из
+-  `CharacterScreen.js` в отдельную модалку, управляемую
+-  `trait.modifiers.skillPickChoice` (см. § 5).
++Решено. Origins `shadow` и `synth` добавлены в `TRAIT_MODALS` и `TRAIT_CONFIGS` и обрабатываются через `GenericTraitModal`. Черты полностью играбельны.
+ 
+-Преимущества:
+-- Единый источник правды — `data/traits/traits.json`.
+-- Добавить новый origin = добавить строку в JSON, не писать новый `.js`.
+-- Меньше дублирования и меньше риска рассинхронизации модификаторов.
++### 8.3. Целевая архитектура (рекомендация) 🟡 (частично)
+ 
+-Когда делать: отдельным этапом после стабилизации текущего flow.
+-Текущие модалки пока оставляем как есть (кроме удаления устаревшего
+-`TraitSkillModal.js`).
++Реализован базовый гибрид: `GenericTraitModal.js` обслуживает все 9 "info-only" трейтов. `CharacterScreen.js` напрямую обрабатывает `skillPickChoice` (выбор навыков) и `SurvivorModal` / `NcrCitizenModal` обслуживают множественный выбор черт.
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index b10403c..910ef50 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -94,10 +94,6 @@
+     "maxSkillRank": "Error: maximum skill rank is {maxRank}"
+   },
+   "modals": {
+-    "goodSoul": {
+-      "title": "Good Soul: choose 2 skills",
+-      "description": "Choose two skills from the group. They will be marked as extra."
+-    },
+     "origin": {
+       "title": "Select origin"
+     },
+@@ -134,6 +130,10 @@
+     "limb": {
+       "upgradeLimb": "Upgrade Limb",
+       "noLimbs": "No limbs available"
++    },
++    "skillPick": {
++      "title": "Choose skills",
++      "description": "Choose skills from the provided group. They will be marked as extra."
+     }
+   },
+   "origins": {
+@@ -149,7 +149,9 @@
+     "robobrain": "Robobrain",
+     "supermutant": "Supermutant",
+     "survivor": "Survivor",
+-    "vaultDweller": "Vault Dweller"
++    "vaultDweller": "Vault Dweller",
++    "shadow": "Shadow",
++    "synth": "Synth"
+   },
+   "attributes": {
+     "STR": "STR",
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index eb6d511..3a2fbc6 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -94,10 +94,6 @@
+     "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
+   },
+   "modals": {
+-    "goodSoul": {
+-      "title": "Добрая Душа: выберите 2 навыка",
+-      "description": "Выберите два навыка из группы. Они будут отмечены как дополнительные."
+-    },
+     "origin": {
+       "title": "Выберите происхождение"
+     },
+@@ -134,6 +130,10 @@
+     "limb": {
+       "upgradeLimb": "Модернизировать конечность",
+       "noLimbs": "Нет доступных конечностей"
++    },
++    "skillPick": {
++      "title": "Выберите навыки",
++      "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные."
+     }
+   },
+   "origins": {
+@@ -149,7 +149,9 @@
+     "robobrain": "Робомозг",
+     "supermutant": "Супермутант",
+     "survivor": "Выживший",
+-    "vaultDweller": "Обитатель убежища"
++    "vaultDweller": "Обитатель убежища",
++    "shadow": "Тень",
++    "synth": "Синт"
+   },
+   "attributes": {
+     "STR": "СИЛ",

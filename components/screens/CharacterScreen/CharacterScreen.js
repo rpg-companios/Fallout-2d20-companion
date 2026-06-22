@@ -52,11 +52,6 @@ import { getTimedAttributeModifiers } from "../../../domain/effects";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
-// Canonical SKILL keys (UPPER_SNAKE_CASE) for the NCR "Good Soul" group.
-// Mirrors ncr-good-soul.modifiers.goodSoulSkills from data/traits/traits.json.
-// For display use getSkillDisplayName(key) at the render site.
-const GOOD_SOUL_SKILL_KEYS = ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"];
-
 const ImageSection = ({ origin }) => {
   const defaultImage = require("../../../assets/bg1.png");
   return (
@@ -325,8 +320,8 @@ export default function CharacterScreen() {
 
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [resetType, setResetType] = useState(null);
-  const [goodSoulPickerVisible, setGoodSoulPickerVisible] = useState(false);
-  const [goodSoulPicks, setGoodSoulPicks] = useState([]);
+  const [skillPickerVisible, setSkillPickerVisible] = useState(false);
+  const [skillPicks, setSkillPicks] = useState([]);
 
   // Состояние для временного распределения очков атрибутов от перков
   const [tempAttributes, setTempAttributes] = useState(null);
@@ -532,128 +527,12 @@ export default function CharacterScreen() {
     }
 
     // Good Soul special handling
-    const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
-    const isGoodSoul =
-      Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
-      trait.modifiers.goodSoulSelectedSkills.length > 0;
-    const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
-    const isBonusFromGoodSoul =
-      isGoodSoul && goodSoulSelected.includes(skillName);
-
-    // Get trait extra skill info
-    const extraSkillsFromTrait =
-      trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
-    const traitForcedSkills = trait?.forcedSkills || [];
-
-    // Check if this skill can be selected as an extra skill
-    const canSelectAsExtra =
-      extraSkillsFromTrait > 0 &&
-      (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
-
-    if (!isCurrentlySelected) {
-      // SELECTING A NEW SKILL
-
-      // Check skill max limit
-      if (currentSkill.value + 2 > skillMax) {
-        showError(
-          tCharacterScreen("errors.skillTagExceedsMaxRank", "Tagging this skill will exceed max rank ({skillMax}). Lower it first.").replace("{skillMax}", String(skillMax)),
-        );
-        return;
-      }
-
-      // Handle Good Soul bonus skills (don't count toward main or extra limits)
-      if (isBonusFromGoodSoul) {
-        // This is handled by trait modal, should not reach here normally
-        return;
-      }
-
-      // Forced skills go to extra pool
-      if (isForcedSkill) {
-        setExtraTaggedSkills((prev) => [...prev, skillName]);
-      }
-      // Try main skills first (max 3)
-      else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
-        setSelectedSkills((prev) => [...prev, skillName]);
-      }
-      // Try extra skills if available
-      else if (
-        canSelectAsExtra &&
-        extraTaggedSkills.length < extraSkillsFromTrait
-      ) {
-        setExtraTaggedSkills((prev) => [...prev, skillName]);
-      }
-      // No slots available
-      else {
-        const extraText = canSelectAsExtra
-          ? `\n\n${tCharacterScreen("labels.extraSlotsAvailable", "Extra slots available")}: ${extraSkillsFromTrait - extraTaggedSkills.length}`
-          : "";
-        showError(
-          tCharacterScreen("errors.maxBaseSkills", "You can choose a maximum of {count} base skills.{extraText}").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
-        );
-        return;
-      }
-
-      // Apply +2 to skill value
-      setSkills((prev) =>
-        prev.map((s, i) => {
-          if (i !== skillIndex) return s;
-          let next = s.value + 2;
-          // Good Soul group cap
-      if (isGoodSoul && goodSoulGroup.includes(s.name) && !isBonusFromGoodSoul) {
-            next = Math.min(next, 4);
-          }
-          return { ...s, value: next };
-        }),
-      );
-    } else {
-      // DESELECTING A SKILL
-
-      // Remove from appropriate pool
-      if (isInMainSkills) {
-        setSelectedSkills((prev) => prev.filter((s) => s !== skillName));
-      }
-      if (isInExtraSkills) {
-        setExtraTaggedSkills((prev) => prev.filter((s) => s !== skillName));
-      }
-
-      // Apply -2 to skill value
-      setSkills((prev) =>
-        prev.map((s, i) => {
-          if (i !== skillIndex) return s;
-          return { ...s, value: Math.max(0, s.value - 2) };
-        }),
-      );
-    }
-  };
-
-  const handleChangeSkillValue = (index, delta) => {
-    if (!attributesSaved) {
-      showAlert(tCharacterScreen("errors.saveAttributesFirstSimple", "Save attributes first."));
-      return;
-    }
-
-    if (delta > 0 && skillPointsLeft <= 0) {
-      showError(tCharacterScreen("errors.noSkillPointsLeft", "You have no skill points left to distribute."));
-      return;
-    }
-
-    setSkills((prev) => {
-      const newSkills = [...prev];
-      const skill = newSkills[index];
-      const isTagged =
-        selectedSkills.includes(skill.name) ||
-        extraTaggedSkills.includes(skill.name);
-
-      // Ограничение от "Добрая Душа": навыки из группы capped 4, кроме двух бонусных
-      const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
-      const isGoodSoul =
-        Array.isArray(trait?.modifiers?.goodSoulSelectedSkills) &&
-        trait.modifiers.goodSoulSelectedSkills.length > 0;
-      const isInGroup = goodSoulGroup.includes(skill.name);
-      const isBonus =
-        isGoodSoul &&
-        (trait?.modifiers?.goodSoulSelectedSkills || []).includes(skill.name);
-      const capForThis = isGoodSoul && isInGroup && !isBonus ? 4 : undefined;
+    const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
+      const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
+      const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+      const isInGroup = skillPickGroup.includes(skill?.name || skillName);
+      const isBonus = isSkillPickActive && skillPickSelected.includes(skill?.name || skillName);
+      const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
 
       if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
         let nextVal = skill.value + delta;
@@ -850,47 +729,44 @@ export default function CharacterScreen() {
     setIsTraitModalVisible(false);
 
     // Если черта «Добрая Душа» — открываем отдельное окно выбора 2 навыков
-    if (newTrait?.modifiers?.goodSoulPending) {
-      setGoodSoulPicks([]);
-      setGoodSoulPickerVisible(true);
+    if (newTrait?.modifiers?.skillPickChoice) {
+      setSkillPicks([]);
+      setSkillPickerVisible(true);
     }
   };
 
-  const goodSoulGroup = GOOD_SOUL_SKILL_KEYS;
-
-  const toggleGoodSoulPick = (skill) => {
-    setGoodSoulPicks((prev) => {
+  const toggleSkillPick = (skill) => {
+    const maxCount = trait?.modifiers?.skillPickChoice?.count || 2;
+    setSkillPicks((prev) => {
       if (prev.includes(skill)) return prev.filter((s) => s !== skill);
-      if (prev.length >= 2) return prev;
+      if (prev.length >= maxCount) return prev;
       return [...prev, skill];
     });
   };
 
-  const handleConfirmGoodSoulSkills = () => {
-    if (goodSoulPicks.length !== 2) return;
-    const picks = [...goodSoulPicks];
+  const confirmSkillPick = () => {
+    const maxCount = trait?.modifiers?.skillPickChoice?.count || 2;
+    if (skillPicks.length !== maxCount) return;
+    const picks = [...skillPicks];
 
     setTrait((prev) => {
       if (!prev) return prev;
-      const prevMods = prev.modifiers || {};
-      const newMods = {
-        ...prevMods,
-        goodSoulPending: false,
-        goodSoulSelectedSkills: picks,
-        goodSoulGroup: [...goodSoulGroup],
-        forcedSkills: [...new Set([...(prevMods.forcedSkills || []), ...picks])],
-        extraSkills: (prevMods.extraSkills || 0) + picks.length,
+      return {
+        ...prev,
+        modifiers: {
+          ...prev.modifiers,
+          skillPickSelected: picks,
+        },
       };
-      return { ...prev, modifiers: newMods };
     });
 
-    setForcedSelectedSkills((prev) => [...new Set([...prev, ...picks])]);
-    setExtraTaggedSkills((prev) => [...new Set([...prev, ...picks])]);
-    setSkills((prev) =>
-      prev.map((s) => (picks.includes(s.name) && s.value < 2 ? { ...s, value: 2 } : s))
-    );
-    setGoodSoulPicks([]);
-    setGoodSoulPickerVisible(false);
+    setExtraTaggedSkills((prev) => {
+      const fromGroup = trait?.modifiers?.skillPickChoice?.from || [];
+      const filtered = prev.filter((s) => !fromGroup.includes(s));
+      return [...new Set([...filtered, ...picks])];
+    });
+
+    setSkillPickerVisible(false);
   };
 
   // Обработчик нажатия на строку черты
@@ -1264,21 +1140,21 @@ export default function CharacterScreen() {
                 </View>
 
                 {(() => {
-                  const goodSoulGroupSkills = GOOD_SOUL_SKILL_KEYS;
-                  const goodSoulSelected = trait?.modifiers?.goodSoulSelectedSkills || [];
-                  const isGoodSoulActive = Array.isArray(goodSoulSelected) && goodSoulSelected.length > 0;
+                  const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
+                  const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
+                  const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
                   return skills.map((skill, index) => {
                     const isTagged =
                       selectedSkills.includes(skill.name) ||
                       extraTaggedSkills.includes(skill.name);
                     const isForced =
                       forcedSelectedSkills.includes(skill.name) && isTagged;
-                    const isGoodSoulCapped =
-                      isGoodSoulActive &&
-                      goodSoulGroupSkills.includes(skill.name) &&
-                      !goodSoulSelected.includes(skill.name);
+                    const isSkillPickCapped =
+                      isSkillPickActive &&
+                      skillPickGroup.includes(skill.name) &&
+                      !skillPickSelected.includes(skill.name);
                     const baseMax = level === 1 ? 3 : 6;
-                    const maxValue = isGoodSoulCapped ? Math.min(baseMax, 4) : baseMax;
+                    const maxValue = isSkillPickCapped ? Math.min(baseMax, 4) : baseMax;
                     const isMaxReached = skill.value >= maxValue;
                     const rowStyle =
                       index % 2 === 0 ? styles.evenRow : styles.oddRow;
@@ -1297,7 +1173,7 @@ export default function CharacterScreen() {
                         rowStyle={rowStyle}
                         disabled={!canDistributeSkills}
                         trait={trait}
-                        italic={isGoodSoulCapped}
+                        italic={isSkillPickCapped}
                         increaseDisabled={skillPointsLeft <= 0}
                       />
                     );
@@ -1362,17 +1238,17 @@ export default function CharacterScreen() {
         <Modal
           animationType="fade"
           transparent={true}
-          visible={goodSoulPickerVisible}
-          onRequestClose={() => setGoodSoulPickerVisible(false)}
+          visible={skillPickerVisible}
+          onRequestClose={() => setSkillPickerVisible(false)}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
-              <Text style={styles.modalTitle}>{tCharacterScreen("modals.goodSoul.title", "Good Soul: choose 2 skills")}</Text>
+              <Text style={styles.modalTitle}>{tCharacterScreen("modals.skillPick.title", "Choose skills")}</Text>
               <Text style={{ marginBottom: 8, textAlign: 'center' }}>
-                {tCharacterScreen("modals.goodSoul.description", "Choose two skills from the group. They will be marked as extra.")}
+                {tCharacterScreen("modals.skillPick.description", "Choose skills from the group. They will be marked as extra.")}
               </Text>
-              {goodSoulGroup.map((skill) => {
-                const isPicked = goodSoulPicks.includes(skill);
+              {(trait?.modifiers?.skillPickChoice?.from || []).map((skill) => {
+                const isPicked = skillPicks.includes(skill);
                 return (
                   <TouchableOpacity
                     key={skill}
@@ -1381,7 +1257,7 @@ export default function CharacterScreen() {
                       { backgroundColor: '#2196F3' },
                       isPicked && { backgroundColor: '#1976D2', borderWidth: 2, borderColor: '#fff' },
                     ]}
-                    onPress={() => toggleGoodSoulPick(skill)}
+                    onPress={() => toggleSkillPick(skill)}
                   >
                     <Text style={{ color: '#fff', fontWeight: 'bold' }}>{getSkillDisplayName(skill)}</Text>
                   </TouchableOpacity>
@@ -1391,10 +1267,10 @@ export default function CharacterScreen() {
                 style={[
                   styles.modalButton,
                   styles.confirmButton,
-                  goodSoulPicks.length !== 2 && styles.disabledButton,
+                  skillPicks.length !== (trait?.modifiers?.skillPickChoice?.count || 2) && styles.disabledButton,
                   { marginTop: 10 },
                 ]}
-                disabled={goodSoulPicks.length !== 2}
+                disabled={skillPicks.length !== (trait?.modifiers?.skillPickChoice?.count || 2)}
                 onPress={handleConfirmGoodSoulSkills}
               >
                 <Text style={styles.buttonText}>{tCharacterScreen("buttons.confirm", "Confirm")}</Text>
@@ -1411,6 +1287,7 @@ export default function CharacterScreen() {
             onSelect={handleSelectTrait}
             currentTrait={trait}
             skills={skills}
+            origin={origin}
           />
         )}
       </SafeAreaView>
