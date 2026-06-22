@@ -642,13 +642,8 @@ export const CharacterProvider = ({ children }) => {
     setActiveTimedEffects([]);
     setSceneCounter(0);
     setEquippedWeapons([]);
-    useCharacterStore.setState({
-      attributes: {},
-      skills: {},
-      items: {},
-      effects: {},
-    });
-    useCharacterStore.getState().resetRobot();
+    useCharacterStore.persist?.clearStorage?.();
+    useCharacterStore.getState().resetCharacterStore();
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
     setEquippedArmor({
