@@ -172,6 +172,23 @@ describe('CharacterStore', () => {
     expect(useCharacterStore.getState().effects).toEqual({});
     expect(useCharacterStore.getState().robot.slots).toEqual({});
   });
+
+  test('resetCharacterStore can seed fresh defaults for a new character', () => {
+    useCharacterStore.getState().loadFromLegacyData({
+      attributes: [{ name: 'STR', value: 9 }],
+      skills: [{ name: 'SMALL_GUNS', value: 3 }],
+    });
+
+    useCharacterStore.getState().resetCharacterStore({
+      attributes: [{ name: 'STR', value: 4 }],
+      skills: [{ name: 'SMALL_GUNS', value: 0 }],
+    });
+
+    expect(useCharacterStore.getState().attributes.STR.base).toBe(4);
+    expect(useCharacterStore.getState().skills.SMALL_GUNS.base).toBe(0);
+    expect(useCharacterStore.getState().items).toEqual({});
+    expect(useCharacterStore.getState().effects).toEqual({});
+  });
 });
 
 describe('Persistence', () => {
