@@ -815,6 +815,26 @@ const useCharacterStore = create(devtools(
         set(normalizedState);
         get().recalculateAll();
       },
+
+      /**
+       * Reset all per-character Zustand data before starting a new character.
+       *
+       * The store is a working cache for the currently opened character, while
+       * characters themselves are saved in the app DB. If the persisted cache is
+       * left populated, the next "create character" flow can rehydrate the
+       * previous character's attributes/skills before the Context seeds defaults.
+       */
+      resetCharacterStore: () => {
+        set({
+          attributes: {},
+          skills: {},
+          items: {},
+          effects: {},
+          derivedStats: {},
+          _characterContext: undefined,
+          ...createInitialRobotState(),
+        });
+      },
       
       /**
        * Экспортировать данные в старый формат для сохранения в БД
