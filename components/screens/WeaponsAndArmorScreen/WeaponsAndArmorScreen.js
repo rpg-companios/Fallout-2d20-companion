@@ -32,6 +32,7 @@ import ArmorModificationModal from './modal/ArmorModificationModal';
 import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
+import { debugLog } from '../../../src/debug/falloutDebug';
 
 
 const HealthCounter = ({ max, isEnabled }) => {
@@ -403,6 +404,13 @@ const WeaponsAndArmorScreen = () => {
   const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
     (weapon) => findLocalizedWeapon(equipmentCatalog, weapon),
   );
+  useEffect(() => {
+    debugLog('weapon.display.list', {
+      locale,
+      equippedWeaponsForDisplay: equippedWeaponsForDisplay.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fire_rate: w.fire_rate, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+      localizedEquippedWeapons: localizedEquippedWeapons.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fire_rate: w.fire_rate, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+    });
+  }, [locale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
 
   const weaponFingerprint = (w) => {
     if (!w) return null;
@@ -445,9 +453,12 @@ const WeaponsAndArmorScreen = () => {
   const handleApplyModification = useCallback((modifiedWeapon) => {
     handleCloseModificationModal();
     const itemId = resolveStoreItemId(selectedWeaponForModification);
+    debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
     if (itemId) {
-      updateItem(itemId, weaponModPatchToStore(modifiedWeapon));
+      const patch = weaponModPatchToStore(modifiedWeapon);
+      debugLog('weapon.mod.apply.screen.patch', { itemId, patch });
+      updateItem(itemId, patch);
       return;
     }
 

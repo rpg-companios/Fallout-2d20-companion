@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { debugLog, FALLOUT_DEBUG_MARKER } from '../src/debug/falloutDebug';
 
 const SUPPORTED_LOCALES = ['ru-RU', 'en-EN'];
 const DEFAULT_LOCALE = 'ru-RU';
@@ -44,7 +45,9 @@ export const subscribeToLocale = (listener) => {
 
 export const getCurrentLocale = () => currentLocale;
 export const setCurrentLocale = (nextLocale) => {
+  const previousLocale = currentLocale;
   currentLocale = normalizeLocale(nextLocale);
+  debugLog('locale.setCurrentLocale', { marker: FALLOUT_DEBUG_MARKER, previousLocale, nextLocale, normalizedLocale: currentLocale });
   emitLocaleChange();
   return currentLocale;
 };

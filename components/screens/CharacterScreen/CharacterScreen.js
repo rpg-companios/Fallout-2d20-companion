@@ -45,10 +45,11 @@ import {
   getSkillDisplayName,
   tCharacterScreen,
 } from "./logic/characterScreenI18n";
-import { getCurrentLocale } from "../../../i18n/locale";
+import { useLocale } from "../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
 import { getTimedAttributeModifiers } from "../../../domain/effects";
+import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../src/debug/falloutDebug";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
@@ -289,6 +290,7 @@ export default function CharacterScreen() {
     setEquippedRobotModules,
   } = useCharacter();
 
+  const debugLocale = useLocale();
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
   const storeEffects = useCharacterStore((state) => state.effects);
@@ -311,6 +313,26 @@ export default function CharacterScreen() {
     }
     return contextSkills;
   }, [storeSkills, contextSkills]);
+
+  useEffect(() => {
+    debugLog('character.renderState', {
+      marker: FALLOUT_DEBUG_MARKER,
+      locale: debugLocale,
+      originId: origin?.id,
+      originName: origin?.name,
+      traitId: trait?.id,
+      traitIds: trait?.ids,
+      traitName: trait?.name,
+      equipmentId: equipment?.id,
+      equipmentName: equipment?.name,
+      attributesSaved,
+      skillsSaved,
+      selectedSkills,
+      extraTaggedSkills,
+      storeSkillsCount: Object.keys(storeSkills || {}).length,
+      skillsPreview: skills.slice(0, 8),
+    });
+  }, [debugLocale, origin?.id, origin?.name, trait?.id, trait?.name, equipment?.id, equipment?.name, attributesSaved, skillsSaved, selectedSkills, extraTaggedSkills, storeSkills, skills]);
 
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
@@ -508,6 +530,17 @@ export default function CharacterScreen() {
     const skillIndex = skills.findIndex((s) => s.name === skillName);
     if (skillIndex < 0) return;
     const currentSkill = skills[skillIndex];
+    debugLog('skill.toggle.start', {
+      skillName,
+      before: currentSkill?.value,
+      canDistributeSkills,
+      attributesSaved,
+      skillsSaved,
+      selectedSkills,
+      extraTaggedSkills,
+      forcedSelectedSkills,
+      storeSkill: useCharacterStore.getState().skills?.[skillName],
+    });
 
     const isInMainSkills = selectedSkills.includes(skillName);
     const isInExtraSkills = extraTaggedSkills.includes(skillName);
@@ -578,6 +611,7 @@ export default function CharacterScreen() {
       }
 
       const appliedDelta = nextValue - currentSkill.value;
+      debugLog('skill.toggle.apply', { skillName, before: currentSkill.value, nextValue, appliedDelta, capForThis, skillMax });
       setSkills((prev) =>
         prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
       );
@@ -592,6 +626,7 @@ export default function CharacterScreen() {
 
       const nextValue = Math.max(0, currentSkill.value - 2);
       const appliedDelta = nextValue - currentSkill.value;
+      debugLog('skill.toggle.remove', { skillName, before: currentSkill.value, nextValue, appliedDelta });
       setSkills((prev) =>
         prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
       );
@@ -630,6 +665,7 @@ export default function CharacterScreen() {
     if (nextVal === skill.value) return;
 
     const appliedDelta = nextVal - skill.value;
+    debugLog('skill.changeValue.apply', { skillName: skill.name, before: skill.value, nextVal, requestedDelta: delta, appliedDelta, capForThis });
     setSkills((prev) => {
       const newSkills = [...prev];
       newSkills[index] = { ...skill, value: nextVal };
