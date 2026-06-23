@@ -8,7 +8,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "10-мм",
+    "name": "10mm",
     "find_formula": "8+4fn{CD}",
     "weight": 0.025,
     "price": 2,
@@ -24,7 +24,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Сигнальная ракета",
+    "name": "Flare",
     "find_formula": "2+1fn{CD}",
     "weight": 0.085,
     "price": 1,
@@ -32,7 +32,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Патрон дробовика",
+    "name": "Shotgun Shell",
     "find_formula": "6+3fn{CD}",
     "weight": 0.1,
     "price": 3,
@@ -48,7 +48,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Топливо огнемета",
+    "name": "Flamer Fuel",
     "find_formula": "12+6fn{CD}",
     "weight": 0.015,
     "price": 1,
@@ -56,7 +56,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Ядерная батарея",
+    "name": "Energy Cell",
     "find_formula": "14+7fn{CD}",
     "weight": 0.03,
     "price": 3,
@@ -64,7 +64,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Патрон гамма-пушки",
+    "name": "Gamma Round",
     "find_formula": "4+2fn{CD}",
     "weight": 0.025,
     "price": 10,
@@ -72,7 +72,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Ж/Д гвоздь",
+    "name": "Railway Spike",
     "find_formula": "6+3fn{CD}",
     "weight": 0.2,
     "price": 1,
@@ -80,7 +80,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Шприц",
+    "name": "Syringe",
     "find_formula": "4+2fn{CD}",
     "weight": 0.1,
     "price": "1",
@@ -88,7 +88,7 @@
     "itemType": "ammo"
   },
   {
-    "name": ".44 Магнум",
+    "name": ".44 Magnum",
     "find_formula": "4+2fn{CD}",
     "weight": 0.055,
     "price": 3,
@@ -104,7 +104,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "5.56-мм",
+    "name": "5.56mm",
     "find_formula": "8+4fn{CD}",
     "weight": 0.035,
     "price": 2,
@@ -112,7 +112,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "5-мм",
+    "name": "5mm",
     "find_formula": "10x(12+6fn{CD})",
     "weight": 0.01,
     "price": 1,
@@ -120,7 +120,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Ядерный блок",
+    "name": "Fusion Core",
     "find_formula": "1",
     "weight": 4,
     "price": 200,
@@ -128,7 +128,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Ракета",
+    "name": "Missile",
     "find_formula": "2+1fn{CD}",
     "weight": 7,
     "price": 25,
@@ -136,7 +136,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "Заряд плазмы",
+    "name": "Plasma Cartridge",
     "find_formula": "10+5fn{CD}",
     "weight": 0.03,
     "price": 5,
@@ -144,7 +144,7 @@
     "itemType": "ammo"
   },
   {
-    "name": "2-мм ЭК",
+    "name": "2mm EC",
     "find_formula": "6+3fn{CD}",
     "weight": 0.13,
     "price": 10,
@@ -152,11 +152,11 @@
     "itemType": "ammo"
   },
   {
-    "name": "Ядерный минизаряд",
+    "name": "Mini Nuke",
     "find_formula": "1+1fn{CD}",
     "weight": 12,
     "price": 100,
     "rarity": 6,
     "itemType": "ammo"
   }
-] 
+]

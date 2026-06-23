@@ -75,8 +75,17 @@ const buildWeaponModRow = (m) => {
     materials: safeStr(m.materials),
     cost: safeNum(m.cost),
     effects: safeStr(m.effects),
+    effectsLegacy: safeStr(m.effectsLegacy),
     effect_description: safeStr(m.effectDescription),
+    effectDescription: safeStr(m.effectDescription),
     weight: safeStr(m.weight),
+    damageModifier: m.damageModifier || null,
+    fireRateModifier: m.fireRateModifier || null,
+    rangeModifier: m.rangeModifier || null,
+    qualityChanges: Array.isArray(m.qualityChanges) ? m.qualityChanges : null,
+    damageType: safeStr(m.damageType),
+    ammoOverride: safeStr(m.ammoOverride),
+    ammoPerShotDelta: m.ammoPerShotDelta ?? null,
     applies_to_ids: appliesToIds.length ? JSON.stringify(appliesToIds) : null,
   };
 };

@@ -506,101 +506,83 @@ export default function CharacterScreen() {
     }
 
     const skillIndex = skills.findIndex((s) => s.name === skillName);
+    if (skillIndex < 0) return;
     const currentSkill = skills[skillIndex];
 
-    // Check current state
     const isInMainSkills = selectedSkills.includes(skillName);
     const isInExtraSkills = extraTaggedSkills.includes(skillName);
     const isForcedSkill = forcedSelectedSkills.includes(skillName);
     const isCurrentlySelected = isInMainSkills || isInExtraSkills;
 
-    // Cannot deselect forced skills
     if (isForcedSkill && isCurrentlySelected) {
       showError(tCharacterScreen("errors.cannotUnselectForcedSkill", "You cannot unselect a forced skill."));
       return;
     }
 
-    // Skill max value checks
     let skillMax = trait?.modifiers?.skillMaxValue ?? 6;
     if (level === 1) {
       skillMax = Math.min(skillMax, 3);
     }
 
-    // SkillPickChoice handling
     const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
     const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
     const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
-    const isBonusFromPick = isSkillPickActive && skillPickSelected.includes(skillName);
+    const isInSkillPickGroup = skillPickGroup.includes(skillName);
+    const isBonusFromSkillPick = isSkillPickActive && skillPickSelected.includes(skillName);
+    const capForThis = isSkillPickActive && isInSkillPickGroup && !isBonusFromSkillPick ? 4 : undefined;
 
-    // Get trait extra skill info
-    const extraSkillsFromTrait =
-      trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
-    const traitForcedSkills = trait?.forcedSkills || [];
-
-    // Check if this skill can be selected as an extra skill
-    const canSelectAsExtra =
-      extraSkillsFromTrait > 0 &&
-      (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
+    const syncSkillStore = (delta) => {
+      const store = useCharacterStore.getState();
+      if (!store.skills?.[skillName]) {
+        store.loadFromLegacyData({ skills });
+      }
+      useCharacterStore.getState().updateSkill(skillName, delta);
+    };
 
     if (!isCurrentlySelected) {
-      // SELECTING A NEW SKILL
-
-      // Check skill max limit
-      if (currentSkill.value + 2 > skillMax) {
+      const unclampedNextValue = currentSkill.value + 2;
+      if (unclampedNextValue > skillMax) {
         showError(
           tCharacterScreen("errors.skillTagExceedsMaxRank", "Tagging this skill will exceed max rank ({skillMax}). Lower it first.").replace("{skillMax}", String(skillMax)),
         );
         return;
       }
+      const nextValue = Math.min(unclampedNextValue, capForThis ?? skillMax);
 
-      // Handle Good Soul bonus skills (don't count toward main or extra limits)
-      if (isBonusFromPick) {
-        // This is handled by trait modal, should not reach here normally
+      if (isBonusFromSkillPick) {
         return;
       }
 
-      // Forced skills go to extra pool
       if (isForcedSkill) {
         setExtraTaggedSkills((prev) => [...prev, skillName]);
-      }
-      // Try main skills first (max 3)
-      else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
+      } else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
         setSelectedSkills((prev) => [...prev, skillName]);
-      }
-      // Try extra skills if available
-      else if (
-        canSelectAsExtra &&
-        extraTaggedSkills.length < extraSkillsFromTrait
-      ) {
-        setExtraTaggedSkills((prev) => [...prev, skillName]);
-      }
-      // No slots available
-      else {
-        const extraText = canSelectAsExtra
-          ? `\n\n${tCharacterScreen("labels.extraSlotsAvailable", "Extra slots available")}: ${extraSkillsFromTrait - extraTaggedSkills.length}`
-          : "";
-        showError(
-          tCharacterScreen("errors.maxBaseSkills", "You can choose a maximum of {count} base skills.{extraText}").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
-        );
-        return;
+      } else {
+        const extraSkillsFromTrait = trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
+        const traitForcedSkills = trait?.forcedSkills || trait?.modifiers?.forcedSkills || [];
+        const canSelectAsExtra =
+          extraSkillsFromTrait > 0 &&
+          (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
+
+        if (canSelectAsExtra && extraTaggedSkills.length < extraSkillsFromTrait) {
+          setExtraTaggedSkills((prev) => [...prev, skillName]);
+        } else {
+          const extraText = canSelectAsExtra
+            ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable", "Extra slots available") + ": " + (extraSkillsFromTrait - extraTaggedSkills.length)
+            : "";
+          showError(
+            tCharacterScreen("errors.maxBaseSkills", "You can choose a maximum of {count} base skills.{extraText}").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
+          );
+          return;
+        }
       }
 
-      // Apply +2 to skill value
+      const appliedDelta = nextValue - currentSkill.value;
       setSkills((prev) =>
-        prev.map((s, i) => {
-          if (i !== skillIndex) return s;
-          let next = s.value + 2;
-          // Good Soul group cap
-      if (isSkillPickActive && skillPickGroup.includes(s.name) && !skillPickSelected.includes(s.name)) {
-            next = Math.min(next, 4);
-          }
-          return { ...s, value: next };
-        }),
+        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
       );
+      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
     } else {
-      // DESELECTING A SKILL
-
-      // Remove from appropriate pool
       if (isInMainSkills) {
         setSelectedSkills((prev) => prev.filter((s) => s !== skillName));
       }
@@ -608,13 +590,12 @@ export default function CharacterScreen() {
         setExtraTaggedSkills((prev) => prev.filter((s) => s !== skillName));
       }
 
-      // Apply -2 to skill value
+      const nextValue = Math.max(0, currentSkill.value - 2);
+      const appliedDelta = nextValue - currentSkill.value;
       setSkills((prev) =>
-        prev.map((s, i) => {
-          if (i !== skillIndex) return s;
-          return { ...s, value: Math.max(0, s.value - 2) };
-        }),
+        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
       );
+      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
     }
   };
 
@@ -629,36 +610,37 @@ export default function CharacterScreen() {
       return;
     }
 
+    const skill = skills[index];
+    if (!skill) return;
+    const isTagged = selectedSkills.includes(skill.name) || extraTaggedSkills.includes(skill.name);
+
+    const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
+    const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
+    const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+    const isInGroup = skillPickGroup.includes(skill.name);
+    const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
+    const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
+
+    if (!canChangeSkillValue(skill.value, delta, trait, level, isTagged)) return;
+
+    let nextVal = skill.value + delta;
+    if (capForThis !== undefined) {
+      nextVal = Math.min(nextVal, capForThis);
+    }
+    if (nextVal === skill.value) return;
+
+    const appliedDelta = nextVal - skill.value;
     setSkills((prev) => {
       const newSkills = [...prev];
-      const skill = newSkills[index];
-      const isTagged =
-        selectedSkills.includes(skill.name) ||
-        extraTaggedSkills.includes(skill.name);
-
-      // Ограничение от skillPickChoice: навыки из группы capped 4, кроме отмеченных
-      const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
-      const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
-      const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
-      
-      const isInGroup = skillPickGroup.includes(skill.name);
-      const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
-      const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
-
-      if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
-        let nextVal = skill.value + delta;
-        if (capForThis !== undefined) {
-          nextVal = Math.min(nextVal, capForThis);
-        }
-        const store = useCharacterStore.getState();
-        if (!store.skills[skill.name]) {
-          store.loadFromLegacyData({ skills });
-        }
-        store.updateSkill(skill.name, delta);
-        newSkills[index] = { ...skill, value: nextVal };
-      }
+      newSkills[index] = { ...skill, value: nextVal };
       return newSkills;
     });
+
+    const store = useCharacterStore.getState();
+    if (!store.skills?.[skill.name]) {
+      store.loadFromLegacyData({ skills });
+    }
+    useCharacterStore.getState().updateSkill(skill.name, appliedDelta);
   };
 
   const handleChangeAttribute = (index, delta) => {
