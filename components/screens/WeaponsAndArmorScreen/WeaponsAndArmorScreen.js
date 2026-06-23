@@ -238,6 +238,16 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
   };
 
 
+const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
+  const appliedModIds = Object.values(weapon?.appliedMods || {}).filter(Boolean);
+  const prefixes = appliedModIds
+    .map((modId) => (catalog?.weaponMods || []).find((mod) => mod.id === modId)?.prefix)
+    .filter(Boolean);
+
+  const localizedBaseName = base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
+  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : (base?.name || weapon?.name);
+};
+
 const findLocalizedWeapon = (catalog, weapon) => {
   if (!weapon?.id) return weapon;
   const base = (catalog?.weapons || []).find((entry) => entry.id === weapon.id);
@@ -260,8 +270,8 @@ const findLocalizedWeapon = (catalog, weapon) => {
     withoutMods: base.withoutMods ?? weapon.withoutMods,
     // при наличии модов сохраняем все изменённые моды поля вместо catalog-данных
     ...(hasAppliedMods ? {
-      name: weapon.name,
-      baseWeaponName: weapon.baseWeaponName,
+      name: getLocalizedModifiedWeaponName(catalog, weapon, base),
+      baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
       damage: weapon.damage,
       fire_rate: weapon.fire_rate,
       qualities: weapon.qualities,

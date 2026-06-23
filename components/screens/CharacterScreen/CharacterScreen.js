@@ -19,8 +19,8 @@ import { selectActiveTimedEffects } from "../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
-import { loadEnrichedOrigins } from "../../../domain/origins";
-import { loadTraitsData } from "../../../domain/traits";
+import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
+import { loadTraitsData, tTrait } from "../../../domain/traits";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
   createInitialAttributes,
@@ -50,6 +50,7 @@ import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
 import { getTimedAttributeModifiers } from "../../../domain/effects";
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../src/debug/falloutDebug";
+import { getEquipmentCatalog } from "../../../i18n/equipmentCatalog";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
@@ -291,6 +292,7 @@ export default function CharacterScreen() {
   } = useCharacter();
 
   const debugLocale = useLocale();
+  const locale = debugLocale;
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
   const storeEffects = useCharacterStore((state) => state.effects);
@@ -333,6 +335,25 @@ export default function CharacterScreen() {
       skillsPreview: skills.slice(0, 8),
     });
   }, [debugLocale, origin?.id, origin?.name, trait?.id, trait?.name, equipment?.id, equipment?.name, attributesSaved, skillsSaved, selectedSkills, extraTaggedSkills, storeSkills, skills]);
+
+  const localizedOrigin = useMemo(() => {
+    if (!origin?.id) return origin;
+    return loadEnrichedOrigins().find((entry) => entry.id === origin.id) || { ...origin, name: tOrigin(origin.id) };
+  }, [origin, locale]);
+
+  const localizedTraitName = useMemo(() => {
+    if (!trait) return null;
+    const traitId = trait.id || trait.ids?.[0];
+    const traitData = loadTraitsData().find((entry) => entry.id === traitId);
+    return traitData?.displayNameKey ? tTrait(traitData.displayNameKey) : trait.name;
+  }, [trait, locale]);
+
+  const localizedEquipmentName = useMemo(() => {
+    if (!equipment) return null;
+    if (!equipment.id) return equipment.name;
+    const catalog = getEquipmentCatalog(locale);
+    return catalog?.equipmentKits?.[equipment.id]?.name || equipment.name;
+  }, [equipment, locale]);
 
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
@@ -493,6 +514,7 @@ export default function CharacterScreen() {
 
     // 2. Set equipment metadata
     setEquipment({
+      id: kit.id,
       name: kit.name,
       weight: kit.weight,
       price: kit.price,
@@ -823,23 +845,37 @@ export default function CharacterScreen() {
       return [...new Set([...withoutOld, ...newForcedSkills, ...newSelectedExtraSkills])];
     });
 
+    const syncTraitSkillDelta = (skillName, delta) => {
+      if (!delta) return;
+      const store = useCharacterStore.getState();
+      if (!store.skills?.[skillName]) {
+        store.loadFromLegacyData({ skills });
+      }
+      useCharacterStore.getState().updateSkill(skillName, delta);
+    };
+
     setSkills((currentSkills) => {
       let tempSkills = [...currentSkills];
       // Отменяем +2 от старых обязательных навыков
       [...oldForcedSkills, ...oldSelectedExtraSkills].forEach((skillName) => {
         const index = tempSkills.findIndex((s) => s.name === skillName);
         if (index > -1) {
+          const before = tempSkills[index].value;
+          const next = Math.max(0, before - 2);
           tempSkills[index] = {
             ...tempSkills[index],
-            value: Math.max(0, tempSkills[index].value - 2),
+            value: next,
           };
+          syncTraitSkillDelta(skillName, next - before);
         }
       });
       // Применяем +2 к новым об��зательным навыкам (если их значение < 2)
       [...newForcedSkills, ...newSelectedExtraSkills].forEach((skillName) => {
         const index = tempSkills.findIndex((s) => s.name === skillName);
         if (index > -1 && tempSkills[index].value < 2) {
+          const before = tempSkills[index].value;
           tempSkills[index] = { ...tempSkills[index], value: 2 };
+          syncTraitSkillDelta(skillName, 2 - before);
         }
       });
       return tempSkills;
@@ -1114,22 +1150,22 @@ export default function CharacterScreen() {
 
             <PressableRow
               title={tCharacterScreen("labels.origin", "Origin")}
-              value={origin ? origin.name : tCharacterScreen("placeholders.selectNone", "Not selected")}
+              value={localizedOrigin ? localizedOrigin.name : tCharacterScreen("placeholders.selectNone", "Not selected")}
               onPress={() => setIsOriginModalVisible(true)}
               disabled={!isSaved}
             />
             <PressableRow
               title={tCharacterScreen("labels.trait", "Trait")}
-              value={trait ? trait.name : tCharacterScreen("placeholders.selectNone", "Not selected")}
+              value={localizedTraitName || tCharacterScreen("placeholders.selectNone", "Not selected")}
               onPress={handleTraitPress}
               disabled={!isSaved || (trait && !isMultiTraitOrigin(origin?.id))}
             />
             <PressableRow
               title={tCharacterScreen("labels.equipmentKit", "Equipment kit")}
-              value={equipment ? equipment.name : tCharacterScreen("placeholders.selectNone", "Not selected")}
+              value={localizedEquipmentName || tCharacterScreen("placeholders.selectNone", "Not selected")}
               disabled={!isSaved}
               onPress={() => {
-                if (origin && origin.equipmentKits) {
+                if (localizedOrigin && localizedOrigin.equipmentKits) {
                   if (equipment) {
                     // Если снаряжение уже выбрано, показываем предупреждение
                     if (Platform.OS === "web") {
@@ -1358,7 +1394,7 @@ export default function CharacterScreen() {
         <EquipmentKitModal
           visible={isEquipmentKitModalVisible}
           onClose={() => setIsEquipmentKitModalVisible(false)}
-          equipmentKits={origin?.equipmentKits}
+          equipmentKits={localizedOrigin?.equipmentKits || origin?.equipmentKits}
           onSelectKit={handleSelectKit}
           setCaps={setCaps}
           character={{ origin, trait }}
