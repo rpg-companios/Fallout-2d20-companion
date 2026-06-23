@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
