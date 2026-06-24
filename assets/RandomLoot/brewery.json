@@ -1,41 +1,197 @@
 [
-    { "roll": 2, "name": "Пиво" },
-    { "roll": 3, "name": "Виски" },
-    { "roll": 4, "name": "Водка" },
-    { "roll": 5, "name": "Вино" },
-    { "roll": 6, "name": "Самогон" },
-    { "roll": 7, "name": "Абсент" },
-    { "roll": 8, "name": "Атомный коктейль" },
-    { "roll": 9, "name": "Боевой коктейль" },
-    { "roll": 10, "name": "Баффаут" },
-    { "roll": 11, "name": "Кейт" },
-    { "roll": 12, "name": "Дэй Триппер" },
-    { "roll": 13, "name": "Файер Белли" },
-    { "roll": 14, "name": "Фиксер" },
-    { "roll": 15, "name": "Ярость" },
-    { "roll": 16, "name": "Гидра" },
-    { "roll": 17, "name": "Ледяное пиво" },
-    { "roll": 18, "name": "Ликер" },
-    { "roll": 19, "name": "Медовуха" },
-    { "roll": 20, "name": "Психо" },
-    { "roll": 21, "name": "Ракета" },
-    { "roll": 22, "name": "Ром" },
-    { "roll": 23, "name": "Скотч" },
-    { "roll": 24, "name": "Спокойствие" },
-    { "roll": 25, "name": "Стелс-бой" },
-    { "roll": 26, "name": "Стим-пак" },
-    { "roll": 27, "name": "Супер Стим-пак" },
-    { "roll": 28, "name": "Турбо" },
-    { "roll": 29, "name": "Ультра-Джет" },
-    { "roll": 30, "name": "Винт" },
-    { "roll": 31, "name": "Х-клетка" },
-    { "roll": 32, "name": "Яд" },
-    { "roll": 33, "name": "Антидот" },
-    { "roll": 34, "name": "Кровавый пакет" },
-    { "roll": 35, "name": "Иррадиатор" },
-    { "roll": 36, "name": "Очищенная вода" },
-    { "roll": 37, "name": "Рад-Х" },
-    { "roll": 38, "name": "Рад-эвэй" },
-    { "roll": 39, "name": "Койот-стейк" },
-    { "roll": 40, "name": "Огненные муравьиные нектары" }
-] 
+  {
+    "roll": 2,
+    "name": "Пиво",
+    "id": "drink_beer"
+  },
+  {
+    "roll": 3,
+    "name": "Виски",
+    "id": "drink_whiskey"
+  },
+  {
+    "roll": 4,
+    "name": "Водка",
+    "id": "drink_vodka"
+  },
+  {
+    "roll": 5,
+    "name": "Вино",
+    "id": "drink_wine"
+  },
+  {
+    "roll": 6,
+    "name": "Самогон",
+    "id": "drink_moonshine"
+  },
+  {
+    "roll": 7,
+    "name": "Абсент",
+    "id": "loot_brewery_абсент"
+  },
+  {
+    "roll": 8,
+    "name": "Атомный коктейль",
+    "id": "loot_brewery_атомный_коктейль"
+  },
+  {
+    "roll": 9,
+    "name": "Боевой коктейль",
+    "id": "loot_brewery_боевой_коктейль"
+  },
+  {
+    "roll": 10,
+    "name": "Баффаут",
+    "id": "chem_buffout"
+  },
+  {
+    "roll": 11,
+    "name": "Кейт",
+    "id": "chem_jet"
+  },
+  {
+    "roll": 12,
+    "name": "Дэй Триппер",
+    "id": "chem_day_tripper"
+  },
+  {
+    "roll": 13,
+    "name": "Файер Белли",
+    "id": "loot_brewery_файер_белли"
+  },
+  {
+    "roll": 14,
+    "name": "Фиксер",
+    "id": "chem_antibiotics"
+  },
+  {
+    "roll": 15,
+    "name": "Ярость",
+    "id": "chem_fury"
+  },
+  {
+    "roll": 16,
+    "name": "Гидра",
+    "id": "chem_bufftats"
+  },
+  {
+    "roll": 17,
+    "name": "Ледяное пиво",
+    "id": "loot_brewery_ледяное_пиво"
+  },
+  {
+    "roll": 18,
+    "name": "Ликер",
+    "id": "loot_brewery_ликер"
+  },
+  {
+    "roll": 19,
+    "name": "Медовуха",
+    "id": "loot_brewery_медовуха"
+  },
+  {
+    "roll": 20,
+    "name": "Психо",
+    "id": "chem_psycho"
+  },
+  {
+    "roll": 21,
+    "name": "Ракета",
+    "id": "chem_psycho_jet"
+  },
+  {
+    "roll": 22,
+    "name": "Ром",
+    "id": "loot_brewery_ром"
+  },
+  {
+    "roll": 23,
+    "name": "Скотч",
+    "id": "loot_brewery_скотч"
+  },
+  {
+    "roll": 24,
+    "name": "Спокойствие",
+    "id": "chem_calmex"
+  },
+  {
+    "roll": 25,
+    "name": "Стелс-бой",
+    "id": "chem_overdrive"
+  },
+  {
+    "roll": 26,
+    "name": "Стим-пак",
+    "id": "chem_stimpak"
+  },
+  {
+    "roll": 27,
+    "name": "Супер Стим-пак",
+    "id": "chem_super_stimpak"
+  },
+  {
+    "roll": 28,
+    "name": "Турбо",
+    "id": "chem_ultra_jet"
+  },
+  {
+    "roll": 29,
+    "name": "Ультра-Джет",
+    "id": "chem_ultra_jet"
+  },
+  {
+    "roll": 30,
+    "name": "Винт",
+    "id": "chem_jet"
+  },
+  {
+    "roll": 31,
+    "name": "Х-клетка",
+    "id": "chem_x_cell"
+  },
+  {
+    "roll": 32,
+    "name": "Яд",
+    "id": "loot_brewery_яд"
+  },
+  {
+    "roll": 33,
+    "name": "Антидот",
+    "id": "chem_addictol"
+  },
+  {
+    "roll": 34,
+    "name": "Кровавый пакет",
+    "id": "chem_blood_pack"
+  },
+  {
+    "roll": 35,
+    "name": "Иррадиатор",
+    "id": "chem_irradiator"
+  },
+  {
+    "roll": 36,
+    "name": "Очищенная вода",
+    "id": "food_purified_water"
+  },
+  {
+    "roll": 37,
+    "name": "Рад-Х",
+    "id": "chem_rad_x"
+  },
+  {
+    "roll": 38,
+    "name": "Рад-эвэй",
+    "id": "chem_radaway"
+  },
+  {
+    "roll": 39,
+    "name": "Койот-стейк",
+    "id": "loot_brewery_койот-стейк"
+  },
+  {
+    "roll": 40,
+    "name": "Огненные муравьиные нектары",
+    "id": "loot_brewery_огненные_муравьиные_нектары"
+  }
+]

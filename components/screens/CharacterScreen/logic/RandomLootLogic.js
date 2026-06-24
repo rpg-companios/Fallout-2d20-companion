@@ -4,7 +4,7 @@ import food from '../../../../assets/RandomLoot/food.json';
 import brewery from '../../../../assets/RandomLoot/brewery.json';
 import chems from '../../../../assets/RandomLoot/chems.json';
 import outcast from '../../../../assets/RandomLoot/outcast.json';
-import { getWeaponByName } from '../../../../db/Database';
+import { getWeaponById } from '../../../../db/Database';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 
 const lootTables = {
@@ -19,7 +19,6 @@ export const supportedLootTags = Object.keys(lootTables);
 
 function parseLootFormula(lootFormula) {
     if (!lootFormula || typeof lootFormula !== 'string') return null;
-    // Формат: [формула]<тег>  — формула может содержать запятые для раздельных бросков
     const regex = /^(.*?)<(\w+)>$/;
     const match = lootFormula.match(regex);
     if (match) {
@@ -32,80 +31,151 @@ function parseLootFormula(lootFormula) {
 }
 
 /**
- * Разрешает один предмет из таблицы лута по результату броска.
+ * Builds an id→item lookup index from the equipment catalog.
+ * All catalog items are indexed by their `id` field.
+ */
+function buildCatalogIndex() {
+    const catalog = getEquipmentCatalog();
+    const index = new Map();
+
+    const addAll = (items, itemType) => {
+        if (!items) return;
+        const list = Array.isArray(items) ? items : [];
+        for (const item of list) {
+            if (item.id) index.set(item.id, { ...item, itemType: item.itemType || itemType });
+        }
+    };
+
+    // Flat lists
+    addAll(catalog.chems, 'chem');
+    addAll(catalog.drinks, 'drinks');
+    addAll(catalog.food, 'food');
+    addAll(catalog.weapons, 'weapon');
+    addAll(catalog.generalGoods, 'misc');
+    addAll(catalog.oddities, 'misc');
+
+    // Armor — flatMap from groups
+    const armorItems = (catalog.armor?.armor || []).flatMap(g => g.items || []);
+    addAll(armorItems, 'armor');
+
+    // Clothes — flatMap from groups
+    const clothesItems = (catalog.clothes?.clothes || []).flatMap(g => g.items || []);
+    addAll(clothesItems, 'clothing');
+
+    // Miscellaneous — flatMap from groups
+    const miscData = catalog.miscellaneous;
+    if (miscData?.miscellaneous) {
+        const miscItems = miscData.miscellaneous.flatMap(g => g.items || []);
+        addAll(miscItems, 'misc');
+    }
+
+    return index;
+}
+
+/**
+ * Resolves a single item from a loot table by roll result.
+ * Uses `id` as the primary lookup key into the equipment catalog.
+ * Falls back to name-based search if the id is not found in the catalog
+ * (e.g., for synthetic loot_* ids).
  */
 async function resolveItemFromTable(rollResult, tag, lootTable) {
+    const catalogIndex = buildCatalogIndex();
     const equipmentCatalog = getEquipmentCatalog();
-    const fullChemsData = equipmentCatalog.chems;
-    const armorData = equipmentCatalog.armor;
-    const clothesData = equipmentCatalog.clothes;
-    const miscData = equipmentCatalog.miscellaneous;
 
     const foundItem = lootTable.find(loot => loot.roll === rollResult);
     if (!foundItem) {
-        return { Название: `[Не найдено] ${tag}`, quantity: 1 };
+        return { name: `[Not found] ${tag}`, quantity: 1, id: `loot_miss_${tag}_${rollResult}` };
     }
 
     const { roll, name, ref, ...otherProps } = foundItem;
 
-    // Жёсткие ссылки на конкретные источники
-    if (ref && ref.source && ref.name) {
-        const source = ref.source;
-        const refName = ref.name;
+    // ── Handle ref (hard reference to another catalog item) ──
+    if (ref && ref.source && ref.id) {
         try {
-            if (source === 'chems') {
-                const chem = fullChemsData.find(x => (x.Название === refName || x.name === refName));
-                if (chem) return { ...chem, name: refName, Название: refName, quantity: 1, itemType: 'chem' };
-            } else if (['light_weapons', 'heavy_weapons', 'energy_weapons', 'melee_weapons'].includes(source)) {
-                const weapon = await getWeaponByName(refName);
+            if (ref.source === 'chems') {
+                const catalogItem = catalogIndex.get(ref.id);
+                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: 'chem' };
+            } else if (['light_weapons', 'heavy_weapons', 'energy_weapons', 'melee_weapons'].includes(ref.source)) {
+                const weapon = await getWeaponById(ref.id);
                 if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
-            } else if (source === 'armor') {
-                const allArmorItems = armorData.armor.flatMap(a => a.items);
-                const ar = allArmorItems.find(x => (x.Название === refName || x.name === refName));
-                if (ar) return { ...ar, name: ar.name || ar.Название, Название: ar.Название || ar.name, quantity: 1, itemType: 'armor' };
-            } else if (source === 'clothes') {
-                const allClothesItems = clothesData.clothes.flatMap(c => c.items);
-                const cl = allClothesItems.find(x => (x.Название === refName || x.name === refName));
-                if (cl) return { ...cl, name: cl.name || cl.Название, Название: cl.Название || cl.name, quantity: 1, itemType: 'clothes' };
-            } else if (source === 'misc') {
-                const allMiscItems = miscData.miscellaneous.flatMap(category => category.items);
-                const mi = allMiscItems.find(x => (x.Название === refName || x.name === refName));
-                if (mi) return { ...mi, name: mi.name || mi.Название, Название: mi.Название || mi.name, quantity: 1, itemType: mi.itemType || 'misc' };
+            } else if (ref.source === 'armor') {
+                const catalogItem = catalogIndex.get(ref.id);
+                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: 'armor' };
+            } else if (ref.source === 'clothes') {
+                const catalogItem = catalogIndex.get(ref.id);
+                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: 'clothing' };
+            } else if (ref.source === 'misc') {
+                const catalogItem = catalogIndex.get(ref.id);
+                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: catalogItem.itemType || 'misc' };
             }
         } catch (e) {
+            // fall through to id-based lookup
         }
     }
 
-    if (tag === 'chem') {
-        const fullChemData = fullChemsData.find(chem => chem.Название === name || chem.name === name);
-        if (fullChemData) return { ...fullChemData, name, Название: name, quantity: 1, itemType: 'chem' };
+    // ── Primary: id-based lookup ──
+    const itemId = foundItem.id;
+    if (itemId) {
+        const catalogItem = catalogIndex.get(itemId);
+        if (catalogItem) {
+            return { ...catalogItem, quantity: 1, itemType: catalogItem.itemType || (tag === 'chem' ? 'chem' : 'loot') };
+        }
+
+        // For weapon ids, try DB
+        if (itemId.startsWith('weapon_')) {
+            try {
+                const weapon = await getWeaponById(itemId);
+                if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
+            } catch (e) {}
+        }
     }
 
+    // ── Fallback: name-based search (only for items not in main catalog) ──
+    // This handles loot-only items (trinkets, some foods) that have synthetic ids
     if (tag === 'outcast') {
-        const fullChemData2 = fullChemsData.find(chem => chem.Название === name || chem.name === name);
-        if (fullChemData2) return { ...fullChemData2, name, Название: name, quantity: 1, itemType: 'chem' };
-        const weapon = await getWeaponByName(name);
-        if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
-        const allArmorItems = armorData.armor.flatMap(a => a.items);
-        const armor = allArmorItems.find(i => i.Название === name || i.name === name);
-        if (armor) return { ...armor, name: armor.name || armor.Название, Название: armor.Название || armor.name, quantity: 1, itemType: 'armor' };
-        const allClothesItems = clothesData.clothes.flatMap(c => c.items);
-        const clothes = allClothesItems.find(i => i.Название === name || i.name === name);
-        if (clothes) return { ...clothes, name: clothes.name || clothes.Название, Название: clothes.Название || clothes.name, quantity: 1, itemType: 'clothes' };
-        const allMiscItems = miscData.miscellaneous.flatMap(category => category.items);
-        const misc = allMiscItems.find(i => i.Название === name || i.name === name);
-        if (misc) return { ...misc, name: misc.name || misc.Название, Название: misc.Название || misc.name, quantity: 1, itemType: misc.itemType || 'misc' };
+        // Try chems by name
+        const chemList = equipmentCatalog.chems || [];
+        const chemMatch = chemList.find(c => c.name === name);
+        if (chemMatch) return { ...chemMatch, name, quantity: 1, itemType: 'chem' };
+
+        // Try weapons by name via DB
+        try {
+            const { getWeaponByName } = await import('../../../../db/Database');
+            const weapon = await getWeaponByName(name);
+            if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
+        } catch (e) {}
+
+        // Try armor by name
+        const armorItems = (equipmentCatalog.armor?.armor || []).flatMap(g => g.items || []);
+        const armorMatch = armorItems.find(i => i.name === name);
+        if (armorMatch) return { ...armorMatch, name: armorMatch.name, quantity: 1, itemType: 'armor' };
+
+        // Try clothes by name
+        const clothesItems = (equipmentCatalog.clothes?.clothes || []).flatMap(g => g.items || []);
+        const clothesMatch = clothesItems.find(i => i.name === name);
+        if (clothesMatch) return { ...clothesMatch, name: clothesMatch.name, quantity: 1, itemType: 'clothing' };
+
+        // Try misc by name
+        const miscData = equipmentCatalog.miscellaneous;
+        const miscItems = miscData?.miscellaneous ? miscData.miscellaneous.flatMap(g => g.items || []) : [];
+        const miscMatch = miscItems.find(i => i.name === name);
+        if (miscMatch) return { ...miscMatch, name: miscMatch.name, quantity: 1, itemType: miscMatch.itemType || 'misc' };
     }
 
-    return { ...otherProps, name, Название: name, quantity: 1, itemType: tag === 'chem' ? 'chem' : 'loot' };
+    // ── Last resort: return the loot table entry as-is with its id ──
+    return {
+        ...otherProps,
+        id: itemId,
+        name,
+        quantity: 1,
+        itemType: tag === 'chem' ? 'chem' : 'loot',
+    };
 }
 
 /**
  * Разрешает формулу лута.
  * - Одиночный бросок: "d20<food>" → один предмет (или null)
  * - Раздельные броски: "d20,d20<food>" → массив предметов
- *
- * Возвращает один объект предмета, или массив если бросков несколько.
  */
 export async function resolveRandomLoot(lootFormula) {
     const parsed = parseLootFormula(lootFormula);
@@ -115,18 +185,15 @@ export async function resolveRandomLoot(lootFormula) {
     const lootTable = lootTables[tag];
     if (!lootTable) return null;
 
-    // Раздельные броски: "d20,d20"
     if (quantityFormula.includes(',')) {
         const rolls = evaluateFormulaMulti(quantityFormula);
         const items = await Promise.all(rolls.map(r => resolveItemFromTable(r, tag, lootTable)));
         return items;
     }
 
-    // Одиночный бросок
     const rollResult = evaluateFormula(quantityFormula);
     return resolveItemFromTable(rollResult, tag, lootTable);
 }
-
 
 export async function resolveRandomLootByRoll(tag, count = 1) {
     const normalizedTag = String(tag || '').toLowerCase();

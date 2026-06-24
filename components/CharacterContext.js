@@ -440,7 +440,7 @@ export const CharacterProvider = ({ children }) => {
 
   const getItemId = (item) => {
     if (item.uniqueId) return item.uniqueId;
-    return item.weaponId || item.code || item.Name || item.Название;
+    return item.weaponId || item.code || item.id || item.Name;
   };
 
   const getModifiedItem = (item) => {

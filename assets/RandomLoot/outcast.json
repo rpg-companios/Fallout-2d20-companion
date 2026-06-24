@@ -1,23 +1,144 @@
 [
-  { "roll": 1,  "name": "Элитный набор инструментов" },
-  { "roll": 2,  "name": "Фонарик" },
-  { "roll": 3,  "name": "Копия журнала \"Чиним вещи\"" },
-  { "roll": 4,  "name": "Антибиотики" },
-  { "roll": 5,  "name": "Крышкомина" },
-  { "roll": 6,  "name": "Радио" },
-  { "roll": 7,  "name": "Боевой Нагрудник", "ref": { "source": "armor", "name": "Боевой Нагрудник" } },
-  { "roll": 8,  "name": "Карта с тайником выживальщиков старого мира" },
-  { "roll": 9,  "name": "Стим-пак", "ref": { "source": "chems", "name": "Стим-пак" } },
-  { "roll": 10, "name": "Боевой Наруч",    "ref": { "source": "armor", "name": "Боевой Наруч" } },
-  { "roll": 11, "name": "Боевой Понож",    "ref": { "source": "armor", "name": "Боевой Понож" } },
-  { "roll": 12, "name": "Массив сенсоров" },
-  { "roll": 13, "name": "Рюкзак маленький" },
-  { "roll": 14, "name": "Меч",              "ref": { "source": "melee_weapons", "name": "Меч" } },
-  { "roll": 15, "name": "Лазерный Мушкет",  "ref": { "source": "energy_weapons", "name": "Лазерный Мушкет" } },
-  { "roll": 16, "name": "Антирадин",        "ref": { "source": "chems", "name": "Рад-эвэй" } },
-  { "roll": 17, "name": "Боевой дробовик",  "ref": { "source": "light_weapons", "name": "Боевой дробовик" } },
-  { "roll": 18, "name": "Силовой кулак" },
-  { "roll": 19, "name": "Прочный Боевой Шлем", "ref": { "source": "armor", "name": "Прочный Боевой Шлем" } },
-  { "roll": 20, "name": "Пип-Бой" }
+  {
+    "roll": 1,
+    "name": "Элитный набор инструментов",
+    "id": "item_deluxe_toolkit"
+  },
+  {
+    "roll": 2,
+    "name": "Фонарик",
+    "id": "item_flashlight"
+  },
+  {
+    "roll": 3,
+    "name": "Копия журнала \"Чиним вещи\"",
+    "id": "item_us_special_ops_manual"
+  },
+  {
+    "roll": 4,
+    "name": "Антибиотики",
+    "id": "chem_antibiotics"
+  },
+  {
+    "roll": 5,
+    "name": "Крышкомина",
+    "id": "item_bobby_pin"
+  },
+  {
+    "roll": 6,
+    "name": "Радио",
+    "id": "item_radio"
+  },
+  {
+    "roll": 7,
+    "name": "Боевой Нагрудник",
+    "ref": {
+      "source": "armor",
+      "name": "Боевой Нагрудник",
+      "id": "armor_combat_chest_001"
+    },
+    "id": "armor_combat_chest_001"
+  },
+  {
+    "roll": 8,
+    "name": "Карта с тайником выживальщиков старого мира",
+    "id": "loot_outcast_карта_с_тайником_выживальщиков_старого_м"
+  },
+  {
+    "roll": 9,
+    "name": "Стим-пак",
+    "ref": {
+      "source": "chems",
+      "name": "Стим-пак",
+      "id": "chem_stimpak"
+    },
+    "id": "chem_stimpak"
+  },
+  {
+    "roll": 10,
+    "name": "Боевой Наруч",
+    "ref": {
+      "source": "armor",
+      "name": "Боевой Наруч",
+      "id": "armor_combat_hand_001"
+    },
+    "id": "armor_combat_hand_001"
+  },
+  {
+    "roll": 11,
+    "name": "Боевой Понож",
+    "ref": {
+      "source": "armor",
+      "name": "Боевой Понож",
+      "id": "armor_combat_leg_001"
+    },
+    "id": "armor_combat_leg_001"
+  },
+  {
+    "roll": 12,
+    "name": "Массив сенсоров",
+    "id": "item_geiger_counter"
+  },
+  {
+    "roll": 13,
+    "name": "Рюкзак маленький",
+    "id": "item_backpack_small"
+  },
+  {
+    "roll": 14,
+    "name": "Меч",
+    "ref": {
+      "source": "melee_weapons",
+      "id": "weapon_sword"
+    },
+    "id": "weapon_chinese_sword"
+  },
+  {
+    "roll": 15,
+    "name": "Лазерный Мушкет",
+    "ref": {
+      "source": "energy_weapons",
+      "id": "weapon_laser_musket"
+    },
+    "id": "weapon_laser_musket"
+  },
+  {
+    "roll": 16,
+    "name": "Антирадин",
+    "ref": {
+      "source": "chems",
+      "name": "Рад-эвэй",
+      "id": "chem_radaway"
+    },
+    "id": "chem_radaway"
+  },
+  {
+    "roll": 17,
+    "name": "Боевой дробовик",
+    "ref": {
+      "source": "light_weapons",
+      "id": "weapon_combat_shotgun"
+    },
+    "id": "weapon_combat_shotgun"
+  },
+  {
+    "roll": 18,
+    "name": "Силовой кулак",
+    "id": "weapon_power_fist"
+  },
+  {
+    "roll": 19,
+    "name": "Прочный Боевой Шлем",
+    "ref": {
+      "source": "armor",
+      "name": "Прочный Боевой Шлем",
+      "id": "armor_combat_head_001"
+    },
+    "id": "armor_combat_head_001"
+  },
+  {
+    "roll": 20,
+    "name": "Пип-Бой",
+    "id": "item_pip_boy"
+  }
 ]
-

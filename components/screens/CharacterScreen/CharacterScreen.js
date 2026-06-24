@@ -502,7 +502,8 @@ export default function CharacterScreen() {
         // a missing id field).
         console.log('[handleSelectKit] candidate item:', item?.name, 'itemType:', item?.itemType,
           'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
-        if (item?.itemType === 'currency' || item?.type === 'currency') return;
+        const CURRENCY_TYPES = new Set(['currency']);
+        if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
         useCharacterStore.getState().addNewItem({
           ...item,
           equipped: isRobot ? true : false,

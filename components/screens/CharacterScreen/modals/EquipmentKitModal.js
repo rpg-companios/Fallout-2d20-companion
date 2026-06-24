@@ -17,8 +17,6 @@ const loadRobotCatalog = () => ({
 });
 
 // Meta-categories shown in the kit modal.
-// All robot limbs/plating collapse into a single "Стандартная конструкция" group;
-// weapons and modules are their own buckets; everything else goes to "Разное".
 const META_CATEGORY_LABELS = {
   structure: tCharacterScreen('modals.equipmentKit.categories.structure', 'Standard Structure'),
   weapon: tCharacterScreen('modals.equipmentKit.categories.weapon', 'Weapons'),
@@ -28,7 +26,7 @@ const META_CATEGORY_LABELS = {
 
 const META_CATEGORY_ORDER = ['structure', 'weapon', 'module', 'misc'];
 
-// Sub-order inside the "Стандартная конструкция" group: голова → корпус → рука → ноги → обшивка
+// Sub-order inside the "Standard Structure" group: head → body → arm → legs → plating
 const STRUCTURE_SUBORDER = {
   robotHead: 0,
   robotBody: 1,
@@ -41,6 +39,9 @@ const STRUCTURE_SUBORDER = {
 };
 
 const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
+
+// Currency itemTypes that are NOT inventory items — tracked via caps counter
+const CURRENCY_TYPES = new Set(['currency']);
 
 const getMetaCategory = (item) => {
   const type = item?.itemType || (item?.weaponId ? 'weapon' : 'misc');
@@ -65,12 +66,12 @@ const getOptionKey = (option, optionIndex) => {
 const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
   if (!entry) return [];
   
-  // Recursively handle nested arrays (e.g., from 'group' items inside 'choice' resolving)
+  // Recursively handle nested arrays
   if (Array.isArray(entry)) {
     return entry.flatMap((e, i) => entryToList(e, selectedChoices, kitId, `${itemIndex}-${i}`));
   }
 
-  // 'choice' — player picks ONE of N options (currently UI default = first).
+  // 'choice' — player picks ONE of N options
   if (entry.type === 'choice') {
     const key = toChoiceKey(kitId, itemIndex);
     const options = Array.isArray(entry.items) ? entry.items : [];
@@ -82,10 +83,7 @@ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
     return [selectedOption];
   }
 
-  // 'pick' — player picks Y of N options. UI for the selection is not built
-  // yet, so for now we collapse it to the first `pickCount` options (or all of
-  // them when pickCount is missing). This keeps existing data flowing through
-  // the resolver; replace with a real picker UI in a follow-up task.
+  // 'pick' — player picks Y of N options
   if (entry.type === 'pick') {
     const options = Array.isArray(entry.items) ? entry.items : [];
     const count = Number.isFinite(entry.pickCount) && entry.pickCount > 0
@@ -94,12 +92,9 @@ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
     return options.slice(0, count);
   }
 
-  // 'rollTable' — kitResolver already rolled it into a real item (or several).
-  // It returns the primary item as `entry` itself and any additional rolls in
-  // `entry._extraItems`. Flatten them all into the kit's item list.
+  // 'rollTable' — kitResolver already rolled it into real items
   if (entry.type === 'rollTable') {
     const extras = Array.isArray(entry._extraItems) ? entry._extraItems : [];
-    // Strip the marker fields so downstream code treats this as a normal item.
     const { type: _t, _extraItems, roll, tableId, ...primary } = entry;
     return [primary, ...extras];
   }
@@ -128,7 +123,6 @@ const toInventoryItems = (entries) => {
         ...weapon,
         id: weapon.id || item.weaponId,
         name: item.displayName || item.name || weapon.name,
-        Название: item.displayName || item.Название || item.name || weapon.name,
         weaponId: weapon.id || item.weaponId,
         appliedMods,
         quantity: item.quantity || 1,
@@ -144,8 +138,7 @@ const toInventoryItems = (entries) => {
 
     raw.push({
       ...item,
-      name: item.name || item.Название || item.itemId,
-      Название: item.Название || item.name || item.itemId,
+      name: item.name || item.itemId,
       quantity: item.quantity || 1,
     });
   });
@@ -154,35 +147,36 @@ const toInventoryItems = (entries) => {
 };
 
 const summarizeItems = (items) => {
+  // Collect all currency-type items into totalCaps, remove them from inventory
   const totalCaps = items.reduce((acc, item) => {
-    if (item.itemType === 'currency' || item.itemType === 'currency_ncr' || item.name === 'Крышки') {
+    if (CURRENCY_TYPES.has(item.itemType)) {
       return acc + (item.quantity || 0);
     }
     return acc;
   }, 0);
 
-  const finalItems = items.filter((item) => item.itemType !== 'currency');
+  // Filter out ALL currency types from inventory items
+  const finalItems = items.filter((item) => !CURRENCY_TYPES.has(item.itemType));
 
   const weight = finalItems.reduce((acc, item) => {
-    const itemWeight = parseFloat(String(item.Вес ?? item.weight ?? '0').replace(',', '.')) || 0;
+    const itemWeight = parseFloat(String(item.weight ?? '0').replace(',', '.')) || 0;
     return acc + (itemWeight * (item.quantity || 1));
   }, 0);
 
   const price = finalItems.reduce((acc, item) => {
-    const itemPrice = item.Цена ?? item.price ?? 0;
+    const itemPrice = item.cost ?? item.price ?? 0;
     return acc + (itemPrice * (item.quantity || 1));
   }, 0);
 
   return { finalItems, totalCaps, weight, price };
 };
 
-const getDisplayName = (item) => item.displayName || item.Название || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem', 'Unknown item');
-
+const getDisplayName = (item) => item.displayName || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem', 'Unknown item');
 
 const formatQuantitySuffix = (item) => {
   const qty = Number(item?.quantity || 0);
   if (!qty || qty <= 1) return '';
-  if (item?.itemType === 'currency') return ` (${qty} ${tCharacterScreen('labels.capsShort', 'caps')})`;
+  if (CURRENCY_TYPES.has(item?.itemType)) return ` (${qty} ${tCharacterScreen('labels.capsShort', 'caps')})`;
   return ` (${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')})`;
 };
 
@@ -192,9 +186,6 @@ const formatAmmoSuffix = (ammo) => {
   const qtyText = qty > 0 ? `${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')}` : `0 ${tCharacterScreen('labels.pcsShort', 'pcs.')}`;
   return ` (${qtyText} ${ammo.name})`;
 };
-
-// For robotArm entries with a builtinWeaponId, returns " + <weapon name>" so the
-// modal makes it visible that the arm carries a built-in weapon (e.g. manipulator).
 
 const resolveRobotBodyPlan = (character) => (
   getBodyPlan(character) || 'protectron'
@@ -231,8 +222,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
             try {
               return await resolveKitItems(kit);
             } catch (error) {
-              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error, 'stack:', error?.stack);
-              console.warn('Не удалось разрешить комплект снаряжения, используется исходный набор:', kit?.id, error);
+              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error);
               return kit;
             }
           }),
@@ -283,14 +273,10 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         robotCatalog,
       );
 
-      // Non-limb/armor items go to equipment inventory
-      // Exclude robot-specific weapons that replace limbs (they live in slots, not inventory)
       const allInventoryItems = [...finalItems.filter(
         (item) => {
           if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'plating', 'armor', 'frame', 'module'].includes(item.itemType)) return false;
-          // Weapons that replace arm slots are part of the robot body, not inventory
           if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
-          // robot_weapon_* is built-in to robot limbs — never goes to inventory
           if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
           return true;
         }
@@ -302,13 +288,11 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         weight,
         price,
         caps: totalCaps,
-        // Robot-specific fields
         robotSlots: slots,
         robotWeapons: weapons,
         robotModules: modules,
       });
     } else {
-      // Human: ensure unarmed_human is included in weapons
       const UNARMED_ID = 'unarmed_human';
       onSelectKit({
         name: kit.name,
@@ -334,7 +318,6 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
       groups[meta].push({ ...entry, _entryIndex: index, _sortKey: getStructureSortKey(probe) });
     });
 
-    // Within "Стандартная конструкция" sort by sub-order: head → body → arm → legs → plating
     if (groups.structure) {
       groups.structure.sort((a, b) => (a._sortKey ?? 99) - (b._sortKey ?? 99));
     }

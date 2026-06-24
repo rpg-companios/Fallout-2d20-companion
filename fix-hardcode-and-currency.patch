@@ -1,0 +1,1601 @@
+diff --git a/assets/RandomLoot/brewery.json b/assets/RandomLoot/brewery.json
+index 43a7387..cfc5913 100644
+--- a/assets/RandomLoot/brewery.json
++++ b/assets/RandomLoot/brewery.json
+@@ -1,41 +1,197 @@
+ [
+-    { "roll": 2, "name": "Пиво" },
+-    { "roll": 3, "name": "Виски" },
+-    { "roll": 4, "name": "Водка" },
+-    { "roll": 5, "name": "Вино" },
+-    { "roll": 6, "name": "Самогон" },
+-    { "roll": 7, "name": "Абсент" },
+-    { "roll": 8, "name": "Атомный коктейль" },
+-    { "roll": 9, "name": "Боевой коктейль" },
+-    { "roll": 10, "name": "Баффаут" },
+-    { "roll": 11, "name": "Кейт" },
+-    { "roll": 12, "name": "Дэй Триппер" },
+-    { "roll": 13, "name": "Файер Белли" },
+-    { "roll": 14, "name": "Фиксер" },
+-    { "roll": 15, "name": "Ярость" },
+-    { "roll": 16, "name": "Гидра" },
+-    { "roll": 17, "name": "Ледяное пиво" },
+-    { "roll": 18, "name": "Ликер" },
+-    { "roll": 19, "name": "Медовуха" },
+-    { "roll": 20, "name": "Психо" },
+-    { "roll": 21, "name": "Ракета" },
+-    { "roll": 22, "name": "Ром" },
+-    { "roll": 23, "name": "Скотч" },
+-    { "roll": 24, "name": "Спокойствие" },
+-    { "roll": 25, "name": "Стелс-бой" },
+-    { "roll": 26, "name": "Стим-пак" },
+-    { "roll": 27, "name": "Супер Стим-пак" },
+-    { "roll": 28, "name": "Турбо" },
+-    { "roll": 29, "name": "Ультра-Джет" },
+-    { "roll": 30, "name": "Винт" },
+-    { "roll": 31, "name": "Х-клетка" },
+-    { "roll": 32, "name": "Яд" },
+-    { "roll": 33, "name": "Антидот" },
+-    { "roll": 34, "name": "Кровавый пакет" },
+-    { "roll": 35, "name": "Иррадиатор" },
+-    { "roll": 36, "name": "Очищенная вода" },
+-    { "roll": 37, "name": "Рад-Х" },
+-    { "roll": 38, "name": "Рад-эвэй" },
+-    { "roll": 39, "name": "Койот-стейк" },
+-    { "roll": 40, "name": "Огненные муравьиные нектары" }
+-] 
+\ No newline at end of file
++  {
++    "roll": 2,
++    "name": "Пиво",
++    "id": "drink_beer"
++  },
++  {
++    "roll": 3,
++    "name": "Виски",
++    "id": "drink_whiskey"
++  },
++  {
++    "roll": 4,
++    "name": "Водка",
++    "id": "drink_vodka"
++  },
++  {
++    "roll": 5,
++    "name": "Вино",
++    "id": "drink_wine"
++  },
++  {
++    "roll": 6,
++    "name": "Самогон",
++    "id": "drink_moonshine"
++  },
++  {
++    "roll": 7,
++    "name": "Абсент",
++    "id": "loot_brewery_абсент"
++  },
++  {
++    "roll": 8,
++    "name": "Атомный коктейль",
++    "id": "loot_brewery_атомный_коктейль"
++  },
++  {
++    "roll": 9,
++    "name": "Боевой коктейль",
++    "id": "loot_brewery_боевой_коктейль"
++  },
++  {
++    "roll": 10,
++    "name": "Баффаут",
++    "id": "chem_buffout"
++  },
++  {
++    "roll": 11,
++    "name": "Кейт",
++    "id": "chem_jet"
++  },
++  {
++    "roll": 12,
++    "name": "Дэй Триппер",
++    "id": "chem_day_tripper"
++  },
++  {
++    "roll": 13,
++    "name": "Файер Белли",
++    "id": "loot_brewery_файер_белли"
++  },
++  {
++    "roll": 14,
++    "name": "Фиксер",
++    "id": "chem_antibiotics"
++  },
++  {
++    "roll": 15,
++    "name": "Ярость",
++    "id": "chem_fury"
++  },
++  {
++    "roll": 16,
++    "name": "Гидра",
++    "id": "chem_bufftats"
++  },
++  {
++    "roll": 17,
++    "name": "Ледяное пиво",
++    "id": "loot_brewery_ледяное_пиво"
++  },
++  {
++    "roll": 18,
++    "name": "Ликер",
++    "id": "loot_brewery_ликер"
++  },
++  {
++    "roll": 19,
++    "name": "Медовуха",
++    "id": "loot_brewery_медовуха"
++  },
++  {
++    "roll": 20,
++    "name": "Психо",
++    "id": "chem_psycho"
++  },
++  {
++    "roll": 21,
++    "name": "Ракета",
++    "id": "chem_psycho_jet"
++  },
++  {
++    "roll": 22,
++    "name": "Ром",
++    "id": "loot_brewery_ром"
++  },
++  {
++    "roll": 23,
++    "name": "Скотч",
++    "id": "loot_brewery_скотч"
++  },
++  {
++    "roll": 24,
++    "name": "Спокойствие",
++    "id": "chem_calmex"
++  },
++  {
++    "roll": 25,
++    "name": "Стелс-бой",
++    "id": "chem_overdrive"
++  },
++  {
++    "roll": 26,
++    "name": "Стим-пак",
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 27,
++    "name": "Супер Стим-пак",
++    "id": "chem_super_stimpak"
++  },
++  {
++    "roll": 28,
++    "name": "Турбо",
++    "id": "chem_ultra_jet"
++  },
++  {
++    "roll": 29,
++    "name": "Ультра-Джет",
++    "id": "chem_ultra_jet"
++  },
++  {
++    "roll": 30,
++    "name": "Винт",
++    "id": "chem_jet"
++  },
++  {
++    "roll": 31,
++    "name": "Х-клетка",
++    "id": "chem_x_cell"
++  },
++  {
++    "roll": 32,
++    "name": "Яд",
++    "id": "loot_brewery_яд"
++  },
++  {
++    "roll": 33,
++    "name": "Антидот",
++    "id": "chem_addictol"
++  },
++  {
++    "roll": 34,
++    "name": "Кровавый пакет",
++    "id": "chem_blood_pack"
++  },
++  {
++    "roll": 35,
++    "name": "Иррадиатор",
++    "id": "chem_irradiator"
++  },
++  {
++    "roll": 36,
++    "name": "Очищенная вода",
++    "id": "food_purified_water"
++  },
++  {
++    "roll": 37,
++    "name": "Рад-Х",
++    "id": "chem_rad_x"
++  },
++  {
++    "roll": 38,
++    "name": "Рад-эвэй",
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 39,
++    "name": "Койот-стейк",
++    "id": "loot_brewery_койот-стейк"
++  },
++  {
++    "roll": 40,
++    "name": "Огненные муравьиные нектары",
++    "id": "loot_brewery_огненные_муравьиные_нектары"
++  }
++]
+\ No newline at end of file
+diff --git a/assets/RandomLoot/chems.json b/assets/RandomLoot/chems.json
+index 4a28e28..a2e053e 100644
+--- a/assets/RandomLoot/chems.json
++++ b/assets/RandomLoot/chems.json
+@@ -1,41 +1,197 @@
+ [
+-    { "roll": 2, "name": "Антидот" },
+-    { "roll": 3, "name": "Баффаут" },
+-    { "roll": 4, "name": "Кейт" },
+-    { "roll": 5, "name": "Дэй Триппер" },
+-    { "roll": 6, "name": "Фиксер" },
+-    { "roll": 7, "name": "Ярость" },
+-    { "roll": 8, "name": "Гидра" },
+-    { "roll": 9, "name": "Мед-Х" },
+-    { "roll": 10, "name": "Ментаты" },
+-    { "roll": 11, "name": "Апельсиновые ментаты" },
+-    { "roll": 12, "name": "Виноградные ментаты" },
+-    { "roll": 13, "name": "Ягодные ментаты" },
+-    { "roll": 14, "name": "Психо" },
+-    { "roll": 15, "name": "Ракета" },
+-    { "roll": 16, "name": "Спокойствие" },
+-    { "roll": 17, "name": "Стелс-бой" },
+-    { "roll": 18, "name": "Стим-пак" },
+-    { "roll": 19, "name": "Супер Стим-пак" },
+-    { "roll": 20, "name": "Турбо" },
+-    { "roll": 21, "name": "Ультра-Джет" },
+-    { "roll": 22, "name": "Винт" },
+-    { "roll": 23, "name": "Х-клетка" },
+-    { "roll": 24, "name": "Рад-Х" },
+-    { "roll": 25, "name": "Рад-эвэй" },
+-    { "roll": 26, "name": "Кровавый пакет" },
+-    { "roll": 27, "name": "Иррадиатор" },
+-    { "roll": 28, "name": "Очищенная вода" },
+-    { "roll": 29, "name": "Докторский саквояж" },
+-    { "roll": 30, "name": "Порошок заживляющий" },
+-    { "roll": 31, "name": "Психотатс" },
+-    { "roll": 32, "name": "Баффтэтс" },
+-    { "roll": 33, "name": "Мед-Х-татс" },
+-    { "roll": 34, "name": "Ментаты-татс" },
+-    { "roll": 35, "name": "Овердрайв" },
+-    { "roll": 36, "name": "Сладкоежка" },
+-    { "roll": 37, "name": "Кальвин" },
+-    { "roll": 38, "name": "Психо-бафф" },
+-    { "roll": 39, "name": "Супер-стим" },
+-    { "roll": 40, "name": "Ультра-стим" }
+-] 
+\ No newline at end of file
++  {
++    "roll": 2,
++    "name": "Антидот",
++    "id": "chem_addictol"
++  },
++  {
++    "roll": 3,
++    "name": "Баффаут",
++    "id": "chem_buffout"
++  },
++  {
++    "roll": 4,
++    "name": "Кейт",
++    "id": "chem_jet"
++  },
++  {
++    "roll": 5,
++    "name": "Дэй Триппер",
++    "id": "chem_day_tripper"
++  },
++  {
++    "roll": 6,
++    "name": "Фиксер",
++    "id": "chem_antibiotics"
++  },
++  {
++    "roll": 7,
++    "name": "Ярость",
++    "id": "chem_fury"
++  },
++  {
++    "roll": 8,
++    "name": "Гидра",
++    "id": "chem_bufftats"
++  },
++  {
++    "roll": 9,
++    "name": "Мед-Х",
++    "id": "chem_med_x"
++  },
++  {
++    "roll": 10,
++    "name": "Ментаты",
++    "id": "chem_mentats"
++  },
++  {
++    "roll": 11,
++    "name": "Апельсиновые ментаты",
++    "id": "chem_mentats_orange"
++  },
++  {
++    "roll": 12,
++    "name": "Виноградные ментаты",
++    "id": "chem_mentats_grape"
++  },
++  {
++    "roll": 13,
++    "name": "Ягодные ментаты",
++    "id": "chem_mentats_berry"
++  },
++  {
++    "roll": 14,
++    "name": "Психо",
++    "id": "chem_psycho"
++  },
++  {
++    "roll": 15,
++    "name": "Ракета",
++    "id": "chem_psycho_jet"
++  },
++  {
++    "roll": 16,
++    "name": "Спокойствие",
++    "id": "chem_calmex"
++  },
++  {
++    "roll": 17,
++    "name": "Стелс-бой",
++    "id": "chem_overdrive"
++  },
++  {
++    "roll": 18,
++    "name": "Стим-пак",
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 19,
++    "name": "Супер Стим-пак",
++    "id": "chem_super_stimpak"
++  },
++  {
++    "roll": 20,
++    "name": "Турбо",
++    "id": "chem_ultra_jet"
++  },
++  {
++    "roll": 21,
++    "name": "Ультра-Джет",
++    "id": "chem_ultra_jet"
++  },
++  {
++    "roll": 22,
++    "name": "Винт",
++    "id": "chem_jet"
++  },
++  {
++    "roll": 23,
++    "name": "Х-клетка",
++    "id": "chem_x_cell"
++  },
++  {
++    "roll": 24,
++    "name": "Рад-Х",
++    "id": "chem_rad_x"
++  },
++  {
++    "roll": 25,
++    "name": "Рад-эвэй",
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 26,
++    "name": "Кровавый пакет",
++    "id": "chem_blood_pack"
++  },
++  {
++    "roll": 27,
++    "name": "Иррадиатор",
++    "id": "chem_irradiator"
++  },
++  {
++    "roll": 28,
++    "name": "Очищенная вода",
++    "id": "food_purified_water"
++  },
++  {
++    "roll": 29,
++    "name": "Докторский саквояж",
++    "id": "item_doctors_bag"
++  },
++  {
++    "roll": 30,
++    "name": "Порошок заживляющий",
++    "id": "chem_healing_salve"
++  },
++  {
++    "roll": 31,
++    "name": "Психотатс",
++    "id": "loot_chems_психотатс"
++  },
++  {
++    "roll": 32,
++    "name": "Баффтэтс",
++    "id": "loot_chems_баффтэтс"
++  },
++  {
++    "roll": 33,
++    "name": "Мед-Х-татс",
++    "id": "loot_chems_мед-х-татс"
++  },
++  {
++    "roll": 34,
++    "name": "Ментаты-татс",
++    "id": "loot_chems_ментаты-татс"
++  },
++  {
++    "roll": 35,
++    "name": "Овердрайв",
++    "id": "chem_overdrive"
++  },
++  {
++    "roll": 36,
++    "name": "Сладкоежка",
++    "id": "chem_daddy_o"
++  },
++  {
++    "roll": 37,
++    "name": "Кальвин",
++    "id": "chem_psychobuff"
++  },
++  {
++    "roll": 38,
++    "name": "Психо-бафф",
++    "id": "chem_psychobuff"
++  },
++  {
++    "roll": 39,
++    "name": "Супер-стим",
++    "id": "chem_super_stimpak"
++  },
++  {
++    "roll": 40,
++    "name": "Ультра-стим",
++    "id": "chem_super_stimpak"
++  }
++]
+\ No newline at end of file
+diff --git a/assets/RandomLoot/food.json b/assets/RandomLoot/food.json
+index 670ea61..5b5f140 100644
+--- a/assets/RandomLoot/food.json
++++ b/assets/RandomLoot/food.json
+@@ -1,41 +1,197 @@
+ [
+-    { "roll": 2, "name": "Игуана на палочке" },
+-    { "roll": 3, "name": "Беличьи шашлычки" },
+-    { "roll": 4, "name": "Жареная радтараканина" },
+-    { "roll": 5, "name": "Солсбери-стейк" },
+-    { "roll": 6, "name": "Свинина с бобами" },
+-    { "roll": 7, "name": "Собачьи консервы" },
+-    { "roll": 8, "name": "Кусочки игуаны" },
+-    { "roll": 9, "name": "Макароны с сыром" },
+-    { "roll": 10, "name": "Засахаренные яблоки" },
+-    { "roll": 11, "name": "Картофельные чипсы" },
+-    { "roll": 12, "name": "Кукуруза" },
+-    { "roll": 13, "name": "Морковь" },
+-    { "roll": 14, "name": "Тато" },
+-    { "roll": 15, "name": "Дыня" },
+-    { "roll": 16, "name": "Кусочки белки" },
+-    { "roll": 17, "name": "Стейк из брамина" },
+-    { "roll": 18, "name": "Яйцо болотника" },
+-    { "roll": 19, "name": "Ребрышки яо-гая" },
+-    { "roll": 20, "name": "Стейк из кротокрыса" },
+-    { "roll": 21, "name": "Мясо болотника" },
+-    { "roll": 22, "name": "Мясо жалокрыла" },
+-    { "roll": 23, "name": "Мясо гуля" },
+-    { "roll": 24, "name": "Человечина" },
+-    { "roll": 25, "name": "Яйцо когтя смерти" },
+-    { "roll": 26, "name": "Стейк из когтя смерти" },
+-    { "roll": 27, "name": "Странное мясо" },
+-    { "roll": 28, "name": "Шашлык из странного мяса" },
+-    { "roll": 29, "name": "Чистая вода" },
+-    { "roll": 30, "name": "Грязная вода" },
+-    { "roll": 31, "name": "Желудь" },
+-    { "roll": 32, "name": "Молоко брамина" },
+-    { "roll": 33, "name": "Бритофрукт" },
+-    { "roll": 34, "name": "Мутафрукт" },
+-    { "roll": 35, "name": "Нюка-кола" },
+-    { "roll": 36, "name": "Нюка-кола Квантовая" },
+-    { "roll": 37, "name": "Сансет Саспарилла" },
+-    { "roll": 38, "name": "Пиво" },
+-    { "roll": 39, "name": "Водка" },
+-    { "roll": 40, "name": "Виски" }
+-] 
+\ No newline at end of file
++  {
++    "roll": 2,
++    "name": "Игуана на палочке",
++    "id": "food_iguana_on_stick"
++  },
++  {
++    "roll": 3,
++    "name": "Беличьи шашлычки",
++    "id": "food_squirrel_stew"
++  },
++  {
++    "roll": 4,
++    "name": "Жареная радтараканина",
++    "id": "food_radroach"
++  },
++  {
++    "roll": 5,
++    "name": "Солсбери-стейк",
++    "id": "food_salisbury_steak"
++  },
++  {
++    "roll": 6,
++    "name": "Свинина с бобами",
++    "id": "food_pork_n_beans"
++  },
++  {
++    "roll": 7,
++    "name": "Собачьи консервы",
++    "id": "food_canned_dog_food"
++  },
++  {
++    "roll": 8,
++    "name": "Кусочки игуаны",
++    "id": "food_iguana_bits"
++  },
++  {
++    "roll": 9,
++    "name": "Макароны с сыром",
++    "id": "food_mac_n_cheese"
++  },
++  {
++    "roll": 10,
++    "name": "Засахаренные яблоки",
++    "id": "food_apple_candy"
++  },
++  {
++    "roll": 11,
++    "name": "Картофельные чипсы",
++    "id": "food_potato_chips"
++  },
++  {
++    "roll": 12,
++    "name": "Кукуруза",
++    "id": "food_corn"
++  },
++  {
++    "roll": 13,
++    "name": "Морковь",
++    "id": "food_carrot"
++  },
++  {
++    "roll": 14,
++    "name": "Тато",
++    "id": "food_tato"
++  },
++  {
++    "roll": 15,
++    "name": "Дыня",
++    "id": "loot_food_дыня"
++  },
++  {
++    "roll": 16,
++    "name": "Кусочки белки",
++    "id": "loot_food_кусочки_белки"
++  },
++  {
++    "roll": 17,
++    "name": "Стейк из брамина",
++    "id": "loot_food_стейк_из_брамина"
++  },
++  {
++    "roll": 18,
++    "name": "Яйцо болотника",
++    "id": "loot_food_яйцо_болотника"
++  },
++  {
++    "roll": 19,
++    "name": "Ребрышки яо-гая",
++    "id": "loot_food_ребрышки_яо-гая"
++  },
++  {
++    "roll": 20,
++    "name": "Стейк из кротокрыса",
++    "id": "loot_food_стейк_из_кротокрыса"
++  },
++  {
++    "roll": 21,
++    "name": "Мясо болотника",
++    "id": "loot_food_мясо_болотника"
++  },
++  {
++    "roll": 22,
++    "name": "Мясо жалокрыла",
++    "id": "loot_food_мясо_жалокрыла"
++  },
++  {
++    "roll": 23,
++    "name": "Мясо гуля",
++    "id": "loot_food_мясо_гуля"
++  },
++  {
++    "roll": 24,
++    "name": "Человечина",
++    "id": "loot_food_человечина"
++  },
++  {
++    "roll": 25,
++    "name": "Яйцо когтя смерти",
++    "id": "loot_food_яйцо_когтя_смерти"
++  },
++  {
++    "roll": 26,
++    "name": "Стейк из когтя смерти",
++    "id": "loot_food_стейк_из_когтя_смерти"
++  },
++  {
++    "roll": 27,
++    "name": "Странное мясо",
++    "id": "loot_food_странное_мясо"
++  },
++  {
++    "roll": 28,
++    "name": "Шашлык из странного мяса",
++    "id": "loot_food_шашлык_из_странного_мяса"
++  },
++  {
++    "roll": 29,
++    "name": "Чистая вода",
++    "id": "loot_food_чистая_вода"
++  },
++  {
++    "roll": 30,
++    "name": "Грязная вода",
++    "id": "loot_food_грязная_вода"
++  },
++  {
++    "roll": 31,
++    "name": "Желудь",
++    "id": "loot_food_желудь"
++  },
++  {
++    "roll": 32,
++    "name": "Молоко брамина",
++    "id": "loot_food_молоко_брамина"
++  },
++  {
++    "roll": 33,
++    "name": "Бритофрукт",
++    "id": "loot_food_бритофрукт"
++  },
++  {
++    "roll": 34,
++    "name": "Мутафрукт",
++    "id": "loot_food_мутафрукт"
++  },
++  {
++    "roll": 35,
++    "name": "Нюка-кола",
++    "id": "drink_nuka_cola"
++  },
++  {
++    "roll": 36,
++    "name": "Нюка-кола Квантовая",
++    "id": "loot_food_нюка-кола_квантовая"
++  },
++  {
++    "roll": 37,
++    "name": "Сансет Саспарилла",
++    "id": "loot_food_сансет_саспарилла"
++  },
++  {
++    "roll": 38,
++    "name": "Пиво",
++    "id": "drink_beer"
++  },
++  {
++    "roll": 39,
++    "name": "Водка",
++    "id": "drink_vodka"
++  },
++  {
++    "roll": 40,
++    "name": "Виски",
++    "id": "drink_whiskey"
++  }
++]
+\ No newline at end of file
+diff --git a/assets/RandomLoot/outcast.json b/assets/RandomLoot/outcast.json
+index 1e40a30..17a9f05 100644
+--- a/assets/RandomLoot/outcast.json
++++ b/assets/RandomLoot/outcast.json
+@@ -1,23 +1,144 @@
+ [
+-  { "roll": 1,  "name": "Элитный набор инструментов" },
+-  { "roll": 2,  "name": "Фонарик" },
+-  { "roll": 3,  "name": "Копия журнала \"Чиним вещи\"" },
+-  { "roll": 4,  "name": "Антибиотики" },
+-  { "roll": 5,  "name": "Крышкомина" },
+-  { "roll": 6,  "name": "Радио" },
+-  { "roll": 7,  "name": "Боевой Нагрудник", "ref": { "source": "armor", "name": "Боевой Нагрудник" } },
+-  { "roll": 8,  "name": "Карта с тайником выживальщиков старого мира" },
+-  { "roll": 9,  "name": "Стим-пак", "ref": { "source": "chems", "name": "Стим-пак" } },
+-  { "roll": 10, "name": "Боевой Наруч",    "ref": { "source": "armor", "name": "Боевой Наруч" } },
+-  { "roll": 11, "name": "Боевой Понож",    "ref": { "source": "armor", "name": "Боевой Понож" } },
+-  { "roll": 12, "name": "Массив сенсоров" },
+-  { "roll": 13, "name": "Рюкзак маленький" },
+-  { "roll": 14, "name": "Меч",              "ref": { "source": "melee_weapons", "name": "Меч" } },
+-  { "roll": 15, "name": "Лазерный Мушкет",  "ref": { "source": "energy_weapons", "name": "Лазерный Мушкет" } },
+-  { "roll": 16, "name": "Антирадин",        "ref": { "source": "chems", "name": "Рад-эвэй" } },
+-  { "roll": 17, "name": "Боевой дробовик",  "ref": { "source": "light_weapons", "name": "Боевой дробовик" } },
+-  { "roll": 18, "name": "Силовой кулак" },
+-  { "roll": 19, "name": "Прочный Боевой Шлем", "ref": { "source": "armor", "name": "Прочный Боевой Шлем" } },
+-  { "roll": 20, "name": "Пип-Бой" }
+-]
+-
++  {
++    "roll": 1,
++    "name": "Элитный набор инструментов",
++    "id": "item_deluxe_toolkit"
++  },
++  {
++    "roll": 2,
++    "name": "Фонарик",
++    "id": "item_flashlight"
++  },
++  {
++    "roll": 3,
++    "name": "Копия журнала \"Чиним вещи\"",
++    "id": "item_us_special_ops_manual"
++  },
++  {
++    "roll": 4,
++    "name": "Антибиотики",
++    "id": "chem_antibiotics"
++  },
++  {
++    "roll": 5,
++    "name": "Крышкомина",
++    "id": "item_bobby_pin"
++  },
++  {
++    "roll": 6,
++    "name": "Радио",
++    "id": "item_radio"
++  },
++  {
++    "roll": 7,
++    "name": "Боевой Нагрудник",
++    "ref": {
++      "source": "armor",
++      "name": "Боевой Нагрудник",
++      "id": "armor_combat_chest_001"
++    },
++    "id": "armor_combat_chest_001"
++  },
++  {
++    "roll": 8,
++    "name": "Карта с тайником выживальщиков старого мира",
++    "id": "loot_outcast_карта_с_тайником_выживальщиков_старого_м"
++  },
++  {
++    "roll": 9,
++    "name": "Стим-пак",
++    "ref": {
++      "source": "chems",
++      "name": "Стим-пак",
++      "id": "chem_stimpak"
++    },
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 10,
++    "name": "Боевой Наруч",
++    "ref": {
++      "source": "armor",
++      "name": "Боевой Наруч",
++      "id": "armor_combat_hand_001"
++    },
++    "id": "armor_combat_hand_001"
++  },
++  {
++    "roll": 11,
++    "name": "Боевой Понож",
++    "ref": {
++      "source": "armor",
++      "name": "Боевой Понож",
++      "id": "armor_combat_leg_001"
++    },
++    "id": "armor_combat_leg_001"
++  },
++  {
++    "roll": 12,
++    "name": "Массив сенсоров",
++    "id": "item_geiger_counter"
++  },
++  {
++    "roll": 13,
++    "name": "Рюкзак маленький",
++    "id": "item_backpack_small"
++  },
++  {
++    "roll": 14,
++    "name": "Меч",
++    "ref": {
++      "source": "melee_weapons",
++      "id": "weapon_sword"
++    },
++    "id": "weapon_chinese_sword"
++  },
++  {
++    "roll": 15,
++    "name": "Лазерный Мушкет",
++    "ref": {
++      "source": "energy_weapons",
++      "id": "weapon_laser_musket"
++    },
++    "id": "weapon_laser_musket"
++  },
++  {
++    "roll": 16,
++    "name": "Антирадин",
++    "ref": {
++      "source": "chems",
++      "name": "Рад-эвэй",
++      "id": "chem_radaway"
++    },
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 17,
++    "name": "Боевой дробовик",
++    "ref": {
++      "source": "light_weapons",
++      "id": "weapon_combat_shotgun"
++    },
++    "id": "weapon_combat_shotgun"
++  },
++  {
++    "roll": 18,
++    "name": "Силовой кулак",
++    "id": "weapon_power_fist"
++  },
++  {
++    "roll": 19,
++    "name": "Прочный Боевой Шлем",
++    "ref": {
++      "source": "armor",
++      "name": "Прочный Боевой Шлем",
++      "id": "armor_combat_head_001"
++    },
++    "id": "armor_combat_head_001"
++  },
++  {
++    "roll": 20,
++    "name": "Пип-Бой",
++    "id": "item_pip_boy"
++  }
++]
+\ No newline at end of file
+diff --git a/assets/RandomLoot/trinkets.json b/assets/RandomLoot/trinkets.json
+index d6e0b42..73487bc 100644
+--- a/assets/RandomLoot/trinkets.json
++++ b/assets/RandomLoot/trinkets.json
+@@ -1,22 +1,102 @@
+ [
+-  { "roll": 1, "name": "Золотые карманные часы" },
+-  { "roll": 2, "name": "Заглючивший голодиск" },
+-  { "roll": 3, "name": "Яркая бандана" },
+-  { "roll": 4, "name": "Серебряный медальон" },
+-  { "roll": 5, "name": "Медаль" },
+-  { "roll": 6, "name": "Горшечное растение" },
+-  { "roll": 7, "name": "Билеты на довоенное мероприятие" },
+-  { "roll": 8, "name": "Обручальное кольцо" },
+-  { "roll": 9, "name": "Приглашение на довоенную тусовку" },
+-  { "roll": 10, "name": "Зажигалка с гравировкой" },
+-  { "roll": 11, "name": "Шулерские кости" },
+-  { "roll": 12, "name": "Удостоверение личности" },
+-  { "roll": 13, "name": "Косметичка" },
+-  { "roll": 14, "name": "Музыкальный инструмент" },
+-  { "roll": 15, "name": "Разбитые очки" },
+-  { "roll": 16, "name": "Ожерелье из хлама" },
+-  { "roll": 17, "name": "Страницы неоконченной истории" },
+-  { "roll": 18, "name": "Невозвращенная книга" },
+-  { "roll": 19, "name": "Открытка с адресом" },
+-  { "roll": 20, "name": "Довоенный галстук" }
+-] 
+\ No newline at end of file
++  {
++    "roll": 1,
++    "name": "Золотые карманные часы",
++    "id": "loot_trinklet_золотые_карманные_часы"
++  },
++  {
++    "roll": 2,
++    "name": "Заглючивший голодиск",
++    "id": "loot_trinklet_заглючивший_голодиск"
++  },
++  {
++    "roll": 3,
++    "name": "Яркая бандана",
++    "id": "loot_trinklet_яркая_бандана"
++  },
++  {
++    "roll": 4,
++    "name": "Серебряный медальон",
++    "id": "loot_trinklet_серебряный_медальон"
++  },
++  {
++    "roll": 5,
++    "name": "Медаль",
++    "id": "loot_trinklet_медаль"
++  },
++  {
++    "roll": 6,
++    "name": "Горшечное растение",
++    "id": "loot_trinklet_горшечное_растение"
++  },
++  {
++    "roll": 7,
++    "name": "Билеты на довоенное мероприятие",
++    "id": "loot_trinklet_билеты_на_довоенное_мероприятие"
++  },
++  {
++    "roll": 8,
++    "name": "Обручальное кольцо",
++    "id": "loot_trinklet_обручальное_кольцо"
++  },
++  {
++    "roll": 9,
++    "name": "Приглашение на довоенную тусовку",
++    "id": "loot_trinklet_приглашение_на_довоенную_тусовку"
++  },
++  {
++    "roll": 10,
++    "name": "Зажигалка с гравировкой",
++    "id": "loot_trinklet_зажигалка_с_гравировкой"
++  },
++  {
++    "roll": 11,
++    "name": "Шулерские кости",
++    "id": "loot_trinklet_шулерские_кости"
++  },
++  {
++    "roll": 12,
++    "name": "Удостоверение личности",
++    "id": "loot_trinklet_удостоверение_личности"
++  },
++  {
++    "roll": 13,
++    "name": "Косметичка",
++    "id": "loot_trinklet_косметичка"
++  },
++  {
++    "roll": 14,
++    "name": "Музыкальный инструмент",
++    "id": "loot_trinklet_музыкальный_инструмент"
++  },
++  {
++    "roll": 15,
++    "name": "Разбитые очки",
++    "id": "loot_trinklet_разбитые_очки"
++  },
++  {
++    "roll": 16,
++    "name": "Ожерелье из хлама",
++    "id": "loot_trinklet_ожерелье_из_хлама"
++  },
++  {
++    "roll": 17,
++    "name": "Страницы неоконченной истории",
++    "id": "loot_trinklet_страницы_неоконченной_истории"
++  },
++  {
++    "roll": 18,
++    "name": "Невозвращенная книга",
++    "id": "loot_trinklet_невозвращенная_книга"
++  },
++  {
++    "roll": 19,
++    "name": "Открытка с адресом",
++    "id": "loot_trinklet_открытка_с_адресом"
++  },
++  {
++    "roll": 20,
++    "name": "Довоенный галстук",
++    "id": "loot_trinklet_довоенный_галстук"
++  }
++]
+\ No newline at end of file
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index f106db8..092a0d3 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -440,7 +440,7 @@ export const CharacterProvider = ({ children }) => {
+ 
+   const getItemId = (item) => {
+     if (item.uniqueId) return item.uniqueId;
+-    return item.weaponId || item.code || item.Name || item.Название;
++    return item.weaponId || item.code || item.id || item.Name;
+   };
+ 
+   const getModifiedItem = (item) => {
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 2f7d629..ad12375 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -502,7 +502,8 @@ export default function CharacterScreen() {
+         // a missing id field).
+         console.log('[handleSelectKit] candidate item:', item?.name, 'itemType:', item?.itemType,
+           'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
+-        if (item?.itemType === 'currency' || item?.type === 'currency') return;
++        const CURRENCY_TYPES = new Set(['currency']);
++        if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
+         useCharacterStore.getState().addNewItem({
+           ...item,
+           equipped: isRobot ? true : false,
+diff --git a/components/screens/CharacterScreen/logic/RandomLootLogic.js b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+index 8b915f7..49675c0 100644
+--- a/components/screens/CharacterScreen/logic/RandomLootLogic.js
++++ b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+@@ -4,7 +4,7 @@ import food from '../../../../assets/RandomLoot/food.json';
+ import brewery from '../../../../assets/RandomLoot/brewery.json';
+ import chems from '../../../../assets/RandomLoot/chems.json';
+ import outcast from '../../../../assets/RandomLoot/outcast.json';
+-import { getWeaponByName } from '../../../../db/Database';
++import { getWeaponById } from '../../../../db/Database';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ 
+ const lootTables = {
+@@ -19,7 +19,6 @@ export const supportedLootTags = Object.keys(lootTables);
+ 
+ function parseLootFormula(lootFormula) {
+     if (!lootFormula || typeof lootFormula !== 'string') return null;
+-    // Формат: [формула]<тег>  — формула может содержать запятые для раздельных бросков
+     const regex = /^(.*?)<(\w+)>$/;
+     const match = lootFormula.match(regex);
+     if (match) {
+@@ -32,80 +31,151 @@ function parseLootFormula(lootFormula) {
+ }
+ 
+ /**
+- * Разрешает один предмет из таблицы лута по результату броска.
++ * Builds an id→item lookup index from the equipment catalog.
++ * All catalog items are indexed by their `id` field.
++ */
++function buildCatalogIndex() {
++    const catalog = getEquipmentCatalog();
++    const index = new Map();
++
++    const addAll = (items, itemType) => {
++        if (!items) return;
++        const list = Array.isArray(items) ? items : [];
++        for (const item of list) {
++            if (item.id) index.set(item.id, { ...item, itemType: item.itemType || itemType });
++        }
++    };
++
++    // Flat lists
++    addAll(catalog.chems, 'chem');
++    addAll(catalog.drinks, 'drinks');
++    addAll(catalog.food, 'food');
++    addAll(catalog.weapons, 'weapon');
++    addAll(catalog.generalGoods, 'misc');
++    addAll(catalog.oddities, 'misc');
++
++    // Armor — flatMap from groups
++    const armorItems = (catalog.armor?.armor || []).flatMap(g => g.items || []);
++    addAll(armorItems, 'armor');
++
++    // Clothes — flatMap from groups
++    const clothesItems = (catalog.clothes?.clothes || []).flatMap(g => g.items || []);
++    addAll(clothesItems, 'clothing');
++
++    // Miscellaneous — flatMap from groups
++    const miscData = catalog.miscellaneous;
++    if (miscData?.miscellaneous) {
++        const miscItems = miscData.miscellaneous.flatMap(g => g.items || []);
++        addAll(miscItems, 'misc');
++    }
++
++    return index;
++}
++
++/**
++ * Resolves a single item from a loot table by roll result.
++ * Uses `id` as the primary lookup key into the equipment catalog.
++ * Falls back to name-based search if the id is not found in the catalog
++ * (e.g., for synthetic loot_* ids).
+  */
+ async function resolveItemFromTable(rollResult, tag, lootTable) {
++    const catalogIndex = buildCatalogIndex();
+     const equipmentCatalog = getEquipmentCatalog();
+-    const fullChemsData = equipmentCatalog.chems;
+-    const armorData = equipmentCatalog.armor;
+-    const clothesData = equipmentCatalog.clothes;
+-    const miscData = equipmentCatalog.miscellaneous;
+ 
+     const foundItem = lootTable.find(loot => loot.roll === rollResult);
+     if (!foundItem) {
+-        return { Название: `[Не найдено] ${tag}`, quantity: 1 };
++        return { name: `[Not found] ${tag}`, quantity: 1, id: `loot_miss_${tag}_${rollResult}` };
+     }
+ 
+     const { roll, name, ref, ...otherProps } = foundItem;
+ 
+-    // Жёсткие ссылки на конкретные источники
+-    if (ref && ref.source && ref.name) {
+-        const source = ref.source;
+-        const refName = ref.name;
++    // ── Handle ref (hard reference to another catalog item) ──
++    if (ref && ref.source && ref.id) {
+         try {
+-            if (source === 'chems') {
+-                const chem = fullChemsData.find(x => (x.Название === refName || x.name === refName));
+-                if (chem) return { ...chem, name: refName, Название: refName, quantity: 1, itemType: 'chem' };
+-            } else if (['light_weapons', 'heavy_weapons', 'energy_weapons', 'melee_weapons'].includes(source)) {
+-                const weapon = await getWeaponByName(refName);
++            if (ref.source === 'chems') {
++                const catalogItem = catalogIndex.get(ref.id);
++                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: 'chem' };
++            } else if (['light_weapons', 'heavy_weapons', 'energy_weapons', 'melee_weapons'].includes(ref.source)) {
++                const weapon = await getWeaponById(ref.id);
+                 if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
+-            } else if (source === 'armor') {
+-                const allArmorItems = armorData.armor.flatMap(a => a.items);
+-                const ar = allArmorItems.find(x => (x.Название === refName || x.name === refName));
+-                if (ar) return { ...ar, name: ar.name || ar.Название, Название: ar.Название || ar.name, quantity: 1, itemType: 'armor' };
+-            } else if (source === 'clothes') {
+-                const allClothesItems = clothesData.clothes.flatMap(c => c.items);
+-                const cl = allClothesItems.find(x => (x.Название === refName || x.name === refName));
+-                if (cl) return { ...cl, name: cl.name || cl.Название, Название: cl.Название || cl.name, quantity: 1, itemType: 'clothes' };
+-            } else if (source === 'misc') {
+-                const allMiscItems = miscData.miscellaneous.flatMap(category => category.items);
+-                const mi = allMiscItems.find(x => (x.Название === refName || x.name === refName));
+-                if (mi) return { ...mi, name: mi.name || mi.Название, Название: mi.Название || mi.name, quantity: 1, itemType: mi.itemType || 'misc' };
++            } else if (ref.source === 'armor') {
++                const catalogItem = catalogIndex.get(ref.id);
++                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: 'armor' };
++            } else if (ref.source === 'clothes') {
++                const catalogItem = catalogIndex.get(ref.id);
++                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: 'clothing' };
++            } else if (ref.source === 'misc') {
++                const catalogItem = catalogIndex.get(ref.id);
++                if (catalogItem) return { ...catalogItem, quantity: 1, itemType: catalogItem.itemType || 'misc' };
+             }
+         } catch (e) {
++            // fall through to id-based lookup
+         }
+     }
+ 
+-    if (tag === 'chem') {
+-        const fullChemData = fullChemsData.find(chem => chem.Название === name || chem.name === name);
+-        if (fullChemData) return { ...fullChemData, name, Название: name, quantity: 1, itemType: 'chem' };
++    // ── Primary: id-based lookup ──
++    const itemId = foundItem.id;
++    if (itemId) {
++        const catalogItem = catalogIndex.get(itemId);
++        if (catalogItem) {
++            return { ...catalogItem, quantity: 1, itemType: catalogItem.itemType || (tag === 'chem' ? 'chem' : 'loot') };
++        }
++
++        // For weapon ids, try DB
++        if (itemId.startsWith('weapon_')) {
++            try {
++                const weapon = await getWeaponById(itemId);
++                if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
++            } catch (e) {}
++        }
+     }
+ 
++    // ── Fallback: name-based search (only for items not in main catalog) ──
++    // This handles loot-only items (trinkets, some foods) that have synthetic ids
+     if (tag === 'outcast') {
+-        const fullChemData2 = fullChemsData.find(chem => chem.Название === name || chem.name === name);
+-        if (fullChemData2) return { ...fullChemData2, name, Название: name, quantity: 1, itemType: 'chem' };
+-        const weapon = await getWeaponByName(name);
+-        if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
+-        const allArmorItems = armorData.armor.flatMap(a => a.items);
+-        const armor = allArmorItems.find(i => i.Название === name || i.name === name);
+-        if (armor) return { ...armor, name: armor.name || armor.Название, Название: armor.Название || armor.name, quantity: 1, itemType: 'armor' };
+-        const allClothesItems = clothesData.clothes.flatMap(c => c.items);
+-        const clothes = allClothesItems.find(i => i.Название === name || i.name === name);
+-        if (clothes) return { ...clothes, name: clothes.name || clothes.Название, Название: clothes.Название || clothes.name, quantity: 1, itemType: 'clothes' };
+-        const allMiscItems = miscData.miscellaneous.flatMap(category => category.items);
+-        const misc = allMiscItems.find(i => i.Название === name || i.name === name);
+-        if (misc) return { ...misc, name: misc.name || misc.Название, Название: misc.Название || misc.name, quantity: 1, itemType: misc.itemType || 'misc' };
++        // Try chems by name
++        const chemList = equipmentCatalog.chems || [];
++        const chemMatch = chemList.find(c => c.name === name);
++        if (chemMatch) return { ...chemMatch, name, quantity: 1, itemType: 'chem' };
++
++        // Try weapons by name via DB
++        try {
++            const { getWeaponByName } = await import('../../../../db/Database');
++            const weapon = await getWeaponByName(name);
++            if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
++        } catch (e) {}
++
++        // Try armor by name
++        const armorItems = (equipmentCatalog.armor?.armor || []).flatMap(g => g.items || []);
++        const armorMatch = armorItems.find(i => i.name === name);
++        if (armorMatch) return { ...armorMatch, name: armorMatch.name, quantity: 1, itemType: 'armor' };
++
++        // Try clothes by name
++        const clothesItems = (equipmentCatalog.clothes?.clothes || []).flatMap(g => g.items || []);
++        const clothesMatch = clothesItems.find(i => i.name === name);
++        if (clothesMatch) return { ...clothesMatch, name: clothesMatch.name, quantity: 1, itemType: 'clothing' };
++
++        // Try misc by name
++        const miscData = equipmentCatalog.miscellaneous;
++        const miscItems = miscData?.miscellaneous ? miscData.miscellaneous.flatMap(g => g.items || []) : [];
++        const miscMatch = miscItems.find(i => i.name === name);
++        if (miscMatch) return { ...miscMatch, name: miscMatch.name, quantity: 1, itemType: miscMatch.itemType || 'misc' };
+     }
+ 
+-    return { ...otherProps, name, Название: name, quantity: 1, itemType: tag === 'chem' ? 'chem' : 'loot' };
++    // ── Last resort: return the loot table entry as-is with its id ──
++    return {
++        ...otherProps,
++        id: itemId,
++        name,
++        quantity: 1,
++        itemType: tag === 'chem' ? 'chem' : 'loot',
++    };
+ }
+ 
+ /**
+  * Разрешает формулу лута.
+  * - Одиночный бросок: "d20<food>" → один предмет (или null)
+  * - Раздельные броски: "d20,d20<food>" → массив предметов
+- *
+- * Возвращает один объект предмета, или массив если бросков несколько.
+  */
+ export async function resolveRandomLoot(lootFormula) {
+     const parsed = parseLootFormula(lootFormula);
+@@ -115,19 +185,16 @@ export async function resolveRandomLoot(lootFormula) {
+     const lootTable = lootTables[tag];
+     if (!lootTable) return null;
+ 
+-    // Раздельные броски: "d20,d20"
+     if (quantityFormula.includes(',')) {
+         const rolls = evaluateFormulaMulti(quantityFormula);
+         const items = await Promise.all(rolls.map(r => resolveItemFromTable(r, tag, lootTable)));
+         return items;
+     }
+ 
+-    // Одиночный бросок
+     const rollResult = evaluateFormula(quantityFormula);
+     return resolveItemFromTable(rollResult, tag, lootTable);
+ }
+ 
+-
+ export async function resolveRandomLootByRoll(tag, count = 1) {
+     const normalizedTag = String(tag || '').toLowerCase();
+ 
+@@ -157,4 +224,4 @@ export async function resolveRandomLootByRoll(tag, count = 1) {
+         if (item) items.push(item);
+     }
+     return items;
+-}
++}
+\ No newline at end of file
+diff --git a/components/screens/CharacterScreen/logic/ammoLogic.js b/components/screens/CharacterScreen/logic/ammoLogic.js
+deleted file mode 100644
+index 81ce3e1..0000000
+--- a/components/screens/CharacterScreen/logic/ammoLogic.js
++++ /dev/null
+@@ -1,61 +0,0 @@
+-// components/screens/CharacterScreen/logic/ammoLogic.js
+-import { calculateDamage, parseFormula } from '../../../../../domain/diceRollsLogic';
+-
+-/**
+- * Парсит формулу вида "X+Nfn{CD} <tag>" или "N <tag>".
+- * @param {string} lootFormula - Формула для лута.
+- * @returns {{quantityFormula: string, tag: string}|null}
+- */
+-function parseLootFormula(lootFormula) {
+-    if (!lootFormula || typeof lootFormula !== 'string') return null;
+-    
+-    const regex = /^(.*?)<(\w+)>$/;
+-    const match = lootFormula.match(regex);
+-
+-    if (match) {
+-        return {
+-            quantityFormula: match[1].trim(),
+-            tag: match[2].toLowerCase(),
+-        };
+-    }
+-    return null;
+-}
+-
+-/**
+- * Рассчитывает конкретный предмет и его количество на основе формулы лута.
+- *
+- * @deprecated Для тега <ammo> используйте resolveAmmoQuantity из kitResolver.js,
+- *   который принимает weaponId и получает тип патрона через weapon.ammo_id из БД.
+- *   Параметр context.weaponName больше не поддерживается для поиска патронов.
+- *
+- * @param {string} lootFormula - Формула, например "5+5fn{CD} <caps>".
+- * @param {object} [context] - Контекст (не используется для <ammo>).
+- * @returns {{name: string, quantity: number, type: string}|null}
+- */
+-export function resolveLoot(lootFormula, context) {
+-    const parsed = parseLootFormula(lootFormula);
+-    if (!parsed) {
+-        return null;
+-    }
+-
+-    const { quantityFormula, tag } = parsed;
+-    
+-    const { baseValue, diceCount } = parseFormula(quantityFormula);
+-    const { finalValue: quantity } = calculateDamage(baseValue, diceCount);
+-
+-    switch (tag) {
+-        case 'ammo':
+-            // @deprecated: разрешение патронов по weaponName удалено.
+-            // Используйте resolveAmmoQuantity из kitResolver.js с weaponId.
+-            return null;
+-
+-        case 'caps':
+-            return { name: 'Крышки', quantity, type: 'currency', Цена: 1, Вес: 0 };
+-
+-        case 'basicmaterial':
+-            return { name: 'Базовые материалы', quantity, type: 'material' };
+-
+-        default:
+-            return null;
+-    }
+-}
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 6e27d42..6f89008 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -17,8 +17,6 @@ const loadRobotCatalog = () => ({
+ });
+ 
+ // Meta-categories shown in the kit modal.
+-// All robot limbs/plating collapse into a single "Стандартная конструкция" group;
+-// weapons and modules are their own buckets; everything else goes to "Разное".
+ const META_CATEGORY_LABELS = {
+   structure: tCharacterScreen('modals.equipmentKit.categories.structure', 'Standard Structure'),
+   weapon: tCharacterScreen('modals.equipmentKit.categories.weapon', 'Weapons'),
+@@ -28,7 +26,7 @@ const META_CATEGORY_LABELS = {
+ 
+ const META_CATEGORY_ORDER = ['structure', 'weapon', 'module', 'misc'];
+ 
+-// Sub-order inside the "Стандартная конструкция" group: голова → корпус → рука → ноги → обшивка
++// Sub-order inside the "Standard Structure" group: head → body → arm → legs → plating
+ const STRUCTURE_SUBORDER = {
+   robotHead: 0,
+   robotBody: 1,
+@@ -42,6 +40,9 @@ const STRUCTURE_SUBORDER = {
+ 
+ const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
+ 
++// Currency itemTypes that are NOT inventory items — tracked via caps counter
++const CURRENCY_TYPES = new Set(['currency']);
++
+ const getMetaCategory = (item) => {
+   const type = item?.itemType || (item?.weaponId ? 'weapon' : 'misc');
+   if (STRUCTURE_TYPES.has(type)) return 'structure';
+@@ -65,12 +66,12 @@ const getOptionKey = (option, optionIndex) => {
+ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
+   if (!entry) return [];
+   
+-  // Recursively handle nested arrays (e.g., from 'group' items inside 'choice' resolving)
++  // Recursively handle nested arrays
+   if (Array.isArray(entry)) {
+     return entry.flatMap((e, i) => entryToList(e, selectedChoices, kitId, `${itemIndex}-${i}`));
+   }
+ 
+-  // 'choice' — player picks ONE of N options (currently UI default = first).
++  // 'choice' — player picks ONE of N options
+   if (entry.type === 'choice') {
+     const key = toChoiceKey(kitId, itemIndex);
+     const options = Array.isArray(entry.items) ? entry.items : [];
+@@ -82,10 +83,7 @@ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
+     return [selectedOption];
+   }
+ 
+-  // 'pick' — player picks Y of N options. UI for the selection is not built
+-  // yet, so for now we collapse it to the first `pickCount` options (or all of
+-  // them when pickCount is missing). This keeps existing data flowing through
+-  // the resolver; replace with a real picker UI in a follow-up task.
++  // 'pick' — player picks Y of N options
+   if (entry.type === 'pick') {
+     const options = Array.isArray(entry.items) ? entry.items : [];
+     const count = Number.isFinite(entry.pickCount) && entry.pickCount > 0
+@@ -94,12 +92,9 @@ const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
+     return options.slice(0, count);
+   }
+ 
+-  // 'rollTable' — kitResolver already rolled it into a real item (or several).
+-  // It returns the primary item as `entry` itself and any additional rolls in
+-  // `entry._extraItems`. Flatten them all into the kit's item list.
++  // 'rollTable' — kitResolver already rolled it into real items
+   if (entry.type === 'rollTable') {
+     const extras = Array.isArray(entry._extraItems) ? entry._extraItems : [];
+-    // Strip the marker fields so downstream code treats this as a normal item.
+     const { type: _t, _extraItems, roll, tableId, ...primary } = entry;
+     return [primary, ...extras];
+   }
+@@ -128,7 +123,6 @@ const toInventoryItems = (entries) => {
+         ...weapon,
+         id: weapon.id || item.weaponId,
+         name: item.displayName || item.name || weapon.name,
+-        Название: item.displayName || item.Название || item.name || weapon.name,
+         weaponId: weapon.id || item.weaponId,
+         appliedMods,
+         quantity: item.quantity || 1,
+@@ -144,8 +138,7 @@ const toInventoryItems = (entries) => {
+ 
+     raw.push({
+       ...item,
+-      name: item.name || item.Название || item.itemId,
+-      Название: item.Название || item.name || item.itemId,
++      name: item.name || item.itemId,
+       quantity: item.quantity || 1,
+     });
+   });
+@@ -154,35 +147,36 @@ const toInventoryItems = (entries) => {
+ };
+ 
+ const summarizeItems = (items) => {
++  // Collect all currency-type items into totalCaps, remove them from inventory
+   const totalCaps = items.reduce((acc, item) => {
+-    if (item.itemType === 'currency' || item.itemType === 'currency_ncr' || item.name === 'Крышки') {
++    if (CURRENCY_TYPES.has(item.itemType)) {
+       return acc + (item.quantity || 0);
+     }
+     return acc;
+   }, 0);
+ 
+-  const finalItems = items.filter((item) => item.itemType !== 'currency');
++  // Filter out ALL currency types from inventory items
++  const finalItems = items.filter((item) => !CURRENCY_TYPES.has(item.itemType));
+ 
+   const weight = finalItems.reduce((acc, item) => {
+-    const itemWeight = parseFloat(String(item.Вес ?? item.weight ?? '0').replace(',', '.')) || 0;
++    const itemWeight = parseFloat(String(item.weight ?? '0').replace(',', '.')) || 0;
+     return acc + (itemWeight * (item.quantity || 1));
+   }, 0);
+ 
+   const price = finalItems.reduce((acc, item) => {
+-    const itemPrice = item.Цена ?? item.price ?? 0;
++    const itemPrice = item.cost ?? item.price ?? 0;
+     return acc + (itemPrice * (item.quantity || 1));
+   }, 0);
+ 
+   return { finalItems, totalCaps, weight, price };
+ };
+ 
+-const getDisplayName = (item) => item.displayName || item.Название || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem', 'Unknown item');
+-
++const getDisplayName = (item) => item.displayName || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem', 'Unknown item');
+ 
+ const formatQuantitySuffix = (item) => {
+   const qty = Number(item?.quantity || 0);
+   if (!qty || qty <= 1) return '';
+-  if (item?.itemType === 'currency') return ` (${qty} ${tCharacterScreen('labels.capsShort', 'caps')})`;
++  if (CURRENCY_TYPES.has(item?.itemType)) return ` (${qty} ${tCharacterScreen('labels.capsShort', 'caps')})`;
+   return ` (${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')})`;
+ };
+ 
+@@ -193,9 +187,6 @@ const formatAmmoSuffix = (ammo) => {
+   return ` (${qtyText} ${ammo.name})`;
+ };
+ 
+-// For robotArm entries with a builtinWeaponId, returns " + <weapon name>" so the
+-// modal makes it visible that the arm carries a built-in weapon (e.g. manipulator).
+-
+ const resolveRobotBodyPlan = (character) => (
+   getBodyPlan(character) || 'protectron'
+ );
+@@ -231,8 +222,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+             try {
+               return await resolveKitItems(kit);
+             } catch (error) {
+-              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error, 'stack:', error?.stack);
+-              console.warn('Не удалось разрешить комплект снаряжения, используется исходный набор:', kit?.id, error);
++              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error);
+               return kit;
+             }
+           }),
+@@ -283,14 +273,10 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+         robotCatalog,
+       );
+ 
+-      // Non-limb/armor items go to equipment inventory
+-      // Exclude robot-specific weapons that replace limbs (they live in slots, not inventory)
+       const allInventoryItems = [...finalItems.filter(
+         (item) => {
+           if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'plating', 'armor', 'frame', 'module'].includes(item.itemType)) return false;
+-          // Weapons that replace arm slots are part of the robot body, not inventory
+           if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
+-          // robot_weapon_* is built-in to robot limbs — never goes to inventory
+           if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
+           return true;
+         }
+@@ -302,13 +288,11 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+         weight,
+         price,
+         caps: totalCaps,
+-        // Robot-specific fields
+         robotSlots: slots,
+         robotWeapons: weapons,
+         robotModules: modules,
+       });
+     } else {
+-      // Human: ensure unarmed_human is included in weapons
+       const UNARMED_ID = 'unarmed_human';
+       onSelectKit({
+         name: kit.name,
+@@ -334,7 +318,6 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+       groups[meta].push({ ...entry, _entryIndex: index, _sortKey: getStructureSortKey(probe) });
+     });
+ 
+-    // Within "Стандартная конструкция" sort by sub-order: head → body → arm → legs → plating
+     if (groups.structure) {
+       groups.structure.sort((a, b) => (a._sortKey ?? 99) - (b._sortKey ?? 99));
+     }
+@@ -433,4 +416,4 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+   );
+ };
+ 
+-export default EquipmentKitModal;
++export default EquipmentKitModal;
+\ No newline at end of file
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 34f0bca..eb28a44 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -160,7 +160,8 @@
+   "kitResolver": {
+     "currency": "Caps",
+     "currencyNcr": "NCR Dollars",
+-    "unknownItem": "Unknown item"
++    "unknownItem": "Unknown item",
++    "basicMaterial": "Basic Materials"
+   },
+   "modals": {
+     "requirements": "Requirements",
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 1db67e2..dc2b594 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -160,7 +160,8 @@
+   "kitResolver": {
+     "currency": "Крышки",
+     "currencyNcr": "Доллары НКР",
+-    "unknownItem": "Неизвестный предмет"
++    "unknownItem": "Неизвестный предмет",
++    "basicMaterial": "Базовые материалы"
+   },
+   "modals": {
+     "requirements": "Требования",
