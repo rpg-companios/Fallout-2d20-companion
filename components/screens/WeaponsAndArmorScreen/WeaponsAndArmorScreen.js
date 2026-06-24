@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
@@ -32,6 +32,7 @@ import ArmorModificationModal from './modal/ArmorModificationModal';
 import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
+import { debugLog } from '../../../src/debug/falloutDebug';
 
 
 const HealthCounter = ({ max, isEnabled }) => {
@@ -237,6 +238,16 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
   };
 
 
+const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
+  const appliedModIds = Object.values(weapon?.appliedMods || {}).filter(Boolean);
+  const prefixes = appliedModIds
+    .map((modId) => (catalog?.weaponMods || []).find((mod) => mod.id === modId)?.prefix)
+    .filter(Boolean);
+
+  const localizedBaseName = base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
+  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : (base?.name || weapon?.name);
+};
+
 const findLocalizedWeapon = (catalog, weapon) => {
   if (!weapon?.id) return weapon;
   const base = (catalog?.weapons || []).find((entry) => entry.id === weapon.id);
@@ -259,8 +270,8 @@ const findLocalizedWeapon = (catalog, weapon) => {
     withoutMods: base.withoutMods ?? weapon.withoutMods,
     // при наличии модов сохраняем все изменённые моды поля вместо catalog-данных
     ...(hasAppliedMods ? {
-      name: weapon.name,
-      baseWeaponName: weapon.baseWeaponName,
+      name: getLocalizedModifiedWeaponName(catalog, weapon, base),
+      baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
       damage: weapon.damage,
       fire_rate: weapon.fire_rate,
       qualities: weapon.qualities,
@@ -403,6 +414,13 @@ const WeaponsAndArmorScreen = () => {
   const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
     (weapon) => findLocalizedWeapon(equipmentCatalog, weapon),
   );
+  useEffect(() => {
+    debugLog('weapon.display.list', {
+      locale,
+      equippedWeaponsForDisplay: equippedWeaponsForDisplay.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fire_rate: w.fire_rate, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+      localizedEquippedWeapons: localizedEquippedWeapons.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fire_rate: w.fire_rate, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+    });
+  }, [locale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
 
   const weaponFingerprint = (w) => {
     if (!w) return null;
@@ -445,9 +463,12 @@ const WeaponsAndArmorScreen = () => {
   const handleApplyModification = useCallback((modifiedWeapon) => {
     handleCloseModificationModal();
     const itemId = resolveStoreItemId(selectedWeaponForModification);
+    debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
     if (itemId) {
-      updateItem(itemId, weaponModPatchToStore(modifiedWeapon));
+      const patch = weaponModPatchToStore(modifiedWeapon);
+      debugLog('weapon.mod.apply.screen.patch', { itemId, patch });
+      updateItem(itemId, patch);
       return;
     }
 

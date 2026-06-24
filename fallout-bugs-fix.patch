@@ -1,0 +1,422 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index fa73a75..caa0710 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -506,48 +506,140 @@ export default function CharacterScreen() {
+     }
+ 
+     const skillIndex = skills.findIndex((s) => s.name === skillName);
++    if (skillIndex < 0) return;
+     const currentSkill = skills[skillIndex];
+ 
+-    // Check current state
+     const isInMainSkills = selectedSkills.includes(skillName);
+     const isInExtraSkills = extraTaggedSkills.includes(skillName);
+     const isForcedSkill = forcedSelectedSkills.includes(skillName);
+     const isCurrentlySelected = isInMainSkills || isInExtraSkills;
+ 
+-    // Cannot deselect forced skills
+     if (isForcedSkill && isCurrentlySelected) {
+       showError(tCharacterScreen("errors.cannotUnselectForcedSkill", "You cannot unselect a forced skill."));
+       return;
+     }
+ 
+-    // Skill max value checks
+     let skillMax = trait?.modifiers?.skillMaxValue ?? 6;
+     if (level === 1) {
+       skillMax = Math.min(skillMax, 3);
+     }
+ 
+-    // Good Soul special handling
+     const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
+-      const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
+-      const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
+-      const isInGroup = skillPickGroup.includes(skill?.name || skillName);
+-      const isBonus = isSkillPickActive && skillPickSelected.includes(skill?.name || skillName);
+-      const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
+-
+-      if (canChangeSkillValue(skill.value, delta, trait, level, isTagged)) {
+-        let nextVal = skill.value + delta;
+-        if (capForThis !== undefined) {
+-          nextVal = Math.min(nextVal, capForThis);
+-        }
+-        const store = useCharacterStore.getState();
+-        if (!store.skills[skill.name]) {
+-          store.loadFromLegacyData({ skills });
++    const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++    const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
++    const isInSkillPickGroup = skillPickGroup.includes(skillName);
++    const isBonusFromSkillPick = isSkillPickActive && skillPickSelected.includes(skillName);
++    const capForThis = isSkillPickActive && isInSkillPickGroup && !isBonusFromSkillPick ? 4 : undefined;
++
++    const syncSkillStore = (delta) => {
++      const store = useCharacterStore.getState();
++      if (!store.skills?.[skillName]) {
++        store.loadFromLegacyData({ skills });
++      }
++      useCharacterStore.getState().updateSkill(skillName, delta);
++    };
++
++    if (!isCurrentlySelected) {
++      const nextValue = Math.min(currentSkill.value + 2, capForThis ?? skillMax);
++      if (nextValue > skillMax || currentSkill.value + 2 > skillMax) {
++        showError(
++          tCharacterScreen("errors.skillTagExceedsMaxRank", "Tagging this skill will exceed max rank ({skillMax}). Lower it first.").replace("{skillMax}", String(skillMax)),
++        );
++        return;
++      }
++
++      if (isBonusFromSkillPick) {
++        return;
++      }
++
++      if (isForcedSkill) {
++        setExtraTaggedSkills((prev) => [...prev, skillName]);
++      } else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
++        setSelectedSkills((prev) => [...prev, skillName]);
++      } else {
++        const extraSkillsFromTrait = trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
++        const traitForcedSkills = trait?.forcedSkills || trait?.modifiers?.forcedSkills || [];
++        const canSelectAsExtra =
++          extraSkillsFromTrait > 0 &&
++          (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
++
++        if (canSelectAsExtra && extraTaggedSkills.length < extraSkillsFromTrait) {
++          setExtraTaggedSkills((prev) => [...prev, skillName]);
++        } else {
++          const extraText = canSelectAsExtra
++            ? `\n\n${tCharacterScreen("labels.extraSlotsAvailable", "Extra slots available")}: ${extraSkillsFromTrait - extraTaggedSkills.length}`
++            : "";
++          showError(
++            tCharacterScreen("errors.maxBaseSkills", "You can choose a maximum of {count} base skills.{extraText}").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
++          );
++          return;
+         }
+-        store.updateSkill(skill.name, delta);
+-        newSkills[index] = { ...skill, value: nextVal };
+       }
++
++      const appliedDelta = nextValue - currentSkill.value;
++      setSkills((prev) =>
++        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
++      );
++      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
++    } else {
++      if (isInMainSkills) {
++        setSelectedSkills((prev) => prev.filter((s) => s !== skillName));
++      }
++      if (isInExtraSkills) {
++        setExtraTaggedSkills((prev) => prev.filter((s) => s !== skillName));
++      }
++
++      const nextValue = Math.max(0, currentSkill.value - 2);
++      const appliedDelta = nextValue - currentSkill.value;
++      setSkills((prev) =>
++        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
++      );
++      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
++    }
++  };
++
++  const handleChangeSkillValue = (index, delta) => {
++    if (!attributesSaved) {
++      showAlert(tCharacterScreen("errors.saveAttributesFirstSimple", "Save attributes first."));
++      return;
++    }
++
++    if (delta > 0 && skillPointsLeft <= 0) {
++      showError(tCharacterScreen("errors.noSkillPointsLeft", "You have no skill points left to distribute."));
++      return;
++    }
++
++    const skill = skills[index];
++    if (!skill) return;
++    const isTagged = selectedSkills.includes(skill.name) || extraTaggedSkills.includes(skill.name);
++
++    const skillPickGroup = trait?.modifiers?.skillPickChoice?.from || [];
++    const skillPickSelected = trait?.modifiers?.skillPickSelected || [];
++    const isSkillPickActive = skillPickGroup.length > 0 && skillPickSelected.length > 0;
++    const isInGroup = skillPickGroup.includes(skill.name);
++    const isBonus = isSkillPickActive && skillPickSelected.includes(skill.name);
++    const capForThis = isSkillPickActive && isInGroup && !isBonus ? 4 : undefined;
++
++    if (!canChangeSkillValue(skill.value, delta, trait, level, isTagged)) return;
++
++    let nextVal = skill.value + delta;
++    if (capForThis !== undefined) {
++      nextVal = Math.min(nextVal, capForThis);
++    }
++    if (nextVal === skill.value) return;
++
++    const appliedDelta = nextVal - skill.value;
++    setSkills((prev) => {
++      const newSkills = [...prev];
++      newSkills[index] = { ...skill, value: nextVal };
+       return newSkills;
+     });
++
++    const store = useCharacterStore.getState();
++    if (!store.skills?.[skill.name]) {
++      store.loadFromLegacyData({ skills });
++    }
++    useCharacterStore.getState().updateSkill(skill.name, appliedDelta);
+   };
+ 
+   const handleChangeAttribute = (index, delta) => {
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index f7edd67..4515aa2 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -75,8 +75,17 @@ const buildWeaponModRow = (m) => {
+     materials: safeStr(m.materials),
+     cost: safeNum(m.cost),
+     effects: safeStr(m.effects),
++    effectsLegacy: safeStr(m.effectsLegacy),
+     effect_description: safeStr(m.effectDescription),
++    effectDescription: safeStr(m.effectDescription),
+     weight: safeStr(m.weight),
++    damageModifier: m.damageModifier || null,
++    fireRateModifier: m.fireRateModifier || null,
++    rangeModifier: m.rangeModifier || null,
++    qualityChanges: Array.isArray(m.qualityChanges) ? m.qualityChanges : null,
++    damageType: safeStr(m.damageType),
++    ammoOverride: safeStr(m.ammoOverride),
++    ammoPerShotDelta: m.ammoPerShotDelta ?? null,
+     applies_to_ids: appliesToIds.length ? JSON.stringify(appliesToIds) : null,
+   };
+ };
+diff --git a/i18n/en-EN/data/equipment/ammo/ammoData.json b/i18n/en-EN/data/equipment/ammo/ammoData.json
+index 4e0e052..ca4bef6 100644
+--- a/i18n/en-EN/data/equipment/ammo/ammoData.json
++++ b/i18n/en-EN/data/equipment/ammo/ammoData.json
+@@ -8,7 +8,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "10-мм",
++    "name": "10mm",
+     "find_formula": "8+4fn{CD}",
+     "weight": 0.025,
+     "price": 2,
+@@ -24,7 +24,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Сигнальная ракета",
++    "name": "Flare",
+     "find_formula": "2+1fn{CD}",
+     "weight": 0.085,
+     "price": 1,
+@@ -32,7 +32,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Патрон дробовика",
++    "name": "Shotgun Shell",
+     "find_formula": "6+3fn{CD}",
+     "weight": 0.1,
+     "price": 3,
+@@ -48,7 +48,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Топливо огнемета",
++    "name": "Flamer Fuel",
+     "find_formula": "12+6fn{CD}",
+     "weight": 0.015,
+     "price": 1,
+@@ -56,7 +56,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Ядерная батарея",
++    "name": "Energy Cell",
+     "find_formula": "14+7fn{CD}",
+     "weight": 0.03,
+     "price": 3,
+@@ -64,7 +64,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Патрон гамма-пушки",
++    "name": "Gamma Round",
+     "find_formula": "4+2fn{CD}",
+     "weight": 0.025,
+     "price": 10,
+@@ -72,7 +72,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Ж/Д гвоздь",
++    "name": "Railway Spike",
+     "find_formula": "6+3fn{CD}",
+     "weight": 0.2,
+     "price": 1,
+@@ -80,7 +80,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Шприц",
++    "name": "Syringe",
+     "find_formula": "4+2fn{CD}",
+     "weight": 0.1,
+     "price": "1",
+@@ -88,7 +88,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": ".44 Магнум",
++    "name": ".44 Magnum",
+     "find_formula": "4+2fn{CD}",
+     "weight": 0.055,
+     "price": 3,
+@@ -104,7 +104,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "5.56-мм",
++    "name": "5.56mm",
+     "find_formula": "8+4fn{CD}",
+     "weight": 0.035,
+     "price": 2,
+@@ -112,7 +112,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "5-мм",
++    "name": "5mm",
+     "find_formula": "10x(12+6fn{CD})",
+     "weight": 0.01,
+     "price": 1,
+@@ -120,7 +120,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Ядерный блок",
++    "name": "Fusion Core",
+     "find_formula": "1",
+     "weight": 4,
+     "price": 200,
+@@ -128,7 +128,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Ракета",
++    "name": "Missile",
+     "find_formula": "2+1fn{CD}",
+     "weight": 7,
+     "price": 25,
+@@ -136,7 +136,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Заряд плазмы",
++    "name": "Plasma Cartridge",
+     "find_formula": "10+5fn{CD}",
+     "weight": 0.03,
+     "price": 5,
+@@ -144,7 +144,7 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "2-мм ЭК",
++    "name": "2mm EC",
+     "find_formula": "6+3fn{CD}",
+     "weight": 0.13,
+     "price": 10,
+@@ -152,11 +152,11 @@
+     "itemType": "ammo"
+   },
+   {
+-    "name": "Ядерный минизаряд",
++    "name": "Mini Nuke",
+     "find_formula": "1+1fn{CD}",
+     "weight": 12,
+     "price": 100,
+     "rarity": 6,
+     "itemType": "ammo"
+   }
+-] 
+\ No newline at end of file
++]
+diff --git a/i18n/en-EN/data/equipment/ammo/ammo_types.json b/i18n/en-EN/data/equipment/ammo/ammo_types.json
+index d407f6d..dfeba2b 100644
+--- a/i18n/en-EN/data/equipment/ammo/ammo_types.json
++++ b/i18n/en-EN/data/equipment/ammo/ammo_types.json
+@@ -1,40 +1,40 @@
+ [
+-  { "id": "ammo_357_magnum", "name": "Патрон .357 Магнум" },
+-  { "id": "ammo_12_7mm", "name": "Патрон 12.7 мм" },
+-  { "id": "ammo_9mm", "name": "Патрон 9 мм" },
+-  { "id": "ammo_50_ball", "name": ".50 Шарик" },
+-  { "id": "ammo_25mm_grenade", "name": "25мм Граната" },
+-  { "id": "ammo_40mm_grenade", "name": "40мм Граната" },
+-  { "id": "ammo_alien_power_cell", "name": "Инопланетные энергоэлементы" },
+-  { "id": "ammo_alien_power_module", "name": "Инопланетный энергомодуль" },
+-  { "id": "ammo_arrow", "name": "Стрела" },
+-  { "id": "ammo_bolt", "name": "Болт" },
+-  { "id": "ammo_plasma_cartridge_alien", "name": "Плазменный картридж" },
+-  { "id": "ammo_38", "name": "Патрон .38" },
+-  { "id": "ammo_10mm", "name": "Патрон 10-мм" },
+-  { "id": "ammo_308", "name": "Патрон .308" },
+-  { "id": "ammo_flare", "name": "Сигнальная ракета" },
+-  { "id": "ammo_shotgun_shell", "name": "Патроны для дробовика" },
+-  { "id": "ammo_45", "name": "Патрон .45" },
+-  { "id": "ammo_flamer_fuel", "name": "Топливо для огнемета" },
+-  { "id": "ammo_energy_cell", "name": "Энергоячейка" },
+-  { "id": "ammo_gamma_round", "name": "Гамма-патроны" },
+-  { "id": "ammo_railway_spike", "name": "Железнодорожный костыль" },
+-  { "id": "ammo_syringe", "name": "Шприц" },
+-  { "id": "ammo_44_magnum", "name": "Патрон .44 Магнум" },
+-  { "id": "ammo_50_cal", "name": "Патрон .50" },
+-  { "id": "ammo_5_56mm", "name": "Патрон 5.56 мм" },
+-  { "id": "ammo_5mm", "name": "Патрон 5 мм" },
+-  { "id": "ammo_fusion_core", "name": "Ядерный блок" },
+-  { "id": "ammo_missile", "name": "Ракета" },
+-  { "id": "ammo_plasma_cartridge", "name": "Плазменный картридж" },
+-  { "id": "ammo_2mm_ec", "name": "Патрон 2 мм ЭК" },
+-  { "id": "ammo_mini_nuke", "name": "Ядерный минизаряд" },
+-  { "id": "ammo_anything", "name": "Что угодно" },
+-  { "id": "ammo_acid_concentrate", "name": "Кислотный концентрат" },
+-  { "id": "ammo_cannonball", "name": "Пушечное ядро" },
+-  { "id": "ammo_cryo_cell", "name": "Крио-элемент" },
+-  { "id": "ammo_harpoon", "name": "Гарпун" },
++  { "id": "ammo_357_magnum", "name": ".357 Magnum Round" },
++  { "id": "ammo_12_7mm", "name": "12.7mm Round" },
++  { "id": "ammo_9mm", "name": "9mm Round" },
++  { "id": "ammo_50_ball", "name": ".50 Ball" },
++  { "id": "ammo_25mm_grenade", "name": "25mm Grenade" },
++  { "id": "ammo_40mm_grenade", "name": "40mm Grenade" },
++  { "id": "ammo_alien_power_cell", "name": "Alien Power Cell" },
++  { "id": "ammo_alien_power_module", "name": "Alien Power Module" },
++  { "id": "ammo_arrow", "name": "Arrow" },
++  { "id": "ammo_bolt", "name": "Bolt" },
++  { "id": "ammo_plasma_cartridge_alien", "name": "Alien Plasma Cartridge" },
++  { "id": "ammo_38", "name": ".38 Round" },
++  { "id": "ammo_10mm", "name": "10mm Round" },
++  { "id": "ammo_308", "name": ".308 Round" },
++  { "id": "ammo_flare", "name": "Flare" },
++  { "id": "ammo_shotgun_shell", "name": "Shotgun Shell" },
++  { "id": "ammo_45", "name": ".45 Round" },
++  { "id": "ammo_flamer_fuel", "name": "Flamer Fuel" },
++  { "id": "ammo_energy_cell", "name": "Energy Cell" },
++  { "id": "ammo_gamma_round", "name": "Gamma Round" },
++  { "id": "ammo_railway_spike", "name": "Railway Spike" },
++  { "id": "ammo_syringe", "name": "Syringe" },
++  { "id": "ammo_44_magnum", "name": ".44 Magnum Round" },
++  { "id": "ammo_50_cal", "name": ".50 Round" },
++  { "id": "ammo_5_56mm", "name": "5.56mm Round" },
++  { "id": "ammo_5mm", "name": "5mm Round" },
++  { "id": "ammo_fusion_core", "name": "Fusion Core" },
++  { "id": "ammo_missile", "name": "Missile" },
++  { "id": "ammo_plasma_cartridge", "name": "Plasma Cartridge" },
++  { "id": "ammo_2mm_ec", "name": "2mm EC Round" },
++  { "id": "ammo_mini_nuke", "name": "Mini Nuke" },
++  { "id": "ammo_anything", "name": "Anything" },
++  { "id": "ammo_acid_concentrate", "name": "Acid Concentrate" },
++  { "id": "ammo_cannonball", "name": "Cannonball" },
++  { "id": "ammo_cryo_cell", "name": "Cryo Cell" },
++  { "id": "ammo_harpoon", "name": "Harpoon" },
+   { "id": "ammo_syringe_bloodpack", "name": "Bloodpack Syringe" },
+   { "id": "ammo_gas_grenade", "name": "Gas Grenade" }
+ ]

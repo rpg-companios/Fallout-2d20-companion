@@ -13,6 +13,7 @@ import { shiftRange } from '../../../../domain/range';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities } from '../../../../domain/weaponDisplay';
 import styles from '../../../../styles/WeaponModificationModal.styles';
+import { debugLog } from '../../../../src/debug/falloutDebug';
 
 
 function toNumber(v) {
@@ -160,6 +161,22 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     ? JSON.stringify(Array.from(qualities).map(id => ({ qualityId: id })))
     : '–';
 
+  debugLog('weapon.mod.compute', {
+    weaponId: baseWeapon?.id ?? baseWeapon?.weaponId,
+    baseName,
+    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges })),
+    baseDamage: damageBase,
+    resultDamage: damage,
+    baseFireRate: fireRateBase,
+    resultFireRate: fire_rate,
+    baseWeight: weightBase,
+    resultWeight: weight,
+    baseCost: costBase,
+    resultCost: cost,
+    rangeShift,
+    resultRange: range_name,
+  });
+
   return {
     ...baseWeapon,
     name,
@@ -242,6 +259,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             const normalizedSlot = normalizeSlotKey(slot);
             const mods = await getModsForWeaponSlot(resolvedWeaponId, slot);
             const normalizedMods = (mods || []).map(normalizeModRow).filter(Boolean);
+            normalizedMods.forEach((m) => debugLog('weapon.mod.row', { weaponId: resolvedWeaponId, slot, normalizedSlot, id: m.id, name: m.name, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges, effectDescription: m.effectDescription }));
             if (!bySlot[normalizedSlot]) bySlot[normalizedSlot] = [];
             bySlot[normalizedSlot].push(...normalizedMods);
           }
@@ -311,6 +329,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
     }
 
     const modificationsArray = Object.values(selectedModifications);
+    debugLog('weapon.mod.apply.modal', { modificationsArray: modificationsArray.map((m) => ({ id: m.id, slot: m.slot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier })), modifiedWeapon });
     if (modificationsArray.length > 0) {
       onApplyModification(modifiedWeapon);
     } else {

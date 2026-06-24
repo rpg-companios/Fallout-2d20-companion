@@ -52,6 +52,7 @@ import {
 import { normalizeForStore, denormalizeForSave } from './migrations.js';
 import { legacyEffectToStore } from './effectsSync.js';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+import { debugLog } from '../debug/falloutDebug.js';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -414,11 +415,13 @@ const useCharacterStore = create(devtools(
           return;
         }
         
+        debugLog('store.updateItem.before', { itemId, oldItem: items[itemId], patch });
         // Merge the patch with existing item data
         const updatedItem = { ...items[itemId], ...patch };
         
         // Normalize item parameters (recalculate totals)
         const normalizedItem = normalizeItemParameters(updatedItem);
+        debugLog('store.updateItem.after', { itemId, updatedItem, normalizedItem });
         items[itemId] = normalizedItem;
         
         set({ items });
