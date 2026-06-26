@@ -52,7 +52,8 @@
     "selectTrait": "Select Trait",
     "confirmSelection": "Confirm Selection",
     "close": "Close",
-    "apply": "Apply"
+    "apply": "Apply",
+    "back": "Back"
   },
   "placeholders": {
     "selectNone": "Not selected",
@@ -133,7 +134,9 @@
     },
     "skillPick": {
       "title": "Choose skills",
-      "description": "Choose skills from the provided group. They will be marked as extra."
+      "description": "Choose skills from the provided group. They will be marked as extra.",
+      "choose1": "Choose 1 skill",
+      "chooseN": "Choose {count} skills"
     }
   },
   "origins": {

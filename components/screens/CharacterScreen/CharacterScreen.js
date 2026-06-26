@@ -363,8 +363,6 @@ export default function CharacterScreen() {
 
   const [showResetWarning, setShowResetWarning] = useState(false);
   const [resetType, setResetType] = useState(null);
-  const [skillPickerVisible, setSkillPickerVisible] = useState(false);
-  const [skillPicks, setSkillPicks] = useState([]);
 
   // Состояние для временного распределения очков атрибутов от перков
   const [tempAttributes, setTempAttributes] = useState(null);
@@ -893,47 +891,6 @@ export default function CharacterScreen() {
     // Устанавливаем саму новую черту
     setTrait(newTrait);
     setIsTraitModalVisible(false);
-
-    // Если в черте есть выбор навыков по контракту skillPickChoice
-    if (newTrait?.modifiers?.skillPickChoice) {
-      setSkillPicks([]);
-      setSkillPickerVisible(true);
-    }
-  };
-
-  const toggleSkillPick = (skill) => {
-    const maxCount = trait?.modifiers?.skillPickChoice?.count || 2;
-    setSkillPicks((prev) => {
-      if (prev.includes(skill)) return prev.filter((s) => s !== skill);
-      if (prev.length >= maxCount) return prev;
-      return [...prev, skill];
-    });
-  };
-
-  const handleConfirmSkillPick = () => {
-    const maxCount = trait?.modifiers?.skillPickChoice?.count || 2;
-    if (skillPicks.length !== maxCount) return;
-    const picks = [...skillPicks];
-
-    setTrait((prev) => {
-      if (!prev) return prev;
-      const prevMods = prev.modifiers || {};
-      const newMods = {
-        ...prevMods,
-        skillPickSelected: picks,
-        forcedSkills: [...new Set([...(prevMods.forcedSkills || []), ...picks])],
-        extraSkills: (prevMods.extraSkills || 0) + picks.length,
-      };
-      return { ...prev, modifiers: newMods };
-    });
-
-    setForcedSelectedSkills((prev) => [...new Set([...prev, ...picks])]);
-    setExtraTaggedSkills((prev) => [...new Set([...prev, ...picks])]);
-    setSkills((prev) =>
-      prev.map((s) => (picks.includes(s.name) && s.value < 2 ? { ...s, value: 2 } : s))
-    );
-    setSkillPicks([]);
-    setSkillPickerVisible(false);
   };
 
   // Обработчик нажатия на строку черты
@@ -1400,51 +1357,6 @@ export default function CharacterScreen() {
           setCaps={setCaps}
           character={{ origin, trait }}
         />
-
-        {/* Модальное окно для выбора навыков по контракту skillPickChoice */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={skillPickerVisible}
-          onRequestClose={() => setSkillPickerVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <Text style={styles.modalTitle}>{tCharacterScreen("modals.skillPick.title", "Choose skills")}</Text>
-              <Text style={{ marginBottom: 8, textAlign: 'center' }}>
-                {tCharacterScreen("modals.skillPick.description", "Choose skills from the group. They will be marked as extra.")}
-              </Text>
-              {(trait?.modifiers?.skillPickChoice?.from || []).map((skill) => {
-                const isPicked = skillPicks.includes(skill);
-                return (
-                  <TouchableOpacity
-                    key={skill}
-                    style={[
-                      { padding: 12, marginVertical: 4, borderRadius: 6, width: '100%', alignItems: 'center' },
-                      { backgroundColor: '#2196F3' },
-                      isPicked && { backgroundColor: '#1976D2', borderWidth: 2, borderColor: '#fff' },
-                    ]}
-                    onPress={() => toggleSkillPick(skill)}
-                  >
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>{getSkillDisplayName(skill)}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-              <TouchableOpacity
-                style={[
-                  styles.modalButton,
-                  styles.confirmButton,
-                  skillPicks.length !== (trait?.modifiers?.skillPickChoice?.count || 2) && styles.disabledButton,
-                  { marginTop: 10 },
-                ]}
-                disabled={skillPicks.length !== (trait?.modifiers?.skillPickChoice?.count || 2)}
-                onPress={handleConfirmSkillPick}
-              >
-                <Text style={styles.buttonText}>{tCharacterScreen("buttons.confirm", "Confirm")}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
 
         {/* Модальное окно для выбора черты */}
         {TraitModalComponent && (
