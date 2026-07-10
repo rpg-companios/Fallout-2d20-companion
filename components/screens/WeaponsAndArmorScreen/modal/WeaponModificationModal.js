@@ -389,6 +389,22 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                   isExpanded={expandedCategories[slot]}
                   onToggle={() => handleToggleCategory(slot)}
                 >
+                  {/* Кнопка «Без мода» — всегда первая в списке слота */}
+                  <TouchableOpacity
+                    style={[styles.modificationItem, !selectedModifications[slot] && styles.selectedModification]}
+                    onPress={() => {
+                      const newSelected = { ...selectedModifications };
+                      delete newSelected[slot];
+                      setSelectedModifications(newSelected);
+                      setModifiedWeapon(applyDbModEffectsToWeapon(baseWeaponForMods || weapon, newSelected));
+                    }}
+                  >
+                    <Text style={styles.modificationName}>
+                      {selectedModifications[slot]
+                        ? tWeaponsAndArmorScreen('modals.removeWeaponMod')
+                        : tWeaponsAndArmorScreen('modals.noWeaponMod')}
+                    </Text>
+                  </TouchableOpacity>
                   {mods.map((mod, index) => (
                     <TouchableOpacity
                       key={index}
