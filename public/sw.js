@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rpg-companion-v8';
+const CACHE_NAME = 'rpg-companion-v9';
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/favicon.ico', '/pwa-icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -18,21 +18,18 @@ self.addEventListener('fetch', (event) => {
   const requestUrl = new URL(event.request.url);
   if (requestUrl.origin !== self.location.origin) return;
 
+  // Network-first strategy: always try the network first so dev changes
+  // are reflected immediately; fall back to cache only when offline.
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-
-      return fetch(event.request)
-        .then((response) => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+    fetch(event.request)
+      .then((response) => {
+        if (!response || response.status !== 200 || response.type !== 'basic') {
           return response;
-        })
-        .catch(() => caches.match('/index.html'));
-    })
+        }
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html')))
   );
 });
