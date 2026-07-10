@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import { getTraitDisplayDescription, TRAITS } from '../CharacterScreen/logic/traitsData';
+import { getTraitNameKey, resolveTraitDisplayName } from '../../../domain/traits';
+import { useLocale } from '../../../i18n/locale';
 import perksData from '../../../assets/Perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
@@ -13,6 +15,7 @@ const PerksAndTraitsScreen = () => {
     trait, level, selectedPerks, setSelectedPerks, annotatePerks, 
     addPerkAttributePoints, attributesSaved 
   } = useCharacter();
+  useLocale(); // подписываемся на смену локали → ре-рендер
   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
   const perkLimit = level + extraPerkSlots;
@@ -96,10 +99,11 @@ const PerksAndTraitsScreen = () => {
             const selectedNames = trait?.modifiers?.selectedTraitNames;
             if (Array.isArray(selectedNames) && selectedNames.length > 0) {
               return selectedNames.map((name, idx) => {
+                const resolvedName = resolveTraitDisplayName(name);
                 const baseTrait = TRAITS[name] || {};
                 return (
                   <View key={`trait-${idx}-${name}`} style={styles.row}>
-                    <Text style={[styles.cell, styles.nameColumn]}>{name}</Text>
+                    <Text style={[styles.cell, styles.nameColumn]}>{resolvedName}</Text>
                     <Text style={[styles.cell, styles.rankColumn]}></Text>
                     {renderTextWithIcons(
                       getTraitDisplayDescription({ name, modifiers: baseTrait.modifiers }),
@@ -111,7 +115,7 @@ const PerksAndTraitsScreen = () => {
             }
             return (
               <View style={styles.row}>
-                <Text style={[styles.cell, styles.nameColumn]}>{trait.name}</Text>
+                <Text style={[styles.cell, styles.nameColumn]}>{getTraitNameKey(trait)}</Text>
                 <Text style={[styles.cell, styles.rankColumn]}></Text>
                 {renderTextWithIcons(
                   getTraitDisplayDescription(trait),

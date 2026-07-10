@@ -195,6 +195,32 @@ export function getTraitNameKey(trait) {
 }
 
 /**
+ * Resolves a trait display name for the current locale from a stored (potentially
+ * stale-locale) name string. Scans all locale dictionaries to find the matching trait,
+ * then returns the name in the current locale. Falls back to the stored name.
+ *
+ * @param {string} storedName - trait name as saved in character state (any locale)
+ * @returns {string} display name in current locale
+ */
+export function resolveTraitDisplayName(storedName) {
+  if (!storedName) return '';
+  // Fast path: stored name already matches current locale
+  const byCurrentLocale = findTraitByLocalizedName(storedName);
+  if (byCurrentLocale) return tTrait(byCurrentLocale.displayNameKey) || storedName;
+  // Slow path: try every locale dictionary to find the matching trait
+  const found = traitsJson.find((t) =>
+    Object.values(TRAIT_DICTIONARIES).some((dict) => {
+      const parts = t.displayNameKey.split('.');
+      let val = dict;
+      for (const p of parts) { val = val?.[p]; }
+      return typeof val === 'string' && val === storedName;
+    })
+  );
+  if (!found) return storedName;
+  return tTrait(found.displayNameKey) || storedName;
+}
+
+/**
  * Returns fully resolved { name, description } for a trait by id,
  * using the current locale.
  */

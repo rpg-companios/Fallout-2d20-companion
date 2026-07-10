@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
 import { initRobotSlots } from '../../../../domain/robotEquip';
 import { isRobotCharacter, getBodyPlan } from '../../../../domain/origins';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+import { useLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/EquipmentKitModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
@@ -15,14 +16,6 @@ const loadRobotCatalog = () => ({
   legs: require('../../../../data/equipment/robot/robotlegs.json'),
   weapons: require('../../../../data/equipment/robot/weapons.json'),
 });
-
-// Meta-categories shown in the kit modal.
-const META_CATEGORY_LABELS = {
-  structure: tCharacterScreen('modals.equipmentKit.categories.structure', 'Standard Structure'),
-  weapon: tCharacterScreen('modals.equipmentKit.categories.weapon', 'Weapons'),
-  module: tCharacterScreen('modals.equipmentKit.categories.module', 'Modules'),
-  misc: tCharacterScreen('modals.equipmentKit.categories.misc', 'Misc'),
-};
 
 const META_CATEGORY_ORDER = ['structure', 'weapon', 'module', 'misc'];
 
@@ -202,6 +195,14 @@ const formatBuiltinWeaponSuffix = (entry) => {
 };
 
 const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, character }) => {
+  const locale = useLocale(); // подписываемся на смену локали → ре-рендер
+  const metaCategoryLabels = useMemo(() => ({
+    structure: tCharacterScreen('modals.equipmentKit.categories.structure', 'Standard Structure'),
+    weapon: tCharacterScreen('modals.equipmentKit.categories.weapon', 'Weapons'),
+    module: tCharacterScreen('modals.equipmentKit.categories.module', 'Modules'),
+    misc: tCharacterScreen('modals.equipmentKit.categories.misc', 'Misc'),
+  }), [locale]);
+
   const [expandedKit, setExpandedKit] = useState(null);
   const [selectedChoices, setSelectedChoices] = useState({});
   const [calculatedKits, setCalculatedKits] = useState([]);
@@ -350,7 +351,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
 
                           return (
                             <View key={category} style={styles.categoryContainer}>
-                              <Text style={styles.categoryTitle}>{META_CATEGORY_LABELS[category] || tCharacterScreen('labels.equipmentKit', 'Equipment Kit')}:</Text>
+                              <Text style={styles.categoryTitle}>{metaCategoryLabels[category] || tCharacterScreen('labels.equipmentKit', 'Equipment Kit')}:</Text>
                               {groups[category].map((entry) => {
                                 if (entry?.type === 'choice') {
                                   return (
