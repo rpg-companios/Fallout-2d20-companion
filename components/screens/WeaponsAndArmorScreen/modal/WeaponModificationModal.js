@@ -316,10 +316,16 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
   const handleSelectModification = (slot, mod) => {
     if (!weapon) return;
 
-    // Строим новый набор выбранных модов (UI-состояние)
-    const newSelected = { ...selectedModifications, [slot]: mod };
-    setSelectedModifications(newSelected);
+    // Повторное нажатие на уже выбранный мод → снять его со слота
+    let newSelected;
+    if (selectedModifications[slot]?.id === mod.id) {
+      newSelected = { ...selectedModifications };
+      delete newSelected[slot];
+    } else {
+      newSelected = { ...selectedModifications, [slot]: mod };
+    }
 
+    setSelectedModifications(newSelected);
     setModifiedWeapon(applyDbModEffectsToWeapon(baseWeaponForMods || weapon, newSelected));
   };
 
@@ -330,11 +336,8 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
 
     const modificationsArray = Object.values(selectedModifications);
     debugLog('weapon.mod.apply.modal', { modificationsArray: modificationsArray.map((m) => ({ id: m.id, slot: m.slot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier })), modifiedWeapon });
-    if (modificationsArray.length > 0) {
-      onApplyModification(modifiedWeapon);
-    } else {
-      Alert.alert(tWeaponsAndArmorScreen('modals.errorTitle'), tWeaponsAndArmorScreen('modals.errorSelectMod'));
-    }
+    // Разрешаем применить даже с нулём модов — это означает снятие всех модов с оружия
+    onApplyModification(modifiedWeapon);
   };
 
   const handleClose = () => {
@@ -438,8 +441,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleApplyModification}
-              style={[styles.applyButton, Object.keys(selectedModifications).length === 0 && styles.disabledButton]}
-              disabled={Object.keys(selectedModifications).length === 0}
+              style={styles.applyButton}
             >
               <Text style={styles.applyButtonText}>{tWeaponsAndArmorScreen('modals.apply')}</Text>
             </TouchableOpacity>
