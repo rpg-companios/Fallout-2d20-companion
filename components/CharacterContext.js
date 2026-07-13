@@ -155,6 +155,11 @@ export const CharacterProvider = ({ children }) => {
   });
   const [caps, setCaps] = useState(0);
   const [currentHealth, setCurrentHealth] = useState(0);
+  const [radiation, setRadiationRaw] = useState(0);
+  const setRadiation = (updater) => setRadiationRaw((prev) => {
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    return Math.max(0, next);
+  });
   const [modifiedItems, setModifiedItems] = useState(new Map());
   const [availablePerkAttributePoints, setAvailablePerkAttributePoints] = useState(0);
   const [luckPoints, setLuckPoints] = useState(0);
@@ -258,6 +263,7 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor,
     caps,
     currentHealth,
+    radiation,
     modifiedItems,
     availablePerkAttributePoints,
     luckPoints,
@@ -275,7 +281,7 @@ export const CharacterProvider = ({ children }) => {
     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
-    equippedArmor, caps, currentHealth, modifiedItems, availablePerkAttributePoints,
+    equippedArmor, caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
     carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog,
   ]);
@@ -305,7 +311,7 @@ export const CharacterProvider = ({ children }) => {
     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
-    equippedArmor, caps, currentHealth, modifiedItems, availablePerkAttributePoints,
+    equippedArmor, caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
     carryWeight, meleeBonus, initiative, defense, buildSnapshot,
   ]);
@@ -390,6 +396,7 @@ export const CharacterProvider = ({ children }) => {
       });
       setCaps(data.caps ?? 0);
       setCurrentHealth(data.currentHealth ?? 0);
+      setRadiationRaw(Math.max(0, data.radiation ?? 0));
       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
       setLuckPoints(data.luckPoints ?? 0);
@@ -708,6 +715,7 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor, setEquippedArmor,
     caps, setCaps,
     currentHealth, setCurrentHealth,
+    radiation, setRadiation,
     luckPoints, setLuckPoints,
     maxLuckPoints, setMaxLuckPoints,
     attributesSaved, setAttributesSaved,

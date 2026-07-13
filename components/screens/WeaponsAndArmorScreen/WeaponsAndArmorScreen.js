@@ -35,17 +35,22 @@ import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
 import { debugLog } from '../../../src/debug/falloutDebug';
 
 
-const HealthCounter = ({ max, isEnabled }) => {
+const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
   const { currentHealth, setCurrentHealth } = useCharacter();
+  const displayMax = max - radiation;
   const canDecrease = isEnabled && currentHealth > 0;
-  const canIncrease = isEnabled && currentHealth < max;
+  const canIncrease = isEnabled && currentHealth < displayMax;
 
   const handleAdjustHealth = (amount) => {
     if (!isEnabled) return;
-    setCurrentHealth(prev => Math.max(0, Math.min(max, prev + amount)));
+    if (amount > 0) {
+      setCurrentHealth(prev => prev >= displayMax ? prev : Math.min(displayMax, prev + amount));
+    } else {
+      setCurrentHealth(prev => Math.max(0, prev + amount));
+    }
   };
 
-  const healthText = isEnabled ? `${currentHealth}/${max}` : '—/—';
+  const healthText = isEnabled ? `${currentHealth}/${displayMax}` : '—/—';
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -64,6 +69,73 @@ const HealthCounter = ({ max, isEnabled }) => {
       >
         <Text style={styles.counterButtonText}>+</Text>
       </TouchableOpacity>
+    </View>
+  );
+};
+
+const RadiationCounter = ({ isEnabled }) => {
+  const { radiation, setRadiation } = useCharacter();
+  const canDecrease = isEnabled && radiation > 0;
+
+  const handleAdjust = (amount) => {
+    if (!isEnabled) return;
+    setRadiation(prev => Math.max(0, prev + amount));
+  };
+
+  const text = isEnabled ? `${radiation}` : '—';
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <TouchableOpacity
+        onPress={() => handleAdjust(-1)}
+        disabled={!canDecrease}
+        style={[styles.counterButton, !canDecrease && { opacity: 0.5 }]}
+      >
+        <Text style={styles.counterButtonText}>-</Text>
+      </TouchableOpacity>
+      <Text style={[styles.counterValue, { minWidth: 50, textAlign: 'center' }]}>{text}</Text>
+      <TouchableOpacity
+        onPress={() => handleAdjust(1)}
+        disabled={!isEnabled}
+        style={[styles.counterButton, !isEnabled && { opacity: 0.5 }]}
+      >
+        <Text style={styles.counterButtonText}>+</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const EffectsPanel = ({ effects }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  useLocale();
+  return (
+    <View style={localStyles.effectsPanelContainer}>
+      <TouchableOpacity style={localStyles.effectsPanelHeader} onPress={() => setIsOpen(v => !v)} activeOpacity={0.8}>
+        <Text style={localStyles.effectsPanelTitle}>{tWeaponsAndArmorScreen('effectsPanel.title')}</Text>
+        <Text style={localStyles.effectsPanelToggle}>{isOpen ? '−' : '+'}</Text>
+      </TouchableOpacity>
+      {isOpen && (
+        <View style={localStyles.effectsPanelBody}>
+          {effects.length === 0 ? (
+            <Text style={localStyles.effectsPanelEmpty}>{tWeaponsAndArmorScreen('effectsPanel.empty')}</Text>
+          ) : (
+            effects.map((effect) => {
+              const effectText = effect.effectName || effect.effectLabel || '—';
+              const isNegative = effect.effectKind === 'negative';
+              return (
+                <View key={effect.id} style={localStyles.effectsPanelRow}>
+                  <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
+                    {effectText}
+                  </Text>
+                  <Text style={localStyles.effectTimerText}>
+                    {getEffectTimeText(effect.scenesLeft)}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -357,6 +429,7 @@ const WeaponsAndArmorScreen = () => {
     attributesSaved,
     trait,
     origin,
+    radiation,
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
@@ -402,7 +475,6 @@ const WeaponsAndArmorScreen = () => {
   const characterForImmunities = { origin, trait };
   const hasRadImmunity = hasRadiationImmunity(characterForImmunities);
   const hasPoisonImmunityValue = hasPoisonImmunity(characterForImmunities);
-  const hasTimedEffects = (activeTimedEffects || []).length > 0;
   const equipmentCatalog = getEquipmentCatalog(locale);
   const robotBodyUpgrade = findRobotBodyUpgrade(
     equipmentCatalog,
@@ -615,33 +687,15 @@ const WeaponsAndArmorScreen = () => {
                 <StatBox title={tWeaponsAndArmorScreen('stats.meleeBonus')} value={meleeBonus} highlightMeleeBonus />
             </View>
             <View style={[localStyles.statsRow, { marginTop: 8 }]}>
-                <StatBox title={tWeaponsAndArmorScreen('stats.effects')} value={hasTimedEffects ? '' : tWeaponsAndArmorScreen('common.empty')}>
-                  {hasTimedEffects ? (
-                    <View style={localStyles.effectsListContainer}>
-                      {(activeTimedEffects || []).map((effect) => {
-                        const effectText = effect.effectName || effect.effectLabel || '—';
-                        const isNegative = effect.effectKind === 'negative';
-                        return (
-                          <View key={effect.id} style={localStyles.effectLineContainer}>
-                            <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
-                              {effectText}
-                            </Text>
-                            {/* TIMER_VISIBILITY_TOGGLE_START: закомментируйте этот блок, чтобы скрыть таймер эффекта */}
-                            <Text style={localStyles.effectTimerText}>
-                              {getEffectTimeText(effect.scenesLeft)}
-                            </Text>
-                            {/* TIMER_VISIBILITY_TOGGLE_END */}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ) : null}
-                </StatBox>
                 <StatBox title={tWeaponsAndArmorScreen('stats.poisonResistance')} value={hasPoisonImmunityValue ? '∞' : '0'} />
+                <StatBox title={tWeaponsAndArmorScreen('stats.radiation')} value="">
+                  <RadiationCounter isEnabled={attributesSaved} />
+                </StatBox>
                 <StatBox title={tWeaponsAndArmorScreen('stats.health')} max={effectiveMaxHealth}>
-                  <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} />
+                  <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
                 </StatBox>
             </View>
+            <EffectsPanel effects={activeTimedEffects || []} />
             </View>
 
             {/* Броня / Слоты робота */}
