@@ -1,0 +1,43 @@
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index aeec877..765d4ca 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -82,7 +82,7 @@ const RadiationCounter = ({ isEnabled }) => {
+     setRadiation(prev => Math.max(0, prev + amount));
+   };
+
+-  const text = isEnabled ? `${radiation}` : '—';
++  const text = isEnabled ? `${radiation}` : '0';
+
+   return (
+     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+@@ -217,8 +217,8 @@ const EffectsPanel = ({ effects, immunities = [] }) => {
+
+ // --- Reusable Components ---
+
+-const StatBox = ({ title, value, children, highlightMeleeBonus = false }) => (
+-  <View style={localStyles.statBoxContainer}>
++const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false }) => (
++  <View style={[localStyles.statBoxContainer, disabled && { opacity: 0.5 }]}>
+     <View style={localStyles.statBoxHeader}>
+       <Text style={styles.sectionTitle}>{title}</Text>
+     </View>
+@@ -555,6 +555,7 @@ const WeaponsAndArmorScreen = () => {
+   const characterForImmunities = { origin, trait };
+   const hasRadImmunity = hasRadiationImmunity(characterForImmunities);
+   const hasPoisonImmunityValue = hasPoisonImmunity(characterForImmunities);
++  const radiationIsEnabled = attributesSaved && !hasRadImmunity;
+   const allImmunities = useMemo(() => {
+     const combined = [
+       ...getOriginImmunities(origin),
+@@ -775,8 +776,8 @@ const WeaponsAndArmorScreen = () => {
+             </View>
+             <View style={[localStyles.statsRow, { marginTop: 8 }]}>
+                 <StatBox title={tWeaponsAndArmorScreen('stats.poisonResistance')} value={hasPoisonImmunityValue ? '∞' : '0'} />
+-                <StatBox title={tWeaponsAndArmorScreen('stats.radiation')} value="">
+-                  <RadiationCounter isEnabled={attributesSaved} />
++                <StatBox title={tWeaponsAndArmorScreen('stats.radiation')} value={hasRadImmunity ? '0' : ''} disabled={hasRadImmunity}>
++                  <RadiationCounter isEnabled={radiationIsEnabled} />
+                 </StatBox>
+                 <StatBox title={tWeaponsAndArmorScreen('stats.health')} max={effectiveMaxHealth}>
+                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
