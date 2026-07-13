@@ -10,7 +10,13 @@
   },
   "effectsPanel": {
     "title": "Effects",
-    "empty": "No active effects"
+    "empty": "No active effects",
+    "immunityPrefix": "Immunity to:",
+    "immunityTypes": {
+      "radiation": "Radiation",
+      "poison": "Poison",
+      "disease": "Disease"
+    }
   },
   "armor": {
     "slots": {

@@ -22,7 +22,7 @@ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { applyArmorMods } from '../../../domain/modsEquip';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
-import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
+import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { getRobotSlotKeys } from '../../../domain/robotEquip';
 
@@ -160,9 +160,20 @@ const WeaponAmmoCell = ({ ammoId, qualities }) => {
   );
 };
 
-const EffectsPanel = ({ effects }) => {
+const EffectsPanel = ({ effects, immunities = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
+
+  const hasImmunities = immunities.length > 0;
+  const hasEffects = (effects || []).length > 0;
+  const isEmpty = !hasImmunities && !hasEffects;
+
+  const immunityLabel = hasImmunities
+    ? `${tWeaponsAndArmorScreen('effectsPanel.immunityPrefix')} ${immunities
+        .map(key => tWeaponsAndArmorScreen(`effectsPanel.immunityTypes.${key}`) || key)
+        .join(', ')}`
+    : null;
+
   return (
     <View style={localStyles.effectsPanelContainer}>
       <TouchableOpacity style={localStyles.effectsPanelHeader} onPress={() => setIsOpen(v => !v)} activeOpacity={0.8}>
@@ -171,23 +182,31 @@ const EffectsPanel = ({ effects }) => {
       </TouchableOpacity>
       {isOpen && (
         <View style={localStyles.effectsPanelBody}>
-          {effects.length === 0 ? (
+          {isEmpty ? (
             <Text style={localStyles.effectsPanelEmpty}>{tWeaponsAndArmorScreen('effectsPanel.empty')}</Text>
           ) : (
-            effects.map((effect) => {
-              const effectText = effect.effectName || effect.effectLabel || '—';
-              const isNegative = effect.effectKind === 'negative';
-              return (
-                <View key={effect.id} style={localStyles.effectsPanelRow}>
-                  <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
-                    {effectText}
-                  </Text>
-                  <Text style={localStyles.effectTimerText}>
-                    {getEffectTimeText(effect.scenesLeft)}
-                  </Text>
+            <>
+              {immunityLabel ? (
+                <View style={localStyles.effectsPanelRow}>
+                  <Text style={[localStyles.effectText, localStyles.positiveEffectText]}>{immunityLabel}</Text>
+                  <Text style={localStyles.effectTimerText}>∞</Text>
                 </View>
-              );
-            })
+              ) : null}
+              {effects.map((effect) => {
+                const effectText = effect.effectName || effect.effectLabel || '—';
+                const isNegative = effect.effectKind === 'negative';
+                return (
+                  <View key={effect.id} style={localStyles.effectsPanelRow}>
+                    <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
+                      {effectText}
+                    </Text>
+                    <Text style={localStyles.effectTimerText}>
+                      {getEffectTimeText(effect.scenesLeft)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </>
           )}
         </View>
       )}
@@ -536,6 +555,13 @@ const WeaponsAndArmorScreen = () => {
   const characterForImmunities = { origin, trait };
   const hasRadImmunity = hasRadiationImmunity(characterForImmunities);
   const hasPoisonImmunityValue = hasPoisonImmunity(characterForImmunities);
+  const allImmunities = useMemo(() => {
+    const combined = [
+      ...getOriginImmunities(origin),
+      ...getTraitImmunities(trait),
+    ];
+    return [...new Set(combined)];
+  }, [origin, trait]);
   const equipmentCatalog = getEquipmentCatalog(locale);
   const robotBodyUpgrade = findRobotBodyUpgrade(
     equipmentCatalog,
@@ -756,7 +782,7 @@ const WeaponsAndArmorScreen = () => {
                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
                 </StatBox>
             </View>
-            <EffectsPanel effects={activeTimedEffects || []} />
+            <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} />
             </View>
 
             {/* Броня / Слоты робота */}

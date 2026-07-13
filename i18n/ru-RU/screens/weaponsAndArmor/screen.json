@@ -10,7 +10,13 @@
   },
   "effectsPanel": {
     "title": "Эффекты",
-    "empty": "Нет активных эффектов"
+    "empty": "Нет активных эффектов",
+    "immunityPrefix": "Иммунитет к:",
+    "immunityTypes": {
+      "radiation": "Радиация",
+      "poison": "Яд",
+      "disease": "Болезни"
+    }
   },
   "armor": {
     "slots": {
