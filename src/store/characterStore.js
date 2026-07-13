@@ -53,6 +53,8 @@ import { normalizeForStore, denormalizeForSave } from './migrations.js';
 import { legacyEffectToStore } from './effectsSync.js';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
+import perksData from '../../data/perks/perks.json';
+import { selectPerkBonuses } from '../../domain/perks.js';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -204,13 +206,27 @@ const useCharacterStore = create(devtools(
       skills: {},
       items: {},
       effects: {},
+      selectedPerks: [],
       derivedStats: {}, // Calculated derived stats
+
+      perkBonuses: {},
 
       // Robot equipment slice (slots / modules / bodyPlan). See robotSlice.js.
       ...createInitialRobotState(),
 
       // Status flags (not part of persistence)
       isEffectsProcessing: false,
+
+      // --- Actions: Perks ---
+      setSelectedPerks: (selectedPerks = []) => {
+        set({ selectedPerks });
+        get().recalculatePerkBonuses();
+        get().recalculateDerivedStats();
+      },
+
+      recalculatePerkBonuses: () => {
+        set({ perkBonuses: selectPerkBonuses(get(), perksData) });
+      },
 
       // --- Actions: Robot equipment (delegated to robotSlice) ---
       ...createRobotActions(set, get),
@@ -749,6 +765,7 @@ const useCharacterStore = create(devtools(
           items: updatedItems,
         });
         
+        get().recalculatePerkBonuses();
         get().recalculateDerivedStats();
       },
       
@@ -759,7 +776,7 @@ const useCharacterStore = create(devtools(
        */
       recalculateDerivedStats: (options = {}) => {
         const state = get();
-        const { attributes, effects } = state;
+        const { attributes, effects, perkBonuses } = state;
 
         // Merge provided options with the last context pushed via setCharacterContext,
         // falling back to defaults. (Previously this used a stub that always returned
@@ -781,10 +798,10 @@ const useCharacterStore = create(devtools(
         // Calculate derived stats
         const derivedStats = calculateDerivedStats(
           attributes,
-          effects,
+          { ...effects, perkBonuses },
           context.trait,
           context.level,
-          equipmentState
+          { ...equipmentState, perkBonuses }
         );
 
         set({ derivedStats });
@@ -815,7 +832,8 @@ const useCharacterStore = create(devtools(
        */
       loadFromLegacyData: (legacyData) => {
         const normalizedState = normalizeForStore(legacyData);
-        set(normalizedState);
+        set({ ...normalizedState, selectedPerks: legacyData?.selectedPerks || [] });
+        get().recalculatePerkBonuses();
         get().recalculateAll();
       },
 
@@ -835,11 +853,14 @@ const useCharacterStore = create(devtools(
           skills: normalizedDefaults.skills || {},
           items: {},
           effects: {},
+          selectedPerks: legacyDefaults?.selectedPerks || [],
+          perkBonuses: {},
           derivedStats: {},
           _characterContext: undefined,
           ...createInitialRobotState(),
         });
 
+        get().recalculatePerkBonuses();
         get().recalculateAll();
       },
       
@@ -863,6 +884,7 @@ const useCharacterStore = create(devtools(
         skills: state.skills,
         items: state.items,
         effects: state.effects,
+        selectedPerks: state.selectedPerks,
         robot: state.robot,
         schemaVersion: 1,
       }),

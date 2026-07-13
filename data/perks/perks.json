@@ -10,7 +10,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.animalFriend.effect"
+    "effectKey": "perks.animalFriend.effect",
+    "effect": "animalFriend"
   },
   {
     "id": "aquaboy",
@@ -23,7 +24,8 @@
       "level": 1,
       "levelIncreasePerRank": 3
     },
-    "effectKey": "perks.aquaboy.effect"
+    "effectKey": "perks.aquaboy.effect",
+    "effect": "aquaboy"
   },
   {
     "id": "radResistant",
@@ -36,7 +38,8 @@
       "level": 1,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.radResistant.effect"
+    "effectKey": "perks.radResistant.effect",
+    "effect": "radResistant"
   },
   {
     "id": "armorer",
@@ -49,7 +52,8 @@
       },
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.armorer.effect"
+    "effectKey": "perks.armorer.effect",
+    "effect": "armorer"
   },
   {
     "id": "barbarian",
@@ -62,7 +66,8 @@
       "level": 4,
       "notForRobots": true
     },
-    "effectKey": "perks.barbarian.effect"
+    "effectKey": "perks.barbarian.effect",
+    "effect": "barbarian"
   },
   {
     "id": "gunFu",
@@ -73,7 +78,8 @@
         "AGI": 7
       }
     },
-    "effectKey": "perks.gunFu.effect"
+    "effectKey": "perks.gunFu.effect",
+    "effect": "gunFu"
   },
   {
     "id": "silverTongue",
@@ -84,7 +90,8 @@
         "CHA": 6
       }
     },
-    "effectKey": "perks.silverTongue.effect"
+    "effectKey": "perks.silverTongue.effect",
+    "effect": "silverTongue"
   },
   {
     "id": "blitz",
@@ -97,7 +104,8 @@
       "level": 1,
       "levelIncreasePerRank": 3
     },
-    "effectKey": "perks.blitz.effect"
+    "effectKey": "perks.blitz.effect",
+    "effect": "blitz"
   },
   {
     "id": "leadBelly",
@@ -110,14 +118,16 @@
       "level": 1,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.leadBelly.effect"
+    "effectKey": "perks.leadBelly.effect",
+    "effect": "leadBelly"
   },
   {
     "id": "juryRigging",
     "nameKey": "perks.juryRigging.name",
     "maxRanks": 1,
     "prerequisites": {},
-    "effectKey": "perks.juryRigging.effect"
+    "effectKey": "perks.juryRigging.effect",
+    "effect": "juryRigging"
   },
   {
     "id": "scoundrel",
@@ -128,7 +138,8 @@
         "CHA": 7
       }
     },
-    "effectKey": "perks.scoundrel.effect"
+    "effectKey": "perks.scoundrel.effect",
+    "effect": "scoundrel"
   },
   {
     "id": "dogmeat",
@@ -139,7 +150,8 @@
         "CHA": 5
       }
     },
-    "effectKey": "perks.dogmeat.effect"
+    "effectKey": "perks.dogmeat.effect",
+    "effect": "dogmeat"
   },
   {
     "id": "hunter",
@@ -150,7 +162,8 @@
         "END": 6
       }
     },
-    "effectKey": "perks.hunter.effect"
+    "effectKey": "perks.hunter.effect",
+    "effect": "hunter"
   },
   {
     "id": "chemist",
@@ -161,7 +174,8 @@
         "INT": 7
       }
     },
-    "effectKey": "perks.chemist.effect"
+    "effectKey": "perks.chemist.effect",
+    "effect": "chemist"
   },
   {
     "id": "shotgunSurgeon",
@@ -173,7 +187,8 @@
         "AGI": 7
       }
     },
-    "effectKey": "perks.shotgunSurgeon.effect"
+    "effectKey": "perks.shotgunSurgeon.effect",
+    "effect": "shotgunSurgeon"
   },
   {
     "id": "movingTarget",
@@ -184,7 +199,8 @@
         "AGI": 6
       }
     },
-    "effectKey": "perks.movingTarget.effect"
+    "effectKey": "perks.movingTarget.effect",
+    "effect": "movingTarget"
   },
   {
     "id": "basher",
@@ -195,7 +211,8 @@
         "STR": 6
       }
     },
-    "effectKey": "perks.basher.effect"
+    "effectKey": "perks.basher.effect",
+    "effect": "basher"
   },
   {
     "id": "laserCommander",
@@ -208,7 +225,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.laserCommander.effect"
+    "effectKey": "perks.laserCommander.effect",
+    "effect": "laserCommander"
   },
   {
     "id": "commando",
@@ -221,7 +239,8 @@
       "level": 2,
       "levelIncreasePerRank": 3
     },
-    "effectKey": "perks.commando.effect"
+    "effectKey": "perks.commando.effect",
+    "effect": "commando"
   },
   {
     "id": "comprehension",
@@ -232,7 +251,8 @@
         "INT": 6
       }
     },
-    "effectKey": "perks.comprehension.effect"
+    "effectKey": "perks.comprehension.effect",
+    "effect": "comprehension"
   },
   {
     "id": "canOpener",
@@ -243,7 +263,8 @@
         "CHA": 5
       }
     },
-    "effectKey": "perks.canOpener.effect"
+    "effectKey": "perks.canOpener.effect",
+    "effect": "canOpener"
   },
   {
     "id": "betterCriticals",
@@ -254,7 +275,8 @@
         "CHA": 9
       }
     },
-    "effectKey": "perks.betterCriticals.effect"
+    "effectKey": "perks.betterCriticals.effect",
+    "effect": "betterCriticals"
   },
   {
     "id": "quickDraw",
@@ -265,7 +287,8 @@
         "AGI": 6
       }
     },
-    "effectKey": "perks.quickDraw.effect"
+    "effectKey": "perks.quickDraw.effect",
+    "effect": "quickDraw"
   },
   {
     "id": "fortuneFinder",
@@ -278,7 +301,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.fortuneFinder.effect"
+    "effectKey": "perks.fortuneFinder.effect",
+    "effect": "fortuneFinder"
   },
   {
     "id": "solarPowered",
@@ -289,7 +313,8 @@
         "END": 7
       }
     },
-    "effectKey": "perks.solarPowered.effect"
+    "effectKey": "perks.solarPowered.effect",
+    "effect": "solarPowered"
   },
   {
     "id": "entomologist",
@@ -300,7 +325,8 @@
         "INT": 7
       }
     },
-    "effectKey": "perks.entomologist.effect"
+    "effectKey": "perks.entomologist.effect",
+    "effect": "entomologist"
   },
   {
     "id": "intenseTraining",
@@ -310,7 +336,8 @@
       "level": 2,
       "levelIncreasePerRank": 2
     },
-    "effectKey": "perks.intenseTraining.effect"
+    "effectKey": "perks.intenseTraining.effect",
+    "effect": "intenseTraining"
   },
   {
     "id": "demolitionExpert",
@@ -322,7 +349,8 @@
         "CHA": 6
       }
     },
-    "effectKey": "perks.demolitionExpert.effect"
+    "effectKey": "perks.demolitionExpert.effect",
+    "effect": "demolitionExpert"
   },
   {
     "id": "roboticsExpert",
@@ -335,7 +363,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.roboticsExpert.effect"
+    "effectKey": "perks.roboticsExpert.effect",
+    "effect": "roboticsExpert"
   },
   {
     "id": "gunNut",
@@ -348,7 +377,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.gunNut.effect"
+    "effectKey": "perks.gunNut.effect",
+    "effect": "gunNut"
   },
   {
     "id": "capCollector",
@@ -359,7 +389,8 @@
         "CHA": 5
       }
     },
-    "effectKey": "perks.capCollector.effect"
+    "effectKey": "perks.capCollector.effect",
+    "effect": "capCollector"
   },
   {
     "id": "ghost",
@@ -371,7 +402,8 @@
         "AGI": 6
       }
     },
-    "effectKey": "perks.ghost.effect"
+    "effectKey": "perks.ghost.effect",
+    "effect": "ghost"
   },
   {
     "id": "scrounger",
@@ -384,7 +416,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.scrounger.effect"
+    "effectKey": "perks.scrounger.effect",
+    "effect": "scrounger"
   },
   {
     "id": "pharmaFarmer",
@@ -395,7 +428,8 @@
         "CHA": 6
       }
     },
-    "effectKey": "perks.pharmaFarmer.effect"
+    "effectKey": "perks.pharmaFarmer.effect",
+    "effect": "pharmaFarmer"
   },
   {
     "id": "partyBoy",
@@ -407,7 +441,8 @@
         "CHA": 7
       }
     },
-    "effectKey": "perks.partyBoy.effect"
+    "effectKey": "perks.partyBoy.effect",
+    "effect": "partyBoy"
   },
   {
     "id": "finesse",
@@ -418,7 +453,8 @@
         "AGI": 9
       }
     },
-    "effectKey": "perks.finesse.effect"
+    "effectKey": "perks.finesse.effect",
+    "effect": "finesse"
   },
   {
     "id": "heavyHitter",
@@ -429,7 +465,8 @@
         "STR": 8
       }
     },
-    "effectKey": "perks.heavyHitter.effect"
+    "effectKey": "perks.heavyHitter.effect",
+    "effect": "heavyHitter"
   },
   {
     "id": "blacksmith",
@@ -442,7 +479,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.blacksmith.effect"
+    "effectKey": "perks.blacksmith.effect",
+    "effect": "blacksmith"
   },
   {
     "id": "piercingStrike",
@@ -453,7 +491,8 @@
         "STR": 7
       }
     },
-    "effectKey": "perks.piercingStrike.effect"
+    "effectKey": "perks.piercingStrike.effect",
+    "effect": "piercingStrike"
   },
   {
     "id": "rifleman",
@@ -466,7 +505,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.rifleman.effect"
+    "effectKey": "perks.rifleman.effect",
+    "effect": "rifleman"
   },
   {
     "id": "meltdown",
@@ -477,7 +517,8 @@
         "PER": 10
       }
     },
-    "effectKey": "perks.meltdown.effect"
+    "effectKey": "perks.meltdown.effect",
+    "effect": "meltdown"
   },
   {
     "id": "fastHealer",
@@ -489,7 +530,8 @@
       },
       "notForRobots": true
     },
-    "effectKey": "perks.fastHealer.effect"
+    "effectKey": "perks.fastHealer.effect",
+    "effect": "fastHealer"
   },
   {
     "id": "medic",
@@ -502,7 +544,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.medic.effect"
+    "effectKey": "perks.medic.effect",
+    "effect": "medic"
   },
   {
     "id": "heaveHo",
@@ -513,14 +556,16 @@
         "STR": 8
       }
     },
-    "effectKey": "perks.heaveHo.effect"
+    "effectKey": "perks.heaveHo.effect",
+    "effect": "heaveHo"
   },
   {
     "id": "actionBoy",
     "nameKey": "perks.actionBoy.name",
     "maxRanks": 1,
     "prerequisites": {},
-    "effectKey": "perks.actionBoy.effect"
+    "effectKey": "perks.actionBoy.effect",
+    "effect": "actionBoy"
   },
   {
     "id": "infiltrator",
@@ -531,7 +576,8 @@
         "PER": 8
       }
     },
-    "effectKey": "perks.infiltrator.effect"
+    "effectKey": "perks.infiltrator.effect",
+    "effect": "infiltrator"
   },
   {
     "id": "nurse",
@@ -542,7 +588,8 @@
         "INT": 8
       }
     },
-    "effectKey": "perks.nurse.effect"
+    "effectKey": "perks.nurse.effect",
+    "effect": "nurse"
   },
   {
     "id": "sizeMatters",
@@ -555,7 +602,8 @@
       },
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.sizeMatters.effect"
+    "effectKey": "perks.sizeMatters.effect",
+    "effect": "sizeMatters"
   },
   {
     "id": "bullRush",
@@ -569,7 +617,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.bullRush.effect"
+    "effectKey": "perks.bullRush.effect",
+    "effect": "bullRush"
   },
   {
     "id": "quickHands",
@@ -580,7 +629,8 @@
         "AGI": 8
       }
     },
-    "effectKey": "perks.quickHands.effect"
+    "effectKey": "perks.quickHands.effect",
+    "effect": "quickHands"
   },
   {
     "id": "masterThief",
@@ -592,7 +642,8 @@
         "AGI": 9
       }
     },
-    "effectKey": "perks.masterThief.effect"
+    "effectKey": "perks.masterThief.effect",
+    "effect": "masterThief"
   },
   {
     "id": "sandman",
@@ -603,7 +654,8 @@
         "AGI": 9
       }
     },
-    "effectKey": "perks.sandman.effect"
+    "effectKey": "perks.sandman.effect",
+    "effect": "sandman"
   },
   {
     "id": "fastMetabolism",
@@ -617,7 +669,8 @@
       "levelIncreasePerRank": 3,
       "notForRobots": true
     },
-    "effectKey": "perks.fastMetabolism.effect"
+    "effectKey": "perks.fastMetabolism.effect",
+    "effect": "fastMetabolism"
   },
   {
     "id": "mysteriousStranger",
@@ -628,7 +681,8 @@
         "CHA": 7
       }
     },
-    "effectKey": "perks.mysteriousStranger.effect"
+    "effectKey": "perks.mysteriousStranger.effect",
+    "effect": "mysteriousStranger"
   },
   {
     "id": "daringNature",
@@ -642,7 +696,8 @@
         "cautiousNature"
       ]
     },
-    "effectKey": "perks.daringNature.effect"
+    "effectKey": "perks.daringNature.effect",
+    "effect": "daringNature"
   },
   {
     "id": "cautiousNature",
@@ -656,7 +711,8 @@
         "daringNature"
       ]
     },
-    "effectKey": "perks.cautiousNature.effect"
+    "effectKey": "perks.cautiousNature.effect",
+    "effect": "cautiousNature"
   },
   {
     "id": "ninja",
@@ -667,7 +723,8 @@
         "AGI": 8
       }
     },
-    "effectKey": "perks.ninja.effect"
+    "effectKey": "perks.ninja.effect",
+    "effect": "ninja"
   },
   {
     "id": "nightPerson",
@@ -678,7 +735,8 @@
         "PER": 7
       }
     },
-    "effectKey": "perks.nightPerson.effect"
+    "effectKey": "perks.nightPerson.effect",
+    "effect": "nightPerson"
   },
   {
     "id": "paralyzingPalm",
@@ -689,7 +747,8 @@
         "STR": 8
       }
     },
-    "effectKey": "perks.paralyzingPalm.effect"
+    "effectKey": "perks.paralyzingPalm.effect",
+    "effect": "paralyzingPalm"
   },
   {
     "id": "nuclearPhysicist",
@@ -700,7 +759,8 @@
         "INT": 9
       }
     },
-    "effectKey": "perks.nuclearPhysicist.effect"
+    "effectKey": "perks.nuclearPhysicist.effect",
+    "effect": "nuclearPhysicist"
   },
   {
     "id": "pickpocket",
@@ -714,14 +774,16 @@
       "level": 1,
       "levelIncreasePerRank": 3
     },
-    "effectKey": "perks.pickpocket.effect"
+    "effectKey": "perks.pickpocket.effect",
+    "effect": "pickpocket"
   },
   {
     "id": "lightStep",
     "nameKey": "perks.lightStep.name",
     "maxRanks": 1,
     "prerequisites": {},
-    "effectKey": "perks.lightStep.effect"
+    "effectKey": "perks.lightStep.effect",
+    "effect": "lightStep"
   },
   {
     "id": "hacker",
@@ -732,7 +794,8 @@
         "INT": 8
       }
     },
-    "effectKey": "perks.hacker.effect"
+    "effectKey": "perks.hacker.effect",
+    "effect": "hacker"
   },
   {
     "id": "pathfinder",
@@ -744,7 +807,8 @@
         "END": 6
       }
     },
-    "effectKey": "perks.pathfinder.effect"
+    "effectKey": "perks.pathfinder.effect",
+    "effect": "pathfinder"
   },
   {
     "id": "gunslinger",
@@ -757,7 +821,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.gunslinger.effect"
+    "effectKey": "perks.gunslinger.effect",
+    "effect": "gunslinger"
   },
   {
     "id": "ironFist",
@@ -770,7 +835,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.ironFist.effect"
+    "effectKey": "perks.ironFist.effect",
+    "effect": "ironFist"
   },
   {
     "id": "adrenalineRush",
@@ -781,7 +847,8 @@
         "STR": 7
       }
     },
-    "effectKey": "perks.adrenalineRush.effect"
+    "effectKey": "perks.adrenalineRush.effect",
+    "effect": "adrenalineRush"
   },
   {
     "id": "intimidation",
@@ -795,7 +862,8 @@
       "level": 3,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.intimidation.effect"
+    "effectKey": "perks.intimidation.effect",
+    "effect": "intimidation"
   },
   {
     "id": "pyromaniac",
@@ -808,7 +876,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.pyromaniac.effect"
+    "effectKey": "perks.pyromaniac.effect",
+    "effect": "pyromaniac"
   },
   {
     "id": "nerdRage",
@@ -821,7 +890,8 @@
       "level": 2,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.nerdRage.effect"
+    "effectKey": "perks.nerdRage.effect",
+    "effect": "nerdRage"
   },
   {
     "id": "snakeater",
@@ -832,7 +902,8 @@
         "END": 7
       }
     },
-    "effectKey": "perks.snakeater.effect"
+    "effectKey": "perks.snakeater.effect",
+    "effect": "snakeater"
   },
   {
     "id": "scrapper",
@@ -842,7 +913,8 @@
       "level": 3,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.scrapper.effect"
+    "effectKey": "perks.scrapper.effect",
+    "effect": "scrapper"
   },
   {
     "id": "refractor",
@@ -856,7 +928,8 @@
       "level": 1,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.refractor.effect"
+    "effectKey": "perks.refractor.effect",
+    "effect": "refractor"
   },
   {
     "id": "strongBack",
@@ -869,7 +942,8 @@
       "level": 1,
       "levelIncreasePerRank": 2
     },
-    "effectKey": "perks.strongBack.effect"
+    "effectKey": "perks.strongBack.effect",
+    "effect": "strongBack"
   },
   {
     "id": "chemResistant",
@@ -882,7 +956,8 @@
       "level": 1,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.chemResistant.effect"
+    "effectKey": "perks.chemResistant.effect",
+    "effect": "chemResistant"
   },
   {
     "id": "ricochet",
@@ -894,7 +969,8 @@
       },
       "level": 5
     },
-    "effectKey": "perks.ricochet.effect"
+    "effectKey": "perks.ricochet.effect",
+    "effect": "ricochet"
   },
   {
     "id": "toughness",
@@ -908,7 +984,8 @@
       "level": 1,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.toughness.effect"
+    "effectKey": "perks.toughness.effect",
+    "effect": "toughness"
   },
   {
     "id": "bloodyMess",
@@ -919,7 +996,8 @@
         "CHA": 6
       }
     },
-    "effectKey": "perks.bloodyMess.effect"
+    "effectKey": "perks.bloodyMess.effect",
+    "effect": "bloodyMess"
   },
   {
     "id": "science",
@@ -932,7 +1010,8 @@
       "level": 2,
       "levelIncreasePerRank": 4
     },
-    "effectKey": "perks.science.effect"
+    "effectKey": "perks.science.effect",
+    "effect": "science"
   },
   {
     "id": "awareness",
@@ -943,7 +1022,8 @@
         "PER": 7
       }
     },
-    "effectKey": "perks.awareness.effect"
+    "effectKey": "perks.awareness.effect",
+    "effect": "awareness"
   },
   {
     "id": "sniper",
@@ -955,7 +1035,8 @@
         "AGI": 6
       }
     },
-    "effectKey": "perks.sniper.effect"
+    "effectKey": "perks.sniper.effect",
+    "effect": "sniper"
   },
   {
     "id": "inspirational",
@@ -966,7 +1047,8 @@
         "CHA": 8
       }
     },
-    "effectKey": "perks.inspirational.effect"
+    "effectKey": "perks.inspirational.effect",
+    "effect": "inspirational"
   },
   {
     "id": "tag",
@@ -975,7 +1057,8 @@
     "prerequisites": {
       "level": 5
     },
-    "effectKey": "perks.tag.effect"
+    "effectKey": "perks.tag.effect",
+    "effect": "tag"
   },
   {
     "id": "adamantiumSkeleton",
@@ -988,7 +1071,8 @@
       "level": 1,
       "levelIncreasePerRank": 3
     },
-    "effectKey": "perks.adamantiumSkeleton.effect"
+    "effectKey": "perks.adamantiumSkeleton.effect",
+    "effect": "adamantiumSkeleton"
   },
   {
     "id": "educated",
@@ -998,7 +1082,8 @@
       "level": 3,
       "levelIncreasePerRank": 3
     },
-    "effectKey": "perks.educated.effect"
+    "effectKey": "perks.educated.effect",
+    "effect": "educated"
   },
   {
     "id": "concentratedFire",
@@ -1010,7 +1095,8 @@
         "AGI": 6
       }
     },
-    "effectKey": "perks.concentratedFire.effect"
+    "effectKey": "perks.concentratedFire.effect",
+    "effect": "concentratedFire"
   },
   {
     "id": "slacker",
@@ -1023,7 +1109,8 @@
       "level": 4,
       "levelIncreasePerRank": 6
     },
-    "effectKey": "perks.slacker.effect"
+    "effectKey": "perks.slacker.effect",
+    "effect": "slacker"
   },
   {
     "id": "triggerRush",
@@ -1036,7 +1123,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.triggerRush.effect"
+    "effectKey": "perks.triggerRush.effect",
+    "effect": "triggerRush"
   },
   {
     "id": "slayer",
@@ -1047,7 +1135,8 @@
         "STR": 8
       }
     },
-    "effectKey": "perks.slayer.effect"
+    "effectKey": "perks.slayer.effect",
+    "effect": "slayer"
   },
   {
     "id": "killer",
@@ -1058,7 +1147,8 @@
         "CHA": 8
       }
     },
-    "effectKey": "perks.killer.effect"
+    "effectKey": "perks.killer.effect",
+    "effect": "killer"
   },
   {
     "id": "junktownVendor",
@@ -1069,7 +1159,8 @@
         "CHA": 8
       }
     },
-    "effectKey": "perks.junktownVendor.effect"
+    "effectKey": "perks.junktownVendor.effect",
+    "effect": "junktownVendor"
   },
   {
     "id": "blackWidow",
@@ -1080,7 +1171,8 @@
         "CHA": 6
       }
     },
-    "effectKey": "perks.blackWidow.effect"
+    "effectKey": "perks.blackWidow.effect",
+    "effect": "blackWidow"
   },
   {
     "id": "steadyAim",
@@ -1092,7 +1184,8 @@
         "AGI": 7
       }
     },
-    "effectKey": "perks.steadyAim.effect"
+    "effectKey": "perks.steadyAim.effect",
+    "effect": "steadyAim"
   },
   {
     "id": "lifeGiver",
@@ -1102,6 +1195,7 @@
       "level": 5,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.lifeGiver.effect"
+    "effectKey": "perks.lifeGiver.effect",
+    "effect": "lifeGiver"
   }
 ]
