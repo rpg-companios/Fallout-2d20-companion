@@ -4,11 +4,12 @@ import { useCharacter } from '../../CharacterContext';
 import { getTraitDisplayDescription, TRAITS } from '../CharacterScreen/logic/traitsData';
 import { getTraitNameKey, resolveTraitDisplayName } from '../../../domain/traits';
 import { useLocale } from '../../../i18n/locale';
-import perksData from '../../../assets/Perks/perks.json';
+import perksData from '../../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
 import styles from '../../../styles/PerksAndTraitsScreen.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
+import { getPerkDisplay, withPerkDisplay } from './perksDisplay';
 
 const PerksAndTraitsScreen = () => {
   const { 
@@ -52,8 +53,10 @@ const PerksAndTraitsScreen = () => {
       return;
     }
 
-    // Специальная обработка для перка "ИНТЕНСИВНЫЕ ТРЕНИРОВКИ"
-    if (perk.perk_name === "ИНТЕНСИВНЫЕ ТРЕНИРОВКИ") {
+    const selectedPerk = withPerkDisplay(perk);
+
+    // Специальная обработка перка по стабильному id, без привязки к русскому названию.
+    if (selectedPerk.id === 'intenseTraining') {
       const canTakeIntensiveTraining = level >= 2 || attributesSaved;
       
       if (!canTakeIntensiveTraining) {
@@ -66,11 +69,11 @@ const PerksAndTraitsScreen = () => {
         return;
       }
 
-      const attributeBonus = perk.modifiers?.attributeBonus || 1;
+      const attributeBonus = 1;
       addPerkAttributePoints(attributeBonus);
       
       const successMessage = tPerksAndTraits('perkSelected.intensiveTrainingSuccess')
-        .replace('{perkName}', perk.perk_name)
+        .replace('{perkName}', selectedPerk.perk_name)
         .replace('{bonus}', attributeBonus);
       if (Platform.OS === 'web') {
         window.alert(successMessage);
@@ -79,7 +82,7 @@ const PerksAndTraitsScreen = () => {
       }
     }
 
-    setSelectedPerks(prev => [...prev, perk]);
+    setSelectedPerks(prev => [...prev, selectedPerk]);
     setPerkModalVisible(false);
   };
 
@@ -126,13 +129,16 @@ const PerksAndTraitsScreen = () => {
           })()}
 
           {/* Выбранные перки (по уровням) */}
-          {selectedPerks.map((perk, idx) => (
-            <View key={`perk-${idx}`} style={styles.row}>
-              <Text style={[styles.cell, styles.nameColumn]}>{perk.perk_name}</Text>
-              <Text style={[styles.cell, styles.rankColumn]}>{perk.rank ?? ''}</Text>
-              {renderTextWithIcons(perk.description, [styles.cell, styles.descriptionColumn])}
-            </View>
-          ))}
+          {selectedPerks.map((perk, idx) => {
+            const display = getPerkDisplay(perk);
+            return (
+              <View key={`perk-${perk.id || idx}`} style={styles.row}>
+                <Text style={[styles.cell, styles.nameColumn]}>{display.name}</Text>
+                <Text style={[styles.cell, styles.rankColumn]}>{perk.rank ?? ''}</Text>
+                {renderTextWithIcons(display.description, [styles.cell, styles.descriptionColumn])}
+              </View>
+            );
+          })}
 
           {/* Пустые строки */}
           {emptyRows.map((_, index) => (

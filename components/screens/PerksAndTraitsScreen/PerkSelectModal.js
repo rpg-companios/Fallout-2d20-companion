@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import styles from '../../../styles/PerkSelectModal.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
+import { getPerkDisplay } from './perksDisplay';
 
 const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
@@ -22,7 +23,8 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
             {(annotatedPerks || []).map((entry, index) => {
               const { perk, available, unmet } = entry;
               const isExpanded = expandedIndex === index;
-              const isSelected = selectedPerks.includes(perk);
+              const display = getPerkDisplay(perk);
+              const isSelected = selectedPerks.some((selected) => selected.id === perk.id);
               
               // Для выбранных перков - если они не развернуты вручную, показываем их свернутыми
               // Для непр-selected перков - обычное поведение
@@ -30,7 +32,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
               
               return (
                 <View
-                  key={`${perk.perk_name}-${perk.rank}-${index}`}
+                  key={`${perk.id || index}-${perk.rank || ''}`}
                   style={[styles.perkItem, !available && styles.perkDisabled]}
                 >
                   <TouchableOpacity
@@ -42,12 +44,12 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
                     style={[styles.perkHeader, isSelected && styles.selectedPerk]}
                   >
                     <Text style={[styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName]}>
-                      {perk.perk_name}
+                      {display.name}
                     </Text>
                   </TouchableOpacity>
                   {shouldShowExpanded && (
                     <View style={styles.perkBody}>
-                      <Text style={styles.perkDescription}>{perk.description}</Text>
+                      <Text style={styles.perkDescription}>{display.description}</Text>
                       {!available && unmet && (
                         <View style={styles.unmetContainer}>
                           {unmet.level && (
@@ -58,7 +60,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
                             </Text>
                           )}
                           {unmet.attributes && Object.entries(unmet.attributes).map(([code, info]) => (
-                            <Text key={`${perk.perk_name}-${code}`} style={styles.unmetText}>
+                            <Text key={`${perk.id || index}-${code}`} style={styles.unmetText}>
                               {tPerksAndTraits('modal.requiresAttribute')
                                 .replace('{code}', code)
                                 .replace('{required}', info.required)
@@ -69,9 +71,9 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
                       )}
                       <TouchableOpacity
                         onPress={() => {
-                          if (selectedPerks.includes(perk)) {
+                          if (selectedPerks.some((selected) => selected.id === perk.id)) {
                             // Отменить выбор
-                            setSelectedPerks(selectedPerks.filter(p => p !== perk));
+                            setSelectedPerks(selectedPerks.filter((selected) => selected.id !== perk.id));
                           } else {
                             // Выбрать перк
                             setSelectedPerks([...selectedPerks, perk]);
