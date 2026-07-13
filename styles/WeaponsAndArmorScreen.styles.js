@@ -211,6 +211,40 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   robotBodyModalButtonText: { color: '#fff', fontWeight: '700' },
+  weaponAmmoCellContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderColor: '#5a5a5a',
+    backgroundColor: '#fff',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  weaponAmmoBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 4,
+    backgroundColor: '#8b1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weaponAmmoBtnDisabled: { opacity: 0.35 },
+  weaponAmmoBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  weaponAmmoCount: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#222',
+  },
 });
 
 export default styles;
