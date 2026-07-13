@@ -166,7 +166,14 @@ export const CharacterProvider = ({ children }) => {
   const [maxLuckPoints, setMaxLuckPoints] = useState(0);
   const [attributesSaved, setAttributesSaved] = useState(false);
   const [skillsSaved, setSkillsSaved] = useState(false);
-  const [selectedPerks, setSelectedPerks] = useState([]);
+  const [selectedPerks, setSelectedPerksRaw] = useState([]);
+  const setSelectedPerks = useCallback((updater) => {
+    setSelectedPerksRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      useCharacterStore.getState().setSelectedPerks(next || []);
+      return next || [];
+    });
+  }, []);
   const [carryWeight, setCarryWeight] = useState(
     calculateCarryWeight(attributes, null),
   );
