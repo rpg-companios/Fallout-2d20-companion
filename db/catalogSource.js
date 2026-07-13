@@ -12,7 +12,9 @@
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getCurrentLocale } from '../i18n/locale';
-import perksData from '../assets/Perks/perks.json';
+import perksData from '../data/perks/perks.json';
+import ruPerksData from '../i18n/ru-RU/data/perks/perks.json';
+import enPerksData from '../i18n/en-EN/data/perks/perks.json';
 
 // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
 const safeStr = (v) => (v === null || v === undefined ? null : String(v));
@@ -104,16 +106,28 @@ const buildQualityRow = (q) => ({
   opposite: safeStr(q.opposite),
 });
 
-const buildPerkRows = () =>
-  perksData.map((perk, i) => ({
-    id: i + 1,
-    perk_name: perk.perk_name,
-    rank: perk.rank || 1,
-    max_rank: perk.max_rank || 1,
-    requirements: perk.requirements ? JSON.stringify(perk.requirements) : null,
-    description: perk.description || '',
-    level_increase: perk.level_increase ?? null,
-  }));
+const PERK_I18N = {
+  'ru-RU': new Map(ruPerksData.map((entry) => [entry.id, entry])),
+  'en-EN': new Map(enPerksData.map((entry) => [entry.id, entry])),
+};
+
+const buildPerkRows = () => {
+  const locale = getCurrentLocale();
+  const localizedById = PERK_I18N[locale] || PERK_I18N['ru-RU'];
+  const ruById = PERK_I18N['ru-RU'];
+  return perksData.map((perk) => {
+    const localized = localizedById.get(perk.id) || ruById.get(perk.id) || {};
+    return {
+      id: perk.id,
+      perk_name: localized.name || perk.id,
+      rank: 1,
+      max_rank: perk.maxRanks || 1,
+      requirements: perk.prerequisites ? JSON.stringify(perk.prerequisites) : null,
+      description: localized.effect || '',
+      level_increase: perk.prerequisites?.levelIncreasePerRank ?? null,
+    };
+  });
+};
 
 const buildItemRows = (catalog) => {
   const { armorList, clothes, chems, miscellaneous } = catalog;
