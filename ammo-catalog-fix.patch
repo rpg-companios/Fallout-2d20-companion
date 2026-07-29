@@ -1,12 +1,469 @@
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 280ada02bd431c7f16fff6cd761f0528e0d8bf06..f4bdc8a632659303530840fe14c7e1cdac4c059f 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -68,50 +68,53 @@ const InventoryScreen = () => {
+   const locale = useLocale();
+   const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
+ 
+   const getItemName = (item) => item?.name || item?.id || '';
+   const getItemType = (item) => {
+     if (item?.itemType) return item.itemType;
+     if (item?.effectType || item?.durationInScenes || item?.duration || item?.positiveEffect) return 'chem';
+     if (item?.type === 'ammo') return 'ammo';
+     if (item?.weaponId || item?.damage !== undefined) return 'weapon';
+     if (item?.clothingType) return 'clothing';
+     if (item?.protectedAreas) return 'armor';
+     return 'misc';
+   };
+   const isWeaponItem = (item) => getItemType(item) === 'weapon';
+   const getModsSignature = (item) => {
+     const applied = item?.appliedMods || {};
+     const modIds = Object.values(applied).filter(Boolean).sort();
+     return modIds.length ? modIds.join('|') : 'none';
+   };
+   const getStackKey = (item) => {
+     const itemType = getItemType(item);
+     if (itemType === 'weapon') {
+       const baseWeaponId = item?.weaponId || item?.id || getItemName(item);
+       return `weapon:${baseWeaponId}:mods:${getModsSignature(item)}`;
+     }
++    if (itemType === 'ammo') {
++      return `ammo:${item?.id || getItemName(item)}`;
++    }
+     return `${itemType}:${getItemName(item)}`;
+   };
+   const createWeaponInstanceId = () => `weapon-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+   const createArmorInstanceId = () => `armor-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+   const getArmorInstanceKey = (item, slot, type) =>
+     item?.equipInstanceId || `${type || item?.itemType || 'armor'}:${item?.stackKey || getStackKey(item)}:${slot}`;
+   const getItemTypeIcon = (itemType) => {
+     if (itemType === 'weapon') return '🔫';
+     if (itemType === 'armor') return '🛡️';
+     if (itemType === 'clothing' || itemType === 'outfit') return '👕';
+     if (itemType === 'chem' || itemType === 'chems') return '💊';
+     if (itemType === 'drinks') return '🥤';
+     if (itemType === 'food') return '🍖';
+     if (itemType === 'ammo') return '🔹';
+     if (itemType === 'misc') return '🔧';
+     return '📦';
+   };
+ 
+   const equippedRobotBodyPart = useMemo(() => {
+     const items = Array.isArray(equipment?.items) ? equipment.items : [];
+     return items.find((item) => String(item?.id || '').startsWith('robot_body_') || item?.itemType === 'robotPart') || null;
+   }, [equipment?.items]);
+ 
+   const robotBodyPlan = trait?.modifiers?.robotBodyPlan
+     || equippedRobotBodyPart?.robotBodyPlan
+@@ -212,51 +215,51 @@ const InventoryScreen = () => {
+       console.log('[resolveLocalizedItem] chem result:', result.id, 'positiveEffect:', result.positiveEffect);
+       return result;
+     }
+ 
+     if (itemType === 'drinks') {
+       const base = (equipmentCatalog?.drinks || []).find((entry) => entry.id === item.id);
+       if (!base) return item;
+       return {
+         ...base,
+         ...item,
+         name: base.name || item.name || item.id,
+       };
+     }
+ 
+     if (itemType === 'food') {
+       const base = (equipmentCatalog?.food || []).find((entry) => entry.id === item.id);
+       if (!base) return item;
+       return {
+         ...base,
+         ...item,
+         name: base.name || item.name || item.id,
+       };
+     }
+ 
+     if (itemType === 'ammo') {
+-      const base = (equipmentCatalog?.ammoData || []).find((entry) => entry.id === item.id);
++      const base = (equipmentCatalog?.ammoTypes || []).find((entry) => entry.id === item.id);
+       if (!base) return item;
+       return {
+         ...base,
+         ...item,
+         name: base.name || item.name || item.id,
+       };
+     }
+ 
+     const miscItems = flattenMiscellaneousItems(equipmentCatalog?.miscellaneous);
+     const base = miscItems.find((entry) => entry.id === item.id)
+       || (equipmentCatalog?.generalGoods || []).find((entry) => entry.id === item.id)
+       || (equipmentCatalog?.robotModules || []).find((entry) => entry.id === item.id)
+       || (equipmentCatalog?.robotItems || []).find((entry) => entry.id === item.id);
+     if (!base) return item;
+     return {
+       ...base,
+       ...item,
+       name: base.name || item.name || item.id,
+     };
+   };
+ 
+ 
+   const handleOpenCapsModal = (type) => {
+     setCapsOperationType(type);
+     setIsCapsModalVisible(true);
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index c73fa2d946215da2b99e3f225a5aa3e3f8f17c57..1416b79a6d2db7892939cbd7873d5842d29eb575 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -107,51 +107,51 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+         if (!cancelled) setWeaponsByType({});
+       }
+     };
+ 
+     loadWeaponsFromDb();
+ 
+     return () => {
+       cancelled = true;
+     };
+   }, [locale]);
+ 
+   const staticData = useMemo(() => {
+     const equipmentCatalog = getEquipmentCatalog(locale);
+ 
+     return {
+       [tInventory('modals.addItemModal.categories.armor')]: (equipmentCatalog.armor?.armor || [])
+         .reduce((acc, category) => {
+           acc[category.type] = category.items;
+           return acc;
+         }, {}),
+       [tInventory('modals.addItemModal.categories.clothing')]: (equipmentCatalog.clothes?.clothes || []).reduce((acc, category) => {
+         acc[category.type] = category.items;
+         return acc;
+       }, {}),
+       [tInventory('modals.addItemModal.categories.ammo')]: {
+-        [tInventory('modals.addItemModal.categories.all')]: Array.isArray(equipmentCatalog.ammoData) ? equipmentCatalog.ammoData : [],
++        [tInventory('modals.addItemModal.categories.all')]: Array.isArray(equipmentCatalog.ammoTypes) ? equipmentCatalog.ammoTypes : [],
+       },
+       [tInventory('modals.addItemModal.categories.drinks')]: {
+         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.drinks || [],
+       },
+       [tInventory('modals.addItemModal.categories.chems')]: {
+         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.chems || [],
+       },
+       [tInventory('modals.addItemModal.categories.food')]: {
+         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.food || [],
+       },
+       [tInventory('modals.addItemModal.categories.items')]: {
+         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.generalGoods || [],
+       },
+       [tInventory('modals.addItemModal.categories.materials')]: {
+         [tInventory('modals.addItemModal.categories.all')]: [],
+       },
+       [tInventory('modals.addItemModal.categories.robotEquipment')]: {
+         [tInventory('modals.addItemModal.categories.robotWeapons')]: equipmentCatalog.robotWeaponsOnly || [],
+         [tInventory('modals.addItemModal.categories.robotPlating')]: equipmentCatalog.robotPlating || [],
+         [tInventory('modals.addItemModal.categories.robotArmorLayer')]: equipmentCatalog.robotArmorLayer || [],
+         [tInventory('modals.addItemModal.categories.robotFrame')]: equipmentCatalog.robotFrames || [],
+         [tInventory('modals.addItemModal.categories.robotBodyParts')]: equipmentCatalog.robotBody || [],
+         [tInventory('modals.addItemModal.categories.robotModules')]: equipmentCatalog.robotModules || [],
+       },
+     };
+diff --git a/domain/contract.test.js b/domain/contract.test.js
+index d7339fd825e6e9ad72ac02d8aa749ca99d00d40a..0061fdf803cb52b0e9cb6cce25fd0ce009e77490 100644
+--- a/domain/contract.test.js
++++ b/domain/contract.test.js
+@@ -121,49 +121,51 @@ describe('getEquipmentCatalog() — weapons have non-empty name', () => {
+ //  in react-native which uses Flow syntax. We verify the contract at the
+ //  catalog level instead — if catalog items have no "Название", kitResolver
+ //  cannot produce it either since it spreads catalog objects directly.)
+ 
+ describe('catalog items — name present, no Название', () => {
+   it('all catalog weapons have name and no Название', async () => {
+     const { getEquipmentCatalog } = await import('../i18n/equipmentCatalog.js');
+     const catalog = getEquipmentCatalog();
+     const weapons = catalog.weapons || [];
+     expect(weapons.length).toBeGreaterThan(0);
+ 
+     for (const item of weapons) {
+       expect(typeof item.name).toBe('string');
+       expect(Object.prototype.hasOwnProperty.call(item, 'Название')).toBe(false);
+     }
+   });
+ 
+   it('all catalog ammoTypes have name and no Название', async () => {
+     const { getEquipmentCatalog } = await import('../i18n/equipmentCatalog.js');
+     const catalog = getEquipmentCatalog();
+     const ammo = catalog.ammoTypes || [];
+     expect(ammo.length).toBeGreaterThan(0);
+ 
+     for (const item of ammo) {
+       expect(typeof item.name).toBe('string');
++      expect(item.id).toMatch(/^ammo_/);
++      expect(item.itemType).toBe('ammo');
+       expect(Object.prototype.hasOwnProperty.call(item, 'Название')).toBe(false);
+     }
+   });
+ });
+ 
+ // ─── 6. armorMods — mechanics + i18n names ───────────────────────────────────
+ 
+ describe('getEquipmentCatalog() — armorMods have mechanics and i18n names', () => {
+   it('every armorMod has a non-empty name and mechanic fields from data/', async () => {
+     const { getEquipmentCatalog } = await import('../i18n/equipmentCatalog.js');
+     const catalog = getEquipmentCatalog();
+     const armorMods = catalog.armorMods || [];
+     expect(armorMods.length).toBeGreaterThan(0);
+ 
+     for (const mod of armorMods) {
+       // i18n name must be present
+       expect(typeof mod.name, `armorMod ${mod.id} missing name`).toBe('string');
+       expect(mod.name.trim(), `armorMod ${mod.id} has empty name`).not.toBe('');
+       // mechanic fields from data/ must be present
+       expect(mod, `armorMod ${mod.id} missing complexity`).toHaveProperty('complexity');
+       expect(mod, `armorMod ${mod.id} missing modType`).toHaveProperty('modType');
+     }
+   });
+ });
 diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
-index 8f74db1..22cb0ec 100644
+index 8f74db17b657a9a0743477fe97509a5c7f9111e1..bd3e0f46aa176fe3f5e6301fc7ec05be2edddcb9 100644
 --- a/i18n/equipmentCatalog.js
 +++ b/i18n/equipmentCatalog.js
-@@ -309,6 +309,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+@@ -1,65 +1,63 @@
+ // Locale-specific display data (names, descriptions, flavour text)
+ import ruWeapons from './ru-RU/data/equipment/weapons/weapons.json';
+ import ruWeaponMods from './ru-RU/data/equipment/weapons/weapon_mods.json';
+ import ruArmor from './ru-RU/data/equipment/armor/armor.json';
+ import ruArmorMods from './ru-RU/data/equipment/armor/armor_mods.json';
+ import ruUniqArmorMods from './ru-RU/data/equipment/armor/uniq_armor_mods.json';
+ import ruArmorEffects from './ru-RU/data/equipment/armor/armor_effects.json';
+ import ruClothes from './ru-RU/data/equipment/armor/clothes.json';
+ import ruAmmoTypes from './ru-RU/data/equipment/ammo/ammo_types.json';
+-import ruAmmoData from './ru-RU/data/equipment/ammo/ammoData.json';
+ import ruMiscItems from './ru-RU/data/equipment/items.json';
+ import ruRobotWeapons from './ru-RU/data/equipment/robot/weapons.json';
+ import ruRobotArms from './ru-RU/data/equipment/robot/robotarms.json';
+ import ruRobotArmor from './ru-RU/data/equipment/robot/armor.json';
+ import ruRobotPlating from './ru-RU/data/equipment/robot/plating.json';
+ import ruRobotFrames from './ru-RU/data/equipment/robot/frames.json';
+ import ruRobotLocations from './ru-RU/data/equipment/robot/locations.json';
+ import ruRobotModules from './ru-RU/data/equipment/robot/modules.json';
+ import ruRobotItems from './ru-RU/data/equipment/robot/items.json';
+ import ruRobotBody from './ru-RU/data/equipment/robot/robotbody.json';
+ import ruRobotHeads from './ru-RU/data/equipment/robot/robotheads.json';
+ import ruRobotLegs from './ru-RU/data/equipment/robot/robotlegs.json';
+ import ruChems from './ru-RU/data/consumables/chems.json';
+ import ruDrinks from './ru-RU/data/consumables/drinks.json';
+ import ruFood from './ru-RU/data/consumables/food.json';
+ import ruQualities from './ru-RU/data/system/qualities.json';
+ import ruGeneralGoods from './ru-RU/data/equipment/general_goods.json';
+ import ruOddities from './ru-RU/data/equipment/oddities.json';
+ import ruEffects from './ru-RU/data/system/effects.json';
+ import ruEquipmentKits from './ru-RU/data/system/equipmentKits.json';
+ 
+ import enWeapons from './en-EN/data/equipment/weapons/weapons.json';
+ import enWeaponMods from './en-EN/data/equipment/weapons/weapon_mods.json';
+ import enArmor from './en-EN/data/equipment/armor/armor.json';
+ import enArmorMods from './en-EN/data/equipment/armor/armor_mods.json';
+ import enUniqArmorMods from './en-EN/data/equipment/armor/uniq_armor_mods.json';
+ import enArmorEffects from './en-EN/data/equipment/armor/armor_effects.json';
+ import enClothes from './en-EN/data/equipment/armor/clothes.json';
+ import enAmmoTypes from './en-EN/data/equipment/ammo/ammo_types.json';
+-import enAmmoData from './en-EN/data/equipment/ammo/ammoData.json';
+ import enMiscItems from './en-EN/data/equipment/items.json';
+ import enRobotWeapons from './en-EN/data/equipment/robot/weapons.json';
+ import enRobotArms from './en-EN/data/equipment/robot/robotarms.json';
+ import enRobotArmor from './en-EN/data/equipment/robot/armor.json';
+ import enRobotPlating from './en-EN/data/equipment/robot/plating.json';
+ import enRobotFrames from './en-EN/data/equipment/robot/frames.json';
+ import enRobotLocations from './en-EN/data/equipment/robot/locations.json';
+ import enRobotModules from './en-EN/data/equipment/robot/modules.json';
+ import enRobotItems from './en-EN/data/equipment/robot/items.json';
+ import enRobotBody from './en-EN/data/equipment/robot/robotbody.json';
+ import enRobotHeads from './en-EN/data/equipment/robot/robotheads.json';
+ import enRobotLegs from './en-EN/data/equipment/robot/robotlegs.json';
+ import enChems from './en-EN/data/consumables/chems.json';
+ import enDrinks from './en-EN/data/consumables/drinks.json';
+ import enFood from './en-EN/data/consumables/food.json';
+ import enQualities from './en-EN/data/system/qualities.json';
+ import enGeneralGoods from './en-EN/data/equipment/general_goods.json';
+ import enOddities from './en-EN/data/equipment/oddities.json';
+ import enEffects from './en-EN/data/system/effects.json';
+ import enEquipmentKits from './en-EN/data/system/equipmentKits.json';
+ 
+ // Locale-independent kit data (items composition, no names)
+ import dataKitsBrotherhood from '../data/equipmentKits/brotherhood.json';
+ import dataKitsBrotherhoodOutcast from '../data/equipmentKits/brotherhoodOutcast.json';
+ import dataKitsChildOfAtom from '../data/equipmentKits/childOfAtom.json';
+@@ -95,101 +93,119 @@ import dataRobotArmor from '../data/equipment/robot/armor.json';
+ import dataRobotPlating from '../data/equipment/robot/armor_plating.json';
+ import dataRobotFrames from '../data/equipment/robot/frames.json';
+ import dataRobotWeapons from '../data/equipment/robot/weapons.json';
+ 
+ import dataGeneralGoods from '../data/equipment/general_goods.json';
+ 
+ import dataOddities from '../data/equipment/oddities.json';
+ 
+ import { getCurrentLocale, normalizeLocale } from './locale';
+ 
+ const ALL_KIT_DATA = {
+   ...dataKitsBrotherhood,
+   ...dataKitsBrotherhoodOutcast,
+   ...dataKitsChildOfAtom,
+   ...dataKitsDefault,
+   ...dataKitsMinuteman,
+   ...dataKitsMisterHandy,
+   ...dataKitsNcr,
+   ...dataKitsRobobrain,
+   ...dataKitsSuperMutant,
+   ...dataKitsVaultDweller,
+   ...dataKitsWastelander,
+   ...dataKitsProtectron,
+ };
+ 
++
++const mergeAmmoById = (dataArr, i18nArr) => {
++  const i18nMap = new Map((i18nArr || []).map((item) => [item.id, item]));
++  return (dataArr || []).map((dataItem) => {
++    const i18nItem = i18nMap.get(dataItem.id);
++    if (!i18nItem?.name) {
++      throw new Error(`[equipmentCatalog] No i18n ammo name for id: ${dataItem.id}`);
++    }
++    return {
++      ...dataItem,
++      ...i18nItem,
++      id: dataItem.id,
++      name: i18nItem.name,
++      itemType: 'ammo',
++      type: 'ammo',
++      price: dataItem.cost,
++    };
++  });
++};
++
+ const EQUIPMENT_BY_LOCALE = {
+   'ru-RU': {
+     weapons: ruWeapons,
+     weaponMods: ruWeaponMods,
+     ammoTypes: ruAmmoTypes,
+     qualities: ruQualities,
+     effects: ruEffects,
+     equipmentKits: ruEquipmentKits,
+     armor: ruArmor,
+     armorMods: ruArmorMods,
+     uniqArmorMods: ruUniqArmorMods,
+     armorEffects: ruArmorEffects,
+     clothes: ruClothes,
+     chems: ruChems,
+     drinks: ruDrinks,
+     food: ruFood,
+     miscellaneous: ruMiscItems,
+     generalGoods: ruGeneralGoods,
+     oddities: ruOddities,
+-    ammoData: ruAmmoData,
+     robotWeapons: ruRobotWeapons,
+     robotArms: ruRobotArms,
+     robotArmor: ruRobotArmor,
+     robotPlating: ruRobotPlating,
+     robotFrames: ruRobotFrames,
+     robotLocations: ruRobotLocations,
+     robotModules: ruRobotModules,
+     robotItems: ruRobotItems,
+     robotBody: ruRobotBody,
+     robotHeads: ruRobotHeads,
+     robotLegs: ruRobotLegs,
+   },
+   'en-EN': {
+     weapons: enWeapons,
+     weaponMods: enWeaponMods,
+     ammoTypes: enAmmoTypes,
+     qualities: enQualities,
+     effects: enEffects,
+     equipmentKits: enEquipmentKits,
+     armor: enArmor,
+     armorMods: enArmorMods,
+     uniqArmorMods: enUniqArmorMods,
+     armorEffects: enArmorEffects,
+     clothes: enClothes,
+     chems: enChems,
+     drinks: enDrinks,
+     food: enFood,
+     miscellaneous: enMiscItems,
+     generalGoods: enGeneralGoods,
+     oddities: enOddities,
+-    ammoData: enAmmoData,
+     robotWeapons: enRobotWeapons,
+     robotArms: enRobotArms,
+     robotArmor: enRobotArmor,
+     robotPlating: enRobotPlating,
+     robotFrames: enRobotFrames,
+     robotLocations: enRobotLocations,
+     robotModules: enRobotModules,
+     robotItems: enRobotItems,
+     robotBody: enRobotBody,
+     robotHeads: enRobotHeads,
+     robotLegs: enRobotLegs,
+   },
+ };
+ 
+ /**
+  * Merges two arrays by `id`, with i18n fields (name, etc.) overlaid on data fields.
+  * Items present only in data are included with a fallback name of their id.
+  */
+ const mergeById = (dataArr, i18nArr) => {
+   const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
+   return (dataArr || []).map((dataItem) => {
+     const i18nItem = i18nMap[dataItem.id] || {};
+     if (!i18nItem.name && process.env.NODE_ENV !== 'production') {
+       console.warn(`[equipmentCatalog] No i18n entry for id: ${dataItem.id}`);
+     }
+@@ -259,51 +275,51 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+     ...(i18n.armor?.armor || []).map((g) => ({
+       ...g,
+       items: (g.items || []).map((item) => ({ ...item, armorCategoryKey: g.categoryKey })),
+     })),
+   ];
+   const armorList = flattenArmorGroups({ armor: armorGroups });
+   const armorIndex = buildArmorIndex([...armorList, ...robotPlatingList, ...robotArmorList, ...robotFramesList]);
+ 
+   // Clothes: merge data/ mechanics with i18n names per item, grouped by clothingType
+   const i18nClothesMap = Object.fromEntries(
+     (i18n.clothes?.clothes || []).flatMap((g) => (g.items || []).map((item) => [item.id, item]))
+   );
+   const clothes = (dataClothes.clothes || []).map((group) => ({
+     ...group,
+     type: (i18n.clothes?.clothes || []).find((g) => g.clothingType === group.clothingType)?.type || group.type,
+     items: (group.items || []).map((dataItem) => {
+       const i18nItem = i18nClothesMap[dataItem.id] || {};
+       if (!i18nItem.name && process.env.NODE_ENV !== 'production') {
+         console.warn(`[equipmentCatalog] No i18n entry for clothes id: ${dataItem.id}`);
+       }
+       return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
+     }),
+   }));
+ 
+   // Consumables
+-  const mergedAmmo = mergeById(dataAmmo, i18n.ammoTypes);
++  const mergedAmmo = mergeAmmoById(dataAmmo, i18n.ammoTypes);
+   const mergedChems = mergeById(dataChems, i18n.chems);
+   const mergedDrinks = mergeById(dataDrinks, i18n.drinks);
+   const mergedFood = mergeById(dataFood, i18n.food);
+   const mergedGeneralGoods = mergeById(dataGeneralGoods, i18n.generalGoods || []);
+   const mergedOddities = mergeById(dataOddities, i18n.oddities || []);
+   const mergedRobotBody = mergeById(dataRobotBody || [], i18n.robotBody || [])
+     .map((b) => ({ ...b, itemType: b.itemType || 'robotBody' }));
+   const mergedRobotHeads = mergeById(dataRobotHeads || [], i18n.robotHeads || [])
+     .map((h) => ({ ...h, itemType: h.itemType || 'robotHead' }));
+   const mergedRobotLegs = mergeById(dataRobotLegs || [], i18n.robotLegs || [])
+     .map((l) => ({ ...l, itemType: l.itemType || 'robotLeg' }));
+   const mergedWeaponMods = mergeById(dataWeaponMods, i18n.weaponMods);
+   const mergedArmorMods = mergeById(dataArmorMods, i18n.armorMods);
+   const mergedUniqArmorMods = mergeById(dataUniqArmorMods, i18n.uniqArmorMods);
+ 
+   // Equipment kits: merge locale-independent items with i18n names
+   const kitNames = i18n.equipmentKits || {};
+   const equipmentKits = Object.fromEntries(
+     Object.entries(ALL_KIT_DATA).map(([kitId, kitData]) => [
+       kitId,
+       { name: kitNames[kitId]?.name || kitId, ...kitData },
+     ])
+   );
+ 
    return {
-     ...i18n,
-     weapons: allWeapons,
-+    ammoData: mergedAmmo,
-     // armorRaw keyed by categoryKey for ArmorModificationModal allowedModCategories lookup
-     armorRaw: dataArmor,
-     armor: { armor: armorGroups },
