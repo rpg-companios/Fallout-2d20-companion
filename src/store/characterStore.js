@@ -613,9 +613,36 @@ const useCharacterStore = create(devtools(
         
         // Apply mod modifiers to parameters
         const finalItem = applyModModifiers(normalizedItem, appliedMods);
+
+        const normalizedFinalItem = normalizeItemParameters(finalItem);
+        const addedQuantity = Number(normalizedFinalItem.quantity) || 1;
+        const existingItemKey = Object.keys(items).find((key) => {
+          const existing = items[key];
+          return existing
+            && (existing.stackKey || existing.id) === (normalizedFinalItem.stackKey || normalizedFinalItem.id)
+            && Boolean(existing.equipped) === Boolean(normalizedFinalItem.equipped)
+            && Boolean(existing.locked) === Boolean(normalizedFinalItem.locked);
+        });
+
+        if (existingItemKey) {
+          const existingItem = items[existingItemKey];
+          const existingQuantity = Number(existingItem.quantity) || 1;
+          items[existingItemKey] = {
+            ...existingItem,
+            ...normalizedFinalItem,
+            id: existingItem.id,
+            quantity: existingQuantity + addedQuantity,
+          };
+
+          console.log('[addNewItem] stacked under key:', existingItemKey, 'quantity:', items[existingItemKey].quantity);
+          set({ items });
+          get().recalculateDerivedStats();
+
+          return existingItemKey;
+        }
         
         // Add item to store
-        items[itemId] = normalizeItemParameters(finalItem);
+        items[itemId] = normalizedFinalItem;
         
         console.log('[addNewItem] stored under key:', itemId, 'equipped:', finalItem.equipped, 'itemType:', finalItem.itemType);
         set({ items });
