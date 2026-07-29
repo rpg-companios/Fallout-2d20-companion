@@ -142,6 +142,7 @@ const InventoryScreen = () => {
   const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
 
   const getItemName = (item) => item?.name || item?.id || '';
+  const getItemCatalogId = (item) => item?.id || item?.weaponId || item?.itemId || item?.armorId || item?.clothingId || item?.code || '';
   const getItemType = (item) => {
     if (item?.itemType) return item.itemType;
     if (item?.effectType || item?.durationInScenes || item?.duration || item?.positiveEffect) return 'chem';
@@ -163,7 +164,7 @@ const InventoryScreen = () => {
       const baseWeaponId = item?.weaponId || item?.id || getItemName(item);
       return `weapon:${baseWeaponId}:mods:${getModsSignature(item)}`;
     }
-    return `${itemType}:${getItemName(item)}`;
+    return `${itemType}:${getItemCatalogId(item)}`;
   };
   const createWeaponInstanceId = () => `weapon-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const createArmorInstanceId = () => `armor-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -253,7 +254,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
     }
 
@@ -263,7 +264,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
     }
 
@@ -274,7 +275,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
     }
 
@@ -287,7 +288,7 @@ const InventoryScreen = () => {
       const result = {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
       console.log('[resolveLocalizedItem] chem result:', result.id, 'positiveEffect:', result.positiveEffect);
       return result;
@@ -299,7 +300,7 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
     }
 
@@ -309,17 +310,17 @@ const InventoryScreen = () => {
       return {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
     }
 
     if (itemType === 'ammo') {
-      const base = (equipmentCatalog?.ammoData || []).find((entry) => entry.id === item.id);
+      const base = (equipmentCatalog?.ammoTypes || []).find((entry) => entry.id === item.id);
       if (!base) return item;
       return {
         ...base,
         ...item,
-        name: base.name || item.id || item.name,
+        name: base.name,
       };
     }
 

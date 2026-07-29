@@ -129,7 +129,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
         return acc;
       }, {}),
       [tInventory('modals.addItemModal.categories.ammo')]: {
-        [tInventory('modals.addItemModal.categories.all')]: Array.isArray(equipmentCatalog.ammoData) ? equipmentCatalog.ammoData : [],
+        [tInventory('modals.addItemModal.categories.all')]: Array.isArray(equipmentCatalog.ammoTypes) ? equipmentCatalog.ammoTypes : [],
       },
       [tInventory('modals.addItemModal.categories.drinks')]: {
         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.drinks || [],
