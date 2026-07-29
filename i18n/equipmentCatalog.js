@@ -7,7 +7,6 @@ import ruUniqArmorMods from './ru-RU/data/equipment/armor/uniq_armor_mods.json';
 import ruArmorEffects from './ru-RU/data/equipment/armor/armor_effects.json';
 import ruClothes from './ru-RU/data/equipment/armor/clothes.json';
 import ruAmmoTypes from './ru-RU/data/equipment/ammo/ammo_types.json';
-import ruAmmoData from './ru-RU/data/equipment/ammo/ammoData.json';
 import ruMiscItems from './ru-RU/data/equipment/items.json';
 import ruRobotWeapons from './ru-RU/data/equipment/robot/weapons.json';
 import ruRobotArms from './ru-RU/data/equipment/robot/robotarms.json';
@@ -37,7 +36,6 @@ import enUniqArmorMods from './en-EN/data/equipment/armor/uniq_armor_mods.json';
 import enArmorEffects from './en-EN/data/equipment/armor/armor_effects.json';
 import enClothes from './en-EN/data/equipment/armor/clothes.json';
 import enAmmoTypes from './en-EN/data/equipment/ammo/ammo_types.json';
-import enAmmoData from './en-EN/data/equipment/ammo/ammoData.json';
 import enMiscItems from './en-EN/data/equipment/items.json';
 import enRobotWeapons from './en-EN/data/equipment/robot/weapons.json';
 import enRobotArms from './en-EN/data/equipment/robot/robotarms.json';
@@ -136,7 +134,6 @@ const EQUIPMENT_BY_LOCALE = {
     miscellaneous: ruMiscItems,
     generalGoods: ruGeneralGoods,
     oddities: ruOddities,
-    ammoData: mergedAmmo,
     robotWeapons: ruRobotWeapons,
     robotArms: ruRobotArms,
     robotArmor: ruRobotArmor,
@@ -167,7 +164,6 @@ const EQUIPMENT_BY_LOCALE = {
     miscellaneous: enMiscItems,
     generalGoods: enGeneralGoods,
     oddities: enOddities,
-    ammoData: mergedAmmo,
     robotWeapons: enRobotWeapons,
     robotArms: enRobotArms,
     robotArmor: enRobotArmor,
@@ -194,6 +190,25 @@ const mergeById = (dataArr, i18nArr) => {
       console.warn(`[equipmentCatalog] No i18n entry for id: ${dataItem.id}`);
     }
     return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
+  });
+};
+
+
+const mergeAmmoById = (dataArr, i18nArr) => {
+  const i18nMap = new Map((i18nArr || []).map((item) => [item.id, item]));
+  return (dataArr || []).map((dataItem) => {
+    const i18nItem = i18nMap.get(dataItem.id);
+    if (!i18nItem?.name) {
+      throw new Error(`[equipmentCatalog] Missing ammo i18n name for id: ${dataItem.id}`);
+    }
+    return {
+      ...dataItem,
+      ...i18nItem,
+      id: dataItem.id,
+      name: i18nItem.name,
+      itemType: 'ammo',
+      type: 'ammo',
+    };
   });
 };
 
@@ -281,7 +296,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   }));
 
   // Consumables
-  const mergedAmmo = mergeById(dataAmmo, i18n.ammoTypes);
+  const mergedAmmo = mergeAmmoById(dataAmmo, i18n.ammoTypes);
   const mergedChems = mergeById(dataChems, i18n.chems);
   const mergedDrinks = mergeById(dataDrinks, i18n.drinks);
   const mergedFood = mergeById(dataFood, i18n.food);
