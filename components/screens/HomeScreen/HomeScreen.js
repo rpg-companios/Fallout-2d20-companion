@@ -27,6 +27,7 @@ import {
   IMPORT_ERRORS,
 } from './logic/characterTransfer';
 import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import styles from '../../../styles/HomeScreen.styles';
 
 const getOriginImage = (originName) => {
@@ -495,6 +496,18 @@ export default function HomeScreen({ navigation }) {
             }}>
               <MaterialCommunityIcons name="coffee-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee', 'Купить автору кофе')}</Text>
+            </TouchableOpacity>
+
+            {/* Принудительное обновление PWA (для разработчика) */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                forcePwaUpdate();
+              }}
+            >
+              <MaterialCommunityIcons name="refresh" size={20} color="#d4af37" />
+              <Text style={styles.menuText}>{tHomeScreen('menu.checkUpdates', 'Проверить обновления')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
