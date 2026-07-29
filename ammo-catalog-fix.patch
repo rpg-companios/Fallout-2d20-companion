@@ -1,0 +1,12 @@
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 8f74db1..22cb0ec 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -309,6 +309,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+   return {
+     ...i18n,
+     weapons: allWeapons,
++    ammoData: mergedAmmo,
+     // armorRaw keyed by categoryKey for ArmorModificationModal allowedModCategories lookup
+     armorRaw: dataArmor,
+     armor: { armor: armorGroups },
