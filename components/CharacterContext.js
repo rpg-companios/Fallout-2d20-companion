@@ -43,6 +43,7 @@ import { denormalizeCharacterState } from '../src/store/migrations.js';
 import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
 const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
+const INITIAL_LEVEL = 1;
 
 const CharacterContext = createContext();
 const BARE_ORIGINS = loadOriginsData();
@@ -100,7 +101,7 @@ export const CharacterProvider = ({ children }) => {
   const [characterId, setCharacterId] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
 
-  const [level, setLevel] = useState(1);
+  const [level, setLevel] = useState(INITIAL_LEVEL);
   const [attributes, setAttributes] = useState(createInitialAttributes());
   const [skills, setSkills] = useState(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
   const [selectedSkills, setSelectedSkills] = useState([]);
@@ -360,7 +361,7 @@ export const CharacterProvider = ({ children }) => {
 
       setCharacterId(id);
       setCharacterName(data.characterName || '');
-      setLevel(data.level ?? 1);
+      setLevel(data.level ?? INITIAL_LEVEL);
       setAttributes(data.attributes || createInitialAttributes());
       setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
       setSelectedSkills(data.selectedSkills || []);
@@ -639,6 +640,8 @@ export const CharacterProvider = ({ children }) => {
 
   const resetCharacter = (preserveOrigin = false) => {
     const initialAttributes = createInitialAttributes();
+    const initialLevel = INITIAL_LEVEL;
+    setLevel(initialLevel);
     const initialSkills = ALL_SKILLS.map(s => ({ ...s, value: 0 }));
     setAttributes(initialAttributes);
     setSkills(initialSkills);
@@ -679,7 +682,7 @@ export const CharacterProvider = ({ children }) => {
     setMeleeBonus(0);
     setInitiative(calculateInitiative(initialAttributes));
     setDefense(calculateDefense(initialAttributes));
-    const currentMaxHealth = calculateMaxHealth(initialAttributes, level);
+    const currentMaxHealth = calculateMaxHealth(initialAttributes, initialLevel);
     setCurrentHealth(currentMaxHealth);
     setModifiedItems(new Map());
     // Reset save status.
