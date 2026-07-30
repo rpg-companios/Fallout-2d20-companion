@@ -35,7 +35,7 @@ const mapWeaponTypeToDbValue = {
   explosive: 'Explosive',
 };
 
-const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title' }) => {
+const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot' }) => {
   const locale = useLocale();
   const [currentPath, setCurrentPath] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -196,6 +196,13 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
 
   const handleSelect = (item) => {
     if (typeof item === 'object' && item?.name) {
+      if (selectionMode === 'buy') {
+        // В режиме покупки промежуточный экран «Добавить» не нужен:
+        // сразу открываем окно покупки (количество и цена задаются там)
+        onSelectItem(item, 1);
+        onClose();
+        return;
+      }
       setPendingItem(item);
       setPendingQuantity('1');
       return;

@@ -1283,6 +1283,7 @@ const InventoryScreen = () => {
           visible={isAddItemModalVisible}
           onClose={() => setAddItemModalVisible(false)}
           onSelectItem={handleSelectCatalogItem}
+          selectionMode={itemSelectionMode}
           rootTitleKey={itemSelectionMode === 'buy' ? 'modals.addItemModal.buyTitle' : 'modals.addItemModal.title'}
         />
         <BuyItemModal
