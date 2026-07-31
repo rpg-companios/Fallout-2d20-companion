@@ -730,12 +730,16 @@ const WeaponsAndArmorScreen = () => {
     const energyDef = Math.max(Number(modifiedArmor?.energyDamageRating || 0), Number(modifiedClothing?.energyDamageRating || 0)) + (timedDR.energy || 0);
     const radDef = Math.max(Number(modifiedArmor?.radiationDamageRating || 0), Number(modifiedClothing?.radiationDamageRating || 0)) + (timedDR.radiation || 0);
 
+    // ПРАВИЛО (от владельца): одежда — НЕ броня, модов брони на одежду нет.
+    // «Улучшить одежду» скрыта: данных модов одежды пока нет (вернём, когда появятся).
+    // Обмундирование/костюмы, экипированные в слот брони, «Улучшить броню» не получают.
+    const isClothingLike = (item) =>
+      Boolean(item) && (item.itemType === 'clothing' || item.itemType === 'outfit' || Boolean(item.clothingType));
     const stats = [
       { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: physDef > 0 ? physDef : tWeaponsAndArmorScreen('common.none') },
       { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: energyDef > 0 ? energyDef : tWeaponsAndArmorScreen('common.none') },
       { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : (radDef > 0 ? radDef : tWeaponsAndArmorScreen('common.none')) },
-      ...(modifiedClothing ? [{ label: tWeaponsAndArmorScreen('armor.fields.clothingModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'clothing') }] : []),
-      ...(modifiedArmor ? [{ label: tWeaponsAndArmorScreen('armor.fields.armorModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'armor') }] : []),
+      ...(modifiedArmor && !isClothingLike(modifiedArmor) ? [{ label: tWeaponsAndArmorScreen('armor.fields.armorModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'armor') }] : []),
     ];
 
     if (slotKey === 'body' && robotBodyUpgrade) {

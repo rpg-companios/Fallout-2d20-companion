@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import dataArmor from '../../data/equipment/armor.json';
+import dataClothes from '../../data/equipment/clothes.json';
 import dataArmorMods from '../../data/equipment/armor_mods.json';
 import dataUniqArmorMods from '../../data/equipment/uniq_armor_mods.json';
 import {
@@ -102,3 +103,43 @@ describe('unique armor mods — строго по типу брони', () => {
     }
   });
 });
+
+// ПРАВИЛО ВЛАДЕЛЬЦА: одежда (обмундирование, костюмы) — НЕ броня.
+// Моды брони на одежду не ставятся и не действуют — даже если одежда
+// экипирована в слот брони (outfit с allowsArmor:false) и имеет protectedAreas.
+describe('одежда не является бронёй — моды брони недоступны', () => {
+  const getClothing = (id) =>
+    dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
+
+  it.each(['clothing_sturdy_clothes', 'clothing_nomad_outfit'])(
+    '%s (обмундирование/костюм) не получает ни стандартных, ни уникальных модов',
+    (id) => {
+      const item = getClothing(id);
+      expect(item).toBeTruthy();
+      const { standardMods, uniqueMods } = getAvailableArmorMods(item, catalog);
+      expect(uniqueMods).toEqual([]);
+      expect(standardMods).toEqual([]);
+    },
+  );
+
+  it('applyArmorMods не применяет никакие моды к одежде (даже записанные ранее)', () => {
+    const suit = getClothing('clothing_sturdy_clothes');
+    const std = dataArmorMods[0];
+    const uniq = dataUniqArmorMods[0];
+    const { item } = applyArmorMods(
+      { ...suit, appliedArmorModId: std.id, appliedUniqueArmorModId: uniq.id },
+      catalog,
+    );
+    expect(item.physicalDamageRating).toBe(suit.physicalDamageRating);
+    expect(item.energyDamageRating).toBe(suit.energyDamageRating);
+    expect(item.appliedArmorModsMeta ?? []).toHaveLength(0);
+  });
+
+  it('броня по-прежнему получает моды (контроль регресса)', () => {
+    const metalChest = onePiece('metalArmor');
+    const own = dataUniqArmorMods.find((m) => m.modCategory === 'metalUniqueMods');
+    const { item } = applyArmorMods({ ...metalChest, appliedUniqueArmorModId: own.id }, catalog);
+    expect(item.physicalDamageRating).not.toBe(metalChest.physicalDamageRating);
+  });
+});
+

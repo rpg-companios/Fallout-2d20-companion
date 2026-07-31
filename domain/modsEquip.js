@@ -377,11 +377,17 @@ export const getArmorCategoryConfig = (item, catalog) => {
 
 /**
  * Pure filter: which standard/unique mods are available for the given armor item.
- * Standard mods — универсальные (доступны всем, фильтр по protectedAreas).
+ * Standard mods — универсальные (доступны всей БРОНЕ, фильтр по protectedAreas).
  * Unique mods — ТОЛЬКО из категории данной брони; если категория неизвестна — пусто.
+ *
+ * ПРАВИЛО (от владельца): одежда (обмундирование, костюмы) — НЕ броня.
+ * Моды брони на одежду не ставятся — даже если одежда экипирована в слот брони.
  */
 export const getAvailableArmorMods = (item, catalog) => {
     if (!item) return { standardMods: [], uniqueMods: [] };
+    if (item.itemType === 'clothing' || item.itemType === 'outfit' || item.clothingType) {
+        return { standardMods: [], uniqueMods: [] };
+    }
     const area = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
     const categoryCfg = getArmorCategoryConfig(item, catalog);
     const allowedStd = new Set(categoryCfg?.allowedModCategories || ['standardMods']);
@@ -444,6 +450,12 @@ export const applyArmorModToItem = (armorItem, mod) => {
 // Apply standard and unique armor mods from a catalog to an armor item.
 export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     if (!armorItem) return { item: armorItem, effects: DEFAULT_EFFECTS };
+
+    // ПРАВИЛО (от владельца): одежда (обмундирование, костюмы) — НЕ броня,
+    // моды брони на одежду не действуют — в т.ч. записанные ранее из-за старого бага.
+    if (armorItem.itemType === 'clothing' || armorItem.itemType === 'outfit' || armorItem.clothingType) {
+        return { item: armorItem, effects: DEFAULT_EFFECTS };
+    }
 
     const stdKey = opts.standardKey || 'appliedArmorModId';
     const uniqKey = opts.uniqueKey || 'appliedUniqueArmorModId';
