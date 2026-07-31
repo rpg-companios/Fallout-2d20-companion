@@ -36,6 +36,7 @@ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanc
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 import { isRobotCharacter } from '../domain/origins';
 import { resolveBodyPlan } from '../domain/bodyplan';
+import { createEmptyEquippedArmor } from '../domain/equippedArmor';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
@@ -146,14 +147,7 @@ export const CharacterProvider = ({ children }) => {
       return next;
     });
   }, []);
-  const [equippedArmor, setEquippedArmor] = useState({
-    head: { armor: null, clothing: null },
-    body: { armor: null, clothing: null },
-    leftArm: { armor: null, clothing: null },
-    rightArm: { armor: null, clothing: null },
-    leftLeg: { armor: null, clothing: null },
-    rightLeg: { armor: null, clothing: null },
-  });
+  const [equippedArmor, setEquippedArmor] = useState(() => createEmptyEquippedArmor());
   const [caps, setCaps] = useState(0);
   const [currentHealth, setCurrentHealth] = useState(0);
   const [radiation, setRadiationRaw] = useState(0);
@@ -394,14 +388,7 @@ export const CharacterProvider = ({ children }) => {
       });
       setEquippedRobotSlots(data.equippedRobotSlots ?? null);
       setEquippedRobotModules(data.equippedRobotModules ?? []);
-      setEquippedArmor(data.equippedArmor || {
-        head: { armor: null, clothing: null },
-        body: { armor: null, clothing: null },
-        leftArm: { armor: null, clothing: null },
-        rightArm: { armor: null, clothing: null },
-        leftLeg: { armor: null, clothing: null },
-        rightLeg: { armor: null, clothing: null },
-      });
+      setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
       setCaps(data.caps ?? 0);
       setCurrentHealth(data.currentHealth ?? 0);
       setRadiationRaw(Math.max(0, data.radiation ?? 0));
@@ -667,14 +654,7 @@ export const CharacterProvider = ({ children }) => {
     });
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
-    setEquippedArmor({
-      head: { armor: null, clothing: null },
-      body: { armor: null, clothing: null },
-      leftArm: { armor: null, clothing: null },
-      rightArm: { armor: null, clothing: null },
-      leftLeg: { armor: null, clothing: null },
-      rightLeg: { armor: null, clothing: null },
-    });
+    setEquippedArmor(createEmptyEquippedArmor());
     setCaps(0);
     setSelectedPerks([]);
     setConditions([]);

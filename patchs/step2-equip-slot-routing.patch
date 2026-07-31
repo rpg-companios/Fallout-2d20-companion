@@ -1,0 +1,350 @@
+diff --git a/__tests__/equipped-armor/slot-routing.test.js b/__tests__/equipped-armor/slot-routing.test.js
+new file mode 100644
+index 0000000..20ab1cb
+--- /dev/null
++++ b/__tests__/equipped-armor/slot-routing.test.js
+@@ -0,0 +1,71 @@
++import { describe, it, expect } from 'vitest';
++import dataClothes from '../../data/equipment/clothes.json';
++import {
++  createEmptyEquippedArmor,
++  resolveTargetLayer,
++  blocksArmorOver,
++} from '../../domain/equippedArmor';
++
++// ПРАВИЛО ВЛАДЕЛЬЦА: слот armor — только броне, слот clothing — только одежде.
++// Одежда, запрещающая броню поверх (outfit, allowsArmor: false), блокирует её
++// ВЫЧИСЛЕНИЕМ (blocksArmorOver), а не переездом в чужой слот.
++// ПРАВИЛО ВЛАДЕЛЬЦА (2026-07-31): никакого легаси, нормализаторов и фоллбэков.
++const getClothing = (id) =>
++  dataClothes.clothes
++    .flatMap((g) => g.items.map((it) => ({ ...g, ...it, type: g.type })))
++    .find((i) => i.id === id);
++
++describe('createEmptyEquippedArmor — единая пустая карта слотов', () => {
++  it('шесть ровных слотов, ни одного предмета', () => {
++    const map = createEmptyEquippedArmor();
++    expect(Object.keys(map).sort()).toEqual(['body', 'head', 'leftArm', 'leftLeg', 'rightArm', 'rightLeg']);
++    Object.values(map).forEach((slot) => expect(slot).toEqual({ armor: null, clothing: null }));
++  });
++
++  it('каждый вызов — независимые объекты (нет общих ссылок)', () => {
++    const a = createEmptyEquippedArmor();
++    const b = createEmptyEquippedArmor();
++    a.body.armor = { id: 'x' };
++    expect(b.body.armor).toBeNull();
++  });
++});
++
++describe('resolveTargetLayer — в какой слот класть предмет', () => {
++  it('броня → armor (и старый предмет без itemType — по id)', () => {
++    expect(resolveTargetLayer({ id: 'armor_raider_chest_001', itemType: 'armor' })).toBe('armor');
++    expect(resolveTargetLayer({ id: 'armor_leather_chest_001' })).toBe('armor');
++  });
++
++  it('любая одежда → clothing: костюм, обмундирование, головной убор', () => {
++    expect(resolveTargetLayer(getClothing('clothing_sturdy_clothes'))).toBe('clothing');
++    expect(resolveTargetLayer(getClothing('clothing_nomad_outfit'))).toBe('clothing');
++    expect(resolveTargetLayer(getClothing('headwear_gas_mask'))).toBe('clothing');
++    expect(resolveTargetLayer({ id: 'x', itemType: 'outfit' })).toBe('clothing');
++  });
++
++  it('ПРАВИЛО: прочее → null (не экипируется; фоллбэков нет)', () => {
++    expect(resolveTargetLayer({ id: 'misc_junk' })).toBeNull();
++    expect(resolveTargetLayer(null)).toBeNull();
++  });
++});
++
++describe('blocksArmorOver — одежда, запрещающая броню поверх (реальные данные)', () => {
++  it('обмундирование блокирует броню', () => {
++    expect(blocksArmorOver(getClothing('clothing_nomad_outfit'))).toBe(true);
++    expect(blocksArmorOver(getClothing('clothing_bos_scribe_armor'))).toBe(true);
++  });
++
++  it('костюм — нет (носится под бронёй)', () => {
++    expect(blocksArmorOver(getClothing('clothing_sturdy_clothes'))).toBe(false);
++  });
++
++  it('головной убор блокирует шлем (allowsArmor: false в данных)', () => {
++    expect(blocksArmorOver(getClothing('headwear_gas_mask'))).toBe(true);
++  });
++
++  it('броня и прочие предметы — никогда', () => {
++    expect(blocksArmorOver({ id: 'armor_metal_chest_001', itemType: 'armor' })).toBe(false);
++    expect(blocksArmorOver({ id: 'misc_junk' })).toBe(false);
++    expect(blocksArmorOver(null)).toBe(false);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index eadbd29..ee4245a 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -36,6 +36,7 @@ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanc
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ import { isRobotCharacter } from '../domain/origins';
+ import { resolveBodyPlan } from '../domain/bodyplan';
++import { createEmptyEquippedArmor } from '../domain/equippedArmor';
+ 
+ // Zustand Store integration (Task 4.1)
+ import useCharacterStore from '../src/store/characterStore';
+@@ -146,14 +147,7 @@ export const CharacterProvider = ({ children }) => {
+       return next;
+     });
+   }, []);
+-  const [equippedArmor, setEquippedArmor] = useState({
+-    head: { armor: null, clothing: null },
+-    body: { armor: null, clothing: null },
+-    leftArm: { armor: null, clothing: null },
+-    rightArm: { armor: null, clothing: null },
+-    leftLeg: { armor: null, clothing: null },
+-    rightLeg: { armor: null, clothing: null },
+-  });
++  const [equippedArmor, setEquippedArmor] = useState(() => createEmptyEquippedArmor());
+   const [caps, setCaps] = useState(0);
+   const [currentHealth, setCurrentHealth] = useState(0);
+   const [radiation, setRadiationRaw] = useState(0);
+@@ -394,14 +388,7 @@ export const CharacterProvider = ({ children }) => {
+       });
+       setEquippedRobotSlots(data.equippedRobotSlots ?? null);
+       setEquippedRobotModules(data.equippedRobotModules ?? []);
+-      setEquippedArmor(data.equippedArmor || {
+-        head: { armor: null, clothing: null },
+-        body: { armor: null, clothing: null },
+-        leftArm: { armor: null, clothing: null },
+-        rightArm: { armor: null, clothing: null },
+-        leftLeg: { armor: null, clothing: null },
+-        rightLeg: { armor: null, clothing: null },
+-      });
++      setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
+       setCaps(data.caps ?? 0);
+       setCurrentHealth(data.currentHealth ?? 0);
+       setRadiationRaw(Math.max(0, data.radiation ?? 0));
+@@ -667,14 +654,7 @@ export const CharacterProvider = ({ children }) => {
+     });
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+-    setEquippedArmor({
+-      head: { armor: null, clothing: null },
+-      body: { armor: null, clothing: null },
+-      leftArm: { armor: null, clothing: null },
+-      rightArm: { armor: null, clothing: null },
+-      leftLeg: { armor: null, clothing: null },
+-      rightLeg: { armor: null, clothing: null },
+-    });
++    setEquippedArmor(createEmptyEquippedArmor());
+     setCaps(0);
+     setSelectedPerks([]);
+     setConditions([]);
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 555a6e2..430de05 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -49,6 +49,7 @@ import { useLocale } from "../../../i18n/locale";
+ import { AttributesSection } from "./AttributesSection";
+ import styles from "../../../styles/CharacterScreen.styles";
+ import { getTimedAttributeModifiers } from "../../../domain/effects";
++import { createEmptyEquippedArmor } from "../../../domain/equippedArmor";
+ import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../src/debug/falloutDebug";
+ import { getEquipmentCatalog } from "../../../i18n/equipmentCatalog";
+ 
+@@ -1136,14 +1137,7 @@ export default function CharacterScreen() {
+                         setEquippedWeapons([]);
+                         setEquippedRobotSlots(null);
+                         setEquippedRobotModules([]);
+-                        setEquippedArmor({
+-                          head: { armor: null, clothing: null },
+-                          body: { armor: null, clothing: null },
+-                          leftArm: { armor: null, clothing: null },
+-                          rightArm: { armor: null, clothing: null },
+-                          leftLeg: { armor: null, clothing: null },
+-                          rightLeg: { armor: null, clothing: null },
+-                        });
++                        setEquippedArmor(createEmptyEquippedArmor());
+                         setCaps(0);
+                         setEquipment(null);
+                         setIsEquipmentKitModalVisible(true);
+@@ -1161,14 +1155,7 @@ export default function CharacterScreen() {
+                               setEquippedWeapons([]);
+                               setEquippedRobotSlots(null);
+                               setEquippedRobotModules([]);
+-                              setEquippedArmor({
+-                                head: { armor: null, clothing: null },
+-                                body: { armor: null, clothing: null },
+-                                leftArm: { armor: null, clothing: null },
+-                                rightArm: { armor: null, clothing: null },
+-                                leftLeg: { armor: null, clothing: null },
+-                                rightLeg: { armor: null, clothing: null },
+-                              });
++                              setEquippedArmor(createEmptyEquippedArmor());
+                               setCaps(0);
+                               setEquipment(null);
+                               setIsEquipmentKitModalVisible(true);
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 4b47979..9c46d3e 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -10,6 +10,7 @@ import AddItemModal from './modals/AddItemModal';
+ import BuyItemModal from './modals/BuyItemModal';
+ import { calculateMaxHealth } from '../../../domain/characterCreation';
+ import { getInstantHealAmount } from '../../../domain/effects';
++import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+@@ -771,10 +772,19 @@ const InventoryScreen = () => {
+       showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
+       return;
+     }
+-    const canWearUnderArmor = itemToEquip.itemType === 'clothing' && (
+-      itemToEquip.allowsArmor === true || itemToEquip.clothingType === 'suit'
+-    );
+-    const targetSlotType = canWearUnderArmor ? 'clothing' : 'armor';
++    // ПРАВИЛО (от владельца): слот экипировки определяется ВИДОМ предмета
++    // (domain/equippedArmor.resolveTargetLayer): броня — в armor, одежда — в clothing.
++    // Запрет брони поверх обмундирования — вычисляемый (blocksArmorOver);
++    // одежда больше не «переезжает» в слот брони, чтобы вытеснять её.
++    // Предмет неизвестного вида (null) не экипируется вовсе — фоллбэков нет.
++    const targetSlotType = resolveTargetLayer(itemToEquip);
++    if (!targetSlotType) {
++      showAlert(
++        tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'),
++        tInventory('screen.alerts.cannotEquipItem', 'Этот предмет нельзя экипировать.'),
++      );
++      return;
++    }
+     const equippedInstances = collectEquippedArmorInstances(currentEquipped);
+     const ownedCount = findUnequippedStoreItemByStackKey(itemToEquip.stackKey || getStackKey(itemToEquip))?.quantity || 0;
+     const equippedCount = Array.from(equippedInstances.values()).filter((entry) => {
+@@ -791,32 +801,35 @@ const InventoryScreen = () => {
+ 
+     const executeEquip = (slotsToOccupy) => {
+       const instancesToUnequip = new Set();
+-      const itemType = itemToEquip.itemType;
+       const markForUnequip = (slot, type) => {
+         const slotItem = currentEquipped?.[slot]?.[type];
+         if (!slotItem) return;
+         instancesToUnequip.add(getArmorInstanceKey(slotItem, slot, type));
+       };
+ 
+-      if (itemType === 'clothing') {
+-          if (canWearUnderArmor) {
+-            slotsToOccupy.forEach(slot => {
+-                if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
+-            });
+-          } else {
++      if (targetSlotType === 'clothing') {
++          // Одежда заменяет одежду в тех же слотах...
++          slotsToOccupy.forEach(slot => {
++              if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
++          });
++          // ...а обмундирование (запрещает броню поверх) вытесняет и броню.
++          // Костюм (носящийся под бронёй) броню не трогает.
++          if (blocksArmorOver(itemToEquip)) {
+             slotsToOccupy.forEach(slot => {
+-                if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
+                 if (currentEquipped[slot].armor) markForUnequip(slot, 'armor');
+             });
+           }
+-      } else if (itemType === 'armor') {
++      } else {
++          // Броня заменяет броню в тех же слотах...
+           slotsToOccupy.forEach(slot => {
+               if (currentEquipped[slot].armor) markForUnequip(slot, 'armor');
+           });
+-      } else if (itemType === 'outfit') {
++          // ...и вытесняет надетое обмундирование (оно запрещает броню поверх).
++          // Костюм из-под брони не вытесняется — ПРАВИЛО (от владельца).
+           slotsToOccupy.forEach(slot => {
+-              if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
+-              if (currentEquipped[slot].armor) markForUnequip(slot, 'armor');
++              if (currentEquipped[slot].clothing && blocksArmorOver(currentEquipped[slot].clothing)) {
++                  markForUnequip(slot, 'clothing');
++              }
+           });
+       }
+ 
+diff --git a/domain/equippedArmor.js b/domain/equippedArmor.js
+new file mode 100644
+index 0000000..a5ab0a1
+--- /dev/null
++++ b/domain/equippedArmor.js
+@@ -0,0 +1,51 @@
++// domain/equippedArmor.js
++// Чистые правила слотов экипировки брони/одежды. Pure functions — no React, no UI.
++//
++// Модель слотов: 6 слотов тела (head, body, leftArm, rightArm, leftLeg, rightLeg),
++// в каждом два под-слота: clothing (одежда) и armor (броня).
++//
++// ПРАВИЛО (от владельца): в под-слоте armor лежит ТОЛЬКО броня,
++// в под-слоте clothing — ТОЛЬКО одежда (обмундирование и костюмы вместе).
++// Одежда, запрещающая броню поверх себя (outfit, allowsArmor: false), НЕ
++// «притворяется» бронёй переездом в чужой слот — запрет ВЫЧИСЛЯЕТСЯ функцией
++// blocksArmorOver(). Слот никогда не решает, чем является предмет: это решает
++// domain/protectionKind.js по полям данных.
++//
++// ПРАВИЛО (от владельца, 2026-07-31): никакого легаси, никаких нормализаторов
++// и фоллбэков в маршрутизации. Неизвестный вид предмета НЕ экипируется,
++// а не «кладётся куда-нибудь по умолчанию».
++
++import { getProtectionKind, PROTECTION_KINDS } from './protectionKind.js';
++
++/** Пустая карта слотов экипировки. Единственный источник этого литерала. */
++export const createEmptyEquippedArmor = () => ({
++    head: { armor: null, clothing: null },
++    body: { armor: null, clothing: null },
++    leftArm: { armor: null, clothing: null },
++    rightArm: { armor: null, clothing: null },
++    leftLeg: { armor: null, clothing: null },
++    rightLeg: { armor: null, clothing: null },
++});
++
++/**
++ * В какой под-слот класть предмет при экипировке:
++ * 'armor' | 'clothing' | null (предмет не защита — не экипируется).
++ * Новые виды защиты (напр. силовая броня) добавляются сюда ЯВНЫМ правилом.
++ */
++export const resolveTargetLayer = (item) => {
++    const kind = getProtectionKind(item);
++    if (kind === PROTECTION_KINDS.ARMOR) return 'armor';
++    if (kind === PROTECTION_KINDS.CLOTHING) return 'clothing';
++    return null;
++};
++
++/**
++ * Запрещает ли одежда надевание брони поверх себя (обмундирование).
++ * Возвращает true только для ОДЕЖДЫ, которую нельзя носить под бронёй:
++ * allowsArmor !== true и clothingType !== 'suit'. Для брони и прочих предметов
++ * всегда false — они сами занимают под-слот armor и вытесняются из него.
++ */
++export const blocksArmorOver = (item) => {
++    if (getProtectionKind(item) !== PROTECTION_KINDS.CLOTHING) return false;
++    return !(item.allowsArmor === true || item.clothingType === 'suit');
++};
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index 485d301..bbae11d 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -3,19 +3,15 @@
+ 
+ import { effectsDictToLegacyArray } from './effectsSync.js';
+ import { resolveWeaponRangeFields } from '../../domain/range.js';
++import { createEmptyEquippedArmor as createEmptyEquippedArmorDomain } from '../../domain/equippedArmor.js';
+ 
+ const PARAM_FIELDS = [
+   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
+ ];
+ 
+-export const createEmptyEquippedArmor = () => ({
+-  head: { armor: null, clothing: null },
+-  body: { armor: null, clothing: null },
+-  leftArm: { armor: null, clothing: null },
+-  rightArm: { armor: null, clothing: null },
+-  leftLeg: { armor: null, clothing: null },
+-  rightLeg: { armor: null, clothing: null },
+-});
++// Пустая карта слотов экипировки живёт в domain/equippedArmor.js (единый источник).
++// Оставлен ре-экспорт под прежним именем для существующих вызовов.
++export const createEmptyEquippedArmor = createEmptyEquippedArmorDomain;
+ 
+ /**
+  * Flatten normalized parameter objects to display values

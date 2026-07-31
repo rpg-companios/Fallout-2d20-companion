@@ -3,19 +3,13 @@
 
 import { effectsDictToLegacyArray } from './effectsSync.js';
 import { resolveWeaponRangeFields } from '../../domain/range.js';
+import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
 ];
 
-export const createEmptyEquippedArmor = () => ({
-  head: { armor: null, clothing: null },
-  body: { armor: null, clothing: null },
-  leftArm: { armor: null, clothing: null },
-  rightArm: { armor: null, clothing: null },
-  leftLeg: { armor: null, clothing: null },
-  rightLeg: { armor: null, clothing: null },
-});
+// Пустая карта слотов экипировки живёт в domain/equippedArmor.js (единый источник).
 
 /**
  * Flatten normalized parameter objects to display values

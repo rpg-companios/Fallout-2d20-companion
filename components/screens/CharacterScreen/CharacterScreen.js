@@ -49,6 +49,7 @@ import { useLocale } from "../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
 import { getTimedAttributeModifiers } from "../../../domain/effects";
+import { createEmptyEquippedArmor } from "../../../domain/equippedArmor";
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../src/debug/falloutDebug";
 import { getEquipmentCatalog } from "../../../i18n/equipmentCatalog";
 
@@ -1136,14 +1137,7 @@ export default function CharacterScreen() {
                         setEquippedWeapons([]);
                         setEquippedRobotSlots(null);
                         setEquippedRobotModules([]);
-                        setEquippedArmor({
-                          head: { armor: null, clothing: null },
-                          body: { armor: null, clothing: null },
-                          leftArm: { armor: null, clothing: null },
-                          rightArm: { armor: null, clothing: null },
-                          leftLeg: { armor: null, clothing: null },
-                          rightLeg: { armor: null, clothing: null },
-                        });
+                        setEquippedArmor(createEmptyEquippedArmor());
                         setCaps(0);
                         setEquipment(null);
                         setIsEquipmentKitModalVisible(true);
@@ -1161,14 +1155,7 @@ export default function CharacterScreen() {
                               setEquippedWeapons([]);
                               setEquippedRobotSlots(null);
                               setEquippedRobotModules([]);
-                              setEquippedArmor({
-                                head: { armor: null, clothing: null },
-                                body: { armor: null, clothing: null },
-                                leftArm: { armor: null, clothing: null },
-                                rightArm: { armor: null, clothing: null },
-                                leftLeg: { armor: null, clothing: null },
-                                rightLeg: { armor: null, clothing: null },
-                              });
+                              setEquippedArmor(createEmptyEquippedArmor());
                               setCaps(0);
                               setEquipment(null);
                               setIsEquipmentKitModalVisible(true);

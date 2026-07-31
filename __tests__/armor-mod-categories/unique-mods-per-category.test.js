@@ -5,11 +5,10 @@ import dataArmorMods from '../../data/equipment/armor_mods.json';
 import dataUniqArmorMods from '../../data/equipment/uniq_armor_mods.json';
 import {
   getAvailableArmorMods,
-  resolveArmorCategoryKey,
   isUniqueModAllowedForArmor,
   applyArmorMods,
 } from '../../domain/modsEquip';
-import { getProtectionKind, PROTECTION_KINDS } from '../../domain/protectionKind';
+import { getProtectionKind, resolveArmorCategoryKey, PROTECTION_KINDS } from '../../domain/protectionKind';
 
 // Тест читает сырые JSON-данные напрямую (без react/db), собирая минимальный
 // «каталог» в том же виде, в каком его отдаёт i18n/equipmentCatalog.
@@ -62,27 +61,27 @@ describe('unique armor mods — строго по типу брони', () => {
     }
   });
 
-  it('броня с неизвестной/несуществующей категорией НЕ получает уникальные моды (fail-closed)', () => {
+  it('броня с неизвестной/несуществующей категорией НЕ получает модов вообще (fail-closed)', () => {
     // Сценарий из бага: «Доспехи писца Братства» — предмет, которого нет в каталоге брони.
+    // ПРАВИЛО ВЛАДЕЛЬЦА (2026-07-31): нет явного семейства → модов нет, даже «универсальных».
     const orphanItem = { id: 'armor_bos_scribe_worn', protectedAreas: ['Body', 'Hand', 'Leg'] };
     const { uniqueMods, standardMods } = getAvailableArmorMods(orphanItem, catalog);
     expect(uniqueMods).toEqual([]);
-    // стандартные моды универсальны — остаются доступны
-    expect(standardMods.length).toBeGreaterThan(0);
+    expect(standardMods).toEqual([]);
   });
 
-  it('категория определяется по префиксу id, если armorCategoryKey отсутствует', () => {
-    expect(resolveArmorCategoryKey({ id: 'armor_leather_chest_001' }, catalog)).toBe('leatherArmor');
-    expect(resolveArmorCategoryKey({ id: 'armor_metal_head_003' }, catalog)).toBe('metalArmor');
-    expect(resolveArmorCategoryKey({ id: 'armor_vault_fullbody_001' }, catalog)).toBe('vaultSecurityArmor');
-    expect(resolveArmorCategoryKey({ id: 'armor_unknown_x' }, catalog)).toBeNull();
+  it('категория строго из armorCategoryKey — без угадывания по id (легаси-веток нет)', () => {
+    expect(resolveArmorCategoryKey({ id: 'any', armorCategoryKey: 'leatherArmor' }, catalog)).toBe('leatherArmor');
+    expect(resolveArmorCategoryKey({ id: 'armor_leather_chest_001' }, catalog)).toBeNull();
+    expect(resolveArmorCategoryKey({ id: 'any', armorCategoryKey: 'unknownCategory' }, catalog)).toBeNull();
+    expect(resolveArmorCategoryKey(null, catalog)).toBeNull();
   });
 
-  it('у старого сохранённого предмета без armorCategoryKey — свои моды определяются по id', () => {
+  it('броня без armorCategoryKey → модов нет вообще (ни уникальных, ни стандартных)', () => {
     const legacy = { id: 'armor_raider_chest_001', protectedAreas: ['Body'] };
-    const { uniqueMods } = getAvailableArmorMods(legacy, catalog);
-    expect(uniqueMods.length).toBeGreaterThan(0);
-    expect(new Set(uniqueMods.map((m) => m.modCategory))).toEqual(new Set(['raiderUniqueMods']));
+    const { uniqueMods, standardMods } = getAvailableArmorMods(legacy, catalog);
+    expect(uniqueMods).toEqual([]);
+    expect(standardMods).toEqual([]);
   });
 
   it('applyArmorMods НЕ применяет уникальный мод чужой категории', () => {
@@ -148,11 +147,11 @@ describe('одежда не является бронёй — моды брон�
 // (itemType/clothingType/семейство брони) — НЕ названием и НЕ слотом,
 // в котором предмет лежит. Неизвестный вид → null → модов нет.
 describe('getProtectionKind — единый определитель вида защиты', () => {
-  it('броня → armor: по itemType и по id-префиксу (старые сейвы без itemType)', () => {
+  it('броня → armor: по itemType или по явному семейному ключу из данных', () => {
     expect(getProtectionKind({ id: 'armor_leather_chest_001', itemType: 'armor', armorCategoryKey: 'leatherArmor' }))
       .toBe(PROTECTION_KINDS.ARMOR);
-    expect(getProtectionKind({ id: 'armor_raider_chest_001' })).toBe(PROTECTION_KINDS.ARMOR);
-    expect(getProtectionKind({ id: 'armor_vault_fullbody_001' })).toBe(PROTECTION_KINDS.ARMOR);
+    expect(getProtectionKind({ id: 'any', armorCategoryKey: 'vaultSecurityArmor' })).toBe(PROTECTION_KINDS.ARMOR);
+    expect(getProtectionKind({ id: 'any', itemType: 'armor' })).toBe(PROTECTION_KINDS.ARMOR);
   });
 
   it('одежда → clothing: обмундирование, костюм, головной убор (реальные данные)', () => {
@@ -169,10 +168,12 @@ describe('getProtectionKind — единый определитель вида �
       .toBe(PROTECTION_KINDS.POWER_ARMOR);
   });
 
-  it('не защита / мусор → null', () => {
+  it('не защита / мусор / предмет без явных полей → null (угадывания нет)', () => {
     expect(getProtectionKind(null)).toBeNull();
     expect(getProtectionKind({})).toBeNull();
     expect(getProtectionKind({ id: 'chem_radaway', itemType: 'chem' })).toBeNull();
+    // даже «броневой» id без явных полей вида — null: префиксов id больше нет
+    expect(getProtectionKind({ id: 'armor_raider_chest_001' })).toBeNull();
   });
 
   it('ПРАВИЛО: название не влияет — «силовая броня» в имени не делает предмет силовой', () => {

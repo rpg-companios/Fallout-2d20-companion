@@ -338,12 +338,9 @@ const hasIntersection = (a = [], b = []) => a.some((x) => b.includes(x));
 // ПРАВИЛО (от владельца): уникальные модификации брони — СТРОГО по типу брони.
 // У каждой категории брони свой набор уникальных модов (напр. только кожаной
 // броне доступны leatherUniqueMods). Неизвестная/неопределённая категория →
-// уникальных модов НЕТ вообще (fail-closed), а не «все моды всем».
+// модов НЕТ вообще (fail-closed), а не «все моды всем» и не «только стандартные».
 //
-// resolveArmorCategoryKey и ARMOR_ID_CATEGORY_PREFIX перенесены в
-// domain/protectionKind.js — единый дом, отвечающий «что это за предмет
-// защиты». Здесь оставлен ре-экспорт для совместимости существующих вызовов.
-export { resolveArmorCategoryKey } from './protectionKind.js';
+// resolveArmorCategoryKey живёт в domain/protectionKind.js — импортируем напрямую.
 
 /** Category config (allowedModCategories / allowedUniqueModCategories / tiers) or null. */
 export const getArmorCategoryConfig = (item, catalog) => {
@@ -366,10 +363,13 @@ export const getAvailableArmorMods = (item, catalog) => {
     if (getProtectionKind(item) !== PROTECTION_KINDS.ARMOR) {
         return { standardMods: [], uniqueMods: [] };
     }
-    const area = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
+    // ПРАВИЛО (от владельца, 2026-07-31): без явного семейства брони — модов нет
+    // вообще. Никаких «по умолчанию разрешим универсальные».
     const categoryCfg = getArmorCategoryConfig(item, catalog);
-    const allowedStd = new Set(categoryCfg?.allowedModCategories || ['standardMods']);
-    const allowedUniq = new Set(categoryCfg?.allowedUniqueModCategories || []);
+    if (!categoryCfg) return { standardMods: [], uniqueMods: [] };
+    const area = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
+    const allowedStd = new Set(categoryCfg.allowedModCategories || []);
+    const allowedUniq = new Set(categoryCfg.allowedUniqueModCategories || []);
 
     const standardMods = (catalog?.armorMods || []).filter((m) =>
         allowedStd.has(m.modCategory) && hasIntersection(m.protectedAreas || [], area));
@@ -433,6 +433,12 @@ export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     // в т.ч. записанные ранее из-за старого бага. Вид решает getProtectionKind
     // (domain/protectionKind.js), а не слот предмета.
     if (getProtectionKind(armorItem) !== PROTECTION_KINDS.ARMOR) {
+        return { item: armorItem, effects: DEFAULT_EFFECTS };
+    }
+
+    // ПРАВИЛО (от владельца, 2026-07-31): без явного семейства брони — никакие
+    // моды не применяются (даже «универсальные» и даже уже записанные ранее).
+    if (!getArmorCategoryConfig(armorItem, catalog)) {
         return { item: armorItem, effects: DEFAULT_EFFECTS };
     }
 

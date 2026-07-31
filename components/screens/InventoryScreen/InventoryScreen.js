@@ -10,6 +10,8 @@ import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
 import { calculateMaxHealth } from '../../../domain/characterCreation';
 import { getInstantHealAmount } from '../../../domain/effects';
+import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -230,11 +232,9 @@ const InventoryScreen = () => {
     const slots = equippedRobotSlots || {};
     return Object.values(slots).some((slotData) => slotData?.limb?.canHoldWeapons === true);
   }, [isRobot, equippedRobotSlots]);
-  const isPowerArmorItem = (item) => {
-    const category = String(item?.category || item?.armorCategoryKey || '').toLowerCase();
-    const name = String(getItemName(item) || '').toLowerCase();
-    return category.includes('power') || name.includes('силов');
-  };
+  // Силовая броня определяется ТОЛЬКО по виду из данных (domain/protectionKind.js).
+  // ПРАВИЛО (от владельца, 2026-07-31): эвристик по названию здесь больше нет.
+  const isPowerArmorItem = (item) => getProtectionKind(item) === PROTECTION_KINDS.POWER_ARMOR;
   const toWeight = (value) => parseFloat(String(value ?? 0).replace(',', '.')) || 0;
   const flattenMiscellaneousItems = (miscCatalog) => {
     if (Array.isArray(miscCatalog)) return miscCatalog;
@@ -771,10 +771,19 @@ const InventoryScreen = () => {
       showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
       return;
     }
-    const canWearUnderArmor = itemToEquip.itemType === 'clothing' && (
-      itemToEquip.allowsArmor === true || itemToEquip.clothingType === 'suit'
-    );
-    const targetSlotType = canWearUnderArmor ? 'clothing' : 'armor';
+    // ПРАВИЛО (от владельца): слот экипировки определяется ВИДОМ предмета
+    // (domain/equippedArmor.resolveTargetLayer): броня — в armor, одежда — в clothing.
+    // Запрет брони поверх обмундирования — вычисляемый (blocksArmorOver);
+    // одежда больше не «переезжает» в слот брони, чтобы вытеснять её.
+    // Предмет неизвестного вида (null) не экипируется вовсе — фоллбэков нет.
+    const targetSlotType = resolveTargetLayer(itemToEquip);
+    if (!targetSlotType) {
+      showAlert(
+        tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'),
+        tInventory('screen.alerts.cannotEquipItem', 'Этот предмет нельзя экипировать.'),
+      );
+      return;
+    }
     const equippedInstances = collectEquippedArmorInstances(currentEquipped);
     const ownedCount = findUnequippedStoreItemByStackKey(itemToEquip.stackKey || getStackKey(itemToEquip))?.quantity || 0;
     const equippedCount = Array.from(equippedInstances.values()).filter((entry) => {
@@ -791,32 +800,35 @@ const InventoryScreen = () => {
 
     const executeEquip = (slotsToOccupy) => {
       const instancesToUnequip = new Set();
-      const itemType = itemToEquip.itemType;
       const markForUnequip = (slot, type) => {
         const slotItem = currentEquipped?.[slot]?.[type];
         if (!slotItem) return;
         instancesToUnequip.add(getArmorInstanceKey(slotItem, slot, type));
       };
 
-      if (itemType === 'clothing') {
-          if (canWearUnderArmor) {
+      if (targetSlotType === 'clothing') {
+          // Одежда заменяет одежду в тех же слотах...
+          slotsToOccupy.forEach(slot => {
+              if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
+          });
+          // ...а обмундирование (запрещает броню поверх) вытесняет и броню.
+          // Костюм (носящийся под бронёй) броню не трогает.
+          if (blocksArmorOver(itemToEquip)) {
             slotsToOccupy.forEach(slot => {
-                if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
-            });
-          } else {
-            slotsToOccupy.forEach(slot => {
-                if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
                 if (currentEquipped[slot].armor) markForUnequip(slot, 'armor');
             });
           }
-      } else if (itemType === 'armor') {
+      } else {
+          // Броня заменяет броню в тех же слотах...
           slotsToOccupy.forEach(slot => {
               if (currentEquipped[slot].armor) markForUnequip(slot, 'armor');
           });
-      } else if (itemType === 'outfit') {
+          // ...и вытесняет надетое обмундирование (оно запрещает броню поверх).
+          // Костюм из-под брони не вытесняется — ПРАВИЛО (от владельца).
           slotsToOccupy.forEach(slot => {
-              if (currentEquipped[slot].clothing) markForUnequip(slot, 'clothing');
-              if (currentEquipped[slot].armor) markForUnequip(slot, 'armor');
+              if (currentEquipped[slot].clothing && blocksArmorOver(currentEquipped[slot].clothing)) {
+                  markForUnequip(slot, 'clothing');
+              }
           });
       }
 
