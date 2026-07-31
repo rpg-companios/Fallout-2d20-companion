@@ -2,12 +2,14 @@
   "powerArmor": [
     {
       "categoryKey": "frame",
+      "type": "Каркас",
       "items": [
         { "id": "power_armor_frame", "name": "Каркас силовой брони" }
       ]
     },
     {
       "categoryKey": "raiderPower",
+      "type": "Силовая броня рейдера",
       "items": [
         { "id": "power_armor_raider_helmet", "name": "Шлем силовой брони рейдера" },
         { "id": "power_armor_raider_chest", "name": "Нагрудник силовой брони рейдера" },
@@ -17,6 +19,7 @@
     },
     {
       "categoryKey": "t45",
+      "type": "Силовая броня Т-45",
       "items": [
         { "id": "power_armor_t45_helmet", "name": "Шлем Т-45" },
         { "id": "power_armor_t45_chest", "name": "Нагрудник Т-45" },
@@ -26,6 +29,7 @@
     },
     {
       "categoryKey": "t51",
+      "type": "Силовая броня Т-51",
       "items": [
         { "id": "power_armor_t51_helmet", "name": "Шлем Т-51" },
         { "id": "power_armor_t51_chest", "name": "Нагрудник Т-51" },
@@ -35,6 +39,7 @@
     },
     {
       "categoryKey": "t60",
+      "type": "Силовая броня Т-60",
       "items": [
         { "id": "power_armor_t60_helmet", "name": "Шлем Т-60" },
         { "id": "power_armor_t60_chest", "name": "Нагрудник Т-60" },
@@ -44,6 +49,7 @@
     },
     {
       "categoryKey": "x01",
+      "type": "Силовая броня X-01",
       "items": [
         { "id": "power_armor_x01_helmet", "name": "Шлем X-01" },
         { "id": "power_armor_x01_chest", "name": "Нагрудник X-01" },

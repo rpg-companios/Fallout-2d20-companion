@@ -6,6 +6,7 @@ import ruArmorMods from './ru-RU/data/equipment/armor/armor_mods.json';
 import ruUniqArmorMods from './ru-RU/data/equipment/armor/uniq_armor_mods.json';
 import ruArmorEffects from './ru-RU/data/equipment/armor/armor_effects.json';
 import ruClothes from './ru-RU/data/equipment/armor/clothes.json';
+import ruPowerArmor from './ru-RU/data/equipment/armor/powerArmor.json';
 import ruAmmoTypes from './ru-RU/data/equipment/ammo/ammo_types.json';
 import ruMiscItems from './ru-RU/data/equipment/items.json';
 import ruRobotWeapons from './ru-RU/data/equipment/robot/weapons.json';
@@ -35,6 +36,7 @@ import enArmorMods from './en-EN/data/equipment/armor/armor_mods.json';
 import enUniqArmorMods from './en-EN/data/equipment/armor/uniq_armor_mods.json';
 import enArmorEffects from './en-EN/data/equipment/armor/armor_effects.json';
 import enClothes from './en-EN/data/equipment/armor/clothes.json';
+import enPowerArmor from './en-EN/data/equipment/armor/powerArmor.json';
 import enAmmoTypes from './en-EN/data/equipment/ammo/ammo_types.json';
 import enMiscItems from './en-EN/data/equipment/items.json';
 import enRobotWeapons from './en-EN/data/equipment/robot/weapons.json';
@@ -79,6 +81,7 @@ import dataArmorMods from '../data/equipment/armor_mods.json';
 import dataUniqArmorMods from '../data/equipment/uniq_armor_mods.json';
 import dataArmorEffects from '../data/equipment/armor_effects.json';
 import dataClothes from '../data/equipment/clothes.json';
+import dataPowerArmor from '../data/equipment/powerArmor.json';
 import dataAmmo from '../data/equipment/ammo.json';
 import dataRobotParts from '../data/equipment/robotparts.json';
 import dataChems from '../data/consumables/chems.json';
@@ -128,6 +131,7 @@ const EQUIPMENT_BY_LOCALE = {
     uniqArmorMods: ruUniqArmorMods,
     armorEffects: ruArmorEffects,
     clothes: ruClothes,
+    powerArmor: ruPowerArmor,
     chems: ruChems,
     drinks: ruDrinks,
     food: ruFood,
@@ -158,6 +162,7 @@ const EQUIPMENT_BY_LOCALE = {
     uniqArmorMods: enUniqArmorMods,
     armorEffects: enArmorEffects,
     clothes: enClothes,
+    powerArmor: enPowerArmor,
     chems: enChems,
     drinks: enDrinks,
     food: enFood,
@@ -279,6 +284,23 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   const armorList = flattenArmorGroups({ armor: armorGroups });
   const armorIndex = buildArmorIndex([...armorList, ...robotPlatingList, ...robotArmorList, ...robotFramesList]);
 
+  // Power armor: i18n file carries group titles/item names ({powerArmor:[{categoryKey,type,items}]}),
+  // data file carries mechanics per set ({<setKey>:{pieces:[...]}}).
+  const powerArmorGroups = (i18n.powerArmor?.powerArmor || []).map((group) => {
+    const statsById = Object.fromEntries(
+      (dataPowerArmor[group.categoryKey]?.pieces || []).map((piece) => [piece.id, piece]),
+    );
+    return {
+      ...group,
+      items: (group.items || []).map((item) => ({
+        ...statsById[item.id],
+        ...item,
+        powerArmorSetKey: group.categoryKey,
+      })),
+    };
+  });
+  const powerArmorList = powerArmorGroups.flatMap((group) => group.items);
+
   // Clothes: merge data/ mechanics with i18n names per item, grouped by clothingType
   const i18nClothesMap = Object.fromEntries(
     (i18n.clothes?.clothes || []).flatMap((g) => (g.items || []).map((item) => [item.id, item]))
@@ -329,6 +351,9 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
     armor: { armor: armorGroups },
     armorList,
     armorIndex,
+    powerArmor: { powerArmor: powerArmorGroups },
+    powerArmorList,
+    powerArmorRaw: dataPowerArmor,
     clothes: { clothes },
     ammoTypes: mergedAmmo,
     chems: validateConsumablesContract(mergedChems, ['chem'], 'chem'),

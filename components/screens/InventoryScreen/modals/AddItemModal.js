@@ -9,6 +9,7 @@ import styles from '../../../../styles/AddItemModal.styles';
 const CATEGORY_ICONS = {
   weapon: '🔫',
   armor: '🛡️',
+  powerArmor: '⚡',
   clothing: '👕',
   ammo: '🔹',
   food: '🍖',
@@ -124,6 +125,11 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
           acc[category.type] = category.items;
           return acc;
         }, {}),
+      [tInventory('modals.addItemModal.categories.powerArmor')]: (equipmentCatalog.powerArmor?.powerArmor || [])
+        .reduce((acc, category) => {
+          acc[category.type] = category.items;
+          return acc;
+        }, {}),
       [tInventory('modals.addItemModal.categories.clothing')]: (equipmentCatalog.clothes?.clothes || []).reduce((acc, category) => {
         acc[category.type] = category.items;
         return acc;
@@ -174,6 +180,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
     if (itemType === 'armor') return tInventory('modals.addItemModal.itemTypes.armor');
+    if (itemType === 'powerArmor') return tInventory('modals.addItemModal.itemTypes.powerArmor');
     if (itemType === 'clothing' || itemType === 'outfit') return tInventory('modals.addItemModal.itemTypes.clothing');
     if (itemType === 'chem' || itemType === 'chems') return tInventory('modals.addItemModal.itemTypes.chem');
     if (itemType === 'drinks') return tInventory('modals.addItemModal.itemTypes.drinks');

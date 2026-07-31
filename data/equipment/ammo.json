@@ -25,7 +25,7 @@
   { "id": "ammo_50_cal", "rarity": 3, "cost": 4 },
   { "id": "ammo_5_56mm", "rarity": 3, "cost": 2 },
   { "id": "ammo_5mm", "rarity": 3, "cost": 1 },
-  { "id": "ammo_fusion_core", "rarity": 3, "cost": 200 },
+  { "id": "ammo_fusion_core", "rarity": 3, "cost": 200, "weight": 4, "maxCharges": 20 },
   { "id": "ammo_missile", "rarity": 3, "cost": 25 },
   { "id": "ammo_plasma_cartridge", "rarity": 4, "cost": 5 },
   { "id": "ammo_2mm_ec", "rarity": 5, "cost": 10 },

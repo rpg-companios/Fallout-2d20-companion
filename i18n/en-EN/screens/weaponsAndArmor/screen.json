@@ -164,6 +164,19 @@
       "upgradeFrame": "Frame"
     }
   },
+  "powerArmor": {
+    "layer": "Power Armor",
+    "frame": "Frame",
+    "partNames": {
+      "helmet": "Helmet",
+      "chest": "Chest Piece",
+      "arm": "Arm",
+      "leg": "Leg"
+    },
+    "durability": "HP",
+    "core": "Fusion Core: {value}",
+    "repair": "Repair"
+  },
   "common": {
     "empty": "—",
     "none": "00",

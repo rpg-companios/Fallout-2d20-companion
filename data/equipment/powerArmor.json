@@ -10,9 +10,15 @@
         "physicalDamageRating": 0,
         "energyDamageRating": 0,
         "radiationDamageRating": 0,
-        "weight": 4500,
-        "cost": 75,
-        "rarity": 4
+        "weight": 150,
+        "cost": 4500,
+        "rarity": 4,
+        "modifiers": {
+          "attributeModifier": {
+            "STR": { "op": "set", "value": 11 }
+          }
+        },
+        "effects": []
       }
     ]
   },
@@ -209,7 +215,7 @@
         "radiationDamageRating": 7,
         "hp": 10,
         "weight": 6,
-        "cost": 650,
+        "cost": 130,
         "rarity": 4
       },
       {
@@ -223,7 +229,7 @@
         "radiationDamageRating": 9,
         "hp": 21,
         "weight": 10,
-        "cost": 750,
+        "cost": 250,
         "rarity": 4
       },
       {
@@ -237,7 +243,7 @@
         "radiationDamageRating": 7,
         "hp": 10,
         "weight": 7.5,
-        "cost": 700,
+        "cost": 170,
         "rarity": 4
       },
       {
@@ -251,7 +257,7 @@
         "radiationDamageRating": 7,
         "hp": 10,
         "weight": 7.5,
-        "cost": 700,
+        "cost": 170,
         "rarity": 4
       }
     ]
@@ -269,7 +275,7 @@
         "radiationDamageRating": 7,
         "hp": 12,
         "weight": 6,
-        "cost": 60,
+        "cost": 140,
         "rarity": 5
       },
       {
@@ -283,7 +289,7 @@
         "radiationDamageRating": 9,
         "hp": 24,
         "weight": 10,
-        "cost": 140,
+        "cost": 280,
         "rarity": 5
       },
       {
@@ -297,7 +303,7 @@
         "radiationDamageRating": 7,
         "hp": 12,
         "weight": 7.5,
-        "cost": 130,
+        "cost": 200,
         "rarity": 5
       },
       {
@@ -311,7 +317,7 @@
         "radiationDamageRating": 7,
         "hp": 12,
         "weight": 7.5,
-        "cost": 100,
+        "cost": 200,
         "rarity": 5
       }
     ]
