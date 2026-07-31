@@ -2,16 +2,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useLocale } from '../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
-import { applyArmorMods, formatModBonuses } from '../../../../domain/modsEquip';
+import { applyArmorMods, formatModBonuses, getAvailableArmorMods } from '../../../../domain/modsEquip';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import styles from '../../../../styles/ArmorModificationModal.styles';
-
-const hasIntersection = (a = [], b = []) => a.some((x) => b.includes(x));
-
-const parseProtectedAreas = (item) => {
-  if (Array.isArray(item?.protectedAreas) && item.protectedAreas.length) return item.protectedAreas;
-  return [];
-};
 
 const findCatalogArmorById = (catalog, id) => {
   if (!id) return null;
@@ -82,26 +75,13 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
   }, [visible, localizedTargetItem, stdKey, uniqKey]);
 
   const { standardMods, uniqueMods } = useMemo(() => {
-    if (!localizedTargetItem) return { standardMods: [], uniqueMods: [] };
+    // Одежда не модифицируется модами брони.
+    if (isClothingMode || !localizedTargetItem) return { standardMods: [], uniqueMods: [] };
 
-    const area = parseProtectedAreas(localizedTargetItem);
-    const categoryCfg = catalog?.armorRaw?.[localizedTargetItem.armorCategoryKey] || null;
-    const allowedStd = new Set(categoryCfg?.allowedModCategories || ['standardMods']);
-    const allowedUniq = new Set(categoryCfg?.allowedUniqueModCategories || []);
-
-    if (isClothingMode) {
-      return { standardMods: [], uniqueMods: [] };
-    }
-
-    const standardMods = (catalog.armorMods || []).filter((m) =>
-      allowedStd.has(m.modCategory) && hasIntersection(m.protectedAreas || [], area),
-    );
-
-    const uniqueMods = (catalog.uniqArmorMods || []).filter((m) =>
-      (allowedUniq.size === 0 || allowedUniq.has(m.modCategory)) && hasIntersection(m.protectedAreas || [], area),
-    );
-
-    return { standardMods, uniqueMods };
+    // ПРАВИЛО (от владельца): уникальные моды — строго по типу брони.
+    // См. domain/modsEquip.js — если категория брони неизвестна, уникальных
+    // модов нет вообще (а не «все моды всем»).
+    return getAvailableArmorMods(localizedTargetItem, catalog);
   }, [localizedTargetItem, catalog, isClothingMode]);
 
   const previewItem = useMemo(() => {

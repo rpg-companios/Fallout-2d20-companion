@@ -332,6 +332,81 @@ export const parseWeaponWithModifications = (weaponString, weaponsData, modsData
 
 const DEFAULT_EFFECTS = { bonusEffects: [], rules: [] };
 
+const hasIntersection = (a = [], b = []) => a.some((x) => b.includes(x));
+
+// ПРАВИЛО (от владельца): уникальные модификации брони — СТРОГО по типу брони.
+// У каждой категории брони свой набор уникальных модов (напр. только кожаной
+// броне доступны leatherUniqueMods). Неизвестная/неопределённая категория →
+// уникальных модов НЕТ вообще (fail-closed), а не «все моды всем».
+const ARMOR_ID_CATEGORY_PREFIX = {
+    armor_raider_: 'raiderArmor',
+    armor_leather_: 'leatherArmor',
+    armor_metal_: 'metalArmor',
+    armor_combat_: 'combatArmor',
+    armor_synth_: 'synthArmor',
+    armor_vault_: 'vaultSecurityArmor',
+};
+
+/**
+ * Resolves the armor category key (as in data/equipment/armor.json) for an item.
+ * 1. item.armorCategoryKey, если он известен каталогу;
+ * 2. вывод из префикса id (armor_raider_* → raiderArmor и т.д.) — для старых
+ *    сохранённых предметов без armorCategoryKey;
+ * 3. null, если категорию определить нельзя.
+ */
+export const resolveArmorCategoryKey = (item, catalog) => {
+    if (!item) return null;
+    const raw = catalog?.armorRaw;
+    const key = item.armorCategoryKey;
+    if (key && raw && Object.prototype.hasOwnProperty.call(raw, key)) return key;
+    const id = String(item.id || '');
+    for (const [prefix, categoryKey] of Object.entries(ARMOR_ID_CATEGORY_PREFIX)) {
+        if (id.startsWith(prefix) && (!raw || Object.prototype.hasOwnProperty.call(raw, categoryKey))) {
+            return categoryKey;
+        }
+    }
+    return raw && key && Object.prototype.hasOwnProperty.call(raw, key) ? key : null;
+};
+
+/** Category config (allowedModCategories / allowedUniqueModCategories / tiers) or null. */
+export const getArmorCategoryConfig = (item, catalog) => {
+    const key = resolveArmorCategoryKey(item, catalog);
+    if (!key) return null;
+    return catalog?.armorRaw?.[key] || null;
+};
+
+/**
+ * Pure filter: which standard/unique mods are available for the given armor item.
+ * Standard mods — универсальные (доступны всем, фильтр по protectedAreas).
+ * Unique mods — ТОЛЬКО из категории данной брони; если категория неизвестна — пусто.
+ */
+export const getAvailableArmorMods = (item, catalog) => {
+    if (!item) return { standardMods: [], uniqueMods: [] };
+    const area = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
+    const categoryCfg = getArmorCategoryConfig(item, catalog);
+    const allowedStd = new Set(categoryCfg?.allowedModCategories || ['standardMods']);
+    const allowedUniq = new Set(categoryCfg?.allowedUniqueModCategories || []);
+
+    const standardMods = (catalog?.armorMods || []).filter((m) =>
+        allowedStd.has(m.modCategory) && hasIntersection(m.protectedAreas || [], area));
+    const uniqueMods = (catalog?.uniqArmorMods || []).filter((m) =>
+        allowedUniq.has(m.modCategory) && hasIntersection(m.protectedAreas || [], area));
+
+    return { standardMods, uniqueMods };
+};
+
+/**
+ * Строгая проверка: можно ли применить уникальный мод к данной броне.
+ * Мод разрешён только если его modCategory входит в allowedUniqueModCategories
+ * категории брони. Неизвестная категория → false.
+ */
+export const isUniqueModAllowedForArmor = (mod, item, catalog) => {
+    if (!mod) return false;
+    const categoryCfg = getArmorCategoryConfig(item, catalog);
+    const allowedUniq = new Set(categoryCfg?.allowedUniqueModCategories || []);
+    return allowedUniq.has(mod.modCategory);
+};
+
 const normalizeModifierValue = (mod) => {
     if (!mod) return 0;
     const sign = mod.op === '-' ? -1 : 1;
@@ -378,7 +453,13 @@ export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     const allStd = Array.isArray(opts.standardMods) ? opts.standardMods : (Array.isArray(catalog?.armorMods) ? catalog.armorMods : []);
     const allUniq = Array.isArray(opts.uniqueMods) ? opts.uniqueMods : (Array.isArray(catalog?.uniqArmorMods) ? catalog.uniqArmorMods : []);
     const stdMod = stdModId ? allStd.find((m) => m.id === stdModId) : (armorItem.appliedArmorMod || null);
-    const uniqMod = uniqModId ? allUniq.find((m) => m.id === uniqModId) : (armorItem.appliedUniqueArmorMod || null);
+    let uniqMod = uniqModId ? allUniq.find((m) => m.id === uniqModId) : (armorItem.appliedUniqueArmorMod || null);
+
+    // ПРАВИЛО (от владельца): уникальный мод чужой категории не применяется.
+    // Защищает статистику предметов, сохранённых до введения строгой фильтрации.
+    if (uniqMod && !isUniqueModAllowedForArmor(uniqMod, armorItem, catalog)) {
+        uniqMod = null;
+    }
 
     const used = [stdMod, uniqMod].filter(Boolean).slice(0, 2);
     let modified = { ...armorItem };
