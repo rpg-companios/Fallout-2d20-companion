@@ -3,6 +3,7 @@
 // Pure functions — no React, no UI dependencies.
 
 import { clampRangeIndex, indexToRangeName } from './range.js';
+import { getProtectionKind, PROTECTION_KINDS, resolveArmorCategoryKey } from './protectionKind.js';
 
 // ---------------------------------------------------------------------------
 // WEAPON MODIFICATIONS
@@ -338,35 +339,11 @@ const hasIntersection = (a = [], b = []) => a.some((x) => b.includes(x));
 // У каждой категории брони свой набор уникальных модов (напр. только кожаной
 // броне доступны leatherUniqueMods). Неизвестная/неопределённая категория →
 // уникальных модов НЕТ вообще (fail-closed), а не «все моды всем».
-const ARMOR_ID_CATEGORY_PREFIX = {
-    armor_raider_: 'raiderArmor',
-    armor_leather_: 'leatherArmor',
-    armor_metal_: 'metalArmor',
-    armor_combat_: 'combatArmor',
-    armor_synth_: 'synthArmor',
-    armor_vault_: 'vaultSecurityArmor',
-};
-
-/**
- * Resolves the armor category key (as in data/equipment/armor.json) for an item.
- * 1. item.armorCategoryKey, если он известен каталогу;
- * 2. вывод из префикса id (armor_raider_* → raiderArmor и т.д.) — для старых
- *    сохранённых предметов без armorCategoryKey;
- * 3. null, если категорию определить нельзя.
- */
-export const resolveArmorCategoryKey = (item, catalog) => {
-    if (!item) return null;
-    const raw = catalog?.armorRaw;
-    const key = item.armorCategoryKey;
-    if (key && raw && Object.prototype.hasOwnProperty.call(raw, key)) return key;
-    const id = String(item.id || '');
-    for (const [prefix, categoryKey] of Object.entries(ARMOR_ID_CATEGORY_PREFIX)) {
-        if (id.startsWith(prefix) && (!raw || Object.prototype.hasOwnProperty.call(raw, categoryKey))) {
-            return categoryKey;
-        }
-    }
-    return raw && key && Object.prototype.hasOwnProperty.call(raw, key) ? key : null;
-};
+//
+// resolveArmorCategoryKey и ARMOR_ID_CATEGORY_PREFIX перенесены в
+// domain/protectionKind.js — единый дом, отвечающий «что это за предмет
+// защиты». Здесь оставлен ре-экспорт для совместимости существующих вызовов.
+export { resolveArmorCategoryKey } from './protectionKind.js';
 
 /** Category config (allowedModCategories / allowedUniqueModCategories / tiers) or null. */
 export const getArmorCategoryConfig = (item, catalog) => {
@@ -380,12 +357,13 @@ export const getArmorCategoryConfig = (item, catalog) => {
  * Standard mods — универсальные (доступны всей БРОНЕ, фильтр по protectedAreas).
  * Unique mods — ТОЛЬКО из категории данной брони; если категория неизвестна — пусто.
  *
- * ПРАВИЛО (от владельца): одежда (обмундирование, костюмы) — НЕ броня.
- * Моды брони на одежду не ставятся — даже если одежда экипирована в слот брони.
+ * ПРАВИЛО (от владельца): моды брони — ТОЛЬКО броне. Вид предмета решает
+ * getProtectionKind (domain/protectionKind.js), а не слот: одежда — не броня,
+ * даже если экипирована в слот брони; неизвестный вид → модов нет.
  */
 export const getAvailableArmorMods = (item, catalog) => {
     if (!item) return { standardMods: [], uniqueMods: [] };
-    if (item.itemType === 'clothing' || item.itemType === 'outfit' || item.clothingType) {
+    if (getProtectionKind(item) !== PROTECTION_KINDS.ARMOR) {
         return { standardMods: [], uniqueMods: [] };
     }
     const area = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
@@ -451,9 +429,10 @@ export const applyArmorModToItem = (armorItem, mod) => {
 export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     if (!armorItem) return { item: armorItem, effects: DEFAULT_EFFECTS };
 
-    // ПРАВИЛО (от владельца): одежда (обмундирование, костюмы) — НЕ броня,
-    // моды брони на одежду не действуют — в т.ч. записанные ранее из-за старого бага.
-    if (armorItem.itemType === 'clothing' || armorItem.itemType === 'outfit' || armorItem.clothingType) {
+    // ПРАВИЛО (от владельца): не броня (одежда и прочее) — моды брони не действуют,
+    // в т.ч. записанные ранее из-за старого бага. Вид решает getProtectionKind
+    // (domain/protectionKind.js), а не слот предмета.
+    if (getProtectionKind(armorItem) !== PROTECTION_KINDS.ARMOR) {
         return { item: armorItem, effects: DEFAULT_EFFECTS };
     }
 

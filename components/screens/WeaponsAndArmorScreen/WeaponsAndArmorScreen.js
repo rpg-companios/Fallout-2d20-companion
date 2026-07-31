@@ -20,6 +20,7 @@ import { renderTextWithIcons } from './textUtils';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { applyArmorMods } from '../../../domain/modsEquip';
+import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
@@ -730,16 +731,16 @@ const WeaponsAndArmorScreen = () => {
     const energyDef = Math.max(Number(modifiedArmor?.energyDamageRating || 0), Number(modifiedClothing?.energyDamageRating || 0)) + (timedDR.energy || 0);
     const radDef = Math.max(Number(modifiedArmor?.radiationDamageRating || 0), Number(modifiedClothing?.radiationDamageRating || 0)) + (timedDR.radiation || 0);
 
-    // ПРАВИЛО (от владельца): одежда — НЕ броня, модов брони на одежду нет.
-    // «Улучшить одежду» скрыта: данных модов одежды пока нет (вернём, когда появятся).
-    // Обмундирование/костюмы, экипированные в слот брони, «Улучшить броню» не получают.
-    const isClothingLike = (item) =>
-      Boolean(item) && (item.itemType === 'clothing' || item.itemType === 'outfit' || Boolean(item.clothingType));
+    // ПРАВИЛО (от владельца): вид предмета решает domain/protectionKind.js,
+    // а не слот, в котором предмет лежит. Кнопку «Улучшить броню» получает
+    // только вид 'armor': одежда в слоте брони её не получает, модов брони
+    // на одежду нет. «Улучшить одежду» скрыта: данных модов одежды пока нет
+    // (вернём, когда появятся).
     const stats = [
       { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: physDef > 0 ? physDef : tWeaponsAndArmorScreen('common.none') },
       { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: energyDef > 0 ? energyDef : tWeaponsAndArmorScreen('common.none') },
       { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : (radDef > 0 ? radDef : tWeaponsAndArmorScreen('common.none')) },
-      ...(modifiedArmor && !isClothingLike(modifiedArmor) ? [{ label: tWeaponsAndArmorScreen('armor.fields.armorModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'armor') }] : []),
+      ...(getProtectionKind(modifiedArmor) === PROTECTION_KINDS.ARMOR ? [{ label: tWeaponsAndArmorScreen('armor.fields.armorModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'armor') }] : []),
     ];
 
     if (slotKey === 'body' && robotBodyUpgrade) {

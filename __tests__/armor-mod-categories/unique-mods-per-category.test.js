@@ -9,6 +9,7 @@ import {
   isUniqueModAllowedForArmor,
   applyArmorMods,
 } from '../../domain/modsEquip';
+import { getProtectionKind, PROTECTION_KINDS } from '../../domain/protectionKind';
 
 // Тест читает сырые JSON-данные напрямую (без react/db), собирая минимальный
 // «каталог» в том же виде, в каком его отдаёт i18n/equipmentCatalog.
@@ -140,6 +141,57 @@ describe('одежда не является бронёй — моды брон�
     const own = dataUniqArmorMods.find((m) => m.modCategory === 'metalUniqueMods');
     const { item } = applyArmorMods({ ...metalChest, appliedUniqueArmorModId: own.id }, catalog);
     expect(item.physicalDamageRating).not.toBe(metalChest.physicalDamageRating);
+  });
+});
+
+// ПРАВИЛО ВЛАДЕЛЬЦА: вид защиты определяется только полями данных
+// (itemType/clothingType/семейство брони) — НЕ названием и НЕ слотом,
+// в котором предмет лежит. Неизвестный вид → null → модов нет.
+describe('getProtectionKind — единый определитель вида защиты', () => {
+  it('броня → armor: по itemType и по id-префиксу (старые сейвы без itemType)', () => {
+    expect(getProtectionKind({ id: 'armor_leather_chest_001', itemType: 'armor', armorCategoryKey: 'leatherArmor' }))
+      .toBe(PROTECTION_KINDS.ARMOR);
+    expect(getProtectionKind({ id: 'armor_raider_chest_001' })).toBe(PROTECTION_KINDS.ARMOR);
+    expect(getProtectionKind({ id: 'armor_vault_fullbody_001' })).toBe(PROTECTION_KINDS.ARMOR);
+  });
+
+  it('одежда → clothing: обмундирование, костюм, головной убор (реальные данные)', () => {
+    const getClothing = (id) =>
+      dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
+    expect(getProtectionKind(getClothing('clothing_nomad_outfit'))).toBe(PROTECTION_KINDS.CLOTHING);
+    expect(getProtectionKind(getClothing('clothing_sturdy_clothes'))).toBe(PROTECTION_KINDS.CLOTHING);
+    expect(getProtectionKind(getClothing('headwear_gas_mask'))).toBe(PROTECTION_KINDS.CLOTHING);
+    expect(getProtectionKind({ id: 'x', itemType: 'outfit' })).toBe(PROTECTION_KINDS.CLOTHING);
+  });
+
+  it('силовая броня → powerArmor по itemType из данных (не по названию)', () => {
+    expect(getProtectionKind({ id: 'power_armor_t45_chest', itemType: 'powerArmor' }))
+      .toBe(PROTECTION_KINDS.POWER_ARMOR);
+  });
+
+  it('не защита / мусор → null', () => {
+    expect(getProtectionKind(null)).toBeNull();
+    expect(getProtectionKind({})).toBeNull();
+    expect(getProtectionKind({ id: 'chem_radaway', itemType: 'chem' })).toBeNull();
+  });
+
+  it('ПРАВИЛО: название не влияет — «силовая броня» в имени не делает предмет силовой', () => {
+    const tricky = { id: 'armor_combat_chest_001', itemType: 'armor', name: 'Силовая боевая броня' };
+    expect(getProtectionKind(tricky)).toBe(PROTECTION_KINDS.ARMOR);
+  });
+
+  it('инвариант: моды брони доступны строго тогда, когда вид = armor', () => {
+    const cases = [
+      [{ ...onePiece('leatherArmor'), itemType: 'armor' }, true],
+      [{ id: 'clothing_nomad_outfit', itemType: 'clothing', clothingType: 'outfit', protectedAreas: ['Body', 'Hand', 'Leg'] }, false],
+      [{ id: 'power_armor_t45_chest', itemType: 'powerArmor', protectedAreas: ['Body'] }, false],
+      [{ id: 'misc_junk' }, false],
+    ];
+    for (const [item, expectAvailable] of cases) {
+      const { standardMods, uniqueMods } = getAvailableArmorMods(item, catalog);
+      expect(standardMods.length + uniqueMods.length > 0, item.id).toBe(expectAvailable);
+      expect(getProtectionKind(item) === PROTECTION_KINDS.ARMOR, item.id).toBe(expectAvailable);
+    }
   });
 });
 
