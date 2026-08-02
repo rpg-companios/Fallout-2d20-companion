@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
-import { getTraitDisplayDescription, TRAITS } from '../CharacterScreen/logic/traitsData';
-import { getTraitNameKey, resolveTraitDisplayName } from '../../../domain/traits';
+import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
 import { useLocale } from '../../../i18n/locale';
 import perksData from '../../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
@@ -103,13 +102,15 @@ const PerksAndTraitsScreen = () => {
             if (Array.isArray(selectedNames) && selectedNames.length > 0) {
               return selectedNames.map((name, idx) => {
                 const resolvedName = resolveTraitDisplayName(name);
-                const baseTrait = TRAITS[name] || {};
                 return (
                   <View key={`trait-${idx}-${name}`} style={styles.row}>
                     <Text style={[styles.cell, styles.nameColumn]}>{resolvedName}</Text>
                     <Text style={[styles.cell, styles.rankColumn]}></Text>
                     {renderTextWithIcons(
-                      getTraitDisplayDescription({ name, modifiers: baseTrait.modifiers }),
+                      // getTraitDescriptionKey не читает modifiers — описание резолвится
+                      // по имени внутри домена (findTraitByLocalizedName), легаси-мапа
+                      // TRAITS из удалённого traitsData.js была no-op для рендера.
+                      getTraitDisplayDescription({ name }),
                       [styles.cell, styles.descriptionColumn]
                     )}
                   </View>
