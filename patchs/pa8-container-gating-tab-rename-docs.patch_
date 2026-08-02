@@ -192,145 +192,82 @@ index 0000000000000000000000000000000000000000..680ba1d2f0dd89fd6c745fb4278eb65a
 +  });
 +});
 diff --git a/__tests__/power-armor/data-catalog.test.js b/__tests__/power-armor/data-catalog.test.js
-index 25eed20cae5d664eb9b9c82e75f53c3024b4aadc..e3d251d8f1ce7578d28acad0d9b5aecd13b2b052 100644
+index 25eed20cae5d664eb9b9c82e75f53c3024b4aadc..d8838287a95a442a002f67c9a5c35bdae42e323c 100644
 --- a/__tests__/power-armor/data-catalog.test.js
 +++ b/__tests__/power-armor/data-catalog.test.js
-@@ -120,13 +120,14 @@ describe('i18n экранов — строки силовой брони на м
+@@ -120,12 +120,13 @@ describe('i18n экранов — строки силовой брони на м
      expect(enAddItemModal.itemTypes.powerArmor).toContain('Power Armor');
    });
  
 -  it('экран брони: «Прочность»/«HP», блок; починки нет — переехала в инвентарь (pa4)', () => {
-+  it('экран брони: «Прочность (ОЗ)»/«Durability (HP)», блок; починки нет — переехала в инвентарь (pa4)', () => {
++  it('экран брони: «Прочн»/«HP», блок; починки нет — переехала в инвентарь (pa4)', () => {
      // ПРАВИЛО (владелец, pa3-редизайн): СБ — не отдельный блок, а модернизация
      // существующей сетки; слоты/заголовки — общие с бронёй (armor.slots.*), имя
      // части — из equipmentCatalog. ПРАВИЛО (владелец, pa4): починка только через
      // инвентарь → ключ repair здесь мёртв и удалён, как layer/frame/partNames/unequip.
 -    expect(ruWaAScreen.powerArmor.durability).toBe('Прочность');
--    expect(enWaAScreen.powerArmor.durability).toBe('HP');
-+    // ПРАВИЛО (владелец, pa8): заголовок строки прочности — «Прочность (ОЗ)».
-+    expect(ruWaAScreen.powerArmor.durability).toBe('Прочность (ОЗ)');
-+    expect(enWaAScreen.powerArmor.durability).toBe('Durability (HP)');
++    // ПРАВИЛО (владелец, pa8): подпись прочности элемента СБ сокращена до «Прочн».
++    expect(ruWaAScreen.powerArmor.durability).toBe('Прочн');
+     expect(enWaAScreen.powerArmor.durability).toBe('HP');
      expect(typeof ruWaAScreen.powerArmor.core).toBe('string');
      expect(ruWaAScreen.powerArmor.core).toContain('{value}');
-     expect(ruWaAScreen.powerArmor.repair).toBeUndefined();
 diff --git a/__tests__/power-armor/domain-mechanics.test.js b/__tests__/power-armor/domain-mechanics.test.js
-index 425e10d521291436814765eacc37bcdacc19d309..fa0567489d0e196ce588ad42109a20c60b4dfa46 100644
+index 425e10d521291436814765eacc37bcdacc19d309..16a2c6f5214220b6d54bd6c25a77db8317fba491 100644
 --- a/__tests__/power-armor/domain-mechanics.test.js
 +++ b/__tests__/power-armor/domain-mechanics.test.js
-@@ -166,6 +166,20 @@ describe('экипировка пакета (§5.1/§5.2)', () => {
+@@ -14,6 +14,7 @@ import {
+   powerArmorFrameStackKey,
+   packPackage,
+   unpackPackage,
++  isPowerArmorPackage,
+   insertCore,
+   hasFrame,
+   canEquipPowerArmorPiece,
+@@ -166,6 +167,24 @@ describe('экипировка пакета (§5.1/§5.2)', () => {
      // Свежий предмет из каталога (weaponId нет): id и есть канонический — путь не сломан.
      expect(unpackPackage(packed).frame.catalogId).toBe(FRAME_CATALOG.id);
    });
 +
-+  it('ПРАВИЛО (владелец): пакет в инвентаре — обычный предмет; контейнер существует только на персонаже', () => {
-+    // Снятый пакет сохраняет части и блок внутри стор-записи (packPackage), но
-+    // контейнером в инвентаре НЕ становится: наличие каркаса ≠ контейнер.
-+    // Контейнер «Силовая броня» — только надетое состояние (каркас с ядерным блоком).
++  it('ПРАВИЛО (владелец, pa8): пакетом-контейнером считается только запись, побывавшая в надетом состоянии', () => {
++    // packPackage всегда пишет installedPieces → контейнер «Силовая броня» в инвентаре.
 +    let eq = wornFrameWithCuts();
-+    eq = equipPowerArmorPiece(eq, 'head', piece('power_armor_t45_helmet', 3));
 +    const packed = packPackage(eq);
-+    expect(packed.installedPieces.head).toEqual(piece('power_armor_t45_helmet', 3));
-+    expect(packed.installedCore).toEqual({ charges: 11 });
-+    expect(hasFrame(eq)).toBe(true);
-+    // Обратная сборка цела — содержимое пакета не теряется при «обычной строке».
-+    expect(unpackPackage(packed)).toEqual(eq);
++    expect(isPowerArmorPackage(packed)).toBe(true);
++    const storeRow = { ...packed, id: packed.stackKey, weaponId: FRAME_CATALOG.id };
++    expect(isPowerArmorPackage(storeRow)).toBe(true);
++    // Пакет без единой части и без блока — всё равно пакет (поле-структура на месте).
++    expect(isPowerArmorPackage(packPackage(unpackPackage({ ...FRAME_CATALOG })))).toBe(true);
++    // Свежий каркас из каталога/магазина: installedPieces нет → НЕ контейнер, обычная строка.
++    expect(isPowerArmorPackage(FRAME_CATALOG)).toBe(false);
++    expect(isPowerArmorPackage({ ...FRAME_CATALOG, id: FRAME_CATALOG.id, weaponId: undefined })).toBe(false);
++    const bareStoreRow = { id: 'powerArmor:frame_x', weaponId: FRAME_CATALOG.id, itemType: 'powerArmor', set: FRAME_CATALOG.set };
++    expect(isPowerArmorPackage(bareStoreRow)).toBe(false);
++    // Часть — не пакет вообще.
++    expect(isPowerArmorPackage({ itemType: 'powerArmor', id: T45_HELMET.id })).toBe(false);
 +  });
  });
  
  describe('Ядерный Блок (§3.2/§5.1/§5.4)', () => {
 diff --git a/__tests__/power-armor/ui-integration.test.js b/__tests__/power-armor/ui-integration.test.js
-index f864196f3ab8ef136552960cec4b8aa61eb54e9e..5afbe9e0093ac51b65ffd699001fdf59e3bd688c 100644
+index f864196f3ab8ef136552960cec4b8aa61eb54e9e..453a9410b7585dbafbe2f919f9d6f36e09378036 100644
 --- a/__tests__/power-armor/ui-integration.test.js
 +++ b/__tests__/power-armor/ui-integration.test.js
-@@ -187,7 +187,7 @@ describe('power-armor ui-integration: контейнер в инвентаре (
-   });
- 
-   // Конвенция vitest: запуск из корня проекта — пути исходников относительно cwd.
--  it('структура: инвентарь — контейнер-аккордеон; системное имя; каркас — элемент контейнера', () => {
-+  it('структура: инвентарь — контейнер-аккордеон только НАДЕТОГО пакета; системное имя; каркас — элемент контейнера', () => {
-     const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
-     expect(src).not.toContain('equippedPowerArmorRows');
-     expect(src).toContain('paContainerRows');
-@@ -196,29 +196,55 @@ describe('power-armor ui-integration: контейнер в инвентаре (
-     for (const marker of ['item.paContainer', 'item.paFrameContent', 'item.paPieceContent', 'item.paCoreContent']) {
+@@ -206,6 +206,10 @@ describe('power-armor ui-integration: контейнер в инвентаре (
        expect(src).toContain(marker);
      }
--    // Счётчик прочности в стиле патронов — свои стили кнопок (красные, как weaponAmmoBtn).
--    expect(src).toContain('paDurabilityBtn');
-+    // В инвентаре прочность не меняется: счётчика нет, значение — текстом + «Починить».
-+    expect(src).toContain("tInventory('screen.labels.durability')");
-   });
- 
--  it('структура: снятый пакет — тоже контейнер (родитель, части с починкой, блок)', () => {
-+  it('структура: ПРАВИЛО владельца — снятый пакет НЕ контейнер; обычный предмет; в инвентаре прочность не меняется', () => {
-     const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
--    for (const marker of ['paExpandPackage', 'item.paPackage', 'item.paPackagePiece', 'repairPowerArmorPackagePiece']) {
--      expect(src).toContain(marker);
-+    // Наличие каркаса (любого: свежего или со снятым содержимым) — обычная строка
-+    // предмета. Контейнер «Силовая броня» существует только на персонаже
-+    // (каркас надет с ядерным блоком): механики контейнера снятого пакета нет совсем.
-+    for (const marker of ['paExpandPackage', 'item.paPackage', 'paOpenPackages', 'isPowerArmorPackage', 'paStoreId']) {
-+      expect(src).not.toContain(marker);
-     }
--    expect(src).toContain('paOpenPackages');
-+    // Счётчик прочности в инвентаре запрещён: ни «−», ни «+» — только «Починить».
-+    expect(src).not.toContain('adjustPowerArmorDurability');
-+    expect(src).not.toContain('paDurability');
-+    const stylesSrc = readFileSync('styles/InventoryScreen.styles.js', 'utf8');
-+    expect(stylesSrc).not.toContain('paDurability');
+     expect(src).toContain('paOpenPackages');
++    // ПРАВИЛО (владелец, pa8): контейнер в инвентаре создаётся только когда каркас
++    // успешно надевался, не раньше — гейт раскрытия по isPowerArmorPackage;
++    // свежий каркас (без installedPieces) остаётся обычной строкой предмета.
++    expect(src).toContain('isPowerArmorPackage(item)');
      const ctx = readFileSync('components/CharacterContext.js', 'utf8');
--    // Новое действие починки части внутри снятого пакета — определено и экспонировано.
--    expect(ctx).toContain('const repairPowerArmorPackagePiece');
--    expect(ctx).toContain('powerArmorFrameStackKey');
-+    // Починка части внутри снятого пакета — мёртвая механика, удалена.
-+    expect(ctx).not.toContain('repairPowerArmorPackagePiece');
-+    const domain = readFileSync('domain/powerArmor.js', 'utf8');
-+    expect(domain).not.toContain('isPowerArmorPackage');
-   });
- 
--  it('структура: экран оружия и брони — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
-+  it('структура: экран экипировки — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
-     const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
-     expect(src).toContain("adjustPowerArmorDurability(slotKey, -1)");
-     expect(src).not.toContain("adjustPowerArmorDurability(slotKey, 1)");
-   });
- 
--  it('структура: экран оружия и брони — починки нет (только инвентарь), счётчик — стиль патронов', () => {
-+  it('структура: прочность в ячейке — ДВЕ строки на всю ширину, часть ячейки (footer ArmorPart)', () => {
-+    // ПРАВИЛО (владелец): строка 1 — заголовок «Прочность (ОЗ)» белым на тёмном,
-+    // строка 2 — счётчик; строки внутри ячейки, не отдельно.
-+    const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
-+    expect(src).toContain('footer');
-+    expect(src).toContain('paDurabilityBlock');
-+    expect(src).toContain('paDurabilityHeaderRow');
-+    expect(src).toContain('paDurabilityCounterRow');
-+    expect(src).toContain("tWeaponsAndArmorScreen('powerArmor.durability')");
-+    const stylesSrc = readFileSync('styles/WeaponsAndArmorScreen.styles.js', 'utf8');
-+    for (const marker of ['paDurabilityBlock', 'paDurabilityHeaderRow', 'paDurabilityHeader', 'paDurabilityCounterRow']) {
-+      expect(stylesSrc).toContain(marker);
-+    }
-+    // белый шрифт на тёмном фоне
-+    expect(stylesSrc).toMatch(/paDurabilityHeaderRow:\s*\{[^}]*'#333'/s);
-+    expect(stylesSrc).toMatch(/paDurabilityHeader:\s*\{[^}]*'#fff'/s);
-+  });
-+
-+  it('структура: экран экипировки — починки нет (только инвентарь), счётчик — стиль патронов', () => {
-     const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
-     expect(src).not.toContain('repairPowerArmorPieceAt');
-     expect(src).not.toContain("powerArmor.repair");
+     // Новое действие починки части внутри снятого пакета — определено и экспонировано.
+     expect(ctx).toContain('const repairPowerArmorPackagePiece');
 diff --git a/components/CharacterContext.js b/components/CharacterContext.js
-index 0eda7b65d898b4373c07e11a8f3650f8c3b2fb06..58becaf63c3f205efa03c9873e9085e8d1383e51 100644
+index 0eda7b65d898b4373c07e11a8f3650f8c3b2fb06..4814ee89207b343e11a873e7fe44b012e8eb7cfa 100644
 --- a/components/CharacterContext.js
 +++ b/components/CharacterContext.js
-@@ -50,7 +50,6 @@ import {
-   findChargedFusionCores,
-   pickFusionCore,
-   powerArmorPieceStackKey,
--  powerArmorFrameStackKey,
-   powerArmorSlotsFor,
-   resolvePowerArmorPieceTarget,
-   repairPowerArmorPiece,
-@@ -135,13 +134,15 @@ const paLocalizedCatalogItem = (catalogId) => {
+@@ -135,13 +135,15 @@ const paLocalizedCatalogItem = (catalogId) => {
    return localized || PA_CATALOG_BY_ID[catalogId];
  };
  const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
@@ -349,49 +286,6 @@ index 0eda7b65d898b4373c07e11a8f3650f8c3b2fb06..58becaf63c3f205efa03c9873e9085e8
  // Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
  // как showAlert в InventoryScreen.
  const paAlert = (title, message = '') => {
-@@ -574,34 +575,6 @@ export const CharacterProvider = ({ children }) => {
-     useCharacterStore.getState().updateItem(storeItemId, { hpCurrent: maxHp, stackKey: newStackKey });
-   }, []);
- 
--  // Починка части ВНУТРИ снятого пакета (стопка-каркас в инвентаре). Состав пакета
--  // входит в подпись стопки (powerArmorFrameStackKey) → после починки стопка либо
--  // переподписывается, либо сливается с уже существующей идентичной (как у part-стопок).
--  // ПРАВИЛО владельца: бесплатно до максимума, то же условие hp < max.
--  const repairPowerArmorPackagePiece = useCallback((storeItemId, slot) => {
--    const { items } = useCharacterStore.getState();
--    const item = items[storeItemId];
--    if (!item || !isPowerArmorFrame(item)) return;
--    const piece = item.installedPieces?.[slot];
--    if (!piece) return;
--    const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
--    if (!Number.isFinite(maxHp) || !needsRepair(piece, maxHp)) return;
--    const installedPieces = { ...item.installedPieces, [slot]: repairPowerArmorPiece(piece, maxHp) };
--    // Ключ считается от КАНОНИЧЕСКОГО id (weaponId), как в getStackKey инвентаря.
--    const catalogId = item.weaponId || item.id;
--    const newStackKey = powerArmorFrameStackKey({ ...item, id: catalogId, installedPieces });
--    const wholeTwinKey = Object.keys(items).find(
--      (key) => key !== storeItemId && (items[key]?.stackKey || items[key]?.id) === newStackKey,
--    );
--    if (wholeTwinKey) {
--      const updated = { ...items };
--      updated[wholeTwinKey] = { ...updated[wholeTwinKey], quantity: (updated[wholeTwinKey].quantity || 1) + (item.quantity || 1) };
--      delete updated[storeItemId];
--      useCharacterStore.setState({ items: updated });
--      return;
--    }
--    useCharacterStore.getState().updateItem(storeItemId, { installedPieces, stackKey: newStackKey });
--  }, []);
- 
-   // ── §5.3/§5.4 Таймер расхода Ядерного блока ──
-   // Тикает только пока приложение открыто («приложение закрыто — отсчёт на паузе»);
-@@ -1122,7 +1095,6 @@ export const CharacterProvider = ({ children }) => {
-     adjustPowerArmorDurability,
-     repairPowerArmorPieceAt,
-     repairPowerArmorStack,
--    repairPowerArmorPackagePiece,
-     caps, setCaps,
-     currentHealth, setCurrentHealth,
-     radiation, setRadiation,
 diff --git a/components/powerArmor/FusionCoreChoiceModal.js b/components/powerArmor/FusionCoreChoiceModal.js
 index 3919daf04591870b933e5c49837eefcfac0491cf..2a5d5bfd762f329763aa2b02fa74ff8feeff704b 100644
 --- a/components/powerArmor/FusionCoreChoiceModal.js
@@ -1586,29 +1480,18 @@ index c815455ba4a00feb0e7bebc1eccb4d21b72288cf..633ef87877356f8dafb7aed24198ab30
    return current;
  };
 diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
-index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec5310849bd8c 100644
+index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..f4256ade32995c7e7988f8e485a627ebf80a0cb4 100644
 --- a/components/screens/InventoryScreen/InventoryScreen.js
 +++ b/components/screens/InventoryScreen/InventoryScreen.js
-@@ -81,10 +81,8 @@ const InventoryScreen = () => {
-     equipPowerArmorPiece,
-     unequipPowerArmorPackage,
-     unequipPowerArmorPieceAt,
--    adjustPowerArmorDurability,
-     repairPowerArmorPieceAt,
-     repairPowerArmorStack,
--    repairPowerArmorPackagePiece,
-   } = useCharacter();
- 
-   const storeItems = useCharacterStore((state) => state.items);
-@@ -170,7 +168,6 @@ const InventoryScreen = () => {
-   const [paContentsOpen, setPaContentsOpen] = useState(false);
-   // Снятые пакеты: каждый — тоже контейнер (ПРАВИЛО владельца), аккордеоны
-   // независимы по id стор-записи: { [storeItemId]: true }.
--  const [paOpenPackages, setPaOpenPackages] = useState({});
- 
-   const locale = useLocale();
-   const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
-@@ -410,7 +407,7 @@ const InventoryScreen = () => {
+@@ -16,6 +16,7 @@ import {
+   isFusionCoreItem,
+   fusionCoreStackKey,
+   isPowerArmorFrame,
++  isPowerArmorPackage,
+   powerArmorPieceStackKey,
+   powerArmorFrameStackKey,
+   rollNewFusionCoreCharges,
+@@ -410,7 +411,7 @@ const InventoryScreen = () => {
  
      const applyToSelf = () => {
        if (isRobot) {
@@ -1617,7 +1500,7 @@ index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec531
          return;
        }
  
-@@ -450,7 +447,9 @@ const InventoryScreen = () => {
+@@ -450,7 +451,9 @@ const InventoryScreen = () => {
  
        // Удаление условий (аддиктол, антибиотики)
        if (conditionsRemoved.length > 0) {
@@ -1628,7 +1511,7 @@ index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec531
        }
  
        // Результат броска на зависимость
-@@ -458,13 +457,13 @@ const InventoryScreen = () => {
+@@ -458,13 +461,13 @@ const InventoryScreen = () => {
          const { effectCount, faces, addicted, addictionLevel } = addictionResult;
          const facesText = faces.join(', ');
          showAlert(
@@ -1646,7 +1529,7 @@ index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec531
          }
        }
  
-@@ -679,7 +678,7 @@ const InventoryScreen = () => {
+@@ -679,7 +682,7 @@ const InventoryScreen = () => {
      }
  
      if (isRobotOnlyItem(displayWeapon) && !isRobot) {
@@ -1655,7 +1538,7 @@ index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec531
        return;
      }
      if (isRobot && isRobotLimbWeapon(displayWeapon)) {
-@@ -857,12 +856,12 @@ const InventoryScreen = () => {
+@@ -857,12 +860,12 @@ const InventoryScreen = () => {
      if (isRobot && !isRobotOnlyItem(itemToEquip)) {
        const isAllowedClothing = itemToEquip.itemType === 'clothing' && itemToEquip.canRobotWear === true;
        if (!isAllowedClothing) {
@@ -1670,7 +1553,7 @@ index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec531
        return;
      }
      // ПРАВИЛО (от владельца): слот экипировки определяется ВИДОМ предмета
-@@ -873,8 +872,8 @@ const InventoryScreen = () => {
+@@ -873,8 +876,8 @@ const InventoryScreen = () => {
      const targetSlotType = resolveTargetLayer(itemToEquip);
      if (!targetSlotType) {
        showAlert(
@@ -1681,205 +1564,21 @@ index bb4c7bebfb74fb34d3521fc9d84908a98bb5eaf7..c10c75030295388517ae1e20635ec531
        );
        return;
      }
-@@ -1101,68 +1100,6 @@ const InventoryScreen = () => {
-     return rows;
-   }, [equippedPowerArmor, equipmentCatalog, paContentsOpen]);
- 
--  // Снятый пакет (стопка-каркас) — тоже КОНТЕЙНЕР (ПРАВИЛО владельца): родитель
--  // «Силовая броня» со сводкой, «Содержание» раскрывает каркас/части/блок. Родитель
--  // сохраняет все поля стор-записи — экипировка/продажа работают с ним как раньше.
--  const paExpandPackage = useCallback((item) => {
--    const paCatalogEntry = (catalogId) =>
--      (equipmentCatalog?.powerArmorList || []).find((p) => p.id === catalogId)
--      || PA_CATALOG_BY_ID[catalogId] || {};
--    const coreMax = (equipmentCatalog?.ammoTypes || []).find((a) => a.id === FUSION_CORE_ID)?.maxCharges;
--    const core = item.installedCore || null;
--    const coreText = core ? `${core.charges}/${coreMax}` : '—';
--    const installed = Object.entries(item.installedPieces || {}).filter(([, piece]) => Boolean(piece));
--    const storeId = item.id;
--    const packageRow = {
--      ...item,
--      uniqueId: `pa-pkg-${storeId}`,
--      paPackage: true,
--      paStoreId: storeId,
--      name: tInventory('screen.powerArmor.containerTitle'),
--      summary: formatInventoryText(tInventory('screen.powerArmor.summary'), {
--        parts: installed.length,
--        core: coreText,
--      }),
--    };
--    if (!paOpenPackages[storeId]) return [packageRow];
--    const rows = [packageRow];
--    const frameEntry = paCatalogEntry(item.weaponId || item.id);
--    rows.push({
--      uniqueId: `pa-pkg-frame-${storeId}`,
--      paFrameContent: true,
--      itemType: 'powerArmor',
--      name: frameEntry.name || (item.weaponId || item.id),
--    });
--    installed.forEach(([slot, piece]) => {
--      const pieceEntry = paCatalogEntry(piece.catalogId);
--      const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
--      rows.push({
--        uniqueId: `pa-pkg-${slot}-${storeId}`,
--        paPackagePiece: true,
--        paSlot: slot,
--        paStoreId: storeId,
--        itemType: 'powerArmor',
--        name: formatInventoryText(tInventory('screen.powerArmor.pieceInSlot'), {
--          name: pieceEntry.name || piece.catalogId,
--          slot: tInventory(`screen.powerArmor.slots.${slot}`),
--        }),
--        hpCurrent: piece.hpCurrent,
--        maxHp,
--        // «Починить» внутри снятого пакета — то же правило: бесплатно, hp < max.
--        showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
--      });
--    });
--    if (core) {
--      rows.push({
--        uniqueId: `pa-pkg-core-${storeId}`,
--        paCoreContent: true,
--        itemType: 'powerArmor',
--        name: formatInventoryText(tInventory('screen.powerArmor.coreRow'), { value: coreText }),
--      });
--    }
--    return rows;
--  }, [equipmentCatalog, paOpenPackages]);
--
-   const displayItems = useMemo(() => {
-     const equippedItemsList = [];
-     (equippedWeaponsForDisplay || []).forEach((w, i) => {
-@@ -1255,12 +1192,12 @@ const InventoryScreen = () => {
+@@ -1255,9 +1258,12 @@ const InventoryScreen = () => {
          .filter(Boolean);
  
      const merged = [...equippedItemsList, ...paContainerRows, ...inventoryItemsList];
 -    // Снятые пакеты разворачиваются в контейнеры (родитель + содержание при открытом аккордеоне).
--    return merged.flatMap((item) =>
++    // Снятые пакеты разворачиваются в контейнеры (родитель + содержание при открытом
++    // аккордеоне). ПРАВИЛО (владелец): только ПАКЕТЫ (isPowerArmorPackage — каркас,
++    // побывавший в надетом состоянии); свежий каркас без installedPieces — обычная
++    // строка предмета, контейнер раньше успешного надевания не создаётся.
+     return merged.flatMap((item) =>
 -      (item?.itemType === 'powerArmor' && isPowerArmorFrame(item) && !item.isEquipped
--        ? paExpandPackage(item)
--        : [item]));
--  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows, paExpandPackage]);
-+    // ПРАВИЛО (владелец): контейнер «Силовая броня» существует только НА персонаже
-+    // (надет каркас с ядерным блоком). Наличие каркаса в инвентаре контейнера не
-+    // создаёт: стор-запись каркаса (хоть свежая, хоть снятый пакет с частями и
-+    // блоком внутри) — обычная строка предмета: её можно продать/надеть.
-+    return merged;
-+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows]);
- 
-   const renderTableHeader = () => {
-     return (
-@@ -1303,11 +1240,9 @@ const InventoryScreen = () => {
-     }
- 
-     if (item.paPieceContent) {
--      // Часть внутри контейнера: счётчик прочности в дизайне патронов (красные
--      // кнопки как у weaponAmmoBtn) + «Починить»/«Снять» — управление частями здесь,
--      // в экране оружия и брони кнопок починки нет (ПРАВИЛО владельца).
--      const canLose = (item.hpCurrent ?? 0) > 0;
--      const canGain = Number.isFinite(item.maxHp) && item.hpCurrent < item.maxHp;
-+      // Часть внутри надетого контейнера: «Починить»/«Снять» — управление частями
-+      // здесь. ПРАВИЛО (владелец): в инвентаре прочность не уменьшается и не
-+      // увеличивается (счётчика нет), ремонт — только кнопкой «Починить».
-       return (
-         <View style={styles.tableRow}>
-           <View style={styles.mainRowContent}>
-@@ -1330,21 +1265,9 @@ const InventoryScreen = () => {
-             </TouchableOpacity>
-           </View>
-           <View style={styles.itemSubRow}>
--            <View style={styles.paDurabilityCell}>
--              <TouchableOpacity
--                style={[styles.paDurabilityBtn, !canLose && styles.paDurabilityBtnDisabled]}
--                onPress={() => adjustPowerArmorDurability(item.paSlot, -1)}
--                disabled={!canLose}>
--                <Text style={styles.paDurabilityBtnText}>−</Text>
--              </TouchableOpacity>
--              <Text style={styles.paDurabilityCount}>{item.hpCurrent}/{item.maxHp}</Text>
--              <TouchableOpacity
--                style={[styles.paDurabilityBtn, !canGain && styles.paDurabilityBtnDisabled]}
--                onPress={() => adjustPowerArmorDurability(item.paSlot, 1)}
--                disabled={!canGain}>
--                <Text style={styles.paDurabilityBtnText}>+</Text>
--              </TouchableOpacity>
--            </View>
-+            <Text style={styles.itemSubText}>
-+              {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
-+            </Text>
-           </View>
-         </View>
-       );
-@@ -1365,70 +1288,6 @@ const InventoryScreen = () => {
-       );
-     }
- 
--    if (item.paPackage) {
--      // СНЯТЫЙ пакет — контейнер в инвентаре (ПРАВИЛО владельца): системный заголовок
--      // + сводка; «Надеть» (весь пакет), «Содержание»/«Свернуть», «Продать».
--      const isOpen = Boolean(paOpenPackages[item.paStoreId]);
--      return (
--        <View style={styles.tableRow}>
--          <View style={styles.mainRowContent}>
--            <View style={styles.itemNameContainer}>
--              <Text style={styles.itemNameText}>{item.name}</Text>
--              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
--            </View>
--          </View>
--          <View style={styles.actionContainer}>
--            <TouchableOpacity
--              style={styles.actionButton}
--              onPress={() => equipPowerArmorPackage(item)}>
--              <Text style={styles.actionButtonText}>{tInventory('screen.actions.equip')}</Text>
--            </TouchableOpacity>
--            <TouchableOpacity
--              style={[styles.actionButton, styles.applyButton]}
--              onPress={() => setPaOpenPackages((m) => ({ ...m, [item.paStoreId]: !m[item.paStoreId] }))}>
--              <Text style={styles.actionButtonText}>{tInventory(isOpen ? 'screen.actions.collapse' : 'screen.actions.contents')}</Text>
--            </TouchableOpacity>
--            <TouchableOpacity
--              style={[styles.actionButton, styles.sellButton]}
--              onPress={() => handleSellItem(item)}>
--              <Text style={styles.actionButtonText}>{tInventory('screen.actions.sell')}</Text>
--            </TouchableOpacity>
--          </View>
--          <View style={styles.itemSubRow}>
--            <Text style={styles.itemSubText}>{item.summary}</Text>
--          </View>
--        </View>
--      );
--    }
--
--    if (item.paPackagePiece) {
--      // Часть внутри снятого пакета: прочность текстом + «Починить» при hp < max.
--      // Счётчиков и извлечения из пакета нет — такой механики не заказывали.
--      return (
--        <View style={styles.tableRow}>
--          <View style={styles.mainRowContent}>
--            <View style={styles.itemNameContainer}>
--              <Text style={styles.itemNameText}>{item.name}</Text>
--            </View>
--          </View>
--          <View style={styles.actionContainer}>
--            {item.showRepair && (
--              <TouchableOpacity
--                style={[styles.actionButton, styles.applyButton]}
--                onPress={() => repairPowerArmorPackagePiece(item.paStoreId, item.paSlot)}>
--                <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
--              </TouchableOpacity>
--            )}
--          </View>
--          <View style={styles.itemSubRow}>
--            <Text style={styles.itemSubText}>
--              {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
--            </Text>
--          </View>
--        </View>
--      );
--    }
--
-     if (item.paCoreContent) {
-       // Ядерный блок — статусная строка без кнопок (замена блоков автоматическая, §5.4).
-       return (
++      (item?.itemType === 'powerArmor' && isPowerArmorPackage(item) && !item.isEquipped
+         ? paExpandPackage(item)
+         : [item]));
+   }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows, paExpandPackage]);
 diff --git a/components/screens/InventoryScreen/logic/inventoryI18n.js b/components/screens/InventoryScreen/logic/inventoryI18n.js
 index faed02bd21a9a903351c3e4122fdc83459268653..2c6967c3f24476a1d0596166ddfc11dd824ea20d 100644
 --- a/components/screens/InventoryScreen/logic/inventoryI18n.js
@@ -1941,27 +1640,10 @@ index f627fbe432d8cef9b84b3bd1d9083305827e1ddc..9b803eabc667d3a66c0ff334e259ec19
    return current;
  };
 diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
-index 7fe2687ca67fd9438e23354cf895efdf82f34e74..7ab48b82d28ed66c6f5ada75f3709f2cd1eeb1f1 100644
+index 7fe2687ca67fd9438e23354cf895efdf82f34e74..66a0518579063a157bf299bb469b1ead614fb9c5 100644
 --- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
 +++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
-@@ -254,7 +254,7 @@ const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled
-   </View>
- );
- 
--const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
-+const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = null }) => {
-     const displayName = [clothingName, armorName].filter(Boolean).join(' / ');
- 
-     return (
-@@ -277,6 +277,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
-                         )}
-                     </View>
-                 ))}
-+                {footer}
-             </View>
-         </View>
-     );
-@@ -765,16 +766,12 @@ const WeaponsAndArmorScreen = () => {
+@@ -765,16 +765,12 @@ const WeaponsAndArmorScreen = () => {
      const slotData = equippedArmor[slotKey];
      const armorItem = findLocalizedArmor(equipmentCatalog, slotData ? slotData.armor : null);
      const clothingItem = findLocalizedClothing(equipmentCatalog, slotData ? slotData.clothing : null);
@@ -1983,65 +1665,7 @@ index 7fe2687ca67fd9438e23354cf895efdf82f34e74..7ab48b82d28ed66c6f5ada75f3709f2c
        subtitle: tWeaponsAndArmorScreen(`armor.slots.${slotKey}.subtitle`),
      };
  
-@@ -792,26 +789,31 @@ const WeaponsAndArmorScreen = () => {
-         { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: paRating(Number(paCatalogItem?.physicalDamageRating || 0) + (timedDR.physical || 0)) },
-         { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: paRating(Number(paCatalogItem?.energyDamageRating || 0) + (timedDR.energy || 0)) },
-         { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
--        {
--          // ПРАВИЛО (от владельца): счётчик прочности — в дизайне счётчика патронов
--          // (красная кнопка как weaponAmmoBtn) и ТОЛЬКО «−»: повышение прочности —
--          // это ремонт, а ремонт делается в инвентаре.
--          label: tWeaponsAndArmorScreen('powerArmor.durability'),
--          custom: (
--            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
--              <TouchableOpacity
--                style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent <= 0 && localStyles.weaponAmmoBtnDisabled]}
--                onPress={() => adjustPowerArmorDurability(slotKey, -1)}
--                disabled={paPiece.hpCurrent <= 0}
--              >
--                <Text style={localStyles.weaponAmmoBtnText}>−</Text>
--              </TouchableOpacity>
--              <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
--            </View>
--          ),
--        },
-       ];
- 
-+      // Прочность части — ДВЕ строки во всю ширину ячейки, часть ячейки (footer
-+      // ArmorPart): заголовок «Прочность (ОЗ)» белым на тёмном и строка счётчика.
-+      // ПРАВИЛО (владелец): на экране экипировки прочность можно только
-+      // УМЕНЬШИТЬ («−»), увеличить нельзя — увеличение это ремонт, ремонт
-+      // делается в инвентаре.
-+      const paDurabilityFooter = (
-+        <View style={localStyles.paDurabilityBlock}>
-+          <View style={localStyles.paDurabilityHeaderRow}>
-+            <Text style={localStyles.paDurabilityHeader}>{tWeaponsAndArmorScreen('powerArmor.durability')}</Text>
-+          </View>
-+          <View style={localStyles.paDurabilityCounterRow}>
-+            <TouchableOpacity
-+              style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent <= 0 && localStyles.weaponAmmoBtnDisabled]}
-+              onPress={() => adjustPowerArmorDurability(slotKey, -1)}
-+              disabled={paPiece.hpCurrent <= 0}
-+            >
-+              <Text style={localStyles.weaponAmmoBtnText}>−</Text>
-+            </TouchableOpacity>
-+            <Text style={localStyles.armorStatValue}>{paPiece.hpCurrent}/{paMaxHp}</Text>
-+          </View>
-+        </View>
-+      );
-+
-       return (
-         <ArmorPart
-           key={slotKey}
-@@ -819,6 +821,7 @@ const WeaponsAndArmorScreen = () => {
-           subtitle={config.subtitle}
-           armorName={paLocalized?.name}
-           stats={paStats}
-+          footer={paDurabilityFooter}
-         />
-       );
-     }
-@@ -999,10 +1002,10 @@ const WeaponsAndArmorScreen = () => {
+@@ -999,10 +995,10 @@ const WeaponsAndArmorScreen = () => {
          <View style={localStyles.modalOverlay}>
            <View style={localStyles.robotBodyModalContent}>
              <Text style={localStyles.robotBodyModalTitle}>
@@ -2400,13 +2024,22 @@ index 0000000000000000000000000000000000000000..16e7cf78dc63f7dd48a2911bbc455a75
 +- Режимы условий (стелс, ОЗ, тип цели) — после Q5/Q6/Q4.
 +- Миграция `effects`-флагов существующих реализаций к JSON — по решению.
 diff --git a/domain/powerArmor.js b/domain/powerArmor.js
-index d5f988ac3c8916f3c8fd258106137ea21ea086d6..ef3796ee88070c3e208da90aad29185148ae0044 100644
+index d5f988ac3c8916f3c8fd258106137ea21ea086d6..1f29db3aedee094c95e2d197f5bf1728b845a170 100644
 --- a/domain/powerArmor.js
 +++ b/domain/powerArmor.js
-@@ -165,6 +165,7 @@ export const unpackPackage = (frameItem) => ({
+@@ -165,6 +165,16 @@ export const unpackPackage = (frameItem) => ({
    pieces: { ...createEmptyEquippedPowerArmor().pieces, ...(frameItem.installedPieces || {}) },
  });
  
++/**
++ * Пакет — стор-запись каркаса, ПОБЫВАВШЕГО в надетом состоянии: packPackage
++ * всегда пишет поле installedPieces (даже если все части null).
++ * ПРАВИЛО (от владельца): контейнер «Силовая броня» в инвентаре создаётся
++ * только когда каркас успешно надевался, не раньше — свежий каркас из
++ * каталога/магазина (без installedPieces) рисуется обычной строкой предмета.
++ */
++export const isPowerArmorPackage = (item) =>
++  isPowerArmorFrame(item) && item.installedPieces != null;
 +
  /** Вставить блок в надетый каркас. Блок изымается из инвентаря вызывающим. */
  export const insertCore = (equipped, core) => ({
@@ -2474,7 +2107,7 @@ index d00b0da1ba919b53636df6f3ddaea1674ccad88c..b7708cf50e4db73de03a0011d6f3f50f
        "title": "Select origin"
      },
 diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
-index 773fdf63b2ec9739524d279b6ce84b90ec67ca6e..6b7ab43db3c7b397c98f98f90b953eeedd4707cd 100644
+index 773fdf63b2ec9739524d279b6ce84b90ec67ca6e..773203b159a5c4de365b435f20f1a7417b5b103c 100644
 --- a/i18n/en-EN/screens/inventory/screen.json
 +++ b/i18n/en-EN/screens/inventory/screen.json
 @@ -5,6 +5,15 @@
@@ -2493,20 +2126,11 @@ index 773fdf63b2ec9739524d279b6ce84b90ec67ca6e..6b7ab43db3c7b397c98f98f90b953eee
      "successTitle": "Success",
      "appliedTitle": "Applied",
      "effectsTitle": "Effects",
-@@ -74,7 +83,7 @@
-     "inventoryEmpty": "Inventory is empty",
-     "totalWeight": "Total weight",
-     "totalPrice": "Total price",
--    "durability": "HP"
-+    "durability": "Durability (HP)"
-   },
-   "powerArmor": {
-     "containerTitle": "Power Armor",
 diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
-index d72936a8efbaa7f5034a23216749a3ddb909f279..34387a4a8772eee7036a77e958a8ba007e9df1e2 100644
+index d72936a8efbaa7f5034a23216749a3ddb909f279..2ca15beca4766bfb9ea6a015519b9195ec2316f7 100644
 --- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
 +++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
-@@ -164,8 +164,22 @@
+@@ -164,6 +164,20 @@
        "upgradeFrame": "Frame"
      }
    },
@@ -2525,11 +2149,8 @@ index d72936a8efbaa7f5034a23216749a3ddb909f279..34387a4a8772eee7036a77e958a8ba00
 +    "comingSoon": "Coming soon"
 +  },
    "powerArmor": {
--    "durability": "HP",
-+    "durability": "Durability (HP)",
+     "durability": "HP",
      "core": "Fusion Core: {value}"
-   },
-   "common": {
 diff --git a/i18n/ru-RU/App.json b/i18n/ru-RU/App.json
 index 4acc70f4ac4ecdda6239afc00e0f677d347666e7..25da41951952e3d84e7147b588692bf383608259 100644
 --- a/i18n/ru-RU/App.json
@@ -2567,7 +2188,7 @@ index 1fb4360cd721f8f832884a22a4b89ed0de11757a..16c9fd1e200b62ab2b2ad47598eb0823
        "title": "Выберите происхождение"
      },
 diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
-index 9b9bce508f90d53ad056773336354d9f22bfa824..db2b70362862d7fec3379bbd0c36f0588ec7223d 100644
+index 9b9bce508f90d53ad056773336354d9f22bfa824..cfbca6726500906ca40361a97221f1b956ba5961 100644
 --- a/i18n/ru-RU/screens/inventory/screen.json
 +++ b/i18n/ru-RU/screens/inventory/screen.json
 @@ -5,6 +5,15 @@
@@ -2591,12 +2212,12 @@ index 9b9bce508f90d53ad056773336354d9f22bfa824..db2b70362862d7fec3379bbd0c36f058
      "totalWeight": "Общий вес",
      "totalPrice": "Общая цена",
 -    "durability": "Прочность"
-+    "durability": "Прочность (ОЗ)"
++    "durability": "Прочн"
    },
    "powerArmor": {
      "containerTitle": "Силовая броня",
 diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
-index 822d64474ca3929c137fbb654a3bdea74eab3d99..e8bd9219399cdd00e56d0781e196444aecc0cf5d 100644
+index 822d64474ca3929c137fbb654a3bdea74eab3d99..64f09efaa165279eed86ad942a5acdfb85ffbb2a 100644
 --- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
 +++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
 @@ -164,8 +164,22 @@
@@ -2619,86 +2240,7 @@ index 822d64474ca3929c137fbb654a3bdea74eab3d99..e8bd9219399cdd00e56d0781e196444a
 +  },
    "powerArmor": {
 -    "durability": "Прочность",
-+    "durability": "Прочность (ОЗ)",
++    "durability": "Прочн",
      "core": "Ядерный блок: {value}"
    },
    "common": {
-diff --git a/styles/InventoryScreen.styles.js b/styles/InventoryScreen.styles.js
-index 7f20dffaf970f77c59dd7410ab538e36061f9f83..166ef5c4553a07ce648acbbc01dca7da5cbb525f 100644
---- a/styles/InventoryScreen.styles.js
-+++ b/styles/InventoryScreen.styles.js
-@@ -84,36 +84,6 @@ const styles = StyleSheet.create({
-   },
-   addActionIcon: { fontSize: 24, color: '#000', fontWeight: 'bold', lineHeight: 26 },
-   addActionLabel: { marginTop: 4, fontSize: 12, color: '#000', fontWeight: '600', textAlign: 'center' },
--  // Счётчик прочности части силовой брони в контейнере — дизайн счётчика патронов
--  // (как weaponAmmoBtn экрана оружия и брони; ПРАВИЛО владельца).
--  paDurabilityCell: {
--    flexDirection: 'row',
--    alignItems: 'center',
--    gap: 6,
--  },
--  paDurabilityBtn: {
--    width: 26,
--    height: 26,
--    borderRadius: 4,
--    backgroundColor: '#8b1a1a',
--    alignItems: 'center',
--    justifyContent: 'center',
--  },
--  paDurabilityBtnDisabled: { opacity: 0.35 },
--  paDurabilityBtnText: {
--    color: '#fff',
--    fontWeight: 'bold',
--    fontSize: 16,
--    lineHeight: 20,
--    includeFontPadding: false,
--  },
--  paDurabilityCount: {
--    minWidth: 48,
--    textAlign: 'center',
--    fontSize: 13,
--    fontWeight: '600',
--    color: '#333',
--  },
- });
- 
- export default styles;
-diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
-index 5bb65a29feb1b96861770c2cdba680e5ac21da75..802ca2c517bb61a3f8483da037ca8a82b502ff2a 100644
---- a/styles/WeaponsAndArmorScreen.styles.js
-+++ b/styles/WeaponsAndArmorScreen.styles.js
-@@ -222,6 +222,33 @@ const styles = StyleSheet.create({
-     paddingVertical: 4,
-     gap: 6,
-   },
-+  // Прочность части силовой брони — ДВЕ строки во всю ширину ячейки, рендерятся
-+  // внутри контейнера ячейки (footer ArmorPart), не отдельно (ПРАВИЛО владельца):
-+  // заголовок «Прочность (ОЗ)» белым шрифтом на тёмном фоне + строка счётчика.
-+  paDurabilityBlock: {
-+    width: '100%',
-+    borderTopWidth: 1,
-+    borderColor: '#5a5a5a',
-+  },
-+  paDurabilityHeaderRow: {
-+    width: '100%',
-+    backgroundColor: '#333',
-+    paddingVertical: 4,
-+    alignItems: 'center',
-+  },
-+  paDurabilityHeader: {
-+    color: '#fff',
-+    fontWeight: 'bold',
-+    fontSize: 12,
-+  },
-+  paDurabilityCounterRow: {
-+    width: '100%',
-+    flexDirection: 'row',
-+    alignItems: 'center',
-+    justifyContent: 'center',
-+    gap: 10,
-+    paddingVertical: 6,
-+  },
-   weaponAmmoBtn: {
-     width: 26,
-     height: 26,

@@ -187,7 +187,7 @@ describe('power-armor ui-integration: контейнер в инвентаре (
   });
 
   // Конвенция vitest: запуск из корня проекта — пути исходников относительно cwd.
-  it('структура: инвентарь — контейнер-аккордеон; системное имя; каркас — элемент контейнера', () => {
+  it('структура: инвентарь — контейнер-аккордеон только НАДЕТОГО пакета; системное имя; каркас — элемент контейнера', () => {
     const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
     expect(src).not.toContain('equippedPowerArmorRows');
     expect(src).toContain('paContainerRows');
@@ -196,33 +196,55 @@ describe('power-armor ui-integration: контейнер в инвентаре (
     for (const marker of ['item.paContainer', 'item.paFrameContent', 'item.paPieceContent', 'item.paCoreContent']) {
       expect(src).toContain(marker);
     }
-    // Счётчик прочности в стиле патронов — свои стили кнопок (красные, как weaponAmmoBtn).
-    expect(src).toContain('paDurabilityBtn');
+    // В инвентаре прочность не меняется: счётчика нет, значение — текстом + «Починить».
+    expect(src).toContain("tInventory('screen.labels.durability')");
   });
 
-  it('структура: снятый пакет — тоже контейнер (родитель, части с починкой, блок)', () => {
+  it('структура: ПРАВИЛО владельца — снятый пакет НЕ контейнер; обычный предмет; в инвентаре прочность не меняется', () => {
     const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
-    for (const marker of ['paExpandPackage', 'item.paPackage', 'item.paPackagePiece', 'repairPowerArmorPackagePiece']) {
-      expect(src).toContain(marker);
+    // Наличие каркаса (любого: свежего или со снятым содержимым) — обычная строка
+    // предмета. Контейнер «Силовая броня» существует только на персонаже
+    // (каркас надет с ядерным блоком): механики контейнера снятого пакета нет совсем.
+    for (const marker of ['paExpandPackage', 'item.paPackage', 'paOpenPackages', 'isPowerArmorPackage', 'paStoreId']) {
+      expect(src).not.toContain(marker);
     }
-    expect(src).toContain('paOpenPackages');
-    // ПРАВИЛО (владелец, pa8): контейнер в инвентаре создаётся только когда каркас
-    // успешно надевался, не раньше — гейт раскрытия по isPowerArmorPackage;
-    // свежий каркас (без installedPieces) остаётся обычной строкой предмета.
-    expect(src).toContain('isPowerArmorPackage(item)');
+    // Счётчик прочности в инвентаре запрещён: ни «−», ни «+» — только «Починить».
+    expect(src).not.toContain('adjustPowerArmorDurability');
+    expect(src).not.toContain('paDurability');
+    const stylesSrc = readFileSync('styles/InventoryScreen.styles.js', 'utf8');
+    expect(stylesSrc).not.toContain('paDurability');
     const ctx = readFileSync('components/CharacterContext.js', 'utf8');
-    // Новое действие починки части внутри снятого пакета — определено и экспонировано.
-    expect(ctx).toContain('const repairPowerArmorPackagePiece');
-    expect(ctx).toContain('powerArmorFrameStackKey');
+    // Починка части внутри снятого пакета — мёртвая механика, удалена.
+    expect(ctx).not.toContain('repairPowerArmorPackagePiece');
+    const domain = readFileSync('domain/powerArmor.js', 'utf8');
+    expect(domain).not.toContain('isPowerArmorPackage');
   });
 
-  it('структура: экран оружия и брони — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
+  it('структура: экран экипировки — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
     const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
     expect(src).toContain("adjustPowerArmorDurability(slotKey, -1)");
     expect(src).not.toContain("adjustPowerArmorDurability(slotKey, 1)");
   });
 
-  it('структура: экран оружия и брони — починки нет (только инвентарь), счётчик — стиль патронов', () => {
+  it('структура: прочность в ячейке — ДВЕ строки на всю ширину, часть ячейки (footer ArmorPart)', () => {
+    // ПРАВИЛО (владелец): строка 1 — заголовок «Прочность (ОЗ)» белым на тёмном,
+    // строка 2 — счётчик; строки внутри ячейки, не отдельно.
+    const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
+    expect(src).toContain('footer');
+    expect(src).toContain('paDurabilityBlock');
+    expect(src).toContain('paDurabilityHeaderRow');
+    expect(src).toContain('paDurabilityCounterRow');
+    expect(src).toContain("tWeaponsAndArmorScreen('powerArmor.durability')");
+    const stylesSrc = readFileSync('styles/WeaponsAndArmorScreen.styles.js', 'utf8');
+    for (const marker of ['paDurabilityBlock', 'paDurabilityHeaderRow', 'paDurabilityHeader', 'paDurabilityCounterRow']) {
+      expect(stylesSrc).toContain(marker);
+    }
+    // белый шрифт на тёмном фоне
+    expect(stylesSrc).toMatch(/paDurabilityHeaderRow:\s*\{[^}]*'#333'/s);
+    expect(stylesSrc).toMatch(/paDurabilityHeader:\s*\{[^}]*'#fff'/s);
+  });
+
+  it('структура: экран экипировки — починки нет (только инвентарь), счётчик — стиль патронов', () => {
     const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
     expect(src).not.toContain('repairPowerArmorPieceAt');
     expect(src).not.toContain("powerArmor.repair");

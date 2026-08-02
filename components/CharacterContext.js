@@ -50,7 +50,6 @@ import {
   findChargedFusionCores,
   pickFusionCore,
   powerArmorPieceStackKey,
-  powerArmorFrameStackKey,
   powerArmorSlotsFor,
   resolvePowerArmorPieceTarget,
   repairPowerArmorPiece,
@@ -576,34 +575,6 @@ export const CharacterProvider = ({ children }) => {
     useCharacterStore.getState().updateItem(storeItemId, { hpCurrent: maxHp, stackKey: newStackKey });
   }, []);
 
-  // Починка части ВНУТРИ снятого пакета (стопка-каркас в инвентаре). Состав пакета
-  // входит в подпись стопки (powerArmorFrameStackKey) → после починки стопка либо
-  // переподписывается, либо сливается с уже существующей идентичной (как у part-стопок).
-  // ПРАВИЛО владельца: бесплатно до максимума, то же условие hp < max.
-  const repairPowerArmorPackagePiece = useCallback((storeItemId, slot) => {
-    const { items } = useCharacterStore.getState();
-    const item = items[storeItemId];
-    if (!item || !isPowerArmorFrame(item)) return;
-    const piece = item.installedPieces?.[slot];
-    if (!piece) return;
-    const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
-    if (!Number.isFinite(maxHp) || !needsRepair(piece, maxHp)) return;
-    const installedPieces = { ...item.installedPieces, [slot]: repairPowerArmorPiece(piece, maxHp) };
-    // Ключ считается от КАНОНИЧЕСКОГО id (weaponId), как в getStackKey инвентаря.
-    const catalogId = item.weaponId || item.id;
-    const newStackKey = powerArmorFrameStackKey({ ...item, id: catalogId, installedPieces });
-    const wholeTwinKey = Object.keys(items).find(
-      (key) => key !== storeItemId && (items[key]?.stackKey || items[key]?.id) === newStackKey,
-    );
-    if (wholeTwinKey) {
-      const updated = { ...items };
-      updated[wholeTwinKey] = { ...updated[wholeTwinKey], quantity: (updated[wholeTwinKey].quantity || 1) + (item.quantity || 1) };
-      delete updated[storeItemId];
-      useCharacterStore.setState({ items: updated });
-      return;
-    }
-    useCharacterStore.getState().updateItem(storeItemId, { installedPieces, stackKey: newStackKey });
-  }, []);
 
   // ── §5.3/§5.4 Таймер расхода Ядерного блока ──
   // Тикает только пока приложение открыто («приложение закрыто — отсчёт на паузе»);
@@ -1124,7 +1095,6 @@ export const CharacterProvider = ({ children }) => {
     adjustPowerArmorDurability,
     repairPowerArmorPieceAt,
     repairPowerArmorStack,
-    repairPowerArmorPackagePiece,
     caps, setCaps,
     currentHealth, setCurrentHealth,
     radiation, setRadiation,

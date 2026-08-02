@@ -222,6 +222,33 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     gap: 6,
   },
+  // Прочность части силовой брони — ДВЕ строки во всю ширину ячейки, рендерятся
+  // внутри контейнера ячейки (footer ArmorPart), не отдельно (ПРАВИЛО владельца):
+  // заголовок «Прочность (ОЗ)» белым шрифтом на тёмном фоне + строка счётчика.
+  paDurabilityBlock: {
+    width: '100%',
+    borderTopWidth: 1,
+    borderColor: '#5a5a5a',
+  },
+  paDurabilityHeaderRow: {
+    width: '100%',
+    backgroundColor: '#333',
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  paDurabilityHeader: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  paDurabilityCounterRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 6,
+  },
   weaponAmmoBtn: {
     width: 26,
     height: 26,

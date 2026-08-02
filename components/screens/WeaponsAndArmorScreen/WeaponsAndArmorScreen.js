@@ -254,7 +254,7 @@ const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled
   </View>
 );
 
-const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
+const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = null }) => {
     const displayName = [clothingName, armorName].filter(Boolean).join(' / ');
 
     return (
@@ -277,6 +277,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
                         )}
                     </View>
                 ))}
+                {footer}
             </View>
         </View>
     );
@@ -788,25 +789,30 @@ const WeaponsAndArmorScreen = () => {
         { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: paRating(Number(paCatalogItem?.physicalDamageRating || 0) + (timedDR.physical || 0)) },
         { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: paRating(Number(paCatalogItem?.energyDamageRating || 0) + (timedDR.energy || 0)) },
         { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
-        {
-          // ПРАВИЛО (от владельца): счётчик прочности — в дизайне счётчика патронов
-          // (красная кнопка как weaponAmmoBtn) и ТОЛЬКО «−»: повышение прочности —
-          // это ремонт, а ремонт делается в инвентаре.
-          label: tWeaponsAndArmorScreen('powerArmor.durability'),
-          custom: (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity
-                style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent <= 0 && localStyles.weaponAmmoBtnDisabled]}
-                onPress={() => adjustPowerArmorDurability(slotKey, -1)}
-                disabled={paPiece.hpCurrent <= 0}
-              >
-                <Text style={localStyles.weaponAmmoBtnText}>−</Text>
-              </TouchableOpacity>
-              <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
-            </View>
-          ),
-        },
       ];
+
+      // Прочность части — ДВЕ строки во всю ширину ячейки, часть ячейки (footer
+      // ArmorPart): заголовок «Прочность (ОЗ)» белым на тёмном и строка счётчика.
+      // ПРАВИЛО (владелец): на экране экипировки прочность можно только
+      // УМЕНЬШИТЬ («−»), увеличить нельзя — увеличение это ремонт, ремонт
+      // делается в инвентаре.
+      const paDurabilityFooter = (
+        <View style={localStyles.paDurabilityBlock}>
+          <View style={localStyles.paDurabilityHeaderRow}>
+            <Text style={localStyles.paDurabilityHeader}>{tWeaponsAndArmorScreen('powerArmor.durability')}</Text>
+          </View>
+          <View style={localStyles.paDurabilityCounterRow}>
+            <TouchableOpacity
+              style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent <= 0 && localStyles.weaponAmmoBtnDisabled]}
+              onPress={() => adjustPowerArmorDurability(slotKey, -1)}
+              disabled={paPiece.hpCurrent <= 0}
+            >
+              <Text style={localStyles.weaponAmmoBtnText}>−</Text>
+            </TouchableOpacity>
+            <Text style={localStyles.armorStatValue}>{paPiece.hpCurrent}/{paMaxHp}</Text>
+          </View>
+        </View>
+      );
 
       return (
         <ArmorPart
@@ -815,6 +821,7 @@ const WeaponsAndArmorScreen = () => {
           subtitle={config.subtitle}
           armorName={paLocalized?.name}
           stats={paStats}
+          footer={paDurabilityFooter}
         />
       );
     }
