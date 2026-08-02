@@ -135,13 +135,15 @@ const paLocalizedCatalogItem = (catalogId) => {
   return localized || PA_CATALOG_BY_ID[catalogId];
 };
 const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
-const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()]?.[key] ?? INV_ALERTS_DICT['ru-RU']?.[key] ?? key;
+// ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
+// (контроль — инвариант-тест __tests__/i18n/no-fallbacks.test.js).
+const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()][key];
 // Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
 // что использует обычная броня при выборе слота.
 const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
 const INV_ACTIONS_DICT = { 'ru-RU': ruInventoryScreen.actions, 'en-EN': enInventoryScreen.actions };
-const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()]?.[key] ?? INV_LABELS_DICT['ru-RU']?.[key] ?? key;
-const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()]?.[key] ?? INV_ACTIONS_DICT['ru-RU']?.[key] ?? key;
+const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
+const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()][key];
 // Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
 // как showAlert в InventoryScreen.
 const paAlert = (title, message = '') => {

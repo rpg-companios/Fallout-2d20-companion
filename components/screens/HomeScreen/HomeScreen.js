@@ -85,7 +85,7 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
       </TouchableOpacity>
       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
       {character.level ? (
-        <Text style={styles.characterLevel}>{tHomeScreen("labels.level", "Ур.")} {character.level}</Text>
+        <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text>
       ) : null}
     </TouchableOpacity>
   );
@@ -165,8 +165,8 @@ export default function HomeScreen({ navigation }) {
     }
   };
   const languageOptions = [
-    { code: 'ru-RU', label: tHomeScreen('language.russian', 'Русский'), flag: '🇷🇺' },
-    { code: 'en-EN', label: tHomeScreen('language.english', 'English'), flag: '🇬🇧' },
+    { code: 'ru-RU', label: tHomeScreen('language.russian'), flag: '🇷🇺' },
+    { code: 'en-EN', label: tHomeScreen('language.english'), flag: '🇬🇧' },
   ];
 
   const loadList = useCallback(async () => {
@@ -206,7 +206,7 @@ export default function HomeScreen({ navigation }) {
       loadList();
     };
 
-    const confirmMessage = tHomeScreen('deleteConfirm', 'Вы действительно хотите удалить этого персонажа?');
+    const confirmMessage = tHomeScreen('deleteConfirm');
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const confirmed = window.confirm(confirmMessage);
@@ -217,15 +217,15 @@ export default function HomeScreen({ navigation }) {
     }
 
     Alert.alert(
-      tHomeScreen('title', 'Менеджер персонажей'),
+      tHomeScreen('title'),
       confirmMessage,
       [
         {
-          text: tHomeScreen('buttons.yes', 'Да') || 'Да',
+          text: tHomeScreen('buttons.yes') || 'Да',
           style: 'destructive',
           onPress: confirmDelete,
         },
-        { text: tHomeScreen('buttons.no', 'Нет') || 'Нет', style: 'cancel' },
+        { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
       ],
       { cancelable: false }
     );
@@ -235,15 +235,15 @@ export default function HomeScreen({ navigation }) {
   const handleDownload = async (character) => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
       Alert.alert(
-        tHomeScreen('title', 'Менеджер персонажей'),
-        tHomeScreen('download.unsupported', 'Загрузка/сохранение файлов поддерживается только в web-версии.')
+        tHomeScreen('title'),
+        tHomeScreen('download.unsupported')
       );
       return;
     }
 
     const row = await db.loadCharacterById(character.id);
     if (!row) {
-      Alert.alert(tHomeScreen('title', 'Менеджер персонажей'), tHomeScreen('download.errors.notFound', 'Персонаж не найден.'));
+      Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
       return;
     }
 
@@ -254,8 +254,8 @@ export default function HomeScreen({ navigation }) {
   const handleUpload = async () => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
       Alert.alert(
-        tHomeScreen('title', 'Менеджер персонажей'),
-        tHomeScreen('upload.unsupported', 'Загрузка файлов поддерживается только в web-версии.')
+        tHomeScreen('title'),
+        tHomeScreen('upload.unsupported')
       );
       return;
     }
@@ -266,8 +266,8 @@ export default function HomeScreen({ navigation }) {
     const parsed = parseCharacterImportPayload(rawText);
     if (parsed.error) {
       Alert.alert(
-        tHomeScreen('title', 'Менеджер персонажей'),
-        tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default', 'Не удалось импортировать персонажа.'))
+        tHomeScreen('title'),
+        tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
       );
       return;
     }
@@ -292,7 +292,7 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const overwriteMessage = tHomeScreen('upload.overwriteConfirm', 'Персонаж с таким именем уже существует. Перезаписать его?');
+    const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const confirmed = window.confirm(overwriteMessage);
@@ -303,12 +303,12 @@ export default function HomeScreen({ navigation }) {
     }
 
     Alert.alert(
-      tHomeScreen('title', 'Менеджер персонажей'),
+      tHomeScreen('title'),
       overwriteMessage,
       [
-        { text: tHomeScreen('buttons.no', 'Нет') || 'Нет', style: 'cancel' },
+        { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
         {
-          text: tHomeScreen('buttons.yes', 'Да') || 'Да',
+          text: tHomeScreen('buttons.yes') || 'Да',
           style: 'destructive',
           onPress: persistImport,
         },
@@ -321,8 +321,8 @@ export default function HomeScreen({ navigation }) {
     setMenuVisible(false);
     if (Platform.OS !== 'web') {
       Alert.alert(
-        tHomeScreen('title', 'Менеджер персонажей'),
-        tHomeScreen('cloudSync.unsupported', 'Синхронизация с облаком доступна только в web-версии.')
+        tHomeScreen('title'),
+        tHomeScreen('cloudSync.unsupported')
       );
       return;
     }
@@ -340,7 +340,7 @@ export default function HomeScreen({ navigation }) {
       await loadList();
       await openCloudFolderInDrive();
       Alert.alert(
-        tHomeScreen('title', 'Менеджер персонажей'),
+        tHomeScreen('title'),
         tHomeScreen(
           'cloudSync.success',
           `Синхронизация завершена. Выгружено: ${result.uploaded}, загружено: ${result.downloaded}.`
@@ -348,7 +348,7 @@ export default function HomeScreen({ navigation }) {
       );
     } catch (e) {
       Alert.alert(
-        tHomeScreen('title', 'Менеджер персонажей'),
+        tHomeScreen('title'),
         tHomeScreen('cloudSync.error', `Ошибка синхронизации: ${e?.message || e}`)
       );
     }
@@ -414,8 +414,8 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>{tHomeScreen("title", "Менеджер персонажей")}</Text>
-        <Text style={styles.subtitle}>{tHomeScreen("subtitle", "Ролевая игра Fallout (2d20)")}</Text>
+        <Text style={styles.title}>{tHomeScreen("title")}</Text>
+        <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
       <ScrollView
         style={styles.scrollView}
@@ -431,8 +431,8 @@ export default function HomeScreen({ navigation }) {
                   return (
                     <ActionCell
                       key="create"
-                      icon={tHomeScreen('createButton.plus', '+')}
-                      label={tHomeScreen('createButton.text', 'Создать\nперсонажа')}
+                      icon={tHomeScreen('createButton.plus')}
+                      label={tHomeScreen('createButton.text')}
                       onPress={handleCreate}
                     />
                   );
@@ -441,8 +441,8 @@ export default function HomeScreen({ navigation }) {
                   return (
                     <ActionCell
                       key="upload"
-                      icon={tHomeScreen('upload.icon', '⇪')}
-                      label={tHomeScreen('upload.button', 'Загрузить\nперсонажа')}
+                      icon={tHomeScreen('upload.icon')}
+                      label={tHomeScreen('upload.button')}
                       onPress={handleUpload}
                     />
                   );
@@ -468,7 +468,7 @@ export default function HomeScreen({ navigation }) {
       {showInstallButton && (
         <TouchableOpacity style={styles.installButton} onPress={handleInstallPress}>
           <MaterialCommunityIcons name="download" size={16} color="#111827" style={{ marginRight: 6 }} />
-          <Text style={styles.installButtonText}>{tHomeScreen('pwa.install', 'Установить приложение')}</Text>
+          <Text style={styles.installButtonText}>{tHomeScreen('pwa.install')}</Text>
         </TouchableOpacity>
       )}
 
@@ -477,25 +477,25 @@ export default function HomeScreen({ navigation }) {
           <Pressable style={styles.menuPanel} onPress={() => {}}>
             <TouchableOpacity style={styles.menuItem} onPress={handleCloudSync}>
               <FontAwesome5 name="google-drive" size={18} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.sync', 'Синхронизация с облаком')}</Text>
+              <Text style={styles.menuText}>{tHomeScreen('menu.sync')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setAboutVisible(true); }}>
               <MaterialCommunityIcons name="information-outline" size={20} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.about', 'О приложении')}</Text>
+              <Text style={styles.menuText}>{tHomeScreen('menu.about')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setCommunityVisible(true); }}>
               <FontAwesome5 name="telegram-plane" size={18} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.community', 'Сообщество')}</Text>
+              <Text style={styles.menuText}>{tHomeScreen('menu.community')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => {
               setMenuVisible(false);
               Alert.alert(
-                tHomeScreen('menu.buyCoffee', 'Купить автору кофе'),
-                tHomeScreen('menu.buyCoffeeDescription', 'Поддержка автора появится в следующих обновлениях.')
+                tHomeScreen('menu.buyCoffee'),
+                tHomeScreen('menu.buyCoffeeDescription')
               );
             }}>
               <MaterialCommunityIcons name="coffee-outline" size={20} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee', 'Купить автору кофе')}</Text>
+              <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee')}</Text>
             </TouchableOpacity>
 
             {/* Принудительное обновление PWA (для разработчика) */}
@@ -507,7 +507,7 @@ export default function HomeScreen({ navigation }) {
               }}
             >
               <MaterialCommunityIcons name="refresh" size={20} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.checkUpdates', 'Проверить обновления')}</Text>
+              <Text style={styles.menuText}>{tHomeScreen('menu.checkUpdates')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -516,15 +516,13 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalBackdropCenter}>
           <View style={styles.infoModal}>
-            <Text style={styles.infoTitle}>{tHomeScreen('menu.about', 'О приложении')}</Text>
+            <Text style={styles.infoTitle}>{tHomeScreen('menu.about')}</Text>
             <Text style={styles.infoText}>
-              {tHomeScreen(
-                'about.description',
-                'Fallout 2d20 Companion — менеджер персонажей для настольной ролевой игры: создание, хранение, редактирование, импорт/экспорт и облачная синхронизация.'
+              {tHomeScreen('about.description'
               )}
             </Text>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAboutVisible(false)}>
-              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -533,7 +531,7 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={communityVisible} transparent animationType="slide" onRequestClose={() => setCommunityVisible(false)}>
         <View style={styles.modalBackdropCenter}>
           <View style={styles.infoModal}>
-            <Text style={styles.infoTitle}>{tHomeScreen('menu.community', 'Сообщество')}</Text>
+            <Text style={styles.infoTitle}>{tHomeScreen('menu.community')}</Text>
             <TouchableOpacity onPress={() => openExternalLink('https://fallout-2d20.ru')}>
               <Text style={styles.linkText}>fallout-2d20.ru</Text>
             </TouchableOpacity>
@@ -544,7 +542,7 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.linkText}>https://vk.com/ttrp_fallout2d20/</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setCommunityVisible(false)}>
-              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -553,10 +551,10 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={iosInstallVisible} transparent animationType="slide" onRequestClose={() => setIosInstallVisible(false)}>
         <View style={styles.modalBackdropCenter}>
           <View style={styles.infoModal}>
-            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install', 'Установить приложение')}</Text>
-            <Text style={styles.infoText}>{tHomeScreen('pwa.iosInstructions', '')}</Text>
+            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
+            <Text style={styles.infoText}>{tHomeScreen('pwa.iosInstructions')}</Text>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIosInstallVisible(false)}>
-              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -565,10 +563,10 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={androidInstallVisible} transparent animationType="slide" onRequestClose={() => setAndroidInstallVisible(false)}>
         <View style={styles.modalBackdropCenter}>
           <View style={styles.infoModal}>
-            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install', 'Установить приложение')}</Text>
-            <Text style={styles.infoText}>{tHomeScreen('pwa.androidInstructions', '')}</Text>
+            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
+            <Text style={styles.infoText}>{tHomeScreen('pwa.androidInstructions')}</Text>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAndroidInstallVisible(false)}>
-              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -577,10 +575,10 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={desktopInstallVisible} transparent animationType="slide" onRequestClose={() => setDesktopInstallVisible(false)}>
         <View style={styles.modalBackdropCenter}>
           <View style={styles.infoModal}>
-            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install', 'Установить приложение')}</Text>
-            <Text style={styles.infoText}>{tHomeScreen('pwa.desktopInstructions', '')}</Text>
+            <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
+            <Text style={styles.infoText}>{tHomeScreen('pwa.desktopInstructions')}</Text>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setDesktopInstallVisible(false)}>
-              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok', 'Ок')}</Text>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
           </View>
         </View>

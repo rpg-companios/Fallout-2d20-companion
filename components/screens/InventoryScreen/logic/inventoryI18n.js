@@ -31,22 +31,19 @@ const DICTIONARIES = {
   },
 };
 
-const resolvePath = (source, path, fallback = '') => {
-  const parts = path.split('.');
+const resolvePath = (source, path) => {
   let current = source;
-
-  for (const part of parts) {
+  for (const part of path.split('.')) {
     current = current?.[part];
-    if (current === undefined) return fallback || 'Ошибка ключа';
+    if (current === undefined) return path;
   }
-
   return current;
 };
 
-export const tInventory = (path, fallback = '') => {
-  const locale = getCurrentLocale();
-  const dictionary = DICTIONARIES[locale] || DICTIONARIES['ru-RU'];
-  return resolvePath(dictionary, path, fallback);
+export const tInventory = (path) => {
+  // ПРАВИЛО (владелец): никаких фолбэков и хардкода — ключ обязан быть в словаре;
+  // промах ключа — дефект данных, видимый маркер — сам путь.
+  return resolvePath(DICTIONARIES[getCurrentLocale()], path);
 };
 
 export const formatInventoryText = (template, params = {}) =>

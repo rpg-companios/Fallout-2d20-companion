@@ -765,16 +765,12 @@ const WeaponsAndArmorScreen = () => {
     const slotData = equippedArmor[slotKey];
     const armorItem = findLocalizedArmor(equipmentCatalog, slotData ? slotData.armor : null);
     const clothingItem = findLocalizedClothing(equipmentCatalog, slotData ? slotData.clothing : null);
-    const robotSlotTitles = isMisterHandyRobot ? {
-      head: 'Оптика',
-      body: 'Корпус',
-      leftArm: 'Рука 1',
-      rightArm: 'Рука 2',
-      leftLeg: 'Рука 3',
-      rightLeg: 'Двигатель',
-    } : null;
+    // Заголовки слотов Мистера Помощника — из словаря (ПРАВИЛО владельца: без хардкода).
+    const robotSlotTitle = isMisterHandyRobot
+      ? tWeaponsAndArmorScreen(`robotSlots.misterHandy.${slotKey}`)
+      : null;
     const config = {
-      title: robotSlotTitles?.[slotKey] || tWeaponsAndArmorScreen(`armor.slots.${slotKey}.title`),
+      title: robotSlotTitle || tWeaponsAndArmorScreen(`armor.slots.${slotKey}.title`),
       subtitle: tWeaponsAndArmorScreen(`armor.slots.${slotKey}.subtitle`),
     };
 
@@ -999,10 +995,10 @@ const WeaponsAndArmorScreen = () => {
         <View style={localStyles.modalOverlay}>
           <View style={localStyles.robotBodyModalContent}>
             <Text style={localStyles.robotBodyModalTitle}>
-              {locale === 'ru-RU' ? 'Модернизация корпуса' : 'Body upgrade'}
+              {tWeaponsAndArmorScreen('robotBodyUpgrade.title')}
             </Text>
             <Text style={localStyles.robotBodyModalText}>
-              {locale === 'ru-RU' ? 'Скоро добавим' : 'Comming Soon'}
+              {tWeaponsAndArmorScreen('robotBodyUpgrade.comingSoon')}
             </Text>
             <TouchableOpacity
               style={localStyles.robotBodyModalButton}

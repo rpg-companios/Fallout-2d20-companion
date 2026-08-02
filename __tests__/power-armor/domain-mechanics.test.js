@@ -14,6 +14,7 @@ import {
   powerArmorFrameStackKey,
   packPackage,
   unpackPackage,
+  isPowerArmorPackage,
   insertCore,
   hasFrame,
   canEquipPowerArmorPiece,
@@ -165,6 +166,24 @@ describe('экипировка пакета (§5.1/§5.2)', () => {
     expect(eq2.frame.core).toEqual({ charges: 11 });
     // Свежий предмет из каталога (weaponId нет): id и есть канонический — путь не сломан.
     expect(unpackPackage(packed).frame.catalogId).toBe(FRAME_CATALOG.id);
+  });
+
+  it('ПРАВИЛО (владелец, pa8): пакетом-контейнером считается только запись, побывавшая в надетом состоянии', () => {
+    // packPackage всегда пишет installedPieces → контейнер «Силовая броня» в инвентаре.
+    let eq = wornFrameWithCuts();
+    const packed = packPackage(eq);
+    expect(isPowerArmorPackage(packed)).toBe(true);
+    const storeRow = { ...packed, id: packed.stackKey, weaponId: FRAME_CATALOG.id };
+    expect(isPowerArmorPackage(storeRow)).toBe(true);
+    // Пакет без единой части и без блока — всё равно пакет (поле-структура на месте).
+    expect(isPowerArmorPackage(packPackage(unpackPackage({ ...FRAME_CATALOG })))).toBe(true);
+    // Свежий каркас из каталога/магазина: installedPieces нет → НЕ контейнер, обычная строка.
+    expect(isPowerArmorPackage(FRAME_CATALOG)).toBe(false);
+    expect(isPowerArmorPackage({ ...FRAME_CATALOG, id: FRAME_CATALOG.id, weaponId: undefined })).toBe(false);
+    const bareStoreRow = { id: 'powerArmor:frame_x', weaponId: FRAME_CATALOG.id, itemType: 'powerArmor', set: FRAME_CATALOG.set };
+    expect(isPowerArmorPackage(bareStoreRow)).toBe(false);
+    // Часть — не пакет вообще.
+    expect(isPowerArmorPackage({ itemType: 'powerArmor', id: T45_HELMET.id })).toBe(false);
   });
 });
 

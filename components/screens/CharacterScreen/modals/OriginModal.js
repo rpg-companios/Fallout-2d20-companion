@@ -23,7 +23,7 @@ const OriginModal = ({
   return (
     <View style={styles.modalOverlay}>
       <View style={styles.modalContainer}>
-        <Text style={styles.modalTitle}>{tCharacterScreen('modals.origin.title', 'Select origin')}</Text>
+        <Text style={styles.modalTitle}>{tCharacterScreen('modals.origin.title')}</Text>
         
         <ScrollView style={styles.originsList}>
           {origins.map(origin => (
@@ -46,7 +46,7 @@ const OriginModal = ({
             style={[styles.modalButton, styles.cancelButton]} 
             onPress={onClose}
           >
-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel', 'Cancel')}</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
           </TouchableOpacity>
           
           {selectedOrigin && (
@@ -54,7 +54,7 @@ const OriginModal = ({
               style={[styles.modalButton, styles.selectButton]} 
               onPress={onConfirm}
             >
-              <Text style={styles.buttonText}>{tCharacterScreen('buttons.select', 'Select')}</Text>
+              <Text style={styles.buttonText}>{tCharacterScreen('buttons.select')}</Text>
             </TouchableOpacity>
           )}
         </View>

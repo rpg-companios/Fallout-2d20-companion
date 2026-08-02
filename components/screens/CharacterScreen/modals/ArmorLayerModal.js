@@ -92,10 +92,10 @@ const getArmorCatalogForLayer = (layer, locale) => {
 /** Layer-specific modal title */
 const getLayerTitle = (layer, locale) => {
   const isRu = locale === 'ru-RU';
-  if (layer === 'plating') return tCharacterScreen('modals.armor.upgradePlating', 'Upgrade Plating');
-  if (layer === 'armor')   return tCharacterScreen('modals.armor.upgradeArmor', 'Upgrade Armor');
-  if (layer === 'frame')   return tCharacterScreen('modals.armor.upgradeFrame', 'Upgrade Frame');
-  return tCharacterScreen('modals.armor.upgradeArmor', 'Upgrade Armor');
+  if (layer === 'plating') return tCharacterScreen('modals.armor.upgradePlating');
+  if (layer === 'armor')   return tCharacterScreen('modals.armor.upgradeArmor');
+  if (layer === 'frame')   return tCharacterScreen('modals.armor.upgradeFrame');
+  return tCharacterScreen('modals.armor.upgradeArmor');
 };
 
 // ---------------------------------------------------------------------------
@@ -127,18 +127,18 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress, locale }) => {
       </Text>
       <View style={styles.statsContainer}>
         {dr.physical !== undefined && (
-          <StatRow label={tCharacterScreen('labels.physDR', 'Phys DR')} value={dr.physical} />
+          <StatRow label={tCharacterScreen('labels.physDR')} value={dr.physical} />
         )}
         {dr.energy !== undefined && (
-          <StatRow label={tCharacterScreen('labels.enrgDR', 'Enrg DR')} value={dr.energy} />
+          <StatRow label={tCharacterScreen('labels.enrgDR')} value={dr.energy} />
         )}
         {item.carryWeightModifier !== undefined && item.carryWeightModifier !== 0 && (
-          <StatRow label={tCharacterScreen('labels.carry', 'Carry')} value={item.carryWeightModifier > 0 ? `+${item.carryWeightModifier}` : item.carryWeightModifier} />
+          <StatRow label={tCharacterScreen('labels.carry')} value={item.carryWeightModifier > 0 ? `+${item.carryWeightModifier}` : item.carryWeightModifier} />
         )}
       </View>
       {item.perkRequired && (
         <Text style={styles.perkRequired}>
-          {tCharacterScreen('labels.requires', 'Requires: ')}{item.perkRequired}
+          {tCharacterScreen('labels.requires')}{item.perkRequired}
         </Text>
       )}
       {item.special ? (
@@ -215,7 +215,7 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
 
           {compatibleItems.length === 0 && !currentItem ? (
             <Text style={styles.emptyText}>
-              {tCharacterScreen('modals.armor.noItems', 'No items available')}
+              {tCharacterScreen('modals.armor.noItems')}
             </Text>
           ) : (
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
@@ -237,13 +237,13 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
 
           <TouchableOpacity style={[styles.closeButton, { backgroundColor: layerColor, marginHorizontal: 12 }]} onPress={handleApply}>
             <Text style={styles.closeButtonText}>
-              {tCharacterScreen('buttons.apply', 'Apply')}
+              {tCharacterScreen('buttons.apply')}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>
-              {tCharacterScreen('buttons.close', 'Close')}
+              {tCharacterScreen('buttons.close')}
             </Text>
           </TouchableOpacity>
         </Pressable>

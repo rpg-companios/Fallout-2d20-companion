@@ -164,19 +164,19 @@ const summarizeItems = (items) => {
   return { finalItems, totalCaps, weight, price };
 };
 
-const getDisplayName = (item) => item.displayName || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem', 'Unknown item');
+const getDisplayName = (item) => item.displayName || item.name || item.itemId || item.weaponId || tCharacterScreen('labels.unknownItem');
 
 const formatQuantitySuffix = (item) => {
   const qty = Number(item?.quantity || 0);
   if (!qty || qty <= 1) return '';
-  if (CURRENCY_TYPES.has(item?.itemType)) return ` (${qty} ${tCharacterScreen('labels.capsShort', 'caps')})`;
-  return ` (${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')})`;
+  if (CURRENCY_TYPES.has(item?.itemType)) return ` (${qty} ${tCharacterScreen('labels.capsShort')})`;
+  return ` (${qty} ${tCharacterScreen('labels.pcsShort')})`;
 };
 
 const formatAmmoSuffix = (ammo) => {
   if (!ammo) return '';
   const qty = Number(ammo.quantity || 0);
-  const qtyText = qty > 0 ? `${qty} ${tCharacterScreen('labels.pcsShort', 'pcs.')}` : `0 ${tCharacterScreen('labels.pcsShort', 'pcs.')}`;
+  const qtyText = qty > 0 ? `${qty} ${tCharacterScreen('labels.pcsShort')}` : `0 ${tCharacterScreen('labels.pcsShort')}`;
   return ` (${qtyText} ${ammo.name})`;
 };
 
@@ -197,10 +197,10 @@ const formatBuiltinWeaponSuffix = (entry) => {
 const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, character }) => {
   const locale = useLocale(); // подписываемся на смену локали → ре-рендер
   const metaCategoryLabels = useMemo(() => ({
-    structure: tCharacterScreen('modals.equipmentKit.categories.structure', 'Standard Structure'),
-    weapon: tCharacterScreen('modals.equipmentKit.categories.weapon', 'Weapons'),
-    module: tCharacterScreen('modals.equipmentKit.categories.module', 'Modules'),
-    misc: tCharacterScreen('modals.equipmentKit.categories.misc', 'Misc'),
+    structure: tCharacterScreen('modals.equipmentKit.categories.structure'),
+    weapon: tCharacterScreen('modals.equipmentKit.categories.weapon'),
+    module: tCharacterScreen('modals.equipmentKit.categories.module'),
+    misc: tCharacterScreen('modals.equipmentKit.categories.misc'),
   }), [locale]);
 
   const [expandedKit, setExpandedKit] = useState(null);
@@ -330,7 +330,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <Text style={styles.title}>{tCharacterScreen('modals.equipmentKit.title', 'Select equipment kit')}</Text>
+          <Text style={styles.title}>{tCharacterScreen('modals.equipmentKit.title')}</Text>
 
           {isLoading ? (
             <ActivityIndicator size="large" color="#005A9C" style={{ marginVertical: 30 }} />
@@ -351,7 +351,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
 
                           return (
                             <View key={category} style={styles.categoryContainer}>
-                              <Text style={styles.categoryTitle}>{metaCategoryLabels[category] || tCharacterScreen('labels.equipmentKit', 'Equipment Kit')}:</Text>
+                              <Text style={styles.categoryTitle}>{metaCategoryLabels[category] || tCharacterScreen('labels.equipmentKit')}:</Text>
                               {groups[category].map((entry) => {
                                 if (entry?.type === 'choice') {
                                   return (

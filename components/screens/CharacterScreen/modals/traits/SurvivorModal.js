@@ -105,7 +105,7 @@ const SurvivorModal = ({
 
     const traitTitle = selectionMode === 'two_traits'
       ? `${originLabel}: ${selectedNames.join(' + ')}`
-      : `${originLabel}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk', '1 perk');
+      : `${originLabel}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk');
 
     onSelect(selectedIds, traitTitle, {
       ...finalMods,
@@ -280,15 +280,15 @@ const SurvivorModal = ({
           ) : (
             // Skill pick step
             <>
-              <Text style={styles.modalTitle}>{tCharacterScreen('modals.skillPick.title', 'Choose skills')}</Text>
+              <Text style={styles.modalTitle}>{tCharacterScreen('modals.skillPick.title')}</Text>
               <Text style={styles.hintText}>
                 {pendingTraitData?.totalCount > 1
-                  ? tCharacterScreen('modals.skillPick.chooseN', 'Choose {count} skills').replace('{count}', String(pendingTraitData.totalCount))
-                  : tCharacterScreen('modals.skillPick.choose1', 'Choose 1 skill')
+                  ? tCharacterScreen('modals.skillPick.chooseN').replace('{count}', String(pendingTraitData.totalCount))
+                  : tCharacterScreen('modals.skillPick.choose1')
                 }
               </Text>
               <Text style={[styles.descriptionText, { color: '#333', marginBottom: 8, textAlign: 'center' }]}>
-                {tCharacterScreen('modals.skillPick.description', 'Choose skills from the provided group. They will be marked as extra.')}
+                {tCharacterScreen('modals.skillPick.description')}
               </Text>
               <ScrollView style={{ width: '100%', maxHeight: 320 }}>
                 {(pendingTraitData?.options || []).map(skillKey => {
@@ -319,13 +319,13 @@ const SurvivorModal = ({
                 disabled={skillPicks.length !== (pendingTraitData?.totalCount || 0)}
                 onPress={confirmSkillPick}
               >
-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm', 'Confirm')}</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.backButton]}
                 onPress={() => { setSkillPickStep(false); setPendingTraitData(null); setSkillPicks([]); }}
               >
-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.back', 'Back')}</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.back')}</Text>
               </TouchableOpacity>
             </>
           )}

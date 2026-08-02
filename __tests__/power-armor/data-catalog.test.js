@@ -120,12 +120,13 @@ describe('i18n экранов — строки силовой брони на м
     expect(enAddItemModal.itemTypes.powerArmor).toContain('Power Armor');
   });
 
-  it('экран брони: «Прочность»/«HP», блок; починки нет — переехала в инвентарь (pa4)', () => {
+  it('экран брони: «Прочн»/«HP», блок; починки нет — переехала в инвентарь (pa4)', () => {
     // ПРАВИЛО (владелец, pa3-редизайн): СБ — не отдельный блок, а модернизация
     // существующей сетки; слоты/заголовки — общие с бронёй (armor.slots.*), имя
     // части — из equipmentCatalog. ПРАВИЛО (владелец, pa4): починка только через
     // инвентарь → ключ repair здесь мёртв и удалён, как layer/frame/partNames/unequip.
-    expect(ruWaAScreen.powerArmor.durability).toBe('Прочность');
+    // ПРАВИЛО (владелец, pa8): подпись прочности элемента СБ сокращена до «Прочн».
+    expect(ruWaAScreen.powerArmor.durability).toBe('Прочн');
     expect(enWaAScreen.powerArmor.durability).toBe('HP');
     expect(typeof ruWaAScreen.powerArmor.core).toBe('string');
     expect(ruWaAScreen.powerArmor.core).toContain('{value}');

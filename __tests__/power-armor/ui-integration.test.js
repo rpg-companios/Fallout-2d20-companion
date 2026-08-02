@@ -206,6 +206,10 @@ describe('power-armor ui-integration: контейнер в инвентаре (
       expect(src).toContain(marker);
     }
     expect(src).toContain('paOpenPackages');
+    // ПРАВИЛО (владелец, pa8): контейнер в инвентаре создаётся только когда каркас
+    // успешно надевался, не раньше — гейт раскрытия по isPowerArmorPackage;
+    // свежий каркас (без installedPieces) остаётся обычной строкой предмета.
+    expect(src).toContain('isPowerArmorPackage(item)');
     const ctx = readFileSync('components/CharacterContext.js', 'utf8');
     // Новое действие починки части внутри снятого пакета — определено и экспонировано.
     expect(ctx).toContain('const repairPowerArmorPackagePiece');

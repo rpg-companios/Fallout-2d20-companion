@@ -164,8 +164,22 @@
       "upgradeFrame": "Рама"
     }
   },
+  "robotSlots": {
+    "misterHandy": {
+      "head": "Оптика",
+      "body": "Корпус",
+      "leftArm": "Рука 1",
+      "rightArm": "Рука 2",
+      "leftLeg": "Рука 3",
+      "rightLeg": "Двигатель"
+    }
+  },
+  "robotBodyUpgrade": {
+    "title": "Модернизация корпуса",
+    "comingSoon": "Скоро добавим"
+  },
   "powerArmor": {
-    "durability": "Прочность",
+    "durability": "Прочн",
     "core": "Ядерный блок: {value}"
   },
   "common": {

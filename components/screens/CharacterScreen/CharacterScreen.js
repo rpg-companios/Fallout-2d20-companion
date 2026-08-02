@@ -83,22 +83,22 @@ const ResetConfirmationModal = ({ visible, onCancel, onConfirm }) => (
   >
     <View style={styles.modalOverlay}>
       <View style={styles.modalContainer}>
-        <Text style={styles.modalTitle}>{tCharacterScreen("warnings.attentionTitle", "Attention!")}</Text>
+        <Text style={styles.modalTitle}>{tCharacterScreen("warnings.attentionTitle")}</Text>
         <Text style={styles.modalText}>
-          {tCharacterScreen("warnings.resetAllValues", "All values will be reset to initial parameters.")}
+          {tCharacterScreen("warnings.resetAllValues")}
         </Text>
         <View style={styles.modalButtons}>
           <TouchableOpacity
             style={[styles.modalButton, styles.cancelButton]}
             onPress={onCancel}
           >
-            <Text style={styles.buttonText}>{tCharacterScreen("buttons.cancel", "Cancel")}</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen("buttons.cancel")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.modalButton, styles.confirmButton]}
             onPress={onConfirm}
           >
-            <Text style={styles.buttonText}>{tCharacterScreen("buttons.agree", "Agree")}</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen("buttons.agree")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -117,7 +117,7 @@ const PressableRow = ({ title, value, onPress, disabled }) => (
     <Text
       style={[
         styles.pressableValue,
-        value === tCharacterScreen("placeholders.selectNone", "Not selected") &&
+        value === tCharacterScreen("placeholders.selectNone") &&
           styles.placeholderText,
       ]}
     >
@@ -390,7 +390,7 @@ export default function CharacterScreen() {
   };
 
   const showError = (message) => {
-    showAlert(tCharacterScreen("alerts.errorTitle", "Error"), message);
+    showAlert(tCharacterScreen("alerts.errorTitle"), message);
   };
 
   // Активация режима распределения очков от перков
@@ -463,7 +463,7 @@ export default function CharacterScreen() {
 
   const handleSavePerkAttributes = () => {
     if (remainingPerkPoints > 0) {
-      showError(tCharacterScreen("errors.distributeAllPerkAttributePoints", "You must distribute all available attribute points."));
+      showError(tCharacterScreen("errors.distributeAllPerkAttributePoints"));
       return;
     }
     commitAttributeChanges(tempAttributes, perkPointsToDistribute);
@@ -560,7 +560,7 @@ export default function CharacterScreen() {
 
   const handleToggleSkill = (skillName) => {
     if (!canDistributeSkills) {
-      showAlert(tCharacterScreen("alerts.warningTitle", "Warning"), tCharacterScreen("errors.saveAttributesFirst", "Distribute and save attributes first."));
+      showAlert(tCharacterScreen("alerts.warningTitle"), tCharacterScreen("errors.saveAttributesFirst"));
       return;
     }
 
@@ -585,7 +585,7 @@ export default function CharacterScreen() {
     const isCurrentlySelected = isInMainSkills || isInExtraSkills;
 
     if (isForcedSkill && isCurrentlySelected) {
-      showError(tCharacterScreen("errors.cannotUnselectForcedSkill", "You cannot unselect a forced skill."));
+      showError(tCharacterScreen("errors.cannotUnselectForcedSkill"));
       return;
     }
 
@@ -613,7 +613,7 @@ export default function CharacterScreen() {
       const unclampedNextValue = currentSkill.value + 2;
       if (unclampedNextValue > skillMax) {
         showError(
-          tCharacterScreen("errors.skillTagExceedsMaxRank", "Tagging this skill will exceed max rank ({skillMax}). Lower it first.").replace("{skillMax}", String(skillMax)),
+          tCharacterScreen("errors.skillTagExceedsMaxRank").replace("{skillMax}", String(skillMax)),
         );
         return;
       }
@@ -638,10 +638,10 @@ export default function CharacterScreen() {
           setExtraTaggedSkills((prev) => [...prev, skillName]);
         } else {
           const extraText = canSelectAsExtra
-            ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable", "Extra slots available") + ": " + (extraSkillsFromTrait - extraTaggedSkills.length)
+            ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable") + ": " + (extraSkillsFromTrait - extraTaggedSkills.length)
             : "";
           showError(
-            tCharacterScreen("errors.maxBaseSkills", "You can choose a maximum of {count} base skills.{extraText}").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
+            tCharacterScreen("errors.maxBaseSkills").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
           );
           return;
         }
@@ -673,12 +673,12 @@ export default function CharacterScreen() {
 
   const handleChangeSkillValue = (index, delta) => {
     if (!attributesSaved) {
-      showAlert(tCharacterScreen("errors.saveAttributesFirstSimple", "Save attributes first."));
+      showAlert(tCharacterScreen("errors.saveAttributesFirstSimple"));
       return;
     }
 
     if (delta > 0 && skillPointsLeft <= 0) {
-      showError(tCharacterScreen("errors.noSkillPointsLeft", "You have no skill points left to distribute."));
+      showError(tCharacterScreen("errors.noSkillPointsLeft"));
       return;
     }
 
@@ -764,18 +764,18 @@ export default function CharacterScreen() {
 
     if (Platform.OS === "web") {
       if (
-        window.confirm(`${tCharacterScreen("warnings.changeOriginTitle", "Change origin?")}\n\n${tCharacterScreen("warnings.changeOriginConfirm", "All your attributes, skills, and traits will be reset. Are you sure?")}`)
+        window.confirm(`${tCharacterScreen("warnings.changeOriginTitle")}\n\n${tCharacterScreen("warnings.changeOriginConfirm")}`)
       ) {
         confirmAndReset();
       }
     } else {
       Alert.alert(
-        tCharacterScreen("warnings.changeOriginTitle", "Change origin?"),
-        tCharacterScreen("warnings.changeOriginConfirm", "All your attributes, skills, and traits will be reset. Are you sure?"),
+        tCharacterScreen("warnings.changeOriginTitle"),
+        tCharacterScreen("warnings.changeOriginConfirm"),
         [
-          { text: tCharacterScreen("buttons.cancel", "Cancel"), style: "cancel" },
+          { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
           {
-            text: tCharacterScreen("buttons.yesReset", "Yes, reset"),
+            text: tCharacterScreen("buttons.yesReset"),
             onPress: confirmAndReset,
             style: "destructive",
           },
@@ -912,19 +912,19 @@ export default function CharacterScreen() {
   // Обработчик нажатия на строку черты
   const handleTraitPress = () => {
     if (!origin) {
-      showError(tCharacterScreen("warnings.selectOriginFirst", "Select origin first"));
+      showError(tCharacterScreen("warnings.selectOriginFirst"));
       return;
     }
 
     // Блокируем, если черта уже выбрана и происхождение не предполагает нескольких черт
     if (trait && !isMultiTraitOrigin(origin.id)) {
-      showAlert(tCharacterScreen("alerts.infoTitle", "Info"), tCharacterScreen("warnings.traitAlreadySelected", "Trait for this origin is already selected."));
+      showAlert(tCharacterScreen("alerts.infoTitle"), tCharacterScreen("warnings.traitAlreadySelected"));
       return;
     }
 
     const availableTraits = getTraitsForOrigin(origin);
     if (availableTraits.length === 0) {
-      showAlert(tCharacterScreen("alerts.infoTitle", "Info"), tCharacterScreen("warnings.noTraitsForOrigin", "No traits available for this origin"));
+      showAlert(tCharacterScreen("alerts.infoTitle"), tCharacterScreen("warnings.noTraitsForOrigin"));
       return;
     }
 
@@ -951,19 +951,19 @@ export default function CharacterScreen() {
 
   const handleSaveAttributes = () => {
     if (!origin) {
-      showError(tCharacterScreen("errors.originRequired", "You must select an origin."));
+      showError(tCharacterScreen("errors.originRequired"));
       return;
     }
     if (!trait) {
-      showError(tCharacterScreen("errors.traitRequired", "You must select a trait."));
+      showError(tCharacterScreen("errors.traitRequired"));
       return;
     }
     if (!equipment) {
-      showError(tCharacterScreen("errors.equipmentRequired", "You must select an equipment kit."));
+      showError(tCharacterScreen("errors.equipmentRequired"));
       return;
     }
     if (remainingAttributePoints !== 0) {
-      showError(tCharacterScreen("errors.spendAllAttributePoints", "Spend all attribute points before saving."));
+      showError(tCharacterScreen("errors.spendAllAttributePoints"));
       return;
     }
 
@@ -975,19 +975,19 @@ export default function CharacterScreen() {
 
   const handleSaveSkills = () => {
     if (!origin) {
-      showError(tCharacterScreen("errors.originRequired", "You must select an origin."));
+      showError(tCharacterScreen("errors.originRequired"));
       return;
     }
     if (!trait) {
-      showError(tCharacterScreen("errors.traitRequired", "You must select a trait."));
+      showError(tCharacterScreen("errors.traitRequired"));
       return;
     }
     if (!equipment) {
-      showError(tCharacterScreen("errors.equipmentRequired", "You must select an equipment kit."));
+      showError(tCharacterScreen("errors.equipmentRequired"));
       return;
     }
     if (skillPointsLeft > 0) {
-      showError(tCharacterScreen("errors.spendAllSkillPoints", "You must distribute all skill points."));
+      showError(tCharacterScreen("errors.spendAllSkillPoints"));
       return;
     }
     // Проверяем, что выбрано правильное количество навыков
@@ -998,7 +998,7 @@ export default function CharacterScreen() {
     // Проверяем основные навыки (всегда должно быть ровно 3)
     if (selectedSkills.length !== BASE_TAGGED_SKILLS) {
       showError(
-        tCharacterScreen("errors.exactBaseSkillsRequired", "You must select exactly {required} base skills. Selected: {selected}.").replace("{required}", String(BASE_TAGGED_SKILLS)).replace("{selected}", String(selectedSkills.length)),
+        tCharacterScreen("errors.exactBaseSkillsRequired").replace("{required}", String(BASE_TAGGED_SKILLS)).replace("{selected}", String(selectedSkills.length)),
       );
       return;
     }
@@ -1009,14 +1009,14 @@ export default function CharacterScreen() {
       extraTaggedSkills.length !== extraSkillsFromTrait
     ) {
       showError(
-        tCharacterScreen("errors.exactExtraSkillsRequired", "You must select {required} extra trait skills. Selected: {selected}.").replace("{required}", String(extraSkillsFromTrait)).replace("{selected}", String(extraTaggedSkills.length)),
+        tCharacterScreen("errors.exactExtraSkillsRequired").replace("{required}", String(extraSkillsFromTrait)).replace("{selected}", String(extraTaggedSkills.length)),
       );
       return;
     }
     const { isValid, maxRank } = validateSkills(skills, trait);
 
     if (!isValid) {
-      showAlert(tCharacterScreen("errors.maxSkillRank", "Error: maximum skill rank is {maxRank}").replace("{maxRank}", String(maxRank)));
+      showAlert(tCharacterScreen("errors.maxSkillRank").replace("{maxRank}", String(maxRank)));
       return;
     }
 
@@ -1083,10 +1083,10 @@ export default function CharacterScreen() {
           <View style={styles.header}>
             {/* Строка для ввода имени персонажа */}
             <View style={styles.nameInputRow}>
-              <Text style={styles.nameInputLabel}>{tCharacterScreen("labels.characterName", "Name")}:</Text>
+              <Text style={styles.nameInputLabel}>{tCharacterScreen("labels.characterName")}:</Text>
               <TextInput
                 style={[styles.nameInput, !isSaved && styles.nameInputActive]}
-                placeholder={tCharacterScreen("placeholders.enterName", "Enter name")}
+                placeholder={tCharacterScreen("placeholders.enterName")}
                 placeholderTextColor="#999"
                 value={characterName}
                 onChangeText={setCharacterName}
@@ -1101,7 +1101,7 @@ export default function CharacterScreen() {
                       : styles.saveNameButtonDisabled,
                   ]}
                   onPress={() => {
-                    saveCharacter(characterName.trim() || 'Персонаж');
+                    saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
                   }}
                   disabled={false}
                 >
@@ -1113,7 +1113,7 @@ export default function CharacterScreen() {
                         : {},
                     ]}
                   >
-                    {tCharacterScreen("buttons.save", "Save")}
+                    {tCharacterScreen("buttons.save")}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1123,20 +1123,20 @@ export default function CharacterScreen() {
             {!isSaved && <View style={styles.disabledOverlay} />}
 
             <PressableRow
-              title={tCharacterScreen("labels.origin", "Origin")}
-              value={localizedOrigin ? localizedOrigin.name : tCharacterScreen("placeholders.selectNone", "Not selected")}
+              title={tCharacterScreen("labels.origin")}
+              value={localizedOrigin ? localizedOrigin.name : tCharacterScreen("placeholders.selectNone")}
               onPress={() => setIsOriginModalVisible(true)}
               disabled={!isSaved}
             />
             <PressableRow
-              title={tCharacterScreen("labels.trait", "Trait")}
-              value={localizedTraitName || tCharacterScreen("placeholders.selectNone", "Not selected")}
+              title={tCharacterScreen("labels.trait")}
+              value={localizedTraitName || tCharacterScreen("placeholders.selectNone")}
               onPress={handleTraitPress}
               disabled={!isSaved || (trait && !isMultiTraitOrigin(origin?.id))}
             />
             <PressableRow
-              title={tCharacterScreen("labels.equipmentKit", "Equipment kit")}
-              value={localizedEquipmentName || tCharacterScreen("placeholders.selectNone", "Not selected")}
+              title={tCharacterScreen("labels.equipmentKit")}
+              value={localizedEquipmentName || tCharacterScreen("placeholders.selectNone")}
               disabled={!isSaved}
               onPress={() => {
                 if (localizedOrigin && localizedOrigin.equipmentKits) {
@@ -1145,7 +1145,7 @@ export default function CharacterScreen() {
                     if (Platform.OS === "web") {
                       if (
                         window.confirm(
-                          tCharacterScreen("warnings.equipmentResetOnWeb", "Attention! Choosing a new equipment kit will reset current inventory. Continue?"),
+                          tCharacterScreen("warnings.equipmentResetOnWeb"),
                         )
                       ) {
                         // Сбрасываем инвентарь и надетые предметы
@@ -1159,12 +1159,12 @@ export default function CharacterScreen() {
                       }
                     } else {
                       Alert.alert(
-                          tCharacterScreen("warnings.attentionTitle", "Attention!"),
-                          tCharacterScreen("warnings.equipmentResetConfirm", "Inventory and all equipment will be reset. Continue?"),
+                          tCharacterScreen("warnings.attentionTitle"),
+                          tCharacterScreen("warnings.equipmentResetConfirm"),
                         [
-                          { text: tCharacterScreen("buttons.cancel", "Cancel"), style: "cancel" },
+                          { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
                           {
-                            text: tCharacterScreen("buttons.continue", "Continue"),
+                            text: tCharacterScreen("buttons.continue"),
                             onPress: () => {
                               // Сбрасываем инвентарь и надетые предметы
                               setEquippedWeapons([]);
@@ -1184,14 +1184,14 @@ export default function CharacterScreen() {
                   }
                 } else {
                   showAlert(
-                    tCharacterScreen("alerts.infoTitle", "Info"),
-                    tCharacterScreen("warnings.noEquipmentForOrigin", "No equipment kits for this origin."),
+                    tCharacterScreen("alerts.infoTitle"),
+                    tCharacterScreen("warnings.noEquipmentForOrigin"),
                   );
                 }
               }}
             />
             <View style={[styles.levelContainer, !isSaved && styles.disabledLevelContainer]}>
-              <Text style={styles.levelLabel}>{tCharacterScreen("labels.level", "Level")}:</Text>
+              <Text style={styles.levelLabel}>{tCharacterScreen("labels.level")}:</Text>
               <CompactCounter
                 value={level}
                 onIncrease={() => isSaved && handleLevelChange(1)}
@@ -1220,7 +1220,7 @@ export default function CharacterScreen() {
               />
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{tCharacterScreen("labels.luckPoints", "Luck points").toUpperCase()}</Text>
+                  <Text style={styles.sectionTitle}>{tCharacterScreen("labels.luckPoints").toUpperCase()}</Text>
                 </View>
                 <LuckPointsRow
                   luckPoints={luckPoints}
@@ -1236,10 +1236,10 @@ export default function CharacterScreen() {
             <View style={styles.rightColumn}>
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{tCharacterScreen("labels.skills", "Skills").toUpperCase()}</Text>
+                  <Text style={styles.sectionTitle}>{tCharacterScreen("labels.skills").toUpperCase()}</Text>
                   {attributesSaved && !skillsSaved && (
                     <Text style={styles.skillsCount}>
-                      {tCharacterScreen("labels.available", "Available")}: {skillPointsLeft} {tCharacterScreen("labels.pointsShort", "points")}
+                      {tCharacterScreen("labels.available")}: {skillPointsLeft} {tCharacterScreen("labels.pointsShort")}
                     </Text>
                   )}
                 </View>
@@ -1250,19 +1250,19 @@ export default function CharacterScreen() {
                   return (
                     <>
                       <Text style={styles.taggedSkillsHint}>
-                        {tCharacterScreen("labels.taggedSkills", "Tagged skills")}: {taggedCount}/{BASE_TAGGED_SKILLS}
+                        {tCharacterScreen("labels.taggedSkills")}: {taggedCount}/{BASE_TAGGED_SKILLS}
                       </Text>
                       {extraSkillsFromTrait > 0 && (
                         <Text style={styles.taggedSkillsHint}>
-                          {tCharacterScreen("labels.extraTaggedSkills", "Extra trait skills")}: {extraCount}/{extraSkillsFromTrait}
+                          {tCharacterScreen("labels.extraTaggedSkills")}: {extraCount}/{extraSkillsFromTrait}
                         </Text>
                       )}
                     </>
                   );
                 })()}
                 <View style={styles.skillsHeader}>
-                  <Text style={styles.skillsHeaderText}>{tCharacterScreen("labels.skill", "Skill")}</Text>
-                  <Text style={styles.skillsHeaderText}>{tCharacterScreen("labels.value", "Value")}</Text>
+                  <Text style={styles.skillsHeaderText}>{tCharacterScreen("labels.skill")}</Text>
+                  <Text style={styles.skillsHeaderText}>{tCharacterScreen("labels.value")}</Text>
                 </View>
 
                 {(() => {
@@ -1312,13 +1312,13 @@ export default function CharacterScreen() {
                       style={[styles.button, styles.saveButton]}
                       onPress={handleSaveSkills}
                     >
-                      <Text style={styles.buttonText}>{tCharacterScreen("buttons.save", "Save")}</Text>
+                      <Text style={styles.buttonText}>{tCharacterScreen("buttons.save")}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.button, styles.resetButton]}
                       onPress={handleResetSkills}
                     >
-                      <Text style={styles.buttonText}>{tCharacterScreen("buttons.reset", "Reset")}</Text>
+                      <Text style={styles.buttonText}>{tCharacterScreen("buttons.reset")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1340,7 +1340,7 @@ export default function CharacterScreen() {
             if (selectedOrigin) {
               confirmOriginSelection(selectedOrigin);
             } else {
-              showError(tCharacterScreen("warnings.selectOriginError", "Select origin"));
+              showError(tCharacterScreen("warnings.selectOriginError"));
             }
           }}
         />

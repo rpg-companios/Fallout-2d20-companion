@@ -35,7 +35,7 @@ const FusionCoreChoiceModal = () => {
       <View style={localStyles.overlay}>
         <View style={localStyles.content}>
           <Text style={localStyles.title}>
-            {tInventory('screen.alerts.powerArmorChooseCoreTitle', 'Выбор Ядерного блока')}
+            {tInventory('screen.alerts.powerArmorChooseCoreTitle')}
           </Text>
           {(pendingCoreChoice.cores || []).map((core) => (
             <TouchableOpacity
@@ -53,7 +53,7 @@ const FusionCoreChoiceModal = () => {
             onPress={() => resolveCoreChoice(null)}
           >
             <Text style={localStyles.cancelRowText}>
-              {tInventory('screen.actions.cancel', 'Отмена')}
+              {tInventory('screen.actions.cancel')}
             </Text>
           </TouchableOpacity>
         </View>

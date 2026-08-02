@@ -114,28 +114,28 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
               {renderTextWithIcons(description, styles.modalText)}
               {skillPickChoice && (
                 <Text style={styles.hintText}>
-                  {tCharacterScreen('modals.skillPick.description', 'Choose skills from the provided group. They will be marked as extra.')}
+                  {tCharacterScreen('modals.skillPick.description')}
                   {'\n'}
-                  {tCharacterScreen('labels.needToPick', 'Need to pick')}: {pickCount}
+                  {tCharacterScreen('labels.needToPick')}: {pickCount}
                 </Text>
               )}
               <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleInfoConfirm}>
                 <Text style={styles.buttonText}>
-                  {skillPickChoice ? tCharacterScreen('buttons.continue', 'Continue') : tCharacterScreen('buttons.ok', 'OK')}
+                  {skillPickChoice ? tCharacterScreen('buttons.continue') : tCharacterScreen('buttons.ok')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handleClose}>
-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel', 'Cancel')}</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <Text style={styles.modalTitle}>{tCharacterScreen('modals.skillPick.title', 'Choose skills')}</Text>
+              <Text style={styles.modalTitle}>{tCharacterScreen('modals.skillPick.title')}</Text>
               <Text style={styles.traitName}>{name}</Text>
               <Text style={styles.hintText}>
                 {pickCount > 1
-                  ? tCharacterScreen('modals.skillPick.chooseN', 'Choose {count} skills').replace('{count}', String(pickCount))
-                  : tCharacterScreen('modals.skillPick.choose1', 'Choose 1 skill')}
+                  ? tCharacterScreen('modals.skillPick.chooseN').replace('{count}', String(pickCount))
+                  : tCharacterScreen('modals.skillPick.choose1')}
               </Text>
               <ScrollView style={{ width: '100%', maxHeight: 300 }}>
                 {skillOptions.map((skillKey) => {
@@ -170,13 +170,13 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
                 onPress={handlePickConfirm}
                 disabled={picks.length !== pickCount}
               >
-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm', 'Confirm')}</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.backButton]}
                 onPress={() => setStep('info')}
               >
-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.back', 'Back')}</Text>
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.back')}</Text>
               </TouchableOpacity>
             </>
           )}

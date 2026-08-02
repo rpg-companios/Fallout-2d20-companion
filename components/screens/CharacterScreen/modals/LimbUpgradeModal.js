@@ -160,18 +160,18 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
       {limb.name}
     </Text>
     <View style={styles.statsContainer}>
-      {limb.melee   !== undefined && <StatRow label={tCharacterScreen("skillsCatalog.MELEE_WEAPONS", "Melee Weapons")} value={limb.melee} />}
-      {limb.guns    !== undefined && <StatRow label={tCharacterScreen("skillsCatalog.SMALL_GUNS", "Small Guns")}    value={limb.guns} />}
-      {limb.mind    !== undefined && <StatRow label={tCharacterScreen("labels.mind", "Mind")}       value={limb.mind} />}
-      {limb.other   !== undefined && <StatRow label={tCharacterScreen("labels.other", "Other")}      value={limb.other} />}
-      {limb.body    !== undefined && <StatRow label={tCharacterScreen("labels.body", "Body")}      value={limb.body} />}
-      {limb.carryWeight !== undefined && <StatRow label={tCharacterScreen("labels.carryWeight", "Carry Weight")} value={limb.carryWeight} />}
-      {limb.rarity  !== undefined && <StatRow label={tCharacterScreen("labels.rarity", "Rarity")}    value={limb.rarity} />}
-      {limb.complexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity", "Complexity")} value={limb.complexity} />}
+      {limb.melee   !== undefined && <StatRow label={tCharacterScreen("skillsCatalog.MELEE_WEAPONS")} value={limb.melee} />}
+      {limb.guns    !== undefined && <StatRow label={tCharacterScreen("skillsCatalog.SMALL_GUNS")}    value={limb.guns} />}
+      {limb.mind    !== undefined && <StatRow label={tCharacterScreen("labels.mind")}       value={limb.mind} />}
+      {limb.other   !== undefined && <StatRow label={tCharacterScreen("labels.other")}      value={limb.other} />}
+      {limb.body    !== undefined && <StatRow label={tCharacterScreen("labels.body")}      value={limb.body} />}
+      {limb.carryWeight !== undefined && <StatRow label={tCharacterScreen("labels.carryWeight")} value={limb.carryWeight} />}
+      {limb.rarity  !== undefined && <StatRow label={tCharacterScreen("labels.rarity")}    value={limb.rarity} />}
+      {limb.complexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity")} value={limb.complexity} />}
     </View>
     {Array.isArray(limb.perksRequired) && limb.perksRequired.length > 0 && (
       <Text style={styles.perksRequired}>
-        {tCharacterScreen("labels.requires", "Requires: ")}{limb.perksRequired.join(', ')}
+        {tCharacterScreen("labels.requires")}{limb.perksRequired.join(', ')}
       </Text>
     )}
   </TouchableOpacity>
@@ -244,10 +244,10 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) 
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.container} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.title}>{tCharacterScreen("modals.limb.upgradeLimb", "Upgrade Limb")}</Text>
+          <Text style={styles.title}>{tCharacterScreen("modals.limb.upgradeLimb")}</Text>
 
           {compatibleLimbs.length === 0 ? (
-            <Text style={styles.emptyText}>{tCharacterScreen("modals.limb.noLimbs", "No limbs available")}</Text>
+            <Text style={styles.emptyText}>{tCharacterScreen("modals.limb.noLimbs")}</Text>
           ) : (
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
               {compatibleLimbs.map((limb) => {

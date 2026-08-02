@@ -68,12 +68,12 @@ export const AttributesSection = ({
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>
-          {tCharacterScreen('labels.attributes', 'Атрибуты').toUpperCase()}
+          {tCharacterScreen('labels.attributes').toUpperCase()}
         </Text>
       </View>
       {(!attributesSaved || isPerkMode) && remainingAttributePoints > 0 && (
         <Text style={styles.pointsHint}>
-          {tCharacterScreen('labels.points', 'Очки')}: {remainingAttributePoints}
+          {tCharacterScreen('labels.points')}: {remainingAttributePoints}
         </Text>
       )}
       {attributes.map((attr, index) => (
@@ -97,13 +97,13 @@ export const AttributesSection = ({
             style={[styles.button, styles.saveButton]}
             onPress={onSaveAttributes}
           >
-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.save', 'Сохранить')}</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.save')}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.button, styles.resetButton]}
             onPress={onResetAttributes}
           >
-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.reset', 'Сбросить')}</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.reset')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -114,7 +114,7 @@ export const AttributesSection = ({
             onPress={onApplyPerkAttributes}
             disabled={remainingAttributePoints > 0}
           >
-            <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm', 'Подтвердить')}</Text>
+            <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm')}</Text>
           </TouchableOpacity>
         </View>
       )}

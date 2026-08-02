@@ -5,6 +5,15 @@
     "add": "↑ Add"
   },
   "alerts": {
+    "conditionsRemovedTitle": "Condition removed",
+    "conditionsRemovedMessage": "Removed: {conditions}",
+    "addictionRollTitle": "Addiction roll",
+    "addictionRollMessage": "Rolled: {faces} — {effectCount} effect(s) out of {addictionLevel} needed.",
+    "addictionGainedTitle": "Addiction",
+    "addictionGainedMessage": "You became addicted to this chem.",
+    "addictionAvoidedTitle": "Addiction",
+    "addictionAvoidedMessage": "Addiction did not take hold.",
+    "cannotEquipItem": "This item cannot be equipped.",
     "successTitle": "Success",
     "appliedTitle": "Applied",
     "effectsTitle": "Effects",

@@ -1,5 +1,7 @@
 {
+  "defaultCharacterName": "Персонаж",
   "labels": {
+    "needToPick": "Нужно выбрать",
     "characterName": "Имя",
     "origin": "Происхождение",
     "trait": "Черта",
@@ -95,6 +97,10 @@
     "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
   },
   "modals": {
+    "ncrCitizen": {
+      "title": "Черта происхождения «Житель НКР»",
+      "originLabel": "Житель НКР"
+    },
     "origin": {
       "title": "Выберите происхождение"
     },

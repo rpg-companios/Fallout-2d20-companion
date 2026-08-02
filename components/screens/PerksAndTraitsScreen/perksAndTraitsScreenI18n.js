@@ -7,15 +7,13 @@ const DICTIONARIES = {
   'en-EN': enPerksAndTraitsScreen,
 };
 
-export const tPerksAndTraits = (path, fallback = '') => {
-  const parts = path.split('.');
-  const locale = getCurrentLocale();
-  let current = DICTIONARIES[locale] || ruPerksAndTraitsScreen;
-
-  for (const part of parts) {
+export const tPerksAndTraits = (path) => {
+  // ПРАВИЛО (владелец): никаких фолбэков и хардкода — ключ обязан быть в словаре;
+  // промах ключа — дефект данных, видимый маркер — сам путь.
+  let current = DICTIONARIES[getCurrentLocale()];
+  for (const part of path.split('.')) {
     current = current?.[part];
-    if (current === undefined) return fallback || 'Ошибка ключа';
+    if (current === undefined) return path;
   }
-
   return current;
 };

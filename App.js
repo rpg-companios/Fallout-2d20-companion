@@ -55,7 +55,7 @@ function App() {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
         <ActivityIndicator size="large" color="#f0e68c" />
         <Text style={{ color: '#f0e68c', marginTop: 16, fontSize: 14, letterSpacing: 1 }}>
-          {tApp('loading', 'Загрузка данных...')}
+          {tApp('loading')}
         </Text>
       </View>
     );
@@ -110,7 +110,7 @@ function App() {
                       component={HomeScreen}
                       options={{
                         tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.home', 'Менеджер')}</Text>
+                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.home')}</Text>
                         ),
                       }}
                     />
@@ -119,7 +119,7 @@ function App() {
                       component={CharacterScreen}
                       options={{
                         tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character', 'Персонаж')}</Text>
+                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
                         ),
                       }}
                     />
@@ -128,7 +128,7 @@ function App() {
                       component={EquipmentScreen}
                       options={{
                         tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment', 'Броня и оружие')}</Text>
+                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
                         ),
                       }}
                     />
@@ -137,7 +137,7 @@ function App() {
                       component={InventoryScreen}
                       options={{
                         tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory', 'Инвентарь')}</Text>
+                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
                         ),
                       }}
                     />
@@ -146,7 +146,7 @@ function App() {
                       component={PerksAndTraitsScreen}
                       options={{
                         tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks', 'Перки')}</Text>
+                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
                         ),
                       }}
                     />

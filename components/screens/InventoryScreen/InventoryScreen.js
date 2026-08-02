@@ -16,6 +16,7 @@ import {
   isFusionCoreItem,
   fusionCoreStackKey,
   isPowerArmorFrame,
+  isPowerArmorPackage,
   powerArmorPieceStackKey,
   powerArmorFrameStackKey,
   rollNewFusionCoreCharges,
@@ -410,7 +411,7 @@ const InventoryScreen = () => {
 
     const applyToSelf = () => {
       if (isRobot) {
-        showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle', 'Ограничение робота'), tInventory('screen.alerts.robotCannotSelfUseMessage', 'Роботы не могут применять еду, напитки и препараты на себя.'));
+        showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
         return;
       }
 
@@ -450,7 +451,9 @@ const InventoryScreen = () => {
 
       // Удаление условий (аддиктол, антибиотики)
       if (conditionsRemoved.length > 0) {
-        showAlert(tInventory('screen.alerts.conditionsRemovedTitle', 'Снято состояние'), tInventory('screen.alerts.conditionsRemovedMessage', 'Снято: {{conditions}}', { conditions: conditionsRemoved.join(', ') }));
+        showAlert(
+          tInventory('screen.alerts.conditionsRemovedTitle'),
+          formatInventoryText(tInventory('screen.alerts.conditionsRemovedMessage'), { conditions: conditionsRemoved.join(', ') }));
       }
 
       // Результат броска на зависимость
@@ -458,13 +461,13 @@ const InventoryScreen = () => {
         const { effectCount, faces, addicted, addictionLevel } = addictionResult;
         const facesText = faces.join(', ');
         showAlert(
-          tInventory('screen.alerts.addictionRollTitle', 'Бросок на зависимость'),
-          tInventory('screen.alerts.addictionRollMessage', 'Брошено: {{faces}} — {{effectCount}} эффект(ов) из {{addictionLevel}} нужных.', { faces: facesText, effectCount, addictionLevel })
+          tInventory('screen.alerts.addictionRollTitle'),
+          formatInventoryText(tInventory('screen.alerts.addictionRollMessage'), { faces: facesText, effectCount, addictionLevel })
         );
         if (addicted) {
-          showAlert(tInventory('screen.alerts.addictionGainedTitle', 'Зависимость'), tInventory('screen.alerts.addictionGainedMessage', 'Вы стали зависимы от этого препарата.'));
+          showAlert(tInventory('screen.alerts.addictionGainedTitle'), tInventory('screen.alerts.addictionGainedMessage'));
         } else {
-          showAlert(tInventory('screen.alerts.addictionAvoidedTitle', 'Зависимость'), tInventory('screen.alerts.addictionAvoidedMessage', 'Зависимость не наступила.'));
+          showAlert(tInventory('screen.alerts.addictionAvoidedTitle'), tInventory('screen.alerts.addictionAvoidedMessage'));
         }
       }
 
@@ -679,7 +682,7 @@ const InventoryScreen = () => {
     }
 
     if (isRobotOnlyItem(displayWeapon) && !isRobot) {
-      showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotOnlyWeaponMessage', 'Это оружие могут использовать только роботы.'));
+      showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle'), tInventory('screen.alerts.robotOnlyWeaponMessage'));
       return;
     }
     if (isRobot && isRobotLimbWeapon(displayWeapon)) {
@@ -857,12 +860,12 @@ const InventoryScreen = () => {
     if (isRobot && !isRobotOnlyItem(itemToEquip)) {
       const isAllowedClothing = itemToEquip.itemType === 'clothing' && itemToEquip.canRobotWear === true;
       if (!isAllowedClothing) {
-        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
+        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
         return;
       }
     }
     if (isRobot && isPowerArmorItem(itemToEquip)) {
-      showAlert(tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'), tInventory('screen.alerts.robotArmorOnlyMessage', 'Роботы не могут экипировать типовую или силовую броню.'));
+      showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
       return;
     }
     // ПРАВИЛО (от владельца): слот экипировки определяется ВИДОМ предмета
@@ -873,8 +876,8 @@ const InventoryScreen = () => {
     const targetSlotType = resolveTargetLayer(itemToEquip);
     if (!targetSlotType) {
       showAlert(
-        tInventory('screen.alerts.robotArmorOnlyTitle', 'Ограничение экипировки'),
-        tInventory('screen.alerts.cannotEquipItem', 'Этот предмет нельзя экипировать.'),
+        tInventory('screen.alerts.robotArmorOnlyTitle'),
+        tInventory('screen.alerts.cannotEquipItem'),
       );
       return;
     }
@@ -1255,9 +1258,12 @@ const InventoryScreen = () => {
         .filter(Boolean);
 
     const merged = [...equippedItemsList, ...paContainerRows, ...inventoryItemsList];
-    // Снятые пакеты разворачиваются в контейнеры (родитель + содержание при открытом аккордеоне).
+    // Снятые пакеты разворачиваются в контейнеры (родитель + содержание при открытом
+    // аккордеоне). ПРАВИЛО (владелец): только ПАКЕТЫ (isPowerArmorPackage — каркас,
+    // побывавший в надетом состоянии); свежий каркас без installedPieces — обычная
+    // строка предмета, контейнер раньше успешного надевания не создаётся.
     return merged.flatMap((item) =>
-      (item?.itemType === 'powerArmor' && isPowerArmorFrame(item) && !item.isEquipped
+      (item?.itemType === 'powerArmor' && isPowerArmorPackage(item) && !item.isEquipped
         ? paExpandPackage(item)
         : [item]));
   }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows, paExpandPackage]);

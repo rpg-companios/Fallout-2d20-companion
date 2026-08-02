@@ -165,6 +165,16 @@ export const unpackPackage = (frameItem) => ({
   pieces: { ...createEmptyEquippedPowerArmor().pieces, ...(frameItem.installedPieces || {}) },
 });
 
+/**
+ * Пакет — стор-запись каркаса, ПОБЫВАВШЕГО в надетом состоянии: packPackage
+ * всегда пишет поле installedPieces (даже если все части null).
+ * ПРАВИЛО (от владельца): контейнер «Силовая броня» в инвентаре создаётся
+ * только когда каркас успешно надевался, не раньше — свежий каркас из
+ * каталога/магазина (без installedPieces) рисуется обычной строкой предмета.
+ */
+export const isPowerArmorPackage = (item) =>
+  isPowerArmorFrame(item) && item.installedPieces != null;
+
 /** Вставить блок в надетый каркас. Блок изымается из инвентаря вызывающим. */
 export const insertCore = (equipped, core) => ({
   ...equipped,

@@ -5,6 +5,15 @@
     "add": "↑ Внести"
   },
   "alerts": {
+    "conditionsRemovedTitle": "Снято состояние",
+    "conditionsRemovedMessage": "Снято: {conditions}",
+    "addictionRollTitle": "Бросок на зависимость",
+    "addictionRollMessage": "Брошено: {faces} — {effectCount} эффект(ов) из {addictionLevel} нужных.",
+    "addictionGainedTitle": "Зависимость",
+    "addictionGainedMessage": "Вы стали зависимы от этого препарата.",
+    "addictionAvoidedTitle": "Зависимость",
+    "addictionAvoidedMessage": "Зависимость не наступила.",
+    "cannotEquipItem": "Этот предмет нельзя экипировать.",
     "successTitle": "Успешно",
     "appliedTitle": "Применено",
     "effectsTitle": "Эффекты",
@@ -74,7 +83,7 @@
     "inventoryEmpty": "Инвентарь пуст",
     "totalWeight": "Общий вес",
     "totalPrice": "Общая цена",
-    "durability": "Прочность"
+    "durability": "Прочн"
   },
   "powerArmor": {
     "containerTitle": "Силовая броня",

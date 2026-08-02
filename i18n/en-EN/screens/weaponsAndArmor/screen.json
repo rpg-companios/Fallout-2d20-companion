@@ -164,6 +164,20 @@
       "upgradeFrame": "Frame"
     }
   },
+  "robotSlots": {
+    "misterHandy": {
+      "head": "Optics",
+      "body": "Body",
+      "leftArm": "Arm 1",
+      "rightArm": "Arm 2",
+      "leftLeg": "Arm 3",
+      "rightLeg": "Thruster"
+    }
+  },
+  "robotBodyUpgrade": {
+    "title": "Body upgrade",
+    "comingSoon": "Coming soon"
+  },
   "powerArmor": {
     "durability": "HP",
     "core": "Fusion Core: {value}"

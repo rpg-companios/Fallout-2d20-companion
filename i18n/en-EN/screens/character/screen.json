@@ -1,5 +1,7 @@
 {
+  "defaultCharacterName": "Character",
   "labels": {
+    "needToPick": "Need to pick",
     "characterName": "Name",
     "origin": "Origin",
     "trait": "Trait",
@@ -95,6 +97,10 @@
     "maxSkillRank": "Error: maximum skill rank is {maxRank}"
   },
   "modals": {
+    "ncrCitizen": {
+      "title": "Origin trait: NCR Citizen",
+      "originLabel": "NCR Citizen"
+    },
     "origin": {
       "title": "Select origin"
     },

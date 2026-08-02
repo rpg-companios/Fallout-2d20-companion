@@ -34,17 +34,17 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
   const layers = [
     {
       key: 'plating',
-      label: tCharacterScreen('labels.plating', 'Plating'),
+      label: tCharacterScreen('labels.plating'),
       current: currentPlating?.name || null,
     },
     {
       key: 'armor',
-      label: tCharacterScreen('labels.armor', 'Armor'),
+      label: tCharacterScreen('labels.armor'),
       current: currentArmor?.name || null,
     },
     {
       key: 'frame',
-      label: tCharacterScreen('labels.frame', 'Frame'),
+      label: tCharacterScreen('labels.frame'),
       current: currentFrame?.name || null,
     },
   ];
@@ -61,7 +61,7 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
       >
         <Pressable style={styles.overlay} onPress={onClose}>
           <Pressable style={styles.container} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.title}>{tCharacterScreen('labels.armor', 'Armor')}</Text>
+            <Text style={styles.title}>{tCharacterScreen('labels.armor')}</Text>
 
             {layers.map((layer) => (
               <TouchableOpacity
