@@ -545,8 +545,10 @@ const useCharacterStore = create(devtools(
         // Generate unique ID for this item instance
         const itemId = item.uniqueId || generateItemId(weaponId, appliedMods);
         
-        // Generate stackKey for stacking identical items
-        const stackKey = generateStackKey(weaponId, appliedMods);
+        // Generate stackKey for stacking identical items.
+        // Предметы со своим ключом (силовая броня, Ядерный Блок — signature
+        // по прочности/зарядам/модам, см. domain/powerArmor) приносят ключ с собой.
+        const stackKey = item.stackKey || generateStackKey(weaponId, appliedMods);
         
         // Normalize item data with parameters
         const normalizedItem = {
@@ -609,6 +611,14 @@ const useCharacterStore = create(devtools(
           protectedAreas: item.protectedAreas,
           equippedSlots: item.equippedSlots,
           equipInstanceId: item.equipInstanceId,
+
+          // Силовая броня / Ядерный Блок (docs/architecture/power-armor-plan.md §4)
+          set: item.set,
+          charges: item.charges,
+          maxCharges: item.maxCharges,
+          hpCurrent: item.hpCurrent,
+          installedPieces: item.installedPieces,
+          installedCore: item.installedCore,
         };
         
         // Apply mod modifiers to parameters

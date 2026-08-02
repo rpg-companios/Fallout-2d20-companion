@@ -35,7 +35,11 @@
     "manipulatorWeightMessage": "This weapon exceeds the manipulator held-weight limit ({maxHeldWeight} lbs).",
     "robotCannotUseTwoHandedMessage": "Current robot hands/manipulators cannot use two-handed weapons.",
     "robotArmorOnlyTitle": "Equipment restriction",
-    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.", "powerArmorNeedsCoreTitle": "Power Armor", "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.", "powerArmorNeedsFrameMessage": "Equip the power armor frame first.", "powerArmorDepletedTitle": "Power depleted", "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory."
+    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.", "powerArmorNeedsCoreTitle": "Power Armor", "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.", "powerArmorNeedsFrameMessage": "Equip the power armor frame first.", "powerArmorDepletedTitle": "Power depleted", "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory.",
+    "mutantCannotWearStandardArmorTitle": "Equipment restriction",
+    "mutantCannotWearStandardArmorMessage": "Super mutants cannot wear power armor.",
+    "powerArmorChooseCoreTitle": "Fusion Core selection",
+    "powerArmorBrokenPieceMessage": "This piece is broken (0 HP) and cannot be equipped. Repair it in the inventory."
   },
   "actions": {
     "cancel": "Cancel",
@@ -50,7 +54,8 @@
     "apply": "Use",
     "sell": "Sell",
     "addLoot": "Add loot",
-    "buyItems": "Buy items"
+    "buyItems": "Buy items",
+    "repair": "Repair"
   },
   "labels": {
     "leftArm": "Left bracer",
@@ -66,6 +71,7 @@
     "pieces": "pcs",
     "inventoryEmpty": "Inventory is empty",
     "totalWeight": "Total weight",
-    "totalPrice": "Total price"
+    "totalPrice": "Total price",
+    "durability": "HP"
   }
 }

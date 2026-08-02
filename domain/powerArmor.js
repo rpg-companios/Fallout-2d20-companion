@@ -8,6 +8,7 @@
  */
 
 import { rollByType } from './diceRollsLogic';
+import { getCanonicalAttributeKey } from './characterCreation';
 
 // Расход зарядов Ядерного блока каркасом, зарядов в час. Временное значение (§3.3 плана).
 export const PA_CORE_DRAIN_PER_HOUR = 5;
@@ -141,7 +142,9 @@ export const insertCore = (equipped, core) => ({
 
 // ─── Ядерный Блок ───────────────────────────────────────────────────────────
 
-export const isFusionCoreItem = (item) => item?.id === FUSION_CORE_ID;
+// id — каталожный id (предмет из каталога), weaponId — канонический id в стор-инвентаре
+// (addNewItem кладёт каталожный id в поле weaponId для всех типов предметов).
+export const isFusionCoreItem = (item) => item?.id === FUSION_CORE_ID || item?.weaponId === FUSION_CORE_ID;
 
 /** Заряженные блоки среди предметов инвентаря. */
 export const findChargedFusionCores = (inventoryItems) =>
@@ -241,4 +244,21 @@ export const applyAttributeModifierValue = (base, entry) => {
   if (entry?.op === '+') return base + value;
   if (entry?.op === '-') return base - value;
   throw new Error(`[powerArmor] неизвестная операция атрибут-модификатора: ${entry?.op}`);
+};
+
+/**
+ * Эффективные атрибуты с применёнными модификаторами каркаса (§5.6):
+ * получает массив [{name, value}] и КАТАЛОЖНЫЙ предмет каркаса (с modifiers).
+ * Каркаса нет / атрибутов нет → возвращает массив как есть (та же ссылка).
+ * Ключи атрибутов канонизируются (STR/СИЛ) — совпадает только объявленное в данных.
+ */
+export const applyFrameAttributeModifiers = (attributesArray, catalogFrameItem) => {
+  const mods = getFrameAttributeModifiers(catalogFrameItem);
+  if (!mods || !Array.isArray(attributesArray)) return attributesArray;
+  return attributesArray.map((attr) => {
+    const key = getCanonicalAttributeKey(attr?.name ?? attr?.id);
+    const entry = key ? mods[key] : null;
+    if (!entry) return attr;
+    return { ...attr, value: applyAttributeModifierValue(Number(attr.value) || 0, entry) };
+  });
 };

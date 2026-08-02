@@ -108,6 +108,14 @@ import {
 
 import { effectsDictToLegacyArray } from './effectsSync.js';
 
+// Силовая броня: модификаторы надетого каркаса (СИЛ=set 11 и др. — данные) применяются
+// К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
+// атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
+import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
+import dataPowerArmor from '../../data/equipment/powerArmor.json';
+
+const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+
 /**
  * Calculate derived stats from attributes, effects, and trait
  * @param {Object} attributes - Normalized attributes object
@@ -123,6 +131,12 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     name: attr.id,
     value: attr.base,
   }));
+
+  // Надетый каркас силовой брони подменяет атрибуты (set/add) для производных.
+  const attributesEffective = applyFrameAttributeModifiers(
+    attributesArray,
+    equipmentState?.powerArmorFrameId ? PA_FRAME_CATALOG : null,
+  );
 
   const effectsArray = effectsDictToLegacyArray(effects);
 
@@ -140,7 +154,7 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   };
 
   // Max Health: END + LCK + level
-  stats.maxHealth.base = calculateMaxHealth(attributesArray, level);
+  stats.maxHealth.base = calculateMaxHealth(attributesEffective, level);
   
   // Timed effects: getTimedMaxHpBonus
   const hpBonus = getTimedMaxHpBonus(effectsArray);
@@ -168,15 +182,15 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   });
   
   // Initiative: PER + AGI
-  stats.initiative.base = calculateInitiative(attributesArray);
+  stats.initiative.base = calculateInitiative(attributesEffective);
   stats.initiative.total = calculateAttributeTotal(stats.initiative);
   
   // Defense: AGI >= 9 ? 2 : 1
-  stats.defense.base = calculateDefense(attributesArray);
+  stats.defense.base = calculateDefense(attributesEffective);
   stats.defense.total = calculateAttributeTotal(stats.defense);
   
   // Melee Bonus: STR-based
-  stats.meleeBonus.base = calculateMeleeBonusValue(attributesArray, trait);
+  stats.meleeBonus.base = calculateMeleeBonusValue(attributesEffective, trait);
   stats.meleeBonus.total = calculateAttributeTotal(stats.meleeBonus);
   
   // Carry Weight:
@@ -186,7 +200,7 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   if (equipmentState.isRobot) {
     stats.carryWeight.base = calculateRobotCarryWeight(robotSlots || {}, trait);
   } else {
-    stats.carryWeight.base = calculateCarryWeight(attributesArray, trait, equipmentState);
+    stats.carryWeight.base = calculateCarryWeight(attributesEffective, trait, equipmentState);
   }
   stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
   

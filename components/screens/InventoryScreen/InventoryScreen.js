@@ -12,6 +12,15 @@ import { calculateMaxHealth } from '../../../domain/characterCreation';
 import { getInstantHealAmount } from '../../../domain/effects';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+import {
+  isFusionCoreItem,
+  fusionCoreStackKey,
+  isPowerArmorFrame,
+  powerArmorPieceStackKey,
+  powerArmorFrameStackKey,
+  rollNewFusionCoreCharges,
+} from '../../../domain/powerArmor';
+import dataPowerArmor from '../../../data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -22,6 +31,11 @@ import styles from '../../../styles/InventoryScreen.styles';
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
 ];
+
+// Каталог механики силовой брони по id (макс. прочность частей, зоны защиты).
+const PA_CATALOG_BY_ID = Object.fromEntries(
+  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
+);
 
 const flattenItemParams = (item) => {
   if (!item) return item;
@@ -59,6 +73,10 @@ const InventoryScreen = () => {
     getModifiedItem,
     trait,
     origin,
+    // Силовая броня: свой слой и свои действия (docs/architecture/power-armor-plan.md).
+    equipPowerArmorPackage,
+    equipPowerArmorPiece,
+    repairPowerArmorStack,
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
@@ -161,6 +179,18 @@ const InventoryScreen = () => {
     return modIds.length ? modIds.join('|') : 'none';
   };
   const getStackKey = (item) => {
+    // Ядерный Блок: блоки с разным зарядом лежат отдельными стопками (§2 плана).
+    // Ветка ПЕРВАЯ: блок — разновидность ammo, но его подпись строится по зарядам.
+    if (isFusionCoreItem(item)) return fusionCoreStackKey(item.charges);
+    if (item?.itemType === 'powerArmor') {
+      // Каталожный id у стор-предмета живёт в weaponId, у свежего из каталога — в id.
+      const catalogId = item.weaponId || item.id;
+      if (isPowerArmorFrame(item)) {
+        // Пакет: подпись считает домен по составу установленных частей и заряду блока.
+        return powerArmorFrameStackKey({ ...item, id: catalogId });
+      }
+      return powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: item.hpCurrent });
+    }
     const itemType = getItemType(item);
     if (itemType === 'weapon') {
       const baseWeaponId = item?.weaponId || item?.id || getItemName(item);
@@ -482,6 +512,55 @@ const InventoryScreen = () => {
 
   const handleAddItem = (item, quantity = 1) => {
     const localizedItem = resolveLocalizedItem(item);
+
+    // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
+    // бросок (покупка 5 шт = 5 независимых бросков), стекаются только одинаковые.
+    if (isFusionCoreItem(localizedItem)) {
+      for (let i = 0; i < quantity; i += 1) {
+        const charges = rollNewFusionCoreCharges(localizedItem.maxCharges);
+        const stackKey = fusionCoreStackKey(charges);
+        const existingItem = findUnequippedStoreItemByStackKey(stackKey);
+        if (existingItem) {
+          adjustStoreItemQuantity(existingItem.id, 1);
+        } else {
+          addNewItem({
+            ...localizedItem,
+            itemType: 'ammo',
+            quantity: 1,
+            charges,
+            stackKey,
+            uniqueId: stackKey,
+          });
+        }
+      }
+      return;
+    }
+
+    // Силовая броня (§4): часть приходит со своей прочностью (hpCurrent = max),
+    // каркас — пустым пакетом (без частей и блока). Подпись стопки — доменная.
+    if (localizedItem.itemType === 'powerArmor') {
+      const prepared = isPowerArmorFrame(localizedItem)
+        ? {
+          ...localizedItem,
+          appliedMods: localizedItem.appliedMods || {},
+          installedPieces: { head: null, body: null, hands: null, legs: null },
+          installedCore: null,
+        }
+        : {
+          ...localizedItem,
+          appliedMods: localizedItem.appliedMods || {},
+          hpCurrent: localizedItem.hpCurrent ?? PA_CATALOG_BY_ID[localizedItem.id]?.hp,
+        };
+      const stackKey = getStackKey(prepared);
+      const existingItem = findUnequippedStoreItemByStackKey(stackKey);
+      if (existingItem) {
+        adjustStoreItemQuantity(existingItem.id, quantity);
+        return;
+      }
+      addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
+      return;
+    }
+
     const stackKey = getStackKey(localizedItem);
     const existingItem = findUnequippedStoreItemByStackKey(stackKey);
 
@@ -1057,7 +1136,19 @@ const InventoryScreen = () => {
     const localizedDisplayItem = resolveLocalizedItem(displayItem);
     const itemName = getItemName(localizedDisplayItem) || tInventory('screen.labels.unknownItem');
     const itemIcon = getItemTypeIcon(item.itemType);
-    const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing';
+    // Ядерный Блок: заряд стопки показываем суффиксом в имени — «Ядерный блок (7/20)».
+    const coreChargeSuffix = isFusionCoreItem(item) && item.charges != null
+      ? ` (${item.charges}/${item.maxCharges})`
+      : '';
+    // Часть силовой брони: строка прочности + «Починить» при hp < max (бесплатно — правило владельца).
+    const isPAItem = item.itemType === 'powerArmor';
+    const paMaxHp = isPAItem && !isPowerArmorFrame(item)
+      ? PA_CATALOG_BY_ID[item.weaponId || item.id]?.hp
+      : null;
+    const showPARepair = Boolean(
+      isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
+    );
+    const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
 
     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
@@ -1085,6 +1176,14 @@ const InventoryScreen = () => {
         } else {
             if (item.itemType === 'weapon') {
                 handleEquipWeapon(item);
+            } else if (item.itemType === 'powerArmor') {
+                // Силовая броня — свой слой: каркас надевается пакетом, часть — в слот
+                // надетого пакета. Через equippedArmor/слоты брони не проходит (план §5).
+                if (isPowerArmorFrame(item)) {
+                    equipPowerArmorPackage(item);
+                } else {
+                    equipPowerArmorPiece(item);
+                }
             } else {
                 handleEquipArmor(item);
             }
@@ -1101,7 +1200,7 @@ const InventoryScreen = () => {
       <View style={styles.tableRow}>
         <View style={styles.mainRowContent}>
           <View style={styles.itemNameContainer}>
-            <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}</Text>
+            <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}{coreChargeSuffix}</Text>
             <Text style={styles.itemTypeIcon}>{itemIcon}</Text>
           </View>
         </View>
@@ -1115,6 +1214,14 @@ const InventoryScreen = () => {
           )}
           {hideEquipButton && (
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+          )}
+
+          {showPARepair && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => repairPowerArmorStack(item.id)}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
           )}
 
           {isConsumable && !item.isEquipped && !isRobot && (
@@ -1131,6 +1238,9 @@ const InventoryScreen = () => {
           )}
         </View>
         <View style={styles.itemSubRow}>
+          {Number.isFinite(paMaxHp) && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
+          )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
           <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>

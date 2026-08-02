@@ -41,10 +41,16 @@ import {
   normalizeAttributeMap,
   getTraitAttributeBonus,
 } from "../../../domain/characterCreation";
+// Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
+// базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
+import { applyFrameAttributeModifiers, hasFrame } from "../../../domain/powerArmor";
+import dataPowerArmor from "../../../data/equipment/powerArmor.json";
 import {
   getSkillDisplayName,
   tCharacterScreen,
 } from "./logic/characterScreenI18n";
+
+const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
 import { useLocale } from "../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
@@ -290,6 +296,7 @@ export default function CharacterScreen() {
     setEquippedWeapons,
     setEquippedRobotSlots,
     setEquippedRobotModules,
+    equippedPowerArmor,
   } = useCharacter();
 
   const debugLocale = useLocale();
@@ -417,12 +424,20 @@ export default function CharacterScreen() {
   const isPerkAttributeMode = tempAttributes !== null;
   const currentAttributes = isPerkAttributeMode ? tempAttributes : attributes;
   const timedAttributeModifiers = getTimedAttributeModifiers(activeTimedEffects);
-  const displayAttributes = (!isPerkAttributeMode && attributesSaved)
-    ? currentAttributes.map((attr) => ({
-      ...attr,
-      value: attr.value + (timedAttributeModifiers[getCanonicalAttributeKey(attr.name)] || 0),
-    }))
-    : currentAttributes;
+  // §5.6: пока надет каркас силовой брони, его модификаторы атрибутов действуют
+  // на отображаемом значении. Режим перка редактирует натуральную базу — не трогаем.
+  const withPowerArmorModifiers = (attrs) =>
+    applyFrameAttributeModifiers(attrs, hasFrame(equippedPowerArmor) ? PA_FRAME_CATALOG : null);
+  const displayAttributes = isPerkAttributeMode
+    ? currentAttributes
+    : withPowerArmorModifiers(
+        attributesSaved
+          ? currentAttributes.map((attr) => ({
+            ...attr,
+            value: attr.value + (timedAttributeModifiers[getCanonicalAttributeKey(attr.name)] || 0),
+          }))
+          : currentAttributes,
+      );
 
   const remainingInitialPoints = getRemainingAttributePoints(attributes, trait);
   const remainingPerkPoints = isPerkAttributeMode
