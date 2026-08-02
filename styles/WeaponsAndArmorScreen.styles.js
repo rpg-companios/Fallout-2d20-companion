@@ -227,6 +227,7 @@ const styles = StyleSheet.create({
   // заголовок «Прочность (ОЗ)» белым шрифтом на тёмном фоне + строка счётчика.
   paDurabilityBlock: {
     width: '100%',
+    backgroundColor: '#fff',
     borderTopWidth: 1,
     borderColor: '#5a5a5a',
   },
@@ -248,6 +249,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 6,
+  },
+  // Значение счётчика — как armorStatValue, но БЕЗ левой границы (ПРАВИЛО
+  // владельца: у значений каунтера левой границы нет, строка единообразная).
+  paDurabilityValue: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 13,
+    padding: 5,
+    minWidth: 40,
+    textAlign: 'center',
   },
   weaponAmmoBtn: {
     width: 26,

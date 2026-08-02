@@ -236,12 +236,22 @@ describe('power-armor ui-integration: контейнер в инвентаре (
     expect(src).toContain('paDurabilityCounterRow');
     expect(src).toContain("tWeaponsAndArmorScreen('powerArmor.durability')");
     const stylesSrc = readFileSync('styles/WeaponsAndArmorScreen.styles.js', 'utf8');
-    for (const marker of ['paDurabilityBlock', 'paDurabilityHeaderRow', 'paDurabilityHeader', 'paDurabilityCounterRow']) {
+    for (const marker of ['paDurabilityBlock', 'paDurabilityHeaderRow', 'paDurabilityHeader', 'paDurabilityCounterRow', 'paDurabilityValue']) {
       expect(stylesSrc).toContain(marker);
     }
     // белый шрифт на тёмном фоне
     expect(stylesSrc).toMatch(/paDurabilityHeaderRow:\s*\{[^}]*'#333'/s);
     expect(stylesSrc).toMatch(/paDurabilityHeader:\s*\{[^}]*'#fff'/s);
+    // ПРАВИЛО (владелец): фон всей области счётчика — белый, не только у значения.
+    expect(stylesSrc).toMatch(/paDurabilityBlock:\s*\{[^}]*backgroundColor: '#fff'/s);
+    // ПРАВИЛО (владелец): у значения счётчика левой границы нет — свой стиль
+    // без borderLeft (armorStatValue с borderLeftWidth в счётчике не используется).
+    expect(src).toContain('localStyles.paDurabilityValue');
+    const valueStyle = stylesSrc.slice(
+      stylesSrc.indexOf('paDurabilityValue: {'),
+      stylesSrc.indexOf('},', stylesSrc.indexOf('paDurabilityValue: {')),
+    );
+    expect(valueStyle).not.toContain('borderLeft');
   });
 
   it('структура: экран экипировки — починки нет (только инвентарь), счётчик — стиль патронов', () => {

@@ -809,7 +809,7 @@ const WeaponsAndArmorScreen = () => {
             >
               <Text style={localStyles.weaponAmmoBtnText}>−</Text>
             </TouchableOpacity>
-            <Text style={localStyles.armorStatValue}>{paPiece.hpCurrent}/{paMaxHp}</Text>
+            <Text style={localStyles.paDurabilityValue}>{paPiece.hpCurrent}/{paMaxHp}</Text>
           </View>
         </View>
       );
