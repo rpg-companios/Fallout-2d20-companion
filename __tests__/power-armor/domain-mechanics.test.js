@@ -7,7 +7,8 @@ import {
   createEmptyEquippedPowerArmor,
   createEmptyPowerArmorRuntime,
   isPowerArmorFrame,
-  powerArmorSlotFor,
+  powerArmorSlotsFor,
+  resolvePowerArmorPieceTarget,
   fusionCoreStackKey,
   powerArmorPieceStackKey,
   powerArmorFrameStackKey,
@@ -27,7 +28,7 @@ import {
   needsRepair,
   repairPowerArmorPiece,
   adjustPieceHp,
-  suppressesLowerLayers,
+  suppressesLayerAt,
   getFrameAttributeModifiers,
   applyAttributeModifierValue,
 } from '../../domain/powerArmor';
@@ -50,9 +51,13 @@ const robotChar = { origin: { characterType: 'robot' } };
 const humanChar = { origin: { characterType: 'human' } };
 
 describe('состояние пакета: конструкторы и слоты', () => {
-  it('createEmptyEquippedPowerArmor: каркаса нет, 4 слота пусты, экземпляры независимы', () => {
+  it('createEmptyEquippedPowerArmor: каркаса нет, 6 слотов пусты, экземпляры независимы', () => {
     const a = createEmptyEquippedPowerArmor();
-    expect(a).toEqual({ frame: null, pieces: { head: null, body: null, hands: null, legs: null } });
+    expect(a).toEqual({ frame: null, pieces: {
+      head: null, body: null,
+      leftArm: null, rightArm: null,
+      leftLeg: null, rightLeg: null,
+    } });
     const b = createEmptyEquippedPowerArmor();
     a.pieces.head = piece('x', 7);
     expect(b.pieces.head).toBeNull();
@@ -63,15 +68,34 @@ describe('состояние пакета: конструкторы и слот�
   });
 
   it('слоты частей по данным; каркас слотом части не является', () => {
-    expect(powerArmorSlotFor(T45_HELMET)).toBe('head');
-    expect(powerArmorSlotFor(T45_CHEST)).toBe('body');
-    expect(powerArmorSlotFor(dataPowerArmor.t45.pieces[2])).toBe('hands'); // arm
-    expect(powerArmorSlotFor(dataPowerArmor.t45.pieces[3])).toBe('legs');  // leg
-    expect(powerArmorSlotFor(FRAME_CATALOG)).toBeNull();
+    // Наруч/понож — один предмет на любую сторону пары (как у обычной брони).
+    expect(powerArmorSlotsFor(T45_HELMET)).toEqual(['head']);
+    expect(powerArmorSlotsFor(T45_CHEST)).toEqual(['body']);
+    expect(powerArmorSlotsFor(dataPowerArmor.t45.pieces[2])).toEqual(['leftArm', 'rightArm']); // arm
+    expect(powerArmorSlotsFor(dataPowerArmor.t45.pieces[3])).toEqual(['leftLeg', 'rightLeg']); // leg
+    expect(powerArmorSlotsFor(FRAME_CATALOG)).toEqual([]);
     expect(isPowerArmorFrame(FRAME_CATALOG)).toBe(true);
     expect(isPowerArmorFrame(T45_CHEST)).toBe(false);
-    expect(powerArmorSlotFor({ itemType: 'powerArmor', protectedAreas: ['Knee'] })).toBeNull();
-    expect(PA_PIECE_SLOTS).toEqual(['head', 'body', 'hands', 'legs']);
+    expect(powerArmorSlotsFor({ itemType: 'powerArmor', protectedAreas: ['Knee'] })).toEqual([]);
+    expect(PA_PIECE_SLOTS).toEqual(['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']);
+  });
+});
+
+describe('целевой слот части (§5.2)', () => {
+  it('свободная сторона пары → она; одна занята → вторая; обе заняты → выбор L/R', () => {
+    let eq = wornFrameWithCuts();
+    // обе руки свободны → первый свободный (левая)
+    expect(resolvePowerArmorPieceTarget(eq, ['leftArm', 'rightArm'])).toEqual({ kind: 'slot', slot: 'leftArm' });
+    // левая занята → правая
+    eq = equipPowerArmorPiece(eq, 'leftArm', piece('power_armor_t45_arm', 10));
+    expect(resolvePowerArmorPieceTarget(eq, ['leftArm', 'rightArm'])).toEqual({ kind: 'slot', slot: 'rightArm' });
+    // обе заняты → игрок выбирает
+    eq = equipPowerArmorPiece(eq, 'rightArm', piece('power_armor_t45_arm', 10));
+    expect(resolvePowerArmorPieceTarget(eq, ['leftArm', 'rightArm']))
+      .toEqual({ kind: 'choice', slots: ['leftArm', 'rightArm'] });
+    // одиночный слот занят → замена без выбора
+    eq = equipPowerArmorPiece(eq, 'head', piece('power_armor_t45_helmet', 5));
+    expect(resolvePowerArmorPieceTarget(eq, ['head'])).toEqual({ kind: 'slot', slot: 'head' });
   });
 });
 
@@ -120,7 +144,7 @@ describe('экипировка пакета (§5.1/§5.2)', () => {
     const packed = packPackage(eq);
     expect(packed.installedCore).toEqual({ charges: 11 });
     expect(packed.installedPieces.head).toEqual(piece('power_armor_t45_helmet', 3, { plated: 'mod_x01' }));
-    expect(packed.installedPieces.hands).toBeNull();
+    expect(packed.installedPieces.leftArm).toBeNull();
     const eq2 = unpackPackage(packed);
     expect(eq2).toEqual(eq);
     expect(hasFrame(eq2)).toBe(true);
@@ -224,9 +248,15 @@ describe('прочность и починка (§5.7)', () => {
 
 describe('подавление нижних слоёв (§5.5)', () => {
   it('голый каркас НЕ подавляет; любая часть — подавляет', () => {
-    expect(suppressesLowerLayers(wornFrameWithCuts())).toBe(false);
-    expect(suppressesLowerLayers(equipPowerArmorPiece(wornFrameWithCuts(), 'hands', piece('a', 5)))).toBe(true);
-    expect(suppressesLowerLayers(equipPowerArmorPiece(wornFrameWithCuts(), 'head', piece('h', 5)))).toBe(true);
+    const bareFrame = wornFrameWithCuts();
+    expect(suppressesLayerAt(bareFrame, 'head')).toBe(false);
+    expect(suppressesLayerAt(bareFrame, 'leftArm')).toBe(false);
+    const withLeftArm = equipPowerArmorPiece(bareFrame, 'leftArm', piece('a', 5));
+    // Часть подавляет ТОЛЬКО свою ячейку; соседние видят нижние слои.
+    expect(suppressesLayerAt(withLeftArm, 'leftArm')).toBe(true);
+    expect(suppressesLayerAt(withLeftArm, 'rightArm')).toBe(false);
+    expect(suppressesLayerAt(withLeftArm, 'head')).toBe(false);
+    expect(suppressesLayerAt(equipPowerArmorPiece(bareFrame, 'head', piece('h', 5)), 'head')).toBe(true);
   });
 });
 

@@ -138,17 +138,19 @@ describe('power-armor ui-integration: i18n-ключи экранов (pa3)', () 
     }
   });
 
-  it('weaponsAndArmor: секция powerArmor полная в обеих локалях', () => {
+  it('weaponsAndArmor: powerArmor — только используемые ключи (мёртвых данных нет)', () => {
     for (const dict of [ruWaasScreen, enWaasScreen]) {
       const pa = dict.powerArmor;
-      for (const key of ['layer', 'frame', 'durability', 'core', 'repair', 'unequip']) {
+      // Используются ячейками сетки и панелью эффектов.
+      for (const key of ['durability', 'core', 'repair']) {
         expect(typeof pa[key], key).toBe('string');
       }
-      for (const part of ['helmet', 'chest', 'arm', 'leg']) {
-        expect(typeof pa.partNames[part], part).toBe('string');
-      }
-      // Строка блока — шаблон с плейсхолдером значения.
       expect(pa.core).toContain('{value}');
+      // Редизайн (владелец): отдельного блока СБ нет — мёртвые ключи удалены.
+      expect(pa.layer).toBeUndefined();
+      expect(pa.frame).toBeUndefined();
+      expect(pa.partNames).toBeUndefined();
+      expect(pa.unequip).toBeUndefined();
     }
   });
 });

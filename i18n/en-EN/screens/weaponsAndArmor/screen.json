@@ -165,18 +165,9 @@
     }
   },
   "powerArmor": {
-    "layer": "Power Armor",
-    "frame": "Frame",
-    "partNames": {
-      "helmet": "Helmet",
-      "chest": "Chest Piece",
-      "arm": "Arm",
-      "leg": "Leg"
-    },
     "durability": "HP",
     "core": "Fusion Core: {value}",
-    "repair": "Repair",
-    "unequip": "↓ Unequip"
+    "repair": "Repair"
   },
   "common": {
     "empty": "—",

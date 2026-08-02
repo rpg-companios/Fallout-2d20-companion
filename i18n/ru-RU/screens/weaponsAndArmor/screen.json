@@ -165,18 +165,9 @@
     }
   },
   "powerArmor": {
-    "layer": "Силовая броня",
-    "frame": "Каркас",
-    "partNames": {
-      "helmet": "Шлем",
-      "chest": "Нагрудник",
-      "arm": "Наручи",
-      "leg": "Поножи"
-    },
     "durability": "Прочность",
     "core": "Ядерный блок: {value}",
-    "repair": "Починить",
-    "unequip": "↓ Снять"
+    "repair": "Починить"
   },
   "common": {
     "empty": "—",

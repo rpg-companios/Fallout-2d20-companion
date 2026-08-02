@@ -28,7 +28,7 @@ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { getRobotSlotKeys } from '../../../domain/robotEquip';
 import {
   hasFrame,
-  suppressesLowerLayers,
+  suppressesLayerAt,
   needsRepair,
   applyFrameAttributeModifiers,
   FUSION_CORE_ID,
@@ -536,8 +536,6 @@ const WeaponsAndArmorScreen = () => {
     radiation,
     // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
     equippedPowerArmor,
-    unequipPowerArmorPackage,
-    unequipPowerArmorPieceAt,
     adjustPowerArmorDurability,
     repairPowerArmorPieceAt,
   } = useCharacter();
@@ -754,115 +752,6 @@ const WeaponsAndArmorScreen = () => {
     return rows;
   }, [equippedPowerArmor, equipmentCatalog]);
 
-  // ПРАВИЛО (от владельца): голый каркас нижние слои НЕ подавляет; подавляет надетая часть.
-  const powerArmorSuppresses = suppressesLowerLayers(equippedPowerArmor);
-
-  // §2: наручи и поножи — одна часть на пару конечностей → 4 слота пакета.
-  const PA_SLOT_TO_PARTNAME = { head: 'helmet', body: 'chest', hands: 'arm', legs: 'leg' };
-
-  const renderPowerArmorPiece = (slot) => {
-    const piece = equippedPowerArmor?.pieces?.[slot];
-    const title = tWeaponsAndArmorScreen(`powerArmor.partNames.${PA_SLOT_TO_PARTNAME[slot]}`);
-    if (!piece) {
-      return (
-        <ArmorPart
-          key={slot}
-          title={title}
-          subtitle={tWeaponsAndArmorScreen('powerArmor.layer')}
-          stats={[]}
-        />
-      );
-    }
-
-    const catalogItem = PA_CATALOG_BY_ID[piece.catalogId];
-    const localizedItem = (equipmentCatalog?.powerArmorList || []).find((p) => p.id === piece.catalogId);
-    const maxHp = catalogItem?.hp;
-    const pieceNeedsRepair = Number.isFinite(maxHp) && needsRepair(piece, maxHp);
-    const ratingValue = (value) => (value > 0 ? value : tWeaponsAndArmorScreen('common.none'));
-
-    const stats = [
-      { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: ratingValue(catalogItem?.physicalDamageRating) },
-      { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: ratingValue(catalogItem?.energyDamageRating) },
-      { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : ratingValue(catalogItem?.radiationDamageRating) },
-      {
-        label: tWeaponsAndArmorScreen('powerArmor.durability'),
-        custom: (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slot, -1)}>
-              <Text style={localStyles.armorModificationButtonText}>−</Text>
-            </TouchableOpacity>
-            <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{piece.hpCurrent}/{maxHp}</Text>
-            <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slot, 1)}>
-              <Text style={localStyles.armorModificationButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        ),
-      },
-      // «Починить» — при hp < max (правило владельца: бесплатно до максимума);
-      // «Снять» — часть уходит в инвентарь своей стопкой.
-      ...(pieceNeedsRepair ? [{
-        label: '',
-        value: tWeaponsAndArmorScreen('powerArmor.repair'),
-        type: 'button',
-        onPress: () => repairPowerArmorPieceAt(slot),
-      }] : []),
-      {
-        label: '',
-        value: tWeaponsAndArmorScreen('powerArmor.unequip'),
-        type: 'button',
-        onPress: () => unequipPowerArmorPieceAt(slot),
-      },
-    ];
-
-    return (
-      <ArmorPart
-        key={slot}
-        title={title}
-        subtitle={tWeaponsAndArmorScreen('powerArmor.layer')}
-        armorName={localizedItem?.name}
-        stats={stats}
-      />
-    );
-  };
-
-  const renderPowerArmorSection = () => {
-    const frameCatalog = PA_FRAME_CATALOG;
-    const frameLocalized = (equipmentCatalog?.powerArmorList || [])
-      .find((p) => p.id === equippedPowerArmor.frame.catalogId);
-    const ratingValue = (value) => (value > 0 ? value : tWeaponsAndArmorScreen('common.none'));
-
-    return (
-      <View style={{ marginBottom: 8 }}>
-        <View style={[localStyles.statsRow, { alignItems: 'center', justifyContent: 'space-between' }]}>
-          <Text style={styles.sectionTitle}>{tWeaponsAndArmorScreen('powerArmor.layer')}</Text>
-          <TouchableOpacity style={localStyles.armorModificationButton} onPress={unequipPowerArmorPackage}>
-            <Text style={localStyles.armorModificationButtonText}>{tWeaponsAndArmorScreen('powerArmor.unequip')}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={[localStyles.statsRow, { marginTop: 8 }]}>
-          <ArmorPart
-            title={tWeaponsAndArmorScreen('powerArmor.frame')}
-            subtitle={tWeaponsAndArmorScreen('powerArmor.layer')}
-            armorName={frameLocalized?.name}
-            stats={[
-              { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: ratingValue(frameCatalog?.physicalDamageRating) },
-              { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: ratingValue(frameCatalog?.energyDamageRating) },
-              { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : ratingValue(frameCatalog?.radiationDamageRating) },
-            ]}
-          />
-        </View>
-        <View style={[localStyles.statsRow, { marginTop: 8 }]}>
-          {renderPowerArmorPiece('head')}
-          {renderPowerArmorPiece('body')}
-        </View>
-        <View style={[localStyles.statsRow, { marginTop: 8 }]}>
-          {renderPowerArmorPiece('hands')}
-          {renderPowerArmorPiece('legs')}
-        </View>
-      </View>
-    );
-  };
-
   const renderArmorPart = (slotKey) => {
     // Проверяем является ли персонаж роботом
     const isRobot = isRobotCharacter({ origin, trait });
@@ -889,6 +778,55 @@ const WeaponsAndArmorScreen = () => {
       title: robotSlotTitles?.[slotKey] || tWeaponsAndArmorScreen(`armor.slots.${slotKey}.title`),
       subtitle: tWeaponsAndArmorScreen(`armor.slots.${slotKey}.subtitle`),
     };
+
+    // Силовая броня (§5.5, ПРАВИЛО владельца): надетая часть СБ подменяет СВОЮ
+    // ячейку сетки — показывает только свои параметры (нижние слои ячейки
+    // подавлены). Ячейки без части показывают обычную броню/одежду как раньше.
+    if (!isRobot && suppressesLayerAt(equippedPowerArmor, slotKey)) {
+      const paPiece = equippedPowerArmor.pieces[slotKey];
+      const paCatalogItem = PA_CATALOG_BY_ID[paPiece.catalogId];
+      const paLocalized = (equipmentCatalog?.powerArmorList || []).find((p) => p.id === paPiece.catalogId);
+      const paMaxHp = paCatalogItem?.hp;
+      const paNeedsRepair = Number.isFinite(paMaxHp) && needsRepair(paPiece, paMaxHp);
+      const paRating = (value) => (value > 0 ? value : tWeaponsAndArmorScreen('common.none'));
+
+      const paStats = [
+        { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: paRating(Number(paCatalogItem?.physicalDamageRating || 0) + (timedDR.physical || 0)) },
+        { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: paRating(Number(paCatalogItem?.energyDamageRating || 0) + (timedDR.energy || 0)) },
+        { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
+        {
+          label: tWeaponsAndArmorScreen('powerArmor.durability'),
+          custom: (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slotKey, -1)}>
+                <Text style={localStyles.armorModificationButtonText}>−</Text>
+              </TouchableOpacity>
+              <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
+              <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slotKey, 1)}>
+                <Text style={localStyles.armorModificationButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ),
+        },
+        // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
+        ...(paNeedsRepair ? [{
+          label: '',
+          value: tWeaponsAndArmorScreen('powerArmor.repair'),
+          type: 'button',
+          onPress: () => repairPowerArmorPieceAt(slotKey),
+        }] : []),
+      ];
+
+      return (
+        <ArmorPart
+          key={slotKey}
+          title={config.title}
+          subtitle={config.subtitle}
+          armorName={paLocalized?.name}
+          stats={paStats}
+        />
+      );
+    }
 
     const { item: modifiedArmor } = applyArmorMods(armorItem, equipmentCatalog);
     const { item: modifiedClothing } = applyArmorMods(clothingItem, equipmentCatalog, { standardKey: 'appliedClothingModId', uniqueKey: 'unused' });
@@ -982,12 +920,8 @@ const WeaponsAndArmorScreen = () => {
               </View>
             ) : (
               <View style={{ marginBottom: 16 }}>
-              {/* Силовая броня: надетый пакет над сеткой нижних слоёв (план §5) */}
-              {hasFrame(equippedPowerArmor) ? renderPowerArmorSection() : null}
-              {/* ПРАВИЛО (от владельца): надетая часть СБ скрывает параметры одежды/брони;
-                  голый каркас — нет (suppressesLowerLayers). */}
-              {!powerArmorSuppresses && (
-              <>
+              {/* Силовая броня — не отдельный блок: часть подменяет СВОЮ ячейку
+                  этой сетки (renderArmorPart), нижние слои ячейки подавляются (§5.5). */}
               <View style={localStyles.statsRow}>
                   {renderArmorPart('leftArm')}
                   {renderArmorPart('head')}
@@ -998,8 +932,6 @@ const WeaponsAndArmorScreen = () => {
                   {renderArmorPart('body')}
                   {renderArmorPart('rightLeg')}
               </View>
-              </>
-              )}
               </View>
             )}
             

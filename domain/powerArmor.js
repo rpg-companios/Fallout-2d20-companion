@@ -24,11 +24,17 @@ export const PA_MS_PER_CHARGE = 3600000 / PA_CORE_DRAIN_PER_HOUR;
 
 export const FUSION_CORE_ID = 'ammo_fusion_core';
 
-// Слоты частей пакета (§2 плана): наручи и поножи — одна часть на пару конечностей.
-export const PA_PIECE_SLOTS = Object.freeze(['head', 'body', 'hands', 'legs']);
+// Слоты частей пакета (§2 плана): как у обычной брони — левая/правая рука и нога
+// отдельно. Наруч/понож — ОДИН предмет, подходящий на любую сторону пары.
+export const PA_PIECE_SLOTS = Object.freeze(['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']);
 
-// Явная карта «зона данных → слот пакета». Других зон у частей PA быть не должно.
-const PA_AREA_TO_SLOT = Object.freeze({ Head: 'head', Body: 'body', Hand: 'hands', Leg: 'legs' });
+// Явная карта «зона данных → слоты-кандидаты пакета». Других зон у частей PA быть не должно.
+const PA_AREA_TO_CANDIDATE_SLOTS = Object.freeze({
+  Head: ['head'],
+  Body: ['body'],
+  Hand: ['leftArm', 'rightArm'],
+  Leg: ['leftLeg', 'rightLeg'],
+});
 
 const PA_FRAME_SET_KEY = 'frame';
 
@@ -37,7 +43,11 @@ const PA_FRAME_SET_KEY = 'frame';
 /** Пустое состояние надетого пакета. */
 export const createEmptyEquippedPowerArmor = () => ({
   frame: null,
-  pieces: { head: null, body: null, hands: null, legs: null },
+  pieces: {
+    head: null, body: null,
+    leftArm: null, rightArm: null,
+    leftLeg: null, rightLeg: null,
+  },
 });
 
 /** Накопитель расхода (персистентный, §5.3): время работы приложения. */
@@ -50,14 +60,30 @@ export const isPowerArmorFrame = (item) =>
   item?.itemType === 'powerArmor' && item?.set === PA_FRAME_SET_KEY;
 
 /**
- * Слот пакета для части PA по её данным. Каркас → null (это не часть).
- * Часть с неизвестной зоной → null (не проходит по белому списку).
+ * Слоты-кандидаты части PA по её данным. Каркас → [] (это не часть).
+ * Наруч → ['leftArm','rightArm'], понож → ['leftLeg','rightLeg'] (один предмет
+ * на любую сторону, как у обычной брони). Часть с неизвестной зоной → []
+ * (не проходит по белому списку).
  */
-export const powerArmorSlotFor = (item) => {
-  if (!item || item.itemType !== 'powerArmor' || isPowerArmorFrame(item)) return null;
+export const powerArmorSlotsFor = (item) => {
+  if (!item || item.itemType !== 'powerArmor' || isPowerArmorFrame(item)) return [];
   const areas = item.protectedAreas;
-  if (!Array.isArray(areas) || areas.length !== 1) return null;
-  return PA_AREA_TO_SLOT[areas[0]] ?? null;
+  if (!Array.isArray(areas) || areas.length !== 1) return [];
+  return PA_AREA_TO_CANDIDATE_SLOTS[areas[0]] ?? [];
+};
+
+/**
+ * Целевой слот для части (как у обычной брони, §5.2):
+ *  - есть свободный кандидат        → { kind: 'slot', slot }  (надеваем в него)
+ *  - кандидат один и он занят        → { kind: 'slot', slot }  (замена: старая часть → инвентарь)
+ *  - пара и обе стороны заняты       → { kind: 'choice', slots }  (игрок выбирает L/R)
+ */
+export const resolvePowerArmorPieceTarget = (equipped, candidateSlots) => {
+  const slots = candidateSlots || [];
+  const free = slots.find((slot) => !equipped?.pieces?.[slot]);
+  if (free) return { kind: 'slot', slot: free };
+  if (slots.length === 1) return { kind: 'slot', slot: slots[0] };
+  return { kind: 'choice', slots };
 };
 
 // ─── Стекинг (§4) ───────────────────────────────────────────────────────────
@@ -220,11 +246,11 @@ export const adjustPieceHp = (piece, delta, maxHp) => ({
 // ─── Подавление нижних слоёв (§5.5) ─────────────────────────────────────────
 
 /**
- * ПРАВИЛО ВЛАДЕЛЬЦА: голый каркас НЕ подавляет нижние слои; подавляет надетая часть.
- * Один флаг: есть хотя бы одна часть пакета → параметры одежды/брони скрыты.
+ * ПРАВИЛО ВЛАДЕЛЬЦА: подавление ЯЧЕЙКОВОЕ — надетая часть подавляет нижние слои
+ * только своего слота; голый каркас не подавляет ничего. Сетка на экране видна
+ * всегда, ячейка со частью СБ показывает только её параметры.
  */
-export const suppressesLowerLayers = (equipped) =>
-  PA_PIECE_SLOTS.some((slot) => Boolean(equipped?.pieces?.[slot]));
+export const suppressesLayerAt = (equipped, slot) => Boolean(equipped?.pieces?.[slot]);
 
 // ─── Модификаторы каркаса (§3.4/§5.6) ───────────────────────────────────────
 

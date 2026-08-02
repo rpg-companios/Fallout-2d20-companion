@@ -74,8 +74,11 @@ const InventoryScreen = () => {
     trait,
     origin,
     // Силовая броня: свой слой и свои действия (docs/architecture/power-armor-plan.md).
+    equippedPowerArmor,
     equipPowerArmorPackage,
     equipPowerArmorPiece,
+    unequipPowerArmorPackage,
+    unequipPowerArmorPieceAt,
     repairPowerArmorStack,
   } = useCharacter();
 
@@ -210,6 +213,7 @@ const InventoryScreen = () => {
     if (itemType === 'drinks') return '🥤';
     if (itemType === 'food') return '🍖';
     if (itemType === 'ammo') return '🔹';
+    if (itemType === 'powerArmor') return '⚡';
     if (itemType === 'misc') return '🔧';
     return '📦';
   };
@@ -1019,6 +1023,47 @@ const InventoryScreen = () => {
     });
   };
   
+  // Силовая броня: надетый каркас и части показываются строками с «Снять»
+  // (модель оружия: экипировка уменьшила стек, строка осталась как надетая), §6.
+  // Строки добавляются ПОСЛЕ подсчёта остатков стеков — двойного вычитания нет.
+  const equippedPowerArmorRows = useMemo(() => {
+    if (!equippedPowerArmor) return [];
+    const paCatalogEntry = (catalogId) =>
+      (equipmentCatalog?.powerArmorList || []).find((p) => p.id === catalogId)
+      || PA_CATALOG_BY_ID[catalogId] || {};
+    const rows = [];
+    if (equippedPowerArmor.frame) {
+      const frameEntry = paCatalogEntry(equippedPowerArmor.frame.catalogId);
+      rows.push({
+        ...frameEntry,
+        id: equippedPowerArmor.frame.catalogId,
+        set: 'frame',
+        itemType: 'powerArmor',
+        isEquipped: true,
+        quantity: 1,
+        uniqueId: 'pa-equipped-frame',
+        name: frameEntry.name || equippedPowerArmor.frame.catalogId,
+      });
+    }
+    Object.entries(equippedPowerArmor.pieces || {}).forEach(([slot, piece]) => {
+      if (!piece) return;
+      const pieceEntry = paCatalogEntry(piece.catalogId);
+      rows.push({
+        ...pieceEntry,
+        id: piece.catalogId,
+        itemType: 'powerArmor',
+        isEquipped: true,
+        quantity: 1,
+        uniqueId: `pa-equipped-${slot}`,
+        paSlot: slot,
+        name: pieceEntry.name || piece.catalogId,
+        hpCurrent: piece.hpCurrent,
+        appliedMods: piece.appliedMods || {},
+      });
+    });
+    return rows;
+  }, [equippedPowerArmor, equipmentCatalog]);
+
   const displayItems = useMemo(() => {
     const equippedItemsList = [];
     (equippedWeaponsForDisplay || []).forEach((w, i) => {
@@ -1110,8 +1155,8 @@ const InventoryScreen = () => {
         })
         .filter(Boolean);
 
-    return [...equippedItemsList, ...inventoryItemsList];
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot]);
+    return [...equippedItemsList, ...equippedPowerArmorRows, ...inventoryItemsList];
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, equippedPowerArmorRows]);
 
   const renderTableHeader = () => {
     return (
@@ -1170,6 +1215,14 @@ const InventoryScreen = () => {
         if (item.isEquipped) {
             if (item.itemType === 'weapon') {
                 handleUnequipWeapon(item, item.slot);
+            } else if (item.itemType === 'powerArmor') {
+                // Слой СБ: каркас снимается комплектом (части и блок внутри),
+                // часть — по её слоту; как обычная броня/оружие (§6 плана).
+                if (isPowerArmorFrame(item)) {
+                    unequipPowerArmorPackage();
+                } else {
+                    unequipPowerArmorPieceAt(item.paSlot);
+                }
             } else {
                 handleUnequipArmor(item);
             }

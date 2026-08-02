@@ -50,7 +50,8 @@ import {
   findChargedFusionCores,
   pickFusionCore,
   powerArmorPieceStackKey,
-  powerArmorSlotFor,
+  powerArmorSlotsFor,
+  resolvePowerArmorPieceTarget,
   repairPowerArmorPiece,
   adjustPieceHp,
   needsRepair,
@@ -134,6 +135,12 @@ const paLocalizedCatalogItem = (catalogId) => {
 };
 const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
 const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()]?.[key] ?? INV_ALERTS_DICT['ru-RU']?.[key] ?? key;
+// Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
+// что использует обычная броня при выборе слота.
+const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
+const INV_ACTIONS_DICT = { 'ru-RU': ruInventoryScreen.actions, 'en-EN': enInventoryScreen.actions };
+const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()]?.[key] ?? INV_LABELS_DICT['ru-RU']?.[key] ?? key;
+const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()]?.[key] ?? INV_ACTIONS_DICT['ru-RU']?.[key] ?? key;
 // Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
 // как showAlert в InventoryScreen.
 const paAlert = (title, message = '') => {
@@ -452,6 +459,8 @@ export const CharacterProvider = ({ children }) => {
   }, [paAddStackToInventory, paPackageToStackItem]);
 
   // ── §5.2 Надеть часть из инвентаря; вытесненная часть слота уходит в инвентарь ──
+  // Наруч/понож — один предмет на любую сторону (как обычная броня): свободный
+  // слот пары → туда; обе стороны заняты → игрок выбирает L/R тем же алертом.
   const equipPowerArmorPieceInto = useCallback((pieceStackItem) => {
     // Каталожный id: у стор-предмета — weaponId, у свежего из каталога — id.
     const catalogId = pieceStackItem.weaponId || pieceStackItem.id;
@@ -460,8 +469,8 @@ export const CharacterProvider = ({ children }) => {
       appliedMods: pieceStackItem.appliedMods || {},
       hpCurrent: pieceStackItem.hpCurrent,
     };
-    const slot = powerArmorSlotFor(PA_CATALOG_BY_ID[catalogId]);
-    if (!slot) return;
+    const candidateSlots = powerArmorSlotsFor(PA_CATALOG_BY_ID[catalogId]);
+    if (candidateSlots.length === 0) return;
     const check = canEquipPowerArmorPiece(equippedPowerArmorRef.current, piece);
     if (!check.ok) {
       paAlert(
@@ -470,11 +479,39 @@ export const CharacterProvider = ({ children }) => {
       );
       return;
     }
-    const equipped = equippedPowerArmorRef.current;
-    const replaced = equipped.pieces[slot];
-    setEquippedPowerArmor(equipPowerArmorPiece(equipped, slot, piece));
-    paDecrementStoreStack(pieceStackItem.id);
-    if (replaced) paAddStackToInventory(paPieceToStackItem(replaced));
+
+    const doEquip = (slot) => {
+      const equipped = equippedPowerArmorRef.current;
+      const replaced = equipped.pieces[slot];
+      setEquippedPowerArmor(equipPowerArmorPiece(equipped, slot, piece));
+      paDecrementStoreStack(pieceStackItem.id);
+      if (replaced) paAddStackToInventory(paPieceToStackItem(replaced));
+    };
+
+    const target = resolvePowerArmorPieceTarget(equippedPowerArmorRef.current, candidateSlots);
+    if (target.kind === 'slot') {
+      doEquip(target.slot);
+      return;
+    }
+
+    // Пара занята → выбор стороны, формулировки — как у обычной брони.
+    const [leftSlot, rightSlot] = target.slots;
+    const leftLabel = tPALabel(leftSlot);
+    const rightLabel = tPALabel(rightSlot);
+    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+      const promptText = tPA('bothSlotsBusyPrompt')
+        .replace('{leftLabel}', leftLabel)
+        .replace('{rightLabel}', rightLabel);
+      const answer = window.prompt(promptText, '1');
+      if (answer === '1') doEquip(leftSlot);
+      else if (answer === '2') doEquip(rightSlot);
+      return;
+    }
+    Alert.alert(tPA('replaceEquipmentTitle'), tPA('bothSlotsBusy'), [
+      { text: leftLabel, onPress: () => doEquip(leftSlot) },
+      { text: rightLabel, onPress: () => doEquip(rightSlot) },
+      { text: tPAAction('cancel'), style: 'cancel' },
+    ]);
   }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem]);
 
   // Снять часть слота → в инвентарь своей стопкой.
