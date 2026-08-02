@@ -794,7 +794,8 @@ const WeaponsAndArmorScreen = () => {
         { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
         {
           // ПРАВИЛО (от владельца): счётчик прочности — в дизайне счётчика патронов
-          // (красная кнопка как weaponAmmoBtn); починка только через инвентарь.
+          // (красная кнопка как weaponAmmoBtn) и ТОЛЬКО «−»: повышение прочности —
+          // это ремонт, а ремонт делается в инвентаре.
           label: tWeaponsAndArmorScreen('powerArmor.durability'),
           custom: (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -806,13 +807,6 @@ const WeaponsAndArmorScreen = () => {
                 <Text style={localStyles.weaponAmmoBtnText}>−</Text>
               </TouchableOpacity>
               <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
-              <TouchableOpacity
-                style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent >= paMaxHp && localStyles.weaponAmmoBtnDisabled]}
-                onPress={() => adjustPowerArmorDurability(slotKey, 1)}
-                disabled={paPiece.hpCurrent >= paMaxHp}
-              >
-                <Text style={localStyles.weaponAmmoBtnText}>+</Text>
-              </TouchableOpacity>
             </View>
           ),
         },

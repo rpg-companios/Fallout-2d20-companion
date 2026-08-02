@@ -1050,7 +1050,9 @@ const InventoryScreen = () => {
       uniqueId: 'pa-container',
       paContainer: true,
       itemType: 'powerArmor',
-      name: frameEntry.name || equippedPowerArmor.frame.catalogId,
+      // ПРАВИЛО (владелец): родитель контейнера — СИСТЕМНЫЙ заголовок «Силовая броня»,
+      // а не каркас; каркас — элемент контейнера, строка внутри «Содержания» (ниже).
+      name: tInventory('screen.powerArmor.containerTitle'),
       summary: formatInventoryText(tInventory('screen.powerArmor.summary'), {
         parts: installed.length,
         core: coreText,
@@ -1058,6 +1060,14 @@ const InventoryScreen = () => {
     };
     if (!paContentsOpen) return [containerRow];
     const rows = [containerRow];
+    // Каркас — элемент контейнера, как части и блок: своя строка без кнопок
+    // (отдельно каркас не снимается — только пакетом через «Снять» родителя).
+    rows.push({
+      uniqueId: 'pa-content-frame',
+      paFrameContent: true,
+      itemType: 'powerArmor',
+      name: frameEntry.name || equippedPowerArmor.frame.catalogId,
+    });
     installed.forEach(([slot, piece]) => {
       const pieceEntry = paCatalogEntry(piece.catalogId);
       const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
@@ -1263,6 +1273,21 @@ const InventoryScreen = () => {
                 disabled={!canGain}>
                 <Text style={styles.paDurabilityBtnText}>+</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.paFrameContent) {
+      // Каркас — элемент контейнера (ПРАВИЛО владельца): строка без кнопок,
+      // снимается только вместе с пакетом через «Снять» родителя.
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.mainRowContent}>
+            <View style={styles.itemNameContainer}>
+              <Text style={styles.itemNameText}>{item.name}</Text>
+              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
             </View>
           </View>
         </View>

@@ -1,0 +1,155 @@
+diff --git a/__tests__/power-armor/ui-integration.test.js b/__tests__/power-armor/ui-integration.test.js
+index 062adef..c0eff24 100644
+--- a/__tests__/power-armor/ui-integration.test.js
++++ b/__tests__/power-armor/ui-integration.test.js
+@@ -164,6 +164,8 @@ describe('power-armor ui-integration: контейнер в инвентаре (
+       expect(typeof dict.actions.contents).toBe('string');
+       expect(typeof dict.actions.collapse).toBe('string');
+       const pa = dict.powerArmor;
++      // Родитель контейнера — системный заголовок «Силовая броня» (ПРАВИЛО владельца).
++      expect(pa.containerTitle.length).toBeGreaterThan(0);
+       expect(pa.summary).toContain('{parts}');
+       expect(pa.summary).toContain('{core}');
+       expect(pa.coreRow).toContain('{value}');
+@@ -177,25 +179,33 @@ describe('power-armor ui-integration: контейнер в инвентаре (
+     }
+   });
+ 
+-  it('inventory: мёртвых pa-ключей нет — секция ровно summary/coreRow/pieceInSlot/slots', () => {
++  it('inventory: мёртвых pa-ключей нет — секция ровно containerTitle/summary/coreRow/pieceInSlot/slots', () => {
+     for (const dict of [ruInventoryScreen, enInventoryScreen]) {
+-      expect(Object.keys(dict.powerArmor).sort()).toEqual(['coreRow', 'pieceInSlot', 'slots', 'summary']);
++      expect(Object.keys(dict.powerArmor).sort()).toEqual(['containerTitle', 'coreRow', 'pieceInSlot', 'slots', 'summary']);
+       expect(Object.keys(dict.powerArmor.slots).sort()).toEqual(['body', 'head', 'leftArm', 'leftLeg', 'rightArm', 'rightLeg']);
+     }
+   });
+ 
+   // Конвенция vitest: запуск из корня проекта — пути исходников относительно cwd.
+-  it('структура: инвентарь — контейнер-аккордеон, старые 7 строк надетого пакета удалены', () => {
++  it('структура: инвентарь — контейнер-аккордеон; системное имя; каркас — элемент контейнера', () => {
+     const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+     expect(src).not.toContain('equippedPowerArmorRows');
+     expect(src).toContain('paContainerRows');
+-    for (const marker of ['item.paContainer', 'item.paPieceContent', 'item.paCoreContent']) {
++    // Родитель — системный заголовок «Силовая броня»; каркас — строка-элемент содержания.
++    expect(src).toContain('screen.powerArmor.containerTitle');
++    for (const marker of ['item.paContainer', 'item.paFrameContent', 'item.paPieceContent', 'item.paCoreContent']) {
+       expect(src).toContain(marker);
+     }
+     // Счётчик прочности в стиле патронов — свои стили кнопок (красные, как weaponAmmoBtn).
+     expect(src).toContain('paDurabilityBtn');
+   });
+ 
++  it('структура: экран оружия и брони — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
++    const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
++    expect(src).toContain("adjustPowerArmorDurability(slotKey, -1)");
++    expect(src).not.toContain("adjustPowerArmorDurability(slotKey, 1)");
++  });
++
+   it('структура: экран оружия и брони — починки нет (только инвентарь), счётчик — стиль патронов', () => {
+     const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
+     expect(src).not.toContain('repairPowerArmorPieceAt');
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 6394858..960e633 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1050,7 +1050,9 @@ const InventoryScreen = () => {
+       uniqueId: 'pa-container',
+       paContainer: true,
+       itemType: 'powerArmor',
+-      name: frameEntry.name || equippedPowerArmor.frame.catalogId,
++      // ПРАВИЛО (владелец): родитель контейнера — СИСТЕМНЫЙ заголовок «Силовая броня»,
++      // а не каркас; каркас — элемент контейнера, строка внутри «Содержания» (ниже).
++      name: tInventory('screen.powerArmor.containerTitle'),
+       summary: formatInventoryText(tInventory('screen.powerArmor.summary'), {
+         parts: installed.length,
+         core: coreText,
+@@ -1058,6 +1060,14 @@ const InventoryScreen = () => {
+     };
+     if (!paContentsOpen) return [containerRow];
+     const rows = [containerRow];
++    // Каркас — элемент контейнера, как части и блок: своя строка без кнопок
++    // (отдельно каркас не снимается — только пакетом через «Снять» родителя).
++    rows.push({
++      uniqueId: 'pa-content-frame',
++      paFrameContent: true,
++      itemType: 'powerArmor',
++      name: frameEntry.name || equippedPowerArmor.frame.catalogId,
++    });
+     installed.forEach(([slot, piece]) => {
+       const pieceEntry = paCatalogEntry(piece.catalogId);
+       const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
+@@ -1269,6 +1279,21 @@ const InventoryScreen = () => {
+       );
+     }
+ 
++    if (item.paFrameContent) {
++      // Каркас — элемент контейнера (ПРАВИЛО владельца): строка без кнопок,
++      // снимается только вместе с пакетом через «Снять» родителя.
++      return (
++        <View style={styles.tableRow}>
++          <View style={styles.mainRowContent}>
++            <View style={styles.itemNameContainer}>
++              <Text style={styles.itemNameText}>{item.name}</Text>
++              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
++            </View>
++          </View>
++        </View>
++      );
++    }
++
+     if (item.paCoreContent) {
+       // Ядерный блок — статусная строка без кнопок (замена блоков автоматическая, §5.4).
+       return (
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 67284c1..7fe2687 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -794,7 +794,8 @@ const WeaponsAndArmorScreen = () => {
+         { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
+         {
+           // ПРАВИЛО (от владельца): счётчик прочности — в дизайне счётчика патронов
+-          // (красная кнопка как weaponAmmoBtn); починка только через инвентарь.
++          // (красная кнопка как weaponAmmoBtn) и ТОЛЬКО «−»: повышение прочности —
++          // это ремонт, а ремонт делается в инвентаре.
+           label: tWeaponsAndArmorScreen('powerArmor.durability'),
+           custom: (
+             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+@@ -806,13 +807,6 @@ const WeaponsAndArmorScreen = () => {
+                 <Text style={localStyles.weaponAmmoBtnText}>−</Text>
+               </TouchableOpacity>
+               <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
+-              <TouchableOpacity
+-                style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent >= paMaxHp && localStyles.weaponAmmoBtnDisabled]}
+-                onPress={() => adjustPowerArmorDurability(slotKey, 1)}
+-                disabled={paPiece.hpCurrent >= paMaxHp}
+-              >
+-                <Text style={localStyles.weaponAmmoBtnText}>+</Text>
+-              </TouchableOpacity>
+             </View>
+           ),
+         },
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 53fef66..773fdf6 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -77,6 +77,7 @@
+     "durability": "HP"
+   },
+   "powerArmor": {
++    "containerTitle": "Power Armor",
+     "summary": "Parts: {parts}/6 · Core: {core}",
+     "coreRow": "Fusion core: {value}",
+     "pieceInSlot": "{name} — {slot}",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 2dbd81b..9b9bce5 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -77,6 +77,7 @@
+     "durability": "Прочность"
+   },
+   "powerArmor": {
++    "containerTitle": "Силовая броня",
+     "summary": "Частей: {parts}/6 · Блок: {core}",
+     "coreRow": "Ядерный блок: {value}",
+     "pieceInSlot": "{name} — {slot}",

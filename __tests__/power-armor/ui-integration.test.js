@@ -164,6 +164,8 @@ describe('power-armor ui-integration: контейнер в инвентаре (
       expect(typeof dict.actions.contents).toBe('string');
       expect(typeof dict.actions.collapse).toBe('string');
       const pa = dict.powerArmor;
+      // Родитель контейнера — системный заголовок «Силовая броня» (ПРАВИЛО владельца).
+      expect(pa.containerTitle.length).toBeGreaterThan(0);
       expect(pa.summary).toContain('{parts}');
       expect(pa.summary).toContain('{core}');
       expect(pa.coreRow).toContain('{value}');
@@ -177,23 +179,31 @@ describe('power-armor ui-integration: контейнер в инвентаре (
     }
   });
 
-  it('inventory: мёртвых pa-ключей нет — секция ровно summary/coreRow/pieceInSlot/slots', () => {
+  it('inventory: мёртвых pa-ключей нет — секция ровно containerTitle/summary/coreRow/pieceInSlot/slots', () => {
     for (const dict of [ruInventoryScreen, enInventoryScreen]) {
-      expect(Object.keys(dict.powerArmor).sort()).toEqual(['coreRow', 'pieceInSlot', 'slots', 'summary']);
+      expect(Object.keys(dict.powerArmor).sort()).toEqual(['containerTitle', 'coreRow', 'pieceInSlot', 'slots', 'summary']);
       expect(Object.keys(dict.powerArmor.slots).sort()).toEqual(['body', 'head', 'leftArm', 'leftLeg', 'rightArm', 'rightLeg']);
     }
   });
 
   // Конвенция vitest: запуск из корня проекта — пути исходников относительно cwd.
-  it('структура: инвентарь — контейнер-аккордеон, старые 7 строк надетого пакета удалены', () => {
+  it('структура: инвентарь — контейнер-аккордеон; системное имя; каркас — элемент контейнера', () => {
     const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
     expect(src).not.toContain('equippedPowerArmorRows');
     expect(src).toContain('paContainerRows');
-    for (const marker of ['item.paContainer', 'item.paPieceContent', 'item.paCoreContent']) {
+    // Родитель — системный заголовок «Силовая броня»; каркас — строка-элемент содержания.
+    expect(src).toContain('screen.powerArmor.containerTitle');
+    for (const marker of ['item.paContainer', 'item.paFrameContent', 'item.paPieceContent', 'item.paCoreContent']) {
       expect(src).toContain(marker);
     }
     // Счётчик прочности в стиле патронов — свои стили кнопок (красные, как weaponAmmoBtn).
     expect(src).toContain('paDurabilityBtn');
+  });
+
+  it('структура: экран оружия и брони — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
+    const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
+    expect(src).toContain("adjustPowerArmorDurability(slotKey, -1)");
+    expect(src).not.toContain("adjustPowerArmorDurability(slotKey, 1)");
   });
 
   it('структура: экран оружия и брони — починки нет (только инвентарь), счётчик — стиль патронов', () => {
