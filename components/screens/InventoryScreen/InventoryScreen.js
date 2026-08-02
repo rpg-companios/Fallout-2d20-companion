@@ -84,6 +84,7 @@ const InventoryScreen = () => {
     adjustPowerArmorDurability,
     repairPowerArmorPieceAt,
     repairPowerArmorStack,
+    repairPowerArmorPackagePiece,
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
@@ -167,6 +168,9 @@ const InventoryScreen = () => {
   // Контейнер «Силовая броня» (ПРАВИЛО владельца): надетый пакет — одна строка
   // в общем списке; «Содержание» раскрывает аккордеоном части и Ядерный блок.
   const [paContentsOpen, setPaContentsOpen] = useState(false);
+  // Снятые пакеты: каждый — тоже контейнер (ПРАВИЛО владельца), аккордеоны
+  // независимы по id стор-записи: { [storeItemId]: true }.
+  const [paOpenPackages, setPaOpenPackages] = useState({});
 
   const locale = useLocale();
   const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
@@ -1097,6 +1101,68 @@ const InventoryScreen = () => {
     return rows;
   }, [equippedPowerArmor, equipmentCatalog, paContentsOpen]);
 
+  // Снятый пакет (стопка-каркас) — тоже КОНТЕЙНЕР (ПРАВИЛО владельца): родитель
+  // «Силовая броня» со сводкой, «Содержание» раскрывает каркас/части/блок. Родитель
+  // сохраняет все поля стор-записи — экипировка/продажа работают с ним как раньше.
+  const paExpandPackage = useCallback((item) => {
+    const paCatalogEntry = (catalogId) =>
+      (equipmentCatalog?.powerArmorList || []).find((p) => p.id === catalogId)
+      || PA_CATALOG_BY_ID[catalogId] || {};
+    const coreMax = (equipmentCatalog?.ammoTypes || []).find((a) => a.id === FUSION_CORE_ID)?.maxCharges;
+    const core = item.installedCore || null;
+    const coreText = core ? `${core.charges}/${coreMax}` : '—';
+    const installed = Object.entries(item.installedPieces || {}).filter(([, piece]) => Boolean(piece));
+    const storeId = item.id;
+    const packageRow = {
+      ...item,
+      uniqueId: `pa-pkg-${storeId}`,
+      paPackage: true,
+      paStoreId: storeId,
+      name: tInventory('screen.powerArmor.containerTitle'),
+      summary: formatInventoryText(tInventory('screen.powerArmor.summary'), {
+        parts: installed.length,
+        core: coreText,
+      }),
+    };
+    if (!paOpenPackages[storeId]) return [packageRow];
+    const rows = [packageRow];
+    const frameEntry = paCatalogEntry(item.weaponId || item.id);
+    rows.push({
+      uniqueId: `pa-pkg-frame-${storeId}`,
+      paFrameContent: true,
+      itemType: 'powerArmor',
+      name: frameEntry.name || (item.weaponId || item.id),
+    });
+    installed.forEach(([slot, piece]) => {
+      const pieceEntry = paCatalogEntry(piece.catalogId);
+      const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
+      rows.push({
+        uniqueId: `pa-pkg-${slot}-${storeId}`,
+        paPackagePiece: true,
+        paSlot: slot,
+        paStoreId: storeId,
+        itemType: 'powerArmor',
+        name: formatInventoryText(tInventory('screen.powerArmor.pieceInSlot'), {
+          name: pieceEntry.name || piece.catalogId,
+          slot: tInventory(`screen.powerArmor.slots.${slot}`),
+        }),
+        hpCurrent: piece.hpCurrent,
+        maxHp,
+        // «Починить» внутри снятого пакета — то же правило: бесплатно, hp < max.
+        showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
+      });
+    });
+    if (core) {
+      rows.push({
+        uniqueId: `pa-pkg-core-${storeId}`,
+        paCoreContent: true,
+        itemType: 'powerArmor',
+        name: formatInventoryText(tInventory('screen.powerArmor.coreRow'), { value: coreText }),
+      });
+    }
+    return rows;
+  }, [equipmentCatalog, paOpenPackages]);
+
   const displayItems = useMemo(() => {
     const equippedItemsList = [];
     (equippedWeaponsForDisplay || []).forEach((w, i) => {
@@ -1188,8 +1254,13 @@ const InventoryScreen = () => {
         })
         .filter(Boolean);
 
-    return [...equippedItemsList, ...paContainerRows, ...inventoryItemsList];
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows]);
+    const merged = [...equippedItemsList, ...paContainerRows, ...inventoryItemsList];
+    // Снятые пакеты разворачиваются в контейнеры (родитель + содержание при открытом аккордеоне).
+    return merged.flatMap((item) =>
+      (item?.itemType === 'powerArmor' && isPowerArmorFrame(item) && !item.isEquipped
+        ? paExpandPackage(item)
+        : [item]));
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows, paExpandPackage]);
 
   const renderTableHeader = () => {
     return (
@@ -1289,6 +1360,70 @@ const InventoryScreen = () => {
               <Text style={styles.itemNameText}>{item.name}</Text>
               <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
             </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.paPackage) {
+      // СНЯТЫЙ пакет — контейнер в инвентаре (ПРАВИЛО владельца): системный заголовок
+      // + сводка; «Надеть» (весь пакет), «Содержание»/«Свернуть», «Продать».
+      const isOpen = Boolean(paOpenPackages[item.paStoreId]);
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.mainRowContent}>
+            <View style={styles.itemNameContainer}>
+              <Text style={styles.itemNameText}>{item.name}</Text>
+              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
+            </View>
+          </View>
+          <View style={styles.actionContainer}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => equipPowerArmorPackage(item)}>
+              <Text style={styles.actionButtonText}>{tInventory('screen.actions.equip')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.applyButton]}
+              onPress={() => setPaOpenPackages((m) => ({ ...m, [item.paStoreId]: !m[item.paStoreId] }))}>
+              <Text style={styles.actionButtonText}>{tInventory(isOpen ? 'screen.actions.collapse' : 'screen.actions.contents')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.sellButton]}
+              onPress={() => handleSellItem(item)}>
+              <Text style={styles.actionButtonText}>{tInventory('screen.actions.sell')}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.itemSubRow}>
+            <Text style={styles.itemSubText}>{item.summary}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.paPackagePiece) {
+      // Часть внутри снятого пакета: прочность текстом + «Починить» при hp < max.
+      // Счётчиков и извлечения из пакета нет — такой механики не заказывали.
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.mainRowContent}>
+            <View style={styles.itemNameContainer}>
+              <Text style={styles.itemNameText}>{item.name}</Text>
+            </View>
+          </View>
+          <View style={styles.actionContainer}>
+            {item.showRepair && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton]}
+                onPress={() => repairPowerArmorPackagePiece(item.paStoreId, item.paSlot)}>
+                <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.itemSubRow}>
+            <Text style={styles.itemSubText}>
+              {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
+            </Text>
           </View>
         </View>
       );

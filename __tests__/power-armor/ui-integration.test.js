@@ -200,6 +200,18 @@ describe('power-armor ui-integration: контейнер в инвентаре (
     expect(src).toContain('paDurabilityBtn');
   });
 
+  it('структура: снятый пакет — тоже контейнер (родитель, части с починкой, блок)', () => {
+    const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+    for (const marker of ['paExpandPackage', 'item.paPackage', 'item.paPackagePiece', 'repairPowerArmorPackagePiece']) {
+      expect(src).toContain(marker);
+    }
+    expect(src).toContain('paOpenPackages');
+    const ctx = readFileSync('components/CharacterContext.js', 'utf8');
+    // Новое действие починки части внутри снятого пакета — определено и экспонировано.
+    expect(ctx).toContain('const repairPowerArmorPackagePiece');
+    expect(ctx).toContain('powerArmorFrameStackKey');
+  });
+
   it('структура: экран оружия и брони — у счётчика только «−», «+» не нужен (ремонт в инвентаре)', () => {
     const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
     expect(src).toContain("adjustPowerArmorDurability(slotKey, -1)");
