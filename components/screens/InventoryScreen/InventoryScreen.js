@@ -1001,8 +1001,8 @@ const InventoryScreen = () => {
       }
     };
 
-    debugLog('equip.armor:routing', { singleLimbSlots });
     const singleLimbSlots = getSingleLimbCandidateSlots(itemToEquip);
+    debugLog('equip.armor:routing', { singleLimbSlots });
     if (!singleLimbSlots) {
       executeEquip(getSlotsForArea(itemToEquip));
       return;
