@@ -120,16 +120,17 @@ describe('i18n экранов — строки силовой брони на м
     expect(enAddItemModal.itemTypes.powerArmor).toContain('Power Armor');
   });
 
-  it('экран брони: «Прочность»/«HP», блок, починка (названия PART — из каталога, не из словаря)', () => {
+  it('экран брони: «Прочность»/«HP», блок; починки нет — переехала в инвентарь (pa4)', () => {
     // ПРАВИЛО (владелец, pa3-редизайн): СБ — не отдельный блок, а модернизация
     // существующей сетки; слоты/заголовки — общие с бронёй (armor.slots.*), имя
-    // части — из equipmentCatalog. Ключей layer/frame/partNames/unequip больше нет.
+    // части — из equipmentCatalog. ПРАВИЛО (владелец, pa4): починка только через
+    // инвентарь → ключ repair здесь мёртв и удалён, как layer/frame/partNames/unequip.
     expect(ruWaAScreen.powerArmor.durability).toBe('Прочность');
     expect(enWaAScreen.powerArmor.durability).toBe('HP');
     expect(typeof ruWaAScreen.powerArmor.core).toBe('string');
     expect(ruWaAScreen.powerArmor.core).toContain('{value}');
-    expect(ruWaAScreen.powerArmor.repair).toBe('Починить');
-    expect(enWaAScreen.powerArmor.repair).toBe('Repair');
+    expect(ruWaAScreen.powerArmor.repair).toBeUndefined();
+    expect(enWaAScreen.powerArmor.repair).toBeUndefined();
     expect(ruWaAScreen.powerArmor.layer).toBeUndefined();
     expect(ruWaAScreen.powerArmor.frame).toBeUndefined();
     expect(ruWaAScreen.powerArmor.partNames).toBeUndefined();

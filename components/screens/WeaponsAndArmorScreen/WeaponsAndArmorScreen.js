@@ -29,7 +29,6 @@ import { getRobotSlotKeys } from '../../../domain/robotEquip';
 import {
   hasFrame,
   suppressesLayerAt,
-  needsRepair,
   applyFrameAttributeModifiers,
   FUSION_CORE_ID,
 } from '../../../domain/powerArmor';
@@ -535,9 +534,9 @@ const WeaponsAndArmorScreen = () => {
     origin,
     radiation,
     // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
+    // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
     equippedPowerArmor,
     adjustPowerArmorDurability,
-    repairPowerArmorPieceAt,
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
@@ -787,7 +786,6 @@ const WeaponsAndArmorScreen = () => {
       const paCatalogItem = PA_CATALOG_BY_ID[paPiece.catalogId];
       const paLocalized = (equipmentCatalog?.powerArmorList || []).find((p) => p.id === paPiece.catalogId);
       const paMaxHp = paCatalogItem?.hp;
-      const paNeedsRepair = Number.isFinite(paMaxHp) && needsRepair(paPiece, paMaxHp);
       const paRating = (value) => (value > 0 ? value : tWeaponsAndArmorScreen('common.none'));
 
       const paStats = [
@@ -795,26 +793,29 @@ const WeaponsAndArmorScreen = () => {
         { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: paRating(Number(paCatalogItem?.energyDamageRating || 0) + (timedDR.energy || 0)) },
         { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
         {
+          // ПРАВИЛО (от владельца): счётчик прочности — в дизайне счётчика патронов
+          // (красная кнопка как weaponAmmoBtn); починка только через инвентарь.
           label: tWeaponsAndArmorScreen('powerArmor.durability'),
           custom: (
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slotKey, -1)}>
-                <Text style={localStyles.armorModificationButtonText}>−</Text>
+              <TouchableOpacity
+                style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent <= 0 && localStyles.weaponAmmoBtnDisabled]}
+                onPress={() => adjustPowerArmorDurability(slotKey, -1)}
+                disabled={paPiece.hpCurrent <= 0}
+              >
+                <Text style={localStyles.weaponAmmoBtnText}>−</Text>
               </TouchableOpacity>
               <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
-              <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slotKey, 1)}>
-                <Text style={localStyles.armorModificationButtonText}>+</Text>
+              <TouchableOpacity
+                style={[localStyles.weaponAmmoBtn, paPiece.hpCurrent >= paMaxHp && localStyles.weaponAmmoBtnDisabled]}
+                onPress={() => adjustPowerArmorDurability(slotKey, 1)}
+                disabled={paPiece.hpCurrent >= paMaxHp}
+              >
+                <Text style={localStyles.weaponAmmoBtnText}>+</Text>
               </TouchableOpacity>
             </View>
           ),
         },
-        // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
-        ...(paNeedsRepair ? [{
-          label: '',
-          value: tWeaponsAndArmorScreen('powerArmor.repair'),
-          type: 'button',
-          onPress: () => repairPowerArmorPieceAt(slotKey),
-        }] : []),
       ];
 
       return (

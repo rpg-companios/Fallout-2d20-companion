@@ -55,7 +55,9 @@
     "sell": "Продать",
     "addLoot": "Добавить добычу",
     "buyItems": "Купить предметы",
-    "repair": "Починить"
+    "repair": "Починить",
+    "contents": "Содержание",
+    "collapse": "Свернуть"
   },
   "labels": {
     "leftArm": "Левый наруч",
@@ -73,5 +75,18 @@
     "totalWeight": "Общий вес",
     "totalPrice": "Общая цена",
     "durability": "Прочность"
+  },
+  "powerArmor": {
+    "summary": "Частей: {parts}/6 · Блок: {core}",
+    "coreRow": "Ядерный блок: {value}",
+    "pieceInSlot": "{name} — {slot}",
+    "slots": {
+      "head": "Голова",
+      "body": "Корпус",
+      "leftArm": "левая рука",
+      "rightArm": "правая рука",
+      "leftLeg": "левая нога",
+      "rightLeg": "правая нога"
+    }
   }
 }

@@ -84,6 +84,36 @@ const styles = StyleSheet.create({
   },
   addActionIcon: { fontSize: 24, color: '#000', fontWeight: 'bold', lineHeight: 26 },
   addActionLabel: { marginTop: 4, fontSize: 12, color: '#000', fontWeight: '600', textAlign: 'center' },
+  // Счётчик прочности части силовой брони в контейнере — дизайн счётчика патронов
+  // (как weaponAmmoBtn экрана оружия и брони; ПРАВИЛО владельца).
+  paDurabilityCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  paDurabilityBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 4,
+    backgroundColor: '#8b1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paDurabilityBtnDisabled: { opacity: 0.35 },
+  paDurabilityBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  paDurabilityCount: {
+    minWidth: 48,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#333',
+  },
 });
 
 export default styles;

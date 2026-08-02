@@ -149,6 +149,23 @@ describe('экипировка пакета (§5.1/§5.2)', () => {
     expect(eq2).toEqual(eq);
     expect(hasFrame(eq2)).toBe(true);
   });
+
+  it('РЕГРЕССИЯ (stackKey вместо имени каркаса): у стор-записи catalogId берётся из weaponId', () => {
+    // Контракт addNewItem: id стор-записи занят инстанс-ключом (у PA — stackKey),
+    // канонический каталожный id лежит в weaponId. Раньше unpackPackage читал catalogId
+    // из item.id → в надетый пакет утекал сырой stackKey (имя каркаса рисовалось ключом).
+    let eq = wornFrameWithCuts();
+    eq = equipPowerArmorPiece(eq, 'head', piece('power_armor_t45_helmet', 3, { plated: 'mod_x01' }));
+    const packed = packPackage(eq);
+    const storeRow = { ...packed, id: packed.stackKey, weaponId: FRAME_CATALOG.id };
+    const eq2 = unpackPackage(storeRow);
+    expect(eq2.frame.catalogId).toBe(FRAME_CATALOG.id);
+    expect(eq2.frame.catalogId).not.toContain('powerArmor:');
+    expect(eq2.pieces.head).toEqual(piece('power_armor_t45_helmet', 3, { plated: 'mod_x01' }));
+    expect(eq2.frame.core).toEqual({ charges: 11 });
+    // Свежий предмет из каталога (weaponId нет): id и есть канонический — путь не сломан.
+    expect(unpackPackage(packed).frame.catalogId).toBe(FRAME_CATALOG.id);
+  });
 });
 
 describe('Ядерный Блок (§3.2/§5.1/§5.4)', () => {

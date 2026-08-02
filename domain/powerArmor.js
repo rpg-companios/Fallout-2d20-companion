@@ -150,10 +150,15 @@ export const packPackage = (equipped) => {
   return { ...item, stackKey: powerArmorFrameStackKey(item) };
 };
 
-/** Надеть пакет из инвентарного предмета каркаса → надетое состояние (§5.1: блок уже внутри). */
+/**
+ * Надеть пакет из инвентарного предмета каркаса → надетое состояние (§5.1: блок уже внутри).
+ * Каталожный id — по контракту addNewItem: у стор-записи инвентаря id занят инстанс-ключом
+ * (у PA — stackKey), а канонический каталожный id лежит в weaponId; у свежего предмета
+ * из каталога weaponId нет — id и есть канонический (та же конвенция, что у isFusionCoreItem).
+ */
 export const unpackPackage = (frameItem) => ({
   frame: {
-    catalogId: frameItem.id,
+    catalogId: frameItem.weaponId || frameItem.id,
     appliedMods: frameItem.appliedMods || {},
     core: frameItem.installedCore || null,
   },

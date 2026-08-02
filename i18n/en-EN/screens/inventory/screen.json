@@ -55,7 +55,9 @@
     "sell": "Sell",
     "addLoot": "Add loot",
     "buyItems": "Buy items",
-    "repair": "Repair"
+    "repair": "Repair",
+    "contents": "Contents",
+    "collapse": "Collapse"
   },
   "labels": {
     "leftArm": "Left bracer",
@@ -73,5 +75,18 @@
     "totalWeight": "Total weight",
     "totalPrice": "Total price",
     "durability": "HP"
+  },
+  "powerArmor": {
+    "summary": "Parts: {parts}/6 · Core: {core}",
+    "coreRow": "Fusion core: {value}",
+    "pieceInSlot": "{name} — {slot}",
+    "slots": {
+      "head": "Head",
+      "body": "Body",
+      "leftArm": "left arm",
+      "rightArm": "right arm",
+      "leftLeg": "left leg",
+      "rightLeg": "right leg"
+    }
   }
 }

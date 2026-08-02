@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
 import dataPowerArmor from '../../data/equipment/powerArmor.json';
 import dataAmmo from '../../data/equipment/ammo.json';
 import {
@@ -142,15 +143,63 @@ describe('power-armor ui-integration: i18n-ключи экранов (pa3)', () 
     for (const dict of [ruWaasScreen, enWaasScreen]) {
       const pa = dict.powerArmor;
       // Используются ячейками сетки и панелью эффектов.
-      for (const key of ['durability', 'core', 'repair']) {
+      for (const key of ['durability', 'core']) {
         expect(typeof pa[key], key).toBe('string');
       }
       expect(pa.core).toContain('{value}');
       // Редизайн (владелец): отдельного блока СБ нет — мёртвые ключи удалены.
+      // pa4: починка переехала в инвентарь-контейнер → ключ repair здесь мёртв, удалён.
       expect(pa.layer).toBeUndefined();
       expect(pa.frame).toBeUndefined();
       expect(pa.partNames).toBeUndefined();
       expect(pa.unequip).toBeUndefined();
+      expect(pa.repair).toBeUndefined();
     }
+  });
+});
+
+describe('power-armor ui-integration: контейнер в инвентаре (pa4, ПРАВИЛО владельца)', () => {
+  it('inventory: кнопки «Содержание»/«Свернуть» и секция powerArmor — в обеих локалях', () => {
+    for (const dict of [ruInventoryScreen, enInventoryScreen]) {
+      expect(typeof dict.actions.contents).toBe('string');
+      expect(typeof dict.actions.collapse).toBe('string');
+      const pa = dict.powerArmor;
+      expect(pa.summary).toContain('{parts}');
+      expect(pa.summary).toContain('{core}');
+      expect(pa.coreRow).toContain('{value}');
+      expect(pa.pieceInSlot).toContain('{name}');
+      expect(pa.pieceInSlot).toContain('{slot}');
+      // Слоты — левая/правая рука и нога отдельно (как у обычной брони), 6 ключей.
+      for (const slot of ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']) {
+        expect(typeof pa.slots[slot], slot).toBe('string');
+        expect(pa.slots[slot].length, slot).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('inventory: мёртвых pa-ключей нет — секция ровно summary/coreRow/pieceInSlot/slots', () => {
+    for (const dict of [ruInventoryScreen, enInventoryScreen]) {
+      expect(Object.keys(dict.powerArmor).sort()).toEqual(['coreRow', 'pieceInSlot', 'slots', 'summary']);
+      expect(Object.keys(dict.powerArmor.slots).sort()).toEqual(['body', 'head', 'leftArm', 'leftLeg', 'rightArm', 'rightLeg']);
+    }
+  });
+
+  // Конвенция vitest: запуск из корня проекта — пути исходников относительно cwd.
+  it('структура: инвентарь — контейнер-аккордеон, старые 7 строк надетого пакета удалены', () => {
+    const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+    expect(src).not.toContain('equippedPowerArmorRows');
+    expect(src).toContain('paContainerRows');
+    for (const marker of ['item.paContainer', 'item.paPieceContent', 'item.paCoreContent']) {
+      expect(src).toContain(marker);
+    }
+    // Счётчик прочности в стиле патронов — свои стили кнопок (красные, как weaponAmmoBtn).
+    expect(src).toContain('paDurabilityBtn');
+  });
+
+  it('структура: экран оружия и брони — починки нет (только инвентарь), счётчик — стиль патронов', () => {
+    const src = readFileSync('components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js', 'utf8');
+    expect(src).not.toContain('repairPowerArmorPieceAt');
+    expect(src).not.toContain("powerArmor.repair");
+    expect(src).toContain('weaponAmmoBtn');
   });
 });

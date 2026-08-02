@@ -19,6 +19,8 @@ import {
   powerArmorPieceStackKey,
   powerArmorFrameStackKey,
   rollNewFusionCoreCharges,
+  hasFrame,
+  FUSION_CORE_ID,
 } from '../../../domain/powerArmor';
 import dataPowerArmor from '../../../data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
@@ -79,6 +81,8 @@ const InventoryScreen = () => {
     equipPowerArmorPiece,
     unequipPowerArmorPackage,
     unequipPowerArmorPieceAt,
+    adjustPowerArmorDurability,
+    repairPowerArmorPieceAt,
     repairPowerArmorStack,
   } = useCharacter();
 
@@ -160,6 +164,9 @@ const InventoryScreen = () => {
   const [itemSelectionMode, setItemSelectionMode] = useState('loot');
   const [isBuyItemModalVisible, setIsBuyItemModalVisible] = useState(false);
   const [selectedItemForBuy, setSelectedItemForBuy] = useState(null);
+  // Контейнер «Силовая броня» (ПРАВИЛО владельца): надетый пакет — одна строка
+  // в общем списке; «Содержание» раскрывает аккордеоном части и Ядерный блок.
+  const [paContentsOpen, setPaContentsOpen] = useState(false);
 
   const locale = useLocale();
   const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
@@ -1023,46 +1030,62 @@ const InventoryScreen = () => {
     });
   };
   
-  // Силовая броня: надетый каркас и части показываются строками с «Снять»
-  // (модель оружия: экипировка уменьшила стек, строка осталась как надетая), §6.
-  // Строки добавляются ПОСЛЕ подсчёта остатков стеков — двойного вычитания нет.
-  const equippedPowerArmorRows = useMemo(() => {
-    if (!equippedPowerArmor) return [];
+  // Силовая броня: надетый пакет — КОНТЕЙНЕР одной строкой в общем списке (ПРАВИЛО
+  // владельца, §6): «Снять» уносит пакет целиком, «Содержание» раскрывает под ним
+  // аккордеон: надетые части (счётчик прочности в дизайне патронов, починка — здесь)
+  // и статус Ядерного блока. Строки строятся строго из equippedPowerArmor, имя —
+  // из локализованного каталога по catalogId; экипировка уменьшила стек стор-записей —
+  // строки идут ПОСЛЕ подсчёта остатков стеков, двойного вычитания нет.
+  const paContainerRows = useMemo(() => {
+    if (!hasFrame(equippedPowerArmor)) return [];
     const paCatalogEntry = (catalogId) =>
       (equipmentCatalog?.powerArmorList || []).find((p) => p.id === catalogId)
       || PA_CATALOG_BY_ID[catalogId] || {};
-    const rows = [];
-    if (equippedPowerArmor.frame) {
-      const frameEntry = paCatalogEntry(equippedPowerArmor.frame.catalogId);
-      rows.push({
-        ...frameEntry,
-        id: equippedPowerArmor.frame.catalogId,
-        set: 'frame',
-        itemType: 'powerArmor',
-        isEquipped: true,
-        quantity: 1,
-        uniqueId: 'pa-equipped-frame',
-        name: frameEntry.name || equippedPowerArmor.frame.catalogId,
-      });
-    }
-    Object.entries(equippedPowerArmor.pieces || {}).forEach(([slot, piece]) => {
-      if (!piece) return;
+    const core = equippedPowerArmor.frame.core;
+    const coreMax = (equipmentCatalog?.ammoTypes || []).find((a) => a.id === FUSION_CORE_ID)?.maxCharges;
+    const coreText = core ? `${core.charges}/${coreMax}` : '—';
+    const frameEntry = paCatalogEntry(equippedPowerArmor.frame.catalogId);
+    const installed = Object.entries(equippedPowerArmor.pieces || {}).filter(([, piece]) => Boolean(piece));
+    const containerRow = {
+      uniqueId: 'pa-container',
+      paContainer: true,
+      itemType: 'powerArmor',
+      name: frameEntry.name || equippedPowerArmor.frame.catalogId,
+      summary: formatInventoryText(tInventory('screen.powerArmor.summary'), {
+        parts: installed.length,
+        core: coreText,
+      }),
+    };
+    if (!paContentsOpen) return [containerRow];
+    const rows = [containerRow];
+    installed.forEach(([slot, piece]) => {
       const pieceEntry = paCatalogEntry(piece.catalogId);
+      const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
       rows.push({
-        ...pieceEntry,
-        id: piece.catalogId,
-        itemType: 'powerArmor',
-        isEquipped: true,
-        quantity: 1,
-        uniqueId: `pa-equipped-${slot}`,
+        uniqueId: `pa-content-${slot}`,
+        paPieceContent: true,
         paSlot: slot,
-        name: pieceEntry.name || piece.catalogId,
+        itemType: 'powerArmor',
+        name: formatInventoryText(tInventory('screen.powerArmor.pieceInSlot'), {
+          name: pieceEntry.name || piece.catalogId,
+          slot: tInventory(`screen.powerArmor.slots.${slot}`),
+        }),
         hpCurrent: piece.hpCurrent,
-        appliedMods: piece.appliedMods || {},
+        maxHp,
+        // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
+        showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
       });
     });
+    if (core) {
+      rows.push({
+        uniqueId: 'pa-content-core',
+        paCoreContent: true,
+        itemType: 'powerArmor',
+        name: formatInventoryText(tInventory('screen.powerArmor.coreRow'), { value: coreText }),
+      });
+    }
     return rows;
-  }, [equippedPowerArmor, equipmentCatalog]);
+  }, [equippedPowerArmor, equipmentCatalog, paContentsOpen]);
 
   const displayItems = useMemo(() => {
     const equippedItemsList = [];
@@ -1155,8 +1178,8 @@ const InventoryScreen = () => {
         })
         .filter(Boolean);
 
-    return [...equippedItemsList, ...equippedPowerArmorRows, ...inventoryItemsList];
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, equippedPowerArmorRows]);
+    return [...equippedItemsList, ...paContainerRows, ...inventoryItemsList];
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows]);
 
   const renderTableHeader = () => {
     return (
@@ -1168,6 +1191,98 @@ const InventoryScreen = () => {
   };
 
   const renderItem = ({ item }) => {
+    // ── Контейнер «Силовая броня» и его содержимое (аккордеон — ПРАВИЛО владельца):
+    // свои строки, общий пайплайн имён/модов обходят (имена уже собраны из каталога).
+    if (item.paContainer) {
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.mainRowContent}>
+            <View style={styles.itemNameContainer}>
+              <Text style={[styles.itemNameText, styles.equippedItemText]}>{item.name}</Text>
+              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
+            </View>
+          </View>
+          <View style={styles.actionContainer}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.unequipButton]}
+              onPress={() => unequipPowerArmorPackage()}>
+              <Text style={styles.actionButtonText}>{tInventory('screen.actions.unequip')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.applyButton]}
+              onPress={() => setPaContentsOpen((open) => !open)}>
+              <Text style={styles.actionButtonText}>{tInventory(paContentsOpen ? 'screen.actions.collapse' : 'screen.actions.contents')}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.itemSubRow}>
+            <Text style={styles.itemSubText}>{item.summary}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.paPieceContent) {
+      // Часть внутри контейнера: счётчик прочности в дизайне патронов (красные
+      // кнопки как у weaponAmmoBtn) + «Починить»/«Снять» — управление частями здесь,
+      // в экране оружия и брони кнопок починки нет (ПРАВИЛО владельца).
+      const canLose = (item.hpCurrent ?? 0) > 0;
+      const canGain = Number.isFinite(item.maxHp) && item.hpCurrent < item.maxHp;
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.mainRowContent}>
+            <View style={styles.itemNameContainer}>
+              <Text style={styles.itemNameText}>{item.name}</Text>
+            </View>
+          </View>
+          <View style={styles.actionContainer}>
+            {item.showRepair && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton]}
+                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
+                <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.actionButton, styles.unequipButton]}
+              onPress={() => unequipPowerArmorPieceAt(item.paSlot)}>
+              <Text style={styles.actionButtonText}>{tInventory('screen.actions.unequip')}</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.itemSubRow}>
+            <View style={styles.paDurabilityCell}>
+              <TouchableOpacity
+                style={[styles.paDurabilityBtn, !canLose && styles.paDurabilityBtnDisabled]}
+                onPress={() => adjustPowerArmorDurability(item.paSlot, -1)}
+                disabled={!canLose}>
+                <Text style={styles.paDurabilityBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.paDurabilityCount}>{item.hpCurrent}/{item.maxHp}</Text>
+              <TouchableOpacity
+                style={[styles.paDurabilityBtn, !canGain && styles.paDurabilityBtnDisabled]}
+                onPress={() => adjustPowerArmorDurability(item.paSlot, 1)}
+                disabled={!canGain}>
+                <Text style={styles.paDurabilityBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    if (item.paCoreContent) {
+      // Ядерный блок — статусная строка без кнопок (замена блоков автоматическая, §5.4).
+      return (
+        <View style={styles.tableRow}>
+          <View style={styles.mainRowContent}>
+            <View style={styles.itemNameContainer}>
+              <Text style={styles.itemNameText}>{item.name}</Text>
+              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
     // Убеждаемся, что у предмета есть itemType
     const itemWithType = {
       ...item,
@@ -1213,16 +1328,10 @@ const InventoryScreen = () => {
 
     const handleActionPress = () => {
         if (item.isEquipped) {
+            // Надетый пакет СБ — контейнер со своими кнопками (см. ветки renderItem выше),
+            // сюда через generic-строку не доходит.
             if (item.itemType === 'weapon') {
                 handleUnequipWeapon(item, item.slot);
-            } else if (item.itemType === 'powerArmor') {
-                // Слой СБ: каркас снимается комплектом (части и блок внутри),
-                // часть — по её слоту; как обычная броня/оружие (§6 плана).
-                if (isPowerArmorFrame(item)) {
-                    unequipPowerArmorPackage();
-                } else {
-                    unequipPowerArmorPieceAt(item.paSlot);
-                }
             } else {
                 handleUnequipArmor(item);
             }
