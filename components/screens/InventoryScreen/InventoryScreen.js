@@ -221,6 +221,7 @@ const InventoryScreen = () => {
     if (itemType === 'chem' || itemType === 'chems') return '💊';
     if (itemType === 'drinks') return '🥤';
     if (itemType === 'food') return '🍖';
+    if (itemType === 'magazine') return '📖';
     if (itemType === 'ammo') return '🔹';
     if (itemType === 'powerArmor') return '⚡';
     if (itemType === 'misc') return '🔧';

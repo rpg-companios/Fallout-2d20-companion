@@ -1,0 +1,102 @@
+[
+  {
+    "id": "disease_blood_worms",
+    "name": "Blood Worms",
+    "effectLabel": "Attacks against you inflict +2 CD damage."
+  },
+  {
+    "id": "disease_bone_worms",
+    "name": "Bone Worms",
+    "effectLabel": "Attacks against you which hit your arms or legs inflict +4 CD damage."
+  },
+  {
+    "id": "disease_buzz_brain",
+    "name": "Buzz Brain",
+    "effectLabel": "INT tests suffer +1 difficulty."
+  },
+  {
+    "id": "disease_dysentery",
+    "name": "Dysentery",
+    "effectLabel": "Halves time at each step of the thirst track."
+  },
+  {
+    "id": "disease_fever_claw",
+    "name": "Fever Claw",
+    "effectLabel": "Your ranged attacks inflict 2 CD less damage (minimum 1 CD)."
+  },
+  {
+    "id": "disease_flap_limb",
+    "name": "Flap Limb",
+    "effectLabel": "STR tests suffer +1 difficulty."
+  },
+  {
+    "id": "disease_glowing_pustules",
+    "name": "Glowing Pustules",
+    "effectLabel": "Whenever you suffer an Injury, anyone within Reach suffers 1 CD Radiation damage."
+  },
+  {
+    "id": "disease_heat_flashes",
+    "name": "Heat Flashes",
+    "effectLabel": "END tests suffer +1 difficulty."
+  },
+  {
+    "id": "disease_jelly_fingers",
+    "name": "Jelly Fingers",
+    "effectLabel": "Attempting a ranged attack requires spending 1 AP."
+  },
+  {
+    "id": "disease_lock_joint",
+    "name": "Lock Joint",
+    "effectLabel": "Attempting a melee attack requires spending 1 AP."
+  },
+  {
+    "id": "disease_needle_spine",
+    "name": "Needle Spine",
+    "effectLabel": "-10 Carry Weight."
+  },
+  {
+    "id": "disease_parasites",
+    "name": "Parasites",
+    "effectLabel": "Halves time at each step of the hunger track."
+  },
+  {
+    "id": "disease_rad_worms",
+    "name": "Rad Worms",
+    "effectLabel": "Whenever you suffer Radiation damage, add +2 to the amount suffered."
+  },
+  {
+    "id": "disease_shell_shock",
+    "name": "Shell Shock",
+    "effectLabel": "Whenever you suffer an Injury, lose 1 AP from the group pool (if possible)."
+  },
+  {
+    "id": "disease_sludge_lung",
+    "name": "Sludge Lung",
+    "effectLabel": "Gain 1 Fatigue; you can only save AP into the group pool if there are 3 or fewer AP saved."
+  },
+  {
+    "id": "disease_snot_ear",
+    "name": "Snot Ear",
+    "effectLabel": "PER tests suffer +1 difficulty."
+  },
+  {
+    "id": "disease_swamp_gas",
+    "name": "Swamp Gas",
+    "effectLabel": "CHA tests suffer +1 difficulty."
+  },
+  {
+    "id": "disease_swamp_itch",
+    "name": "Swamp Itch",
+    "effectLabel": "AGI tests suffer +1 difficulty."
+  },
+  {
+    "id": "disease_the_whoopsies",
+    "name": "The Whoopsies",
+    "effectLabel": "Must spend twice as many Luck points to gain an Effect."
+  },
+  {
+    "id": "disease_weeping_sores",
+    "name": "Weeping Sores",
+    "effectLabel": "Whenever you suffer Physical damage, you suffer +1 Physical damage at the start of your next turn, ignoring damage resistance."
+  }
+]

@@ -146,6 +146,9 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       [tInventory('modals.addItemModal.categories.food')]: {
         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.food || [],
       },
+      [tInventory('modals.addItemModal.categories.magazines')]: {
+        [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.magazines || [],
+      },
       [tInventory('modals.addItemModal.categories.items')]: {
         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.generalGoods || [],
       },

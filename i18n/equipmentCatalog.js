@@ -24,6 +24,7 @@ import ruRobotLegs from './ru-RU/data/equipment/robot/robotlegs.json';
 import ruChems from './ru-RU/data/consumables/chems.json';
 import ruDrinks from './ru-RU/data/consumables/drinks.json';
 import ruFood from './ru-RU/data/consumables/food.json';
+import ruMagazines from './ru-RU/data/consumables/magazines.json';
 import ruQualities from './ru-RU/data/system/qualities.json';
 import ruGeneralGoods from './ru-RU/data/equipment/general_goods.json';
 import ruOddities from './ru-RU/data/equipment/oddities.json';
@@ -54,6 +55,7 @@ import enRobotLegs from './en-EN/data/equipment/robot/robotlegs.json';
 import enChems from './en-EN/data/consumables/chems.json';
 import enDrinks from './en-EN/data/consumables/drinks.json';
 import enFood from './en-EN/data/consumables/food.json';
+import enMagazines from './en-EN/data/consumables/magazines.json';
 import enQualities from './en-EN/data/system/qualities.json';
 import enGeneralGoods from './en-EN/data/equipment/general_goods.json';
 import enOddities from './en-EN/data/equipment/oddities.json';
@@ -88,6 +90,7 @@ import dataRobotParts from '../data/equipment/robotparts.json';
 import dataChems from '../data/consumables/chems.json';
 import dataDrinks from '../data/consumables/drinks.json';
 import dataFood from '../data/consumables/food.json';
+import dataMagazines from '../data/consumables/magazines.json';
 import dataWeaponModSlots from '../data/equipment/weapon_mod_slots.json';
 import dataRobotBody from '../data/equipment/robot/robotbody.json';
 import dataRobotHeads from '../data/equipment/robot/robotheads.json';
@@ -136,6 +139,7 @@ const EQUIPMENT_BY_LOCALE = {
     chems: ruChems,
     drinks: ruDrinks,
     food: ruFood,
+    magazines: ruMagazines,
     miscellaneous: ruMiscItems,
     generalGoods: ruGeneralGoods,
     oddities: ruOddities,
@@ -167,6 +171,7 @@ const EQUIPMENT_BY_LOCALE = {
     chems: enChems,
     drinks: enDrinks,
     food: enFood,
+    magazines: enMagazines,
     miscellaneous: enMiscItems,
     generalGoods: enGeneralGoods,
     oddities: enOddities,
@@ -188,7 +193,7 @@ const EQUIPMENT_BY_LOCALE = {
  * Merges two arrays by `id`, with i18n fields (name, etc.) overlaid on data fields.
  * Items present only in data are included with a fallback name of their id.
  */
-const mergeById = (dataArr, i18nArr) => {
+export const mergeById = (dataArr, i18nArr) => {
   const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
   return (dataArr || []).map((dataItem) => {
     const i18nItem = i18nMap[dataItem.id] || {};
@@ -332,6 +337,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   const mergedChems = mergeById(dataChems, i18n.chems);
   const mergedDrinks = mergeById(dataDrinks, i18n.drinks);
   const mergedFood = mergeById(dataFood, i18n.food);
+  const mergedMagazines = mergeById(dataMagazines, i18n.magazines);
   const mergedGeneralGoods = mergeById(dataGeneralGoods, i18n.generalGoods || []);
   const mergedOddities = mergeById(dataOddities, i18n.oddities || []);
   const mergedRobotBody = mergeById(dataRobotBody || [], i18n.robotBody || [])
@@ -369,6 +375,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
     chems: validateConsumablesContract(mergedChems, ['chem'], 'chem'),
     drinks: validateConsumablesContract(mergedDrinks, ['drinks'], 'drinks'),
     food: validateConsumablesContract(mergedFood, ['food'], 'food'),
+    magazines: validateConsumablesContract(mergedMagazines, ['magazine'], 'magazine'),
     generalGoods: mergedGeneralGoods,
     oddities: mergedOddities,
     weaponMods: mergedWeaponMods,
