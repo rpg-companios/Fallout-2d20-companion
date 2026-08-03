@@ -203,7 +203,47 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     stats.carryWeight.base = calculateCarryWeight(attributesEffective, trait, equipmentState);
   }
   stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
-  
+
+  // --- Перк-бонусы (perkBonuses) ---
+  // perkBonuses попадает сюда через аргумент effects ({ ...effects, perkBonuses })
+  const perkBonuses = effects?.perkBonuses || {};
+
+  // maxHealthBonus (lifeGiver)
+  const maxHealthFromPerks = Number(perkBonuses.maxHealthBonus) || 0;
+  if (maxHealthFromPerks !== 0) {
+    stats.maxHealth.modifiers.push({
+      source: 'perks',
+      value: maxHealthFromPerks,
+      operation: '+',
+    });
+    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+  }
+
+  // carryWeightBonus (strongBack)
+  const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
+  if (carryFromPerks !== 0 && !equipmentState.isRobot) {
+    stats.carryWeight.modifiers.push({
+      source: 'perks',
+      value: carryFromPerks,
+      operation: '+',
+    });
+    stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
+  }
+
+  // damageResistance (toughness / refractor / radResistant / barbarian)
+  const drFromPerks = perkBonuses.damageResistance || {};
+  ['physical', 'energy', 'radiation'].forEach((type) => {
+    const bonus = Number(drFromPerks[type]) || 0;
+    if (bonus !== 0) {
+      stats.damageResistance[type].modifiers.push({
+        source: 'perks',
+        value: bonus,
+        operation: '+',
+      });
+      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
+    }
+  });
+
   return stats;
 };
 

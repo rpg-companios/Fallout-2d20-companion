@@ -894,8 +894,17 @@ export const CharacterProvider = ({ children }) => {
     if (removed.length > 0) setConditions(nextConditions);
 
     // 3. Зависимость
+    // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
+    const hasPartyBoyImmunity =
+      item?.isAlcohol === true &&
+      Boolean(useCharacterStore.getState().perkBonuses?.alcoholAddictionImmune);
+
     let addictionResult = null;
-    if (item?.addictionLevel > 0 && item?.negativeEffect === 'addiction') {
+    if (
+      item?.addictionLevel > 0 &&
+      item?.negativeEffect === 'addiction' &&
+      !hasPartyBoyImmunity
+    ) {
       const dosesToday = recordChemDose(item.id || item.name);
       addictionResult = checkAddiction(item, dosesToday);
       if (addictionResult.addicted && !conditions.includes('addicted')) {

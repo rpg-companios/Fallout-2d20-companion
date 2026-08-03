@@ -13,6 +13,7 @@
   {
     "id": "drink_beer",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 5,
     "rarity": 1,
@@ -33,6 +34,7 @@
   {
     "id": "drink_bourbon",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 7,
     "rarity": 2,
@@ -43,6 +45,7 @@
   {
     "id": "drink_moonshine",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 30,
     "rarity": 3,
@@ -73,6 +76,7 @@
   {
     "id": "drink_dirty_wastelander",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 10,
     "rarity": 3,
@@ -173,6 +177,7 @@
   {
     "id": "drink_rum",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 8,
     "rarity": 2,
@@ -193,6 +198,7 @@
   {
     "id": "drink_wine",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 5,
     "rarity": 3,
@@ -203,6 +209,7 @@
   {
     "id": "drink_vodka",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 5,
     "rarity": 3,
@@ -213,6 +220,7 @@
   {
     "id": "drink_whiskey",
     "itemType": "drinks",
+    "isAlcohol": true,
     "weight": 0.5,
     "cost": 5,
     "rarity": 3,

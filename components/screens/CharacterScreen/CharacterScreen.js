@@ -304,6 +304,7 @@ export default function CharacterScreen() {
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
   const storeEffects = useCharacterStore((state) => state.effects);
+  const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
 
   const attributes = useMemo(() => {
@@ -632,16 +633,18 @@ export default function CharacterScreen() {
         setSelectedSkills((prev) => [...prev, skillName]);
       } else {
         const extraSkillsFromTrait = trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
+        const extraSkillsFromPerk = Number(storePerkBonuses?.extraTaggedSkills) || 0;
+        const totalExtraSkillSlots = extraSkillsFromTrait + extraSkillsFromPerk;
         const traitForcedSkills = trait?.forcedSkills || trait?.modifiers?.forcedSkills || [];
         const canSelectAsExtra =
-          extraSkillsFromTrait > 0 &&
+          totalExtraSkillSlots > 0 &&
           (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
 
-        if (canSelectAsExtra && extraTaggedSkills.length < extraSkillsFromTrait) {
+        if (canSelectAsExtra && extraTaggedSkills.length < totalExtraSkillSlots) {
           setExtraTaggedSkills((prev) => [...prev, skillName]);
         } else {
           const extraText = canSelectAsExtra
-            ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable") + ": " + (extraSkillsFromTrait - extraTaggedSkills.length)
+            ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable") + ": " + (totalExtraSkillSlots - extraTaggedSkills.length)
             : "";
           showError(
             tCharacterScreen("errors.maxBaseSkills").replace("{count}", String(BASE_TAGGED_SKILLS)).replace("{extraText}", extraText),
@@ -1006,13 +1009,15 @@ export default function CharacterScreen() {
       return;
     }
 
-    // Проверяем экстра навыки от черт
+    // Проверяем экстра навыки от черт и перков (tag)
+    const extraSkillsFromPerkVal = Number(storePerkBonuses?.extraTaggedSkills) || 0;
+    const totalExtraSlots = extraSkillsFromTrait + extraSkillsFromPerkVal;
     if (
-      extraSkillsFromTrait > 0 &&
-      extraTaggedSkills.length !== extraSkillsFromTrait
+      totalExtraSlots > 0 &&
+      extraTaggedSkills.length !== totalExtraSlots
     ) {
       showError(
-        tCharacterScreen("errors.exactExtraSkillsRequired").replace("{required}", String(extraSkillsFromTrait)).replace("{selected}", String(extraTaggedSkills.length)),
+        tCharacterScreen("errors.exactExtraSkillsRequired").replace("{required}", String(totalExtraSlots)).replace("{selected}", String(extraTaggedSkills.length)),
       );
       return;
     }
@@ -1248,6 +1253,8 @@ export default function CharacterScreen() {
                 </View>
                 {attributesSaved && !skillsSaved && (() => {
                   const extraSkillsFromTrait = trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
+                  const extraSkillsFromPerkDisp = Number(storePerkBonuses?.extraTaggedSkills) || 0;
+                  const totalExtraSlotsDisp = extraSkillsFromTrait + extraSkillsFromPerkDisp;
                   const taggedCount = selectedSkills.length;
                   const extraCount = extraTaggedSkills.length;
                   return (
@@ -1255,9 +1262,9 @@ export default function CharacterScreen() {
                       <Text style={styles.taggedSkillsHint}>
                         {tCharacterScreen("labels.taggedSkills")}: {taggedCount}/{BASE_TAGGED_SKILLS}
                       </Text>
-                      {extraSkillsFromTrait > 0 && (
+                      {totalExtraSlotsDisp > 0 && (
                         <Text style={styles.taggedSkillsHint}>
-                          {tCharacterScreen("labels.extraTaggedSkills")}: {extraCount}/{extraSkillsFromTrait}
+                          {tCharacterScreen("labels.extraTaggedSkills")}: {extraCount}/{totalExtraSlotsDisp}
                         </Text>
                       )}
                     </>
