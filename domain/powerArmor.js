@@ -196,10 +196,18 @@ export const pickFusionCore = (cores) => {
   return same ? { kind: 'auto', core: charged[0] } : { kind: 'choice', cores: charged };
 };
 
-/** Заряды нового блока (§3.2): бросок из конфига, кламп к maxCharges из данных предмета. */
-export const rollNewFusionCoreCharges = (maxCharges) => {
+/**
+ * Заряды нового блока (§3.2): бросок из конфига, кламп к maxCharges из данных предмета.
+ * fusionCoreChargeBonus — бонус перка nuclearPhysicist (+3). При наличии бонуса результат
+ * может превышать maxCharges (например, 23/20). Без бонуса — кламп к maxCharges.
+ */
+export const rollNewFusionCoreCharges = (maxCharges, fusionCoreChargeBonus = 0) => {
   const rolled = rollByType(FUSION_CORE_CHARGES_ROLL.rollType, FUSION_CORE_CHARGES_ROLL.rollValue);
-  return Math.max(1, Math.min(rolled, maxCharges));
+  const total = rolled + fusionCoreChargeBonus;
+  if (fusionCoreChargeBonus > 0) {
+    return Math.max(1, total);
+  }
+  return Math.max(1, Math.min(total, maxCharges));
 };
 
 // ─── Таймер расхода (§5.3/§5.4) ─────────────────────────────────────────────

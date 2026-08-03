@@ -93,6 +93,7 @@ const InventoryScreen = () => {
   const unequipItem = useCharacterStore((state) => state.unequipItem);
   const addNewItem = useCharacterStore((state) => state.addNewItem);
   const updateItem = useCharacterStore((state) => state.updateItem);
+  const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
@@ -427,16 +428,21 @@ const InventoryScreen = () => {
         maxHealth: calculateMaxHealth(attributes, level),
       });
 
-      if (healAmount) {
+      // fastMetabolism: +hpHealBonus к любому мгновенному восстановлению ОЗ
+      const hpHealBonus = healAmount > 0 ? (Number(storePerkBonuses?.hpHealBonus) || 0) : 0;
+      const totalHeal = healAmount + hpHealBonus;
+
+      if (totalHeal > 0) {
         const maxHealth = calculateMaxHealth(attributes, level);
-        const newHealth = Math.min(maxHealth, currentHealth + healAmount);
+        const newHealth = Math.min(maxHealth, currentHealth + totalHeal);
         debugLog('consumable.screen.healing', {
-          healAmount,
+          healAmount: totalHeal,
+          hpHealBonus,
           currentHealth,
           newHealth,
         });
         setCurrentHealth(newHealth);
-        showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount }));
+        showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount: totalHeal }));
       } else {
         debugLog('consumable.screen.noHeal', { itemName });
         showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedSelfMessage'), { itemName }));
@@ -533,7 +539,8 @@ const InventoryScreen = () => {
     // бросок (покупка 5 шт = 5 независимых бросков), стекаются только одинаковые.
     if (isFusionCoreItem(localizedItem)) {
       for (let i = 0; i < quantity; i += 1) {
-        const charges = rollNewFusionCoreCharges(localizedItem.maxCharges);
+        const fcBonus = Number(storePerkBonuses?.fusionCoreChargeBonus) || 0;
+        const charges = rollNewFusionCoreCharges(localizedItem.maxCharges, fcBonus);
         const stackKey = fusionCoreStackKey(charges);
         const existingItem = findUnequippedStoreItemByStackKey(stackKey);
         if (existingItem) {

@@ -9,6 +9,8 @@ import { radResistantPerk } from './radResistant';
 import { barbarianPerk } from './barbarian';
 import { partyBoyPerk } from './partyBoy';
 import { tagPerk } from './tag';
+import { nuclearPhysicistPerk } from './nuclearPhysicist';
+import { fastMetabolismPerk } from './fastMetabolism';
 
 export const perkEffects = {
   [intenseTrainingPerk.id]: intenseTrainingPerk,
@@ -22,6 +24,8 @@ export const perkEffects = {
   [barbarianPerk.id]: barbarianPerk,
   [partyBoyPerk.id]: partyBoyPerk,
   [tagPerk.id]: tagPerk,
+  [nuclearPhysicistPerk.id]: nuclearPhysicistPerk,
+  [fastMetabolismPerk.id]: fastMetabolismPerk,
 };
 
 export function getPerkEffect(effectId) {
