@@ -508,14 +508,17 @@ export default function CharacterScreen() {
     const isRobot = Boolean(kit.robotSlots);
 
     // 1. Add kit items to Zustand Store
-    console.log('[handleSelectKit] kit.items count:', kit.items?.length, 'isRobot:', isRobot);
+    debugLog('kits.select.start', { count: kit.items?.length, isRobot });
     if (kit.items && Array.isArray(kit.items)) {
       kit.items.forEach(item => {
         // Currency (caps) is not an inventory item — it is tracked separately via
         // setCaps below. Skip it so it never hits addNewItem (which would warn about
         // a missing id field).
-        console.log('[handleSelectKit] candidate item:', item?.name, 'itemType:', item?.itemType,
-          'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
+        debugLog('kits.select.candidate', {
+          name: item?.name,
+          itemType: item?.itemType,
+          id: item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId,
+        });
         const CURRENCY_TYPES = new Set(['currency']);
         if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
         useCharacterStore.getState().addNewItem({
@@ -524,7 +527,7 @@ export default function CharacterScreen() {
           locked:   isRobot ? true : false,
         });
       });
-      console.log('[handleSelectKit] store items after add:', Object.keys(useCharacterStore.getState().items));
+      debugLog('kits.select.done', { itemIds: Object.keys(useCharacterStore.getState().items) });
     }
 
     // 2. Set equipment metadata

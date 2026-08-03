@@ -1,3 +1,4 @@
+import { debugLog } from '../../../../src/debug/falloutDebug';
 import { useState, useEffect, useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
@@ -223,7 +224,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
             try {
               return await resolveKitItems(kit);
             } catch (error) {
-              console.error('[EquipmentKitModal] resolveKitItems failed for kit', kit?.id, 'error:', error?.message || error);
+              debugLog('kits.modal.failed', { kitId: kit?.id, error: error?.message || String(error) });
               return kit;
             }
           }),

@@ -1,3 +1,4 @@
+import { debugLog } from '../src/debug/falloutDebug';
 import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import * as db from '../db';
 import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
@@ -870,7 +871,7 @@ export const CharacterProvider = ({ children }) => {
    * Возвращает { timedResult, addictionResult, conditionsRemoved }.
    */
   const applyConsumableFull = (item) => {
-    console.log('[applyConsumableFull] START:', {
+    debugLog('consumable.apply.start', {
       itemName: item?.name || item?.Name,
       itemId: item?.id || item?.code,
       positiveEffect: item?.positiveEffect,
@@ -902,7 +903,7 @@ export const CharacterProvider = ({ children }) => {
       }
     }
 
-    console.log('[applyConsumableFull] RESULT:', {
+    debugLog('consumable.apply.result', {
       timedResult,
       addictionResult,
       conditionsRemoved: removed,
@@ -930,9 +931,9 @@ export const CharacterProvider = ({ children }) => {
       const timerPreview = normalizedResult.effects
         .map((effect) => `${effect.effectName || effect.effectLabel}: ${effect.scenesLeft} scenes`)
         .join(' | ');
-      console.log(`[TimedEffects] ${timerPreview}`);
+      debugLog('consumable.timedEffects', { timerPreview });
     } else {
-      console.log('[TimedEffects] No active effects.');
+      debugLog('consumable.timedEffects', { timerPreview: null });
     }
 
     return {
@@ -967,9 +968,7 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const commitAttributeChanges = (newAttributes, pointsSpent) => {
-    console.warn(
-      '[CharacterContext] commitAttributeChanges is deprecated. Use Zustand Store actions instead: updateAttribute(attrId, delta)'
-    );
+    debugLog('ctx.deprecatedCommitAttributeChanges');
 
     // Calculate deltas from current attributes to new attributes
     const currentAttributesArray = attributes;
@@ -1152,7 +1151,7 @@ export const useCharacterAttribute = (attrId) => {
 
   // Warn if attribute doesn't exist (should be created on load)
   if (!attribute) {
-    console.warn(`[useCharacterAttribute] Attribute ${attrId} not found in store`);
+    debugLog('store.attrNotFound', { attrId, where: 'useCharacterAttribute' });
   }
 
   return attribute;
@@ -1168,7 +1167,7 @@ export const useCharacterItem = (itemId) => {
 
   // Warn if item doesn't exist
   if (!item) {
-    console.warn(`[useCharacterItem] Item ${itemId} not found in store`);
+    debugLog('store.itemNotFound', { itemId, where: 'useCharacterItem' });
   }
 
   return item;
@@ -1184,7 +1183,7 @@ export const useCharacterEffect = (effectId) => {
 
   // Warn if effect doesn't exist
   if (!effect) {
-    console.warn(`[useCharacterEffect] Effect ${effectId} not found in store`);
+    debugLog('store.effectNotFound', { effectId, where: 'useCharacterEffect' });
   }
 
   return effect;

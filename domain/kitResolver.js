@@ -1,3 +1,4 @@
+import { debugLog } from '../src/debug/falloutDebug';
 import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../db/Database';
 import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';
@@ -252,15 +253,15 @@ async function resolveEntry(entry) {
 }
 
 export async function resolveKitItems(kit) {
-  console.log('[resolveKitItems] start kitId:', kit?.id, 'raw items count:', kit?.items?.length);
+  debugLog('kits.resolve.start', { kitId: kit?.id, count: kit?.items?.length });
   const entries = await Promise.all((kit.items || []).map(async (entry, index) => {
     try {
       const resolved = await resolveEntry(entry);
       const label = resolved?.displayName || resolved?.name || resolved?.itemId || resolved?.weaponId || JSON.stringify(resolved).slice(0, 60);
-      console.log('[resolveKitItems] entry', index, 'type:', entry?.type, 'itemType:', entry?.itemType, 'resolved label:', label);
+      debugLog('kits.resolve.entry', { index, type: entry?.type, itemType: entry?.itemType, label });
       return resolved;
     } catch (err) {
-      console.error('[resolveKitItems] FAILED entry', index, 'type:', entry?.type, 'itemType:', entry?.itemType, 'error:', err?.message || err);
+      debugLog('kits.resolve.failed', { index, type: entry?.type, itemType: entry?.itemType, error: err?.message || String(err) });
       throw err;
     }
   }));

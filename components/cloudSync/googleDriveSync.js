@@ -1,3 +1,4 @@
+import { debugLog } from '../../src/debug/falloutDebug';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
@@ -233,6 +234,6 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
 
     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
   } catch (e) {
-    console.warn('[CloudSync] Failed to sync character:', e?.message || e);
+    debugLog('sync.cloudFailed', { message: e?.message || String(e) });
   }
 };

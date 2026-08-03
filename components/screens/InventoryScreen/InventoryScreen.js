@@ -24,6 +24,7 @@ import {
 } from '../../../domain/powerArmor';
 import dataPowerArmor from '../../../data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { isRobotCharacter } from '../../../domain/origins';
@@ -324,7 +325,7 @@ const InventoryScreen = () => {
     if (itemType === 'chem' || itemType === 'chems') {
       const base = (equipmentCatalog?.chems || []).find((entry) => entry.id === item.id);
       if (!base) {
-        console.log('[resolveLocalizedItem] No chem base found for:', item.id, 'item:', item);
+        debugLog('i18n.resolveChem.noBase', { id: item.id, item });
         return item;
       }
       const result = {
@@ -332,7 +333,7 @@ const InventoryScreen = () => {
         ...item,
         name: base.name,
       };
-      console.log('[resolveLocalizedItem] chem result:', result.id, 'positiveEffect:', result.positiveEffect);
+      debugLog('i18n.resolveChem.result', { id: result.id, positiveEffect: result.positiveEffect });
       return result;
     }
 
@@ -397,7 +398,7 @@ const InventoryScreen = () => {
     const consumableItem = { ...item };
     const itemName = getItemName(consumableItem);
 
-    console.log('[handleApplyConsumable] START:', {
+    debugLog('consumable.screen.start', {
       itemName,
       item,
       consumableItem,
@@ -418,7 +419,7 @@ const InventoryScreen = () => {
       // Лечение HP
       const healAmount = getInstantHealAmount(consumableItem);
 
-      console.log('[handleApplyConsumable] HEAL CALC:', {
+      debugLog('consumable.screen.healCalc', {
         itemName,
         healAmount,
         currentHealth,
@@ -428,7 +429,7 @@ const InventoryScreen = () => {
       if (healAmount) {
         const maxHealth = calculateMaxHealth(attributes, level);
         const newHealth = Math.min(maxHealth, currentHealth + healAmount);
-        console.log('[handleApplyConsumable] HEALING:', {
+        debugLog('consumable.screen.healing', {
           healAmount,
           currentHealth,
           newHealth,
@@ -436,7 +437,7 @@ const InventoryScreen = () => {
         setCurrentHealth(newHealth);
         showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount }));
       } else {
-        console.log('[handleApplyConsumable] NO HEAL AMOUNT FOUND');
+        debugLog('consumable.screen.noHeal', { itemName });
         showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedSelfMessage'), { itemName }));
       }
 
@@ -892,6 +893,20 @@ const InventoryScreen = () => {
     }
 
     const executeEquip = (slotsToOccupy) => {
+      // ПРАВИЛО (владелец): молчаливых падений нет. Пустой список слотов —
+      // дефект данных предмета (нет protectedAreas): сообщаем, а не no-op.
+      if (!slotsToOccupy || slotsToOccupy.length === 0) {
+        debugLog('equip.armor:emptySlots', {
+          id: itemToEquip?.id || itemToEquip?.armorId || itemToEquip?.weaponId,
+          stackKey: itemToEquip?.stackKey,
+          protectedAreas: itemToEquip?.protectedAreas,
+        });
+        showAlert(
+          tInventory('screen.alerts.robotArmorOnlyTitle'),
+          tInventory('screen.alerts.cannotEquipItem'),
+        );
+        return;
+      }
       const instancesToUnequip = new Set();
       const markForUnequip = (slot, type) => {
         const slotItem = currentEquipped?.[slot]?.[type];

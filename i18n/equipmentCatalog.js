@@ -1,4 +1,5 @@
 // Locale-specific display data (names, descriptions, flavour text)
+import { debugLog } from '../src/debug/falloutDebug';
 import ruWeapons from './ru-RU/data/equipment/weapons/weapons.json';
 import ruWeaponMods from './ru-RU/data/equipment/weapons/weapon_mods.json';
 import ruArmor from './ru-RU/data/equipment/armor/armor.json';
@@ -191,8 +192,8 @@ const mergeById = (dataArr, i18nArr) => {
   const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
   return (dataArr || []).map((dataItem) => {
     const i18nItem = i18nMap[dataItem.id] || {};
-    if (!i18nItem.name && process.env.NODE_ENV !== 'production') {
-      console.warn(`[equipmentCatalog] No i18n entry for id: ${dataItem.id}`);
+    if (!i18nItem.name) {
+      debugLog('catalog.missingI18n', { id: dataItem.id });
     }
     return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
   });
@@ -275,12 +276,21 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
     .map((item) => ({ ...item, itemType: 'robotFrame' }));
 
   // Armor: i18n file has {armor:[{type, categoryKey, items}]}, data file has allowedModCategories per categoryKey
-  const armorGroups = [
-    ...(i18n.armor?.armor || []).map((g) => ({
-      ...g,
-      items: (g.items || []).map((item) => ({ ...item, armorCategoryKey: g.categoryKey })),
-    })),
-  ];
+  // Броня: единый источник механики — data/equipment/armor.json (как у
+  // weapons/clothes/powerArmor). i18n-файл несёт только отображаемые поля
+  // (type группы, name предмета). Тощая i18n-запись (как ранее en-EN) больше
+  // не даёт «молчаливую» неэкипируемую броню — protectedAreas всегда из data.
+  const armorPiecesByCategory = Object.fromEntries(
+    Object.entries(dataArmor || {}).map(([categoryKey, category]) => [
+      categoryKey,
+      Object.values(category?.tiers || {}).flatMap((tier) => tier?.pieces || []),
+    ]),
+  );
+  const armorGroups = (i18n.armor?.armor || []).map((g) => ({
+    ...g,
+    items: mergeById(armorPiecesByCategory[g.categoryKey], g.items)
+      .map((item) => ({ ...item, armorCategoryKey: g.categoryKey })),
+  }));
   const armorList = flattenArmorGroups({ armor: armorGroups });
   const armorIndex = buildArmorIndex([...armorList, ...robotPlatingList, ...robotArmorList, ...robotFramesList]);
 
@@ -310,8 +320,8 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
     type: (i18n.clothes?.clothes || []).find((g) => g.clothingType === group.clothingType)?.type || group.type,
     items: (group.items || []).map((dataItem) => {
       const i18nItem = i18nClothesMap[dataItem.id] || {};
-      if (!i18nItem.name && process.env.NODE_ENV !== 'production') {
-        console.warn(`[equipmentCatalog] No i18n entry for clothes id: ${dataItem.id}`);
+      if (!i18nItem.name) {
+        debugLog('catalog.missingI18nClothes', { id: dataItem.id });
       }
       return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
     }),

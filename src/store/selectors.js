@@ -1,6 +1,7 @@
 // src/store/selectors.js
 // Pure selector functions for reading data from the normalized character store
 
+import { debugLog } from '../debug/falloutDebug';
 import { effectsDictToLegacyArray } from './effectsSync.js';
 import { resolveWeaponRangeFields } from '../../domain/range.js';
 import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
@@ -138,8 +139,11 @@ export const selectItemsByEquipped = (state, equipped) => {
   const matched = Object.values(state.items || {}).filter(
     (item) => Boolean(item.equipped) === equipped,
   );
-  console.log('[selectItemsByEquipped] total items:', Object.keys(state.items || {}).length,
-    'equipped filter:', equipped, 'matched:', matched.length);
+  debugLog('items.selectByEquipped', {
+    total: Object.keys(state.items || {}).length,
+    equipped,
+    matched: matched.length,
+  });
   return matched;
 };
 

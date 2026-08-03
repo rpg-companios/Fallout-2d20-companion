@@ -243,7 +243,7 @@ const useCharacterStore = create(devtools(
         const attributes = { ...state.attributes };
         
         if (!attributes[attrId]) {
-          console.warn(`Attribute ${attrId} not found`);
+          debugLog('store.attrNotFound', { attrId });
           return;
         }
         
@@ -273,7 +273,7 @@ const useCharacterStore = create(devtools(
         const attributes = { ...state.attributes };
         
         if (!attributes[attrId]) {
-          console.warn(`Attribute ${attrId} not found`);
+          debugLog('store.attrNotFound', { attrId });
           return;
         }
         
@@ -304,7 +304,7 @@ const useCharacterStore = create(devtools(
         const attributes = { ...state.attributes };
         
         if (!attributes[attrId]) {
-          console.warn(`Attribute ${attrId} not found`);
+          debugLog('store.attrNotFound', { attrId });
           return;
         }
         
@@ -335,7 +335,7 @@ const useCharacterStore = create(devtools(
         const skills = { ...state.skills };
         
         if (!skills[skillId]) {
-          console.warn(`Skill ${skillId} not found`);
+          debugLog('store.skillNotFound', { skillId });
           return;
         }
         
@@ -365,7 +365,7 @@ const useCharacterStore = create(devtools(
         const skills = { ...state.skills };
         
         if (!skills[skillId]) {
-          console.warn(`Skill ${skillId} not found`);
+          debugLog('store.skillNotFound', { skillId });
           return;
         }
         
@@ -396,7 +396,7 @@ const useCharacterStore = create(devtools(
         const skills = { ...state.skills };
         
         if (!skills[skillId]) {
-          console.warn(`Skill ${skillId} not found`);
+          debugLog('store.skillNotFound', { skillId });
           return;
         }
         
@@ -427,7 +427,7 @@ const useCharacterStore = create(devtools(
         const items = { ...state.items };
         
         if (!items[itemId]) {
-          console.warn(`Item ${itemId} not found`);
+          debugLog('store.itemNotFound', { itemId });
           return;
         }
         
@@ -453,7 +453,7 @@ const useCharacterStore = create(devtools(
         const items = { ...state.items };
         
         if (!items[itemId]) {
-          console.warn(`Item ${itemId} not found`);
+          debugLog('store.itemNotFound', { itemId });
           return;
         }
         
@@ -474,7 +474,7 @@ const useCharacterStore = create(devtools(
         const items = { ...state.items };
 
         if (!items[itemId]) {
-          console.warn(`Item ${itemId} not found`);
+          debugLog('store.itemNotFound', { itemId });
           return;
         }
 
@@ -482,7 +482,7 @@ const useCharacterStore = create(devtools(
         // cannot be unequipped via the normal flow. They are released only
         // when the limb that holds them is swapped — see robotEquip.js.
         if (items[itemId].locked) {
-          console.warn(`Item ${itemId} is locked (robot built-in); refuse to unequip.`);
+          debugLog('store.lockedUnequipRefused', { itemId });
           return;
         }
 
@@ -520,11 +520,14 @@ const useCharacterStore = create(devtools(
       addNewItem: (item) => {
         const state = get();
         const items = { ...state.items };
-        console.log('[addNewItem] received:', item?.name, 'itemType:', item?.itemType,
-          'id:', item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId);
+        debugLog('items.add.received', {
+          name: item?.name,
+          itemType: item?.itemType,
+          id: item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId,
+        });
         
         if (!item) {
-          console.warn('addNewItem: item is null or undefined');
+          debugLog('items.add.invalid', { reason: 'null-or-undefined' });
           return;
         }
         
@@ -534,10 +537,10 @@ const useCharacterStore = create(devtools(
           || item.itemId || item.armorId || item.clothingId;
         
         if (!weaponId) {
-          console.warn('addNewItem: item missing any known id field', item);
+          debugLog('items.add.invalid', { reason: 'no-id-field', item });
           return;
         }
-        console.log('[addNewItem] canonical id:', weaponId);
+        debugLog('items.add.canonicalId', { weaponId });
         
         // Get applied mods
         const appliedMods = item.appliedMods || {};
@@ -644,7 +647,7 @@ const useCharacterStore = create(devtools(
             quantity: existingQuantity + addedQuantity,
           };
 
-          console.log('[addNewItem] stacked under key:', existingItemKey, 'quantity:', items[existingItemKey].quantity);
+          debugLog('items.add.stacked', { key: existingItemKey, quantity: items[existingItemKey].quantity });
           set({ items });
           get().recalculateDerivedStats();
 
@@ -654,7 +657,7 @@ const useCharacterStore = create(devtools(
         // Add item to store
         items[itemId] = normalizedFinalItem;
         
-        console.log('[addNewItem] stored under key:', itemId, 'equipped:', finalItem.equipped, 'itemType:', finalItem.itemType);
+        debugLog('items.add.stored', { key: itemId, equipped: finalItem.equipped, itemType: finalItem.itemType });
         set({ items });
         get().recalculateDerivedStats();
         
@@ -695,7 +698,7 @@ const useCharacterStore = create(devtools(
         const effects = { ...state.effects };
         
         if (!effects[effectId]) {
-          console.warn(`Effect ${effectId} not found`);
+          debugLog('store.effectNotFound', { effectId });
           return;
         }
         
@@ -717,7 +720,7 @@ const useCharacterStore = create(devtools(
         const effects = { ...state.effects };
 
         if (!effects[effectId]) {
-          console.warn(`Effect ${effectId} not found`);
+          debugLog('store.effectNotFound', { effectId });
           return;
         }
 
