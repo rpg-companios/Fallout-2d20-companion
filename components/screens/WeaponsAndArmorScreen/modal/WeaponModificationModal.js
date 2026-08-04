@@ -61,19 +61,14 @@ function normalizeSlotKey(slot) {
   return aliases[singular] || singular;
 }
 
-function translateModPrefix(token) {
-  if (!token) return token;
-  const t = String(token).trim();
-  // Keep original token as fallback to avoid showing generic i18n error text for unknown prefixes.
-  return tWeaponsAndArmorScreen(`weapon.modPrefixes.${t}`, t);
-}
-
+// mod.prefix (а при его отсутствии — mod.name) уже локализован в
+// i18n/<loc>/data/equipment/weapons/weapon_mods.json — единственном источнике
+// истины для названий и префиксов модов. Второго словаря (modPrefixes) не нужно:
+// prefix приходит из каталога в языке текущей локали и используется напрямую.
 function getModDisplayName(mod, weaponBaseName) {
   if (!mod) return '';
-  const rawPrefix = mod.prefix || '';
-  const rawName = mod.name || '';
-  const localizedPrefix = translateModPrefix(rawPrefix || rawName);
-  return weaponBaseName ? declinePrefix(localizedPrefix, weaponBaseName) : localizedPrefix;
+  const token = (mod.prefix || mod.name || '').trim();
+  return weaponBaseName ? declinePrefix(token, weaponBaseName) : token;
 }
 
 function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {

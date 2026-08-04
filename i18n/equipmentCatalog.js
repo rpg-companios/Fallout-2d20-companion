@@ -1,5 +1,4 @@
 // Locale-specific display data (names, descriptions, flavour text)
-import { debugLog } from '../src/debug/falloutDebug';
 import ruWeapons from './ru-RU/data/equipment/weapons/weapons.json';
 import ruWeaponMods from './ru-RU/data/equipment/weapons/weapon_mods.json';
 import ruArmor from './ru-RU/data/equipment/armor/armor.json';
@@ -191,16 +190,17 @@ const EQUIPMENT_BY_LOCALE = {
 
 /**
  * Merges two arrays by `id`, with i18n fields (name, etc.) overlaid on data fields.
- * Items present only in data are included with a fallback name of their id.
+ * Строгий контракт: у каждой позиции данных обязан быть локализованный name —
+ * иначе это дефект данных и каталог строится только с ошибкой (никаких фолбэков на id).
  */
 export const mergeById = (dataArr, i18nArr) => {
-  const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
+  const i18nMap = new Map((i18nArr || []).map((item) => [item.id, item]));
   return (dataArr || []).map((dataItem) => {
-    const i18nItem = i18nMap[dataItem.id] || {};
-    if (!i18nItem.name) {
-      debugLog('catalog.missingI18n', { id: dataItem.id });
+    const i18nItem = i18nMap.get(dataItem.id);
+    if (!i18nItem?.name) {
+      throw new Error(`[equipmentCatalog] Missing i18n name for id: ${dataItem.id}`);
     }
-    return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
+    return { ...dataItem, ...i18nItem, name: i18nItem.name };
   });
 };
 
@@ -254,8 +254,9 @@ const validateConsumablesContract = (items, allowedTypes, fallbackType) => {
 };
 
 export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
-  const normalized = normalizeLocale(locale);
-  const i18n = EQUIPMENT_BY_LOCALE[normalized] || EQUIPMENT_BY_LOCALE['ru-RU'];
+  // normalizeLocale уже гарантирует ключ из SUPPORTED_LOCALES (ru-RU|en-EN),
+  // поэтому фолбэк на ru-RU здесь невозможен — берём локализованный словарь напрямую.
+  const i18n = EQUIPMENT_BY_LOCALE[normalizeLocale(locale)];
 
   // Weapons: merge data/ stats with i18n names/flavour
   const weapons = mergeById(dataWeapons, i18n.weapons).map((w) => ({ ...w, itemType: 'weapon' }));
@@ -324,11 +325,11 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
     ...group,
     type: (i18n.clothes?.clothes || []).find((g) => g.clothingType === group.clothingType)?.type || group.type,
     items: (group.items || []).map((dataItem) => {
-      const i18nItem = i18nClothesMap[dataItem.id] || {};
-      if (!i18nItem.name) {
-        debugLog('catalog.missingI18nClothes', { id: dataItem.id });
+      const i18nItem = i18nClothesMap[dataItem.id];
+      if (!i18nItem?.name) {
+        throw new Error(`[equipmentCatalog] Missing clothes i18n name for id: ${dataItem.id}`);
       }
-      return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
+      return { ...dataItem, ...i18nItem, name: i18nItem.name };
     }),
   }));
 
@@ -353,10 +354,13 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   // Equipment kits: merge locale-independent items with i18n names
   const kitNames = i18n.equipmentKits || {};
   const equipmentKits = Object.fromEntries(
-    Object.entries(ALL_KIT_DATA).map(([kitId, kitData]) => [
-      kitId,
-      { name: kitNames[kitId]?.name || kitId, ...kitData },
-    ])
+    Object.entries(ALL_KIT_DATA).map(([kitId, kitData]) => {
+      const name = kitNames[kitId]?.name;
+      if (!name) {
+        throw new Error(`[equipmentCatalog] Missing equipment kit i18n name for id: ${kitId}`);
+      }
+      return [kitId, { name, ...kitData }];
+    })
   );
 
   return {

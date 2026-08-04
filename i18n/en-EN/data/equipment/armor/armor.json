@@ -2,6 +2,7 @@
   "armor": [
     {
       "categoryKey": "raiderArmor",
+      "type": "Raider Armor",
       "items": [
         { "id": "armor_raider_chest_001", "name": "Raider Chest Piece" },
         { "id": "armor_raider_leg_001", "name": "Raider Leg" },
@@ -16,6 +17,7 @@
     },
     {
       "categoryKey": "leatherArmor",
+      "type": "Leather Armor",
       "items": [
         { "id": "armor_leather_chest_001", "name": "Leather Chest Piece" },
         { "id": "armor_leather_leg_001", "name": "Leather Leg" },
@@ -30,6 +32,7 @@
     },
     {
       "categoryKey": "metalArmor",
+      "type": "Metal Armor",
       "items": [
         { "id": "armor_metal_head_001", "name": "Metal Helmet" },
         { "id": "armor_metal_chest_001", "name": "Metal Chest Piece" },
@@ -47,6 +50,7 @@
     },
     {
       "categoryKey": "combatArmor",
+      "type": "Combat Armor",
       "items": [
         { "id": "armor_combat_head_001", "name": "Combat Helmet" },
         { "id": "armor_combat_chest_001", "name": "Combat Chest Piece" },
@@ -64,6 +68,7 @@
     },
     {
       "categoryKey": "synthArmor",
+      "type": "Synth Armor",
       "items": [
         { "id": "armor_synth_head_001", "name": "Synth Helmet" },
         { "id": "armor_synth_chest_001", "name": "Synth Chest Piece" },
@@ -81,6 +86,7 @@
     },
     {
       "categoryKey": "vaultSecurityArmor",
+      "type": "Vault-Tec Security Armor",
       "items": [
         { "id": "armor_vault_head_001", "name": "Vault Security Helmet" },
         { "id": "armor_vault_fullbody_001", "name": "Vault Security Armor" }
