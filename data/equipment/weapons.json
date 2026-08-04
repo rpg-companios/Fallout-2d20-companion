@@ -2863,6 +2863,35 @@
     "weaponType": "Light"
   },
   {
+    "id": "weapon_crossbow",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 44,
+    "rarity": 2,
+    "ammoId": "ammo_bolt",
+    "range": "M",
+    "imageName": "Crossbow",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [],
+    "qualities": [
+      {
+        "qualityId": "quality_silent"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_slow_load"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,

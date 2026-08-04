@@ -5168,5 +5168,60 @@
         "name": "Bayonet"
       }
     ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_198",
+    "slot": "Frame",
+    "cost": 30,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_crossbow"
+    ],
+    "effectsLegacy": "plus 1 CD Damage, minus 1 Fire Rate, lose Recoil 6",
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_199",
+    "slot": "Sights",
+    "cost": 10,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_crossbow"
+    ],
+    "effectsLegacy": "plus 1 Range",
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_200",
+    "slot": "Sights",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_crossbow"
+    ],
+    "effectsLegacy": "plus 1 Range, gain Accurate",
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "name": "Accurate"
+      }
+    ]
   }
 ]

@@ -1180,5 +1180,23 @@
     "name": "Large Bayonet",
     "prefix": "Bayoneted",
     "effectDescription": "gain Bayonet"
+  },
+  {
+    "id": "mod_198",
+    "name": "Блочная рама",
+    "prefix": "Блочный",
+    "effectDescription": "+1 CD урона, -1 скорострельность, убирает «Отдача 6»"
+  },
+  {
+    "id": "mod_199",
+    "name": "Железный прицел",
+    "prefix": "",
+    "effectDescription": "+1 дистанция"
+  },
+  {
+    "id": "mod_200",
+    "name": "Прицел с подсветкой",
+    "prefix": "Подсвеченный",
+    "effectDescription": "+1 дистанция, добавляет «Точное»"
   }
 ]

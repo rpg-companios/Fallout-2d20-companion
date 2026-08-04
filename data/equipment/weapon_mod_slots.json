@@ -219,5 +219,9 @@
   "weapon_eugene": {
     "Barrel": ["mod_096"],
     "Sights": ["mod_033"]
+  },
+  "weapon_crossbow": {
+    "Frame": ["mod_198"],
+    "Sights": ["mod_199", "mod_200"]
   }
 }

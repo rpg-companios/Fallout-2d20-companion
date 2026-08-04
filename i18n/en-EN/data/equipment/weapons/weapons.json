@@ -1130,6 +1130,16 @@
     }
   },
   {
+    "id": "weapon_crossbow",
+    "name": "Crossbow",
+    "rangeName": "Medium",
+    "flavour": "Despite its primitiveness, the crossbow has many advantages: the weapon is light, ammunition is simpler to make than bullets, and shooting is nearly silent. Bolts can also be crafted with various effects, making it a versatile weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
     "id": "unarmed_human",
     "name": "Fists",
     "rangeName": "Close"
