@@ -2746,6 +2746,39 @@
     "withoutMods": true
   },
   {
+    "id": "weapon_pistol_injector",
+    "itemType": "weapon",
+    "damage": 0,
+    "fireRate": 0,
+    "weight": "5",
+    "cost": 333,
+    "rarity": 5,
+    "ammoId": "ammo_tranq_dart",
+    "range": "C",
+    "imageName": "Pistol Injector",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "persistent"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_tranq_x",
+        "value": 3
+      },
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_reliable"
+      }
+    ],
+    "weaponType": "Light",
+    "withoutMods": true
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,
