@@ -1696,8 +1696,8 @@
     "damage": 5,
     "fireRate": 0,
     "weight": "8",
-    "cost": 115,
-    "rarity": 4,
+    "cost": 500,
+    "rarity": 3,
     "ammoId": "ammo_fusion_core",
     "range": "C",
     "imageName": "Assaultron Head Laser",
@@ -2915,6 +2915,61 @@
       },
       {
         "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
+    "id": "weapon_wattz_2000",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "8",
+    "cost": 420,
+    "rarity": 5,
+    "ammoId": "ammo_energy_cell",
+    "range": "L",
+    "imageName": "Wattz 2000",
+    "mainAttr": "PER",
+    "mainSkill": "ENERGY_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "damageEffects": [],
+    "qualities": [
+      {
+        "qualityId": "quality_accurate"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Energy",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_sten",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 3,
+    "weight": "9",
+    "cost": 133,
+    "rarity": 5,
+    "ammoId": "ammo_9mm",
+    "range": "M",
+    "imageName": "Sten",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "burst"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_inaccurate"
+      },
+      {
+        "qualityId": "quality_two-handed"
       }
     ],
     "weaponType": "Light"
