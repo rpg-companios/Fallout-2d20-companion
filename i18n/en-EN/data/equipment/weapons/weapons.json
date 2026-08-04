@@ -1140,6 +1140,16 @@
     }
   },
   {
+    "id": "weapon_boarding_pistol",
+    "name": "Boarding Pistol",
+    "rangeName": "Medium",
+    "flavour": "A boarding weapon firing a grappling hook. On a hit, the target must pass a test or be pulled closer; it can also be used to move the wielder across short distances.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
     "id": "unarmed_human",
     "name": "Fists",
     "rangeName": "Close"

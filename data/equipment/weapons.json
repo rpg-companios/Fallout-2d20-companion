@@ -2892,6 +2892,34 @@
     "weaponType": "Light"
   },
   {
+    "id": "weapon_boarding_pistol",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 3,
+    "weight": "9",
+    "cost": 55,
+    "rarity": 2,
+    "ammoId": "ammo_grappling_hook",
+    "range": "M",
+    "imageName": "Boarding Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "piercing"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_inaccurate"
+      },
+      {
+        "qualityId": "quality_unreliable"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,

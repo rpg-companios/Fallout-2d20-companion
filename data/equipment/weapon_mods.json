@@ -5223,5 +5223,38 @@
         "name": "Accurate"
       }
     ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_201",
+    "slot": "Winch",
+    "cost": 6,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_boarding_pistol"
+    ],
+    "effectsLegacy": "gain Reliable"
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_202",
+    "slot": "Winch",
+    "cost": 10,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_boarding_pistol"
+    ],
+    "effectsLegacy": "plus 1 CD Damage"
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_203",
+    "slot": "Barrels",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_boarding_pistol"
+    ],
+    "effectsLegacy": "plus 1 Range"
   }
 ]

@@ -223,5 +223,9 @@
   "weapon_crossbow": {
     "Frame": ["mod_198"],
     "Sights": ["mod_199", "mod_200"]
+  },
+  "weapon_boarding_pistol": {
+    "Winch": ["mod_201", "mod_202"],
+    "Barrel": ["mod_017", "mod_203"]
   }
 }
