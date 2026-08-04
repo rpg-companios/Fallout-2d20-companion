@@ -50,6 +50,7 @@ import {
 } from './resolvers.js';
 
 import { normalizeForStore, denormalizeForSave } from './migrations.js';
+import { CURRENT_SCHEMA_VERSION } from './saveSchema.js';
 import { legacyEffectToStore } from './effectsSync.js';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
@@ -926,7 +927,7 @@ const useCharacterStore = create(devtools(
         effects: state.effects,
         selectedPerks: state.selectedPerks,
         robot: state.robot,
-        schemaVersion: 1,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated
       onRehydrateStorage: () => (state) => {

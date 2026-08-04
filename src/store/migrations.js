@@ -1,6 +1,8 @@
 // src/store/migrations.js
 // Минимальные миграционные функции для перехода к нормализованному формату
 
+import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+
 /**
  * Преобразует атрибуты из старого формата [{name, value}] в словарь
  */
@@ -226,7 +228,7 @@ export const normalizeForStore = (data = {}) => {
     skills: normalizeSkills(data.skills),
     items: normalizeItems(data.equipment, data.equippedWeapons),
     effects: normalizeEffects(data.activeTimedEffects),
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
   };
 };
 
@@ -330,3 +332,57 @@ export const denormalizeForSave = (storeState = {}) => {
 export const denormalizeCharacterState = (storeState = {}) => {
   return denormalizeForSave(storeState);
 };
+
+// ---------------------------------------------------------------------------
+// Версионированные миграции сохранения персонажа
+// ---------------------------------------------------------------------------
+//
+// Механизм конвертации старых сохранений в новый формат, чтобы не «плодить
+// fallback» в loadCharacter. Каждая миграция — чистая функция (state) => state',
+// которая переводит сохранение РОВНО на одну версию вперёд.
+//
+// Правила (владелец):
+//   - Индекс миграции в массиве = версия, ИЗ которой она переводит (MIGRATIONS[v0] -> v1).
+//   - Миграция должна быть чистой и идемпотентной: повторный прогон не ломает данные.
+//   - Никогда не удаляй старые миграции — только добавляй новые в конец.
+//   - Новое поле в сохранении = новая миграция, а НЕ `|| fallback` в loadCharacter.
+
+/**
+ * Последовательно применяет миграции, пока состояние не достигнет
+ * CURRENT_SCHEMA_VERSION. Сохранения с неизвестной/будущей версией
+ * не трогаются (вернём как есть), чтобы не повредить данные.
+ */
+export function migrateCharacterState(data) {
+  if (!data || typeof data !== 'object') return data;
+
+  let state = { ...data };
+  const fromVersion = Number.isInteger(state.schemaVersion)
+    ? state.schemaVersion
+    : LEGACY_SCHEMA_VERSION;
+
+  if (fromVersion >= CURRENT_SCHEMA_VERSION) {
+    return state;
+  }
+
+  let version = fromVersion;
+  while (version < CURRENT_SCHEMA_VERSION) {
+    const migrate = MIGRATIONS[version];
+    if (typeof migrate !== 'function') {
+      // Нет миграции для этой версии — не знаем, как преобразовать. Не ломаем данные.
+      break;
+    }
+    state = migrate(state) || state;
+    version += 1;
+    state.schemaVersion = version;
+  }
+
+  return state;
+}
+
+/**
+ * Реестр миграций по версиям.
+ * MIGRATIONS[0] — переход v0 -> v1, MIGRATIONS[1] — v1 -> v2, и т.д.
+ * Сейчас версия 0 (текущий формат), поэтому реестр пуст. Новые миграции
+ * добавляются сюда по мере изменения формата.
+ */
+const MIGRATIONS = [];

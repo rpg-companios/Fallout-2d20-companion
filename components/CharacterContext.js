@@ -72,7 +72,8 @@ import { Alert, Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
-import { denormalizeCharacterState } from '../src/store/migrations.js';
+import { denormalizeCharacterState, migrateCharacterState } from '../src/store/migrations.js';
+import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/saveSchema.js';
 import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
 const INITIAL_LEVEL = 1;
@@ -96,15 +97,21 @@ const serializeState = (state) => ({
   modifiedItems: state.modifiedItems instanceof Map
     ? Array.from(state.modifiedItems.entries())
     : (Array.isArray(state.modifiedItems) ? state.modifiedItems : []),
-  schemaVersion: 1,
+  schemaVersion: CURRENT_SCHEMA_VERSION,
 });
 
-const deserializeState = (data) => ({
-  ...data,
-  origin: resolveOrigin(data.origin),
-  modifiedItems: new Map(Array.isArray(data.modifiedItems) ? data.modifiedItems : []),
-  schemaVersion: data.schemaVersion ?? 0,
-});
+const deserializeState = (data) => {
+  // Прогоняем сохранение через миграции: если формат старый (v0), приводим к
+  // текущей версии. Миграции покрывают будущие изменения формата — вместо
+  // «плодящихся fallback» в loadCharacter.
+  const migrated = migrateCharacterState(data);
+  return {
+    ...migrated,
+    origin: resolveOrigin(migrated.origin),
+    modifiedItems: new Map(Array.isArray(migrated.modifiedItems) ? migrated.modifiedItems : []),
+    schemaVersion: migrated.schemaVersion ?? LEGACY_SCHEMA_VERSION,
+  };
+};
 
 // ─── Силовая броня: каталожные справочники и тексты алертов ────────────────
 // Механика — domain/powerArmor.js; специфика — docs/architecture/power-armor-plan.md.
