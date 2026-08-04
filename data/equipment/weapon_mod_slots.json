@@ -209,5 +209,11 @@
     "Stock": ["mod_028", "mod_029"],
     "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037"],
     "Muzzle": ["mod_042"]
+  },
+  "weapon_magnum_monicon": {
+    "Receiver": ["mod_004", "mod_005", "mod_006"],
+    "Barrel": ["mod_015", "mod_016"],
+    "Grip": ["mod_026"],
+    "Sights": ["mod_033", "mod_034", "mod_038"]
   }
 }

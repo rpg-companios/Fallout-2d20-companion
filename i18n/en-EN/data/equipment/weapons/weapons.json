@@ -1100,6 +1100,16 @@
     }
   },
   {
+    "id": "weapon_magnum_monicon",
+    "name": "Magnum Monicon",
+    "rangeName": "Medium",
+    "flavour": "The Magnum Monicon deals all types of damage. Apply damage as usual, then reduce it by the target's lowest damage resistance (Physical, Energy, Radiation, or Poison) at the point of impact.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
     "id": "unarmed_human",
     "name": "Fists",
     "rangeName": "Close"

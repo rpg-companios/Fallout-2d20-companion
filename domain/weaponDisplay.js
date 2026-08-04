@@ -20,6 +20,7 @@ const DAMAGE_TYPE_LABELS = {
     radiation: 'Радиационный',
     poison: 'Ядовитый',
     fire: 'Огненный',
+    special: 'Особый',
   },
   'en-EN': {
     physical: 'Physical',
@@ -27,6 +28,7 @@ const DAMAGE_TYPE_LABELS = {
     radiation: 'Radiation',
     poison: 'Poison',
     fire: 'Fire',
+    special: 'Special',
   },
 };
 

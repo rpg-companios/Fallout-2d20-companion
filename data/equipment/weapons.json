@@ -2779,6 +2779,31 @@
     "withoutMods": true
   },
   {
+    "id": "weapon_magnum_monicon",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 1,
+    "weight": "6",
+    "cost": 0,
+    "rarity": 5,
+    "ammoId": "ammo_44_magnum",
+    "range": "M",
+    "imageName": "Magnum Monicon",
+    "mainAttr": "PER",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "special",
+    "damageEffects": [
+      "piercing"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,
