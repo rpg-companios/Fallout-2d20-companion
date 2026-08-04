@@ -31,11 +31,11 @@ const migrateSkillsToCanonical = (rawSkills) => {
     return canonical ? { ...s, name: canonical } : s;
   });
 };
-import { loadOriginsData, findEnrichedOrigin } from '../domain/origins';
+import { loadOriginsData, findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
-import { isRobotCharacter } from '../domain/origins';
+
 import { resolveBodyPlan } from '../domain/bodyplan';
 import { createEmptyEquippedArmor } from '../domain/equippedArmor';
 import {
@@ -75,7 +75,6 @@ import useCharacterStore from '../src/store/characterStore';
 import { denormalizeCharacterState } from '../src/store/migrations.js';
 import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
-const UNARMED_HUMAN_WEAPON = { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
 const INITIAL_LEVEL = 1;
 
 const CharacterContext = createContext();
@@ -744,13 +743,13 @@ export const CharacterProvider = ({ children }) => {
       // Migrate old [null, null] format to dynamic array
       const rawWeapons = data.equippedWeapons || [];
       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
-      // Add unarmed_human for human characters if not present (Requirement 13.1)
+      // Ensure the archetype's built-in unarmed weapon is present on load
+      // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
       const loadedOrigin = resolveOrigin(data.origin);
       const loadedTrait = data.trait || null;
-      if (!isRobotCharacter({ origin: loadedOrigin, trait: loadedTrait })) {
-        if (!migratedWeapons.some(w => w?.id === 'unarmed_human')) {
-          migratedWeapons = [UNARMED_HUMAN_WEAPON, ...migratedWeapons];
-        }
+      const builtin = getBuiltinBaseWeapon({ origin: loadedOrigin, trait: loadedTrait });
+      if (builtin && !migratedWeapons.some(w => w?.id === builtin.id)) {
+        migratedWeapons = [builtin, ...migratedWeapons];
       }
       setEquippedWeapons(migratedWeapons);
       // Seed the store's robot body plan first so derived carry-weight resolves

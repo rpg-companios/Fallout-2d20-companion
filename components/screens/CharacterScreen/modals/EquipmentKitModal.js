@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
 import { initRobotSlots } from '../../../../domain/robotEquip';
-import { isRobotCharacter, getBodyPlan } from '../../../../domain/origins';
+import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../domain/origins';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { useLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/EquipmentKitModal.styles';
@@ -295,14 +295,15 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         robotModules: modules,
       });
     } else {
-      const UNARMED_ID = 'unarmed_human';
+      // Non-robots always have their built-in unarmed weapon (fists).
+      const builtin = getBuiltinBaseWeapon(character);
       onSelectKit({
         name: kit.name,
         items: finalItems,
         weight,
         price,
         caps: totalCaps,
-        unarmedWeaponId: UNARMED_ID,
+        unarmedWeaponId: builtin?.id || null,
       });
     }
 

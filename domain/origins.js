@@ -117,6 +117,24 @@ export function getBodyPlan(character) {
 }
 
 // ---------------------------------------------------------------------------
+// Builtin base weapon (unarmed)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the character's built-in unarmed weapon, determined by archetype.
+ * - Non-robots (human, mutant, ghoul, cyborg) always have fists (`unarmed_human`).
+ * - Robots have no built-in unarmed weapon here: their melee comes from a
+ *   manipulator/limb (`robot_weapon_manipulator`) chosen via the equipment kit,
+ *   so nothing is injected automatically.
+ *
+ * @returns {{ id: string, isBuiltin: true, itemType: 'weapon' } | null}
+ */
+export function getBuiltinBaseWeapon(character) {
+  if (isRobotCharacter(character)) return null;
+  return { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
+}
+
+// ---------------------------------------------------------------------------
 // i18n
 // ---------------------------------------------------------------------------
 

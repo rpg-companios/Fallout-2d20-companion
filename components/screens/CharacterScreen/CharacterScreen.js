@@ -549,7 +549,7 @@ export default function CharacterScreen() {
       setEquippedRobotModules(kit.robotModules || []);
       setEquippedWeapons(kit.robotWeapons || []);
     } else {
-      // Human: ensure unarmed_human is in equippedWeapons
+      // Non-robot: ensure the archetype's built-in unarmed weapon (fists) is equipped.
       if (kit.unarmedWeaponId) {
         setEquippedWeapons((prev) => {
           const already = prev.some((w) => w?.id === kit.unarmedWeaponId);
