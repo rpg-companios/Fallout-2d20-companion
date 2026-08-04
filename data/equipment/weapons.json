@@ -2830,6 +2830,39 @@
     "weaponType": "Heavy"
   },
   {
+    "id": "weapon_tear_gas_launcher",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "18",
+    "cost": 254,
+    "rarity": 3,
+    "ammoId": "ammo_tear_gas",
+    "range": "M",
+    "imageName": "Tear Gas Launcher",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "poison",
+    "damageEffects": [
+      "persistent",
+      "stun",
+      "spread"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_blast"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,
