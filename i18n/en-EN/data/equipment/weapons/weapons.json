@@ -1070,6 +1070,26 @@
     }
   },
   {
+    "id": "weapon_ghoul_pistol",
+    "name": "Ghoul Pistol",
+    "rangeName": "Medium",
+    "flavour": "The Ghoul pistol is so heavily modified that its original form remains a mystery. Part revolver, part grenade launcher, this super-powerful pistol brings death and destruction both up close and at range. A truly terrifying weapon that is sure to leave a bloody mess at the pull of the trigger.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_sten_injector",
+    "name": "Sten Injector",
+    "rangeName": "Medium",
+    "flavour": "For those times when a single dart is not enough, this tranquilizer submachine gun can turn several enemies at once into truly... exceptionally calm pincushions. Side effects may vary. Vault-Tec is not responsible for loss of taste, touch, motor functions, or death caused by an overdose of tranquilizer.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
     "id": "unarmed_human",
     "name": "Fists",
     "rangeName": "Close"

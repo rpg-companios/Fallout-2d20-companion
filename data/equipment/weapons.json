@@ -2682,6 +2682,70 @@
     "weaponType": "Light"
   },
   {
+    "id": "weapon_ghoul_pistol",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 3,
+    "weight": "5",
+    "cost": 372,
+    "rarity": 5,
+    "ammoId": "ammo_44_magnum",
+    "range": "M",
+    "imageName": "Ghoul Pistol",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "piercing",
+      "vicious"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_close_quarters"
+      },
+      {
+        "qualityId": "quality_debilitating"
+      }
+    ],
+    "weaponType": "Light",
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_sten_injector",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 3,
+    "weight": "9",
+    "cost": 445,
+    "rarity": 5,
+    "ammoId": "ammo_syringe",
+    "range": "M",
+    "imageName": "Sten Injector",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "persistent",
+      "burst"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_tranq_x",
+        "value": 3
+      },
+      {
+        "qualityId": "quality_inaccurate"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light",
+    "withoutMods": true
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,
