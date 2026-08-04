@@ -2804,6 +2804,32 @@
     "weaponType": "Light"
   },
   {
+    "id": "weapon_eugene",
+    "itemType": "weapon",
+    "damage": 3,
+    "fireRate": 3,
+    "weight": "31",
+    "cost": 2625,
+    "rarity": 3,
+    "ammoId": "ammo_5mm",
+    "range": "M",
+    "imageName": "Eugene",
+    "mainAttr": "STR",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "burst",
+      "spread"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Heavy"
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,
