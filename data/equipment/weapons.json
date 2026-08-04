@@ -2661,6 +2661,27 @@
     "weaponType": "Heavy"
   },
   {
+    "id": "weapon_ghoul_rifle",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "9",
+    "cost": 265,
+    "rarity": 4,
+    "ammoId": "ammo_308",
+    "range": "M",
+    "imageName": "Ghoul Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "piercing"
+    ],
+    "qualities": [],
+    "weaponType": "Light"
+  },
+  {
     "id": "weapon_unarmed_attack",
     "itemType": "weapon",
     "damage": 2,

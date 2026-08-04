@@ -202,5 +202,12 @@
     "Stock": ["mod_028", "mod_030"],
     "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
     "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+  },
+  "weapon_ghoul_rifle": {
+    "Receiver": ["mod_007", "mod_005", "mod_008", "mod_004", "mod_006", "mod_007", "mod_187"],
+    "Barrel": ["mod_017", "mod_018"],
+    "Stock": ["mod_028", "mod_029"],
+    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037"],
+    "Muzzle": ["mod_042"]
   }
 }
