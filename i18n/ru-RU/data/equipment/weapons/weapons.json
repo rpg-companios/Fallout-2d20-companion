@@ -40,6 +40,16 @@
     }
   },
   {
+    "id": "weapon_chinese_assault_rifle",
+    "name": "Китайский автомат",
+    "rangeName": "Средняя",
+    "flavour": "Китайский автомат — надёжное и простое в обслуживании оружие, часто встречающееся у рейдеров по всей Пустоши.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
     "id": "weapon_combat_rifle",
     "name": "Боевая винтовка",
     "rangeName": "Средняя",
@@ -1004,6 +1014,16 @@
     "name": "Пушка Теслы",
     "rangeName": "Дальняя",
     "flavour": "The Tesla cannon is a shoulder-mounted directed Энергооружие using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_underwater_gun",
+    "name": "Подводное ружьё",
+    "rangeName": "Средняя",
+    "flavour": "Пневматическое оружие, разработанное для ВМС США. Конструкция из коррозионно-стойких материалов обеспечивает эффективное применение под водой, стреляя специальными гарпунами.",
     "stockNames": {
       "without": "",
       "with": ""

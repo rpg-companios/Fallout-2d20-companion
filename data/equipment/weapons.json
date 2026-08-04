@@ -95,6 +95,31 @@
     "weaponType": "Light"
   },
   {
+    "id": "weapon_chinese_assault_rifle",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 2,
+    "weight": "2",
+    "cost": 184,
+    "rarity": 3,
+    "ammoId": "ammo_5_56mm",
+    "range": "M",
+    "imageName": "Chinese Assault Rifle",
+    "mainAttr": "AGI",
+    "mainSkill": "SMALL_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [
+      "burst"
+    ],
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Light"
+  },
+  {
     "id": "weapon_combat_rifle",
     "itemType": "weapon",
     "damage": 5,
@@ -2601,6 +2626,36 @@
     ],
     "weaponType": "Energy",
     "withoutMods": true
+  },
+  {
+    "id": "weapon_underwater_gun",
+    "itemType": "weapon",
+    "damage": 8,
+    "fireRate": 0,
+    "weight": "8",
+    "cost": 90,
+    "rarity": 3,
+    "ammoId": "ammo_harpoon",
+    "range": "M",
+    "imageName": "Underwater Gun",
+    "mainAttr": "AGI",
+    "mainSkill": "BIG_GUNS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "damageEffects": [],
+    "qualities": [
+      {
+        "qualityId": "quality_piercing_x",
+        "value": 2
+      },
+      {
+        "qualityId": "quality_silent"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Heavy"
   },
   {
     "id": "weapon_unarmed_attack",

@@ -40,6 +40,16 @@
     }
   },
   {
+    "id": "weapon_chinese_assault_rifle",
+    "name": "Chinese Assault Rifle",
+    "rangeName": "Medium",
+    "flavour": "The Chinese assault rifle is a reliable and simple-to-maintain weapon, commonly found in the hands of raiders across the wasteland.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
     "id": "weapon_combat_rifle",
     "name": "Combat Rifle",
     "rangeName": "Medium",
@@ -1034,6 +1044,16 @@
     "name": "Tesla Cannon",
     "rangeName": "Дальняя",
     "flavour": "The Tesla cannon is a shoulder-mounted directed Энергооружие using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_underwater_gun",
+    "name": "Underwater Gun",
+    "rangeName": "Medium",
+    "flavour": "A pneumatic weapon developed for the US Navy. Its corrosion-resistant construction allows effective use underwater, firing specialized harpoons.",
     "stockNames": {
       "without": "",
       "with": ""
