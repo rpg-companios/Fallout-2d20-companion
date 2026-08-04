@@ -1,0 +1,29 @@
+From ebce92b81b7b016d7ebe7866aeee29bca1c106fe Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Tue, 4 Aug 2026 11:31:17 +0000
+Subject: [PATCH] fix(robot): correct misterHandy default head id
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+bodyplans.json указывал на несуществующий robot_head_mister_handy; реальный предмет — robot_head_mister_handy_eye_stalk. Раньше работало только через фолбэк defaultForBodyPlan в robotEquip.js. Kits уже использовали правильный id.
+---
+ data/bodyplans/bodyplans.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/bodyplans/bodyplans.json b/data/bodyplans/bodyplans.json
+index 04bd1fd..82803e7 100644
+--- a/data/bodyplans/bodyplans.json
++++ b/data/bodyplans/bodyplans.json
+@@ -62,7 +62,7 @@
+       "thruster"
+     ],
+     "defaults": {
+-      "head": "robot_head_mister_handy",
++      "head": "robot_head_mister_handy_eye_stalk",
+       "body": "robot_body_mister_handy",
+       "arm1": "robot_arm_mister_handy",
+       "arm2": "robot_arm_mister_handy",
+-- 
+2.47.3
+
