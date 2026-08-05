@@ -860,7 +860,11 @@ const InventoryScreen = () => {
     });
   };
 
-  const handleEquipArmor = (itemToEquip) => {
+  const handleEquipArmor = (itemToEquipRaw) => {
+    // Совместимость сохранений: статические поля (protectedAreas, itemType, …)
+    // берём из каталога по id — в старых сохранениях их может не быть, и без них
+    // предмет не надевается. Каталог = источник истины.
+    const itemToEquip = resolveLocalizedItem(itemToEquipRaw) || itemToEquipRaw;
     const currentEquipped = equippedArmor;
     if (isRobot && !isRobotOnlyItem(itemToEquip)) {
       const isAllowedClothing = itemToEquip.itemType === 'clothing' && itemToEquip.canRobotWear === true;

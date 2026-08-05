@@ -382,7 +382,68 @@ export function migrateCharacterState(data) {
 /**
  * Реестр миграций по версиям.
  * MIGRATIONS[0] — переход v0 -> v1, MIGRATIONS[1] — v1 -> v2, и т.д.
- * Сейчас версия 0 (текущий формат), поэтому реестр пуст. Новые миграции
- * добавляются сюда по мере изменения формата.
  */
-const MIGRATIONS = [];
+
+// --- v0 -> v1: разделение эффектов (effect_) и качеств (quality_) в экипировке ---
+// В старых сохранениях экипированное оружие хранило качества вперемешку
+// (quality_burst и пр. — теперь это effect_*) и/или поле damageEffects
+// (голые строки). Миграция разводит их по effects/qualities с прямыми id,
+// точно как в data-миграции (патчи 09/11). Идемпотентна.
+const _EFFECT_OLD_IDS = new Set([
+  'quality_burst', 'quality_breaking', 'quality_persistent', 'quality_piercing_x',
+  'quality_radioactive', 'quality_spread', 'quality_stun', 'quality_vicious',
+  'quality_freeze', 'quality_arc',
+]);
+const _ID_RENAME_V0V1 = {
+  quality_burst: 'effect_burst', quality_breaking: 'effect_breaking',
+  quality_persistent: 'effect_persistent', quality_piercing_x: 'effect_piercing_x',
+  quality_radioactive: 'effect_radioactive', quality_spread: 'effect_spread',
+  quality_stun: 'effect_stun', quality_vicious: 'effect_vicious',
+  quality_freeze: 'effect_freeze', quality_arc: 'effect_arc',
+  quality_supressed: 'quality_suppressed',
+};
+const _BARE_TO_EFFECT = {
+  burst: 'effect_burst', piercing: 'effect_piercing_x', persistent: 'effect_persistent',
+  spread: 'effect_spread', vicious: 'effect_vicious', stun: 'effect_stun',
+  radioactive: 'effect_radioactive', breaking: 'effect_breaking', arc: 'effect_arc',
+  freeze: 'effect_freeze',
+};
+const _isEffectId = (id) => String(id).startsWith('effect_');
+const _remapIdV0V1 = (old) => (old === 'quality_silent' ? 'quality_suppressed' : (_ID_RENAME_V0V1[old] || old));
+
+const _migrateEquippedEntryV0V1 = (entry) => {
+  if (!entry || typeof entry !== 'object') return entry;
+  const effectsMap = new Map();
+  (entry.effects || []).forEach((e) => {
+    const id = (e && e.effectId) || e;
+    if (id) effectsMap.set(id, e && e.value != null ? { effectId: id, value: e.value } : { effectId: id });
+  });
+  const qualities = [];
+  (entry.qualities || []).forEach((q) => {
+    const oldId = (q && q.qualityId) || q;
+    const id = _remapIdV0V1(oldId);
+    if (_isEffectId(id)) effectsMap.set(id, q && q.value != null ? { effectId: id, value: q.value } : { effectId: id });
+    else if (id) qualities.push(q && q.value != null ? { qualityId: id, value: q.value } : { qualityId: id });
+  });
+  (entry.damageEffects || []).forEach((name) => {
+    const id = _BARE_TO_EFFECT[name] || name;
+    if (id) effectsMap.set(id, { effectId: id });
+  });
+  const out = { ...entry };
+  out.effects = [...effectsMap.values()];
+  out.qualities = qualities;
+  delete out.damageEffects;
+  delete out.damage_effects;
+  return out;
+};
+
+const MIGRATIONS = [
+  // v0 -> v1: разделить эффекты/качества в экипированном оружии.
+  (state) => {
+    const next = { ...state };
+    if (Array.isArray(next.equippedWeapons)) {
+      next.equippedWeapons = next.equippedWeapons.map(_migrateEquippedEntryV0V1);
+    }
+    return next;
+  },
+];
