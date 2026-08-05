@@ -22,8 +22,8 @@ import * as db from '../../../db';
 import {
   createCharacterExportPayload,
   parseCharacterImportPayload,
-  downloadCharacterPayloadWeb,
-  pickCharacterFileWeb,
+  downloadCharacterPayload,
+  pickCharacterFile,
   IMPORT_ERRORS,
 } from './logic/characterTransfer';
 import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
@@ -235,7 +235,7 @@ export default function HomeScreen({ navigation }) {
 
 
   const handleDownload = async (character) => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    if (false) { // cross-platform
       Alert.alert(
         tHomeScreen('title'),
         tHomeScreen('download.unsupported')
@@ -250,11 +250,11 @@ export default function HomeScreen({ navigation }) {
     }
 
     const payload = createCharacterExportPayload(row);
-    downloadCharacterPayloadWeb(payload, row.name);
+    downloadCharacterPayload(payload, row.name);
   };
 
   const handleUpload = async () => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    if (false) { // cross-platform
       Alert.alert(
         tHomeScreen('title'),
         tHomeScreen('upload.unsupported')
@@ -262,7 +262,7 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const rawText = await pickCharacterFileWeb();
+    const rawText = await pickCharacterFile();
     if (!rawText) return;
 
     const parsed = parseCharacterImportPayload(rawText);
