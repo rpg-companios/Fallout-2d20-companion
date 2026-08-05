@@ -243,18 +243,34 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const row = await db.loadCharacterById(character.id);
-    if (!row) {
-      Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
-      return;
-    }
+    try {
+      const row = await db.loadCharacterById(character.id);
+      if (!row) {
+        Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
+        return;
+      }
 
-    const payload = createCharacterExportPayload(row);
-    downloadCharacterPayloadWeb(payload, row.name);
+      const payload = createCharacterExportPayload(row);
+      // downloadCharacterPayloadWeb теперь асинхронный и использует Web Share API для PWA
+      const result = await downloadCharacterPayloadWeb(payload, row.name);
+
+      if (result && !result.success && !result.aborted) {
+        Alert.alert(
+          tHomeScreen('title'),
+          tHomeScreen('download.errors.failed', 'Не удалось сохранить файл')
+        );
+      }
+    } catch (e) {
+      console.error('handleDownload error:', e);
+      Alert.alert(
+        tHomeScreen('title'),
+        tHomeScreen('download.errors.failed', 'Не удалось сохранить файл')
+      );
+    }
   };
 
   const handleUpload = async () => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    if (Platform.OS !== 'web') {
       Alert.alert(
         tHomeScreen('title'),
         tHomeScreen('upload.unsupported')
@@ -262,6 +278,9 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
+    // ВАЖНО: для iOS Safari вызов pickCharacterFileWeb должен быть
+    // прямо в ответ на жест пользователя, без промежуточных async-операций
+    // (используем expo-document-picker под капотом)
     const rawText = await pickCharacterFileWeb();
     if (!rawText) return;
 
