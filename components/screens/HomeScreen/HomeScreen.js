@@ -81,7 +81,7 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
         }}
         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
       >
-        <Text style={styles.downloadIcon}>⭳</Text>
+        <Text style={styles.downloadIcon}>📥</Text>
       </TouchableOpacity>
       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
       {character.level ? (
