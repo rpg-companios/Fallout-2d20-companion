@@ -22,7 +22,7 @@ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { applyArmorMods } from '../../../domain/modsEquip';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
-import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
+import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects } from '../../../domain/weaponDisplay';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { getRobotSlotKeys } from '../../../domain/robotEquip';
@@ -305,7 +305,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     // Канонический формат полей оружия
     const weaponName = displayWeapon.name ?? tWeaponsAndArmorScreen('common.empty');
     const damageType = resolveWeaponDamageType(displayWeapon.damage_type ?? displayWeapon.damageType);
-    const effectsValue = displayWeapon.damage_effects ?? displayWeapon.damageEffects ?? tWeaponsAndArmorScreen('common.empty');
+    const effectsValue = resolveWeaponEffects(displayWeapon.effects) || tWeaponsAndArmorScreen('common.empty');
     const fireRateBase = Number(displayWeapon.fire_rate ?? 0) || 0;
     const rangeValue = displayWeapon.range_name ?? displayWeapon.rangeName ?? tWeaponsAndArmorScreen('common.empty');
     const qualitiesValue = resolveWeaponQualities(displayWeapon.qualities) || tWeaponsAndArmorScreen('common.empty');
@@ -454,7 +454,7 @@ const findLocalizedWeapon = (catalog, weapon) => {
       range_name: weapon.range_name,
       weight: weapon.weight,
       cost: weapon.cost,
-      damage_effects: weapon.damage_effects,
+      effects: weapon.effects,
     } : {
       name: base.name || weapon.name,
     }),

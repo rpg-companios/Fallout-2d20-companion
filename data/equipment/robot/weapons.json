@@ -17,7 +17,8 @@
       {
         "qualityId": "quality_close_quarters"
       }
-    ]
+    ],
+    "effects": []
   },
   {
     "id": "robot_weapon_protectron_manipulator",
@@ -37,7 +38,8 @@
       {
         "qualityId": "quality_close_quarters"
       }
-    ]
+    ],
+    "effects": []
   },
   {
     "id": "robot_weapon_flamethrower",
@@ -57,12 +59,13 @@
     "installComplexity": null,
     "installPerksRequired": null,
     "installSkill": null,
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_persistent"
+        "effectId": "effect_persistent"
       },
       {
-        "qualityId": "quality_spread"
+        "effectId": "effect_spread"
       }
     ]
   },
@@ -73,9 +76,6 @@
     "weaponType": "Melee",
     "damage": 3,
     "damageType": "physical",
-    "damageEffects": [
-      "piercing"
-    ],
     "range": "C",
     "mainAttr": "STR",
     "mainSkill": "MELEE_WEAPONS",
@@ -90,10 +90,15 @@
     "installSkill": "Repair",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_vicious"
       },
       {
-        "qualityId": "quality_close_quarters"
+        "effectId": "effect_piercing_x"
       }
     ]
   },
@@ -115,10 +120,10 @@
     "installComplexity": null,
     "installPerksRequired": null,
     "installSkill": null,
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
+        "effectId": "effect_piercing_x"
       }
     ]
   },
@@ -142,10 +147,12 @@
     "installSkill": null,
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_close_quarters"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_burst"
       }
     ]
   },
@@ -171,13 +178,15 @@
     "installSkill": "Science",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
-        "qualityId": "quality_freeze"
-      },
-      {
         "qualityId": "quality_inaccurate"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_freeze"
       }
     ]
   },
@@ -199,10 +208,12 @@
     "installSkill": null,
     "qualities": [
       {
-        "qualityId": "quality_stun"
-      },
-      {
         "qualityId": "quality_close_quarters"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_stun"
       }
     ]
   },
@@ -226,7 +237,8 @@
       {
         "qualityId": "quality_blast"
       }
-    ]
+    ],
+    "effects": []
   },
   {
     "id": "robot_weapon_construction_claw",
@@ -234,9 +246,6 @@
     "weaponType": "Unarmed",
     "damage": 4,
     "damageType": "physical",
-    "damageEffects": [
-      "breaking"
-    ],
     "range": "C",
     "mainAttr": "STR",
     "mainSkill": "UNARMED",
@@ -253,6 +262,11 @@
       {
         "qualityId": "quality_close_quarters"
       }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_breaking"
+      }
     ]
   },
   {
@@ -261,9 +275,6 @@
     "weaponType": "Unarmed",
     "damage": 5,
     "damageType": "physical",
-    "damageEffects": [
-      "vicious"
-    ],
     "range": "C",
     "mainAttr": "STR",
     "mainSkill": "UNARMED",
@@ -283,6 +294,11 @@
       {
         "qualityId": "quality_close_quarters"
       }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
     ]
   },
   {
@@ -291,9 +307,6 @@
     "weaponType": "Unarmed",
     "damage": 4,
     "damageType": "physical",
-    "damageEffects": [
-      "breaking"
-    ],
     "range": "C",
     "mainAttr": "STR",
     "mainSkill": "UNARMED",
@@ -308,10 +321,15 @@
     "installSkill": "Repair",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
+        "qualityId": "quality_close_quarters"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_vicious"
       },
       {
-        "qualityId": "quality_close_quarters"
+        "effectId": "effect_breaking"
       }
     ]
   },
@@ -334,9 +352,10 @@
       "Science! 1"
     ],
     "installSkill": "Science",
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_stun"
+        "effectId": "effect_stun"
       }
     ]
   },
@@ -359,9 +378,10 @@
       "Science! 1"
     ],
     "installSkill": "Science",
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_stun"
+        "effectId": "effect_stun"
       }
     ]
   },
@@ -389,10 +409,10 @@
       "damageFloor": 4,
       "damageReductionPerAmmoSaved": 1
     },
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
+        "effectId": "effect_piercing_x"
       }
     ]
   },
@@ -414,9 +434,10 @@
     "installPerksRequired": null,
     "installSkill": null,
     "ammoId": "ammo_energy_cell",
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_stun"
+        "effectId": "effect_stun"
       }
     ]
   },
@@ -440,7 +461,8 @@
       {
         "qualityId": "quality_close_quarters"
       }
-    ]
+    ],
+    "effects": []
   },
   {
     "id": "robot_weapon_tesla_arm",
@@ -463,9 +485,10 @@
       "Science! 1"
     ],
     "installSkill": "Science",
-    "qualities": [
+    "qualities": [],
+    "effects": [
       {
-        "qualityId": "quality_burst"
+        "effectId": "effect_burst"
       }
     ]
   },
@@ -475,9 +498,6 @@
     "weaponType": "Small Guns",
     "damage": 4,
     "damageType": "poison",
-    "damageEffects": [
-      "persistent"
-    ],
     "fireRate": 0,
     "range": "M",
     "mainAttr": "AGI",
@@ -496,6 +516,11 @@
       },
       {
         "qualityId": "quality_inaccurate"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_persistent"
       }
     ]
   }

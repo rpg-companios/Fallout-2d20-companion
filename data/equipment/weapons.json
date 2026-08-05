@@ -16,13 +16,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
   },
   {
     "id": "weapon_10mm_pistol",
@@ -47,7 +49,8 @@
         "qualityId": "quality_reliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_flare_gun",
@@ -70,7 +73,8 @@
       }
     ],
     "weaponType": "Light",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_assault_rifle",
@@ -92,7 +96,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_chinese_assault_rifle",
@@ -109,15 +114,17 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "burst"
-    ],
     "qualities": [
       {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_combat_rifle",
@@ -139,7 +146,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_gauss_rifle",
@@ -158,14 +166,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_hunting_rifle",
@@ -184,14 +193,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_submachine_gun",
@@ -210,16 +220,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_combat_shotgun",
@@ -238,16 +250,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_double_barrel_shotgun",
@@ -266,19 +280,21 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
-        "qualityId": "quality_spread"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      },
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_pipe_bolt_action",
@@ -297,14 +313,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_unreliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_pipe_gun",
@@ -329,7 +346,8 @@
         "qualityId": "quality_unreliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_pipe_revolver",
@@ -354,7 +372,8 @@
         "qualityId": "quality_unreliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_railway_rifle",
@@ -373,9 +392,6 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_breaking"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -385,7 +401,12 @@
         "qualityId": "quality_debilitating"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_breaking"
+      }
+    ]
   },
   {
     "id": "weapon_syringer",
@@ -407,7 +428,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_institute_laser",
@@ -426,16 +448,18 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_close_quarters"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_laser_musket",
@@ -454,14 +478,15 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_laser_gun",
@@ -480,14 +505,15 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_plasma_gun",
@@ -509,7 +535,8 @@
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": []
   },
   {
     "id": "weapon_gamma_gun",
@@ -528,20 +555,21 @@
     "damageType": "radiation",
     "qualities": [
       {
-        "qualityId": "quality_stun"
-      },
-      {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_inaccurate"
       },
       {
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_stun"
+      },
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_fat_man",
@@ -560,15 +588,6 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
-        "qualityId": "quality_breaking"
-      },
-      {
-        "qualityId": "quality_radioactive"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -578,7 +597,18 @@
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      },
+      {
+        "effectId": "effect_breaking"
+      },
+      {
+        "effectId": "effect_radioactive"
+      }
+    ]
   },
   {
     "id": "weapon_flamer",
@@ -597,15 +627,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
-        "qualityId": "quality_burst"
-      },
-      {
-        "qualityId": "quality_persistent"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -615,7 +636,18 @@
         "qualityId": "quality_debilitating"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      },
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_persistent"
+      }
+    ]
   },
   {
     "id": "weapon_gatling_laser",
@@ -634,13 +666,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -650,7 +675,15 @@
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_heavy_incinerator",
@@ -669,22 +702,24 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
-        "qualityId": "quality_burst"
-      },
-      {
-        "qualityId": "quality_persistent"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_debilitating"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      },
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_persistent"
+      }
+    ]
   },
   {
     "id": "weapon_junk_jet",
@@ -706,7 +741,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": []
   },
   {
     "id": "weapon_minigun",
@@ -725,12 +761,6 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -740,7 +770,15 @@
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      },
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_missile_launcher",
@@ -765,7 +803,8 @@
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": []
   },
   {
     "id": "weapon_sword",
@@ -784,14 +823,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_parry"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_combat_knife",
@@ -808,13 +848,13 @@
     "mainSkill": "MELEE_WEAPONS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Melee",
+    "effects": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
+        "effectId": "effect_piercing_x"
       }
-    ],
-    "weaponType": "Melee"
+    ]
   },
   {
     "id": "weapon_machete",
@@ -831,13 +871,13 @@
     "mainSkill": "MELEE_WEAPONS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Melee",
+    "effects": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
+        "effectId": "effect_piercing_x"
       }
-    ],
-    "weaponType": "Melee"
+    ]
   },
   {
     "id": "weapon_ripper",
@@ -854,12 +894,13 @@
     "mainSkill": "MELEE_WEAPONS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Melee",
+    "effects": [
       {
-        "qualityId": "quality_vicious"
+        "effectId": "effect_vicious"
       }
-    ],
-    "weaponType": "Melee"
+    ]
   },
   {
     "id": "weapon_shishkebab",
@@ -878,14 +919,15 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_parry"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_switchblade",
@@ -904,14 +946,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_concealed"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_baseball_bat",
@@ -933,7 +976,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_baseball_bat_aluminum",
@@ -955,7 +999,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_board",
@@ -977,7 +1022,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_lead_pipe",
@@ -995,7 +1041,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_pipe_wrench",
@@ -1013,7 +1060,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_pool_cue",
@@ -1035,7 +1083,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_rolling_pin",
@@ -1053,7 +1102,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_baton",
@@ -1071,7 +1121,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_sledgehammer",
@@ -1089,7 +1140,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_super_sledge",
@@ -1108,13 +1160,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_breaking"
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_breaking"
+      }
+    ]
   },
   {
     "id": "weapon_tire_iron",
@@ -1132,7 +1186,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_walking_cane",
@@ -1150,7 +1205,8 @@
     "hasStockVariant": false,
     "damageType": "physical",
     "qualities": [],
-    "weaponType": "Melee"
+    "weaponType": "Melee",
+    "effects": []
   },
   {
     "id": "weapon_boxing_glove",
@@ -1167,12 +1223,13 @@
     "mainSkill": "UNARMED",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Unarmed",
+    "effects": [
       {
-        "qualityId": "quality_stun"
+        "effectId": "effect_stun"
       }
-    ],
-    "weaponType": "Unarmed"
+    ]
   },
   {
     "id": "weapon_deathclaw_gauntlet",
@@ -1189,13 +1246,13 @@
     "mainSkill": "UNARMED",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Unarmed",
+    "effects": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
+        "effectId": "effect_piercing_x"
       }
-    ],
-    "weaponType": "Unarmed"
+    ]
   },
   {
     "id": "weapon_knuckles",
@@ -1217,7 +1274,8 @@
         "qualityId": "quality_concealed"
       }
     ],
-    "weaponType": "Unarmed"
+    "weaponType": "Unarmed",
+    "effects": []
   },
   {
     "id": "weapon_power_fist",
@@ -1234,12 +1292,13 @@
     "mainSkill": "UNARMED",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Unarmed",
+    "effects": [
       {
-        "qualityId": "quality_stun"
+        "effectId": "effect_stun"
       }
-    ],
-    "weaponType": "Unarmed"
+    ]
   },
   {
     "id": "weapon_throwing_knife",
@@ -1258,21 +1317,22 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_concealed"
       },
       {
         "qualityId": "quality_thrown"
       },
       {
-        "qualityId": "quality_silent"
+        "qualityId": "quality_suppressed"
       }
     ],
     "weaponType": "Thrown",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_tomahawk",
@@ -1291,18 +1351,19 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_thrown"
       },
       {
-        "qualityId": "quality_silent"
+        "qualityId": "quality_suppressed"
       }
     ],
     "weaponType": "Thrown",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_javelin",
@@ -1321,18 +1382,19 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_thrown"
       },
       {
-        "qualityId": "quality_silent"
+        "qualityId": "quality_suppressed"
       }
     ],
     "weaponType": "Thrown",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_baseball_grenade",
@@ -1358,7 +1420,8 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_frag_grenade",
@@ -1384,7 +1447,8 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_molotov",
@@ -1403,9 +1467,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_persistent"
-      },
-      {
         "qualityId": "quality_thrown"
       },
       {
@@ -1413,7 +1474,12 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_persistent"
+      }
+    ]
   },
   {
     "id": "weapon_nuka_grenade",
@@ -1432,15 +1498,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
-        "qualityId": "quality_breaking"
-      },
-      {
-        "qualityId": "quality_radioactive"
-      },
-      {
         "qualityId": "quality_thrown"
       },
       {
@@ -1448,7 +1505,18 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      },
+      {
+        "effectId": "effect_breaking"
+      },
+      {
+        "effectId": "effect_radioactive"
+      }
+    ]
   },
   {
     "id": "weapon_plasma_grenade",
@@ -1474,7 +1542,8 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_pulse_grenade",
@@ -1493,9 +1562,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_stun"
-      },
-      {
         "qualityId": "quality_thrown"
       },
       {
@@ -1503,7 +1569,12 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_stun"
+      }
+    ]
   },
   {
     "id": "weapon_bottlecap_mine",
@@ -1529,7 +1600,8 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_frag_mine",
@@ -1555,7 +1627,8 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_nuke_mine",
@@ -1574,15 +1647,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
-        "qualityId": "quality_breaking"
-      },
-      {
-        "qualityId": "quality_radioactive"
-      },
-      {
         "qualityId": "quality_mine"
       },
       {
@@ -1590,7 +1654,18 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      },
+      {
+        "effectId": "effect_breaking"
+      },
+      {
+        "effectId": "effect_radioactive"
+      }
+    ]
   },
   {
     "id": "weapon_plasma_mine",
@@ -1615,7 +1690,8 @@
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Explosive"
+    "weaponType": "Explosive",
+    "effects": []
   },
   {
     "id": "weapon_m79_grenade_launcher",
@@ -1640,7 +1716,8 @@
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_acid_soaker",
@@ -1657,16 +1734,17 @@
     "mainSkill": "ENERGY_WEAPONS",
     "hasStockVariant": false,
     "damageType": "energy",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Energy",
+    "withoutMods": true,
+    "effects": [
       {
-        "qualityId": "quality_burst"
+        "effectId": "effect_burst"
       },
       {
-        "qualityId": "quality_persistent"
+        "effectId": "effect_persistent"
       }
-    ],
-    "weaponType": "Energy",
-    "withoutMods": true
+    ]
   },
   {
     "id": "weapon_alien_blaster",
@@ -1688,7 +1766,8 @@
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": []
   },
   {
     "id": "weapon_assaultron_head_laser",
@@ -1707,14 +1786,15 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 2
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_mesmetron",
@@ -1731,12 +1811,13 @@
     "mainSkill": "ENERGY_WEAPONS",
     "hasStockVariant": false,
     "damageType": "energy",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Energy",
+    "effects": [
       {
-        "qualityId": "quality_stun"
+        "effectId": "effect_stun"
       }
-    ],
-    "weaponType": "Energy"
+    ]
   },
   {
     "id": "weapon_tesla_rifle",
@@ -1756,12 +1837,14 @@
     "qualities": [
       {
         "qualityId": "quality_two-handed"
-      },
-      {
-        "qualityId": "quality_burst"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_broadsider",
@@ -1780,16 +1863,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
   },
   {
     "id": "weapon_cryolator",
@@ -1808,16 +1893,18 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_debilitating"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_harpoon_gun",
@@ -1836,14 +1923,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 2
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_357_magnum_revolver",
@@ -1862,13 +1950,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
   },
   {
     "id": "weapon_12_7mm_pistol",
@@ -1887,13 +1977,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
   },
   {
     "id": "weapon_12_7mm_smg",
@@ -1912,16 +2004,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_25mm_grenade_apw",
@@ -1946,7 +2040,8 @@
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_9mm_pistol",
@@ -1971,7 +2066,8 @@
         "qualityId": "quality_reliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_anti_materiel_rifle",
@@ -1990,14 +2086,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 2
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_battle_rifle",
@@ -2019,7 +2116,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_black_powder_blunderbuss",
@@ -2038,9 +2136,6 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -2048,7 +2143,12 @@
       }
     ],
     "weaponType": "Light",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_black_powder_pistol",
@@ -2071,7 +2171,8 @@
       }
     ],
     "weaponType": "Light",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_black_powder_rifle",
@@ -2096,7 +2197,8 @@
         "qualityId": "quality_unreliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_gauss_pistol",
@@ -2113,13 +2215,13 @@
     "mainSkill": "ENERGY_WEAPONS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "qualities": [
+    "qualities": [],
+    "weaponType": "Energy",
+    "effects": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
+        "effectId": "effect_piercing_x"
       }
-    ],
-    "weaponType": "Energy"
+    ]
   },
   {
     "id": "weapon_gauss_shotgun",
@@ -2138,13 +2240,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_lever_action_rifle",
@@ -2166,7 +2270,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_light_machine_gun",
@@ -2185,16 +2290,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_pump_action_shotgun",
@@ -2213,13 +2320,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_spread"
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_radium_rifle",
@@ -2239,12 +2348,14 @@
     "qualities": [
       {
         "qualityId": "quality_two-handed"
-      },
-      {
-        "qualityId": "quality_burst"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_sniper_rifle",
@@ -2263,14 +2374,15 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_bow",
@@ -2292,10 +2404,11 @@
         "qualityId": "quality_two-handed"
       },
       {
-        "qualityId": "quality_silent"
+        "qualityId": "quality_suppressed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_alien_atomizer",
@@ -2314,13 +2427,15 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_alien_disintegrator",
@@ -2339,14 +2454,15 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 2
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_arc_welder",
@@ -2365,16 +2481,18 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
-        "qualityId": "quality_persistent"
-      },
-      {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_persistent"
+      }
+    ]
   },
   {
     "id": "weapon_microwave_emitter",
@@ -2399,7 +2517,8 @@
         "qualityId": "quality_debilitating"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": []
   },
   {
     "id": "weapon_50_cal_machine_gun",
@@ -2418,16 +2537,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_auto_grenade_launcher",
@@ -2446,16 +2567,18 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_drone_cannon",
@@ -2480,7 +2603,8 @@
         "qualityId": "quality_blast"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": []
   },
   {
     "id": "weapon_gatling_gun",
@@ -2499,9 +2623,6 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -2511,7 +2632,12 @@
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_gatling_plasma",
@@ -2530,9 +2656,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -2542,7 +2665,12 @@
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_gauss_minigun",
@@ -2561,20 +2689,21 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
-        "qualityId": "quality_piercing_x",
-        "value": 1
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
         "qualityId": "quality_gatling"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_plasma_caster",
@@ -2596,7 +2725,8 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Energy"
+    "weaponType": "Energy",
+    "effects": []
   },
   {
     "id": "weapon_tesla_cannon",
@@ -2615,9 +2745,6 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_burst"
-      },
-      {
         "qualityId": "quality_two-handed"
       },
       {
@@ -2625,7 +2752,12 @@
       }
     ],
     "weaponType": "Energy",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_underwater_gun",
@@ -2642,14 +2774,9 @@
     "mainSkill": "BIG_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [],
     "qualities": [
       {
-        "qualityId": "quality_piercing_x",
-        "value": 2
-      },
-      {
-        "qualityId": "quality_silent"
+        "qualityId": "quality_suppressed"
       },
       {
         "qualityId": "quality_two-handed"
@@ -2658,7 +2785,12 @@
         "qualityId": "quality_underwater"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_ghoul_rifle",
@@ -2675,11 +2807,13 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "piercing"
-    ],
     "qualities": [],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_ghoul_pistol",
@@ -2696,10 +2830,6 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "piercing",
-      "vicious"
-    ],
     "qualities": [
       {
         "qualityId": "quality_close_quarters"
@@ -2709,7 +2839,15 @@
       }
     ],
     "weaponType": "Light",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      },
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
   },
   {
     "id": "weapon_sten_injector",
@@ -2726,14 +2864,9 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "persistent",
-      "burst"
-    ],
     "qualities": [
       {
-        "qualityId": "quality_tranq_x",
-        "value": 3
+        "qualityId": "quality_tranq_x"
       },
       {
         "qualityId": "quality_inaccurate"
@@ -2743,7 +2876,15 @@
       }
     ],
     "weaponType": "Light",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_persistent"
+      },
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_pistol_injector",
@@ -2760,13 +2901,9 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "persistent"
-    ],
     "qualities": [
       {
-        "qualityId": "quality_tranq_x",
-        "value": 3
+        "qualityId": "quality_tranq_x"
       },
       {
         "qualityId": "quality_close_quarters"
@@ -2776,7 +2913,12 @@
       }
     ],
     "weaponType": "Light",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_persistent"
+      }
+    ]
   },
   {
     "id": "weapon_magnum_monicon",
@@ -2793,15 +2935,17 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "special",
-    "damageEffects": [
-      "piercing"
-    ],
     "qualities": [
       {
         "qualityId": "quality_close_quarters"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_eugene",
@@ -2818,16 +2962,20 @@
     "mainSkill": "BIG_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "burst",
-      "spread"
-    ],
     "qualities": [
       {
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Heavy"
+    "weaponType": "Heavy",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      },
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_tear_gas_launcher",
@@ -2844,11 +2992,6 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "poison",
-    "damageEffects": [
-      "persistent",
-      "stun",
-      "spread"
-    ],
     "qualities": [
       {
         "qualityId": "quality_blast"
@@ -2860,7 +3003,18 @@
         "qualityId": "quality_inaccurate"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_persistent"
+      },
+      {
+        "effectId": "effect_stun"
+      },
+      {
+        "effectId": "effect_spread"
+      }
+    ]
   },
   {
     "id": "weapon_crossbow",
@@ -2877,10 +3031,9 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [],
     "qualities": [
       {
-        "qualityId": "quality_silent"
+        "qualityId": "quality_suppressed"
       },
       {
         "qualityId": "quality_two-handed"
@@ -2889,7 +3042,8 @@
         "qualityId": "quality_slow_load"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": []
   },
   {
     "id": "weapon_boarding_pistol",
@@ -2906,9 +3060,6 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "piercing"
-    ],
     "qualities": [
       {
         "qualityId": "quality_inaccurate"
@@ -2917,7 +3068,12 @@
         "qualityId": "quality_unreliable"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
   },
   {
     "id": "weapon_wattz_2000",
@@ -2934,7 +3090,6 @@
     "mainSkill": "ENERGY_WEAPONS",
     "hasStockVariant": false,
     "damageType": "energy",
-    "damageEffects": [],
     "qualities": [
       {
         "qualityId": "quality_accurate"
@@ -2944,7 +3099,8 @@
       }
     ],
     "weaponType": "Energy",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_sten",
@@ -2961,9 +3117,6 @@
     "mainSkill": "SMALL_GUNS",
     "hasStockVariant": false,
     "damageType": "physical",
-    "damageEffects": [
-      "burst"
-    ],
     "qualities": [
       {
         "qualityId": "quality_inaccurate"
@@ -2972,7 +3125,12 @@
         "qualityId": "quality_two-handed"
       }
     ],
-    "weaponType": "Light"
+    "weaponType": "Light",
+    "effects": [
+      {
+        "effectId": "effect_burst"
+      }
+    ]
   },
   {
     "id": "weapon_unarmed_attack",
@@ -2991,7 +3149,8 @@
     "damageType": "physical",
     "qualities": [],
     "weaponType": "Unarmed",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "weapon_rock",
@@ -3010,14 +3169,16 @@
     "damageType": "physical",
     "qualities": [
       {
-        "qualityId": "quality_vicious"
-      },
-      {
         "qualityId": "quality_thrown"
       }
     ],
     "weaponType": "Thrown",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
   },
   {
     "id": "weapon_pulse_mine",
@@ -3043,7 +3204,8 @@
       }
     ],
     "weaponType": "Explosive",
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   },
   {
     "id": "unarmed_human",
@@ -3063,6 +3225,7 @@
         "qualityId": "quality_close_quarters"
       }
     ],
-    "withoutMods": true
+    "withoutMods": true,
+    "effects": []
   }
 ]

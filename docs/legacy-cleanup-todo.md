@@ -86,7 +86,6 @@
 
 ## 8. TODO из кода
 
-- `scripts/markWeaponsWithoutMods.js` — проверить и добавить моды для `weapon_fat_man` и `weapon_heavy_incinerator`
 - `WeaponsAndArmorScreen.js` — Robot Body Upgrade Modal ("Скоро добавим")
 
 ---

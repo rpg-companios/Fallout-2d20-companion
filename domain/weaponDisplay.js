@@ -6,11 +6,18 @@
 
 import ruQualities from '../i18n/ru-RU/data/system/qualities.json';
 import enQualities from '../i18n/en-EN/data/system/qualities.json';
+import ruEffects from '../i18n/ru-RU/data/system/damageEffects.json';
+import enEffects from '../i18n/en-EN/data/system/damageEffects.json';
 import { getCurrentLocale } from '../i18n/locale';
 
 const QUALITY_DICTS = {
   'ru-RU': ruQualities,
   'en-EN': enQualities,
+};
+
+const EFFECT_DICTS = {
+  'ru-RU': ruEffects,
+  'en-EN': enEffects,
 };
 
 const DAMAGE_TYPE_LABELS = {
@@ -68,6 +75,38 @@ export function resolveWeaponQualities(qualities) {
       if (!q || typeof q !== 'object') return '';
       const name = qualityMap[q.qualityId] || q.qualityId || '';
       if (q.value != null) return `${name} ${q.value}`;
+      return name;
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * Локализованный список ЭФФЕКТОВ оружия (effect_* — срабатывают при выпадении
+ символа эффекта). В отличие от качеств, эффекты — отдельная сущность.
+ Принимает массив {effectId, value?} (или JSON-строку из БД).
+ */
+export function resolveWeaponEffects(effects) {
+  const locale = getCurrentLocale();
+  const dict = EFFECT_DICTS[locale] || ruEffects;
+  const effectMap = Object.fromEntries(dict.map((e) => [e.id, e.name]));
+
+  let arr = effects;
+  if (typeof arr === 'string') {
+    try {
+      arr = JSON.parse(arr);
+    } catch {
+      return arr;
+    }
+  }
+  if (!Array.isArray(arr) || arr.length === 0) return '';
+
+  return arr
+    .map((e) => {
+      if (typeof e === 'string') return e;
+      if (!e || typeof e !== 'object') return '';
+      const name = effectMap[e.effectId] || e.effectId || '';
+      if (e.value != null) return `${name} ${e.value}`;
       return name;
     })
     .filter(Boolean)

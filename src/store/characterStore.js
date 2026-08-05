@@ -49,8 +49,8 @@ import {
   calculateParameterTotal
 } from './resolvers.js';
 
-import { normalizeForStore, denormalizeForSave } from './migrations.js';
-import { CURRENT_SCHEMA_VERSION } from './saveSchema.js';
+import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './migrations.js';
+import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
 import { legacyEffectToStore } from './effectsSync.js';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
@@ -920,6 +920,24 @@ const useCharacterStore = create(devtools(
       // (react-native-web maps AsyncStorage onto window.localStorage).
       // Без этого на native localStorage отсутствует и персист молча не работает.
       storage: createJSONStorage(() => AsyncStorage),
+
+      // Версия схемы для Zustand persist. При несовпадении сохранённой версии
+      // с текущей Zustand вызывает migrate() ДО onRehydrateStorage.
+      // Синхронизирована с CURRENT_SCHEMA_VERSION из saveSchema.js — единственным
+      // источником истины. При бампе версии: поднять CURRENT_SCHEMA_VERSION
+      // и добавить функцию в MIGRATIONS[] в migrations.js.
+      version: CURRENT_SCHEMA_VERSION,
+
+      // Прогоняем сохранённое состояние через тот же конвейер миграций,
+      // что и SQLite-загрузка (CharacterContext.deserializeState).
+      // storedVersion — версия, с которой была записана запись в AsyncStorage.
+      migrate: (persistedState, storedVersion) => {
+        return migrateCharacterState({
+          ...persistedState,
+          schemaVersion: Number.isInteger(storedVersion) ? storedVersion : LEGACY_SCHEMA_VERSION,
+        });
+      },
+
       partialize: (state) => ({
         attributes: state.attributes,
         skills: state.skills,

@@ -11,7 +11,7 @@ import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModByI
 import { declinePrefix } from '../../../../domain/modsEquip';
 import { shiftRange } from '../../../../domain/range';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
-import { resolveWeaponQualities } from '../../../../domain/weaponDisplay';
+import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../domain/weaponDisplay';
 import styles from '../../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../src/debug/falloutDebug';
 
@@ -33,12 +33,13 @@ function normalizeModRow(row) {
     // canonical DB fields only
     weight: row.weight ?? 0,
     cost: row.cost ?? 0,
-    // Localized description for UI
-    effectDescription: row.effectsLegacy ?? row.effectDescription ?? row.effect_description ?? row.effects ?? '',
+    // Localized description for UI (i18n effectDescription, locale-driven).
+    effectDescription: row.effectDescription || row.effect_description || row.effects || '',
     damageModifier: row.damageModifier,
     fireRateModifier: row.fireRateModifier,
     rangeModifier: row.rangeModifier,
     qualityChanges: row.qualityChanges,
+    effectChanges: row.effectChanges,
   };
 }
 
@@ -94,26 +95,23 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   let weight = weightBase;
   let cost = costBase;
   let rangeShift = 0;
-  const qualities = new Set();
-  const rawQualities = baseWeapon.qualities ?? '';
-  try {
-    const parsed = JSON.parse(String(rawQualities));
-    if (Array.isArray(parsed)) {
-      for (const q of parsed) {
-        const id = (typeof q === 'object' && q?.qualityId) ? q.qualityId : String(q).trim();
-        if (id && id !== '–') qualities.add(id);
-      }
-    }
-  } catch {
-    String(rawQualities).split(',').map(q => q.trim()).filter(q => q && q !== '–').forEach(q => qualities.add(q));
-  }
+  // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
+  const qualities = new Map(); // qualityId -> entry
+  const effects = new Map();   // effectId -> entry
+  const loadBase = (field, map, idKey) => {
+    let arr = baseWeapon[field];
+    if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { return; } }
+    if (!Array.isArray(arr)) return;
+    arr.forEach((e) => {
+      const id = (typeof e === 'object' && e ? e[idKey] : e);
+      if (id && id !== '–') map.set(id, e && e.value != null ? { [idKey]: id, value: e.value } : { [idKey]: id });
+    });
+  };
+  loadBase('qualities', qualities, 'qualityId');
+  loadBase('effects', effects, 'effectId');
 
   // Применяем структурированные модификаторы из JSON
-  const extraEffectsText = [];
   for (const mod of selectedMods) {
-    const eff = String(mod.effectDescription || '');
-    if (eff) extraEffectsText.push(eff);
-
     if (mod.damageModifier) {
       if (mod.damageModifier.op === '+') damage += Number(mod.damageModifier.value);
       if (mod.damageModifier.op === '-') damage -= Number(mod.damageModifier.value);
@@ -131,11 +129,17 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
       if (mod.rangeModifier.op === '-') rangeShift -= Number(mod.rangeModifier.value);
     }
 
+    if (mod.effectChanges && Array.isArray(mod.effectChanges)) {
+      for (const c of mod.effectChanges) {
+        if (c.op === 'gain') effects.set(c.id, c.value != null ? { effectId: c.id, value: c.value } : { effectId: c.id });
+        if (c.op === 'lose') effects.delete(c.id);
+      }
+    }
+
     if (mod.qualityChanges && Array.isArray(mod.qualityChanges)) {
-      for (const qc of mod.qualityChanges) {
-        const qName = qc.value ? `${qc.name} ${qc.value}` : qc.name;
-        if (qc.op === 'gain') qualities.add(qName);
-        if (qc.op === 'lose') qualities.delete(qName);
+      for (const c of mod.qualityChanges) {
+        if (c.op === 'gain') qualities.set(c.id, c.value != null ? { qualityId: c.id, value: c.value } : { qualityId: c.id });
+        if (c.op === 'lose') qualities.delete(c.id);
       }
     }
 
@@ -148,13 +152,12 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // to Close..Extreme. Canonical logic lives in domain/range.js.
   const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
   const { name: range_name_key } = shiftRange(
-    baseWeapon.range_name ?? baseWeapon.range_index ?? baseWeapon.range ?? 'Close',
+    baseWeapon.range ?? baseWeapon.range_index ?? baseWeapon.range_name ?? 'Close',
     rangeShift,
   );
   const range_name = rangeNames[range_name_key] || range_name_key;
-  const qualitiesValue = qualities.size
-    ? JSON.stringify(Array.from(qualities).map(id => ({ qualityId: id })))
-    : '–';
+  const effectsValue = effects.size ? JSON.stringify([...effects.values()]) : '–';
+  const qualitiesValue = qualities.size ? JSON.stringify([...qualities.values()]) : '–';
 
   debugLog('weapon.mod.compute', {
     weaponId: baseWeapon?.id ?? baseWeapon?.weaponId,
@@ -180,6 +183,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     fire_rate,
     range_name,
     qualities: qualitiesValue,
+    effects: effectsValue,
     weight: String(weight),
     cost,
     // сохраняем выбранные моды
@@ -187,7 +191,6 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
       Object.entries(selectedBySlot).map(([slot, mod]) => [slot, mod?.id]).filter(([, id]) => !!id)
     ),
     _selectedModsBySlot: selectedBySlot,
-    damage_effects: extraEffectsText.join('; '),
   };
 }
 
@@ -435,7 +438,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                     {tWeaponsAndArmorScreen('modals.weaponRange')}: {modifiedWeapon.range_name || tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {modifiedWeapon.weight} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {modifiedWeapon.cost}
                   </Text>
                   <Text style={styles.previewEffects}>
-                    {tWeaponsAndArmorScreen('modals.previewEffects')}: {modifiedWeapon.damage_effects}
+                    {tWeaponsAndArmorScreen('modals.previewEffects')}: {resolveWeaponEffects(modifiedWeapon.effects)}
                   </Text>
                   <Text style={styles.previewQualities}>
                     {tWeaponsAndArmorScreen('modals.previewQualities')}: {resolveWeaponQualities(modifiedWeapon.qualities)}
