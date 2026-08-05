@@ -76,6 +76,7 @@ const InventoryScreen = () => {
     getModifiedItem,
     trait,
     origin,
+    carryWeight,
     // Силовая броня: свой слой и свои действия (docs/architecture/power-armor-plan.md).
     equippedPowerArmor,
     equipPowerArmorPackage,
@@ -1593,7 +1594,7 @@ const InventoryScreen = () => {
             />
           </View>
           <View style={styles.summaryContainer}>
-            <Text style={styles.summaryText}>{tInventory('screen.labels.totalWeight')}: {totalWeight}</Text>
+            <Text style={styles.summaryText}>{tInventory('screen.labels.totalWeight')}: {totalWeight}/{carryWeight ?? 0}</Text>
             <Text style={styles.summaryText}>{tInventory('screen.labels.totalPrice')}: {totalPrice}</Text>
           </View>
         </View>
