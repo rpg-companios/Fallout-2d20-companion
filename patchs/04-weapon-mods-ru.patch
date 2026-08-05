@@ -1,0 +1,1808 @@
+From ce0908668c7553efc26dbecf8071c2834fbd8fba Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Wed, 5 Aug 2026 02:20:05 +0000
+Subject: [PATCH] =?UTF-8?q?feat(i18n):=20translate=20weapon=20mods=20to=20?=
+ =?UTF-8?q?Russian=20=E2=80=94=20names,=20prefixes,=20effects=20({/CD}=20d?=
+ =?UTF-8?q?ice=20tokens)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Все 203 мода: name+prefix по справочнику txt; effectDescription — по словарю терминов (качества из qualities.json, операторы в стиле txt). Урон/CD/DC/КУ записаны как токен {/CD} — рендерится картинкой кубика глобально (см. патч 05).
+---
+ .../data/equipment/weapons/weapon_mods.json   | 1172 ++++++++---------
+ 1 file changed, 586 insertions(+), 586 deletions(-)
+
+diff --git a/i18n/ru-RU/data/equipment/weapons/weapon_mods.json b/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
+index 399b5cf..68563fa 100644
+--- a/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
++++ b/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
+@@ -1,1191 +1,1191 @@
+ [
+   {
+     "id": "mod_001",
+-    "name": "Rapid",
+-    "prefix": "Rapid",
+-    "effectDescription": "minus 1 CD Damage, plus 2 Fire Rate"
++    "name": "Скорострельный",
++    "prefix": "Скорострельный",
++    "effectDescription": "−1 {/CD} урона, +2 Скорость стрельбы"
+   },
+   {
+     "id": "mod_002",
+     "name": "Бронебойный",
+     "prefix": "Бронебойный",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_003",
+-    "name": "Tuned",
+-    "prefix": "Tuned",
+-    "effectDescription": "plus 1 CD Damage, plus 1 Fire Rate"
++    "name": "Настроенный",
++    "prefix": "Настроенный",
++    "effectDescription": "+1 {/CD} урона, +1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_004",
+-    "name": "Hardened",
+-    "prefix": "Hardened",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Укреплённый",
++    "prefix": "Укреплённый",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_005",
+-    "name": "Powerful",
+-    "prefix": "Powerful",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Усиленный",
++    "prefix": "Усиленный",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_006",
+     "name": "Продвинутый",
+     "prefix": "Продвинутый",
+-    "effectDescription": "plus 3 CD Damage, plus 1 Fire Rate"
++    "effectDescription": "+3 {/CD} урона, +1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_007",
+     "name": "Калиброванный",
+     "prefix": "Калиброванный",
+-    "effectDescription": "gain Vicious"
++    "effectDescription": "Добавляет Порочный"
+   },
+   {
+     "id": "mod_008",
+-    "name": "Automatic",
+-    "prefix": "Auto",
+-    "effectDescription": "minus 1 CD Damage, plus 2 Fire Rate, gain Burst, gain Inaccurate"
++    "name": "Автоматический",
++    "prefix": "Автоматический",
++    "effectDescription": "−1 {/CD} урона, +2 Скорость стрельбы, Добавляет Очередь, Добавляет Неточное"
+   },
+   {
+     "id": "mod_009",
+-    "name": "Hair Trigger",
+-    "prefix": "Hair Trigger",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Чувствительный",
++    "prefix": "Чувствительный",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_010",
+-    "name": ".38 Receiver",
+-    "prefix": ".38",
+-    "effectDescription": "Set 4 CD Damage, Ammo .38"
++    "name": "Ресивер .38",
++    "prefix": "Ресивер .38",
++    "effectDescription": "Урон 4 {/CD}, патроны: .38"
+   },
+   {
+     "id": "mod_011",
+-    "name": ".308 Receiver",
+-    "prefix": ".308",
+-    "effectDescription": "Set 7 CD Damage, Ammo .308"
++    "name": "Ресивер .308",
++    "prefix": "Ресивер .308",
++    "effectDescription": "Урон 7 {/CD}, патроны: .308"
+   },
+   {
+     "id": "mod_012",
+-    "name": ".45 Receiver",
+-    "prefix": ".45",
+-    "effectDescription": "Set 4 CD Damage, Ammo .45"
++    "name": "Ресивер .45",
++    "prefix": "Ресивер .45",
++    "effectDescription": "Урон 4 {/CD}, патроны: .45"
+   },
+   {
+     "id": "mod_013",
+-    "name": ".50 Receiver",
+-    "prefix": ".50",
+-    "effectDescription": "Set 8 CD Damage, Ammo .50"
++    "name": "Ресивер .50",
++    "prefix": "Ресивер .50",
++    "effectDescription": "Урон 8 {/CD}, патроны: .50"
+   },
+   {
+     "id": "mod_014",
+-    "name": "Automatic Piston",
+-    "prefix": "Automatic",
+-    "effectDescription": "plus 2 Fire Rate, minus 1 Range"
++    "name": "Автоматический пистонный",
++    "prefix": "Автоматический пистонный",
++    "effectDescription": "+2 Скорость стрельбы, −1 Дистанция"
+   },
+   {
+     "id": "mod_015",
+-    "name": "Snubnose",
+-    "prefix": "Snub-Noses",
+-    "effectDescription": "gain Inaccurate"
++    "name": "Укороченный",
++    "prefix": "Укороченный",
++    "effectDescription": "Добавляет Неточное"
+   },
+   {
+     "id": "mod_016",
+-    "name": "Bull Barrel",
+-    "prefix": "Bull Barrel",
+-    "effectDescription": "gain Reliable"
++    "name": "Толстостенный",
++    "prefix": "Толстостенный",
++    "effectDescription": "Добавляет Надежное"
+   },
+   {
+     "id": "mod_017",
+-    "name": "Long",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 Range"
++    "name": "Длинный",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_018",
+-    "name": "Ported",
+-    "prefix": "Ported",
+-    "effectDescription": "plus 1 Range, plus 1 Fire Rate"
++    "name": "Портированный",
++    "prefix": "Портированный",
++    "effectDescription": "+1 Дистанция, +1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_019",
+-    "name": "Vented",
+-    "prefix": "Vented",
+-    "effectDescription": "plus 1 Range, plus 1 Fire Rate, gain Reliable"
++    "name": "Вентилируемый",
++    "prefix": "Вентилируемый",
++    "effectDescription": "+1 Дистанция, +1 Скорость стрельбы, Добавляет Надежное"
+   },
+   {
+     "id": "mod_020",
+-    "name": "Sawed-Off",
+-    "prefix": "Sawed-Off",
+-    "effectDescription": "gain Close Quarters, lose Two-Handed"
++    "name": "Сверхкороткий",
++    "prefix": "Сверхкороткий",
++    "effectDescription": "Добавляет Вплотную, Убирает Двуручное"
+   },
+   {
+     "id": "mod_021",
+-    "name": "Shielded Barrel",
+-    "prefix": "Shielded",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Экранированный",
++    "prefix": "Экранированный",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_022",
+-    "name": "Finned",
+-    "prefix": "Finned",
+-    "effectDescription": "plus 1 CD Damage, plus 1 Range"
++    "name": "Ребристый",
++    "prefix": "Ребристый",
++    "effectDescription": "+1 {/CD} урона, +1 Дистанция"
+   },
+   {
+     "id": "mod_023",
+-    "name": "Large Magazine",
+-    "prefix": "High Capacity",
+-    "effectDescription": "plus 1 Fire Rate, gain Unreliable"
++    "name": "Большой",
++    "prefix": "Высокоёмкий",
++    "effectDescription": "+1 Скорость стрельбы, Добавляет Ненадежное"
+   },
+   {
+     "id": "mod_024",
+-    "name": "Quick-Eject Mag",
+-    "prefix": "Quick",
+-    "effectDescription": "gain Reliable"
++    "name": "Быстросъёмный",
++    "prefix": "Быстрый",
++    "effectDescription": "Добавляет Надежное"
+   },
+   {
+     "id": "mod_025",
+-    "name": "Large Quick-Eject Mag",
+-    "prefix": "Quick High Capacity",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Большой быстросъёмный",
++    "prefix": "Быстрый высокоёмкий",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_026",
+-    "name": "Comfort Grip",
+-    "prefix": "Comfort",
+-    "effectDescription": "lose Inaccurate"
++    "name": "Удобная",
++    "prefix": "Удобный",
++    "effectDescription": "Убирает Неточное"
+   },
+   {
+     "id": "mod_027",
+-    "name": "Sharpshooter's Grip",
+-    "prefix": "Sharpshooter's",
+-    "effectDescription": "gain Piercing 1, lose Inaccurate"
++    "name": "Тактическая",
++    "prefix": "Меткий",
++    "effectDescription": "Добавляет Проникающий 1, Убирает Неточное"
+   },
+   {
+     "id": "mod_028",
+-    "name": "Full Stock",
+-    "prefix": "Full Stock",
+-    "effectDescription": "gain Two-Handed, lose Inaccurate"
++    "name": "Полная ложа",
++    "prefix": "Стрелковый",
++    "effectDescription": "Добавляет Двуручное, Убирает Неточное"
+   },
+   {
+     "id": "mod_029",
+-    "name": "Marksman's Stock",
+-    "prefix": "Markman's",
+-    "effectDescription": "gain Two-Handed, gain Accurate, lose Inaccurate"
++    "name": "Ложа стрелка",
++    "prefix": "Стрелковый",
++    "effectDescription": "Добавляет Двуручное, Добавляет Точное, Убирает Неточное"
+   },
+   {
+     "id": "mod_030",
+-    "name": "Recoil Compensating Stock",
+-    "prefix": "Recoil Compensated",
+-    "effectDescription": "gain Two-Handed, plus 1 Fire Rate, lose Inaccurate"
++    "name": "Ложа с компенсатором отдачи",
++    "prefix": "Демпфированный",
++    "effectDescription": "Добавляет Двуручное, +1 Скорость стрельбы, Убирает Неточное"
+   },
+   {
+     "id": "mod_031",
+-    "name": "Full Capacitors",
+-    "prefix": "",
+-    "effectDescription": "plus 1 CD Damage, gain Vicious"
++    "name": "Полные конденсаторы",
++    "prefix": "Полные конденсаторы",
++    "effectDescription": "+1 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_032",
+-    "name": "Capacitor Boosting Coil",
+-    "prefix": "",
+-    "effectDescription": "plus 1 CD Damage, minus 1 Fire Rate"
++    "name": "Катушка усиления конденсатора",
++    "prefix": "Катушка усиления конденсатора",
++    "effectDescription": "+1 {/CD} урона, −1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_033",
+-    "name": "Reflex Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "gain Re-roll Hit Location"
++    "name": "Коллиматорный",
++    "prefix": "Тактический",
++    "effectDescription": "Добавляет Перевыбрать конечность"
+   },
+   {
+     "id": "mod_034",
+-    "name": "Short Scope",
+-    "prefix": "Scoped",
+-    "effectDescription": "gain Accurate"
++    "name": "Короткий оптический",
++    "prefix": "Прицельный",
++    "effectDescription": "Добавляет Точное"
+   },
+   {
+     "id": "mod_035",
+-    "name": "Long Scope",
+-    "prefix": "Long Scoped",
+-    "effectDescription": "gain Accurate, plus 1 Range"
++    "name": "Длинный оптический",
++    "prefix": "Прицельный",
++    "effectDescription": "Добавляет Точное, +1 Дистанция"
+   },
+   {
+     "id": "mod_036",
+-    "name": "Short Night Vision Scope",
+-    "prefix": "Night Vision",
+-    "effectDescription": "gain Accurate, gain Night Vision"
++    "name": "Короткий оптический ночного видения",
++    "prefix": "Ночного видения",
++    "effectDescription": "Добавляет Точное, Добавляет Ночное Видение"
+   },
+   {
+     "id": "mod_037",
+-    "name": "Long Night Vision Scope",
+-    "prefix": "Long Night Vision",
+-    "effectDescription": "gain Accurate, gain Night Vision, plus 1 Range"
++    "name": "Длинный оптический ночного видения",
++    "prefix": "Ночного видения",
++    "effectDescription": "Добавляет Точное, Добавляет Ночное Видение, +1 Дистанция"
+   },
+   {
+     "id": "mod_038",
+-    "name": "Recon Scope",
+-    "prefix": "Recon",
+-    "effectDescription": "gain Accurate, gain Recon"
++    "name": "Прицел разведчика",
++    "prefix": "Прицел разведчика",
++    "effectDescription": "Добавляет Точное, Добавляет Разведовательный"
+   },
+   {
+     "id": "mod_039",
+-    "name": "Bayonet",
+-    "prefix": "Beyoneted",
+-    "effectDescription": "gain Bayonet"
++    "name": "Штык",
++    "prefix": "Штыковой",
++    "effectDescription": "Добавляет Штык"
+   },
+   {
+     "id": "mod_040",
+-    "name": "Compensator",
+-    "prefix": "Componsated",
+-    "effectDescription": "lose Inaccurate"
++    "name": "Компенсатор",
++    "prefix": "Компенсированный",
++    "effectDescription": "Убирает Неточное"
+   },
+   {
+     "id": "mod_041",
+-    "name": "Muzzle Break",
+-    "prefix": "Muzzled",
+-    "effectDescription": "lose Inaccurate, plus 1 Fire Rate"
++    "name": "Дульный тормоз",
++    "prefix": "Пламегасительный",
++    "effectDescription": "Убирает Неточное, +1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_042",
+-    "name": "Suppressor",
+-    "prefix": "Supressed",
+-    "effectDescription": "gain Supressed"
++    "name": "Глушитель",
++    "prefix": "Тихий",
++    "effectDescription": "Добавляет Тихое"
+   },
+   {
+     "id": "mod_043",
+-    "name": "Beta Wave Tuner",
+-    "prefix": "Incendiary",
+-    "effectDescription": "gain Persistent"
++    "name": "Тюнер бета-волн",
++    "prefix": "Тюнер бета-волн",
++    "effectDescription": "Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_044",
+-    "name": "Boosted Capacitor",
+-    "prefix": "Boosted",
+-    "effectDescription": "plus 1 CD Damage, minus 1 Fire Rate"
++    "name": "Усиленный конденсатор",
++    "prefix": "Усиленный",
++    "effectDescription": "+1 {/CD} урона, −1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_045",
+-    "name": "Photon Exciter",
+-    "prefix": "Excited",
+-    "effectDescription": "gain Vicious"
++    "name": "Возбудитель фотонов",
++    "prefix": "Возбуждённый",
++    "effectDescription": "Добавляет Порочный"
+   },
+   {
+     "id": "mod_046",
+-    "name": "Photon Agitator",
+-    "prefix": "Agitated",
+-    "effectDescription": "plus 1 CD Damage, gain Vicious"
++    "name": "Фотонная мешалка",
++    "prefix": "Смешанный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_047",
+-    "name": "Three-Crank Capacitor",
+-    "prefix": "Three-Crank",
+-    "effectDescription": "plus 1 CD Damage, gain Crank 1"
++    "name": "3-зарядный",
++    "prefix": "3-зарядный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Ствол 1"
+   },
+   {
+     "id": "mod_048",
+-    "name": "Four-Crank Capacitor",
+-    "prefix": "Four-Crank",
+-    "effectDescription": "plus 2 CD Damage, gain Crank 2"
++    "name": "4-зарядный",
++    "prefix": "4-зарядный",
++    "effectDescription": "+2 {/CD} урона, Добавляет Ствол 2"
+   },
+   {
+     "id": "mod_049",
+-    "name": "Five-Crank Capacitor",
+-    "prefix": "Five-Crank",
+-    "effectDescription": "plus 3 CD Damage, gain Crank 3 "
++    "name": "5-зарядный",
++    "prefix": "5-зарядный",
++    "effectDescription": "+3 {/CD} урона, Добавляет Ствол 3"
+   },
+   {
+     "id": "mod_050",
+-    "name": "Six-Crank Capacitor",
+-    "prefix": "Six-Crank",
+-    "effectDescription": "plus 4 CD Damage, gain Crank 4"
++    "name": "6-зарядный",
++    "prefix": "6-зарядный",
++    "effectDescription": "+4 {/CD} урона, Добавляет Ствол 4"
+   },
+   {
+     "id": "mod_051",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 Range, lose Close Quarters"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция, Убирает Вплотную"
+   },
+   {
+     "id": "mod_052",
+-    "name": "Splitter",
+-    "prefix": "Splitter",
+-    "effectDescription": "minus 1 CD Damage, gain Spread, gain Inaccurate"
++    "name": "Расщепитель",
++    "prefix": "Рассеянный",
++    "effectDescription": "−1 {/CD} урона, Добавляет Разброс, Добавляет Неточное"
+   },
+   {
+     "id": "mod_053",
+-    "name": "Automatic Barrel",
+-    "prefix": "Automatic",
+-    "effectDescription": "minus 1 CD Damage, plus 1 Range, plus 1 Fire Rate, lose Close Quarters"
++    "name": "Автоматический ствол",
++    "prefix": "Автоматический ствол",
++    "effectDescription": "−1 {/CD} урона, +1 Дистанция, +1 Скорость стрельбы, Убирает Вплотную"
+   },
+   {
+     "id": "mod_054",
+-    "name": "Improved Barrel",
+-    "prefix": "Improved",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Улучшенный ствол",
++    "prefix": "Улучшенный ствол",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_055",
+-    "name": "Sniper Barrel",
+-    "prefix": "Sniper",
+-    "effectDescription": "plus 2 CD Damage, plus 1 Range, minus 1 Fire Rate, lose Close Quarters"
++    "name": "Снайперский ствол",
++    "prefix": "Снайперский ствол",
++    "effectDescription": "+2 {/CD} урона, +1 Дистанция, −1 Скорость стрельбы, Убирает Вплотную"
+   },
+   {
+     "id": "mod_056",
+-    "name": "Flamer Barrel",
+-    "prefix": "Thrower",
+-    "effectDescription": "minus 2 CD Damage, plus 1 Range, plus 2 Fire Rate, gain Burst, gain Spread, gain Inaccurate"
++    "name": "Огнемётный ствол",
++    "prefix": "Огнемётный ствол",
++    "effectDescription": "−2 {/CD} урона, +1 Дистанция, +2 Скорость стрельбы, Добавляет Очередь, Добавляет Разброс, Добавляет Неточное"
+   },
+   {
+     "id": "mod_057",
+-    "name": "Sharpshooter's Grip",
+-    "prefix": "Sharpshooter's",
+-    "effectDescription": "gain Piercing 1, lose Inaccurate"
++    "name": "Тактическая",
++    "prefix": "Меткий",
++    "effectDescription": "Добавляет Проникающий 1, Убирает Неточное"
+   },
+   {
+     "id": "mod_058",
+-    "name": "Standard Stock",
+-    "prefix": "",
+-    "effectDescription": "gain Two-Handed, lose Inaccurate, lose Close Quarters"
++    "name": "Стандартная ложа",
++    "prefix": "Стандартная ложа",
++    "effectDescription": "Добавляет Двуручное, Убирает Неточное, Убирает Вплотную"
+   },
+   {
+     "id": "mod_059",
+-    "name": "Full Stock",
+-    "prefix": "",
+-    "effectDescription": "gain Piercing 1, lose Close Quarters"
++    "name": "Полная ложа",
++    "prefix": "Стрелковый",
++    "effectDescription": "Добавляет Проникающий 1, Убирает Вплотную"
+   },
+   {
+     "id": "mod_060",
+-    "name": "Marksman's Stock",
+-    "prefix": "Marksman's",
+-    "effectDescription": "gain Two-Handed, gain Accurate, lose Inaccurate, gain Close Quarters"
++    "name": "Ложа стрелка",
++    "prefix": "Стрелковый",
++    "effectDescription": "Добавляет Двуручное, Добавляет Точное, Убирает Неточное, Добавляет Вплотную"
+   },
+   {
+     "id": "mod_061",
+-    "name": "Recoil Compensating",
+-    "prefix": "Recoil Compensated",
+-    "effectDescription": "plus 1 Range, gain Two-Handed, lose Inaccurate, gain Close Quarters"
++    "name": "Ложа с компенсатором отдачи",
++    "prefix": "Ложа с компенсатором отдачи",
++    "effectDescription": "+1 Дистанция, Добавляет Двуручное, Убирает Неточное, Добавляет Вплотную"
+   },
+   {
+     "id": "mod_062",
+-    "name": "Reflex Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "gain Re-roll Hit Location"
++    "name": "Коллиматорный",
++    "prefix": "Тактический",
++    "effectDescription": "Добавляет Перевыбрать конечность"
+   },
+   {
+     "id": "mod_063",
+-    "name": "Short Scope",
+-    "prefix": "Scoped",
+-    "effectDescription": "gain Accurate"
++    "name": "Короткий оптический",
++    "prefix": "Прицельный",
++    "effectDescription": "Добавляет Точное"
+   },
+   {
+     "id": "mod_064",
+-    "name": "Long Scope",
+-    "prefix": "Scoped",
+-    "effectDescription": "gain Accurate, plus 1 Range"
++    "name": "Длинный оптический",
++    "prefix": "Прицельный",
++    "effectDescription": "Добавляет Точное, +1 Дистанция"
+   },
+   {
+     "id": "mod_065",
+-    "name": "Short Night Vision Scope",
+-    "prefix": "Night Vision",
+-    "effectDescription": "gain Accurate, gain Night Vision"
++    "name": "Короткий оптический ночного видения",
++    "prefix": "Ночного видения",
++    "effectDescription": "Добавляет Точное, Добавляет Ночное Видение"
+   },
+   {
+     "id": "mod_066",
+-    "name": "Long Night Vision Scope",
+-    "prefix": "Night Vision",
+-    "effectDescription": "gain Accurate, gain Night Vision, plus 1 Range"
++    "name": "Длинный оптический ночного видения",
++    "prefix": "Ночного видения",
++    "effectDescription": "Добавляет Точное, Добавляет Ночное Видение, +1 Дистанция"
+   },
+   {
+     "id": "mod_067",
+-    "name": "Recon Scope",
+-    "prefix": "Recon",
+-    "effectDescription": "gain Accurate, gain Recon"
++    "name": "Прицел разведчика",
++    "prefix": "Прицел разведчика",
++    "effectDescription": "Добавляет Точное, Добавляет Разведовательный"
+   },
+   {
+     "id": "mod_068",
+-    "name": "Beam Splitter",
+-    "prefix": "Scattered",
+-    "effectDescription": "minus 1 CD Damage, plus 1 Fire Rate, minus 1 Range, gain Spread, gain Inaccurate"
++    "name": "Разделитель луча",
++    "prefix": "Рассеянный",
++    "effectDescription": "−1 {/CD} урона, +1 Скорость стрельбы, −1 Дистанция, Добавляет Разброс, Добавляет Неточное"
+   },
+   {
+     "id": "mod_069",
+-    "name": "Beam Focuser",
+-    "prefix": "Focused",
+-    "effectDescription": "plus 1 Range"
++    "name": "Фокусировщик луча",
++    "prefix": "Фокусированный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_070",
+-    "name": "Gyro Compensating Lens",
+-    "prefix": "Targetting",
+-    "effectDescription": "plus 1 Fire Rate, lose Inaccurate"
++    "name": "Линза с гирокомпенсацией",
++    "prefix": "Целеуказательный",
++    "effectDescription": "+1 Скорость стрельбы, Убирает Неточное"
+   },
+   {
+     "id": "mod_071",
+-    "name": "Deep Dish",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 CD Damage, plus 1 Range"
++    "name": "Глубокая тарелка",
++    "prefix": "Глубокая тарелка",
++    "effectDescription": "+1 {/CD} урона, +1 Дистанция"
+   },
+   {
+     "id": "mod_072",
+-    "name": "Electric Signal Carrier Antennae",
+-    "prefix": "Electrifed",
+-    "effectDescription": "Set 7 CD Damage, Damage Type Energy, gain Radioactive"
++    "name": "Электросигнальные антенны",
++    "prefix": "Электросигнальные антенны",
++    "effectDescription": "Урон 7 {/CD}, тип урона: энергетический, Добавляет Радиоактивный"
+   },
+   {
+     "id": "mod_073",
+-    "name": "Signal Repeater",
+-    "prefix": "Automatic",
+-    "effectDescription": "plus 2 Fire Rate, gain Burst, lose Blast"
++    "name": "Ретранслятор сигнала",
++    "prefix": "Ретранслятор сигнала",
++    "effectDescription": "+2 Скорость стрельбы, Добавляет Очередь, Убирает Врыв"
+   },
+   {
+     "id": "mod_074",
+-    "name": "Napalm Fuel",
+-    "prefix": "Napalmer",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Напалмовое топливо",
++    "prefix": "Напалмовое топливо",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_075",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "lose Inaccurate"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "Убирает Неточное"
+   },
+   {
+     "id": "mod_076",
+-    "name": "Large Tank",
+-    "prefix": "High Capacity",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Большой бак",
++    "prefix": "Большой бак",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_077",
+-    "name": "Huge Tank",
+-    "prefix": "Max Capacity",
+-    "effectDescription": "plus 2 Fire Rate"
++    "name": "Огромный бак",
++    "prefix": "Огромный бак",
++    "effectDescription": "+2 Скорость стрельбы"
+   },
+   {
+     "id": "mod_078",
+-    "name": "Compression Nozzle",
+-    "prefix": "Compressed",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Компрессионное сопло",
++    "prefix": "Компрессионное сопло",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_079",
+-    "name": "Vaporization Nozzle",
+-    "prefix": "Vaporizing",
+-    "effectDescription": "plus 1 CD Damage, gain Vicious"
++    "name": "Испаряющее сопло",
++    "prefix": "Испаряющее сопло",
++    "effectDescription": "+1 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_080",
+-    "name": "Photon Exciter",
+-    "prefix": "Excited",
+-    "effectDescription": "gain Vicious"
++    "name": "Возбудитель фотонов",
++    "prefix": "Возбуждённый",
++    "effectDescription": "Добавляет Порочный"
+   },
+   {
+     "id": "mod_081",
+-    "name": "Beta Wave Tuner",
+-    "prefix": "Incendiary",
+-    "effectDescription": "gain Persistent"
++    "name": "Тюнер бета-волн",
++    "prefix": "Тюнер бета-волн",
++    "effectDescription": "Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_082",
+-    "name": "Boosted Capacitor",
+-    "prefix": "Boosted",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Усиленный конденсатор",
++    "prefix": "Усиленный",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_083",
+-    "name": "Photon Agitator",
+-    "prefix": "Agitated",
+-    "effectDescription": "plus 1 CD Damage, gain Vicious"
++    "name": "Фотонная мешалка",
++    "prefix": "Смешанный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_084",
+-    "name": "Charging Barrels",
+-    "prefix": "Charging",
+-    "effectDescription": "plus 4 CD Damage, plus 1 Range, minus 3 Fire Rate"
++    "name": "Зарядные стволы",
++    "prefix": "Зарядные стволы",
++    "effectDescription": "+4 {/CD} урона, +1 Дистанция, −3 Скорость стрельбы"
+   },
+   {
+     "id": "mod_085",
+-    "name": "Reflex Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "lose Inaccurate"
++    "name": "Коллиматорный",
++    "prefix": "Тактический",
++    "effectDescription": "Убирает Неточное"
+   },
+   {
+     "id": "mod_086",
+-    "name": "Beam Focuser",
+-    "prefix": "Focused",
+-    "effectDescription": "plus 1 Range, gain Piercing 1"
++    "name": "Фокусировщик луча",
++    "prefix": "Фокусированный",
++    "effectDescription": "+1 Дистанция, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_087",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 Range"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_088",
+-    "name": "Recoil Compensating Stock",
+-    "prefix": "Recoil Compensated",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Ложа с компенсатором отдачи",
++    "prefix": "Демпфированный",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_089",
+-    "name": "Gunner Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "gain Re-roll Hit Location"
++    "name": "Прицел стрелка",
++    "prefix": "Прицел стрелка",
++    "effectDescription": "Добавляет Перевыбрать конечность"
+   },
+   {
+     "id": "mod_090",
+-    "name": "Electrification Module",
+-    "prefix": "Electrifed",
+-    "effectDescription": "gain Vicious, Damage Type Energy"
++    "name": "Модуль электрификации",
++    "prefix": "Модуль электрификации",
++    "effectDescription": "Добавляет Порочный, тип урона: энергетический"
+   },
+   {
+     "id": "mod_091",
+-    "name": "Ignition Module",
+-    "prefix": "Flaming",
+-    "effectDescription": "gain Persistent"
++    "name": "Модуль поджига",
++    "prefix": "Модуль поджига",
++    "effectDescription": "Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_092",
+-    "name": "Accelerated Barrel",
+-    "prefix": "High-Speed",
+-    "effectDescription": "plus 1 CD Damage, plus 1 Fire Rate, minus 1 Range"
++    "name": "Ускоренный ствол",
++    "prefix": "Ускоренный ствол",
++    "effectDescription": "+1 {/CD} урона, +1 Скорость стрельбы, −1 Дистанция"
+   },
+   {
+     "id": "mod_093",
+-    "name": "Tri-Barrel",
+-    "prefix": "High-Powered",
+-    "effectDescription": "plus 2 CD Damage, minus 2 Fire Rate"
++    "name": "Трёхствольный",
++    "prefix": "Трёхствольный",
++    "effectDescription": "+2 {/CD} урона, −2 Скорость стрельбы"
+   },
+   {
+     "id": "mod_094",
+-    "name": "Gunner Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "lose Inaccurate"
++    "name": "Прицел стрелка",
++    "prefix": "Прицел стрелка",
++    "effectDescription": "Убирает Неточное"
+   },
+   {
+     "id": "mod_095",
+-    "name": "Shredder",
+-    "prefix": "Bayonetted Shredding",
+-    "effectDescription": "gain Shredder"
++    "name": "Дробитель",
++    "prefix": "Дробитель",
++    "effectDescription": "Добавляет Крушащий"
+   },
+   {
+     "id": "mod_096",
+-    "name": "Triple Barrel",
+-    "prefix": "Triple Barrel",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Тройной ствол",
++    "prefix": "Тройной ствол",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_097",
+-    "name": "Quad Barrel",
+-    "prefix": "Quad Barrel",
+-    "effectDescription": "plus 2 Fire Rate"
++    "name": "Четырёхствольный",
++    "prefix": "Четырёхствольный",
++    "effectDescription": "+2 Скорость стрельбы"
+   },
+   {
+     "id": "mod_098",
+-    "name": "Scope",
+-    "prefix": "Scoped",
+-    "effectDescription": "gain Accurate"
++    "name": "Оптический",
++    "prefix": "Прицельный",
++    "effectDescription": "Добавляет Точное"
+   },
+   {
+     "id": "mod_099",
+-    "name": "Night Vision Scope",
+-    "prefix": "Night-Vision",
+-    "effectDescription": "gain Accurate, gain Night Vision"
++    "name": "Оптический ночного видения",
++    "prefix": "Ночного видения",
++    "effectDescription": "Добавляет Точное, Добавляет Ночное Видение"
+   },
+   {
+     "id": "mod_100",
+-    "name": "Targeting Computer",
+-    "prefix": "Targetting",
+-    "effectDescription": "gain Targetting Computer"
++    "name": "Компьютер наведения",
++    "prefix": "Компьютер наведения",
++    "effectDescription": "Добавляет Компьютер наведения"
+   },
+   {
+     "id": "mod_101",
+-    "name": "Bayonet",
+-    "prefix": "Bayonetted Shredding",
+-    "effectDescription": "gain Bayonet"
++    "name": "Штык",
++    "prefix": "Штыковой",
++    "effectDescription": "Добавляет Штык"
+   },
+   {
+     "id": "mod_102",
+-    "name": "Stabilizer",
+-    "prefix": "Muzzles",
+-    "effectDescription": "gain Piercing 1"
++    "name": "Стабилизатор",
++    "prefix": "Стабилизатор",
++    "effectDescription": "Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_103",
+-    "name": "Serrated Blade",
+-    "prefix": "Serrated",
+-    "effectDescription": "gain Persistent"
++    "name": "Зазубренное лезвие",
++    "prefix": "Зазубренное лезвие",
++    "effectDescription": "Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_104",
+-    "name": "Electrified Blade",
+-    "prefix": "Electrifed",
+-    "effectDescription": "plus 1 CD Damage, damage type Energy"
++    "name": "Электризованное лезвие",
++    "prefix": "Электризованное лезвие",
++    "effectDescription": "+1 {/CD} урона, тип урона: энергетический"
+   },
+   {
+     "id": "mod_105",
+-    "name": "Electrified Serrated Blade",
+-    "prefix": "Serrated Electrifed",
+-    "effectDescription": "plus 1 CD Damage, damage type Energy, gain Persistent"
++    "name": "Электризованное зазубренное лезвие",
++    "prefix": "Электризованное зазубренное лезвие",
++    "effectDescription": "+1 {/CD} урона, тип урона: энергетический, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_106",
+-    "name": "Stun Pack",
+-    "prefix": "Stunning",
+-    "effectDescription": "plus 2 CD Damage, damage type Energy, gain Stun"
++    "name": "Шокер",
++    "prefix": "Шокер",
++    "effectDescription": "+2 {/CD} урона, тип урона: энергетический, Добавляет Оглушающий"
+   },
+   {
+     "id": "mod_107",
+-    "name": "Serrated Blade",
+-    "prefix": "Serrated",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Зазубренное лезвие",
++    "prefix": "Зазубренное лезвие",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_108",
+-    "name": "Stealth Blade",
+-    "prefix": "Stealth",
+-    "effectDescription": "plus 1 CD Damage, gain Sneak Attack, gain Persistent"
++    "name": "Скрытое лезвие",
++    "prefix": "Скрытое лезвие",
++    "effectDescription": "+1 {/CD} урона, Добавляет Скрытная атака, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_109",
+-    "name": "Serrated Blade",
+-    "prefix": "Serrated",
+-    "effectDescription": "plus 2 CD Damage, gain Persistent"
++    "name": "Зазубренное лезвие",
++    "prefix": "Зазубренное лезвие",
++    "effectDescription": "+2 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_110",
+-    "name": "Curved Blade",
+-    "prefix": "Curved",
+-    "effectDescription": "plus 1 CD Damage, gain Disarm"
++    "name": "Изогнутое лезвие",
++    "prefix": "Изогнутое лезвие",
++    "effectDescription": "+1 {/CD} урона, Добавляет Обезоруживающий"
+   },
+   {
+     "id": "mod_111",
+-    "name": "Extended Blade",
+-    "prefix": "Extended",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Удлинённое лезвие",
++    "prefix": "Удлинённое лезвие",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_112",
+-    "name": "Extra Flame Jets",
+-    "prefix": "Searing",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Дополнительные струи пламени",
++    "prefix": "Дополнительные струи пламени",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_113",
+-    "name": "Serrated Blade",
+-    "prefix": "Serrated",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Зазубренное лезвие",
++    "prefix": "Зазубренное лезвие",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_114",
+-    "name": "Barbed",
+-    "prefix": "Barbed",
+-    "effectDescription": "gain Piercing 1"
++    "name": "Шипастый",
++    "prefix": "Шипастый",
++    "effectDescription": "Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_115",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_116",
+-    "name": "Sharp",
+-    "prefix": "Sharp",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Острый",
++    "prefix": "Острый",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_117",
+-    "name": "Chain-Wrapped",
+-    "prefix": "Chain-Wrapped",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Обмотанный цепью",
++    "prefix": "Обмотанный цепью",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_118",
+-    "name": "Bladed",
+-    "prefix": "Bladed",
+-    "effectDescription": "plus 2 CD Damage, gain Persistent"
++    "name": "С лезвием",
++    "prefix": "С лезвием",
++    "effectDescription": "+2 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_119",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_120",
+-    "name": "Puncturing",
+-    "prefix": "Puncturing",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Пронзающий",
++    "prefix": "Пронзающий",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_121",
+-    "name": "Bladed",
+-    "prefix": "Bladed",
+-    "effectDescription": "plus 2 CD Damage, gain Persistent"
++    "name": "С лезвием",
++    "prefix": "С лезвием",
++    "effectDescription": "+2 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_122",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_123",
+-    "name": "Heavy",
+-    "prefix": "Heavy",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Тяжёлый",
++    "prefix": "Тяжёлый",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_124",
+-    "name": "Hooked",
+-    "prefix": "Hooked",
+-    "effectDescription": "plus 1 CD Damage, gain Disarm"
++    "name": "С крюком",
++    "prefix": "С крюком",
++    "effectDescription": "+1 {/CD} урона, Добавляет Обезоруживающий"
+   },
+   {
+     "id": "mod_125",
+-    "name": "Heavy",
+-    "prefix": "Heavy",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Тяжёлый",
++    "prefix": "Тяжёлый",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_126",
+-    "name": "Puncturing",
+-    "prefix": "Puncturing",
+-    "effectDescription": "plus 2 CD Damage, gain Piercing 1"
++    "name": "Пронзающий",
++    "prefix": "Пронзающий",
++    "effectDescription": "+2 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_127",
+-    "name": "Extra Heavy",
+-    "prefix": "Extra Heavy",
+-    "effectDescription": "plus 3 CD Damage"
++    "name": "Сверхтяжёлый",
++    "prefix": "Сверхтяжёлый",
++    "effectDescription": "+3 {/CD} урона"
+   },
+   {
+     "id": "mod_128",
+-    "name": "Barbed",
+-    "prefix": "Barbed",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипастый",
++    "prefix": "Шипастый",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_129",
+-    "name": "Sharp",
+-    "prefix": "Sharp",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Острый",
++    "prefix": "Острый",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_130",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_131",
+-    "name": "Sharp",
+-    "prefix": "Sharp",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "Острый",
++    "prefix": "Острый",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_132",
+-    "name": "Electrified",
+-    "prefix": "Electrified",
+-    "effectDescription": "plus 2 CD Damage, damage type Energy"
++    "name": "Электризованный",
++    "prefix": "Электризованный",
++    "effectDescription": "+2 {/CD} урона, тип урона: энергетический"
+   },
+   {
+     "id": "mod_133",
+-    "name": "Stun Pack",
+-    "prefix": "Stun Pack",
+-    "effectDescription": "plus 3 CD Damage, damage type Energy, gain Stun"
++    "name": "Шокер",
++    "prefix": "Шокер",
++    "effectDescription": "+3 {/CD} урона, тип урона: энергетический, Добавляет Оглушающий"
+   },
+   {
+     "id": "mod_134",
+-    "name": "Puncturing",
+-    "prefix": "Puncturing",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Пронзающий",
++    "prefix": "Пронзающий",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_135",
+-    "name": "Heavy",
+-    "prefix": "Heavy",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Тяжёлый",
++    "prefix": "Тяжёлый",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_136",
+-    "name": "Heating Coil",
+-    "prefix": "Heating Coil",
+-    "effectDescription": "plus 1 CD Damage, damage type Energy"
++    "name": "Нагревательная спираль",
++    "prefix": "Нагревательная спираль",
++    "effectDescription": "+1 {/CD} урона, тип урона: энергетический"
+   },
+   {
+     "id": "mod_137",
+-    "name": "Stun Pack",
+-    "prefix": "Stun Pack",
+-    "effectDescription": "plus 2 CD Damage, damage type Energy, gain Stun"
++    "name": "Шокер",
++    "prefix": "Шокер",
++    "effectDescription": "+2 {/CD} урона, тип урона: энергетический, Добавляет Оглушающий"
+   },
+   {
+     "id": "mod_138",
+-    "name": "Bladed",
+-    "prefix": "Bladed",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "С лезвием",
++    "prefix": "С лезвием",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_139",
+-    "name": "Barbed",
+-    "prefix": "Barbed",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипастый",
++    "prefix": "Шипастый",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_140",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_141",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_142",
+-    "name": "Puncturing",
+-    "prefix": "Puncturing",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Пронзающий",
++    "prefix": "Пронзающий",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_143",
+-    "name": "Lead Lining",
+-    "prefix": "Lined",
+-    "effectDescription": "plus 2 CD Damage"
++    "name": "Свинцовая оплётка",
++    "prefix": "Свинцовая оплётка",
++    "effectDescription": "+2 {/CD} урона"
+   },
+   {
+     "id": "mod_144",
+-    "name": "Extra Claw",
+-    "prefix": "Large",
+-    "effectDescription": "plus 1 CD Damage, gain Disarm"
++    "name": "Дополнительный коготь",
++    "prefix": "Дополнительный коготь",
++    "effectDescription": "+1 {/CD} урона, Добавляет Обезоруживающий"
+   },
+   {
+     "id": "mod_145",
+-    "name": "Sharp",
+-    "prefix": "Sharp",
+-    "effectDescription": "gain Persistent"
++    "name": "Острый",
++    "prefix": "Острый",
++    "effectDescription": "Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_146",
+-    "name": "Spiked",
+-    "prefix": "Spiked",
+-    "effectDescription": "gain Piercing 1"
++    "name": "Шипованный",
++    "prefix": "Шипованный",
++    "effectDescription": "Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_147",
+-    "name": "Puncturing",
+-    "prefix": "Puncturing",
+-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
++    "name": "Пронзающий",
++    "prefix": "Пронзающий",
++    "effectDescription": "+1 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_148",
+-    "name": "Bladed",
+-    "prefix": "Bladed",
+-    "effectDescription": "plus 1 CD Damage, gain Persistent"
++    "name": "С лезвием",
++    "prefix": "С лезвием",
++    "effectDescription": "+1 {/CD} урона, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_149",
+-    "name": "Puncturing",
+-    "prefix": "Puncturing",
+-    "effectDescription": "plus 2 CD Damage, Gain Piercing 1"
++    "name": "Пронзающий",
++    "prefix": "Пронзающий",
++    "effectDescription": "+2 {/CD} урона, Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_150",
+-    "name": "Heating Coil",
+-    "prefix": "Heated",
+-    "effectDescription": "plus 2 CD Damage, Damage Type Energy"
++    "name": "Нагревательная спираль",
++    "prefix": "Нагревательная спираль",
++    "effectDescription": "+2 {/CD} урона, тип урона: энергетический"
+   },
+   {
+     "id": "mod_151",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 Range"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_152",
+-    "name": "Recoil Compensating Stock",
+-    "prefix": "Recoil Compensated",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Ложа с компенсатором отдачи",
++    "prefix": "Демпфированный",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_153",
+-    "name": "Gunner Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "gain Re-roll Hit Location"
++    "name": "Прицел стрелка",
++    "prefix": "Прицел стрелка",
++    "effectDescription": "Добавляет Перевыбрать конечность"
+   },
+   {
+     "id": "mod_154",
+-    "name": "Electrification Module",
+-    "prefix": "Electrified",
+-    "effectDescription": "gain Vicious, Damage Type Energy"
++    "name": "Модуль электрификации",
++    "prefix": "Модуль электрификации",
++    "effectDescription": "Добавляет Порочный, тип урона: энергетический"
+   },
+   {
+     "id": "mod_155",
+-    "name": "Ignition Module",
+-    "prefix": "Flaming",
+-    "effectDescription": "gain Persistent"
++    "name": "Модуль поджига",
++    "prefix": "Модуль поджига",
++    "effectDescription": "Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_156",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 Range"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_157",
+-    "name": "Full Stock",
+-    "prefix": "",
+-    "effectDescription": "Gain Two-Handed, Lose Inaccurate"
++    "name": "Полная ложа",
++    "prefix": "Стрелковый",
++    "effectDescription": "Добавляет Двуручное, Убирает Неточное"
+   },
+   {
+     "id": "mod_158",
+-    "name": "Caustic",
+-    "prefix": "Caustic",
+-    "effectDescription": "plus 1 CD Damage"
++    "name": "Едкий",
++    "prefix": "Едкий",
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_159",
+-    "name": "Large Ampoule",
+-    "prefix": "High Capacity",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Большая ампула",
++    "prefix": "Большая ампула",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_160",
+-    "name": "Large Vial",
+-    "prefix": "Maximum Capacity",
+-    "effectDescription": "plus 3 Fire Rate"
++    "name": "Большой флакон",
++    "prefix": "Большой флакон",
++    "effectDescription": "+3 Скорость стрельбы"
+   },
+   {
+     "id": "mod_161",
+-    "name": "Fusion Mag",
+-    "prefix": "Converted",
+-    "effectDescription": "Set 3 CD Damage, minus 1 Fire Rate, Ammo changes to Fusion Cell"
++    "name": "Ядерный магазин",
++    "prefix": "Ядерный магазин",
++    "effectDescription": "Урон 3 {/CD}, −1 Скорость стрельбы, смена патронов на термоядерный элемент"
+   },
+   {
+     "id": "mod_162",
+-    "name": "Capacitor Mk III",
+-    "prefix": "Mk III",
+-    "effectDescription": "plus 1 CD Damage, gain Crank 3"
++    "name": "Конденсатор Мк III",
++    "prefix": "Конденсатор Мк III",
++    "effectDescription": "+1 {/CD} урона, Добавляет Ствол 3"
+   },
+   {
+     "id": "mod_163",
+-    "name": "Capacitor Mk IV",
+-    "prefix": "Mk IV",
+-    "effectDescription": "plus 2 CD Damage, gain Crank 4"
++    "name": "Конденсатор Мк IV",
++    "prefix": "Конденсатор Мк IV",
++    "effectDescription": "+2 {/CD} урона, Добавляет Ствол 4"
+   },
+   {
+     "id": "mod_164",
+-    "name": "Capacitor Mk V",
+-    "prefix": "Mk V",
+-    "effectDescription": "plus 3 CD Damage, gain Crank 5"
++    "name": "Конденсатор Мк V",
++    "prefix": "Конденсатор Мк V",
++    "effectDescription": "+3 {/CD} урона, Добавляет Ствол 5"
+   },
+   {
+     "id": "mod_165",
+-    "name": "Capacitor Mk VI",
+-    "prefix": "Mk VI",
+-    "effectDescription": "plus 4 CD Damage, gain Crank 6"
++    "name": "Конденсатор Мк VI",
++    "prefix": "Конденсатор Мк VI",
++    "effectDescription": "+4 {/CD} урона, Добавляет Ствол 6"
+   },
+   {
+     "id": "mod_166",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "plus 1 Range"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_167",
+-    "name": "Light Barrel",
+-    "prefix": "Fluted",
+-    "effectDescription": "plus 2 CD Damage, Lose Blast"
++    "name": "Лёгкий ствол",
++    "prefix": "Лёгкий ствол",
++    "effectDescription": "+2 {/CD} урона, Убирает Врыв"
+   },
+   {
+     "id": "mod_168",
+     "name": "Многозарядное дуло",
+-    "prefix": "Repeating",
+-    "effectDescription": "plus 1 Fire Rate, Gain Inaccurate"
++    "prefix": "Многозарядный",
++    "effectDescription": "+1 Скорость стрельбы, Добавляет Неточное"
+   },
+   {
+     "id": "mod_169",
+-    "name": "M79 Launcher",
+-    "prefix": "Converted",
+-    "effectDescription": "plus 1 Range, ammo 40mm Grenades"
++    "name": "Гранатомёт M79",
++    "prefix": "Гранатомёт M79",
++    "effectDescription": "+1 Дистанция, патроны: 40мм гранаты"
+   },
+   {
+     "id": "mod_170",
+-    "name": "Crystallizing Barrel",
+-    "prefix": "Crystallized",
+-    "effectDescription": "plus 2 CD Damage, plus 1 Range, minus 1 Fire Rate, Lose Stun, Lose Unreliable"
++    "name": "Кристаллизующий ствол",
++    "prefix": "Кристаллизующий ствол",
++    "effectDescription": "+2 {/CD} урона, +1 Дистанция, −1 Скорость стрельбы, Убирает Оглушающий, Убирает Ненадежное"
+   },
+   {
+     "id": "mod_171",
+-    "name": "Fusion Mag",
+-    "prefix": "Converted",
+-    "effectDescription": "Set 2 CD Damage, minus 1 Fire Rate, Ammo fusion cell"
++    "name": "Ядерный магазин",
++    "prefix": "Ядерный магазин",
++    "effectDescription": "Урон 2 {/CD}, −1 Скорость стрельбы, патроны: термоядерный элемент"
+   },
+   {
+     "id": "mod_172",
+-    "name": "Recoil Compensating Stock",
+-    "prefix": "Recoil Compensating",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Ложа с компенсатором отдачи",
++    "prefix": "Демпфированный",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_173",
+-    "name": "Reflex Tactical",
+-    "prefix": "",
+-    "effectDescription": "Gain Re-roll Hit Location"
++    "name": "Тактический коллиматорный",
++    "prefix": "Тактический коллиматорный",
++    "effectDescription": "Добавляет Перевыбрать конечность"
+   },
+   {
+     "id": "mod_174",
+-    "name": "Barbed Harpoon",
+-    "prefix": "Barbed",
+-    "effectDescription": "Gain Vicious, Gain Persistent"
++    "name": "Зазубренный гарпун",
++    "prefix": "Зазубренный гарпун",
++    "effectDescription": "Добавляет Порочный, Добавляет Устойчивый"
+   },
+   {
+     "id": "mod_175",
+-    "name": "Flechette Darts",
+-    "prefix": "Tiny",
+-    "effectDescription": "Gain Spread, minus 1 Range"
++    "name": "Флешетные дротики",
++    "prefix": "Флешетные дротики",
++    "effectDescription": "Добавляет Разброс, −1 Дистанция"
+   },
+   {
+     "id": "mod_176",
+-    "name": "Recoil Compensating Stock",
+-    "prefix": "Recoil Compensating",
+-    "effectDescription": "plus 1 Fire Rate"
++    "name": "Ложа с компенсатором отдачи",
++    "prefix": "Демпфированный",
++    "effectDescription": "+1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_177",
+-    "name": "Gunner Sight",
+-    "prefix": "Tactical",
+-    "effectDescription": "Gain Re-roll Hit Location"
++    "name": "Прицел стрелка",
++    "prefix": "Прицел стрелка",
++    "effectDescription": "Добавляет Перевыбрать конечность"
+   },
+   {
+     "id": "mod_178",
+-    "name": "Short Scope",
+-    "prefix": "Scoped",
+-    "effectDescription": "Gain Accurate"
++    "name": "Короткий оптический",
++    "prefix": "Прицельный",
++    "effectDescription": "Добавляет Точное"
+   },
+   {
+     "id": "mod_179",
+-    "name": "Armor Piercing Receiver",
+-    "prefix": "Armor Piercing",
+-    "effectDescription": "Gain Piercing 1"
++    "name": "Бронебойный ресивер",
++    "prefix": "Бронебойный ресивер",
++    "effectDescription": "Добавляет Проникающий 1"
+   },
+   {
+     "id": "mod_180",
+-    "name": "Armor Piercing Automatic",
+-    "prefix": "AP Auto",
+-    "effectDescription": "minus 1 CD Damage, plus 2 Fire Rate, gain Piercing 1, gain Inaccurate"
++    "name": "Автоматический бронебойный",
++    "prefix": "Автоматический бронебойный",
++    "effectDescription": "−1 {/CD} урона, +2 Скорость стрельбы, Добавляет Проникающий 1, Добавляет Неточное"
+   },
+   {
+     "id": "mod_181",
+-    "name": "Hardened Automatic",
+-    "prefix": "Hardened Auto",
+-    "effectDescription": "plus 2 Fire Rate, gain Inaccurate"
++    "name": "Автоматический укреплённый",
++    "prefix": "Автоматический укреплённый",
++    "effectDescription": "+2 Скорость стрельбы, Добавляет Неточное"
+   },
+   {
+     "id": "mod_182",
+-    "name": "Rapid Automatic",
+-    "prefix": "Rapid",
+-    "effectDescription": "minus 1 CD Damage, plus 3 Fire Rate, Gain Inaccurate"
++    "name": "Скорострельный автоматический",
++    "prefix": "Скорострельный автоматический",
++    "effectDescription": "−1 {/CD} урона, +3 Скорость стрельбы, Добавляет Неточное"
+   },
+   {
+     "id": "mod_183",
+-    "name": "Calibrated Powerful",
+-    "prefix": "Calibrated Powerful",
+-    "effectDescription": "plus 2 CD Damage, Gain Vicious"
++    "name": "Усиленный калиброванный",
++    "prefix": "Усиленный калиброванный",
++    "effectDescription": "+2 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_184",
+-    "name": "Powerful Automatic",
+-    "prefix": "Powerful Auto",
+-    "effectDescription": "plus 1 CD Damage, plus 2 Fire Rate, Gain Inaccurate"
++    "name": "Усиленный автоматический",
++    "prefix": "Усиленный автоматический",
++    "effectDescription": "+1 {/CD} урона, +2 Скорость стрельбы, Добавляет Неточное"
+   },
+   {
+     "id": "mod_185",
+-    "name": "Hardened Piercing Auto",
+-    "prefix": "Hardened AP Auto",
+-    "effectDescription": "plus 2 Fire Rate, Gain Piercing 1, Gain Inaccurate"
++    "name": "Укреплённый бронебойный автоматический",
++    "prefix": "Укреплённый бронебойный автоматический",
++    "effectDescription": "+2 Скорость стрельбы, Добавляет Проникающий 1, Добавляет Неточное"
+   },
+   {
+     "id": "mod_186",
+-    "name": "9mm Receiver",
+-    "prefix": "9mm",
+-    "effectDescription": "Set 3 CD Damage, Ammo 9mm, plus 1 Fire Rate"
++    "name": "Ресивер 9мм",
++    "prefix": "Ресивер 9мм",
++    "effectDescription": "Урон 3 {/CD}, патроны: 9мм, +1 Скорость стрельбы"
+   },
+   {
+     "id": "mod_187",
+-    "name": ".357 Receiver",
+-    "prefix": ".357",
+-    "effectDescription": "Set 5 CD Damage, ammo .357, gain Vicious"
++    "name": "Ресивер .357",
++    "prefix": "Ресивер .357",
++    "effectDescription": "Урон 5 {/CD}, патроны: .357, Добавляет Порочный"
+   },
+   {
+     "id": "mod_188",
+-    "name": "Heavy Barrel",
+-    "prefix": "",
+-    "effectDescription": "Plus 1 CD Damage, gain Vicious"
++    "name": "Тяжёлый ствол",
++    "prefix": "Тяжёлый ствол",
++    "effectDescription": "+1 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_189",
+-    "name": "Heavy Barrel",
+-    "prefix": "",
+-    "effectDescription": "Plus 1 CD Damage, gain Vicious"
++    "name": "Тяжёлый ствол",
++    "prefix": "Тяжёлый ствол",
++    "effectDescription": "+1 {/CD} урона, Добавляет Порочный"
+   },
+   {
+     "id": "mod_190",
+-    "name": "Long Barrel",
+-    "prefix": "",
+-    "effectDescription": "Plus 1 Range"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_191",
+-    "name": "25mm Receiver",
+-    "prefix": "",
+-    "effectDescription": "Set 4 CD Damage, Ammo 25mm Grenade, plus 2 Fire Rate"
++    "name": "Ресивер 25мм",
++    "prefix": "Ресивер 25мм",
++    "effectDescription": "Урон 4 {/CD}, патроны: 25мм граната, +2 Скорость стрельбы"
+   },
+   {
+     "id": "mod_192",
+-    "name": "Speedy Receiver",
+-    "prefix": "",
+-    "effectDescription": "plus 2 Fire Rate"
++    "name": "Скоростной ресивер",
++    "prefix": "Скоростной ресивер",
++    "effectDescription": "+2 Скорость стрельбы"
+   },
+   {
+     "id": "mod_193",
+-    "name": "Long Barrel",
+-    "prefix": "Long",
+-    "effectDescription": "Plus 1 Range"
++    "name": "Длинный ствол",
++    "prefix": "Длинный",
++    "effectDescription": "+1 Дистанция"
+   },
+   {
+     "id": "mod_194",
+-    "name": "Comfort Grip",
+-    "prefix": "Comfort Grip",
+-    "effectDescription": "Lose Recoil 6"
++    "name": "Удобная",
++    "prefix": "Удобный",
++    "effectDescription": "Убирает Отдача 6"
+   },
+   {
+     "id": "mod_195",
+-    "name": "Extra-Large Magazine",
+-    "prefix": "",
+-    "effectDescription": "Plus 1 Fire Rate, Gain Unreliable"
++    "name": "Увеличенный магазин",
++    "prefix": "Увеличенный магазин",
++    "effectDescription": "+1 Скорость стрельбы, Добавляет Ненадежное"
+   },
+   {
+     "id": "mod_196",
+-    "name": "Front Sight Ring",
+-    "prefix": "Sighted",
+-    "effectDescription": "Lose Inaccurate"
++    "name": "Кольцевая мушка",
++    "prefix": "Кольцевая мушка",
++    "effectDescription": "Убирает Неточное"
+   },
+   {
+     "id": "mod_197",
+-    "name": "Large Bayonet",
+-    "prefix": "Bayoneted",
+-    "effectDescription": "gain Bayonet"
++    "name": "Большой штык",
++    "prefix": "Большой штык",
++    "effectDescription": "Добавляет Штык"
+   },
+   {
+     "id": "mod_198",
+     "name": "Блочная рама",
+     "prefix": "Блочный",
+-    "effectDescription": "+1 CD урона, -1 скорострельность, убирает «Отдача 6»"
++    "effectDescription": "+1 {/CD} урона, -1 скорострельность, убирает «Отдача 6»"
+   },
+   {
+     "id": "mod_199",
+@@ -1209,7 +1209,7 @@
+     "id": "mod_202",
+     "name": "Усиленная лебёдка",
+     "prefix": "Усиленная",
+-    "effectDescription": "+1 DC урона"
++    "effectDescription": "+1 {/CD} урона"
+   },
+   {
+     "id": "mod_203",
+-- 
+2.47.3
+

@@ -7,12 +7,12 @@
   {
     "id": "mag_astoundingly_awesome_tales_01",
     "name": "Astoundingly Awesome Tales: Attack of the Fishmen!",
-    "effectLabel": "+1 CD on attacks against Mirelurks"
+    "effectLabel": "+1 {/CD} on attacks against Mirelurks"
   },
   {
     "id": "mag_astoundingly_awesome_tales_02",
     "name": "Astoundingly Awesome Tales: Rise of the Mutants!",
-    "effectLabel": "+1 CD on attacks against super mutants"
+    "effectLabel": "+1 {/CD} on attacks against super mutants"
   },
   {
     "id": "mag_astoundingly_awesome_tales_03",
@@ -27,12 +27,12 @@
   {
     "id": "mag_astoundingly_awesome_tales_05",
     "name": "Astoundingly Awesome Tales: The Starlet Sniper!",
-    "effectLabel": "+1 CD on attacks with Accurate weapons"
+    "effectLabel": "+1 {/CD} on attacks with Accurate weapons"
   },
   {
     "id": "mag_astoundingly_awesome_tales_06",
     "name": "Astoundingly Awesome Tales: Curse of the Burned!",
-    "effectLabel": "+1 CD on attacks vs Ghouls"
+    "effectLabel": "+1 {/CD} on attacks vs Ghouls"
   },
   {
     "id": "mag_astoundingly_awesome_tales_07",
@@ -42,7 +42,7 @@
   {
     "id": "mag_astoundingly_awesome_tales_08",
     "name": "Astoundingly Awesome Tales: Deadly Lasers!",
-    "effectLabel": "+1 CD on attacks with Energy weapons"
+    "effectLabel": "+1 {/CD} on attacks with Energy weapons"
   },
   {
     "id": "mag_astoundingly_awesome_tales_09",
@@ -52,12 +52,12 @@
   {
     "id": "mag_astoundingly_awesome_tales_10",
     "name": "Astoundingly Awesome Tales: Surrounded by the Dead!",
-    "effectLabel": "+1 CD on attacks where you spend one or more Ammunition for bonus damage"
+    "effectLabel": "+1 {/CD} on attacks where you spend one or more Ammunition for bonus damage"
   },
   {
     "id": "mag_backwoodsman_01",
     "name": "Backwoodsman: Get Off My Lawn",
-    "effectLabel": "When you find ammo, you find +2 CD more shots"
+    "effectLabel": "When you find ammo, you find +2 {/CD} more shots"
   },
   {
     "id": "mag_backwoodsman_02",
@@ -77,7 +77,7 @@
   {
     "id": "mag_backwoodsman_05",
     "name": "Backwoodsman: Carnivorous Rabbits of Appalachia",
-    "effectLabel": "Add +2 CD damage to an attack against a Mammal or Lizard"
+    "effectLabel": "Add +2 {/CD} damage to an attack against a Mammal or Lizard"
   },
   {
     "id": "mag_backwoodsman_06",
@@ -87,7 +87,7 @@
   {
     "id": "mag_backwoodsman_07",
     "name": "Backwoodsman: Art of the Tomahawk",
-    "effectLabel": "Add +2 CD damage to a Thrown weapon attack (other than an Explosive)"
+    "effectLabel": "Add +2 {/CD} damage to a Thrown weapon attack (other than an Explosive)"
   },
   {
     "id": "mag_backwoodsman_08",
@@ -122,12 +122,12 @@
   {
     "id": "mag_future_weapons_today",
     "name": "Future Weapons Today",
-    "effectLabel": "Once, when you make an attack with an Energy Weapon, you may overcharge it. Increase the damage by +2 CD for that attack. The weapon cannot be used to make an attack in the turn after an overcharged attack as it cools down."
+    "effectLabel": "Once, when you make an attack with an Energy Weapon, you may overcharge it. Increase the damage by +2 {/CD} for that attack. The weapon cannot be used to make an attack in the turn after an overcharged attack as it cools down."
   },
   {
     "id": "mag_grognak_the_barbarian_01",
     "name": "Grognak the Barbarian: Blood on the Harp",
-    "effectLabel": "One successful melee attack you make inflicts +2 CD damage"
+    "effectLabel": "One successful melee attack you make inflicts +2 {/CD} damage"
   },
   {
     "id": "mag_grognak_the_barbarian_02",
@@ -147,7 +147,7 @@
   {
     "id": "mag_grognak_the_barbarian_05",
     "name": "Grognak the Barbarian: Demon Slaves, Demon Sands",
-    "effectLabel": "One attack against Ghouls inflicts +2 CD damage"
+    "effectLabel": "One attack against Ghouls inflicts +2 {/CD} damage"
   },
   {
     "id": "mag_grognak_the_barbarian_06",
@@ -177,7 +177,7 @@
   {
     "id": "mag_guns_and_bullets_01",
     "name": "Guns and Bullets: The Future of Hunting?",
-    "effectLabel": "One attack against Robots inflicts +2 CD damage"
+    "effectLabel": "One attack against Robots inflicts +2 {/CD} damage"
   },
   {
     "id": "mag_guns_and_bullets_02",
@@ -207,12 +207,12 @@
   {
     "id": "mag_guns_and_bullets_07",
     "name": "Guns and Bullets: Take Aim, Army Style",
-    "effectLabel": "One aimed attack made with a weapon which lacks the Accurate quality inflicts +2 CD damage"
+    "effectLabel": "One aimed attack made with a weapon which lacks the Accurate quality inflicts +2 {/CD} damage"
   },
   {
     "id": "mag_guns_and_bullets_08",
     "name": "Guns and Bullets: Bear-Proofing Your Campsite",
-    "effectLabel": "One attack against Yao Guai inflicts +3 CD damage"
+    "effectLabel": "One attack against Yao Guai inflicts +3 {/CD} damage"
   },
   {
     "id": "mag_guns_and_bullets_09",
@@ -222,7 +222,7 @@
   {
     "id": "mag_guns_and_bullets_10",
     "name": "Guns and Bullets: Guide to Hunting Commies!",
-    "effectLabel": "One attack against an enemy with a lower level than you inflicts +2 CD damage"
+    "effectLabel": "One attack against an enemy with a lower level than you inflicts +2 {/CD} damage"
   },
   {
     "id": "mag_live_and_love_01",
@@ -232,7 +232,7 @@
   {
     "id": "mag_live_and_love_02",
     "name": "Live & Love: Nuke-the-Man!",
-    "effectLabel": "+1 CD damage to attacks from all party members for one scene"
+    "effectLabel": "+1 {/CD} damage to attacks from all party members for one scene"
   },
   {
     "id": "mag_live_and_love_03",
@@ -302,7 +302,7 @@
   {
     "id": "mag_tesla_science_magazine_03",
     "name": "Tesla Science Magazine: Rocket Science for Toddlers",
-    "effectLabel": "+2 CD damage inflicted by one attack with a Blast weapon"
+    "effectLabel": "+2 {/CD} damage inflicted by one attack with a Blast weapon"
   },
   {
     "id": "mag_tesla_science_magazine_04",
@@ -317,7 +317,7 @@
   {
     "id": "mag_tesla_science_magazine_06",
     "name": "Tesla Science Magazine: Geckos and Gamma Radiation",
-    "effectLabel": "+2 CD damage inflicted on one attack against a Mutated creature"
+    "effectLabel": "+2 {/CD} damage inflicted on one attack against a Mutated creature"
   },
   {
     "id": "mag_tesla_science_magazine_07",
@@ -337,7 +337,7 @@
   {
     "id": "mag_true_police_stories",
     "name": "True Police Stories",
-    "effectLabel": "Once, when you roll the damage of an attack, you may spend a Luck point to turn up to three CD to any face, rather than rolling them."
+    "effectLabel": "Once, when you roll the damage of an attack, you may spend a Luck point to turn up to three {/CD} to any face, rather than rolling them."
   },
   {
     "id": "mag_tumblers_today_01",
@@ -352,7 +352,7 @@
   {
     "id": "mag_tumblers_today_03",
     "name": "Tumblers Today: Confessions of a Housebreaker",
-    "effectLabel": "When scavenging or looting, spend 1 Luck to find 2+2 CD Bobby Pins"
+    "effectLabel": "When scavenging or looting, spend 1 Luck to find 2+2 {/CD} Bobby Pins"
   },
   {
     "id": "mag_tumblers_today_04",
@@ -407,7 +407,7 @@
   {
     "id": "mag_us_covert_operations_manual_04",
     "name": "U.S. Covert Operations Manual: FH 5-04 Not the Soldiers You're Looking For",
-    "effectLabel": "+1 CD damage inflicted by attacks against Character NPCs"
+    "effectLabel": "+1 {/CD} damage inflicted by attacks against Character NPCs"
   },
   {
     "id": "mag_us_covert_operations_manual_05",
@@ -427,7 +427,7 @@
   {
     "id": "mag_us_covert_operations_manual_08",
     "name": "U.S. Covert Operations Manual: FH 5-08 Bushes, Boxes, and Beehives: Camouflage Special",
-    "effectLabel": "+2 CD damage inflicted by an unarmed attack or an attack made with a knife"
+    "effectLabel": "+2 {/CD} damage inflicted by an unarmed attack or an attack made with a knife"
   },
   {
     "id": "mag_us_covert_operations_manual_09",
@@ -452,7 +452,7 @@
   {
     "id": "mag_wasteland_survival_guide_03",
     "name": "Wasteland Survival Guide: The Bright Side of Radiation Poisoning",
-    "effectLabel": "When you consume irradiated food or drink, heal additional HP equal to the roll on the CD"
+    "effectLabel": "When you consume irradiated food or drink, heal additional HP equal to the roll on the {/CD}"
   },
   {
     "id": "mag_wasteland_survival_guide_04",

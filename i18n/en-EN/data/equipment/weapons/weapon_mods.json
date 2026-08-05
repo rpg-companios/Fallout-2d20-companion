@@ -3,37 +3,37 @@
     "id": "mod_001",
     "name": "Rapid",
     "prefix": "Rapid",
-    "effectDescription": "minus 1 CD Damage, plus 2 Fire Rate"
+    "effectDescription": "minus 1 {/CD} Damage, plus 2 Fire Rate"
   },
   {
     "id": "mod_002",
     "name": "Armor-Piercing",
     "prefix": "Armor-Piercing",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_003",
     "name": "Tuned",
     "prefix": "Tuned",
-    "effectDescription": "plus 1 CD Damage, plus 1 Fire Rate"
+    "effectDescription": "plus 1 {/CD} Damage, plus 1 Fire Rate"
   },
   {
     "id": "mod_004",
     "name": "Hardened",
     "prefix": "Hardened",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_005",
     "name": "Powerful",
     "prefix": "Powerful",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_006",
     "name": "Advanced",
     "prefix": "Advanced",
-    "effectDescription": "plus 3 CD Damage, plus 1 Fire Rate"
+    "effectDescription": "plus 3 {/CD} Damage, plus 1 Fire Rate"
   },
   {
     "id": "mod_007",
@@ -45,7 +45,7 @@
     "id": "mod_008",
     "name": "Automatic",
     "prefix": "Auto",
-    "effectDescription": "minus 1 CD Damage, plus 2 Fire Rate, gain Burst, gain Inaccurate"
+    "effectDescription": "minus 1 {/CD} Damage, plus 2 Fire Rate, gain Burst, gain Inaccurate"
   },
   {
     "id": "mod_009",
@@ -57,25 +57,25 @@
     "id": "mod_010",
     "name": ".38 Receiver",
     "prefix": ".38",
-    "effectDescription": "Set 4 CD Damage, Ammo .38"
+    "effectDescription": "Set 4 {/CD} Damage, Ammo .38"
   },
   {
     "id": "mod_011",
     "name": ".308 Receiver",
     "prefix": ".308",
-    "effectDescription": "Set 7 CD Damage, Ammo .308"
+    "effectDescription": "Set 7 {/CD} Damage, Ammo .308"
   },
   {
     "id": "mod_012",
     "name": ".45 Receiver",
     "prefix": ".45",
-    "effectDescription": "Set 4 CD Damage, Ammo .45"
+    "effectDescription": "Set 4 {/CD} Damage, Ammo .45"
   },
   {
     "id": "mod_013",
     "name": ".50 Receiver",
     "prefix": ".50",
-    "effectDescription": "Set 8 CD Damage, Ammo .50"
+    "effectDescription": "Set 8 {/CD} Damage, Ammo .50"
   },
   {
     "id": "mod_014",
@@ -123,13 +123,13 @@
     "id": "mod_021",
     "name": "Shielded Barrel",
     "prefix": "Shielded",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_022",
     "name": "Finned",
     "prefix": "Finned",
-    "effectDescription": "plus 1 CD Damage, plus 1 Range"
+    "effectDescription": "plus 1 {/CD} Damage, plus 1 Range"
   },
   {
     "id": "mod_023",
@@ -183,13 +183,13 @@
     "id": "mod_031",
     "name": "Full Capacitors",
     "prefix": "",
-    "effectDescription": "plus 1 CD Damage, gain Vicious"
+    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
   },
   {
     "id": "mod_032",
     "name": "Capacitor Boosting Coil",
     "prefix": "",
-    "effectDescription": "plus 1 CD Damage, minus 1 Fire Rate"
+    "effectDescription": "plus 1 {/CD} Damage, minus 1 Fire Rate"
   },
   {
     "id": "mod_033",
@@ -261,7 +261,7 @@
     "id": "mod_044",
     "name": "Boosted Capacitor",
     "prefix": "Boosted",
-    "effectDescription": "plus 1 CD Damage, minus 1 Fire Rate"
+    "effectDescription": "plus 1 {/CD} Damage, minus 1 Fire Rate"
   },
   {
     "id": "mod_045",
@@ -273,31 +273,31 @@
     "id": "mod_046",
     "name": "Photon Agitator",
     "prefix": "Agitated",
-    "effectDescription": "plus 1 CD Damage, gain Vicious"
+    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
   },
   {
     "id": "mod_047",
     "name": "Three-Crank Capacitor",
     "prefix": "Three-Crank",
-    "effectDescription": "plus 1 CD Damage, gain Crank 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Crank 1"
   },
   {
     "id": "mod_048",
     "name": "Four-Crank Capacitor",
     "prefix": "Four-Crank",
-    "effectDescription": "plus 2 CD Damage, gain Crank 2"
+    "effectDescription": "plus 2 {/CD} Damage, gain Crank 2"
   },
   {
     "id": "mod_049",
     "name": "Five-Crank Capacitor",
     "prefix": "Five-Crank",
-    "effectDescription": "plus 3 CD Damage, gain Crank 3 "
+    "effectDescription": "plus 3 {/CD} Damage, gain Crank 3 "
   },
   {
     "id": "mod_050",
     "name": "Six-Crank Capacitor",
     "prefix": "Six-Crank",
-    "effectDescription": "plus 4 CD Damage, gain Crank 4"
+    "effectDescription": "plus 4 {/CD} Damage, gain Crank 4"
   },
   {
     "id": "mod_051",
@@ -309,31 +309,31 @@
     "id": "mod_052",
     "name": "Splitter",
     "prefix": "Splitter",
-    "effectDescription": "minus 1 CD Damage, gain Spread, gain Inaccurate"
+    "effectDescription": "minus 1 {/CD} Damage, gain Spread, gain Inaccurate"
   },
   {
     "id": "mod_053",
     "name": "Automatic Barrel",
     "prefix": "Automatic",
-    "effectDescription": "minus 1 CD Damage, plus 1 Range, plus 1 Fire Rate, lose Close Quarters"
+    "effectDescription": "minus 1 {/CD} Damage, plus 1 Range, plus 1 Fire Rate, lose Close Quarters"
   },
   {
     "id": "mod_054",
     "name": "Improved Barrel",
     "prefix": "Improved",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_055",
     "name": "Sniper Barrel",
     "prefix": "Sniper",
-    "effectDescription": "plus 2 CD Damage, plus 1 Range, minus 1 Fire Rate, lose Close Quarters"
+    "effectDescription": "plus 2 {/CD} Damage, plus 1 Range, minus 1 Fire Rate, lose Close Quarters"
   },
   {
     "id": "mod_056",
     "name": "Flamer Barrel",
     "prefix": "Thrower",
-    "effectDescription": "minus 2 CD Damage, plus 1 Range, plus 2 Fire Rate, gain Burst, gain Spread, gain Inaccurate"
+    "effectDescription": "minus 2 {/CD} Damage, plus 1 Range, plus 2 Fire Rate, gain Burst, gain Spread, gain Inaccurate"
   },
   {
     "id": "mod_057",
@@ -405,7 +405,7 @@
     "id": "mod_068",
     "name": "Beam Splitter",
     "prefix": "Scattered",
-    "effectDescription": "minus 1 CD Damage, plus 1 Fire Rate, minus 1 Range, gain Spread, gain Inaccurate"
+    "effectDescription": "minus 1 {/CD} Damage, plus 1 Fire Rate, minus 1 Range, gain Spread, gain Inaccurate"
   },
   {
     "id": "mod_069",
@@ -423,13 +423,13 @@
     "id": "mod_071",
     "name": "Deep Dish",
     "prefix": "Long",
-    "effectDescription": "plus 1 CD Damage, plus 1 Range"
+    "effectDescription": "plus 1 {/CD} Damage, plus 1 Range"
   },
   {
     "id": "mod_072",
     "name": "Electric Signal Carrier Antennae",
     "prefix": "Electrifed",
-    "effectDescription": "Set 7 CD Damage, Damage Type Energy, gain Radioactive"
+    "effectDescription": "Set 7 {/CD} Damage, Damage Type Energy, gain Radioactive"
   },
   {
     "id": "mod_073",
@@ -441,7 +441,7 @@
     "id": "mod_074",
     "name": "Napalm Fuel",
     "prefix": "Napalmer",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_075",
@@ -465,13 +465,13 @@
     "id": "mod_078",
     "name": "Compression Nozzle",
     "prefix": "Compressed",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_079",
     "name": "Vaporization Nozzle",
     "prefix": "Vaporizing",
-    "effectDescription": "plus 1 CD Damage, gain Vicious"
+    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
   },
   {
     "id": "mod_080",
@@ -489,19 +489,19 @@
     "id": "mod_082",
     "name": "Boosted Capacitor",
     "prefix": "Boosted",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_083",
     "name": "Photon Agitator",
     "prefix": "Agitated",
-    "effectDescription": "plus 1 CD Damage, gain Vicious"
+    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
   },
   {
     "id": "mod_084",
     "name": "Charging Barrels",
     "prefix": "Charging",
-    "effectDescription": "plus 4 CD Damage, plus 1 Range, minus 3 Fire Rate"
+    "effectDescription": "plus 4 {/CD} Damage, plus 1 Range, minus 3 Fire Rate"
   },
   {
     "id": "mod_085",
@@ -549,13 +549,13 @@
     "id": "mod_092",
     "name": "Accelerated Barrel",
     "prefix": "High-Speed",
-    "effectDescription": "plus 1 CD Damage, plus 1 Fire Rate, minus 1 Range"
+    "effectDescription": "plus 1 {/CD} Damage, plus 1 Fire Rate, minus 1 Range"
   },
   {
     "id": "mod_093",
     "name": "Tri-Barrel",
     "prefix": "High-Powered",
-    "effectDescription": "plus 2 CD Damage, minus 2 Fire Rate"
+    "effectDescription": "plus 2 {/CD} Damage, minus 2 Fire Rate"
   },
   {
     "id": "mod_094",
@@ -621,61 +621,61 @@
     "id": "mod_104",
     "name": "Electrified Blade",
     "prefix": "Electrifed",
-    "effectDescription": "plus 1 CD Damage, damage type Energy"
+    "effectDescription": "plus 1 {/CD} Damage, damage type Energy"
   },
   {
     "id": "mod_105",
     "name": "Electrified Serrated Blade",
     "prefix": "Serrated Electrifed",
-    "effectDescription": "plus 1 CD Damage, damage type Energy, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, damage type Energy, gain Persistent"
   },
   {
     "id": "mod_106",
     "name": "Stun Pack",
     "prefix": "Stunning",
-    "effectDescription": "plus 2 CD Damage, damage type Energy, gain Stun"
+    "effectDescription": "plus 2 {/CD} Damage, damage type Energy, gain Stun"
   },
   {
     "id": "mod_107",
     "name": "Serrated Blade",
     "prefix": "Serrated",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_108",
     "name": "Stealth Blade",
     "prefix": "Stealth",
-    "effectDescription": "plus 1 CD Damage, gain Sneak Attack, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Sneak Attack, gain Persistent"
   },
   {
     "id": "mod_109",
     "name": "Serrated Blade",
     "prefix": "Serrated",
-    "effectDescription": "plus 2 CD Damage, gain Persistent"
+    "effectDescription": "plus 2 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_110",
     "name": "Curved Blade",
     "prefix": "Curved",
-    "effectDescription": "plus 1 CD Damage, gain Disarm"
+    "effectDescription": "plus 1 {/CD} Damage, gain Disarm"
   },
   {
     "id": "mod_111",
     "name": "Extended Blade",
     "prefix": "Extended",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_112",
     "name": "Extra Flame Jets",
     "prefix": "Searing",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_113",
     "name": "Serrated Blade",
     "prefix": "Serrated",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_114",
@@ -687,157 +687,157 @@
     "id": "mod_115",
     "name": "Spiked",
     "prefix": "Spiked",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_116",
     "name": "Sharp",
     "prefix": "Sharp",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_117",
     "name": "Chain-Wrapped",
     "prefix": "Chain-Wrapped",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_118",
     "name": "Bladed",
     "prefix": "Bladed",
-    "effectDescription": "plus 2 CD Damage, gain Persistent"
+    "effectDescription": "plus 2 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_119",
     "name": "Spiked",
     "prefix": "Spiked",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_120",
     "name": "Puncturing",
     "prefix": "Puncturing",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_121",
     "name": "Bladed",
     "prefix": "Bladed",
-    "effectDescription": "plus 2 CD Damage, gain Persistent"
+    "effectDescription": "plus 2 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_122",
     "name": "Spiked",
     "prefix": "Spiked",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_123",
     "name": "Heavy",
     "prefix": "Heavy",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_124",
     "name": "Hooked",
     "prefix": "Hooked",
-    "effectDescription": "plus 1 CD Damage, gain Disarm"
+    "effectDescription": "plus 1 {/CD} Damage, gain Disarm"
   },
   {
     "id": "mod_125",
     "name": "Heavy",
     "prefix": "Heavy",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_126",
     "name": "Puncturing",
     "prefix": "Puncturing",
-    "effectDescription": "plus 2 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 2 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_127",
     "name": "Extra Heavy",
     "prefix": "Extra Heavy",
-    "effectDescription": "plus 3 CD Damage"
+    "effectDescription": "plus 3 {/CD} Damage"
   },
   {
     "id": "mod_128",
     "name": "Barbed",
     "prefix": "Barbed",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_129",
     "name": "Sharp",
     "prefix": "Sharp",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_130",
     "name": "Spiked",
     "prefix": "Spiked",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_131",
     "name": "Sharp",
     "prefix": "Sharp",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_132",
     "name": "Electrified",
     "prefix": "Electrified",
-    "effectDescription": "plus 2 CD Damage, damage type Energy"
+    "effectDescription": "plus 2 {/CD} Damage, damage type Energy"
   },
   {
     "id": "mod_133",
     "name": "Stun Pack",
     "prefix": "Stun Pack",
-    "effectDescription": "plus 3 CD Damage, damage type Energy, gain Stun"
+    "effectDescription": "plus 3 {/CD} Damage, damage type Energy, gain Stun"
   },
   {
     "id": "mod_134",
     "name": "Puncturing",
     "prefix": "Puncturing",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_135",
     "name": "Heavy",
     "prefix": "Heavy",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_136",
     "name": "Heating Coil",
     "prefix": "Heating Coil",
-    "effectDescription": "plus 1 CD Damage, damage type Energy"
+    "effectDescription": "plus 1 {/CD} Damage, damage type Energy"
   },
   {
     "id": "mod_137",
     "name": "Stun Pack",
     "prefix": "Stun Pack",
-    "effectDescription": "plus 2 CD Damage, damage type Energy, gain Stun"
+    "effectDescription": "plus 2 {/CD} Damage, damage type Energy, gain Stun"
   },
   {
     "id": "mod_138",
     "name": "Bladed",
     "prefix": "Bladed",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_139",
     "name": "Barbed",
     "prefix": "Barbed",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_140",
     "name": "Spiked",
     "prefix": "Spiked",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_141",
@@ -849,19 +849,19 @@
     "id": "mod_142",
     "name": "Puncturing",
     "prefix": "Puncturing",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_143",
     "name": "Lead Lining",
     "prefix": "Lined",
-    "effectDescription": "plus 2 CD Damage"
+    "effectDescription": "plus 2 {/CD} Damage"
   },
   {
     "id": "mod_144",
     "name": "Extra Claw",
     "prefix": "Large",
-    "effectDescription": "plus 1 CD Damage, gain Disarm"
+    "effectDescription": "plus 1 {/CD} Damage, gain Disarm"
   },
   {
     "id": "mod_145",
@@ -879,25 +879,25 @@
     "id": "mod_147",
     "name": "Puncturing",
     "prefix": "Puncturing",
-    "effectDescription": "plus 1 CD Damage, gain Piercing 1"
+    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
   },
   {
     "id": "mod_148",
     "name": "Bladed",
     "prefix": "Bladed",
-    "effectDescription": "plus 1 CD Damage, gain Persistent"
+    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
   },
   {
     "id": "mod_149",
     "name": "Puncturing",
     "prefix": "Puncturing",
-    "effectDescription": "plus 2 CD Damage, Gain Piercing 1"
+    "effectDescription": "plus 2 {/CD} Damage, Gain Piercing 1"
   },
   {
     "id": "mod_150",
     "name": "Heating Coil",
     "prefix": "Heated",
-    "effectDescription": "plus 2 CD Damage, Damage Type Energy"
+    "effectDescription": "plus 2 {/CD} Damage, Damage Type Energy"
   },
   {
     "id": "mod_151",
@@ -945,7 +945,7 @@
     "id": "mod_158",
     "name": "Caustic",
     "prefix": "Caustic",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_159",
@@ -963,31 +963,31 @@
     "id": "mod_161",
     "name": "Fusion Mag",
     "prefix": "Converted",
-    "effectDescription": "Set 3 CD Damage, minus 1 Fire Rate, Ammo changes to Fusion Cell"
+    "effectDescription": "Set 3 {/CD} Damage, minus 1 Fire Rate, Ammo changes to Fusion Cell"
   },
   {
     "id": "mod_162",
     "name": "Capacitor Mk III",
     "prefix": "Mk III",
-    "effectDescription": "plus 1 CD Damage, gain Crank 3"
+    "effectDescription": "plus 1 {/CD} Damage, gain Crank 3"
   },
   {
     "id": "mod_163",
     "name": "Capacitor Mk IV",
     "prefix": "Mk IV",
-    "effectDescription": "plus 2 CD Damage, gain Crank 4"
+    "effectDescription": "plus 2 {/CD} Damage, gain Crank 4"
   },
   {
     "id": "mod_164",
     "name": "Capacitor Mk V",
     "prefix": "Mk V",
-    "effectDescription": "plus 3 CD Damage, gain Crank 5"
+    "effectDescription": "plus 3 {/CD} Damage, gain Crank 5"
   },
   {
     "id": "mod_165",
     "name": "Capacitor Mk VI",
     "prefix": "Mk VI",
-    "effectDescription": "plus 4 CD Damage, gain Crank 6"
+    "effectDescription": "plus 4 {/CD} Damage, gain Crank 6"
   },
   {
     "id": "mod_166",
@@ -999,7 +999,7 @@
     "id": "mod_167",
     "name": "Light Barrel",
     "prefix": "Fluted",
-    "effectDescription": "plus 2 CD Damage, Lose Blast"
+    "effectDescription": "plus 2 {/CD} Damage, Lose Blast"
   },
   {
     "id": "mod_168",
@@ -1017,13 +1017,13 @@
     "id": "mod_170",
     "name": "Crystallizing Barrel",
     "prefix": "Crystallized",
-    "effectDescription": "plus 2 CD Damage, plus 1 Range, minus 1 Fire Rate, Lose Stun, Lose Unreliable"
+    "effectDescription": "plus 2 {/CD} Damage, plus 1 Range, minus 1 Fire Rate, Lose Stun, Lose Unreliable"
   },
   {
     "id": "mod_171",
     "name": "Fusion Mag",
     "prefix": "Converted",
-    "effectDescription": "Set 2 CD Damage, minus 1 Fire Rate, Ammo fusion cell"
+    "effectDescription": "Set 2 {/CD} Damage, minus 1 Fire Rate, Ammo fusion cell"
   },
   {
     "id": "mod_172",
@@ -1077,7 +1077,7 @@
     "id": "mod_180",
     "name": "Armor Piercing Automatic",
     "prefix": "AP Auto",
-    "effectDescription": "minus 1 CD Damage, plus 2 Fire Rate, gain Piercing 1, gain Inaccurate"
+    "effectDescription": "minus 1 {/CD} Damage, plus 2 Fire Rate, gain Piercing 1, gain Inaccurate"
   },
   {
     "id": "mod_181",
@@ -1089,19 +1089,19 @@
     "id": "mod_182",
     "name": "Rapid Automatic",
     "prefix": "Rapid",
-    "effectDescription": "minus 1 CD Damage, plus 3 Fire Rate, Gain Inaccurate"
+    "effectDescription": "minus 1 {/CD} Damage, plus 3 Fire Rate, Gain Inaccurate"
   },
   {
     "id": "mod_183",
     "name": "Calibrated Powerful",
     "prefix": "Calibrated Powerful",
-    "effectDescription": "plus 2 CD Damage, Gain Vicious"
+    "effectDescription": "plus 2 {/CD} Damage, Gain Vicious"
   },
   {
     "id": "mod_184",
     "name": "Powerful Automatic",
     "prefix": "Powerful Auto",
-    "effectDescription": "plus 1 CD Damage, plus 2 Fire Rate, Gain Inaccurate"
+    "effectDescription": "plus 1 {/CD} Damage, plus 2 Fire Rate, Gain Inaccurate"
   },
   {
     "id": "mod_185",
@@ -1113,25 +1113,25 @@
     "id": "mod_186",
     "name": "9mm Receiver",
     "prefix": "9mm",
-    "effectDescription": "Set 3 CD Damage, Ammo 9mm, plus 1 Fire Rate"
+    "effectDescription": "Set 3 {/CD} Damage, Ammo 9mm, plus 1 Fire Rate"
   },
   {
     "id": "mod_187",
     "name": ".357 Receiver",
     "prefix": ".357",
-    "effectDescription": "Set 5 CD Damage, ammo .357, gain Vicious"
+    "effectDescription": "Set 5 {/CD} Damage, ammo .357, gain Vicious"
   },
   {
     "id": "mod_188",
     "name": "Heavy Barrel",
     "prefix": "",
-    "effectDescription": "Plus 1 CD Damage, gain Vicious"
+    "effectDescription": "Plus 1 {/CD} Damage, gain Vicious"
   },
   {
     "id": "mod_189",
     "name": "Heavy Barrel",
     "prefix": "",
-    "effectDescription": "Plus 1 CD Damage, gain Vicious"
+    "effectDescription": "Plus 1 {/CD} Damage, gain Vicious"
   },
   {
     "id": "mod_190",
@@ -1143,7 +1143,7 @@
     "id": "mod_191",
     "name": "25mm Receiver",
     "prefix": "",
-    "effectDescription": "Set 4 CD Damage, Ammo 25mm Grenade, plus 2 Fire Rate"
+    "effectDescription": "Set 4 {/CD} Damage, Ammo 25mm Grenade, plus 2 Fire Rate"
   },
   {
     "id": "mod_192",
@@ -1185,7 +1185,7 @@
     "id": "mod_198",
     "name": "mod_198",
     "prefix": "mod_198",
-    "effectDescription": "plus 1 CD Damage, minus 1 Fire Rate, lose Recoil 6"
+    "effectDescription": "plus 1 {/CD} Damage, minus 1 Fire Rate, lose Recoil 6"
   },
   {
     "id": "mod_199",
@@ -1209,7 +1209,7 @@
     "id": "mod_202",
     "name": "mod_202",
     "prefix": "mod_202",
-    "effectDescription": "plus 1 CD Damage"
+    "effectDescription": "plus 1 {/CD} Damage"
   },
   {
     "id": "mod_203",

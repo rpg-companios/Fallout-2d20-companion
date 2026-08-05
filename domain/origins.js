@@ -131,7 +131,17 @@ export function getBodyPlan(character) {
  */
 export function getBuiltinBaseWeapon(character) {
   if (isRobotCharacter(character)) return null;
-  return { id: 'unarmed_human', isBuiltin: true, itemType: 'weapon' };
+  // Имя берём из каталога i18n (как у прочего оружия), чтобы кулаки везде
+  // отображались как «Кулаки»/«Fists», а не сырым id. origins.js уже имеет
+  // доступ к catalog/locale (см. заголовок файла).
+  const base = (getEquipmentCatalog(getCurrentLocale())?.weapons || [])
+    .find((w) => w.id === 'unarmed_human');
+  return {
+    id: 'unarmed_human',
+    isBuiltin: true,
+    itemType: 'weapon',
+    name: base?.name || 'unarmed_human',
+  };
 }
 
 // ---------------------------------------------------------------------------

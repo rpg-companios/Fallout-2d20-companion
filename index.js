@@ -2,6 +2,10 @@ import { registerRootComponent } from 'expo';
 import React from 'react';
 import { View, Text } from 'react-native';
 
+import { setupRichText } from './components/screens/WeaponsAndArmorScreen/textUtils';
+// Глобально: любой <Text> рендерит токен {/CD} как картинку кубика (assets/CD.png).
+setupRichText();
+
 import App from './App';
 
 class ErrorBoundary extends React.Component {

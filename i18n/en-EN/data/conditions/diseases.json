@@ -2,12 +2,12 @@
   {
     "id": "disease_blood_worms",
     "name": "Blood Worms",
-    "effectLabel": "Attacks against you inflict +2 CD damage."
+    "effectLabel": "Attacks against you inflict +2 {/CD} damage."
   },
   {
     "id": "disease_bone_worms",
     "name": "Bone Worms",
-    "effectLabel": "Attacks against you which hit your arms or legs inflict +4 CD damage."
+    "effectLabel": "Attacks against you which hit your arms or legs inflict +4 {/CD} damage."
   },
   {
     "id": "disease_buzz_brain",
@@ -22,7 +22,7 @@
   {
     "id": "disease_fever_claw",
     "name": "Fever Claw",
-    "effectLabel": "Your ranged attacks inflict 2 CD less damage (minimum 1 CD)."
+    "effectLabel": "Your ranged attacks inflict 2 {/CD} less damage (minimum 1 {/CD})."
   },
   {
     "id": "disease_flap_limb",
@@ -32,7 +32,7 @@
   {
     "id": "disease_glowing_pustules",
     "name": "Glowing Pustules",
-    "effectLabel": "Whenever you suffer an Injury, anyone within Reach suffers 1 CD Radiation damage."
+    "effectLabel": "Whenever you suffer an Injury, anyone within Reach suffers 1 {/CD} Radiation damage."
   },
   {
     "id": "disease_heat_flashes",

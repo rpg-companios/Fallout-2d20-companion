@@ -19,18 +19,18 @@
   { "id": "robot_plating_primal_arms",       "name": "Primal Plate for the Arm",       "special": "Makeshift armor, reduces carrying capacity" },
   { "id": "robot_plating_primal_thruster",   "name": "Primal Plate for Locomotion",  "special": "Makeshift armor, reduces carrying capacity" },
 
-  { "id": "robot_plating_serrated_optics",   "name": "Serrated Plate for the Head (Optics)",        "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
-  { "id": "robot_plating_serrated_body",     "name": "Serrated Plate for the Body",      "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
-  { "id": "robot_plating_serrated_arms",     "name": "Serrated Plate for the Arm",       "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
-  { "id": "robot_plating_serrated_thruster", "name": "Serrated Plate for Locomotion",  "special": "On melee complication: attacker takes 2 DC Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_optics",   "name": "Serrated Plate for the Head (Optics)",        "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_body",     "name": "Serrated Plate for the Body",      "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_arms",     "name": "Serrated Plate for the Arm",       "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)" },
+  { "id": "robot_plating_serrated_thruster", "name": "Serrated Plate for Locomotion",  "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)" },
 
-  { "id": "robot_plating_noxious_optics",    "name": "Noxious Plate for the Head (Optics)",        "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
-  { "id": "robot_plating_noxious_body",      "name": "Noxious Plate for the Body",      "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
-  { "id": "robot_plating_noxious_arms",      "name": "Noxious Plate for the Arm",       "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
-  { "id": "robot_plating_noxious_thruster",  "name": "Noxious Plate for Locomotion",  "special": "On melee complication: attacker takes 2 DC Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_optics",    "name": "Noxious Plate for the Head (Optics)",        "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_body",      "name": "Noxious Plate for the Body",      "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_arms",      "name": "Noxious Plate for the Arm",       "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)" },
+  { "id": "robot_plating_noxious_thruster",  "name": "Noxious Plate for Locomotion",  "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)" },
 
-  { "id": "robot_plating_toxic_optics",      "name": "Toxic Plate for the Head (Optics)",        "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" },
-  { "id": "robot_plating_toxic_body",        "name": "Toxic Plate for the Body",      "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" },
-  { "id": "robot_plating_toxic_arms",        "name": "Toxic Plate for the Arm",       "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" },
-  { "id": "robot_plating_toxic_thruster",    "name": "Toxic Plate for Locomotion",  "special": "On melee complication: attacker takes 2 DC Radiation; Arms attacks gain Radioactive" }
+  { "id": "robot_plating_toxic_optics",      "name": "Toxic Plate for the Head (Optics)",        "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive" },
+  { "id": "robot_plating_toxic_body",        "name": "Toxic Plate for the Body",      "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive" },
+  { "id": "robot_plating_toxic_arms",        "name": "Toxic Plate for the Arm",       "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive" },
+  { "id": "robot_plating_toxic_thruster",    "name": "Toxic Plate for Locomotion",  "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive" }
 ]
