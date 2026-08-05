@@ -88,9 +88,11 @@ export const pickCharacterFileWeb = () => new Promise((resolve) => {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = `${EXPORT_FILE_EXTENSION},application/json`;
+  input.style.display = 'none';
 
   input.onchange = () => {
     const file = input.files && input.files[0];
+    if (input.parentNode) input.parentNode.removeChild(input);
     if (!file) {
       resolve(null);
       return;
@@ -102,6 +104,8 @@ export const pickCharacterFileWeb = () => new Promise((resolve) => {
     reader.readAsText(file, 'utf-8');
   };
 
+  // PWA (standalone): input должен быть в DOM, иначе .click() не открывает диалог.
+  document.body.appendChild(input);
   input.click();
 });
 
