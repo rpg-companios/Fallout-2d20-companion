@@ -1399,9 +1399,9 @@ const InventoryScreen = () => {
     };
     
     const price = parseFloat(
-      displayItem.cost ?? displayItem.price
+      localizedDisplayItem.cost ?? localizedDisplayItem.price
     ) || 0;
-    const weightRaw = displayItem.weight;
+    const weightRaw = localizedDisplayItem.weight;
     const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
 
     return (
@@ -1488,20 +1488,19 @@ const InventoryScreen = () => {
       const flatItem = flattenItemParams(item);
       const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
       const modifiedItem = getModifiedItem(itemWithType);
-      const displayItem = modifiedItem || flatItem;
+      const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
       const weight = parseFloat(String(displayItem.weight).replace(',', '.')) || 0;
       return acc + (weight * (flatItem.quantity || 1));
     }, 0);
 
     equippedWeaponsForDisplay.forEach(weapon => {
       if (weapon) {
-        // Получаем модифицированную версию оружия, если она есть
         const weaponWithType = {
           ...weapon,
           itemType: weapon.itemType || 'weapon'
         };
         const modifiedWeapon = getModifiedItem(weaponWithType);
-        const displayWeapon = modifiedWeapon || weapon;
+        const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
         
         const weightRaw = displayWeapon.weight;
         const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
@@ -1509,22 +1508,23 @@ const InventoryScreen = () => {
       }
     });
     
-    // Вес экипированной брони и одежды
     Object.values(equippedArmor).forEach(slotData => {
       if (slotData.armor) {
-        const weightRaw = slotData.armor.weight;
+        const displayArmor = resolveLocalizedItem(slotData.armor);
+        const weightRaw = displayArmor.weight;
         const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
         total += weight;
       }
       if (slotData.clothing) {
-        const weightRaw = slotData.clothing.weight;
+        const displayClothing = resolveLocalizedItem(slotData.clothing);
+        const weightRaw = displayClothing.weight;
         const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
         total += weight;
       }
     });
     
     return Number(total.toFixed(3));
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem]);
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, equipmentCatalog]);
   
   const totalPrice = useMemo(() => {
     let total = 0;
@@ -1533,40 +1533,40 @@ const InventoryScreen = () => {
       const flatItem = flattenItemParams(item);
       const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
       const modifiedItem = getModifiedItem(itemWithType);
-      const displayItem = modifiedItem || flatItem;
+      const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
       const price = parseFloat(displayItem.cost ?? displayItem.price) || 0;
       return acc + (price * (flatItem.quantity || 1));
     }, 0);
 
     equippedWeaponsForDisplay.forEach(weapon => {
       if (weapon) {
-        // Получаем модифицированную версию оружия, если она есть
         const weaponWithType = {
           ...weapon,
           itemType: weapon.itemType || 'weapon'
         };
         const modifiedWeapon = getModifiedItem(weaponWithType);
-        const displayWeapon = modifiedWeapon || weapon;
+        const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
         
         const price = parseFloat(displayWeapon.cost ?? displayWeapon.price) || 0;
         total += price;
       }
     });
     
-    // Цена экипированной брони и одежды
     Object.values(equippedArmor).forEach(slotData => {
       if (slotData.armor) {
-        const price = parseFloat(slotData.armor.cost ?? slotData.armor.price) || 0;
+        const displayArmor = resolveLocalizedItem(slotData.armor);
+        const price = parseFloat(displayArmor.cost ?? displayArmor.price) || 0;
         total += price;
       }
       if (slotData.clothing) {
-        const price = parseFloat(slotData.clothing.cost ?? slotData.clothing.price) || 0;
+        const displayClothing = resolveLocalizedItem(slotData.clothing);
+        const price = parseFloat(displayClothing.cost ?? displayClothing.price) || 0;
         total += price;
       }
     });
     
     return total;
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem]);
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, equipmentCatalog]);
 
   return (
     <ImageBackground
