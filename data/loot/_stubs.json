@@ -1,41 +1,5 @@
 [
  {
-  "id": "food_iguana_bits",
-  "name": "Iguana Bits",
-  "itemType": "food",
-  "weight": 0.5,
-  "cost": 8,
-  "rarity": 1,
-  "hpHealed": 4,
-  "irradiated": true,
-  "effectKey": "",
-  "stub": true
- },
- {
-  "id": "food_razorgrain",
-  "name": "Razorgrain",
-  "itemType": "food",
-  "weight": 0.5,
-  "cost": 4,
-  "rarity": 0,
-  "hpHealed": 2,
-  "irradiated": true,
-  "effectKey": "",
-  "stub": true
- },
- {
-  "id": "food_tato",
-  "name": "Tato",
-  "itemType": "food",
-  "weight": 0.5,
-  "cost": 5,
-  "rarity": 0,
-  "hpHealed": 3,
-  "irradiated": true,
-  "effectKey": "",
-  "stub": true
- },
- {
   "id": "item_treasure_map",
   "name": "Карта с тайником выживальщиков старого мира",
   "itemType": "misc",
