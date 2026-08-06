@@ -6,40 +6,10 @@ import rewardData from '../data/skillRewards.json';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';
-import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+import { findCatalogEntry } from './resolveItem';
 import { debugLog } from '../src/debug/falloutDebug';
 
 const toNumber = (v) => Number.isFinite(v) ? v : Number(v) || 0;
-
-// Каталог по itemType для поиска предмета по id.
-const findInCatalog = (catalog, id, itemType) => {
-  const search = (arr) => (arr || []).find((e) => e.id === id);
-  switch (itemType) {
-    case 'weapon':
-      return search(catalog?.weapons) || null;
-    case 'ammo':
-      return search(catalog?.ammoTypes) || null;
-    case 'armor':
-      return catalog?.armorIndex?.byId?.get(id) || null;
-    case 'clothing':
-    case 'outfit': {
-      const all = (catalog?.clothes?.clothes || []).flatMap((g) => g.items || []);
-      return search(all) || null;
-    }
-    case 'chem':
-    case 'chems':
-      return search(catalog?.chems) || null;
-    case 'drinks':
-      return search(catalog?.drinks) || null;
-    case 'food':
-      return search(catalog?.food) || null;
-    case 'misc':
-    default: {
-      const misc = (catalog?.miscellaneous || []).flatMap((g) => g?.items || []);
-      return search(misc) || search(catalog?.generalGoods) || null;
-    }
-  }
-};
 
 // Бросок кубика (боевой): base + rollValue * CD результат.
 const rollCD = (base, rollValue) => {
@@ -72,31 +42,22 @@ const resolveEntry = async (entry, catalog, kitContext) => {
     return resolveEntry(chosen, catalog, kitContext);
   }
 
-  // Currency (крышки).
+  // Currency (крышки) — идёт в счётчик крышек, а не в инвентарь (как у комплектов:
+  // handleSelectKit делает setCaps(prev => prev + kit.caps)). В инвентаре крышек
+  // быть не должно — у них нет каталоговой записи, и «две стопки по 9 и 17»
+  // возникали именно отсюда.
   if (entry.itemType === 'currency') {
     const count = entry.rollCount || 1;
-    const items = [];
-    for (let i = 0; i < count; i++) {
-      const amount = rollD20Currency();
-      items.push({
-        id: `currency_${Date.now()}_${i}`,
-        itemType: 'misc',
-        subtype: 'currency',
-        name: tWeaponsAndArmorScreen('kitResolver.currency'),
-        quantity: amount,
-        weight: 0,
-        cost: amount,
-        stackKey: `currency:${amount}`,
-      });
-    }
-    return items;
+    let caps = 0;
+    for (let i = 0; i < count; i++) caps += rollD20Currency();
+    return { items: [], caps };
   }
 
   // Бросок по таблице лута (d20 → таблица).
   if (entry.rollType === 'rollD20' && entry.tableId) {
     const count = entry.quantity || 1;
     const result = await resolveRandomLootByRoll(entry.tableId, count);
-    return result || [];
+    return { items: result || [], caps: 0 };
   }
 
   // Боевой кубик (CD) — определяет количество.
@@ -105,49 +66,55 @@ const resolveEntry = async (entry, catalog, kitContext) => {
     quantity = rollCD(entry.base, entry.rollValue);
   }
 
-  // Патроны из комплекта (SMALL_GUNS).
+  // Патроны из комплекта (SMALL_GUNS). Без явного stackKey — addNewItem сгенерит
+  // подпись по каноническому id (как у патронов из комплекта), и награда стакается
+  // с уже лежащими патронами, а не плодит отдельную стопку ammo:<id>.
   if (entry.itemType === 'ammo_from_kit') {
     if (!kitContext?.ammoFromKit) {
       debugLog('skillRewards.noKitAmmo', { skill: 'SMALL_GUNS' });
-      return [];
+      return { items: [], caps: 0 };
     }
-    const base = findInCatalog(catalog, kitContext.ammoFromKit, 'ammo');
-    if (!base) return [];
-    return [{
-      ...base,
-      itemType: 'ammo',
-      quantity,
-      stackKey: `ammo:${kitContext.ammoFromKit}`,
-    }];
+    const base = findCatalogEntry(catalog, kitContext.ammoFromKit, 'ammo');
+    if (!base) return { items: [], caps: 0 };
+    return {
+      items: [{ ...base, itemType: 'ammo', quantity }],
+      caps: 0,
+    };
   }
 
   // Конкретный предмет.
   if (entry.itemId) {
-    const base = findInCatalog(catalog, entry.itemId, entry.itemType);
+    const base = findCatalogEntry(catalog, entry.itemId, entry.itemType);
     if (!base) {
       debugLog('skillRewards.itemNotFound', { id: entry.itemId, itemType: entry.itemType });
-      return [];
+      return { items: [], caps: 0 };
     }
-    return [{
-      ...base,
-      itemType: entry.itemType || base.itemType,
-      quantity,
-    }];
+    return {
+      items: [{
+        ...base,
+        itemType: entry.itemType || base.itemType,
+        quantity,
+      }],
+      caps: 0,
+    };
   }
 
-  return [];
+  return { items: [], caps: 0 };
 };
 
 /**
  * Главная функция: берёт выбранные навыки, резолвит награды.
  * @param {string[]} skillKeys — ["ATHLETICS", "BARTER", ...]
  * @param {object} [options] — { ammoFromKit?: string } (id патрона из комплекта)
- * @returns {Promise<object[]>} — массив предметов для addNewItem
+ * @returns {Promise<{ items: object[], caps: number }>}
+ *   items  — предметы для addNewItem;
+ *   caps   — крышки (BARTER), их надо провести через setCaps, а не addNewItem.
  */
 export const resolveSkillRewards = async (skillKeys, options = {}) => {
   const catalog = getEquipmentCatalog();
   const kitContext = { ammoFromKit: options.ammoFromKit || null };
   const allItems = [];
+  let caps = 0;
 
   for (const skillKey of skillKeys) {
     const reward = rewardData[skillKey];
@@ -155,8 +122,9 @@ export const resolveSkillRewards = async (skillKeys, options = {}) => {
 
     for (const entry of reward.items) {
       try {
-        const items = await resolveEntry(entry, catalog, kitContext);
+        const { items, caps: entryCaps } = await resolveEntry(entry, catalog, kitContext);
         allItems.push(...items);
+        caps += entryCaps;
       } catch (e) {
         debugLog('skillRewards.resolveError', { skillKey, error: e?.message });
       }
@@ -166,8 +134,9 @@ export const resolveSkillRewards = async (skillKeys, options = {}) => {
   debugLog('skillRewards.resolved', {
     skills: skillKeys,
     itemCount: allItems.length,
+    caps,
     items: allItems.map((i) => ({ id: i.id, name: i.name, qty: i.quantity })),
   });
 
-  return allItems;
+  return { items: allItems, caps };
 };

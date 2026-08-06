@@ -1,0 +1,209 @@
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index b4df780..b770af7 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -27,6 +27,7 @@ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
++import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+@@ -282,106 +283,10 @@ const InventoryScreen = () => {
+   // ПРАВИЛО (от владельца, 2026-07-31): эвристик по названию здесь больше нет.
+   const isPowerArmorItem = (item) => getProtectionKind(item) === PROTECTION_KINDS.POWER_ARMOR;
+   const toWeight = (value) => parseFloat(String(value ?? 0).replace(',', '.')) || 0;
+-  const flattenMiscellaneousItems = (miscCatalog) => {
+-    if (Array.isArray(miscCatalog)) return miscCatalog;
+-    if (Array.isArray(miscCatalog?.miscellaneous)) {
+-      return miscCatalog.miscellaneous.flatMap((group) => group?.items || []);
+-    }
+-    return [];
+-  };
+ 
+-  const resolveLocalizedItem = (item) => {
+-    if (!item || !item.id) return item;
+-    const itemType = getItemType(item);
+-
+-    if (itemType === 'weapon') {
+-      const base = (equipmentCatalog?.weapons || []).find((entry) => entry.id === item.id);
+-      if (!base) return item;
+-      return {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-    }
+-
+-    if (itemType === 'armor') {
+-      const base = equipmentCatalog?.armorIndex?.byId?.get(item.id);
+-      if (!base) return item;
+-      return {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-    }
+-
+-    if (itemType === 'clothing' || itemType === 'outfit') {
+-      const allClothes = (equipmentCatalog?.clothes?.clothes || []).flatMap((group) => group.items || []);
+-      const base = allClothes.find((entry) => entry.id === item.id);
+-      if (!base) return item;
+-      return {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-    }
+-
+-    if (itemType === 'chem' || itemType === 'chems') {
+-      const base = (equipmentCatalog?.chems || []).find((entry) => entry.id === item.id);
+-      if (!base) {
+-        debugLog('i18n.resolveChem.noBase', { id: item.id, item });
+-        return item;
+-      }
+-      const result = {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-      debugLog('i18n.resolveChem.result', { id: result.id, positiveEffect: result.positiveEffect });
+-      return result;
+-    }
+-
+-    if (itemType === 'drinks') {
+-      const base = (equipmentCatalog?.drinks || []).find((entry) => entry.id === item.id);
+-      if (!base) return item;
+-      return {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-    }
+-
+-    if (itemType === 'food') {
+-      const base = (equipmentCatalog?.food || []).find((entry) => entry.id === item.id);
+-      if (!base) return item;
+-      return {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-    }
+-
+-    if (itemType === 'ammo') {
+-      const base = (equipmentCatalog?.ammoTypes || []).find((entry) => entry.id === item.id);
+-      if (!base) return item;
+-      return {
+-        ...base,
+-        ...item,
+-        name: base.name,
+-      };
+-    }
+-
+-    const miscItems = flattenMiscellaneousItems(equipmentCatalog?.miscellaneous);
+-    const base = miscItems.find((entry) => entry.id === item.id)
+-      || (equipmentCatalog?.generalGoods || []).find((entry) => entry.id === item.id)
+-      || (equipmentCatalog?.robotModules || []).find((entry) => entry.id === item.id)
+-      || (equipmentCatalog?.robotItems || []).find((entry) => entry.id === item.id);
+-    if (!base) return item;
+-    return {
+-      ...base,
+-      ...item,
+-      name: item.name || base.name || item.id,
+-    };
+-  };
++  // Обогащение инстанса каталожными данными — единая точка (domain/resolveItem):
++  // вес/цена/эффект/имя берутся из каталога по id. Локальной копии логики больше нет.
++  const resolveLocalizedItem = (item) => resolveItem(item, equipmentCatalog);
+ 
+ 
+   const handleOpenCapsModal = (type) => {
+@@ -1399,11 +1304,8 @@ const InventoryScreen = () => {
+         }
+     };
+     
+-    const price = parseFloat(
+-      localizedDisplayItem.cost ?? localizedDisplayItem.price ?? localizedDisplayItem.value
+-    ) || 0;
+-    const weightRaw = localizedDisplayItem.weight;
+-    const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
++    const price = getItemPrice(localizedDisplayItem);
++    const weight = getItemWeight(localizedDisplayItem);
+ 
+     return (
+       <View style={styles.tableRow}>
+@@ -1490,7 +1392,7 @@ const InventoryScreen = () => {
+       const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
+       const modifiedItem = getModifiedItem(itemWithType);
+       const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
+-      const weight = parseFloat(String(displayItem.weight).replace(',', '.')) || 0;
++      const weight = getItemWeight(displayItem);
+       return acc + (weight * (flatItem.quantity || 1));
+     }, 0);
+ 
+@@ -1502,25 +1404,16 @@ const InventoryScreen = () => {
+         };
+         const modifiedWeapon = getModifiedItem(weaponWithType);
+         const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
+-        
+-        const weightRaw = displayWeapon.weight;
+-        const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
+-        total += weight;
++        total += getItemWeight(displayWeapon);
+       }
+     });
+     
+     Object.values(equippedArmor).forEach(slotData => {
+       if (slotData.armor) {
+-        const displayArmor = resolveLocalizedItem(slotData.armor);
+-        const weightRaw = displayArmor.weight;
+-        const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
+-        total += weight;
++        total += getItemWeight(resolveLocalizedItem(slotData.armor));
+       }
+       if (slotData.clothing) {
+-        const displayClothing = resolveLocalizedItem(slotData.clothing);
+-        const weightRaw = displayClothing.weight;
+-        const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
+-        total += weight;
++        total += getItemWeight(resolveLocalizedItem(slotData.clothing));
+       }
+     });
+     
+@@ -1535,7 +1428,7 @@ const InventoryScreen = () => {
+       const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
+       const modifiedItem = getModifiedItem(itemWithType);
+       const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
+-      const price = parseFloat(displayItem.cost ?? displayItem.price ?? displayItem.value) || 0;
++      const price = getItemPrice(displayItem);
+       return acc + (price * (flatItem.quantity || 1));
+     }, 0);
+ 
+@@ -1547,22 +1440,16 @@ const InventoryScreen = () => {
+         };
+         const modifiedWeapon = getModifiedItem(weaponWithType);
+         const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
+-        
+-        const price = parseFloat(displayWeapon.cost ?? displayWeapon.price) || 0;
+-        total += price;
++        total += getItemPrice(displayWeapon);
+       }
+     });
+     
+     Object.values(equippedArmor).forEach(slotData => {
+       if (slotData.armor) {
+-        const displayArmor = resolveLocalizedItem(slotData.armor);
+-        const price = parseFloat(displayArmor.cost ?? displayArmor.price) || 0;
+-        total += price;
++        total += getItemPrice(resolveLocalizedItem(slotData.armor));
+       }
+       if (slotData.clothing) {
+-        const displayClothing = resolveLocalizedItem(slotData.clothing);
+-        const price = parseFloat(displayClothing.cost ?? displayClothing.price) || 0;
+-        total += price;
++        total += getItemPrice(resolveLocalizedItem(slotData.clothing));
+       }
+     });
+     
