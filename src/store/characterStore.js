@@ -559,7 +559,7 @@ const useCharacterStore = create(devtools(
           id: itemId,
           weaponId: weaponId,
           name: item.name || item.weaponName || item.Name || weaponId,
-          itemType: item.itemType || 'weapon',
+          itemType: item.itemType || 'misc',
           equipped: item.equipped || false,
           // `locked: true` marks items that came from a robot kit. They are
           // equipped at character creation and cannot be removed via the normal
