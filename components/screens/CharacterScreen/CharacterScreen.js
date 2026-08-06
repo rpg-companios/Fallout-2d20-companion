@@ -56,6 +56,7 @@ import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
 import { getTimedAttributeModifiers } from "../../../domain/effects";
 import { createEmptyEquippedArmor } from "../../../domain/equippedArmor";
+import { resolveSkillRewards } from "../../../domain/skillRewards";
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../src/debug/falloutDebug";
 import { getEquipmentCatalog } from "../../../i18n/equipmentCatalog";
 
@@ -979,7 +980,7 @@ export default function CharacterScreen() {
     setSkillsSaved(false);
   };
 
-  const handleSaveSkills = () => {
+  const handleSaveSkills = async () => {
     if (!origin) {
       showError(tCharacterScreen("errors.originRequired"));
       return;
@@ -1029,6 +1030,22 @@ export default function CharacterScreen() {
     }
 
     setSkillsSaved(true);
+
+    // Награды за выбранные навыки — молча добавляем в инвентарь.
+    try {
+      const allSkillKeys = [...selectedSkills, ...extraTaggedSkills];
+      if (allSkillKeys.length > 0) {
+        // AmmoId берём прямо из стора — комплект уже резолвился при выборе,
+        // патроны лежат среди items. Никаких index.json и сканирования файлов.
+        const storeItems = Object.values(useCharacterStore.getState().items);
+        const ammoItem = storeItems.find(i => i.itemType === 'ammo');
+        const rewards = await resolveSkillRewards(allSkillKeys, { ammoFromKit: ammoItem?.id || null });
+        const { addNewItem } = useCharacterStore.getState();
+        rewards.forEach(item => addNewItem(item));
+      }
+    } catch (e) {
+      console.warn('skillRewards:', e?.message);
+    }
   };
 
   const handleResetAttributes = () => {
