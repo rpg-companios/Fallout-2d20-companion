@@ -1,0 +1,12 @@
+diff --git a/i18n/en-EN/data/consumables/food.json b/i18n/en-EN/data/consumables/food.json
+index f1e0690..497763d 100644
+--- a/i18n/en-EN/data/consumables/food.json
++++ b/i18n/en-EN/data/consumables/food.json
+@@ -73,5 +73,6 @@
+   { "id": "food_queen_mirelurk_meat", "name": "Queen Mirelurk Meat", "effectLabel": "" },
+   { "id": "food_stingwing_meat", "name": "Stingwing Meat", "effectLabel": "" },
+   { "id": "food_yao_guai_meat", "name": "Yao Guai Meat", "effectLabel": "" },
+-  { "id": "food_canned_meat", "name": "Canned Meat", "effectLabel": "" }
++  { "id": "food_canned_meat", "name": "Canned Meat", "effectLabel": "" },
++  { "id": "food_dog_meat", "name": "Собачатина", "effectLabel": "" }
+ ]
