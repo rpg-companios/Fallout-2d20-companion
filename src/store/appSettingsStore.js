@@ -9,6 +9,8 @@ const useAppSettingsStore = create(
     (set) => ({
       randomWeaponDurabilityEnabled: false,
       weaponDurabilityLossPer10Shots: 1,
+      characterFoldersEnabled: false,
+      setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
       setRandomWeaponDurabilityEnabled: (enabled) => set({ randomWeaponDurabilityEnabled: Boolean(enabled) }),
       setWeaponDurabilityLossPer10Shots: (value) => set({ weaponDurabilityLossPer10Shots: clampLoss(value) }),
     }),
@@ -17,6 +19,7 @@ const useAppSettingsStore = create(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         randomWeaponDurabilityEnabled: state.randomWeaponDurabilityEnabled,
+        characterFoldersEnabled: state.characterFoldersEnabled,
         weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
       }),
     },
