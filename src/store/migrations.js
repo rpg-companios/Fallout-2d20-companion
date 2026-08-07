@@ -2,6 +2,7 @@
 // Минимальные миграционные функции для перехода к нормализованному формату
 
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
 
 /**
  * Преобразует атрибуты из старого формата [{name, value}] в словарь
@@ -452,4 +453,30 @@ const MIGRATIONS = [
     }
     return next;
   },
+  // v2 -> v3: a weapon cannot retain both members of an opposite-quality pair.
+  // The final saved order is authoritative, so the last conflicting quality wins.
+  (state) => {
+    const normalizeWeapon = (item) => {
+      if (!item || typeof item !== 'object') return item;
+      const raw = item.qualities;
+      if (Array.isArray(raw)) return { ...item, qualities: resolveMutuallyExclusiveQualities(raw) };
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return { ...item, qualities: JSON.stringify(resolveMutuallyExclusiveQualities(parsed)) };
+        } catch (_) {}
+      }
+      return item;
+    };
+    return {
+      ...state,
+      equipment: state.equipment
+        ? { ...state.equipment, items: (state.equipment.items || []).map(normalizeWeapon) }
+        : state.equipment,
+      equippedWeapons: Array.isArray(state.equippedWeapons)
+        ? state.equippedWeapons.map(normalizeWeapon)
+        : state.equippedWeapons,
+    };
+  },
+
 ];

@@ -47,6 +47,19 @@ function normalizeModRow(row) {
 // CRITICAL INVARIANT:
 // Only ONE installed mod per category(slot) is allowed at any time.
 // If a new mod is selected in the same category, it MUST replace the previous one.
+const CONFLICTING_MOD_SLOTS = Object.freeze({
+  grip: 'stock',
+  stock: 'grip',
+});
+
+const setSelectedMod = (selected, slot, mod) => {
+  const next = { ...selected };
+  const oppositeSlot = CONFLICTING_MOD_SLOTS[slot];
+  if (oppositeSlot) delete next[oppositeSlot];
+  next[slot] = mod;
+  return next;
+};
+
 function normalizeSlotKey(slot) {
   const raw = String(slot || '').trim();
   if (!raw) return 'other';
@@ -281,7 +294,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
         for (const [slot, modId] of Object.entries(applied)) {
           const modRow = await getWeaponModById(modId);
           const normalizedSlot = normalizeSlotKey(slot);
-          if (modRow) selected[normalizedSlot] = normalizeModRow(modRow);
+          if (modRow) {
+            selected = setSelectedMod(selected, normalizedSlot, normalizeModRow(modRow));
+          }
         }
 
         if (cancelled) return;
@@ -321,7 +336,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
       newSelected = { ...selectedModifications };
       delete newSelected[slot];
     } else {
-      newSelected = { ...selectedModifications, [slot]: mod };
+      newSelected = setSelectedMod(selectedModifications, slot, mod);
     }
 
     setSelectedModifications(newSelected);

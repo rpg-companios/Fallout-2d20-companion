@@ -12,7 +12,8 @@
 // v1 — разделение эффектов (effect_) и качеств (quality_) в экипировке
 //       (см. MIGRATIONS[0] в migrations.js).
 // v2 — журнал уже выданных наград за отмеченные навыки.
-export const CURRENT_SCHEMA_VERSION = 2;
+// v3 — normalize mutually exclusive weapon qualities in legacy saves.
+export const CURRENT_SCHEMA_VERSION = 3;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

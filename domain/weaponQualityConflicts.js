@@ -13,3 +13,16 @@ export const applyQualityGain = (qualities, quality) => {
   if (opposite) qualities.delete(opposite);
   qualities.set(qualityId, quality?.value != null ? { qualityId, value: quality.value } : { qualityId });
 };
+
+
+/** Normalizes a saved array of qualities; for a conflicting pair, the last entry wins. */
+export const resolveMutuallyExclusiveQualities = (qualities) => {
+  if (!Array.isArray(qualities)) return qualities;
+  const byId = new Map();
+  qualities.forEach((quality) => {
+    const qualityId = quality?.qualityId || quality?.id || quality;
+    if (!qualityId) return;
+    applyQualityGain(byId, typeof quality === 'string' ? { qualityId } : quality);
+  });
+  return [...byId.values()];
+};
