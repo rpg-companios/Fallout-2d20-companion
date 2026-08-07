@@ -23,7 +23,8 @@
   "download": {
     "unsupported": "File save/export is available only in web version.",
     "errors": {
-      "notFound": "Character was not found."
+      "notFound": "Character was not found.",
+      "failed": "Failed to save file."
     }
   },
   "deleteConfirm": "Do you really want to delete this character?",

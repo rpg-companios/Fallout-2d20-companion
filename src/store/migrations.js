@@ -58,22 +58,15 @@ export const normalizeSkills = (skillsArray = []) => {
 export const normalizeItems = (equipment = {}, equippedWeapons = []) => {
   const result = {};
   
-  // Helper функция для копирования только нужных полей предмета
-  const copyItemFields = (item) => {
-    const fieldsToCopy = [
-      'id', 'name', 'itemType', 'equipped', 'uniqueId', 'weaponId', 
-      'code', 'Name', 'quantity', 'stackKey', 'appliedMods',
-      'equipInstanceId', 'armorCategoryKey', 'stackKey', 'price'
-    ];
-    
-    const copied = {};
-    fieldsToCopy.forEach(field => {
-      if (item[field] !== undefined) {
-        copied[field] = item[field];
-      }
-    });
-    return copied;
-  };
+  // Сохраняем ВСЕ поля предмета при загрузке из БД — каталожные данные
+  // (вес/цена/эффект/имя) всё равно обогащаются на отображении через
+  // resolveItem по id, но сам инстанс обязан пройти сейв↔загрузку без потерь.
+  //
+  // Прежний короткий fieldsToCopy срезал weight/cost/qualities/effects/
+  // fire_rate/baseWeaponName/positiveEffect/hpHealed/value и т.д. — отсюда
+  // «вес/цена 0» у предметов и слёт пересчитанных статов модов оружия после
+  // перезагрузки персонажа из БД. Каталог = источник истины; инстанс — без потерь.
+  const copyItemFields = (item) => (item && typeof item === 'object' ? { ...item } : {});
   
   // Обычные предметы из инвентаря
   const inventoryItems = equipment?.items || [];

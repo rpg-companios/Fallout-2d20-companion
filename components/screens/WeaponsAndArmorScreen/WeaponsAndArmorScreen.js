@@ -19,6 +19,7 @@ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { resolveItem, findCatalogEntry } from '../../../domain/resolveItem';
 import { applyArmorMods } from '../../../domain/modsEquip';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
@@ -426,7 +427,7 @@ const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
 
 const findLocalizedWeapon = (catalog, weapon) => {
   if (!weapon?.id) return weapon;
-  const base = (catalog?.weapons || []).find((entry) => entry.id === weapon.id);
+  const base = findCatalogEntry(catalog, weapon.id, 'weapon');
   if (!base) return weapon;
 
   // Если на оружии применены моды (есть baseWeaponName), сохраняем все модифицированные поля.
@@ -461,28 +462,11 @@ const findLocalizedWeapon = (catalog, weapon) => {
   };
 };
 
-const findLocalizedArmor = (catalog, armorItem) => {
-  if (!armorItem?.id) return armorItem;
-  const base = catalog?.armorIndex?.byId?.get(armorItem.id);
-  if (!base) return armorItem;
-  return {
-    ...base,
-    ...armorItem,
-    name: base.name || armorItem.name,
-  };
-};
+// Обогащение брони/одежды — единая точка (domain/resolveItem): каталожные данные
+// (имя, рейтинги, зоны защиты) подставляются по id. Локальной копии логики нет.
+const findLocalizedArmor = (catalog, armorItem) => resolveItem(armorItem, catalog);
 
-const findLocalizedClothing = (catalog, clothingItem) => {
-  if (!clothingItem?.id) return clothingItem;
-  const allClothes = (catalog?.clothes?.clothes || []).flatMap((group) => group.items || []);
-  const base = allClothes.find((entry) => entry.id === clothingItem.id);
-  if (!base) return clothingItem;
-  return {
-    ...base,
-    ...clothingItem,
-    name: base.name || clothingItem.name,
-  };
-};
+const findLocalizedClothing = (catalog, clothingItem) => resolveItem(clothingItem, catalog);
 
 const chunkSlotKeys = (keys, size) => {
   const chunks = [];
