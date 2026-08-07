@@ -46,7 +46,8 @@
     "community": "Community",
     "buyCoffee": "Buy author a coffee",
     "buyCoffeeDescription": "Author support links will be added in future updates.",
-    "checkUpdates": "Check for updates"
+    "checkUpdates": "Check for updates",
+    "settings": "Settings"
   },
   "about": {
     "description": "Fallout 2d20 Companion is a character manager for tabletop RPG: create, store, edit, import/export, and sync through cloud."
@@ -62,5 +63,12 @@
     "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
     "androidInstructions": "To install the app on Android:\n\nIn Chrome — tap the menu (⋮) in the top right corner and select «Install app» or «Add to Home screen».\n\nIn Samsung Internet — tap the menu (☰) → «Add page» → «On Home screen».",
     "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
+  },
+  "settings": {
+    "title": "Settings",
+    "durabilityTitle": "Random weapon durability",
+    "durabilityDescription": "Weapons obtained through “Add Loot” have random durability from 1 to 100. Firing weapons consumes durability.",
+    "lossTitle": "Durability loss per 10 shots",
+    "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much."
   }
 }

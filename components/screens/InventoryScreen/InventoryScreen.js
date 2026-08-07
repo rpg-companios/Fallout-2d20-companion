@@ -31,6 +31,8 @@ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolv
 import { isRobotCharacter } from '../../../domain/origins';
 import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
 import styles from '../../../styles/InventoryScreen.styles';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
@@ -96,6 +98,8 @@ const InventoryScreen = () => {
   const addNewItem = useCharacterStore((state) => state.addNewItem);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+  const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+  const randomWeaponDurabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
@@ -438,7 +442,7 @@ const InventoryScreen = () => {
     setSelectedItemForSale(null);
   };
 
-  const handleAddItem = (item, quantity = 1) => {
+  const handleAddItem = (item, quantity = 1, source = 'loot') => {
     const localizedItem = resolveLocalizedItem(item);
 
     // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
@@ -490,6 +494,26 @@ const InventoryScreen = () => {
       return;
     }
 
+    // Durability is per weapon instance: tracked weapons must never be stacked.
+    if (randomWeaponDurabilityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
+      for (let index = 0; index < quantity; index += 1) {
+        const durability = source === 'buy' ? 100 : rollWeaponDurability();
+        const uniqueId = `${localizedItem.id}_durability_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`;
+        addNewItem({
+          ...localizedItem,
+          itemType: 'weapon',
+          quantity: 1,
+          uniqueId,
+          stackKey: uniqueId,
+          durabilityTracked: true,
+          durability,
+          durabilityAmmoRemainder: 0,
+          durabilityWearRemainder: 0,
+        });
+      }
+      return;
+    }
+
     const stackKey = getStackKey(localizedItem);
     const existingItem = findUnequippedStoreItemByStackKey(stackKey);
 
@@ -520,7 +544,7 @@ const InventoryScreen = () => {
   const handleConfirmBuy = (quantity, unitPrice) => {
     const finalCost = quantity * unitPrice;
     setCaps((prev) => prev - finalCost);
-    handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity);
+    handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
     setIsBuyItemModalVisible(false);
     setSelectedItemForBuy(null);
   };
@@ -1260,6 +1284,7 @@ const InventoryScreen = () => {
     const showPARepair = Boolean(
       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
     );
+    const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
 
@@ -1306,6 +1331,11 @@ const InventoryScreen = () => {
     
     const price = getItemPrice(localizedDisplayItem);
     const weight = getItemWeight(localizedDisplayItem);
+    const weaponAmmoIds = String(localizedDisplayItem?.ammoId ?? localizedDisplayItem?.ammo_id ?? '')
+      .split(',').map((id) => id.trim()).filter((id) => id && id !== 'ammo_anything');
+    const weaponAmmoNames = weaponAmmoIds
+      .map((ammoId) => (equipmentCatalog?.ammoTypes || []).find((ammo) => ammo.id === ammoId)?.name)
+      .filter(Boolean);
 
     return (
       <View style={styles.tableRow}>
@@ -1325,6 +1355,14 @@ const InventoryScreen = () => {
           )}
           {hideEquipButton && (
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+          )}
+
+          {showWeaponRepair && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => repairWeapon(item.id)}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
           )}
 
           {showPARepair && (
@@ -1352,8 +1390,14 @@ const InventoryScreen = () => {
           {Number.isFinite(paMaxHp) && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
           )}
+          {item.durabilityTracked && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.durability}/100</Text>
+          )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
+          {weaponAmmoNames.length > 0 && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.ammo')}: {weaponAmmoNames.join(', ')}</Text>
+          )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
         </View>
       </View>

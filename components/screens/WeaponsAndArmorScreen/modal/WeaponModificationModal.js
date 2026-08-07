@@ -10,6 +10,7 @@ import {
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById, getWeaponMods } from '../../../../db/Database';
 import { declinePrefix } from '../../../../domain/modsEquip';
 import { shiftRange } from '../../../../domain/range';
+import { applyQualityGain } from '../../../../domain/weaponQualityConflicts';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../domain/weaponDisplay';
 import styles from '../../../../styles/WeaponModificationModal.styles';
@@ -138,7 +139,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
 
     if (mod.qualityChanges && Array.isArray(mod.qualityChanges)) {
       for (const c of mod.qualityChanges) {
-        if (c.op === 'gain') qualities.set(c.id, c.value != null ? { qualityId: c.id, value: c.value } : { qualityId: c.id });
+        if (c.op === 'gain') applyQualityGain(qualities, { qualityId: c.id, value: c.value });
         if (c.op === 'lose') qualities.delete(c.id);
       }
     }

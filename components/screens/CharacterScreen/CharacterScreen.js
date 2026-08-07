@@ -1039,11 +1039,15 @@ export default function CharacterScreen() {
         // патроны лежат среди items. Никаких index.json и сканирования файлов.
         const storeItems = Object.values(useCharacterStore.getState().items);
         const ammoItem = storeItems.find(i => i.itemType === 'ammo');
-        const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(allSkillKeys, { ammoFromKit: ammoItem?.id || null });
-        const { addNewItem } = useCharacterStore.getState();
-        rewardItems.forEach(item => addNewItem(item));
-        // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
-        if (rewardCaps) setCaps(prev => prev + rewardCaps);
+        const { addNewItem, rewardedSkills, markSkillsAsRewarded } = useCharacterStore.getState();
+        const unrewardedSkills = allSkillKeys.filter((skill) => !(rewardedSkills || []).includes(skill));
+        if (unrewardedSkills.length > 0) {
+          const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
+          rewardItems.forEach(item => addNewItem(item));
+          // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
+          if (rewardCaps) setCaps(prev => prev + rewardCaps);
+          markSkillsAsRewarded(unrewardedSkills);
+        }
       }
     } catch (e) {
       console.warn('skillRewards:', e?.message);

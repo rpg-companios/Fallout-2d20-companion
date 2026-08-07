@@ -1,0 +1,697 @@
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 7566e13..d0be9aa 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -29,6 +29,7 @@ import {
+ import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import styles from '../../../styles/HomeScreen.styles';
++import SettingsModal from '../../settings/SettingsModal';
+ 
+ const getOriginImage = (originName) => {
+   if (!originName) return null;
+@@ -101,6 +102,7 @@ export default function HomeScreen({ navigation }) {
+   const [menuVisible, setMenuVisible] = useState(false);
+   const [aboutVisible, setAboutVisible] = useState(false);
+   const [communityVisible, setCommunityVisible] = useState(false);
++  const [settingsVisible, setSettingsVisible] = useState(false);
+ 
+   const [installPrompt, setInstallPrompt] = useState(null);
+   const [isStandalone, setIsStandalone] = useState(false);
+@@ -477,6 +479,10 @@ export default function HomeScreen({ navigation }) {
+       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
+           <Pressable style={styles.menuPanel} onPress={() => {}}>
++            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
++              <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
++              <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
++            </TouchableOpacity>
+             <TouchableOpacity style={styles.menuItem} onPress={handleCloudSync}>
+               <FontAwesome5 name="google-drive" size={18} color="#d4af37" />
+               <Text style={styles.menuText}>{tHomeScreen('menu.sync')}</Text>
+@@ -515,6 +521,8 @@ export default function HomeScreen({ navigation }) {
+         </Pressable>
+       </Modal>
+ 
++      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
++
+       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
+         <View style={styles.modalBackdropCenter}>
+           <View style={styles.infoModal}>
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index b770af7..f7f977f 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -31,6 +31,8 @@ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolv
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
++import useAppSettingsStore from '../../../src/store/appSettingsStore';
++import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
+ 
+ const PARAM_FIELDS = [
+   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
+@@ -96,6 +98,8 @@ const InventoryScreen = () => {
+   const addNewItem = useCharacterStore((state) => state.addNewItem);
+   const updateItem = useCharacterStore((state) => state.updateItem);
+   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
++  const repairWeapon = useCharacterStore((state) => state.repairWeapon);
++  const randomWeaponDurabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
+ 
+   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
+     return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
+@@ -438,7 +442,7 @@ const InventoryScreen = () => {
+     setSelectedItemForSale(null);
+   };
+ 
+-  const handleAddItem = (item, quantity = 1) => {
++  const handleAddItem = (item, quantity = 1, source = 'loot') => {
+     const localizedItem = resolveLocalizedItem(item);
+ 
+     // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
+@@ -490,6 +494,26 @@ const InventoryScreen = () => {
+       return;
+     }
+ 
++    // Durability is per weapon instance: tracked weapons must never be stacked.
++    if (randomWeaponDurabilityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
++      for (let index = 0; index < quantity; index += 1) {
++        const durability = source === 'buy' ? 100 : rollWeaponDurability();
++        const uniqueId = `${localizedItem.id}_durability_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`;
++        addNewItem({
++          ...localizedItem,
++          itemType: 'weapon',
++          quantity: 1,
++          uniqueId,
++          stackKey: uniqueId,
++          durabilityTracked: true,
++          durability,
++          durabilityAmmoRemainder: 0,
++          durabilityWearRemainder: 0,
++        });
++      }
++      return;
++    }
++
+     const stackKey = getStackKey(localizedItem);
+     const existingItem = findUnequippedStoreItemByStackKey(stackKey);
+ 
+@@ -520,7 +544,7 @@ const InventoryScreen = () => {
+   const handleConfirmBuy = (quantity, unitPrice) => {
+     const finalCost = quantity * unitPrice;
+     setCaps((prev) => prev - finalCost);
+-    handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity);
++    handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
+     setIsBuyItemModalVisible(false);
+     setSelectedItemForBuy(null);
+   };
+@@ -1260,6 +1284,7 @@ const InventoryScreen = () => {
+     const showPARepair = Boolean(
+       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
+     );
++    const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
+     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
+     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
+ 
+@@ -1327,6 +1352,14 @@ const InventoryScreen = () => {
+               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+           )}
+ 
++          {showWeaponRepair && (
++              <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => repairWeapon(item.id)}>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
++              </TouchableOpacity>
++          )}
++
+           {showPARepair && (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+@@ -1352,6 +1385,9 @@ const InventoryScreen = () => {
+           {Number.isFinite(paMaxHp) && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
+           )}
++          {item.durabilityTracked && (
++            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.durability}/100</Text>
++          )}
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 6d42605..7c7f662 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -48,6 +48,8 @@ import RobotSlot from './RobotSlot';
+ import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
+ import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
+ import { debugLog } from '../../../src/debug/falloutDebug';
++import useAppSettingsStore from '../../../src/store/appSettingsStore';
++import { isAmmoWeapon } from '../../../domain/weaponDurability';
+ 
+ 
+ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
+@@ -120,12 +122,13 @@ const RadiationCounter = ({ isEnabled }) => {
+   );
+ };
+ 
+-const WeaponAmmoCell = ({ ammoId, qualities }) => {
++const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
+   const storeItems = useCharacterStore((state) => state.items);
+-  const updateItem = useCharacterStore((state) => state.updateItem);
++  const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
++  const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++  const baseLossPer10Shots = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
+ 
+   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
+-
+   let ammoPerShot = 1;
+   let parsedQ = qualities;
+   if (typeof parsedQ === 'string') {
+@@ -135,39 +138,27 @@ const WeaponAmmoCell = ({ ammoId, qualities }) => {
+     const hungryQ = parsedQ.find(q => q?.qualityId === 'quality_ammo-hungry_x');
+     if (hungryQ?.value != null) ammoPerShot = Math.max(1, Number(hungryQ.value) || 1);
+   }
+-
+   const ammoItems = Object.values(storeItems || {}).filter(
+-    item => item.itemType === 'ammo' && ammoIds.includes(item.id)
++    item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
+   );
+   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+-  const canSpend = totalAmmo >= ammoPerShot;
++  const isBroken = durabilityEnabled && Number(durability) <= 0;
++  const canSpend = totalAmmo >= ammoPerShot && !isBroken;
+ 
+   const handleSpend = () => {
+     if (!canSpend) return;
+-    let toDeduct = ammoPerShot;
+-    for (const item of [...ammoItems]) {
+-      if (toDeduct <= 0) break;
+-      const qty = item.quantity || 1;
+-      const deduct = Math.min(qty, toDeduct);
+-      const newQty = qty - deduct;
+-      if (newQty <= 0) {
+-        const current = { ...useCharacterStore.getState().items };
+-        delete current[item.id];
+-        useCharacterStore.setState({ items: current });
+-      } else {
+-        updateItem(item.id, { quantity: newQty });
+-      }
+-      toDeduct -= deduct;
+-    }
++    spendAmmoForWeapon({
++      weaponInstanceId,
++      ammoIds,
++      ammoAmount: ammoPerShot,
++      durabilityEnabled,
++      baseLossPer10Shots,
++    });
+   };
+ 
+   return (
+     <View style={localStyles.weaponAmmoCellContainer}>
+-      <TouchableOpacity
+-        style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]}
+-        onPress={handleSpend}
+-        disabled={!canSpend}
+-      >
++      <TouchableOpacity style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]} onPress={handleSpend} disabled={!canSpend}>
+         <Text style={localStyles.weaponAmmoBtnText}>−</Text>
+       </TouchableOpacity>
+       <Text style={localStyles.weaponAmmoCount}>{totalAmmo}</Text>
+@@ -288,6 +279,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
+ 
+ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+     const { hasTrait, attributes, skills, trait } = useCharacter();
++    const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
+     if (!weapon) {
+       return (
+         <View style={localStyles.weaponCardContainer}>
+@@ -365,6 +357,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+ 
+     const rawAmmoId = displayWeapon?.ammoId ?? displayWeapon?.ammo_id ?? '';
+     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
++    const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
++    const showDurability = durabilityEnabled && isAmmoWeapon(displayWeapon);
+ 
+     const stats = [
+       { label: tWeaponsAndArmorScreen('weapon.fields.success'), value: `${successValue}` },
+@@ -374,7 +368,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+       { label: tWeaponsAndArmorScreen('weapon.fields.fireRate'), value: fireRateWithTrait },
+       { label: tWeaponsAndArmorScreen('weapon.fields.range'), value: rangeValue },
+       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
+-      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities }] : []),
++      ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
++      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
+       ...(displayWeapon?.withoutMods ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
+     ];
+   
+@@ -393,7 +388,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+             <View key={index} style={[localStyles.weaponStatRow, { borderBottomWidth: 1 }]}>
+               <Text style={localStyles.weaponStatLabel}>{stat.label}</Text>
+               {stat.type === 'ammo' ? (
+-                <WeaponAmmoCell ammoId={stat.ammoId} qualities={stat.qualities} />
++                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} />
+               ) : stat.type === 'button' ? (
+                 <TouchableOpacity 
+                   style={localStyles.weaponModificationButton}
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+new file mode 100644
+index 0000000..c1c53cf
+--- /dev/null
++++ b/components/settings/SettingsModal.js
+@@ -0,0 +1,20 @@
++import React from 'react';
++import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
++
++export default function SettingsModal({ visible, onClose }) {
++  const enabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++  const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
++  const setEnabled = useAppSettingsStore((state) => state.setRandomWeaponDurabilityEnabled);
++  const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
++  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++    <View style={styles.backdrop}><View style={styles.modal}>
++      <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
++      <View style={styles.row}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text></View><Switch value={enabled} onValueChange={setEnabled} /></View>
++      {enabled && <View style={styles.loss}><Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text><View style={styles.counter}><TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}><Text style={styles.button}>−</Text></TouchableOpacity><Text style={styles.value}>{loss}</Text><TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}><Text style={styles.button}>+</Text></TouchableOpacity></View><Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text></View>}
++      <TouchableOpacity onPress={onClose} style={styles.close}><Text>OK</Text></TouchableOpacity>
++    </View></View>
++  </Modal>;
++}
++const styles=StyleSheet.create({backdrop:{flex:1,backgroundColor:'rgba(0,0,0,.6)',justifyContent:'center',padding:20},modal:{backgroundColor:'#fff',borderRadius:12,padding:20},title:{fontSize:22,fontWeight:'700',marginBottom:18},row:{flexDirection:'row',gap:12},text:{flex:1},label:{fontSize:16,fontWeight:'700'},description:{fontSize:13,color:'#555',lineHeight:18,marginTop:6},loss:{borderTopWidth:1,borderColor:'#ddd',marginTop:18,paddingTop:16},counter:{flexDirection:'row',alignItems:'center',marginTop:12,gap:20},button:{fontSize:28,fontWeight:'700',paddingHorizontal:12},value:{fontSize:22,minWidth:45,textAlign:'center'},close:{alignSelf:'flex-end',marginTop:18,padding:10}});
+diff --git a/domain/weaponDurability.js b/domain/weaponDurability.js
+new file mode 100644
+index 0000000..875a1c8
+--- /dev/null
++++ b/domain/weaponDurability.js
+@@ -0,0 +1,46 @@
++const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
++
++export const isAmmoWeapon = (weapon) => {
++  const ammoId = weapon?.ammoId ?? weapon?.ammo_id;
++  return Boolean(ammoId && ammoId !== 'ammo_anything');
++};
++
++export const rollWeaponDurability = () => Math.floor(Math.random() * 100) + 1;
++
++const normalizeQualities = (qualities) => {
++  if (typeof qualities === 'string') {
++    try { return JSON.parse(qualities); } catch (_) { return []; }
++  }
++  return Array.isArray(qualities) ? qualities : [];
++};
++
++export const getDurabilityMultiplier = (qualities) => {
++  const ids = new Set(normalizeQualities(qualities).map((quality) => quality?.qualityId || quality?.id));
++  if (ids.has('quality_unreliable')) return 2;
++  if (ids.has('quality_reliable')) return 0.5;
++  return 1;
++};
++
++/** Applies wear for spent ammunition. One spent round counts as one shot. */
++export const applyWeaponWear = (weapon, ammoSpent, baseLossPer10Shots) => {
++  const spent = Math.max(0, Math.floor(Number(ammoSpent) || 0));
++  const baseLoss = clamp(Math.floor(Number(baseLossPer10Shots) || 1), 1, 100);
++  const ammoRemainder = Math.max(0, Math.floor(Number(weapon?.durabilityAmmoRemainder) || 0));
++  const fullTens = Math.floor((ammoRemainder + spent) / 10);
++  const nextAmmoRemainder = (ammoRemainder + spent) % 10;
++  const pendingWear = Math.max(0, Number(weapon?.durabilityWearRemainder) || 0)
++    + fullTens * baseLoss * getDurabilityMultiplier(weapon?.qualities);
++  const loss = Math.floor(pendingWear);
++
++  return {
++    durability: clamp(Math.floor(Number(weapon?.durability) || 0) - loss, 0, 100),
++    durabilityAmmoRemainder: nextAmmoRemainder,
++    durabilityWearRemainder: pendingWear - loss,
++  };
++};
++
++export const repairWeaponDurability = () => ({
++  durability: 100,
++  durabilityAmmoRemainder: 0,
++  durabilityWearRemainder: 0,
++});
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 858d593..f39c075 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -46,7 +46,8 @@
+     "community": "Community",
+     "buyCoffee": "Buy author a coffee",
+     "buyCoffeeDescription": "Author support links will be added in future updates.",
+-    "checkUpdates": "Check for updates"
++    "checkUpdates": "Check for updates",
++    "settings": "Settings"
+   },
+   "about": {
+     "description": "Fallout 2d20 Companion is a character manager for tabletop RPG: create, store, edit, import/export, and sync through cloud."
+@@ -62,5 +63,12 @@
+     "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
+     "androidInstructions": "To install the app on Android:\n\nIn Chrome — tap the menu (⋮) in the top right corner and select «Install app» or «Add to Home screen».\n\nIn Samsung Internet — tap the menu (☰) → «Add page» → «On Home screen».",
+     "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
++  },
++  "settings": {
++    "title": "Settings",
++    "durabilityTitle": "Random weapon durability",
++    "durabilityDescription": "Weapons obtained through “Add Loot” have random durability from 1 to 100. Firing weapons consumes durability.",
++    "lossTitle": "Durability loss per 10 shots",
++    "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much."
+   }
+ }
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 02b9403..01882a4 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -96,7 +96,8 @@
+       "range": "RANGE",
+       "qualities": "QUALITIES",
+       "ammo": "AMMO",
+-      "modification": "Modification"
++      "modification": "Modification",
++      "durability": "DURABILITY"
+     },
+     "modSlots": {
+       "barrel": "Barrel",
+@@ -218,41 +219,41 @@
+     "errorSelectMod": "Please select at least one modification"
+   },
+   "robotLimbs": {
+-    "robot_head_protectron":             "Protectron Head",
++    "robot_head_protectron": "Protectron Head",
+     "robot_head_mister_handy_eye_stalk": "Mister Handy Eye Stalk",
+-    "robot_head_assaultron":             "Assaultron Head",
+-    "robot_head_assaultron_laser":       "Assaultron Head (Laser)",
+-    "robot_head_robobrain":              "Robobrain Head",
+-    "robot_head_sentry_bot":             "Sentry Bot Head",
+-    "robot_body_mister_handy":           "Mr. Handy Body",
+-    "robot_body_protectron":             "Protectron Body",
+-    "robot_body_assaultron":             "Assaultron Body",
+-    "robot_body_robobrain":              "Robobrain Body",
+-    "robot_body_sentry_bot":             "Sentry Bot Body",
+-    "robot_legs_mister_handy_thruster":  "Mister Handy Thruster",
+-    "robot_legs_protectron":             "Protectron Legs",
+-    "robot_legs_assaultron":             "Assaultron Legs",
+-    "robot_legs_robobrain_treads":       "Robobrain Treads",
+-    "robot_legs_sentry_bot":             "Sentry Bot Legs",
+-    "robot_weapon_manipulator":          "Manipulator",
++    "robot_head_assaultron": "Assaultron Head",
++    "robot_head_assaultron_laser": "Assaultron Head (Laser)",
++    "robot_head_robobrain": "Robobrain Head",
++    "robot_head_sentry_bot": "Sentry Bot Head",
++    "robot_body_mister_handy": "Mr. Handy Body",
++    "robot_body_protectron": "Protectron Body",
++    "robot_body_assaultron": "Assaultron Body",
++    "robot_body_robobrain": "Robobrain Body",
++    "robot_body_sentry_bot": "Sentry Bot Body",
++    "robot_legs_mister_handy_thruster": "Mister Handy Thruster",
++    "robot_legs_protectron": "Protectron Legs",
++    "robot_legs_assaultron": "Assaultron Legs",
++    "robot_legs_robobrain_treads": "Robobrain Treads",
++    "robot_legs_sentry_bot": "Sentry Bot Legs",
++    "robot_weapon_manipulator": "Manipulator",
+     "robot_weapon_protectron_manipulator": "Protectron Manipulator",
+-    "robot_arm_protectron":              "Protectron Arm",
+-    "robot_arm_mister_handy":            "Mister Handy Arm",
+-    "robot_arm_assaultron":              "Assaultron Arm",
+-    "robot_arm_assaultron_shocker":      "Assaultron Shocker Arms",
+-    "robot_arm_robobrain":               "Robobrain Arm",
+-    "robot_arm_sentry_bot":              "Sentry Bot Arm",
+-    "robot_weapon_flamethrower":         "Flamethrower",
+-    "robot_weapon_circular_saw":         "Circular Saw",
+-    "robot_weapon_laser_cutter":         "Laser Cutter",
+-    "robot_weapon_auto_10mm":            "Automatic 10mm Pistol",
+-    "robot_weapon_cryojet":              "Cryojet",
+-    "robot_weapon_shocker_arms":         "Shocker Arms",
+-    "robot_weapon_construction_claw":    "Construction Claw",
+-    "robot_weapon_drill":                "Drill",
+-    "robot_weapon_vice_grip":            "Vice Grip",
+-    "robot_weapon_claw":                 "Claw",
+-    "robot_weapon_tesla_arm":            "Tesla Carbine",
+-    "robot_arm_smoke_manipulator":       "Smoke Manipulator"
++    "robot_arm_protectron": "Protectron Arm",
++    "robot_arm_mister_handy": "Mister Handy Arm",
++    "robot_arm_assaultron": "Assaultron Arm",
++    "robot_arm_assaultron_shocker": "Assaultron Shocker Arms",
++    "robot_arm_robobrain": "Robobrain Arm",
++    "robot_arm_sentry_bot": "Sentry Bot Arm",
++    "robot_weapon_flamethrower": "Flamethrower",
++    "robot_weapon_circular_saw": "Circular Saw",
++    "robot_weapon_laser_cutter": "Laser Cutter",
++    "robot_weapon_auto_10mm": "Automatic 10mm Pistol",
++    "robot_weapon_cryojet": "Cryojet",
++    "robot_weapon_shocker_arms": "Shocker Arms",
++    "robot_weapon_construction_claw": "Construction Claw",
++    "robot_weapon_drill": "Drill",
++    "robot_weapon_vice_grip": "Vice Grip",
++    "robot_weapon_claw": "Claw",
++    "robot_weapon_tesla_arm": "Tesla Carbine",
++    "robot_arm_smoke_manipulator": "Smoke Manipulator"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index e92117b..b42ba9a 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -46,7 +46,8 @@
+     "community": "Сообщество",
+     "buyCoffee": "Купить автору кофе",
+     "buyCoffeeDescription": "Поддержка автора появится в следующих обновлениях.",
+-    "checkUpdates": "Проверить обновления"
++    "checkUpdates": "Проверить обновления",
++    "settings": "Настройки"
+   },
+   "about": {
+     "description": "Fallout 2d20 Companion — менеджер персонажей для настольной ролевой игры: создание, хранение, редактирование, импорт/экспорт и облачная синхронизация."
+@@ -62,5 +63,12 @@
+     "iosInstructions": "Чтобы установить приложение на iPhone/iPad:\n\n1. Нажмите кнопку «Поделиться» (Share) в нижней панели Safari.\n2. Выберите «На экран «Домой»» (Add to Home Screen).\n3. Нажмите «Добавить».",
+     "androidInstructions": "Чтобы установить приложение на Android:\n\nВ Chrome — нажмите меню (⋮) в правом верхнем углу и выберите «Установить приложение» или «Добавить на главный экран».\n\nВ Samsung Internet — нажмите меню (☰) → «Добавить страницу» → «На главный экран».",
+     "desktopInstructions": "Чтобы установить приложение:\n\nВ Edge / Chrome — найдите значок установки (⊕ или значок компьютера) в правой части адресной строки и нажмите его.\n\nВ Firefox — откройте меню (···) → «Установить сайт как приложение»."
++  },
++  "settings": {
++    "title": "Настройки",
++    "durabilityTitle": "Случайная прочность оружия",
++    "durabilityDescription": "Оружие, получаемое через «Добавить добычу», обладает случайной прочностью от 1 до 100. Выстрелы из оружия тратят прочность.",
++    "lossTitle": "Расход прочности за 10 выстрелов",
++    "lossDescription": "По умолчанию расходуется 1 прочность за 10 выстрелов. «Ненадёжное» оружие тратит в 2 раза больше, а «Надёжное» — в 2 раза меньше."
+   }
+ }
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 811a895..4b352b3 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -96,7 +96,8 @@
+       "range": "ДИСТАНЦИЯ",
+       "qualities": "КАЧЕСТВА",
+       "ammo": "ПАТРОНЫ",
+-      "modification": "Модификация"
++      "modification": "Модификация",
++      "durability": "ПРОЧНОСТЬ"
+     },
+     "modSlots": {
+       "barrel": "Ствол",
+@@ -218,41 +219,41 @@
+     "errorSelectMod": "Выберите хотя бы одну модификацию"
+   },
+   "robotLimbs": {
+-    "robot_head_protectron":             "Голова Протектрона",
++    "robot_head_protectron": "Голова Протектрона",
+     "robot_head_mister_handy_eye_stalk": "Глазной стебель Мистера Помощника",
+-    "robot_head_assaultron":             "Голова Ассолтрона",
+-    "robot_head_assaultron_laser":       "Голова Ассолтрона (лазер)",
+-    "robot_head_robobrain":              "Голова Роботмозга",
+-    "robot_head_sentry_bot":             "Голова Сентри-бота",
+-    "robot_body_mister_handy":           "Корпус Мистера Помощника",
+-    "robot_body_protectron":             "Корпус Протектрона",
+-    "robot_body_assaultron":             "Корпус Ассолтрона",
+-    "robot_body_robobrain":              "Корпус Роботмозга",
+-    "robot_body_sentry_bot":             "Корпус Сентри-бота",
+-    "robot_legs_mister_handy_thruster":  "Тяга Мистера Помощника",
+-    "robot_legs_protectron":             "Ноги Протектрона",
+-    "robot_legs_assaultron":             "Ноги Ассолтрона",
+-    "robot_legs_robobrain_treads":       "Гусеницы Роботмозга",
+-    "robot_legs_sentry_bot":             "Ноги Сентри-бота",
+-    "robot_weapon_manipulator":          "Манипулятор",
++    "robot_head_assaultron": "Голова Ассолтрона",
++    "robot_head_assaultron_laser": "Голова Ассолтрона (лазер)",
++    "robot_head_robobrain": "Голова Роботмозга",
++    "robot_head_sentry_bot": "Голова Сентри-бота",
++    "robot_body_mister_handy": "Корпус Мистера Помощника",
++    "robot_body_protectron": "Корпус Протектрона",
++    "robot_body_assaultron": "Корпус Ассолтрона",
++    "robot_body_robobrain": "Корпус Роботмозга",
++    "robot_body_sentry_bot": "Корпус Сентри-бота",
++    "robot_legs_mister_handy_thruster": "Тяга Мистера Помощника",
++    "robot_legs_protectron": "Ноги Протектрона",
++    "robot_legs_assaultron": "Ноги Ассолтрона",
++    "robot_legs_robobrain_treads": "Гусеницы Роботмозга",
++    "robot_legs_sentry_bot": "Ноги Сентри-бота",
++    "robot_weapon_manipulator": "Манипулятор",
+     "robot_weapon_protectron_manipulator": "Манипулятор Протектрона",
+-    "robot_arm_protectron":              "Рука Протектрона",
+-    "robot_arm_mister_handy":            "Рука Мистера Помощника",
+-    "robot_arm_assaultron":              "Рука Ассолтрона",
+-    "robot_arm_assaultron_shocker":      "Шоковые руки Ассолтрона",
+-    "robot_arm_robobrain":               "Рука Роботмозга",
+-    "robot_arm_sentry_bot":              "Рука Сентри-бота",
+-    "robot_weapon_flamethrower":         "Огнемёт",
+-    "robot_weapon_circular_saw":         "Циркулярная пила",
+-    "robot_weapon_laser_cutter":         "Лазерный резак",
+-    "robot_weapon_auto_10mm":            "Автоматический 10-мм пистолет",
+-    "robot_weapon_cryojet":              "Криораспылитель",
+-    "robot_weapon_shocker_arms":         "Руки-шокеры",
+-    "robot_weapon_construction_claw":    "Строительный коготь",
+-    "robot_weapon_drill":                "Бур",
+-    "robot_weapon_vice_grip":            "Тиски",
+-    "robot_weapon_claw":                 "Коготь",
+-    "robot_weapon_tesla_arm":            "Карабин Теслы",
+-    "robot_arm_smoke_manipulator":       "Экстендер с зажимом"
++    "robot_arm_protectron": "Рука Протектрона",
++    "robot_arm_mister_handy": "Рука Мистера Помощника",
++    "robot_arm_assaultron": "Рука Ассолтрона",
++    "robot_arm_assaultron_shocker": "Шоковые руки Ассолтрона",
++    "robot_arm_robobrain": "Рука Роботмозга",
++    "robot_arm_sentry_bot": "Рука Сентри-бота",
++    "robot_weapon_flamethrower": "Огнемёт",
++    "robot_weapon_circular_saw": "Циркулярная пила",
++    "robot_weapon_laser_cutter": "Лазерный резак",
++    "robot_weapon_auto_10mm": "Автоматический 10-мм пистолет",
++    "robot_weapon_cryojet": "Криораспылитель",
++    "robot_weapon_shocker_arms": "Руки-шокеры",
++    "robot_weapon_construction_claw": "Строительный коготь",
++    "robot_weapon_drill": "Бур",
++    "robot_weapon_vice_grip": "Тиски",
++    "robot_weapon_claw": "Коготь",
++    "robot_weapon_tesla_arm": "Карабин Теслы",
++    "robot_arm_smoke_manipulator": "Экстендер с зажимом"
+   }
+ }
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+new file mode 100644
+index 0000000..ed7be6a
+--- /dev/null
++++ b/src/store/appSettingsStore.js
+@@ -0,0 +1,26 @@
++import { create } from 'zustand';
++import { persist, createJSONStorage } from 'zustand/middleware';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++const clampLoss = (value) => Math.min(100, Math.max(1, Math.floor(Number(value) || 1)));
++
++const useAppSettingsStore = create(
++  persist(
++    (set) => ({
++      randomWeaponDurabilityEnabled: false,
++      weaponDurabilityLossPer10Shots: 1,
++      setRandomWeaponDurabilityEnabled: (enabled) => set({ randomWeaponDurabilityEnabled: Boolean(enabled) }),
++      setWeaponDurabilityLossPer10Shots: (value) => set({ weaponDurabilityLossPer10Shots: clampLoss(value) }),
++    }),
++    {
++      name: 'fallout2d20:settings',
++      storage: createJSONStorage(() => AsyncStorage),
++      partialize: (state) => ({
++        randomWeaponDurabilityEnabled: state.randomWeaponDurabilityEnabled,
++        weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
++      }),
++    },
++  ),
++);
++
++export default useAppSettingsStore;
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 640b164..3130cc8 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -56,6 +56,7 @@ import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+ import { debugLog } from '../debug/falloutDebug.js';
+ import perksData from '../../data/perks/perks.json';
+ import { selectPerkBonuses } from '../../domain/perks.js';
++import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+ 
+ // Helper function to generate unique IDs
+ const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+@@ -445,6 +446,49 @@ const useCharacterStore = create(devtools(
+         get().recalculateDerivedStats();
+       },
+       
++      /** Spend ammunition and update weapon wear in one state transaction. */
++      spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots }) => {
++        const state = get();
++        const weapon = state.items[weaponInstanceId];
++        const amount = Math.max(1, Math.floor(Number(ammoAmount) || 1));
++        if (!weapon) return { ok: false, reason: 'weapon-not-found' };
++        const trackedWeapon = durabilityEnabled && !weapon.durabilityTracked
++          ? { ...weapon, durabilityTracked: true, durability: 100, durabilityAmmoRemainder: 0, durabilityWearRemainder: 0 }
++          : weapon;
++        if (durabilityEnabled && Number(trackedWeapon.durability) <= 0) {
++          return { ok: false, reason: 'broken' };
++        }
++
++        const acceptedAmmoIds = new Set(ammoIds || []);
++        const ammoEntries = Object.entries(state.items).filter(([, item]) =>
++          item.itemType === 'ammo' && acceptedAmmoIds.has(item.weaponId || item.id),
++        );
++        const available = ammoEntries.reduce((sum, [, item]) => sum + (Number(item.quantity) || 1), 0);
++        if (available < amount) return { ok: false, reason: 'not-enough-ammo' };
++
++        const items = { ...state.items };
++        let remaining = amount;
++        for (const [itemId, ammo] of ammoEntries) {
++          if (!remaining) break;
++          const quantity = Number(ammo.quantity) || 1;
++          const spent = Math.min(quantity, remaining);
++          if (quantity === spent) delete items[itemId];
++          else items[itemId] = { ...ammo, quantity: quantity - spent };
++          remaining -= spent;
++        }
++        if (durabilityEnabled) {
++          items[weaponInstanceId] = { ...trackedWeapon, ...applyWeaponWear(trackedWeapon, amount, baseLossPer10Shots) };
++        }
++        set({ items });
++        return { ok: true };
++      },
++
++      repairWeapon: (itemId) => {
++        const item = get().items[itemId];
++        if (!item?.durabilityTracked || Number(item.durability) >= 100) return;
++        get().updateItem(itemId, repairWeaponDurability());
++      },
++
+       /**
+        * Equip an item (set equipped = true)
+        * @param {string} itemId - Item ID
+@@ -557,6 +601,8 @@ const useCharacterStore = create(devtools(
+         // Normalize item data with parameters
+         const normalizedItem = {
+           id: itemId,
++          // instanceId survives display enrichment, whose `id` is the catalog id.
++          instanceId: itemId,
+           weaponId: weaponId,
+           name: item.name || item.weaponName || item.Name || weaponId,
+           itemType: item.itemType || 'misc',
+@@ -602,6 +648,12 @@ const useCharacterStore = create(devtools(
+           qualities: item.qualities,
+           imageName: item.imageName,
+ 
++          // Optional weapon durability is instance-specific and never catalog data.
++          durabilityTracked: Boolean(item.durabilityTracked),
++          durability: item.durability,
++          durabilityAmmoRemainder: item.durabilityAmmoRemainder,
++          durabilityWearRemainder: item.durabilityWearRemainder,
++
+           // Consumable fields (chems, food, drinks) — preserved verbatim from catalog
+           positiveEffect: item.positiveEffect,
+           positiveEffectDuration: item.positiveEffectDuration,
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index 0a1cad5..2f67399 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -118,6 +118,7 @@ export const storeItemToWeaponDisplay = (item) => {
+ 
+   return {
+     ...flat,
++    instanceId: flat.instanceId || flat.id,
+     id: flat.weaponId || flat.id,
+     fire_rate: flat.fireRate ?? flat.fire_rate,
+     damage_type: flat.damageType ?? flat.damage_type,

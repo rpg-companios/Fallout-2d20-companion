@@ -29,6 +29,7 @@ import {
 import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import styles from '../../../styles/HomeScreen.styles';
+import SettingsModal from '../../settings/SettingsModal';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -101,6 +102,7 @@ export default function HomeScreen({ navigation }) {
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
   const [communityVisible, setCommunityVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -477,6 +479,10 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Pressable style={styles.menuPanel} onPress={() => {}}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
+              <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
+              <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleCloudSync}>
               <FontAwesome5 name="google-drive" size={18} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.sync')}</Text>
@@ -514,6 +520,8 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
 
       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalBackdropCenter}>

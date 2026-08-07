@@ -118,6 +118,7 @@ export const storeItemToWeaponDisplay = (item) => {
 
   return {
     ...flat,
+    instanceId: flat.instanceId || flat.id,
     id: flat.weaponId || flat.id,
     fire_rate: flat.fireRate ?? flat.fire_rate,
     damage_type: flat.damageType ?? flat.damage_type,

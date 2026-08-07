@@ -1,0 +1,1000 @@
+diff --git a/components/screens/CharacterScreen/logic/RandomLootLogic.js b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+index f616579..3c3c499 100644
+--- a/components/screens/CharacterScreen/logic/RandomLootLogic.js
++++ b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+@@ -6,8 +6,11 @@ import chems from '../../../../data/loot/chems.json';
+ import outcast from '../../../../data/loot/outcast.json';
+ import weaponsMelee from '../../../../data/loot/weapons_melee.json';
+ import lootStubs from '../../../../data/loot/_stubs.json';
++import ruLootStubs from '../../../../i18n/ru-RU/data/loot/stubs.json';
++import enLootStubs from '../../../../i18n/en-EN/data/loot/stubs.json';
+ import { getWeaponById } from '../../../../db/Database';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
++import { getCurrentLocale } from '../../../../i18n/locale';
+ 
+ const lootTables = {
+   trinklet: trinkets,
+@@ -72,9 +75,11 @@ function buildCatalogIndex() {
+         addAll(miscItems, 'misc');
+     }
+ 
+-    // Заглушки лута (data/loot/_stubs.json) — предметы, которых ещё нет в основном
+-    // каталоге; помечены stub:true и предназначены для замены на реальные данные.
+-    addAll(lootStubs);
++    // Loot stubs contain locale-independent item data. Their display names are
++    // resolved by id from the active locale, like the rest of the catalog.
++    const localizedStubNames = getCurrentLocale() === 'en-EN' ? enLootStubs : ruLootStubs;
++    const stubNamesById = new Map(localizedStubNames.map((item) => [item.id, item.name]));
++    addAll(lootStubs.map((item) => ({ ...item, name: stubNamesById.get(item.id) })));
+ 
+     return index;
+ }
+diff --git a/data/loot/_stubs.json b/data/loot/_stubs.json
+index fa5e6cb..4d4bdf3 100644
+--- a/data/loot/_stubs.json
++++ b/data/loot/_stubs.json
+@@ -1,7 +1,6 @@
+ [
+  {
+   "id": "item_treasure_map",
+-  "name": "Карта с тайником выживальщиков старого мира",
+   "itemType": "misc",
+   "weight": 0.5,
+   "rarity": 2,
+@@ -10,7 +9,6 @@
+  },
+  {
+   "id": "outcast_stub_1",
+-  "name": "Элитный набор инструментов",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -19,7 +17,6 @@
+  },
+  {
+   "id": "outcast_stub_10",
+-  "name": "Боевой Наруч",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -28,7 +25,6 @@
+  },
+  {
+   "id": "outcast_stub_11",
+-  "name": "Боевой Понож",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -37,7 +33,6 @@
+  },
+  {
+   "id": "outcast_stub_12",
+-  "name": "Массив сенсоров",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -46,7 +41,6 @@
+  },
+  {
+   "id": "outcast_stub_13",
+-  "name": "Рюкзак маленький",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -55,7 +49,6 @@
+  },
+  {
+   "id": "outcast_stub_15",
+-  "name": "Лазерный Мушкет",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -64,7 +57,6 @@
+  },
+  {
+   "id": "outcast_stub_17",
+-  "name": "Боевой дробовик",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -73,7 +65,6 @@
+  },
+  {
+   "id": "outcast_stub_18",
+-  "name": "Силовой кулак",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -82,7 +73,6 @@
+  },
+  {
+   "id": "outcast_stub_19",
+-  "name": "Прочный Боевой Шлем",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -91,7 +81,6 @@
+  },
+  {
+   "id": "outcast_stub_2",
+-  "name": "Фонарик",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -100,7 +89,6 @@
+  },
+  {
+   "id": "outcast_stub_20",
+-  "name": "Пип-Бой",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -109,7 +97,6 @@
+  },
+  {
+   "id": "outcast_stub_3",
+-  "name": "Копия журнала \"Чиним вещи\"",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -118,7 +105,6 @@
+  },
+  {
+   "id": "outcast_stub_5",
+-  "name": "Заколка",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -127,7 +113,6 @@
+  },
+  {
+   "id": "outcast_stub_6",
+-  "name": "Радио",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -136,7 +121,6 @@
+  },
+  {
+   "id": "outcast_stub_7",
+-  "name": "Боевой Нагрудник",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -145,7 +129,6 @@
+  },
+  {
+   "id": "trinkets_stub_1",
+-  "name": "Золотые карманные часы",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -154,7 +137,6 @@
+  },
+  {
+   "id": "trinkets_stub_10",
+-  "name": "Зажигалка с гравировкой",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -163,7 +145,6 @@
+  },
+  {
+   "id": "trinkets_stub_11",
+-  "name": "Шулерские кости",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -172,7 +153,6 @@
+  },
+  {
+   "id": "trinkets_stub_12",
+-  "name": "Удостоверение личности",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -181,7 +161,6 @@
+  },
+  {
+   "id": "trinkets_stub_13",
+-  "name": "Косметичка",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -190,7 +169,6 @@
+  },
+  {
+   "id": "trinkets_stub_14",
+-  "name": "Музыкальный инструмент",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -199,7 +177,6 @@
+  },
+  {
+   "id": "trinkets_stub_15",
+-  "name": "Разбитые очки",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -208,7 +185,6 @@
+  },
+  {
+   "id": "trinkets_stub_16",
+-  "name": "Ожерелье из хлама",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -217,7 +193,6 @@
+  },
+  {
+   "id": "trinkets_stub_17",
+-  "name": "Страницы неоконченной истории",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -226,7 +201,6 @@
+  },
+  {
+   "id": "trinkets_stub_18",
+-  "name": "Невозвращенная книга",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -235,7 +209,6 @@
+  },
+  {
+   "id": "trinkets_stub_19",
+-  "name": "Открытка с адресом",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -244,7 +217,6 @@
+  },
+  {
+   "id": "trinkets_stub_2",
+-  "name": "Заглючивший голодиск",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -253,7 +225,6 @@
+  },
+  {
+   "id": "trinkets_stub_20",
+-  "name": "Довоенный галстук",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -262,7 +233,6 @@
+  },
+  {
+   "id": "trinkets_stub_3",
+-  "name": "Яркая бандана",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -271,7 +241,6 @@
+  },
+  {
+   "id": "trinkets_stub_4",
+-  "name": "Серебряный медальон",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -280,7 +249,6 @@
+  },
+  {
+   "id": "trinkets_stub_5",
+-  "name": "Медаль",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -289,7 +257,6 @@
+  },
+  {
+   "id": "trinkets_stub_6",
+-  "name": "Горшечное растение",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -298,7 +265,6 @@
+  },
+  {
+   "id": "trinkets_stub_7",
+-  "name": "Билеты на довоенное мероприятие",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -307,7 +273,6 @@
+  },
+  {
+   "id": "trinkets_stub_8",
+-  "name": "Обручальное кольцо",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -316,7 +281,6 @@
+  },
+  {
+   "id": "trinkets_stub_9",
+-  "name": "Приглашение на довоенную тусовку",
+   "itemType": "misc",
+   "weight": 0.5,
+   "cost": 0,
+@@ -325,7 +289,6 @@
+  },
+  {
+   "id": "weapon_chinese_sword",
+-  "name": "Меч",
+   "itemType": "weapon",
+   "weight": 0.5,
+   "cost": 100,
+diff --git a/i18n/en-EN/data/equipment/weapons/weapons.json b/i18n/en-EN/data/equipment/weapons/weapons.json
+index 990ffac..3a17126 100644
+--- a/i18n/en-EN/data/equipment/weapons/weapons.json
++++ b/i18n/en-EN/data/equipment/weapons/weapons.json
+@@ -692,7 +692,7 @@
+   {
+     "id": "weapon_assaultron_head_laser",
+     "name": "Assaultron Head Laser",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "The head of an Assaultron contains a high-yield laser emitter, shielded behind sturdy armor plating. Assaultrons use this laser to blast the enemy as they close into melee. The laser itself uses a capacitor that can build up an extremely powerful charge, but which requires considerable energy for each fully charged blast. Due to the solid design, destroyed Assaultrons sometimes have an intact head that can be used as an impromptu hand-held laser.",
+     "stockNames": {
+       "without": "",
+@@ -702,7 +702,7 @@
+   {
+     "id": "weapon_mesmetron",
+     "name": "Mesmetron",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "A weapon similar to the gamma gun with the ability to create blasts of high intense energy. This approach creates variable waves that, when received by the brain of a sentient creature, overwhelms the senses and distorts perception making individuals confused and more susceptible.",
+     "stockNames": {
+       "without": "",
+@@ -712,7 +712,7 @@
+   {
+     "id": "weapon_tesla_rifle",
+     "name": "Tesla Rifle",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "The Tesla gun is a firearm that takes the energy from a fusion cell and launches the energy out as a coil of electrical energy. The energy generally seeks out a way to dissipate allowing for it to arc out to multiple targets in a single shot.",
+     "stockNames": {
+       "without": "",
+@@ -722,7 +722,7 @@
+   {
+     "id": "weapon_broadsider",
+     "name": "Broadsider",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "The broadsider is a naval cannon that has been modified with a chassis that allows for it to be a portable weapon. In addition to having a portable frame, the firing mechanism has been altered to include electronic triggers to avoid the traditional fuse. The cannon requires traditional loading however, with cannonballs being loaded directly into the muzzle.",
+     "stockNames": {
+       "without": "",
+@@ -732,7 +732,7 @@
+   {
+     "id": "weapon_cryolator",
+     "name": "Cryolator",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "The cryolator, a machine designed with the ability to perform cryogenic freezing while maintaining mobility. Operating on a similar principle to a flamer, the cryolater takes pressurized nitrogen gas from a cryo cell and liquefies it, spraying the concentrated chemical element over a desired area in range.",
+     "stockNames": {
+       "without": "",
+@@ -742,7 +742,7 @@
+   {
+     "id": "weapon_harpoon_gun",
+     "name": "Harpoon Gun",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "The harpoon gun is a handheld version of the harpoon cannon, sacrificing power for mobility. A special designed chassis allows for the weapon to be portable and is adapted with a firing mechanism for convenient firing.",
+     "stockNames": {
+       "without": "",
+@@ -752,8 +752,8 @@
+   {
+     "id": "weapon_357_magnum_revolver",
+     "name": ".357 Magnum Revolver",
+-    "rangeName": "Близкая",
+-    "flavour": "A single-action revolver chambered for .357 magnum (though ones using .38 special rounds also exist). Not as potent as the feared and respected .44 revolver, these guns remain scattered around parts of the Wasteland due to their common use by police forces as service weapons and due to their extremely simple, durable build that makes them easy to maintain and extremely Надёжное.",
++    "rangeName": "Close",
++    "flavour": "A single-action revolver chambered for .357 magnum (though ones using .38 special rounds also exist). Not as potent as the feared and respected .44 revolver, these guns remain scattered around parts of the Wasteland due to their common use by police forces as service weapons and due to their extremely simple, durable build that makes them easy to maintain and extremely reliable.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -762,7 +762,7 @@
+   {
+     "id": "weapon_12_7mm_pistol",
+     "name": "12.7mm Pistol",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "A heavy-duty single-shot weapon with exceptional stopping power. Most known examples are believed to have been imported from overseas before the war. Given the weapon's punishing recoil, it can be tricky to use for those not prepared for its kick.",
+     "stockNames": {
+       "without": "",
+@@ -772,7 +772,7 @@
+   {
+     "id": "weapon_12_7mm_smg",
+     "name": "12.7mm SMG",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "An uncommon mixture of compact weapon and large-caliber round, the 12.7mm submachine gun features an unconventional top-mounted magazine, lying parallel to the weapon's barrel. While small and lightweight itself, the weapon's recoil and rate of fire can make it tricky to handle.",
+     "stockNames": {
+       "without": "",
+@@ -782,7 +782,7 @@
+   {
+     "id": "weapon_25mm_grenade_apw",
+     "name": "25mm Grenade APW",
+-    "rangeName": "Дальняя",
++    "rangeName": "Long",
+     "flavour": "The 25mm grenade APW is a semi-automatic grenade launcher. Specifically, this weapon contains a stock magazine capacity of six grenades, a brisk rate of fire, decent accuracy and allows modifications. While the grenades are much smaller and less impactful than those found in many other grenade launchers, the weapon itself is not as cumbersome as larger grenade launchers.",
+     "stockNames": {
+       "without": "",
+@@ -792,7 +792,7 @@
+   {
+     "id": "weapon_9mm_pistol",
+     "name": "9mm Pistol",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "A common sight in the California and Mojave Wastelands and used as a standard sidearm by the New California Republic Army, this model of 9mm autoloader handgun was manufactured in vast quantities before the Great War. Its light weight, ease of handling, and common ammunition makes it a popular choice for personal defense, or as a backup weapon. However, the sturdy design doesn't lend itself as well to modifications as other common weapons.",
+     "stockNames": {
+       "without": "",
+@@ -802,7 +802,7 @@
+   {
+     "id": "weapon_anti_materiel_rifle",
+     "name": "Anti-Materiel Rifle",
+-    "rangeName": "Дальняя",
++    "rangeName": "Long",
+     "flavour": "Utilizing an ergonomic, metallic skeleton design with a free-floating barrel, the anti-materiel rifle is a bolt-action, high-caliber precision weapon intended for use against materiel and hard targets. The weapon is designed for use at long ranges and should ideally not be fired while standing up due to the heavy recoil. Rare and highly sought-after, these guns are ideal for dealing with things like deathclaws, the larger radscorpions, and other sizeable threats… so long as you've got time to set up the first shot.",
+     "stockNames": {
+       "without": "",
+@@ -812,7 +812,7 @@
+   {
+     "id": "weapon_battle_rifle",
+     "name": "Battle Rifle",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "Something of a relic of old 20th-century engineering, this sturdy, gas-operated semi-automatic rifle is nevertheless a solid choice of rifle for the discerning raider or mercenary. Its old-fashioned construction makes for a durable weapon with considerable stopping power, but it isn't easily modified.",
+     "stockNames": {
+       "without": "",
+@@ -822,7 +822,7 @@
+   {
+     "id": "weapon_black_powder_blunderbuss",
+     "name": "Black Powder Blunderbuss",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "An archaic percussion-cap firearm, of a kind possibly salvaged from museums or the collections of reenactors. They fire a heavy .50 musket ball propelled by gunpowder, and are only effective at very close ranges, but when they do hit, they can do a lot of damage.",
+     "stockNames": {
+       "without": "",
+@@ -832,8 +832,8 @@
+   {
+     "id": "weapon_black_powder_pistol",
+     "name": "Black Powder Pistol",
+-    "rangeName": "Близкая",
+-    "flavour": "An archaic percussion-cap firearm, of a kind possibly salvaged from museums or the collections of reenactors. Compared to the blunderbuss, the pistol is less Неточное and has a slightly longer effective range, but it packs no less of a punch.",
++    "rangeName": "Close",
++    "flavour": "An archaic percussion-cap firearm, of a kind possibly salvaged from museums or the collections of reenactors. Compared to the blunderbuss, the pistol is less inaccurate and has a slightly longer effective range, but it packs no less of a punch.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -842,7 +842,7 @@
+   {
+     "id": "weapon_black_powder_rifle",
+     "name": "Black Powder Rifle",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "An archaic percussion-cap muzzle-loading rifle, of a kind possibly salvaged from museums or the collections of reenactors. The rifle's longer barrel gives it considerably longer range and slightly more stopping power than its smaller counterparts, but while it's fine against one or two foes, the slow rate of fire and long reload process make it inconvenient when heavily outnumbered.",
+     "stockNames": {
+       "without": "",
+@@ -852,7 +852,7 @@
+   {
+     "id": "weapon_gauss_pistol",
+     "name": "Gauss Pistol",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "A handheld alternative to a full-sized gauss rifle. Despite its small size, it maintains formidable stopping power over considerable distances, and in the hands of a skilled user, it can bring down even the most durable foes.",
+     "stockNames": {
+       "without": "",
+@@ -862,7 +862,7 @@
+   {
+     "id": "weapon_gauss_shotgun",
+     "name": "Gauss Shotgun",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "Technically more of a volley gun than a shotgun, as it fires multiple shots from multiple barrels at once, the gauss shotgun is a rare and devastating weapon which peppers a target with hypervelocity rounds.",
+     "stockNames": {
+       "without": "",
+@@ -872,8 +872,8 @@
+   {
+     "id": "weapon_lever_action_rifle",
+     "name": "Lever-Action Rifle",
+-    "rangeName": "Средняя",
+-    "flavour": "As the name suggests, a lever-action rifle uses a lever to cycle the weapon's action; this is typically part of the trigger guard, allowing the shooter to cycle the action with minimal effort or movement. Though this slows the rate of fire, it's a Надёжное design that stands up to use, time, and nuclear war.",
++    "rangeName": "Medium",
++    "flavour": "As the name suggests, a lever-action rifle uses a lever to cycle the weapon's action; this is typically part of the trigger guard, allowing the shooter to cycle the action with minimal effort or movement. Though this slows the rate of fire, it's a reliable design that stands up to use, time, and nuclear war.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -882,7 +882,7 @@
+   {
+     "id": "weapon_light_machine_gun",
+     "name": "Light Machine Gun",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "The light machine gun is built to provide heavy firepower in a package not much larger than a typical rifle. While certainly heavier and more cumbersome than an assault rifle, it maintains a high rate of fire and can be easily modified with parts used by a variety of similar weapons, allowing the user to customize their fire support.",
+     "stockNames": {
+       "without": "",
+@@ -892,8 +892,8 @@
+   {
+     "id": "weapon_pump_action_shotgun",
+     "name": "Pump-Action Shotgun",
+-    "rangeName": "Близкая",
+-    "flavour": "A solid and wideРазброс design of shotgun found across the Wastelands. While it has a far larger magazine capacity than double-barreled shotguns, the slow (but distinctive) pump-action design keeps the rate of fire low compared to semi-automatic combat shotguns.",
++    "rangeName": "Close",
++    "flavour": "A solid and wide-spread design of shotgun found across the Wastelands. While it has a far larger magazine capacity than double-barreled shotguns, the slow (but distinctive) pump-action design keeps the rate of fire low compared to semi-automatic combat shotguns.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -902,7 +902,7 @@
+   {
+     "id": "weapon_radium_rifle",
+     "name": "Radium Rifle",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "The Radium Rifle irradiates bullets as they are fired, causing ballistic damage, with an extra kick of radiation damage that is deadly to humans",
+     "stockNames": {
+       "without": "",
+@@ -912,7 +912,7 @@
+   {
+     "id": "weapon_sniper_rifle",
+     "name": "Sniper Rifle",
+-    "rangeName": "Дальняя",
++    "rangeName": "Long",
+     "flavour": "A scoped rifle once designed for use by military and police forces to eliminate targets efficiently from long distances. The design incorporates many features that other weapons would be modded to have, but such built-in design means that it's difficult to alter purpose-made sniper rifles",
+     "stockNames": {
+       "without": "",
+@@ -922,7 +922,7 @@
+   {
+     "id": "weapon_bow",
+     "name": "Bow",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "A bolt-action rifle commonly found in the hands of super mutants and raiders. The simple design made them common amongst hunters and survivalists before the Great War, and they're endlessly customizable. It seems fanciful to suggest that the simple short-barrelled slug-thrower carried by a super mutant could be turned into a precision sniper's rifle, yet that describes the hunting rifle perfectly.",
+     "stockNames": {
+       "without": "",
+@@ -932,7 +932,7 @@
+   {
+     "id": "weapon_alien_atomizer",
+     "name": "Alien Atomizer",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "A form of alien energy pistol, found in use by the extra-terrestrial beings sometimes called \"Zetans\". Encounters with these creatures are extremely rare, and their weapons are extremely potent. Nobody understands their technology well enough to modify these guns, however.",
+     "stockNames": {
+       "without": "",
+@@ -942,7 +942,7 @@
+   {
+     "id": "weapon_alien_disintegrator",
+     "name": "Alien Disintegrator",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "A form of alien energy rifle, appearing like a space-age blunderbuss, found in use by the extra-terrestrial beings sometimes called \"Zetans\". Like the smaller atomizers, the technology of these weapons is too unknown for anyone to successfully modify one of these weapons.",
+     "stockNames": {
+       "without": "",
+@@ -952,7 +952,7 @@
+   {
+     "id": "weapon_arc_welder",
+     "name": "Arc Welder",
+-    "rangeName": "Близкая",
++    "rangeName": "Close",
+     "flavour": "This odd weapon can discharge a constant, high-voltage stream of electricity. While painful and damaging to living creatures, it is especially effective against robots and enemies in Power Armor, as electricity discharges into delicate components.",
+     "stockNames": {
+       "without": "",
+@@ -962,8 +962,8 @@
+   {
+     "id": "weapon_microwave_emitter",
+     "name": "Microwave Emitter",
+-    "rangeName": "Средняя",
+-    "flavour": "This advanced Энергооружие generates intense blasts of microwave radiation. While it won't irradiate you—microwaves are non-ionizing radiation—it can cause intense burns as whatever is hit by the blast is heated up from the inside, boiling the water in your cells. And metal is little protection: the microwave blast can't effectively be dispersed by metallic objects, which heat up, produce electrical sparks, damage delicate circuitry. While extremely rare, these weapons provide a serious advantage when used against heavily armored targets.",
++    "rangeName": "Medium",
++    "flavour": "This advanced energy weapon generates intense blasts of microwave radiation. While it won't irradiate you—microwaves are non-ionizing radiation—it can cause intense burns as whatever is hit by the blast is heated up from the inside, boiling the water in your cells. And metal is little protection: the microwave blast can't effectively be dispersed by metallic objects, which heat up, produce electrical sparks, damage delicate circuitry. While extremely rare, these weapons provide a serious advantage when used against heavily armored targets.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -972,7 +972,7 @@
+   {
+     "id": "weapon_50_cal_machine_gun",
+     "name": ".50 Cal Machine Gun",
+-    "rangeName": "Средняя",
++    "rangeName": "Medium",
+     "flavour": "These machine guns, chambered for the powerful .50 round, are extremely effective against infantry, materiel, lightly armored vehicles, boats, buildings, aircraft, and a wide range of other targets. This design has been in use in one form or another since long before the Great War but finds a new lease of life when carried by Power Armored fighters who can wield the cumbersome gun.",
+     "stockNames": {
+       "without": "",
+@@ -982,7 +982,7 @@
+   {
+     "id": "weapon_auto_grenade_launcher",
+     "name": "Auto Grenade Launcher",
+-    "rangeName": "Дальняя",
++    "rangeName": "Long",
+     "flavour": "The automatic grenade launcher (sometimes referred to as a grenade machine gun), is a belt-fed, blowback-operated, air-cooled automatic weapon designed to lay down a heavy volume of explosive ordnance and support infantry and vehicle operations. Designed for use as a crew-served weapon, the automatic grenade launcher was intended for use against a variety of targets ranging from infantry and light vehicles to fortifications and other materiel. The sheer weight of the weapon and bulk of the ammunition limited its versatility, until the advent of Power Armor. Since then, many units were converted for use on foot, rather than from a tripod.",
+     "stockNames": {
+       "without": "",
+@@ -992,8 +992,8 @@
+   {
+     "id": "weapon_drone_cannon",
+     "name": "Drone Cannon",
+-    "rangeName": "Средняя",
+-    "flavour": "Found on the arms of guardian drones—a form of alien robot sometimes seen on board crashed alien spacecraft—these potent, if strange, Энергооружиеs fire a ball of energy that acts a little like a grenade, bouncing for a few seconds before exploding.",
++    "rangeName": "Medium",
++    "flavour": "Found on the arms of guardian drones—a form of alien robot sometimes seen on board crashed alien spacecraft—these potent, if strange, energy weapons fire a ball of energy that acts a little like a grenade, bouncing for a few seconds before exploding.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -1001,9 +1001,9 @@
+   },
+   {
+     "id": "weapon_gatling_gun",
+-    "name": "Гатлинг Gun",
+-    "rangeName": "Средняя",
+-    "flavour": "Originally referred to as \"Гатлинг's battery gun\", these weapons resemble an old-fashioned version of a minigun, with the rotating barrels operated by a hand-crank rather than an electric motor. Naturally, this means that it has a slower rate of fire than its more advanced counterpart, but the weapon is no less functional for its old-fashioned design.",
++    "name": "Gatling Gun",
++    "rangeName": "Medium",
++    "flavour": "Originally referred to as \"Gatling's battery gun\", these weapons resemble an old-fashioned version of a minigun, with the rotating barrels operated by a hand-crank rather than an electric motor. Naturally, this means that it has a slower rate of fire than its more advanced counterpart, but the weapon is no less functional for its old-fashioned design.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -1011,8 +1011,8 @@
+   },
+   {
+     "id": "weapon_gatling_plasma",
+-    "name": "Гатлинг Plasma",
+-    "rangeName": "Средняя",
++    "name": "Gatling Plasma",
++    "rangeName": "Medium",
+     "flavour": "An evolution of plasma gun technology, the gatling plasma is a rare, potent, and costly weapon to use. Like smaller weapons of its kind, it inflicts damage through a combination of both physical impact and thermal transfer, and like other gatling weaponry, it inflicts this damage via a rapid-firing collection of rotating barrels that spray huge numbers of shots at the enemy. The relative scarcity of plasma cartridges, or extremely rare plasma cores, and the rate at which this weapon consumes ammunition, means that keeping the weapon supplied for use can be a full-time job.",
+     "stockNames": {
+       "without": "",
+@@ -1022,7 +1022,7 @@
+   {
+     "id": "weapon_gauss_minigun",
+     "name": "Gauss Minigun",
+-    "rangeName": "Дальняя",
++    "rangeName": "Long",
+     "flavour": "The Gauss Minigun is a powerful, automatic ballistic weapon that rapidly fires hypervelocity 2mm rounds that deal devastating damage. Given their scarce ammunition and the sheer rate of fire it possesses—particularly when modified—this is a powerful weapon that demands a wealthy and well-supplied owner. It can even be fitted with a Tesla coil, charging rounds with electricity as they're fired.",
+     "stockNames": {
+       "without": "",
+@@ -1032,8 +1032,8 @@
+   {
+     "id": "weapon_plasma_caster",
+     "name": "Plasma Caster",
+-    "rangeName": "Средняя",
+-    "flavour": "The Tesla cannon is a shoulder-mounted directed Энергооружие using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
++    "rangeName": "Medium",
++    "flavour": "The Tesla cannon is a shoulder-mounted directed energy weapon using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -1042,8 +1042,8 @@
+   {
+     "id": "weapon_tesla_cannon",
+     "name": "Tesla Cannon",
+-    "rangeName": "Дальняя",
+-    "flavour": "The Tesla cannon is a shoulder-mounted directed Энергооружие using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
++    "rangeName": "Long",
++    "flavour": "The Tesla cannon is a shoulder-mounted directed energy weapon using technology based on designs by Nikola Tesla. The weapon entered limited production pre-War, and is a rare sight in the Wastelands, but some branches of the Brotherhood of Steel have sought out the technology and attempted to recreate it for their own needs.",
+     "stockNames": {
+       "without": "",
+       "with": ""
+@@ -1174,4 +1174,4 @@
+     "name": "Fists",
+     "rangeName": "Close"
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/i18n/en-EN/data/loot/stubs.json b/i18n/en-EN/data/loot/stubs.json
+new file mode 100644
+index 0000000..2e52cf8
+--- /dev/null
++++ b/i18n/en-EN/data/loot/stubs.json
+@@ -0,0 +1,150 @@
++[
++  {
++    "id": "item_treasure_map",
++    "name": "Treasure Map of an Old World Survivalist Cache"
++  },
++  {
++    "id": "outcast_stub_1",
++    "name": "Elite Toolkit"
++  },
++  {
++    "id": "outcast_stub_10",
++    "name": "Combat Bracer"
++  },
++  {
++    "id": "outcast_stub_11",
++    "name": "Combat Greave"
++  },
++  {
++    "id": "outcast_stub_12",
++    "name": "Sensor Array"
++  },
++  {
++    "id": "outcast_stub_13",
++    "name": "Small Backpack"
++  },
++  {
++    "id": "outcast_stub_15",
++    "name": "Laser Musket"
++  },
++  {
++    "id": "outcast_stub_17",
++    "name": "Combat Shotgun"
++  },
++  {
++    "id": "outcast_stub_18",
++    "name": "Power Fist"
++  },
++  {
++    "id": "outcast_stub_19",
++    "name": "Sturdy Combat Helmet"
++  },
++  {
++    "id": "outcast_stub_2",
++    "name": "Flashlight"
++  },
++  {
++    "id": "outcast_stub_20",
++    "name": "Pip-Boy"
++  },
++  {
++    "id": "outcast_stub_3",
++    "name": "Copy of \"Fixing Things\" Magazine"
++  },
++  {
++    "id": "outcast_stub_5",
++    "name": "Bobby Pin"
++  },
++  {
++    "id": "outcast_stub_6",
++    "name": "Radio"
++  },
++  {
++    "id": "outcast_stub_7",
++    "name": "Combat Chest Piece"
++  },
++  {
++    "id": "trinkets_stub_1",
++    "name": "Gold Pocket Watch"
++  },
++  {
++    "id": "trinkets_stub_10",
++    "name": "Engraved Lighter"
++  },
++  {
++    "id": "trinkets_stub_11",
++    "name": "Loaded Dice"
++  },
++  {
++    "id": "trinkets_stub_12",
++    "name": "Identification Card"
++  },
++  {
++    "id": "trinkets_stub_13",
++    "name": "Cosmetics Bag"
++  },
++  {
++    "id": "trinkets_stub_14",
++    "name": "Musical Instrument"
++  },
++  {
++    "id": "trinkets_stub_15",
++    "name": "Broken Glasses"
++  },
++  {
++    "id": "trinkets_stub_16",
++    "name": "Junk Necklace"
++  },
++  {
++    "id": "trinkets_stub_17",
++    "name": "Pages of an Unfinished Story"
++  },
++  {
++    "id": "trinkets_stub_18",
++    "name": "Overdue Book"
++  },
++  {
++    "id": "trinkets_stub_19",
++    "name": "Postcard with an Address"
++  },
++  {
++    "id": "trinkets_stub_2",
++    "name": "Glitched Holotape"
++  },
++  {
++    "id": "trinkets_stub_20",
++    "name": "Pre-War Tie"
++  },
++  {
++    "id": "trinkets_stub_3",
++    "name": "Bright Bandana"
++  },
++  {
++    "id": "trinkets_stub_4",
++    "name": "Silver Locket"
++  },
++  {
++    "id": "trinkets_stub_5",
++    "name": "Medal"
++  },
++  {
++    "id": "trinkets_stub_6",
++    "name": "Potted Plant"
++  },
++  {
++    "id": "trinkets_stub_7",
++    "name": "Tickets to a Pre-War Event"
++  },
++  {
++    "id": "trinkets_stub_8",
++    "name": "Wedding Ring"
++  },
++  {
++    "id": "trinkets_stub_9",
++    "name": "Invitation to a Pre-War Party"
++  },
++  {
++    "id": "weapon_chinese_sword",
++    "name": "Sword"
++  }
++]
+diff --git a/i18n/ru-RU/data/loot/stubs.json b/i18n/ru-RU/data/loot/stubs.json
+new file mode 100644
+index 0000000..f3ef81c
+--- /dev/null
++++ b/i18n/ru-RU/data/loot/stubs.json
+@@ -0,0 +1,150 @@
++[
++  {
++    "id": "item_treasure_map",
++    "name": "Карта с тайником выживальщиков старого мира"
++  },
++  {
++    "id": "outcast_stub_1",
++    "name": "Элитный набор инструментов"
++  },
++  {
++    "id": "outcast_stub_10",
++    "name": "Боевой Наруч"
++  },
++  {
++    "id": "outcast_stub_11",
++    "name": "Боевой Понож"
++  },
++  {
++    "id": "outcast_stub_12",
++    "name": "Массив сенсоров"
++  },
++  {
++    "id": "outcast_stub_13",
++    "name": "Рюкзак маленький"
++  },
++  {
++    "id": "outcast_stub_15",
++    "name": "Лазерный Мушкет"
++  },
++  {
++    "id": "outcast_stub_17",
++    "name": "Боевой дробовик"
++  },
++  {
++    "id": "outcast_stub_18",
++    "name": "Силовой кулак"
++  },
++  {
++    "id": "outcast_stub_19",
++    "name": "Прочный Боевой Шлем"
++  },
++  {
++    "id": "outcast_stub_2",
++    "name": "Фонарик"
++  },
++  {
++    "id": "outcast_stub_20",
++    "name": "Пип-Бой"
++  },
++  {
++    "id": "outcast_stub_3",
++    "name": "Копия журнала \"Чиним вещи\""
++  },
++  {
++    "id": "outcast_stub_5",
++    "name": "Заколка"
++  },
++  {
++    "id": "outcast_stub_6",
++    "name": "Радио"
++  },
++  {
++    "id": "outcast_stub_7",
++    "name": "Боевой Нагрудник"
++  },
++  {
++    "id": "trinkets_stub_1",
++    "name": "Золотые карманные часы"
++  },
++  {
++    "id": "trinkets_stub_10",
++    "name": "Зажигалка с гравировкой"
++  },
++  {
++    "id": "trinkets_stub_11",
++    "name": "Шулерские кости"
++  },
++  {
++    "id": "trinkets_stub_12",
++    "name": "Удостоверение личности"
++  },
++  {
++    "id": "trinkets_stub_13",
++    "name": "Косметичка"
++  },
++  {
++    "id": "trinkets_stub_14",
++    "name": "Музыкальный инструмент"
++  },
++  {
++    "id": "trinkets_stub_15",
++    "name": "Разбитые очки"
++  },
++  {
++    "id": "trinkets_stub_16",
++    "name": "Ожерелье из хлама"
++  },
++  {
++    "id": "trinkets_stub_17",
++    "name": "Страницы неоконченной истории"
++  },
++  {
++    "id": "trinkets_stub_18",
++    "name": "Невозвращенная книга"
++  },
++  {
++    "id": "trinkets_stub_19",
++    "name": "Открытка с адресом"
++  },
++  {
++    "id": "trinkets_stub_2",
++    "name": "Заглючивший голодиск"
++  },
++  {
++    "id": "trinkets_stub_20",
++    "name": "Довоенный галстук"
++  },
++  {
++    "id": "trinkets_stub_3",
++    "name": "Яркая бандана"
++  },
++  {
++    "id": "trinkets_stub_4",
++    "name": "Серебряный медальон"
++  },
++  {
++    "id": "trinkets_stub_5",
++    "name": "Медаль"
++  },
++  {
++    "id": "trinkets_stub_6",
++    "name": "Горшечное растение"
++  },
++  {
++    "id": "trinkets_stub_7",
++    "name": "Билеты на довоенное мероприятие"
++  },
++  {
++    "id": "trinkets_stub_8",
++    "name": "Обручальное кольцо"
++  },
++  {
++    "id": "trinkets_stub_9",
++    "name": "Приглашение на довоенную тусовку"
++  },
++  {
++    "id": "weapon_chinese_sword",
++    "name": "Меч"
++  }
++]

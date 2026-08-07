@@ -6,8 +6,11 @@ import chems from '../../../../data/loot/chems.json';
 import outcast from '../../../../data/loot/outcast.json';
 import weaponsMelee from '../../../../data/loot/weapons_melee.json';
 import lootStubs from '../../../../data/loot/_stubs.json';
+import ruLootStubs from '../../../../i18n/ru-RU/data/loot/stubs.json';
+import enLootStubs from '../../../../i18n/en-EN/data/loot/stubs.json';
 import { getWeaponById } from '../../../../db/Database';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+import { getCurrentLocale } from '../../../../i18n/locale';
 
 const lootTables = {
   trinklet: trinkets,
@@ -72,9 +75,11 @@ function buildCatalogIndex() {
         addAll(miscItems, 'misc');
     }
 
-    // Заглушки лута (data/loot/_stubs.json) — предметы, которых ещё нет в основном
-    // каталоге; помечены stub:true и предназначены для замены на реальные данные.
-    addAll(lootStubs);
+    // Loot stubs contain locale-independent item data. Their display names are
+    // resolved by id from the active locale, like the rest of the catalog.
+    const localizedStubNames = getCurrentLocale() === 'en-EN' ? enLootStubs : ruLootStubs;
+    const stubNamesById = new Map(localizedStubNames.map((item) => [item.id, item.name]));
+    addAll(lootStubs.map((item) => ({ ...item, name: stubNamesById.get(item.id) })));
 
     return index;
 }

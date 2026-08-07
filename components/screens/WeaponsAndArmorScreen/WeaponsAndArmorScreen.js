@@ -48,6 +48,8 @@ import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
 import { debugLog } from '../../../src/debug/falloutDebug';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import { isAmmoWeapon } from '../../../domain/weaponDurability';
 
 
 const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
@@ -120,12 +122,13 @@ const RadiationCounter = ({ isEnabled }) => {
   );
 };
 
-const WeaponAmmoCell = ({ ammoId, qualities }) => {
+const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
   const storeItems = useCharacterStore((state) => state.items);
-  const updateItem = useCharacterStore((state) => state.updateItem);
+  const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
+  const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
+  const baseLossPer10Shots = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
 
   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
-
   let ammoPerShot = 1;
   let parsedQ = qualities;
   if (typeof parsedQ === 'string') {
@@ -135,39 +138,27 @@ const WeaponAmmoCell = ({ ammoId, qualities }) => {
     const hungryQ = parsedQ.find(q => q?.qualityId === 'quality_ammo-hungry_x');
     if (hungryQ?.value != null) ammoPerShot = Math.max(1, Number(hungryQ.value) || 1);
   }
-
   const ammoItems = Object.values(storeItems || {}).filter(
-    item => item.itemType === 'ammo' && ammoIds.includes(item.id)
+    item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
   );
   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  const canSpend = totalAmmo >= ammoPerShot;
+  const isBroken = durabilityEnabled && Number(durability) <= 0;
+  const canSpend = totalAmmo >= ammoPerShot && !isBroken;
 
   const handleSpend = () => {
     if (!canSpend) return;
-    let toDeduct = ammoPerShot;
-    for (const item of [...ammoItems]) {
-      if (toDeduct <= 0) break;
-      const qty = item.quantity || 1;
-      const deduct = Math.min(qty, toDeduct);
-      const newQty = qty - deduct;
-      if (newQty <= 0) {
-        const current = { ...useCharacterStore.getState().items };
-        delete current[item.id];
-        useCharacterStore.setState({ items: current });
-      } else {
-        updateItem(item.id, { quantity: newQty });
-      }
-      toDeduct -= deduct;
-    }
+    spendAmmoForWeapon({
+      weaponInstanceId,
+      ammoIds,
+      ammoAmount: ammoPerShot,
+      durabilityEnabled,
+      baseLossPer10Shots,
+    });
   };
 
   return (
     <View style={localStyles.weaponAmmoCellContainer}>
-      <TouchableOpacity
-        style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]}
-        onPress={handleSpend}
-        disabled={!canSpend}
-      >
+      <TouchableOpacity style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]} onPress={handleSpend} disabled={!canSpend}>
         <Text style={localStyles.weaponAmmoBtnText}>−</Text>
       </TouchableOpacity>
       <Text style={localStyles.weaponAmmoCount}>{totalAmmo}</Text>
@@ -288,6 +279,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
     const { hasTrait, attributes, skills, trait } = useCharacter();
+    const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -365,6 +357,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
 
     const rawAmmoId = displayWeapon?.ammoId ?? displayWeapon?.ammo_id ?? '';
     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
+    const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
+    const showDurability = durabilityEnabled && isAmmoWeapon(displayWeapon);
 
     const stats = [
       { label: tWeaponsAndArmorScreen('weapon.fields.success'), value: `${successValue}` },
@@ -374,7 +368,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
       { label: tWeaponsAndArmorScreen('weapon.fields.fireRate'), value: fireRateWithTrait },
       { label: tWeaponsAndArmorScreen('weapon.fields.range'), value: rangeValue },
       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
-      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities }] : []),
+      ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
+      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
       ...(displayWeapon?.withoutMods ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
     ];
   
@@ -393,7 +388,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
             <View key={index} style={[localStyles.weaponStatRow, { borderBottomWidth: 1 }]}>
               <Text style={localStyles.weaponStatLabel}>{stat.label}</Text>
               {stat.type === 'ammo' ? (
-                <WeaponAmmoCell ammoId={stat.ammoId} qualities={stat.qualities} />
+                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} />
               ) : stat.type === 'button' ? (
                 <TouchableOpacity 
                   style={localStyles.weaponModificationButton}

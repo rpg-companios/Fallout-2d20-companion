@@ -183,6 +183,7 @@ const mergeSnapshotWithStoreData = (snapshot) => {
     equipment: preferFilled(legacyData.equipment, snapshot.equipment),
     equippedWeapons: preferFilled(legacyData.equippedWeapons, snapshot.equippedWeapons),
     activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
+    rewardedSkills: legacyData.rewardedSkills,
   };
 };
 

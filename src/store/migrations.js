@@ -221,6 +221,7 @@ export const normalizeForStore = (data = {}) => {
     skills: normalizeSkills(data.skills),
     items: normalizeItems(data.equipment, data.equippedWeapons),
     effects: normalizeEffects(data.activeTimedEffects),
+    rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };
 };
@@ -316,6 +317,7 @@ export const denormalizeForSave = (storeState = {}) => {
     equipment,
     equippedWeapons,
     activeTimedEffects: denormalizeEffects(storeState.effects || {}),
+    rewardedSkills: Array.isArray(storeState.rewardedSkills) ? storeState.rewardedSkills : [],
   };
 };
 
@@ -436,6 +438,17 @@ const MIGRATIONS = [
     const next = { ...state };
     if (Array.isArray(next.equippedWeapons)) {
       next.equippedWeapons = next.equippedWeapons.map(_migrateEquippedEntryV0V1);
+    }
+    return next;
+  },
+  // v1 -> v2: existing saved characters have already received their initial
+  // tagged-skill rewards, so seed their reward journal to prevent duplication.
+  (state) => {
+    const next = { ...state };
+    if (!Array.isArray(next.rewardedSkills)) {
+      next.rewardedSkills = next.skillsSaved
+        ? [...new Set([...(next.selectedSkills || []), ...(next.extraTaggedSkills || [])])]
+        : [];
     }
     return next;
   },
