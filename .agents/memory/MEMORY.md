@@ -1,3 +1,4 @@
 - [Zustand selector infinite loops](zustand-selector-fix.md) — never pass inline arrow functions or `useShallow(inlineArrow)` to Zustand hooks; subscribe to raw state slice then derive with `useMemo` instead.
 - [Expo Web platform stubs](expo-web-stubs.md) — SQLiteAdapter and WASM-dependent modules must be stubbed via `.web.js` platform files; metro.config.js needs `unstable_conditionNames` to force CJS Zustand.
 - [Kit inventory item ID resolution](kit-item-id-resolution.md) — addNewItem and normalizeItems must accept itemId/armorId/clothingId fallbacks; kit JSON armor IDs must match catalog exactly.
+- [React Native drag drop measurements](react-native-drag-drop-measurements.md) — conditionally rendered drop zones must be measured after mount and awaited again on release; refs can be null at drag start.

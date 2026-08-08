@@ -201,20 +201,71 @@ export default function HomeScreen({ navigation }) {
 
   const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
     if (!characterId) return;
-    await db.moveCharacterToFolder(characterId, folderId);
-    setMovingCharacterId(null);
-    setDrag(null);
-    loadList();
+    try {
+      await db.moveCharacterToFolder(characterId, folderId);
+      setMovingCharacterId(null);
+      setDrag(null);
+      dropBounds.current = {};
+      await loadList();
+    } catch (error) {
+      // Keep the drag state visible if persistence fails so the user can retry
+      // instead of losing the intended move silently.
+    }
   };
 
-  const handleDragStart = (event, character) => {
+  const measureDropTargets = useCallback(() => {
+    const measurements = Object.entries(folderRefs.current)
+      .map(([id, ref]) => new Promise((resolve) => {
+        if (!ref?.measureInWindow) {
+          resolve();
+          return;
+        }
+        ref.measureInWindow((x, y, width, height) => {
+          dropBounds.current[id] = { x, y, width, height };
+          resolve();
+        });
+      }));
+
+    measurements.push(new Promise((resolve) => {
+      if (!rootDropRef.current?.measureInWindow) {
+        resolve();
+        return;
+      }
+      rootDropRef.current.measureInWindow((x, y, width, height) => {
+        dropBounds.current.root = { x, y, width, height };
+        resolve();
+      });
+    }));
+
+    return Promise.all(measurements);
+  }, []);
+
+  // The root drop zone is conditionally rendered after movingCharacterId is
+  // set. Measuring it inside handleDragStart happens before that render, so
+  // rootDropRef is null. Measure again after the zone has mounted.
+  useEffect(() => {
+    if (!movingCharacterId) {
+      delete dropBounds.current.root;
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      measureDropTargets();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [movingCharacterId, activeFolder, measureDropTargets]);
+
+  const handleDragStart = async (event, character) => {
+    dropBounds.current = {};
     setMovingCharacterId(character.id);
     setDrag({ character, x: event.pageX, y: event.pageY });
-    Object.entries(folderRefs.current).forEach(([id, ref]) => ref?.measureInWindow?.((x, y, width, height) => { dropBounds.current[id] = { x, y, width, height }; }));
-    rootDropRef.current?.measureInWindow?.((x, y, width, height) => { dropBounds.current.root = { x, y, width, height }; });
+    await measureDropTargets();
   };
   const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
   const handleDragEnd = async (event) => {
+    // A final measurement covers the case where the pointer is released
+    // immediately after the conditionally rendered root zone appears.
+    await measureDropTargets();
     const target = Object.entries(dropBounds.current).find(([id, b]) => id !== 'root' && b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height);
     if (target) await handleMoveToFolder(target[0]);
     else {
