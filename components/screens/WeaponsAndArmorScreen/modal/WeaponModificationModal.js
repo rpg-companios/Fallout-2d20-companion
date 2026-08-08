@@ -42,6 +42,7 @@ function normalizeModRow(row) {
     damageType: row.damageType ?? row.damage_type,
     qualityChanges: row.qualityChanges,
     effectChanges: row.effectChanges,
+    damageTypeOverride: row.damageTypeOverride,
   };
 }
 
@@ -110,12 +111,20 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   let weight = weightBase;
   let cost = costBase;
   let rangeShift = 0;
-  let damageType = baseWeapon.damage_type ?? baseWeapon.damageType;
-  // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
-  const qualities = new Map(); // qualityId -> entry
-  const effects = new Map();   // effectId -> entry
-  const loadBase = (field, map, idKey) => {
-    let arr = baseWeapon[field];
+  // Нормализуем базовый damageType в массив
+  let damage_type = baseWeapon.damage_type ?? baseWeapon.damageType;
+  if (typeof damage_type === "string") {
+    try {
+      damage_type = JSON.parse(damage_type);
+    } catch {
+      damage_type = [damage_type];
+    }
+  }
+  if (!Array.isArray(damage_type)) {
+    damage_type = damage_type ? [damage_type] : ["physical"];
+  } else {
+    damage_type = [...damage_type];
+  }
     if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { return; } }
     if (!Array.isArray(arr)) return;
     arr.forEach((e) => {
@@ -163,6 +172,23 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
       }
     }
 
+    // Обработка damageTypeOverride (изменение типа урона)
+    if (mod.damageTypeOverride) {
+      const { op, value } = mod.damageTypeOverride;
+      if (op === 'set') {
+        // Замена: полностью перезаписываем массив
+        damage_type = Array.isArray(value) ? [...value] : [value];
+      } else if (op === 'add') {
+        // Добавление: добавляем тип, если его нет
+        const typesToAdd = Array.isArray(value) ? value : [value];
+        for (const t of typesToAdd) {
+          if (!damage_type.includes(t)) {
+            damage_type.push(t);
+          }
+        }
+      }
+    }
+
     // Вес/цена модов
     weight += toNumber(mod.weight);
     cost += toNumber(mod.cost);
@@ -182,7 +208,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   debugLog('weapon.mod.compute', {
     weaponId: baseWeapon?.id ?? baseWeapon?.weaponId,
     baseName,
-    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges })),
+    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges, damageTypeOverride: m.damageTypeOverride })),
     baseDamage: damageBase,
     resultDamage: damage,
     baseFireRate: fireRateBase,
@@ -193,6 +219,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     resultCost: cost,
     rangeShift,
     resultRange: range_name,
+    baseDamageType: baseWeapon.damage_type ?? baseWeapon.damageType,
+    resultDamageType: damage_type,
   });
 
   return {
@@ -204,6 +232,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     damageType,
     damage_type: damageType,
     range_name,
+    damage_type,
+    damageType: damage_type, // дублируем для совместимости
     qualities: qualitiesValue,
     effects: effectsValue,
     weight: String(weight),

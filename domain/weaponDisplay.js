@@ -114,14 +114,42 @@ export function resolveWeaponEffects(effects) {
 }
 
 /**
- * Resolves a weapon's damageType key to a localized string.
+ * Resolves a weapon's damageType to a localized string.
  *
- * @param {string} damageType  e.g. "physical", "energy"
+ * Supports:
+ *  - Array of strings: ["energy", "physical"] → "Энергетический + Физический"
+ *  - JSON string of array: '["energy","physical"]' → "Энергетический + Физический"
+ *  - Plain string: "physical" → "Физический"
+ *  - null / undefined → ''
+ *
+ * @param {any} damageType  e.g. ["physical", "energy"], "physical", '["energy"]'
  * @returns {string}
  */
 export function resolveWeaponDamageType(damageType) {
   if (!damageType) return '';
+
   const locale = getCurrentLocale();
   const labels = DAMAGE_TYPE_LABELS[locale] || DAMAGE_TYPE_LABELS['ru-RU'];
-  return labels[damageType] || damageType;
+
+  // Parse JSON string if needed
+  let arr = damageType;
+  if (typeof arr === 'string') {
+    try {
+      arr = JSON.parse(arr);
+    } catch {
+      // Legacy plain string — return as-is
+      return labels[arr] || arr;
+    }
+  }
+
+  // Support array of damage types
+  if (Array.isArray(arr)) {
+    if (arr.length === 0) return '';
+    return arr
+      .map(dt => labels[dt] || dt)
+      .join(' + ');
+  }
+
+  // Single string value
+  return labels[arr] || arr;
 }

@@ -3,6 +3,7 @@
 
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
 import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+import { catalogGetWeaponModById } from '../../db/catalogSource';
 
 /**
  * Преобразует атрибуты из старого формата [{name, value}] в словарь
@@ -475,6 +476,117 @@ const MIGRATIONS = [
         : state.equipment,
       equippedWeapons: Array.isArray(state.equippedWeapons)
         ? state.equippedWeapons.map(normalizeWeapon)
+        : state.equippedWeapons,
+    };
+  },
+
+  // v3 -> v4: damageType из строки в массив (поддержка комбинированного урона).
+  // Миграция преобразует все damageType (строка) в массивы в предметах.
+  // Также пересчитывает моды для оружия, чтобы применить новые damageTypeOverride.
+  // Идемпотентна: если уже массив — не трогает.
+  (state) => {
+    const migrateDamageType = (item) => {
+      if (!item || typeof item !== 'object') return item;
+
+      // Мигрируем damageType и damage_type
+      const migrateField = (value) => {
+        if (!value) return value;
+
+        // Если уже массив — не трогаем
+        if (Array.isArray(value)) return value;
+
+        // Если JSON-строка массива — парсим
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Это обычная строка, оборачиваем в массив
+            return [value];
+          }
+        }
+
+        // Обёртываем строку в массив
+        return [value];
+      };
+
+      const out = { ...item };
+
+      if (out.damageType !== undefined) {
+        out.damageType = migrateField(out.damageType);
+      }
+      if (out.damage_type !== undefined) {
+        out.damage_type = migrateField(out.damage_type);
+      }
+
+      return out;
+    };
+
+    // Пересчитываем моды для оружия (применяем новые damageTypeOverride из каталога)
+    const recalculateWeaponMods = (item) => {
+      if (!item || item.itemType !== 'weapon' || !item.appliedMods) return item;
+
+      try {
+        let updatedItem = { ...item };
+        const appliedMods = item.appliedMods || {};
+
+        Object.entries(appliedMods).forEach(([slot, modId]) => {
+          const mod = catalogGetWeaponModById(modId);
+          if (!mod || !mod.damageTypeOverride) return;
+
+          const { op, value } = mod.damageTypeOverride;
+
+          // Получаем текущий damageType
+          let currentType = updatedItem.damageType;
+          if (typeof currentType === 'string') {
+            try {
+              currentType = JSON.parse(currentType);
+            } catch {
+              currentType = [currentType];
+            }
+          }
+          if (!Array.isArray(currentType)) {
+            currentType = currentType ? [currentType] : ['physical'];
+          }
+
+          if (op === 'set') {
+            updatedItem.damageType = Array.isArray(value) ? value : [value];
+          } else if (op === 'add') {
+            const typesToAdd = Array.isArray(value) ? value : [value];
+            for (const t of typesToAdd) {
+              if (!currentType.includes(t)) {
+                currentType.push(t);
+              }
+            }
+            updatedItem.damageType = currentType;
+          }
+        });
+
+        return updatedItem;
+      } catch (error) {
+        // Если пересчёт модов не удался (например, каталог не загружен),
+        // возвращаем предмет с мигрированным damageType, но без пересчёта модов.
+        // Моды пересчитаются при следующем открытии модалки модов.
+        console.warn('Migration v4: failed to recalculate weapon mods', error);
+        return item;
+      }
+    };
+
+    return {
+      ...state,
+      items: state.items
+        ? Object.fromEntries(
+            Object.entries(state.items).map(([id, item]) => {
+              const migrated = migrateDamageType(item);
+              return [id, recalculateWeaponMods(migrated)];
+            })
+          )
+        : state.items,
+      equipment: state.equipment
+        ? { ...state.equipment, items: (state.equipment.items || []).map(item => recalculateWeaponMods(migrateDamageType(item))) }
+        : state.equipment,
+      equippedWeapons: Array.isArray(state.equippedWeapons)
+        ? state.equippedWeapons.map(item => recalculateWeaponMods(migrateDamageType(item)))
         : state.equippedWeapons,
     };
   },

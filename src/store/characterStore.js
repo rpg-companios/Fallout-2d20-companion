@@ -178,10 +178,36 @@ const applyModModifiers = (item, appliedMods = {}) => {
       });
     }
 
-    // Apply damageType modifier (if mod changes damage type). damageType is a plain
-    // string; just overwrite it.
-    if (mod.damageType) {
-      updatedItem.damageType = mod.damageType;
+    // Apply damageTypeOverride (if mod changes damage type).
+    if (mod.damageTypeOverride) {
+      const { op, value } = mod.damageTypeOverride;
+
+      // Получаем текущий damageType (поддержка массива и строки)
+      let currentType = updatedItem.damageType;
+      if (typeof currentType === 'string') {
+        try {
+          currentType = JSON.parse(currentType);
+        } catch {
+          currentType = [currentType];
+        }
+      }
+      if (!Array.isArray(currentType)) {
+        currentType = currentType ? [currentType] : ['physical'];
+      }
+
+      if (op === 'set') {
+        // Замена: полностью перезаписываем массив
+        updatedItem.damageType = Array.isArray(value) ? value : [value];
+      } else if (op === 'add') {
+        // Добавление: добавляем тип, если его нет
+        const typesToAdd = Array.isArray(value) ? value : [value];
+        for (const t of typesToAdd) {
+          if (!currentType.includes(t)) {
+            currentType.push(t);
+          }
+        }
+        updatedItem.damageType = currentType;
+      }
     }
   });
   

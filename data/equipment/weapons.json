@@ -529,7 +529,10 @@
     "mainAttr": "PER",
     "mainSkill": "ENERGY_WEAPONS",
     "hasStockVariant": true,
-    "damageType": "energy",
+    "damageType": [
+      "energy",
+      "physical"
+    ],
     "qualities": [
       {
         "qualityId": "quality_close_quarters"
@@ -1532,7 +1535,10 @@
     "mainAttr": "PER",
     "mainSkill": "EXPLOSIVES",
     "hasStockVariant": false,
-    "damageType": "energy",
+    "damageType": [
+      "energy",
+      "physical"
+    ],
     "qualities": [
       {
         "qualityId": "quality_thrown"
@@ -1681,7 +1687,10 @@
     "mainAttr": "PER",
     "mainSkill": "EXPLOSIVES",
     "hasStockVariant": false,
-    "damageType": "energy",
+    "damageType": [
+      "energy",
+      "physical"
+    ],
     "qualities": [
       {
         "qualityId": "quality_mine"
@@ -2653,7 +2662,10 @@
     "mainAttr": "STR",
     "mainSkill": "BIG_GUNS",
     "hasStockVariant": false,
-    "damageType": "energy",
+    "damageType": [
+      "energy",
+      "physical"
+    ],
     "qualities": [
       {
         "qualityId": "quality_two-handed"
@@ -2719,7 +2731,10 @@
     "mainAttr": "STR",
     "mainSkill": "BIG_GUNS",
     "hasStockVariant": false,
-    "damageType": "energy",
+    "damageType": [
+      "energy",
+      "physical"
+    ],
     "qualities": [
       {
         "qualityId": "quality_two-handed"

@@ -36,28 +36,36 @@ const ROBOT_WEAPON_BASE_MAP = {
 
 // ─── row builders (identical shape to seed.js INSERTs) ──────────────────────
 
-const buildWeaponRow = (w) => ({
-  id: w.id,
-  name: w.name || '',
-  weapon_type: w.weaponType || '',
-  damage: safeNum(w.damage),
-  damage_effects: safeStr(w.damageEffects),
-  damage_type: safeStr(w.damageType),
-  fire_rate: safeStr(w.fireRate),
-  qualities: Array.isArray(w.qualities) ? JSON.stringify(w.qualities) : safeStr(w.qualities),
-  effects: Array.isArray(w.effects) ? JSON.stringify(w.effects) : safeStr(w.effects),
-  weight: safeStr(w.weight),
-  cost: safeStr(w.cost),
-  rarity: safeStr(w.rarity),
-  ammo_id: safeStr(w.ammoId),
-  range: safeStr(w.range),
-  range_name: safeStr(w.rangeName),
-  main_attr: safeStr(w.mainAttr),
-  main_skill: safeStr(w.mainSkill),
-  rules: safeStr(w.rules),
-  flavour: safeStr(w.flavour),
-  mods_config: w.modsConfig != null ? safeStr(w.modsConfig) : null,
-});
+const buildWeaponRow = (w) => {
+  // Поддержка массива и строки для damageType (обратная совместимость)
+  const damageType = Array.isArray(w.damageType)
+    ? JSON.stringify(w.damageType)
+    : safeStr(w.damageType);
+
+  return {
+    id: w.id,
+    name: w.name || '',
+    weapon_type: w.weaponType || '',
+    damage: safeNum(w.damage),
+    damage_effects: safeStr(w.damageEffects),
+    damage_type: damageType,
+    damageType: damageType, // camelCase для совместимости с UI
+    fire_rate: safeStr(w.fireRate),
+    qualities: Array.isArray(w.qualities) ? JSON.stringify(w.qualities) : safeStr(w.qualities),
+    effects: Array.isArray(w.effects) ? JSON.stringify(w.effects) : safeStr(w.effects),
+    weight: safeStr(w.weight),
+    cost: safeStr(w.cost),
+    rarity: safeStr(w.rarity),
+    ammo_id: safeStr(w.ammoId),
+    range: safeStr(w.range),
+    range_name: safeStr(w.rangeName),
+    main_attr: safeStr(w.mainAttr),
+    main_skill: safeStr(w.mainSkill),
+    rules: safeStr(w.rules),
+    flavour: safeStr(w.flavour),
+    mods_config: w.modsConfig != null ? safeStr(w.modsConfig) : null,
+  };
+};
 
 const buildWeaponModRow = (m) => {
   const baseIds = Array.isArray(m.applies_to_ids) ? m.applies_to_ids : [];
@@ -86,6 +94,7 @@ const buildWeaponModRow = (m) => {
     rangeModifier: m.rangeModifier || null,
     qualityChanges: Array.isArray(m.qualityChanges) ? m.qualityChanges : null,
     effectChanges: Array.isArray(m.effectChanges) ? m.effectChanges : null,
+    damageTypeOverride: m.damageTypeOverride || null,
     damageType: safeStr(m.damageType),
     ammoOverride: safeStr(m.ammoOverride),
     ammoPerShotDelta: m.ammoPerShotDelta ?? null,
