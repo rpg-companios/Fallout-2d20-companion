@@ -1,0 +1,700 @@
+diff --git a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index c9eb998..138e864 100644
+--- a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -41,6 +41,7 @@ function normalizeModRow(row) {
+     rangeModifier: row.rangeModifier,
+     qualityChanges: row.qualityChanges,
+     effectChanges: row.effectChanges,
++    damageTypeOverride: row.damageTypeOverride,
+   };
+ }
+ 
+@@ -109,6 +110,22 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+   let weight = weightBase;
+   let cost = costBase;
+   let rangeShift = 0;
++
++  // Нормализуем базовый damageType в массив
++  let damage_type = baseWeapon.damage_type ?? baseWeapon.damageType;
++  if (typeof damage_type === 'string') {
++    try {
++      damage_type = JSON.parse(damage_type);
++    } catch {
++      damage_type = [damage_type];
++    }
++  }
++  if (!Array.isArray(damage_type)) {
++    damage_type = damage_type ? [damage_type] : ['physical'];
++  } else {
++    damage_type = [...damage_type]; // копируем, чтобы не мутировать оригинал
++  }
++
+   // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
+   const qualities = new Map(); // qualityId -> entry
+   const effects = new Map();   // effectId -> entry
+@@ -157,6 +174,23 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+       }
+     }
+ 
++    // Обработка damageTypeOverride (изменение типа урона)
++    if (mod.damageTypeOverride) {
++      const { op, value } = mod.damageTypeOverride;
++      if (op === 'set') {
++        // Замена: полностью перезаписываем массив
++        damage_type = Array.isArray(value) ? [...value] : [value];
++      } else if (op === 'add') {
++        // Добавление: добавляем тип, если его нет
++        const typesToAdd = Array.isArray(value) ? value : [value];
++        for (const t of typesToAdd) {
++          if (!damage_type.includes(t)) {
++            damage_type.push(t);
++          }
++        }
++      }
++    }
++
+     // Вес/цена модов
+     weight += toNumber(mod.weight);
+     cost += toNumber(mod.cost);
+@@ -176,7 +210,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+   debugLog('weapon.mod.compute', {
+     weaponId: baseWeapon?.id ?? baseWeapon?.weaponId,
+     baseName,
+-    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges })),
++    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges, damageTypeOverride: m.damageTypeOverride })),
+     baseDamage: damageBase,
+     resultDamage: damage,
+     baseFireRate: fireRateBase,
+@@ -187,6 +221,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+     resultCost: cost,
+     rangeShift,
+     resultRange: range_name,
++    baseDamageType: baseWeapon.damage_type ?? baseWeapon.damageType,
++    resultDamageType: damage_type,
+   });
+ 
+   return {
+@@ -196,6 +232,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+     damage,
+     fire_rate,
+     range_name,
++    damage_type,
++    damageType: damage_type, // дублируем для совместимости
+     qualities: qualitiesValue,
+     effects: effectsValue,
+     weight: String(weight),
+diff --git a/data/equipment/weapon_mods.json b/data/equipment/weapon_mods.json
+index 677acc8..2692982 100644
+--- a/data/equipment/weapon_mods.json
++++ b/data/equipment/weapon_mods.json
+@@ -2176,7 +2176,13 @@
+         "op": "gain",
+         "id": "effect_radioactive"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -2612,7 +2618,11 @@
+         "op": "gain",
+         "id": "effect_vicious"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "add",
++      "value": "energy"
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -2946,7 +2956,13 @@
+       "value": 1
+     },
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -2973,7 +2989,13 @@
+         "op": "gain",
+         "id": "effect_persistent"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -3000,7 +3022,13 @@
+         "op": "gain",
+         "id": "effect_stun"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -3684,7 +3712,13 @@
+       "value": 2
+     },
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -3711,7 +3745,13 @@
+         "op": "gain",
+         "id": "effect_stun"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -3783,7 +3823,13 @@
+       "value": 1
+     },
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -3810,7 +3856,13 @@
+         "op": "gain",
+         "id": "effect_stun"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -4146,7 +4198,13 @@
+       "value": 2
+     },
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "damageTypeOverride": {
++      "op": "set",
++      "value": [
++        "energy"
++      ]
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -4236,7 +4294,11 @@
+         "op": "gain",
+         "id": "effect_vicious"
+       }
+-    ]
++    ],
++    "damageTypeOverride": {
++      "op": "add",
++      "value": "energy"
++    }
+   },
+   {
+     "modType": "weapon",
+@@ -5336,4 +5398,4 @@
+     "effectChanges": [],
+     "qualityChanges": []
+   }
+-]
++]
+\ No newline at end of file
+diff --git a/data/equipment/weapons.json b/data/equipment/weapons.json
+index 9e32106..dbfc642 100644
+--- a/data/equipment/weapons.json
++++ b/data/equipment/weapons.json
+@@ -529,7 +529,10 @@
+     "mainAttr": "PER",
+     "mainSkill": "ENERGY_WEAPONS",
+     "hasStockVariant": true,
+-    "damageType": "energy",
++    "damageType": [
++      "energy",
++      "physical"
++    ],
+     "qualities": [
+       {
+         "qualityId": "quality_close_quarters"
+@@ -1532,7 +1535,10 @@
+     "mainAttr": "PER",
+     "mainSkill": "EXPLOSIVES",
+     "hasStockVariant": false,
+-    "damageType": "energy",
++    "damageType": [
++      "energy",
++      "physical"
++    ],
+     "qualities": [
+       {
+         "qualityId": "quality_thrown"
+@@ -1681,7 +1687,10 @@
+     "mainAttr": "PER",
+     "mainSkill": "EXPLOSIVES",
+     "hasStockVariant": false,
+-    "damageType": "energy",
++    "damageType": [
++      "energy",
++      "physical"
++    ],
+     "qualities": [
+       {
+         "qualityId": "quality_mine"
+@@ -2653,7 +2662,10 @@
+     "mainAttr": "STR",
+     "mainSkill": "BIG_GUNS",
+     "hasStockVariant": false,
+-    "damageType": "energy",
++    "damageType": [
++      "energy",
++      "physical"
++    ],
+     "qualities": [
+       {
+         "qualityId": "quality_two-handed"
+@@ -2719,7 +2731,10 @@
+     "mainAttr": "STR",
+     "mainSkill": "BIG_GUNS",
+     "hasStockVariant": false,
+-    "damageType": "energy",
++    "damageType": [
++      "energy",
++      "physical"
++    ],
+     "qualities": [
+       {
+         "qualityId": "quality_two-handed"
+@@ -3228,4 +3243,4 @@
+     "withoutMods": true,
+     "effects": []
+   }
+-]
++]
+\ No newline at end of file
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index 3dcfaeb..bd64522 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -36,28 +36,36 @@ const ROBOT_WEAPON_BASE_MAP = {
+ 
+ // ─── row builders (identical shape to seed.js INSERTs) ──────────────────────
+ 
+-const buildWeaponRow = (w) => ({
+-  id: w.id,
+-  name: w.name || '',
+-  weapon_type: w.weaponType || '',
+-  damage: safeNum(w.damage),
+-  damage_effects: safeStr(w.damageEffects),
+-  damage_type: safeStr(w.damageType),
+-  fire_rate: safeStr(w.fireRate),
+-  qualities: Array.isArray(w.qualities) ? JSON.stringify(w.qualities) : safeStr(w.qualities),
+-  effects: Array.isArray(w.effects) ? JSON.stringify(w.effects) : safeStr(w.effects),
+-  weight: safeStr(w.weight),
+-  cost: safeStr(w.cost),
+-  rarity: safeStr(w.rarity),
+-  ammo_id: safeStr(w.ammoId),
+-  range: safeStr(w.range),
+-  range_name: safeStr(w.rangeName),
+-  main_attr: safeStr(w.mainAttr),
+-  main_skill: safeStr(w.mainSkill),
+-  rules: safeStr(w.rules),
+-  flavour: safeStr(w.flavour),
+-  mods_config: w.modsConfig != null ? safeStr(w.modsConfig) : null,
+-});
++const buildWeaponRow = (w) => {
++  // Поддержка массива и строки для damageType (обратная совместимость)
++  const damageType = Array.isArray(w.damageType)
++    ? JSON.stringify(w.damageType)
++    : safeStr(w.damageType);
++
++  return {
++    id: w.id,
++    name: w.name || '',
++    weapon_type: w.weaponType || '',
++    damage: safeNum(w.damage),
++    damage_effects: safeStr(w.damageEffects),
++    damage_type: damageType,
++    damageType: damageType, // camelCase для совместимости с UI
++    fire_rate: safeStr(w.fireRate),
++    qualities: Array.isArray(w.qualities) ? JSON.stringify(w.qualities) : safeStr(w.qualities),
++    effects: Array.isArray(w.effects) ? JSON.stringify(w.effects) : safeStr(w.effects),
++    weight: safeStr(w.weight),
++    cost: safeStr(w.cost),
++    rarity: safeStr(w.rarity),
++    ammo_id: safeStr(w.ammoId),
++    range: safeStr(w.range),
++    range_name: safeStr(w.rangeName),
++    main_attr: safeStr(w.mainAttr),
++    main_skill: safeStr(w.mainSkill),
++    rules: safeStr(w.rules),
++    flavour: safeStr(w.flavour),
++    mods_config: w.modsConfig != null ? safeStr(w.modsConfig) : null,
++  };
++};
+ 
+ const buildWeaponModRow = (m) => {
+   const baseIds = Array.isArray(m.applies_to_ids) ? m.applies_to_ids : [];
+@@ -86,6 +94,7 @@ const buildWeaponModRow = (m) => {
+     rangeModifier: m.rangeModifier || null,
+     qualityChanges: Array.isArray(m.qualityChanges) ? m.qualityChanges : null,
+     effectChanges: Array.isArray(m.effectChanges) ? m.effectChanges : null,
++    damageTypeOverride: m.damageTypeOverride || null,
+     damageType: safeStr(m.damageType),
+     ammoOverride: safeStr(m.ammoOverride),
+     ammoPerShotDelta: m.ammoPerShotDelta ?? null,
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index 8862642..cc9461a 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -114,14 +114,42 @@ export function resolveWeaponEffects(effects) {
+ }
+ 
+ /**
+- * Resolves a weapon's damageType key to a localized string.
++ * Resolves a weapon's damageType to a localized string.
+  *
+- * @param {string} damageType  e.g. "physical", "energy"
++ * Supports:
++ *  - Array of strings: ["energy", "physical"] → "Энергетический + Физический"
++ *  - JSON string of array: '["energy","physical"]' → "Энергетический + Физический"
++ *  - Plain string: "physical" → "Физический"
++ *  - null / undefined → ''
++ *
++ * @param {any} damageType  e.g. ["physical", "energy"], "physical", '["energy"]'
+  * @returns {string}
+  */
+ export function resolveWeaponDamageType(damageType) {
+   if (!damageType) return '';
++
+   const locale = getCurrentLocale();
+   const labels = DAMAGE_TYPE_LABELS[locale] || DAMAGE_TYPE_LABELS['ru-RU'];
+-  return labels[damageType] || damageType;
++
++  // Parse JSON string if needed
++  let arr = damageType;
++  if (typeof arr === 'string') {
++    try {
++      arr = JSON.parse(arr);
++    } catch {
++      // Legacy plain string — return as-is
++      return labels[arr] || arr;
++    }
++  }
++
++  // Support array of damage types
++  if (Array.isArray(arr)) {
++    if (arr.length === 0) return '';
++    return arr
++      .map(dt => labels[dt] || dt)
++      .join(' + ');
++  }
++
++  // Single string value
++  return labels[arr] || arr;
+ }
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index c5c83c7..5cee5fa 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -178,10 +178,36 @@ const applyModModifiers = (item, appliedMods = {}) => {
+       });
+     }
+ 
+-    // Apply damageType modifier (if mod changes damage type). damageType is a plain
+-    // string; just overwrite it.
+-    if (mod.damageType) {
+-      updatedItem.damageType = mod.damageType;
++    // Apply damageTypeOverride (if mod changes damage type).
++    if (mod.damageTypeOverride) {
++      const { op, value } = mod.damageTypeOverride;
++
++      // Получаем текущий damageType (поддержка массива и строки)
++      let currentType = updatedItem.damageType;
++      if (typeof currentType === 'string') {
++        try {
++          currentType = JSON.parse(currentType);
++        } catch {
++          currentType = [currentType];
++        }
++      }
++      if (!Array.isArray(currentType)) {
++        currentType = currentType ? [currentType] : ['physical'];
++      }
++
++      if (op === 'set') {
++        // Замена: полностью перезаписываем массив
++        updatedItem.damageType = Array.isArray(value) ? value : [value];
++      } else if (op === 'add') {
++        // Добавление: добавляем тип, если его нет
++        const typesToAdd = Array.isArray(value) ? value : [value];
++        for (const t of typesToAdd) {
++          if (!currentType.includes(t)) {
++            currentType.push(t);
++          }
++        }
++        updatedItem.damageType = currentType;
++      }
+     }
+   });
+   
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 7f341cc..0863045 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -3,6 +3,7 @@
+ 
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+ import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
++import { catalogGetWeaponModById } from '../../db/catalogSource';
+ 
+ /**
+  * Преобразует атрибуты из старого формата [{name, value}] в словарь
+@@ -479,4 +480,115 @@ const MIGRATIONS = [
+     };
+   },
+ 
++  // v3 -> v4: damageType из строки в массив (поддержка комбинированного урона).
++  // Миграция преобразует все damageType (строка) в массивы в предметах.
++  // Также пересчитывает моды для оружия, чтобы применить новые damageTypeOverride.
++  // Идемпотентна: если уже массив — не трогает.
++  (state) => {
++    const migrateDamageType = (item) => {
++      if (!item || typeof item !== 'object') return item;
++
++      // Мигрируем damageType и damage_type
++      const migrateField = (value) => {
++        if (!value) return value;
++
++        // Если уже массив — не трогаем
++        if (Array.isArray(value)) return value;
++
++        // Если JSON-строка массива — парсим
++        if (typeof value === 'string') {
++          try {
++            const parsed = JSON.parse(value);
++            if (Array.isArray(parsed)) return parsed;
++          } catch {
++            // Это обычная строка, оборачиваем в массив
++            return [value];
++          }
++        }
++
++        // Обёртываем строку в массив
++        return [value];
++      };
++
++      const out = { ...item };
++
++      if (out.damageType !== undefined) {
++        out.damageType = migrateField(out.damageType);
++      }
++      if (out.damage_type !== undefined) {
++        out.damage_type = migrateField(out.damage_type);
++      }
++
++      return out;
++    };
++
++    // Пересчитываем моды для оружия (применяем новые damageTypeOverride из каталога)
++    const recalculateWeaponMods = (item) => {
++      if (!item || item.itemType !== 'weapon' || !item.appliedMods) return item;
++
++      try {
++        let updatedItem = { ...item };
++        const appliedMods = item.appliedMods || {};
++
++        Object.entries(appliedMods).forEach(([slot, modId]) => {
++          const mod = catalogGetWeaponModById(modId);
++          if (!mod || !mod.damageTypeOverride) return;
++
++          const { op, value } = mod.damageTypeOverride;
++
++          // Получаем текущий damageType
++          let currentType = updatedItem.damageType;
++          if (typeof currentType === 'string') {
++            try {
++              currentType = JSON.parse(currentType);
++            } catch {
++              currentType = [currentType];
++            }
++          }
++          if (!Array.isArray(currentType)) {
++            currentType = currentType ? [currentType] : ['physical'];
++          }
++
++          if (op === 'set') {
++            updatedItem.damageType = Array.isArray(value) ? value : [value];
++          } else if (op === 'add') {
++            const typesToAdd = Array.isArray(value) ? value : [value];
++            for (const t of typesToAdd) {
++              if (!currentType.includes(t)) {
++                currentType.push(t);
++              }
++            }
++            updatedItem.damageType = currentType;
++          }
++        });
++
++        return updatedItem;
++      } catch (error) {
++        // Если пересчёт модов не удался (например, каталог не загружен),
++        // возвращаем предмет с мигрированным damageType, но без пересчёта модов.
++        // Моды пересчитаются при следующем открытии модалки модов.
++        console.warn('Migration v4: failed to recalculate weapon mods', error);
++        return item;
++      }
++    };
++
++    return {
++      ...state,
++      items: state.items
++        ? Object.fromEntries(
++            Object.entries(state.items).map(([id, item]) => {
++              const migrated = migrateDamageType(item);
++              return [id, recalculateWeaponMods(migrated)];
++            })
++          )
++        : state.items,
++      equipment: state.equipment
++        ? { ...state.equipment, items: (state.equipment.items || []).map(item => recalculateWeaponMods(migrateDamageType(item))) }
++        : state.equipment,
++      equippedWeapons: Array.isArray(state.equippedWeapons)
++        ? state.equippedWeapons.map(item => recalculateWeaponMods(migrateDamageType(item)))
++        : state.equippedWeapons,
++    };
++  },
++
+ ];
+\ No newline at end of file
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 5e54527..0e511d4 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -13,7 +13,8 @@
+ //       (см. MIGRATIONS[0] в migrations.js).
+ // v2 — журнал уже выданных наград за отмеченные навыки.
+ // v3 — normalize mutually exclusive weapon qualities in legacy saves.
+-export const CURRENT_SCHEMA_VERSION = 3;
++// v4 — damageType из строки в массив (поддержка комбинированного урона).
++export const CURRENT_SCHEMA_VERSION = 4;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index 2f67399..cca02a1 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -85,7 +85,19 @@ export const getEquippedArmor = (state) => {
+ export const weaponModPatchToStore = (modifiedWeapon) => {
+   const rangeName = modifiedWeapon.range_name ?? modifiedWeapon.rangeName;
+   const damageEffects = modifiedWeapon.damage_effects ?? modifiedWeapon.damageEffects;
+-  const damageType = modifiedWeapon.damage_type ?? modifiedWeapon.damageType;
++
++  // Нормализуем damageType в массив
++  let damageType = modifiedWeapon.damage_type ?? modifiedWeapon.damageType;
++  if (typeof damageType === 'string') {
++    try {
++      damageType = JSON.parse(damageType);
++    } catch {
++      damageType = [damageType];
++    }
++  }
++  if (!Array.isArray(damageType)) {
++    damageType = damageType ? [damageType] : ['physical'];
++  }
+ 
+   return {
+     ...modifiedWeapon,
+@@ -98,7 +110,7 @@ export const weaponModPatchToStore = (modifiedWeapon) => {
+     damageEffects,
+     damage_effects: damageEffects,
+     damageType,
+-    damage_type: damageType,
++    damage_type: JSON.stringify(damageType), // сохраняем как JSON-строку
+     qualities: modifiedWeapon.qualities,
+     weight: modifiedWeapon.weight,
+     cost: modifiedWeapon.cost,
+@@ -116,12 +128,26 @@ export const storeItemToWeaponDisplay = (item) => {
+   // name/index) so display + mod-step math share one representation. See domain/range.js.
+   const { range_index, range_name } = resolveWeaponRangeFields(flat);
+ 
++  // Десериализуем damage_type если это JSON-строка
++  let damageType = flat.damageType ?? flat.damage_type;
++  if (typeof damageType === 'string') {
++    try {
++      damageType = JSON.parse(damageType);
++    } catch {
++      damageType = [damageType];
++    }
++  }
++  if (!Array.isArray(damageType)) {
++    damageType = damageType ? [damageType] : ['physical'];
++  }
++
+   return {
+     ...flat,
+     instanceId: flat.instanceId || flat.id,
+     id: flat.weaponId || flat.id,
+     fire_rate: flat.fireRate ?? flat.fire_rate,
+-    damage_type: flat.damageType ?? flat.damage_type,
++    damage_type: damageType,
++    damageType,
+     damage_effects: flat.damageEffects ?? flat.damage_effects,
+     range_index,
+     range_name,
