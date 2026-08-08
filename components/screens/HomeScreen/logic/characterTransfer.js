@@ -182,6 +182,7 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
 
 /**
  * Легаси-реализация выбора файла через скрытый input (фолбэк)
+ * Улучшенная версия для Android с обработкой потери фокуса
  */
 const pickFileLegacy = () =>
   new Promise((resolve) => {
@@ -189,87 +190,244 @@ const pickFileLegacy = () =>
       resolve(null);
       return;
     }
+    
+    console.log('🔄 Создаем input для выбора файла...');
     const input = document.createElement('input');
     input.type = 'file';
-    // Расширяем фильтр для лучшей совместимости с Android браузерами
-    input.accept = `${EXPORT_FILE_EXTENSION},.json,application/json,text/plain,*/*`;
+    
+    // ОЧЕНЬ широкий фильтр для Android - убираем ограничения
+    // На Android лучше вообще не использовать accept или использовать очень простой
+    input.accept = '*/*'; // Принимаем все файлы
     input.style.display = 'none';
-
+    
+    // Таймаут для очистки если ничего не выбрано
+    let cleanupTimeout = null;
+    
+    const cleanup = () => {
+      console.log('🧹 Очищаем input...');
+      if (cleanupTimeout) clearTimeout(cleanupTimeout);
+      if (input.parentNode) {
+        input.parentNode.removeChild(input);
+      }
+      // Удаляем все обработчики
+      input.onchange = null;
+      input.oncancel = null;
+      input.onabort = null;
+    };
+    
     input.onchange = () => {
+      console.log('📄 Событие onchange сработало');
+      cleanup();
       const file = input.files && input.files[0];
-      if (input.parentNode) input.parentNode.removeChild(input);
       if (!file) {
+        console.log('❌ Файл не выбран');
         resolve(null);
         return;
       }
+      
+      console.log(`📁 Выбран файл: ${file.name}, размер: ${file.size} байт, тип: ${file.type}`);
+      
+      // Проверяем размер файла (максимум 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        console.error('❌ Файл слишком большой:', file.size);
+        resolve(null);
+        return;
+      }
+      
       const reader = new FileReader();
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-      reader.onerror = () => resolve(null);
+      reader.onload = () => {
+        console.log('✅ Файл успешно прочитан');
+        resolve(typeof reader.result === 'string' ? reader.result : null);
+      };
+      reader.onerror = () => {
+        console.error('❌ Ошибка чтения файла');
+        resolve(null);
+      };
+      reader.onabort = () => {
+        console.log('⏹️  Чтение файла прервано');
+        resolve(null);
+      };
       reader.readAsText(file, 'utf-8');
+    };
+    
+    // Обработка отмены на Android (не все браузеры поддерживают oncancel)
+    input.oncancel = () => {
+      console.log('⏹️  Пользователь отменил выбор файла (oncancel)');
+      cleanup();
+      resolve(null);
+    };
+    
+    input.onabort = () => {
+      console.log('⏹️  Выбор файла прерван (onabort)');
+      cleanup();
+      resolve(null);
+    };
+
+    // Добавляем обработку потери фокуса (проблема на Android)
+    const handleWindowBlur = () => {
+      console.log('👁️‍🗨️  Окно потеряло фокус (возможно открыт файловый менеджер)');
+      // Не очищаем сразу, ждем возвращения фокуса
+    };
+    
+    const handleWindowFocus = () => {
+      console.log('👁️‍🗨️  Окно получило фокус');
+      // Если через 1 секунду после фокуса файл еще не выбран, очищаем
+      cleanupTimeout = setTimeout(() => {
+        if (input.parentNode) {
+          console.log('⏰ Таймаут: файл не выбран за 1 секунду после фокуса');
+          cleanup();
+          resolve(null);
+        }
+      }, 1000);
+    };
+
+    // Добавляем глобальные обработчики
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+    
+    // Убираем обработчики после очистки
+    const originalCleanup = cleanup;
+    cleanup = () => {
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      originalCleanup();
     };
 
     document.body.appendChild(input);
+    console.log('👆 Кликаем по input...');
     input.click();
+    
+    // Автоматическая очистка через 30 секунд на всякий случай
+    setTimeout(() => {
+      if (input.parentNode) {
+        console.log('⏰ Автоматическая очистка через 30 секунд');
+        cleanup();
+        resolve(null);
+      }
+    }, 30000);
   });
 
 /**
  * Импорт через browser-fs-access.fileOpen или expo-document-picker
- * На вебе используем browser-fs-access для надёжности
+ * Улучшенная версия для Android с детальным логированием
  * @returns {Promise<string|null>}
  */
 export const pickCharacterFileWeb = async () => {
+  console.log('📂 Начинаем процесс выбора файла...');
+  
   try {
-    // 1. browser-fs-access — приоритет для веба
+    // Пробуем все методы в правильном порядке с логированием
+    const methodsToTry = [];
+    
+    // 1. browser-fs-access — приоритет для веба (но может не работать на Android)
     if (Platform.OS === 'web' && fsAccess && fsAccess.fileOpen) {
-      try {
-        const blob = await fsAccess.fileOpen({
-          mimeTypes: ['application/json', 'text/json', 'text/plain'],
-          extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
-          description: 'Файл персонажа',
-          multiple: false,
-        });
-        return await blob.text();
-      } catch (fsError) {
-        if (fsError && fsError.name === 'AbortError') {
-          return null; // Пользователь отменил выбор
+      methodsToTry.push({
+        name: 'browser-fs-access',
+        execute: async () => {
+          console.log('🔄 Пробуем browser-fs-access.fileOpen...');
+          const blob = await fsAccess.fileOpen({
+            mimeTypes: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'],
+            extensions: [EXPORT_FILE_EXTENSION, '.json', '*'].filter(Boolean),
+            description: 'Файл персонажа Fallout 2d20 (.rpgc или .json)',
+            multiple: false,
+          });
+          console.log('✅ browser-fs-access получил файл');
+          return await blob.text();
         }
-        console.warn('browser-fs-access failed, fallback:', fsError);
-      }
+      });
     }
 
     // 2. На нативных платформах используем DocumentPicker
     if (DocumentPicker && DocumentPicker.getDocumentAsync) {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', 'text/json', 'application/octet-stream', '.rpgc', '.json'],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+      methodsToTry.push({
+        name: 'expo-document-picker',
+        execute: async () => {
+          console.log('🔄 Пробуем expo-document-picker...');
+          const result = await DocumentPicker.getDocumentAsync({
+            type: ['application/json', 'text/json', 'application/octet-stream', '.rpgc', '.json'],
+            copyToCacheDirectory: true,
+            multiple: false,
+          });
 
-      if (result.canceled) return null;
+          if (result.canceled) {
+            console.log('⏹️  Пользователь отменил выбор в DocumentPicker');
+            throw new Error('User canceled');
+          }
 
-      const file = result.assets[0];
-      if (!file || !file.uri) return null;
+          const file = result.assets[0];
+          if (!file || !file.uri) {
+            console.error('❌ DocumentPicker вернул пустой файл');
+            throw new Error('No file selected');
+          }
 
-      try {
-        if (file.file && typeof file.file.text === 'function') {
-          return await file.file.text();
+          console.log(`📁 DocumentPicker выбрал файл: ${file.uri}`);
+          
+          try {
+            if (file.file && typeof file.file.text === 'function') {
+              return await file.file.text();
+            }
+            const response = await fetch(file.uri);
+            const text = await response.text();
+            console.log('✅ Файл успешно загружен через DocumentPicker');
+            return text;
+          } catch (fetchErr) {
+            console.error('❌ Ошибка загрузки файла из DocumentPicker:', fetchErr);
+            throw fetchErr;
+          }
         }
-        const response = await fetch(file.uri);
-        const text = await response.text();
-        return text;
-      } catch (fetchErr) {
-        console.warn('fetch Blob URI failed:', fetchErr);
-        return null;
+      });
+    }
+
+    // 3. Улучшенный legacy input - работает почти везде
+    methodsToTry.push({
+      name: 'legacy-input',
+      execute: async () => {
+        console.log('🔄 Пробуем улучшенный legacy input...');
+        const result = await pickFileLegacy();
+        if (result) {
+          console.log('✅ Legacy input успешно загрузил файл');
+          return result;
+        }
+        throw new Error('Legacy input не выбрал файл');
+      }
+    });
+
+    // Пробуем все методы по порядку
+    console.log(`🔍 Доступно методов загрузки файлов: ${methodsToTry.length}`);
+    
+    for (let i = 0; i < methodsToTry.length; i++) {
+      const method = methodsToTry[i];
+      try {
+        console.log(`\n--- Попытка ${i + 1}: ${method.name} ---`);
+        const result = await method.execute();
+        if (result) {
+          console.log(`\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
+          return result;
+        }
+      } catch (methodError) {
+        if (methodError && methodError.name === 'AbortError') {
+          console.log(`\n⏹️  Пользователь отменил в методе "${method.name}"`);
+          return null;
+        }
+        if (methodError.message === 'User canceled') {
+          console.log(`\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
+          return null;
+        }
+        console.warn(`\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+        // Продолжаем пробовать следующий метод
       }
     }
 
-    // 3. Фолбэк для платформ без browser-fs-access или DocumentPicker
-    return await pickFileLegacy();
+    console.error('\n❌ Все методы загрузки файлов не сработали');
+    return null;
   } catch (error) {
-    console.error('Ошибка загрузки:', error);
+    console.error('\n❌ Критическая ошибка загрузки файла:', error);
+    // Последняя попытка через legacy
     try {
+      console.log('🔄 Последняя попытка через legacy input...');
       return await pickFileLegacy();
-    } catch {
+    } catch (finalError) {
+      console.error('❌ И legacy input не сработал:', finalError);
       return null;
     }
   }
