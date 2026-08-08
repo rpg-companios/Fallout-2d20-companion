@@ -349,14 +349,29 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const row = await db.loadCharacterById(character.id);
-    if (!row) {
-      Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
-      return;
-    }
+    try {
+      const row = await db.loadCharacterById(character.id);
+      if (!row) {
+        Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
+        return;
+      }
 
-    const payload = createCharacterExportPayload(row);
-    downloadCharacterPayload(payload, row.name);
+      const payload = createCharacterExportPayload(row);
+      const result = await downloadCharacterPayload(payload, row.name);
+      
+      if (!result.success && !result.aborted) {
+        Alert.alert(
+          tHomeScreen('title'),
+          tHomeScreen('download.errors.failed') || 'Не удалось скачать персонажа. Попробуйте ещё раз или смените браузер.'
+        );
+      }
+    } catch (error) {
+      console.error('Ошибка скачивания файла:', error);
+      Alert.alert(
+        tHomeScreen('title'),
+        'Не удалось скачать персонажа. Проверьте консоль для подробностей.'
+      );
+    }
   };
 
   const handleUpload = async () => {
@@ -368,61 +383,70 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const rawText = await pickCharacterFile();
-    if (!rawText) return;
+    try {
+      // Вызов pickCharacterFile должен быть первым в обработчике для user activation
+      const rawText = await pickCharacterFile();
+      if (!rawText) return;
 
-    const parsed = parseCharacterImportPayload(rawText);
-    if (parsed.error) {
+      const parsed = parseCharacterImportPayload(rawText);
+      if (parsed.error) {
+        Alert.alert(
+          tHomeScreen('title'),
+          tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
+        );
+        return;
+      }
+
+      const importedCharacter = parsed.character;
+      const existing = characters.find((item) => item.name === importedCharacter.name);
+
+      const persistImport = async () => {
+        const id = existing?.id || importedCharacter.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+        await db.saveCharacter(
+          id,
+          importedCharacter.name,
+          importedCharacter.level ?? 1,
+          importedCharacter.originName ?? null,
+          importedCharacter.data
+        );
+        await loadList();
+      };
+
+      if (!existing) {
+        await persistImport();
+        return;
+      }
+
+      const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const confirmed = window.confirm(overwriteMessage);
+        if (confirmed) {
+          await persistImport();
+        }
+        return;
+      }
+
       Alert.alert(
         tHomeScreen('title'),
-        tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
+        overwriteMessage,
+        [
+          { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
+          {
+            text: tHomeScreen('buttons.yes') || 'Да',
+            style: 'destructive',
+            onPress: persistImport,
+          },
+        ],
+        { cancelable: true }
       );
-      return;
-    }
-
-    const importedCharacter = parsed.character;
-    const existing = characters.find((item) => item.name === importedCharacter.name);
-
-    const persistImport = async () => {
-      const id = existing?.id || importedCharacter.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-      await db.saveCharacter(
-        id,
-        importedCharacter.name,
-        importedCharacter.level ?? 1,
-        importedCharacter.originName ?? null,
-        importedCharacter.data
+    } catch (error) {
+      console.error('Ошибка загрузки файла:', error);
+      Alert.alert(
+        tHomeScreen('title'),
+        'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
       );
-      await loadList();
-    };
-
-    if (!existing) {
-      await persistImport();
-      return;
     }
-
-    const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const confirmed = window.confirm(overwriteMessage);
-      if (confirmed) {
-        await persistImport();
-      }
-      return;
-    }
-
-    Alert.alert(
-      tHomeScreen('title'),
-      overwriteMessage,
-      [
-        { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
-        {
-          text: tHomeScreen('buttons.yes') || 'Да',
-          style: 'destructive',
-          onPress: persistImport,
-        },
-      ],
-      { cancelable: true }
-    );
   };
 
   const handleCloudSync = async () => {

@@ -3,6 +3,9 @@
  * Адаптерный слой: связывает чистую доменную логику (domain/characterTransfer)
  * с платформенными API (Web Share API, <a download>, expo-document-picker).
  *
+ * WEB / PWA: использует browser-fs-access для надёжного file I/O
+ * NATIVE: использует expo-document-picker и expo-sharing
+ *
  * Чистая логика — в domain/characterTransfer.js, здесь только IO.
  */
 
@@ -33,6 +36,17 @@ try {
   DocumentPicker = require('expo-document-picker');
 } catch {
   DocumentPicker = null;
+}
+
+// browser-fs-access для веб-части
+let fsAccess = null;
+if (Platform.OS === 'web') {
+  try {
+    // eslint-disable-next-line global-require
+    fsAccess = require('browser-fs-access');
+  } catch {
+    fsAccess = null;
+  }
 }
 
 /**
@@ -71,11 +85,8 @@ const canUseWebShareWithFiles = (file) => {
 };
 
 /**
- * Сохранение через Web Share API (PWA iOS/Android) + фолбэк на anchor
- * Архитектура решения:
- * 1. navigator.share({ files: [file] }) — нативное меню «Поделиться» → «Сохранить в файлы»
- * 2. Фолбэк: <a download> для десктопа
- * @returns {Promise<{success: boolean, method: 'share'|'anchor'|'unsupported', aborted?: boolean}>}
+ * Сохранение через browser-fs-access.fileSave или Web Share API + фолбэк
+ * @returns {Promise<{success: boolean, method: 'fsaccess'|'share'|'anchor'|'unsupported', aborted?: boolean}>}
  */
 export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
   const fileName = sanitizeFileName(preferredName);
@@ -87,9 +98,27 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
 
   try {
     const blob = new Blob([jsonString], { type: 'application/json' });
+
+    // 1. browser-fs-access — приоритетное решение для веба
+    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
+      try {
+        await fsAccess.fileSave(blob, {
+          fileName: fileName,
+          extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
+          description: 'Файл персонажа',
+        });
+        return { success: true, method: 'fsaccess' };
+      } catch (fsError) {
+        if (fsError && fsError.name === 'AbortError') {
+          return { success: false, method: 'fsaccess', aborted: true };
+        }
+        console.warn('browser-fs-access failed, fallback to share/anchor:', fsError);
+      }
+    }
+
     const file = new File([blob], fileName, { type: 'application/json' });
 
-    // 1. Web Share API — основное решение для PWA
+    // 2. Web Share API — для PWA iOS/Android
     if (canUseWebShareWithFiles(file)) {
       try {
         await navigator.share({
@@ -105,7 +134,7 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
       }
     }
 
-    // 2. Фолбэк
+    // 3. Фолбэк
     const anchorOk = downloadViaAnchorFallback(blob, fileName);
     if (anchorOk) {
       return { success: true, method: 'anchor' };
@@ -129,7 +158,8 @@ const pickFileLegacy = () =>
     }
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = `${EXPORT_FILE_EXTENSION},application/json,.json`;
+    // Расширяем фильтр для лучшей совместимости с Android браузерами
+    input.accept = `${EXPORT_FILE_EXTENSION},.json,application/json,text/plain,*/*`;
     input.style.display = 'none';
 
     input.onchange = () => {
@@ -150,12 +180,31 @@ const pickFileLegacy = () =>
   });
 
 /**
- * Импорт через expo-document-picker + фолбэк
- * Должен вызываться строго в onPress (требование iOS Safari)
+ * Импорт через browser-fs-access.fileOpen или expo-document-picker
+ * На вебе используем browser-fs-access для надёжности
  * @returns {Promise<string|null>}
  */
 export const pickCharacterFileWeb = async () => {
   try {
+    // 1. browser-fs-access — приоритет для веба
+    if (Platform.OS === 'web' && fsAccess && fsAccess.fileOpen) {
+      try {
+        const blob = await fsAccess.fileOpen({
+          mimeTypes: ['application/json', 'text/json', 'text/plain'],
+          extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
+          description: 'Файл персонажа',
+          multiple: false,
+        });
+        return await blob.text();
+      } catch (fsError) {
+        if (fsError && fsError.name === 'AbortError') {
+          return null; // Пользователь отменил выбор
+        }
+        console.warn('browser-fs-access failed, fallback:', fsError);
+      }
+    }
+
+    // 2. На нативных платформах используем DocumentPicker
     if (DocumentPicker && DocumentPicker.getDocumentAsync) {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/json', 'text/json', 'application/octet-stream', '.rpgc', '.json'],
@@ -176,14 +225,12 @@ export const pickCharacterFileWeb = async () => {
         const text = await response.text();
         return text;
       } catch (fetchErr) {
-        console.warn('fetch Blob URI failed, fallback to legacy:', fetchErr);
-        if (Platform.OS === 'web' || typeof document !== 'undefined') {
-          return await pickFileLegacy();
-        }
+        console.warn('fetch Blob URI failed:', fetchErr);
         return null;
       }
     }
 
+    // 3. Фолбэк для платформ без browser-fs-access или DocumentPicker
     return await pickFileLegacy();
   } catch (error) {
     console.error('Ошибка загрузки:', error);
@@ -209,22 +256,40 @@ export const saveCharacter = async (characterData, filename = 'character.json') 
 
   const jsonString = JSON.stringify(payload, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
-  const file = new File([blob], safeFilename, { type: 'application/json' });
 
   try {
+    // Используем browser-fs-access для веба
+    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
+      await fsAccess.fileSave(blob, {
+        fileName: safeFilename,
+        extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
+        description: 'Файл персонажа',
+      });
+      return { method: 'browser-fs-access', success: true };
+    }
+
+    const file = new File([blob], safeFilename, { type: 'application/json' });
+
     if (Platform.OS === 'web' && canUseWebShareWithFiles(file)) {
       await navigator.share({
         files: [file],
         title: 'Сохранение персонажа',
       });
-      return;
+      return { method: 'share', success: true };
     }
 
     if (typeof document !== 'undefined') {
       downloadViaAnchorFallback(blob, safeFilename);
+      return { method: 'anchor', success: true };
     }
+
+    return { method: 'unsupported', success: false };
   } catch (error) {
+    if (error && error.name === 'AbortError') {
+      return { method: 'cancelled', success: false, aborted: true };
+    }
     console.error('Ошибка сохранения:', error);
+    return { method: 'unsupported', success: false, error };
   }
 };
 
@@ -238,3 +303,9 @@ export const loadCharacter = async () => {
     return null;
   }
 };
+
+/**
+ * Алиасы для обратной совместимости
+ */
+export const pickCharacterFile = pickCharacterFileWeb;
+export const downloadCharacterPayload = downloadCharacterPayloadWeb;

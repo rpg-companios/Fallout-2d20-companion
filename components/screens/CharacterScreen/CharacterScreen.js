@@ -1132,7 +1132,16 @@ export default function CharacterScreen() {
                       : styles.saveNameButtonDisabled,
                   ]}
                   onPress={() => {
-                    saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
+                    try {
+                      // Вызов saveCharacter должен быть первым в обработчике для user activation
+                      saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
+                    } catch (error) {
+                      console.error('Ошибка сохранения:', error);
+                      Alert.alert(
+                        tCharacterScreen('title') || 'Ошибка',
+                        'Не удалось сохранить персонажа. Проверьте консоль для подробностей.'
+                      );
+                    }
                   }}
                   disabled={false}
                 >
