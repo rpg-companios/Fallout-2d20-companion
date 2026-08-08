@@ -12,6 +12,7 @@ import {
   Modal,
   Linking,
   TextInput,
+  PanResponder,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -48,50 +49,28 @@ const ActionCell = ({ icon, label, onPress, disabled = false }) => (
   </TouchableOpacity>
 );
 
-const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd, moving }) => {
+const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd }) => {
   const originImage = getOriginImage(character.originName);
+  // PanResponder keeps ownership of the pointer after it leaves the small handle,
+  // which Touchable's touch callbacks do not guarantee on web and native.
+  const callbacks = useRef({});
+  callbacks.current = { character, onDragStart, onDragMove, onDragEnd };
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (_event, gesture) => callbacks.current.onDragStart({ pageX: gesture.x0, pageY: gesture.y0 }, callbacks.current.character),
+    onPanResponderMove: (_event, gesture) => callbacks.current.onDragMove({ pageX: gesture.moveX, pageY: gesture.moveY }),
+    onPanResponderRelease: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+    onPanResponderTerminate: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+  })).current;
   return (
-    <TouchableOpacity
-      style={styles.characterCell}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <TouchableOpacity style={styles.dragHandle} onPressIn={(event) => onDragStart(event.nativeEvent, character)} onTouchMove={(event) => onDragMove(event.nativeEvent)} onPressOut={(event) => onDragEnd(event.nativeEvent)}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></TouchableOpacity>
-      {moving && <View style={styles.draggingOverlay}><Text style={styles.draggingText}>↕</Text></View>}
-      <View style={styles.characterImageContainer}>
-        {originImage ? (
-          <Image source={originImage} style={styles.characterImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.characterImagePlaceholder}>
-            <Text style={styles.characterImagePlaceholderText}>?</Text>
-          </View>
-        )}
-      </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={(event) => {
-          event?.stopPropagation?.();
-          onDelete();
-        }}
-        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-      >
-        <Text style={styles.deleteIcon}>🗑</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.downloadButton}
-        onPress={(event) => {
-          event?.stopPropagation?.();
-          onDownload();
-        }}
-        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-      >
-        <MaterialCommunityIcons name="download" size={16} color="#8a8a8a" />
-      </TouchableOpacity>
+    <TouchableOpacity style={styles.characterCell} onPress={onPress} activeOpacity={0.8}>
+      <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
+      <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
+      <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><Text style={styles.deleteIcon}>🗑</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.downloadButton} onPress={(event) => { event?.stopPropagation?.(); onDownload(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><MaterialCommunityIcons name="download" size={16} color="#8a8a8a" /></TouchableOpacity>
       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
-      {character.level ? (
-        <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text>
-      ) : null}
+      {character.level ? <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text> : null}
     </TouchableOpacity>
   );
 };
@@ -110,6 +89,7 @@ export default function HomeScreen({ navigation }) {
   const [movingCharacterId, setMovingCharacterId] = useState(null);
   const [drag, setDrag] = useState(null);
   const folderRefs = useRef({});
+  const rootDropRef = useRef(null);
   const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -230,12 +210,17 @@ export default function HomeScreen({ navigation }) {
     setMovingCharacterId(character.id);
     setDrag({ character, x: event.pageX, y: event.pageY });
     Object.values(folderRefs.current).forEach((ref) => ref?.measureInWindow?.((x, y, width, height) => { ref.__dropBounds = { x, y, width, height }; }));
+    rootDropRef.current?.measureInWindow?.((x, y, width, height) => { rootDropRef.current.__dropBounds = { x, y, width, height }; });
   };
   const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
   const handleDragEnd = async (event) => {
     const target = Object.entries(folderRefs.current).find(([, ref]) => { const b = ref?.__dropBounds; return b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height; });
     if (target) await handleMoveToFolder(target[0]);
-    else { setMovingCharacterId(null); setDrag(null); }
+    else {
+      const root = rootDropRef.current?.__dropBounds;
+      if (root && event.pageX >= root.x && event.pageX <= root.x + root.width && event.pageY >= root.y && event.pageY <= root.y + root.height) await handleMoveToFolder(null);
+      else { setMovingCharacterId(null); setDrag(null); }
+    }
   };
 
   const handleDeleteFolder = (folder) => {
@@ -482,7 +467,7 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
-      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity>}</View>}
+      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <TouchableOpacity ref={rootDropRef} style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity>}</View>}
       {movingCharacterId && !activeFolder && <Text style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
       <ScrollView
         style={styles.scrollView}
