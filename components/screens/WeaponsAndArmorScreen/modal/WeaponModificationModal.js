@@ -125,6 +125,12 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   } else {
     damage_type = [...damage_type];
   }
+
+  // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
+  const qualities = new Map(); // qualityId -> entry
+  const effects = new Map();   // effectId -> entry
+  const loadBase = (field, map, idKey) => {
+    let arr = baseWeapon[field];
     if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { return; } }
     if (!Array.isArray(arr)) return;
     arr.forEach((e) => {
@@ -152,10 +158,6 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     if (mod.rangeModifier) {
       if (mod.rangeModifier.op === '+') rangeShift += Number(mod.rangeModifier.value);
       if (mod.rangeModifier.op === '-') rangeShift -= Number(mod.rangeModifier.value);
-    }
-
-    if (mod.damageType) {
-      damageType = mod.damageType;
     }
 
     if (mod.effectChanges && Array.isArray(mod.effectChanges)) {
@@ -229,11 +231,9 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     baseWeaponName: baseName,
     damage,
     fire_rate,
-    damageType,
-    damage_type: damageType,
-    range_name,
     damage_type,
     damageType: damage_type, // дублируем для совместимости
+    range_name,
     qualities: qualitiesValue,
     effects: effectsValue,
     weight: String(weight),
