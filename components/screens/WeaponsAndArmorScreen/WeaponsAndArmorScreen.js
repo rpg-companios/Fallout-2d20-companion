@@ -300,7 +300,9 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const damageType = resolveWeaponDamageType(displayWeapon.damage_type ?? displayWeapon.damageType);
     const effectsValue = resolveWeaponEffects(displayWeapon.effects) || tWeaponsAndArmorScreen('common.empty');
     const fireRateBase = Number(displayWeapon.fire_rate ?? 0) || 0;
-    const rangeValue = displayWeapon.range_name ?? displayWeapon.rangeName ?? tWeaponsAndArmorScreen('common.empty');
+    const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
+    const range_name_key = displayWeapon.range_name ?? displayWeapon.rangeName ?? '';
+    const rangeValue = rangeNames[range_name_key] || range_name_key || tWeaponsAndArmorScreen('common.empty');
     const qualitiesValue = resolveWeaponQualities(displayWeapon.qualities) || tWeaponsAndArmorScreen('common.empty');
     const mainAttr = displayWeapon.mainAttr ?? displayWeapon.main_attr ?? 'AGI';
     const mainSkill = displayWeapon.mainSkill ?? displayWeapon.main_skill ?? 'SMALL_GUNS';
