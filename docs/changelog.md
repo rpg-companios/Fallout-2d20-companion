@@ -133,3 +133,51 @@
 - Weapon grips and stocks are now mutually exclusive modifications.
 - Installing a grip automatically removes the stock, and installing a stock removes the grip.
 - The Russian name of the slot was corrected from «Приклад» to «Ложе».
+
+---
+
+## 45 — Миграция сохранений при обновлении / Save migration on application updates
+
+### RU
+
+- Добавлена единая версионированная система миграции сохранений персонажей.
+- Изменения формата сохранений оформляются последовательными миграциями между версиями схемы.
+- Миграции применяются как при загрузке персонажа из SQLite, так и при восстановлении состояния из AsyncStorage.
+- Добавлен единый источник текущей версии схемы и документация по добавлению новых миграций.
+- Старые сохранения не требуют ручной конвертации после обновления приложения.
+
+### EN
+
+- Added a unified versioned migration system for character saves.
+- Save-format changes are represented as sequential migrations between schema versions.
+- Migrations run both when loading a character from SQLite and when rehydrating state from AsyncStorage.
+- Added a single source of truth for the current schema version and documentation for adding future migrations.
+- Legacy saves no longer require manual conversion after an application update.
+
+---
+
+## 46 — Каталоги персонажей / Character folders
+
+### RU
+
+- Добавлены каталоги для организации сохранённых персонажей.
+- Добавлены создание, открытие, удаление каталогов и отображение количества персонажей в каждом каталоге.
+- Персонажей можно перемещать между каталогами перетаскиванием.
+- В открытом каталоге появилась drop-зона «Вернуть в список персонажей» для возврата персонажа в корневой каталог.
+- Исправлен перенос персонажа из папки в корневой список при отпускании над зоной «назад».
+- Настройка «Каталоги персонажей» сохраняется между запусками.
+- При выключенной настройке кнопка «Создать каталог» полностью скрывается, а персонажи занимают освободившееся место.
+- Существующие каталоги и распределение персонажей не удаляются при выключении настройки.
+- Добавлена поддержка русского и английского языков для интерфейса каталогов.
+
+### EN
+
+- Added character folders for organizing saved characters.
+- Added folder creation, opening, deletion, and character counts.
+- Characters can be moved between folders using drag and drop.
+- Added a “Move to character list” drop zone when viewing a folder.
+- Fixed moving a character from a folder back to the root list when dropped over the back zone.
+- The “Character folders” setting is persisted between launches.
+- When the setting is disabled, the “Create folder” button is fully hidden and characters use the freed grid space.
+- Existing folders and character assignments are preserved when the setting is disabled.
+- Added Russian and English localization for the folder interface.
