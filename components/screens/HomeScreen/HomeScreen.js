@@ -105,6 +105,13 @@ export default function HomeScreen({ navigation }) {
   const [desktopInstallVisible, setDesktopInstallVisible] = useState(false);
 
   useEffect(() => {
+    if (!characterFoldersEnabled && folderDraftVisible) {
+      setFolderDraftVisible(false);
+      setFolderName('');
+    }
+  }, [characterFoldersEnabled, folderDraftVisible]);
+
+  useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
 
     const standalone =
@@ -466,8 +473,16 @@ export default function HomeScreen({ navigation }) {
   };
 
   const allItems = [
-    ...(activeFolder ? [] : [{ type: 'create' }, { type: 'upload' }, { type: 'createFolder' }]),
-    ...(activeFolder ? [] : (folderDraftVisible ? [{ type: 'folderDraft' }] : [])),
+    ...(activeFolder
+      ? []
+      : [
+          { type: 'create' },
+          { type: 'upload' },
+          ...(characterFoldersEnabled ? [{ type: 'createFolder' }] : []),
+        ]),
+    ...(activeFolder
+      ? []
+      : (folderDraftVisible && characterFoldersEnabled ? [{ type: 'folderDraft' }] : [])),
     ...(activeFolder ? [] : folders.map((folder) => ({ type: 'folder', ...folder }))),
     ...characters.map(c => ({ type: 'character', ...c })),
   ];
