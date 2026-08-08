@@ -39,6 +39,7 @@ function normalizeModRow(row) {
     damageModifier: row.damageModifier,
     fireRateModifier: row.fireRateModifier,
     rangeModifier: row.rangeModifier,
+    damageType: row.damageType ?? row.damage_type,
     qualityChanges: row.qualityChanges,
     effectChanges: row.effectChanges,
   };
@@ -109,6 +110,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   let weight = weightBase;
   let cost = costBase;
   let rangeShift = 0;
+  let damageType = baseWeapon.damage_type ?? baseWeapon.damageType;
   // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
   const qualities = new Map(); // qualityId -> entry
   const effects = new Map();   // effectId -> entry
@@ -141,6 +143,10 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     if (mod.rangeModifier) {
       if (mod.rangeModifier.op === '+') rangeShift += Number(mod.rangeModifier.value);
       if (mod.rangeModifier.op === '-') rangeShift -= Number(mod.rangeModifier.value);
+    }
+
+    if (mod.damageType) {
+      damageType = mod.damageType;
     }
 
     if (mod.effectChanges && Array.isArray(mod.effectChanges)) {
@@ -195,6 +201,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     baseWeaponName: baseName,
     damage,
     fire_rate,
+    damageType,
+    damage_type: damageType,
     range_name,
     qualities: qualitiesValue,
     effects: effectsValue,
@@ -289,7 +297,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
         }
 
         // выбранные моды из appliedMods (если уже есть)
-        const selected = {};
+        let selected = {};
         const applied = weaponWithBase.appliedMods || {};
         for (const [slot, modId] of Object.entries(applied)) {
           const modRow = await getWeaponModById(modId);

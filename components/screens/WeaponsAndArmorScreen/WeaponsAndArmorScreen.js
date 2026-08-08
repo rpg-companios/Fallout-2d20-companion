@@ -446,6 +446,8 @@ const findLocalizedWeapon = (catalog, weapon) => {
       baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
       damage: weapon.damage,
       fire_rate: weapon.fire_rate,
+      damageType: weapon.damageType,
+      damage_type: weapon.damage_type,
       qualities: weapon.qualities,
       range_name: weapon.range_name,
       weight: weapon.weight,
