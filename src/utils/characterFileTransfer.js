@@ -49,6 +49,7 @@ if (Platform.OS === 'web') {
 
 /**
  * Сохранение данных персонажа
+ * Улучшенная версия: начинаем с Web Share API для лучшей работы на Android
  */
 export const saveCharacter = async (characterData, filename = 'character.json') => {
   try {
@@ -59,17 +60,83 @@ export const saveCharacter = async (characterData, filename = 'character.json') 
 
     const jsonString = JSON.stringify(characterData, null, 2);
 
-    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
+    if (Platform.OS === 'web') {
       const blob = new Blob([jsonString], { type: 'application/json' });
-      // fileSave сам решает: показать нативный "Save As" диалог
-      // (File System Access API) или скачать файл через a[download].
-      // Работает одинаково в обычной вкладке и в установленном PWA.
-      await fsAccess.fileSave(blob, {
-        fileName: safeFilename,
-        extensions: ['.json', EXPORT_FILE_EXTENSION].filter(Boolean),
-        description: 'Файл персонажа',
-      });
-      return { method: 'browser-fs-access', success: true };
+      const file = new File([blob], safeFilename, { type: 'application/json' });
+
+      // Определяем доступные методы в правильном порядке для мобильных устройств
+      const methodsToTry = [];
+      
+      // 1. Web Share API - ПРИОРИТЕТ для всех мобильных устройств
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.share) {
+        methodsToTry.push({
+          name: 'share-web',
+          execute: async () => {
+            // Проверяем, может ли браузер поделиться файлом
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: 'Сохранение персонажа',
+              });
+              return { method: 'share-web', success: true };
+            }
+            throw new Error('Web Share API не поддерживает этот файл');
+          }
+        });
+      }
+
+      // 2. browser-fs-access - для десктопов (может не работать на Android)
+      if (fsAccess && fsAccess.fileSave) {
+        methodsToTry.push({
+          name: 'browser-fs-access',
+          execute: async () => {
+            await fsAccess.fileSave(blob, {
+              fileName: safeFilename,
+              extensions: ['.json', EXPORT_FILE_EXTENSION].filter(Boolean),
+              description: 'Файл персонажа',
+            });
+            return { method: 'browser-fs-access', success: true };
+          }
+        });
+      }
+
+      // 3. Anchor download - САМЫЙ НАДЕЖНЫЙ fallback, работает везде
+      if (typeof document !== 'undefined') {
+        methodsToTry.push({
+          name: 'anchor-download',
+          execute: () => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = safeFilename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            return { method: 'anchor-download', success: true };
+          }
+        });
+      }
+
+      // Пробуем все методы по порядку
+      for (const method of methodsToTry) {
+        try {
+          const result = await method.execute();
+          console.log(`✅ Метод сохранения "${method.name}" сработал`);
+          return result;
+        } catch (methodError) {
+          if (methodError && methodError.name === 'AbortError') {
+            console.log(`⏹️  Пользователь отменил в методе "${method.name}"`);
+            return { method: method.name, success: false, aborted: true };
+          }
+          console.warn(`❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+          // Продолжаем пробовать следующий метод
+        }
+      }
+
+      console.error('❌ Все методы сохранения не сработали');
+      return { method: 'unsupported', success: false };
     }
 
     // --- Native (собранное приложение) ---

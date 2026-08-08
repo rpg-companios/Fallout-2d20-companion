@@ -86,6 +86,7 @@ const canUseWebShareWithFiles = (file) => {
 
 /**
  * Сохранение через browser-fs-access.fileSave или Web Share API + фолбэк
+ * Улучшенная версия с приоритетом Web Share API для Android
  * @returns {Promise<{success: boolean, method: 'fsaccess'|'share'|'anchor'|'unsupported', aborted?: boolean}>}
  */
 export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
@@ -98,51 +99,83 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
 
   try {
     const blob = new Blob([jsonString], { type: 'application/json' });
-
-    // 1. browser-fs-access — приоритетное решение для веба
-    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
-      try {
-        await fsAccess.fileSave(blob, {
-          fileName: fileName,
-          extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
-          description: 'Файл персонажа',
-        });
-        return { success: true, method: 'fsaccess' };
-      } catch (fsError) {
-        if (fsError && fsError.name === 'AbortError') {
-          return { success: false, method: 'fsaccess', aborted: true };
-        }
-        console.warn('browser-fs-access failed, fallback to share/anchor:', fsError);
-      }
-    }
-
     const file = new File([blob], fileName, { type: 'application/json' });
 
-    // 2. Web Share API — для PWA iOS/Android
+    // Проверяем все методы в ПРАВИЛЬНОМ порядке для мобильных устройств
+    const methodsToTry = [];
+    
+    // 1. Web Share API - ВСЕГДА приоритет на вебе (особенно на Android)
     if (canUseWebShareWithFiles(file)) {
-      try {
-        await navigator.share({
-          files: [file],
-          title: 'Сохранение персонажа',
-        });
-        return { success: true, method: 'share' };
-      } catch (shareErr) {
-        if (shareErr && shareErr.name === 'AbortError') {
-          return { success: false, method: 'share', aborted: true };
+      methodsToTry.push({
+        name: 'share',
+        execute: async () => {
+          console.log('🔄 Пробуем Web Share API...');
+          await navigator.share({
+            files: [file],
+            title: 'Сохранение персонажа',
+          });
+          console.log('✅ Web Share API сработал');
+          return { success: true, method: 'share' };
         }
-        console.warn('navigator.share failed, fallback to anchor:', shareErr);
+      });
+    }
+
+    // 2. browser-fs-access - для десктопов (может не работать на Android)
+    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
+      methodsToTry.push({
+        name: 'fsaccess',
+        execute: async () => {
+          console.log('🔄 Пробуем browser-fs-access...');
+          await fsAccess.fileSave(blob, {
+            fileName: fileName,
+            extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
+            description: 'Файл персонажа',
+          });
+          console.log('✅ browser-fs-access сработал');
+          return { success: true, method: 'fsaccess' };
+        }
+      });
+    }
+
+    // 3. Anchor download - САМЫЙ НАДЕЖНЫЙ fallback, работает везде
+    if (typeof document !== 'undefined') {
+      methodsToTry.push({
+        name: 'anchor',
+        execute: () => {
+          console.log('🔄 Пробуем anchor download...');
+          const anchorOk = downloadViaAnchorFallback(blob, fileName);
+          if (anchorOk) {
+            console.log('✅ Anchor download сработал');
+            return { success: true, method: 'anchor' };
+          }
+          throw new Error('Anchor download failed');
+        }
+      });
+    }
+
+    // Пробуем все методы по порядку
+    console.log(`🔍 Доступно методов сохранения: ${methodsToTry.length}`);
+    for (let i = 0; i < methodsToTry.length; i++) {
+      const method = methodsToTry[i];
+      try {
+        const result = await method.execute();
+        if (result.success) {
+          return result;
+        }
+      } catch (methodError) {
+        if (methodError && methodError.name === 'AbortError') {
+          console.log(`⏹️  Пользователь отменил в методе "${method.name}"`);
+          return { success: false, method: method.name, aborted: true };
+        }
+        console.warn(`❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+        // Продолжаем пробовать следующий метод
       }
     }
 
-    // 3. Фолбэк
-    const anchorOk = downloadViaAnchorFallback(blob, fileName);
-    if (anchorOk) {
-      return { success: true, method: 'anchor' };
-    }
-
+    console.error('❌ Все методы сохранения не сработали');
     return { success: false, method: 'unsupported' };
   } catch (error) {
-    console.error('Ошибка сохранения:', error);
+    console.error('❌ Ошибка сохранения:', error);
     return { success: false, method: 'unsupported', error };
   }
 };
@@ -244,6 +277,7 @@ export const pickCharacterFileWeb = async () => {
 
 /**
  * API из ТЗ — saveCharacter / loadCharacter (для прямого использования)
+ * Улучшенная версия с надежным fallback для Android
  */
 export const saveCharacter = async (characterData, filename = 'character.json') => {
   const payload =
@@ -258,29 +292,67 @@ export const saveCharacter = async (characterData, filename = 'character.json') 
   const blob = new Blob([jsonString], { type: 'application/json' });
 
   try {
-    // Используем browser-fs-access для веба
-    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
-      await fsAccess.fileSave(blob, {
-        fileName: safeFilename,
-        extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
-        description: 'Файл персонажа',
-      });
-      return { method: 'browser-fs-access', success: true };
-    }
-
+    // Пробуем все доступные методы сохранения по порядку
+    const methodsToTry = [];
+    
+    // 1. Web Share API - лучший для мобильных устройств
     const file = new File([blob], safeFilename, { type: 'application/json' });
-
     if (Platform.OS === 'web' && canUseWebShareWithFiles(file)) {
-      await navigator.share({
-        files: [file],
-        title: 'Сохранение персонажа',
+      methodsToTry.push({
+        name: 'share',
+        execute: async () => {
+          await navigator.share({
+            files: [file],
+            title: 'Сохранение персонажа',
+          });
+          return { method: 'share', success: true };
+        }
       });
-      return { method: 'share', success: true };
     }
 
+    // 2. browser-fs-access
+    if (Platform.OS === 'web' && fsAccess && fsAccess.fileSave) {
+      methodsToTry.push({
+        name: 'browser-fs-access',
+        execute: async () => {
+          await fsAccess.fileSave(blob, {
+            fileName: safeFilename,
+            extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
+            description: 'Файл персонажа',
+          });
+          return { method: 'browser-fs-access', success: true };
+        }
+      });
+    }
+
+    // 3. Anchor download - самый надежный fallback
     if (typeof document !== 'undefined') {
-      downloadViaAnchorFallback(blob, safeFilename);
-      return { method: 'anchor', success: true };
+      methodsToTry.push({
+        name: 'anchor',
+        execute: () => {
+          const anchorOk = downloadViaAnchorFallback(blob, safeFilename);
+          if (anchorOk) {
+            return { method: 'anchor', success: true };
+          }
+          throw new Error('Anchor download failed');
+        }
+      });
+    }
+
+    // Пробуем все методы по порядку
+    for (const method of methodsToTry) {
+      try {
+        const result = await method.execute();
+        if (result.success) {
+          return result;
+        }
+      } catch (methodError) {
+        if (methodError && methodError.name === 'AbortError') {
+          return { method: method.name, success: false, aborted: true };
+        }
+        console.warn(`Method ${method.name} failed:`, methodError);
+        // Продолжаем пробовать следующий метод
+      }
     }
 
     return { method: 'unsupported', success: false };
