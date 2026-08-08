@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Linking,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -30,6 +31,7 @@ import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudS
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -39,14 +41,14 @@ const getOriginImage = (originName) => {
 
 const NUM_COLS = 3;
 
-const ActionCell = ({ icon, label, onPress }) => (
-  <TouchableOpacity style={styles.createCell} onPress={onPress} activeOpacity={0.7}>
-    <Text style={styles.createPlus}>{icon}</Text>
+const ActionCell = ({ icon, label, onPress, disabled = false }) => (
+  <TouchableOpacity style={[styles.createCell, disabled && styles.disabledCell]} onPress={onPress} disabled={disabled} activeOpacity={0.7}>
+    {typeof icon === 'string' ? <Text style={styles.createPlus}>{icon}</Text> : icon}
     <Text style={styles.createLabel}>{label}</Text>
   </TouchableOpacity>
 );
 
-const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
+const CharacterCell = ({ character, onPress, onDelete, onDownload, onMoveStart, moving }) => {
   const originImage = getOriginImage(character.originName);
   return (
     <TouchableOpacity
@@ -54,6 +56,8 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
       onPress={onPress}
       activeOpacity={0.8}
     >
+      <TouchableOpacity style={styles.dragHandle} onLongPress={onMoveStart} delayLongPress={250} onPress={(event) => event?.stopPropagation?.()}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></TouchableOpacity>
+      {moving && <View style={styles.draggingOverlay}><Text style={styles.draggingText}>↕</Text></View>}
       <View style={styles.characterImageContainer}>
         {originImage ? (
           <Image source={originImage} style={styles.characterImage} resizeMode="cover" />
@@ -98,6 +102,13 @@ export default function HomeScreen({ navigation }) {
   const locale = useLocale();
   const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
   const [characters, setCharacters] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [folderCounts, setFolderCounts] = useState({});
+  const [folderDraftVisible, setFolderDraftVisible] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const [activeFolder, setActiveFolder] = useState(null);
+  const [movingCharacterId, setMovingCharacterId] = useState(null);
+  const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
@@ -176,21 +187,55 @@ export default function HomeScreen({ navigation }) {
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await getCharactersList();
-      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setCharacters(list);
+      const savedFolders = await db.getCharacterFolders();
+      const folderLists = await Promise.all(savedFolders.map((folder) => db.getCharactersInFolder(folder.id)));
+      const counts = Object.fromEntries(savedFolders.map((folder, index) => [folder.id, folderLists[index].length]));
+      const visible = activeFolder ? folderLists[savedFolders.findIndex((folder) => folder.id === activeFolder.id)] || [] : await db.getRootCharactersList();
+      visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setCharacters(visible);
+      setFolders(savedFolders);
+      setFolderCounts(counts);
     } catch (e) {
       setCharacters([]);
     } finally {
       setLoading(false);
     }
-  }, [getCharactersList]);
+  }, [getCharactersList, activeFolder]);
 
   useFocusEffect(
     useCallback(() => {
       loadList();
     }, [loadList])
   );
+
+  const handleCreateFolder = async () => {
+    if (!folderName.trim()) return;
+    await db.createCharacterFolder(folderName);
+    setFolderName('');
+    setFolderDraftVisible(false);
+    loadList();
+  };
+
+  const handleMoveToFolder = async (folderId) => {
+    if (!movingCharacterId) return;
+    await db.moveCharacterToFolder(movingCharacterId, folderId);
+    setMovingCharacterId(null);
+    loadList();
+  };
+
+  const handleDeleteFolder = (folder) => {
+    const remove = async () => {
+      await db.deleteCharacterFolderAndCharacters(folder.id);
+      if (activeFolder?.id === folder.id) setActiveFolder(null);
+      loadList();
+    };
+    const message = `${tHomeScreen('folders.deleteMessage')} ${tHomeScreen('folders.characters')}: ${folderCounts[folder.id] || 0}.`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm(message)) remove();
+      return;
+    }
+    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [{ text: tHomeScreen('folders.cancel'), style: 'cancel' }, { text: tHomeScreen('folders.deleteConfirm'), style: 'destructive', onPress: remove }]);
+  };
 
   const handleCreate = () => {
     resetCharacter();
@@ -369,8 +414,9 @@ export default function HomeScreen({ navigation }) {
   };
 
   const allItems = [
-    { type: 'create' },
-    { type: 'upload' },
+    ...(activeFolder ? [] : [{ type: 'create' }, { type: 'upload' }, { type: 'createFolder' }]),
+    ...(activeFolder ? [] : (folderDraftVisible ? [{ type: 'folderDraft' }] : [])),
+    ...(activeFolder ? [] : folders.map((folder) => ({ type: 'folder', ...folder }))),
     ...characters.map(c => ({ type: 'character', ...c })),
   ];
 
@@ -421,6 +467,8 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
+      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity>}</View>}
+      {movingCharacterId && !activeFolder && <Text style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -451,6 +499,15 @@ export default function HomeScreen({ navigation }) {
                     />
                   );
                 }
+                if (item.type === 'createFolder') {
+                  return <ActionCell key="create-folder" icon={<MaterialCommunityIcons name="folder-plus-outline" size={38} color={characterFoldersEnabled ? '#5a5a5a' : '#aaa'} />} label={tHomeScreen('folders.create')} disabled={!characterFoldersEnabled} onPress={() => setFolderDraftVisible(true)} />;
+                }
+                if (item.type === 'folderDraft') {
+                  return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
+                }
+                if (item.type === 'folder') {
+                  return <TouchableOpacity key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => movingCharacterId ? handleMoveToFolder(item.id) : setActiveFolder(item)}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
                 }
@@ -461,6 +518,8 @@ export default function HomeScreen({ navigation }) {
                     onPress={() => handleOpen(item.id)}
                     onDelete={() => handleDelete(item)}
                     onDownload={() => handleDownload(item)}
+                    onMoveStart={() => setMovingCharacterId(item.id)}
+                    moving={movingCharacterId === item.id}
                   />
                 );
               })}
