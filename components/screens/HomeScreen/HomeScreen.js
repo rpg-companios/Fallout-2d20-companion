@@ -90,6 +90,7 @@ export default function HomeScreen({ navigation }) {
   const [drag, setDrag] = useState(null);
   const folderRefs = useRef({});
   const rootDropRef = useRef(null);
+  const dropBounds = useRef({});
   const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -209,15 +210,15 @@ export default function HomeScreen({ navigation }) {
   const handleDragStart = (event, character) => {
     setMovingCharacterId(character.id);
     setDrag({ character, x: event.pageX, y: event.pageY });
-    Object.values(folderRefs.current).forEach((ref) => ref?.measureInWindow?.((x, y, width, height) => { ref.__dropBounds = { x, y, width, height }; }));
-    rootDropRef.current?.measureInWindow?.((x, y, width, height) => { rootDropRef.current.__dropBounds = { x, y, width, height }; });
+    Object.entries(folderRefs.current).forEach(([id, ref]) => ref?.measureInWindow?.((x, y, width, height) => { dropBounds.current[id] = { x, y, width, height }; }));
+    rootDropRef.current?.measureInWindow?.((x, y, width, height) => { dropBounds.current.root = { x, y, width, height }; });
   };
   const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
   const handleDragEnd = async (event) => {
-    const target = Object.entries(folderRefs.current).find(([, ref]) => { const b = ref?.__dropBounds; return b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height; });
+    const target = Object.entries(dropBounds.current).find(([id, b]) => id !== 'root' && b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height);
     if (target) await handleMoveToFolder(target[0]);
     else {
-      const root = rootDropRef.current?.__dropBounds;
+      const root = dropBounds.current.root;
       if (root && event.pageX >= root.x && event.pageX <= root.x + root.width && event.pageY >= root.y && event.pageY <= root.y + root.height) await handleMoveToFolder(null);
       else { setMovingCharacterId(null); setDrag(null); }
     }
@@ -467,7 +468,7 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
-      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <TouchableOpacity ref={rootDropRef} style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity>}</View>}
+      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
       {movingCharacterId && !activeFolder && <Text style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
       <ScrollView
         style={styles.scrollView}
@@ -506,7 +507,7 @@ export default function HomeScreen({ navigation }) {
                   return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
                 }
                 if (item.type === 'folder') {
-                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => movingCharacterId ? handleMoveToFolder(item.id) : setActiveFolder(item)}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
                 }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
