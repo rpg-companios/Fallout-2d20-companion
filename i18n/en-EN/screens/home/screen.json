@@ -67,12 +67,17 @@
   "settings": {
     "title": "Settings",
     "survivalModeTitle": "Survival Mode Settings",
+<<<<<<< ours
     "qualityTitle": "Random weapon quality",
     "qualityDescription": "Weapons added through \"Loot\" have random quality. Merchant weapons are always 100% quality.",
+=======
+>>>>>>> theirs
     "durabilityTitle": "Weapon wear on firing",
     "durabilityDescription": "Enable weapon wear mechanic when firing.",
     "lossTitle": "Durability loss per 10 shots",
     "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much.",
+    "qualityTitle": "Random weapon quality",
+    "qualityDescription": "Weapons added through \"Loot\" have random durability from 1 to 100. Merchant weapons are always 100%.",
     "foldersTitle": "Character folders",
     "foldersDescription": "Organize created characters into folders."
   },

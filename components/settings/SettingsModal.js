@@ -4,6 +4,7 @@ import useAppSettingsStore from '../../src/store/appSettingsStore';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
 
 export default function SettingsModal({ visible, onClose }) {
+<<<<<<< ours
   const qualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
   const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
   const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
@@ -11,6 +12,15 @@ export default function SettingsModal({ visible, onClose }) {
 
   const setQualityEnabled = useAppSettingsStore((state) => state.setRandomWeaponQualityEnabled);
   const setDurabilityLossEnabled = useAppSettingsStore((state) => state.setWeaponDurabilityLossEnabled);
+=======
+  const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+  const qualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+  const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
+  const foldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
+
+  const setDurabilityLossEnabled = useAppSettingsStore((state) => state.setWeaponDurabilityLossEnabled);
+  const setQualityEnabled = useAppSettingsStore((state) => state.setRandomWeaponQualityEnabled);
+>>>>>>> theirs
   const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
   const setFoldersEnabled = useAppSettingsStore((state) => state.setCharacterFoldersEnabled);
 
@@ -25,6 +35,7 @@ export default function SettingsModal({ visible, onClose }) {
 
           <View style={styles.row}>
             <View style={styles.text}>
+<<<<<<< ours
               <Text style={styles.label}>{tHomeScreen('settings.qualityTitle')}</Text>
               <Text style={styles.description}>{tHomeScreen('settings.qualityDescription')}</Text>
             </View>
@@ -33,6 +44,8 @@ export default function SettingsModal({ visible, onClose }) {
 
           <View style={[styles.row, styles.settingRow]}>
             <View style={styles.text}>
+=======
+>>>>>>> theirs
               <Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text>
               <Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text>
             </View>
@@ -40,6 +53,7 @@ export default function SettingsModal({ visible, onClose }) {
           </View>
 
           {durabilityLossEnabled && (
+<<<<<<< ours
             <View style={styles.loss}>
               <Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text>
               <View style={styles.counter}>
@@ -53,6 +67,31 @@ export default function SettingsModal({ visible, onClose }) {
               </View>
               <Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text>
             </View>
+=======
+            <>
+              <View style={styles.loss}>
+                <Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text>
+                <View style={styles.counter}>
+                  <TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}>
+                    <Text style={styles.button}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.value}>{loss}</Text>
+                  <TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}>
+                    <Text style={styles.button}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text>
+              </View>
+
+              <View style={[styles.row, styles.settingRow]}>
+                <View style={styles.text}>
+                  <Text style={styles.label}>{tHomeScreen('settings.qualityTitle')}</Text>
+                  <Text style={styles.description}>{tHomeScreen('settings.qualityDescription')}</Text>
+                </View>
+                <Switch value={qualityEnabled} onValueChange={setQualityEnabled} />
+              </View>
+            </>
+>>>>>>> theirs
           )}
 
           {/* Разделитель */}
