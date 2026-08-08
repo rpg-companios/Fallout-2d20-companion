@@ -14,8 +14,8 @@ export default function SettingsModal({ visible, onClose }) {
     <View style={styles.backdrop}><View style={styles.modal}>
       <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
       <View style={styles.row}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text></View><Switch value={enabled} onValueChange={setEnabled} /></View>
-      <View style={[styles.row, styles.loss]}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text></View><Switch value={foldersEnabled} onValueChange={setFoldersEnabled} /></View>
       {enabled && <View style={styles.loss}><Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text><View style={styles.counter}><TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}><Text style={styles.button}>−</Text></TouchableOpacity><Text style={styles.value}>{loss}</Text><TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}><Text style={styles.button}>+</Text></TouchableOpacity></View><Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text></View>}
+      <View style={[styles.row, styles.loss]}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text></View><Switch value={foldersEnabled} onValueChange={setFoldersEnabled} /></View>
       <TouchableOpacity onPress={onClose} style={styles.close}><Text>OK</Text></TouchableOpacity>
     </View></View>
   </Modal>;

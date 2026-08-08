@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -48,7 +48,7 @@ const ActionCell = ({ icon, label, onPress, disabled = false }) => (
   </TouchableOpacity>
 );
 
-const CharacterCell = ({ character, onPress, onDelete, onDownload, onMoveStart, moving }) => {
+const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd, moving }) => {
   const originImage = getOriginImage(character.originName);
   return (
     <TouchableOpacity
@@ -56,7 +56,7 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload, onMoveStart, 
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <TouchableOpacity style={styles.dragHandle} onLongPress={onMoveStart} delayLongPress={250} onPress={(event) => event?.stopPropagation?.()}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></TouchableOpacity>
+      <TouchableOpacity style={styles.dragHandle} onPressIn={(event) => onDragStart(event.nativeEvent, character)} onTouchMove={(event) => onDragMove(event.nativeEvent)} onPressOut={(event) => onDragEnd(event.nativeEvent)}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></TouchableOpacity>
       {moving && <View style={styles.draggingOverlay}><Text style={styles.draggingText}>↕</Text></View>}
       <View style={styles.characterImageContainer}>
         {originImage ? (
@@ -108,6 +108,8 @@ export default function HomeScreen({ navigation }) {
   const [folderName, setFolderName] = useState('');
   const [activeFolder, setActiveFolder] = useState(null);
   const [movingCharacterId, setMovingCharacterId] = useState(null);
+  const [drag, setDrag] = useState(null);
+  const folderRefs = useRef({});
   const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -216,11 +218,24 @@ export default function HomeScreen({ navigation }) {
     loadList();
   };
 
-  const handleMoveToFolder = async (folderId) => {
-    if (!movingCharacterId) return;
-    await db.moveCharacterToFolder(movingCharacterId, folderId);
+  const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
+    if (!characterId) return;
+    await db.moveCharacterToFolder(characterId, folderId);
     setMovingCharacterId(null);
+    setDrag(null);
     loadList();
+  };
+
+  const handleDragStart = (event, character) => {
+    setMovingCharacterId(character.id);
+    setDrag({ character, x: event.pageX, y: event.pageY });
+    Object.values(folderRefs.current).forEach((ref) => ref?.measureInWindow?.((x, y, width, height) => { ref.__dropBounds = { x, y, width, height }; }));
+  };
+  const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
+  const handleDragEnd = async (event) => {
+    const target = Object.entries(folderRefs.current).find(([, ref]) => { const b = ref?.__dropBounds; return b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height; });
+    if (target) await handleMoveToFolder(target[0]);
+    else { setMovingCharacterId(null); setDrag(null); }
   };
 
   const handleDeleteFolder = (folder) => {
@@ -506,7 +521,7 @@ export default function HomeScreen({ navigation }) {
                   return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
                 }
                 if (item.type === 'folder') {
-                  return <TouchableOpacity key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => movingCharacterId ? handleMoveToFolder(item.id) : setActiveFolder(item)}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => movingCharacterId ? handleMoveToFolder(item.id) : setActiveFolder(item)}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
                 }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
@@ -518,7 +533,9 @@ export default function HomeScreen({ navigation }) {
                     onPress={() => handleOpen(item.id)}
                     onDelete={() => handleDelete(item)}
                     onDownload={() => handleDownload(item)}
-                    onMoveStart={() => setMovingCharacterId(item.id)}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
                     moving={movingCharacterId === item.id}
                   />
                 );
@@ -527,6 +544,7 @@ export default function HomeScreen({ navigation }) {
           ))
         )}
       </ScrollView>
+      {drag && <View pointerEvents="none" style={[styles.dragPreview, { left: drag.x - 54, top: drag.y - 28 }]}><Text style={styles.dragPreviewText}>{drag.character.name}</Text></View>}
 
       {showInstallButton && (
         <TouchableOpacity style={styles.installButton} onPress={handleInstallPress}>
