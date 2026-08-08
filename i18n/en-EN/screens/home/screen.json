@@ -66,8 +66,11 @@
   },
   "settings": {
     "title": "Settings",
-    "durabilityTitle": "Random weapon durability",
-    "durabilityDescription": "Weapons obtained through “Add Loot” have random durability from 1 to 100. Firing weapons consumes durability.",
+    "survivalModeTitle": "Survival Mode Settings",
+    "qualityTitle": "Random weapon quality",
+    "qualityDescription": "Weapons added through \"Loot\" have random quality. Merchant weapons are always 100% quality.",
+    "durabilityTitle": "Weapon wear on firing",
+    "durabilityDescription": "Enable weapon wear mechanic when firing.",
     "lossTitle": "Durability loss per 10 shots",
     "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much.",
     "foldersTitle": "Character folders",

@@ -99,7 +99,7 @@ const InventoryScreen = () => {
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
-  const randomWeaponDurabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
+  const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
@@ -495,7 +495,7 @@ const InventoryScreen = () => {
     }
 
     // Durability is per weapon instance: tracked weapons must never be stacked.
-    if (randomWeaponDurabilityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
+    if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
       for (let index = 0; index < quantity; index += 1) {
         const durability = source === 'buy' ? 100 : rollWeaponDurability();
         const uniqueId = `${localizedItem.id}_durability_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`;

@@ -125,7 +125,7 @@ const RadiationCounter = ({ isEnabled }) => {
 const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
   const storeItems = useCharacterStore((state) => state.items);
   const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
-  const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
+  const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
   const baseLossPer10Shots = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
 
   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -142,7 +142,7 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => 
     item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
   );
   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  const isBroken = durabilityEnabled && Number(durability) <= 0;
+  const isBroken = durabilityLossEnabled && Number(durability) <= 0;
   const canSpend = totalAmmo >= ammoPerShot && !isBroken;
 
   const handleSpend = () => {
@@ -151,7 +151,7 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => 
       weaponInstanceId,
       ammoIds,
       ammoAmount: ammoPerShot,
-      durabilityEnabled,
+      durabilityEnabled: durabilityLossEnabled,
       baseLossPer10Shots,
     });
   };
@@ -279,7 +279,8 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
     const { hasTrait, attributes, skills, trait } = useCharacter();
-    const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
+    const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+    const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -360,7 +361,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const rawAmmoId = displayWeapon?.ammoId ?? displayWeapon?.ammo_id ?? '';
     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
     const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
-    const showDurability = durabilityEnabled && isAmmoWeapon(displayWeapon);
+    const showDurability = (randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon);
 
     const stats = [
       { label: tWeaponsAndArmorScreen('weapon.fields.success'), value: `${successValue}` },
