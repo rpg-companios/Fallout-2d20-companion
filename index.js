@@ -40,9 +40,18 @@ const AppWithBoundary = () => (
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch((error) => {
-      console.warn('Service worker registration failed:', error);
-    });
+    const currentWorkerUrl = `${window.location.origin}/service-worker.js`;
+    navigator.serviceWorker.getRegistrations()
+      .then((registrations) => Promise.all(
+        registrations
+          .filter((registration) => registration.scope === `${window.location.origin}/`
+            && registration.active?.scriptURL !== currentWorkerUrl)
+          .map((registration) => registration.unregister())
+      ))
+      .then(() => navigator.serviceWorker.register('/service-worker.js'))
+      .catch((error) => {
+        console.warn('Service worker registration failed:', error);
+      });
   });
 }
 

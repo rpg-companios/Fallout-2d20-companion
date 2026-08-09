@@ -29,13 +29,6 @@
         window.dispatchEvent(new CustomEvent('pwaInstalled'));
       });
 
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((error) => {
-            console.error('Service Worker registration failed:', error);
-          });
-        });
-      }
     </script>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">

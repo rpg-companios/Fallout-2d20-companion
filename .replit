@@ -43,6 +43,7 @@ args = "npx expo start --web --port 5000"
 waitForPort = 5000
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "static"
 run = ["npm", "run", "serve"]
 build = ["npm", "run", "build"]
+publicDir = "dist"

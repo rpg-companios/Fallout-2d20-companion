@@ -1,35 +1,13 @@
-const CACHE_NAME = 'rpg-companion-v9';
-const APP_SHELL = ['/', '/index.html', '/manifest.json', '/favicon.ico', '/pwa-icon.svg'];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).catch(() => undefined));
-  self.skipWaiting();
-});
+// Compatibility worker for clients that still have /sw.js registered.
+// The app now uses /service-worker.js. Retire this duplicate registration
+// instead of allowing it to serve stale HTML for missing JavaScript bundles.
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
-  );
-  self.clients.claim();
-});
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-  const requestUrl = new URL(event.request.url);
-  if (requestUrl.origin !== self.location.origin) return;
-
-  // Network-first strategy: always try the network first so dev changes
-  // are reflected immediately; fall back to cache only when offline.
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
-        }
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/index.html')))
+    Promise.all([
+      self.registration.unregister(),
+      caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))),
+    ]).then(() => self.clients.claim())
   );
 });
