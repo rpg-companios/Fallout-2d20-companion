@@ -650,10 +650,7 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => {
               setMenuVisible(false);
-              Alert.alert(
-                tHomeScreen('menu.buyCoffee'),
-                tHomeScreen('menu.buyCoffeeDescription')
-              );
+              openExternalLink('https://boosty.to/fallout2d20ru');
             }}>
               <MaterialCommunityIcons name="coffee-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee')}</Text>
