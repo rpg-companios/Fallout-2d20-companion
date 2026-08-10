@@ -1,0 +1,2272 @@
+From 44ae4fcffe2bc430ff7acf284167b9a7371ad8d8 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 10 Aug 2026 11:48:01 +0000
+Subject: [PATCH] feat(robot): add Securitron origin (trait, body plan, kit, Mk
+ II OS)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Ориджин «Секьюритрон» реализован полностью:
+- trait «Секьюритрон Mk I»: иммунитеты к яду/радиации, вес 150 фикс
+  (STR/перки не влияют), запрет расходников/еды/питья/отдыха, ремонт для
+  восстановления, эффект no_hunger_thirst_fatigue (данные для будущей механики)
+- свой план тела securitron: голова / корпус / левая рука / правая рука /
+  колесо; layout 1-3-1; таблица попаданий 1-2/3-11/12-14/15-17/18-20
+- новые робо-части (голова, корпус 150, рука-манипулятор, колесо) + i18n ru/en
+- комплект securitron_standard: авт. лазерный пистолет (мод mod_053) и ПП .45
+  встроены ВНУТРЬ рук (builtinWeapons), ладони свободны для любого оружия;
+  ракетница и гранатомёт M79 — нерабочие (requiresMkII) до установки драйвера;
+  заводская броня корпуса/головы/рук; принтер (новый робо-предмет)
+- «Драйвер ОС Mk II»: уникальный робо-предмет, кнопка «Применить» в инвентаре
+  (только для секьюритрона), активирует Mk II оружие; флаг mk2Installed
+  персистится в robot-срезе стора; до установки оружие — disabled-карточки
+  «Требуется ОС Mk II» на экране снаряжения и пометка в инвентаре
+- поддержка слота wheel и встроенного оружия конечностей в robotEquip;
+  распределение робо-брони (robotArmor) по слотам; фикс дублей предметов
+  кита в инвентаре; префикс RU мода mod_053 → «Автоматический»
+- WeaponCard: хук mk2Installed вызывается БЕЗУСЛОВНО (Правила хуков) — ранее
+  хук после раннего return пустого слота ронял React «Rendered more hooks»
+- тесты: __tests__/securitron (24) — данные/механика + РЕНДЕР-смок WeaponCard
+  (react-test-renderer); vitest.config.js: JSX в .js через babel (рендер-тесты
+  компонентов); devDeps: react-test-renderer, @babel/core,
+  @babel/plugin-transform-react-jsx; changelog ru/en; docs/schema 01-origins
+---
+ .../securitron/securitron-origin.test.js      | 472 ++++++++++++++++++
+ .../securitron/weaponcard-render.test.js      | 145 ++++++
+ .../CharacterScreen/modals/ArmorLayerModal.js |   1 +
+ .../modals/EquipmentKitModal.js               |  39 +-
+ .../modals/traits/GenericTraitModal.js        |   1 +
+ .../CharacterScreen/modals/traits/index.js    |   1 +
+ .../InventoryScreen/InventoryScreen.js        |  46 ++
+ .../WeaponsAndArmorScreen/RobotSlot.js        |   1 +
+ .../WeaponsAndArmorScreen.js                  |  23 +-
+ data/bodyplans/bodyplans.json                 |  62 ++-
+ data/equipment/robot/robotarms.json           |  24 +
+ data/equipment/robot/robotbody.json           |  25 +
+ data/equipment/robot/robotheads.json          |  19 +
+ data/equipment/robot/robotlegs.json           |  19 +
+ data/equipment/robotparts.json                |  16 +
+ data/equipmentKits/securitron.json            | 107 ++++
+ data/origins/origins.json                     |   8 +-
+ data/traits/traits.json                       |  12 +
+ docs/changelog.en.md                          |  14 +
+ docs/changelog.md                             |  12 +
+ docs/changelog.ru.md                          |  14 +
+ docs/schema/01-origins.md                     |   2 +-
+ domain/kitResolver.js                         |   9 +
+ domain/robotEquip.js                          | 100 +++-
+ domain/robotSlotLogic.js                      |   8 +-
+ i18n/en-EN/data/equipment/robot/items.json    |  16 +-
+ .../en-EN/data/equipment/robot/robotarms.json |   3 +-
+ .../en-EN/data/equipment/robot/robotbody.json |   3 +-
+ .../data/equipment/robot/robotheads.json      |   3 +-
+ .../en-EN/data/equipment/robot/robotlegs.json |   3 +-
+ i18n/en-EN/data/system/equipmentKits.json     |   3 +-
+ i18n/en-EN/data/system/traits.json            |   6 +
+ i18n/en-EN/screens/character/screen.json      |   3 +-
+ i18n/en-EN/screens/inventory/screen.json      |  22 +-
+ .../en-EN/screens/weaponsAndArmor/screen.json |  14 +-
+ i18n/equipmentCatalog.js                      |   2 +
+ i18n/ru-RU/data/equipment/robot/items.json    |  16 +-
+ .../ru-RU/data/equipment/robot/robotarms.json |   3 +-
+ .../ru-RU/data/equipment/robot/robotbody.json |   3 +-
+ .../data/equipment/robot/robotheads.json      |   3 +-
+ .../ru-RU/data/equipment/robot/robotlegs.json |   3 +-
+ .../data/equipment/weapons/weapon_mods.json   |   2 +-
+ i18n/ru-RU/data/system/equipmentKits.json     |   3 +-
+ i18n/ru-RU/data/system/traits.json            |   6 +
+ i18n/ru-RU/screens/character/screen.json      |   3 +-
+ i18n/ru-RU/screens/inventory/screen.json      |  22 +-
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  14 +-
+ package.json                                  |   4 +-
+ src/store/characterStore.js                   |   4 +
+ src/store/robotSlice.js                       |  42 +-
+ vitest.config.js                              |  25 +
+ 51 files changed, 1337 insertions(+), 74 deletions(-)
+ create mode 100644 __tests__/securitron/securitron-origin.test.js
+ create mode 100644 __tests__/securitron/weaponcard-render.test.js
+ create mode 100644 data/equipmentKits/securitron.json
+
+diff --git a/__tests__/securitron/securitron-origin.test.js b/__tests__/securitron/securitron-origin.test.js
+new file mode 100644
+index 0000000..8ac8dd9
+--- /dev/null
++++ b/__tests__/securitron/securitron-origin.test.js
+@@ -0,0 +1,472 @@
++/**
++ * Ориджин «Секьюритрон» — контракты данных.
++ *
++ * Покрывает:
++ *  - данные ориджина/трейта (иммунитеты, вес, эффекты)
++ *  - план тела (слоты, дефолты, layout, таблица попаданий)
++ *  - разрешение комплекта и распределение по слотам робота
++ *  - переносимый вес робота (корпус + модификаторы брони)
++ *  - полноту i18n ru-RU / en-EN
++ */
++import { describe, it, expect, vi } from 'vitest';
++
++// db/Database в проде делегирует в db/catalogSource (каталог из JSON), но тянет
++// react-native/адаптеры, которые не резолвятся в node. Мокаем сам модуль,
++// делегируя в реальный catalogSource — моды/патроны/предметы берутся из данных.
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++import originsJson from '../../data/origins/origins.json';
++import traitsJson from '../../data/traits/traits.json';
++import bodyPlans from '../../data/bodyplans/bodyplans.json';
++import kitData from '../../data/equipmentKits/securitron.json';
++import ruTraits from '../../i18n/ru-RU/data/system/traits.json';
++import enTraits from '../../i18n/en-EN/data/system/traits.json';
++import ruKitNames from '../../i18n/ru-RU/data/system/equipmentKits.json';
++import enKitNames from '../../i18n/en-EN/data/system/equipmentKits.json';
++import ruRobotHeads from '../../i18n/ru-RU/data/equipment/robot/robotheads.json';
++import enRobotHeads from '../../i18n/en-EN/data/equipment/robot/robotheads.json';
++import ruRobotBodies from '../../i18n/ru-RU/data/equipment/robot/robotbody.json';
++import enRobotBodies from '../../i18n/en-EN/data/equipment/robot/robotbody.json';
++import ruRobotArms from '../../i18n/ru-RU/data/equipment/robot/robotarms.json';
++import enRobotArms from '../../i18n/en-EN/data/equipment/robot/robotarms.json';
++import ruRobotLegs from '../../i18n/ru-RU/data/equipment/robot/robotlegs.json';
++import enRobotLegs from '../../i18n/en-EN/data/equipment/robot/robotlegs.json';
++import ruRobotItems from '../../i18n/ru-RU/data/equipment/robot/items.json';
++import enRobotItems from '../../i18n/en-EN/data/equipment/robot/items.json';
++import ruWaAScreen from '../../i18n/ru-RU/screens/weaponsAndArmor/screen.json';
++import enWaAScreen from '../../i18n/en-EN/screens/weaponsAndArmor/screen.json';
++
++import { resolveKitItems } from '../../domain/kitResolver';
++import { initRobotSlots, getRobotSlotKeys } from '../../domain/robotEquip';
++import { calculateRobotCarryWeight } from '../../domain/characterCreation';
++import { getBodyPlan } from '../../domain/bodyplan';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import useCharacterStore from '../../src/store/characterStore';
++import { selectRobotMk2Installed } from '../../src/store/robotSlice';
++
++/**
++ * Репликация EquipmentKitModal.handleSelectKit + CharacterScreen.handleSelectKit:
++ * формирование финального списка предметов и добавление в стор (equipped+locked).
++ */
++const simulateKitSelect = async (kitId, kitItems, bodyPlan) => {
++  const resolved = await resolveKitItems({ id: kitId, items: kitItems });
++
++  // toInventoryItems (модалка)
++  const raw = [];
++  resolved.items.forEach((item) => {
++    if (!item) return;
++    if (item.itemType === 'weapon' || item.weaponId) {
++      const weapon = item._weapon || {};
++      const appliedMods = {};
++      (item._mods || []).forEach((mod) => { if (mod.slot && mod.id) appliedMods[mod.slot] = mod.id; });
++      raw.push({
++        ...weapon,
++        id: weapon.id || item.weaponId,
++        name: item.displayName || item.name || weapon.name,
++        weaponId: weapon.id || item.weaponId,
++        appliedMods,
++        quantity: item.quantity || 1,
++        itemType: 'weapon',
++        hasMods: item.hasMods ?? false,
++        builtinToArm: item.builtinToArm,
++        requiresMkII: item.requiresMkII,
++      });
++      if (item.resolvedAmmunition) {
++        raw.push({ ...item.resolvedAmmunition, quantity: item.resolvedAmmunition.quantity || 1 });
++      }
++      return;
++    }
++    raw.push({ ...item, name: item.name || item.itemId, quantity: item.quantity || 1 });
++  });
++
++  const { slots, weapons, modules, inventoryItems: robotInventory } = initRobotSlots(
++    bodyPlan,
++    resolved.items,
++    loadRobotCatalog(),
++  );
++
++  const slotConsumedTypes = new Set([
++    'robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs',
++    'plating', 'armor', 'robotArmor', 'frame', 'module',
++  ]);
++  const finalItemsOnly = raw.filter((item) => {
++    if (slotConsumedTypes.has(item.itemType)) return false;
++    if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
++    if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
++    return true;
++  });
++  const robotInvKeys = new Set(
++    robotInventory.map((i) => i.weaponId || i.id || i.itemId || i.armorId || i.clothingId).filter(Boolean),
++  );
++  const dedupedFinalItems = finalItemsOnly.filter((item) => {
++    const key = item.weaponId || item.id || item.itemId || item.armorId || item.clothingId;
++    return !key || !robotInvKeys.has(key);
++  });
++
++  useCharacterStore.getState().resetCharacterStore();
++  [...dedupedFinalItems, ...robotInventory].forEach((item) => {
++    if (item.itemType === 'currency' || item.type === 'currency') return;
++    useCharacterStore.getState().addNewItem({ ...item, equipped: true, locked: true });
++  });
++
++  return {
++    storeItems: useCharacterStore.getState().items,
++    slotWeapons: weapons,
++    slots,
++    modules,
++  };
++};
++
++const ORIGIN_ID = 'securitron';
++const TRAIT_ID = 'securitron-mark-i';
++const KIT_ID = 'securitron_standard';
++const BODY_PLAN = 'securitron';
++
++const loadRobotCatalog = () => ({
++  heads: require('../../data/equipment/robot/robotheads.json'),
++  bodies: require('../../data/equipment/robot/robotbody.json'),
++  arms: require('../../data/equipment/robot/robotarms.json'),
++  legs: require('../../data/equipment/robot/robotlegs.json'),
++  weapons: require('../../data/equipment/robot/weapons.json'),
++});
++
++const getOrigin = () => originsJson.find((o) => o.id === ORIGIN_ID);
++const getTrait = () => traitsJson.find((t) => t.id === TRAIT_ID);
++
++const getNameOf = (list, id) => list.find((x) => x.id === id)?.name;
++
++describe('Ориджин Секьюритрон: данные', () => {
++  it('ориджин: робот, свой план тела, трейт и комплект', () => {
++    const origin = getOrigin();
++    expect(origin).toBeDefined();
++    expect(origin.characterType).toBe('robot');
++    expect(origin.bodyPlan).toBe(BODY_PLAN);
++    expect(origin.traitIds).toEqual([TRAIT_ID]);
++    expect(origin.equipmentKitIds).toEqual([KIT_ID]);
++  });
++
++  it('трейт: иммунитеты ровно [radiation, poison] (без disease), вес 150 фикс', () => {
++    const trait = getTrait();
++    expect(trait).toBeDefined();
++    expect(trait.originId).toBe(ORIGIN_ID);
++    expect(trait.modifiers.immunities).toEqual(['radiation', 'poison']);
++    expect(trait.modifiers.carryWeightFixed).toBe(150);
++    expect(trait.modifiers.carryWeightStrengthMultiplier).toBe(0);
++    expect(trait.modifiers.effects).toContain('no_consumables_food_rest');
++    expect(trait.modifiers.effects).toContain('repair_to_heal');
++    expect(trait.modifiers.effects).toContain('no_hunger_thirst_fatigue');
++  });
++
++  it('трейт переведён в обеих локалях (не ключом)', () => {
++    const trait = getTrait();
++    const ru = ruTraits.traits.securitron.markI;
++    const en = enTraits.traits.securitron.markI;
++    expect(ru.name).toBeTruthy();
++    expect(ru.description).toBeTruthy();
++    expect(en.name).toBeTruthy();
++    expect(en.description).toBeTruthy();
++    expect(ru.name).not.toBe(trait.displayNameKey);
++    expect(en.name).not.toBe(trait.displayNameKey);
++    // Содержательные проверки описаний
++    expect(ru.description).toContain('Mk I');
++    expect(ru.description).toContain('150');
++    expect(en.description).toContain('Mk I');
++    expect(en.description).toContain('150 lbs');
++  });
++});
++
++describe('Ориджин Секьюритрон: план тела', () => {
++  const plan = bodyPlans[BODY_PLAN];
++
++  it('слоты: голова, корпус, руки, одно колесо', () => {
++    expect(plan).toBeDefined();
++    expect(plan.slots).toEqual(['head', 'leftArm', 'body', 'rightArm', 'wheel']);
++  });
++
++  it('дефолты указывают на существующие части (с переводом в обеих локалях)', () => {
++    const defaults = plan.defaults;
++    expect(defaults).toMatchObject({
++      head: 'robot_head_securitron',
++      body: 'robot_body_securitron',
++      leftArm: 'robot_arm_securitron',
++      rightArm: 'robot_arm_securitron',
++      wheel: 'robot_legs_securitron',
++    });
++    for (const id of Object.values(defaults)) {
++      const ru = getNameOf(ruRobotHeads, id) ?? getNameOf(ruRobotBodies, id)
++        ?? getNameOf(ruRobotArms, id) ?? getNameOf(ruRobotLegs, id);
++      const en = getNameOf(enRobotHeads, id) ?? getNameOf(enRobotBodies, id)
++        ?? getNameOf(enRobotArms, id) ?? getNameOf(enRobotLegs, id);
++      expect(ru, `ru name for ${id}`).toBeTruthy();
++      expect(en, `en name for ${id}`).toBeTruthy();
++    }
++  });
++
++  it('строение: 1-я строка голова, 2-я рука-корпус-рука, 3-я колесо', () => {
++    expect(plan.layout).toEqual([
++      ['head'],
++      ['leftArm', 'body', 'rightArm'],
++      ['wheel'],
++    ]);
++  });
++
++  it('таблица попаданий d20: 1-2 голова, 3-11 корпус, 12-14 левая, 15-17 правая, 18-20 колесо', () => {
++    expect(plan.hitLocations).toEqual({
++      head: '1-2',
++      body: '3-11',
++      leftArm: '12-14',
++      rightArm: '15-17',
++      wheel: '18-20',
++    });
++  });
++
++  it('руки умеют держать оружие; колесо — слот движения', () => {
++    expect(plan.slotCapabilities.leftArm.canEquipWeapon).toBe(true);
++    expect(plan.slotCapabilities.rightArm.canEquipWeapon).toBe(true);
++    expect(getRobotSlotKeys(BODY_PLAN)).toEqual(plan.slots);
++    expect(getBodyPlan(BODY_PLAN)).toBeDefined();
++  });
++
++  it('слот колеса локализован (robotSlot.slotNames) в обеих локалях', () => {
++    expect(ruWaAScreen.robotSlot.slotNames.wheel).toBe('Колесо');
++    expect(enWaAScreen.robotSlot.slotNames.wheel).toBe('Wheel');
++  });
++
++  it('новые конечности локализованы в robotLimbs обеих локалей', () => {
++    for (const id of ['robot_head_securitron', 'robot_body_securitron', 'robot_arm_securitron', 'robot_legs_securitron']) {
++      expect(ruWaAScreen.robotLimbs[id], `ru robotLimbs.${id}`).toBeTruthy();
++      expect(enWaAScreen.robotLimbs[id], `en robotLimbs.${id}`).toBeTruthy();
++    }
++  });
++});
++
++describe('Ориджин Секьюритрон: комплект и слоты робота', () => {
++  it('комплект есть в data и назван в обеих локалях', () => {
++    expect(kitData[KIT_ID]).toBeDefined();
++    expect(Array.isArray(kitData[KIT_ID].items)).toBe(true);
++    expect(kitData[KIT_ID].name).toBeUndefined(); // имя — только в i18n
++    expect(ruKitNames[KIT_ID].name).toBeTruthy();
++    expect(enKitNames[KIT_ID].name).toBeTruthy();
++  });
++
++  it('каталог собирает комплект (name + items) без ошибок каталога', () => {
++    const catalog = getEquipmentCatalog('ru-RU');
++    const kit = catalog.equipmentKits[KIT_ID];
++    expect(kit).toBeDefined();
++    expect(typeof kit.name).toBe('string');
++    expect(Array.isArray(kit.items)).toBe(true);
++  });
++
++  it('распределение: голова/корпус/колесо по слотам, ладонные оружия — в руках с модами', async () => {
++    const resolved = await resolveKitItems({ id: KIT_ID, items: kitData[KIT_ID].items });
++    const { slots, weapons, modules, inventoryItems } = initRobotSlots(BODY_PLAN, resolved.items, loadRobotCatalog());
++
++    expect(slots.head.limb.id).toBe('robot_head_securitron');
++    expect(slots.body.limb.id).toBe('robot_body_securitron');
++    expect(slots.wheel.limb.id).toBe('robot_legs_securitron');
++    expect(slots.leftArm.limb.id).toBe('robot_arm_securitron');
++    expect(slots.rightArm.limb.id).toBe('robot_arm_securitron');
++
++    // Ладонные орудия встроены ВНУТРЬ рук (limb.builtinWeapons):
++    // лазер — левая, ПП — правая; ладонь (heldWeapon) свободна — манипуляторы
++    // могут держать любое другое оружие.
++    expect(slots.leftArm.heldWeapon).toBeNull();
++    expect(slots.rightArm.heldWeapon).toBeNull();
++    expect(slots.leftArm.limb.canHoldWeapons).toBe(true);
++    expect(slots.leftArm.limb.weaponSlots).toBe(1);
++
++    const leftBuiltins = slots.leftArm.limb.builtinWeapons;
++    const rightBuiltins = slots.rightArm.limb.builtinWeapons;
++    expect(leftBuiltins.map((w) => w.id).sort()).toEqual(['robot_weapon_manipulator', 'weapon_laser_gun']);
++    expect(rightBuiltins.map((w) => w.id).sort()).toEqual(['robot_weapon_manipulator', 'weapon_submachine_gun']);
++
++    const laser = leftBuiltins.find((w) => w.id === 'weapon_laser_gun');
++    expect(laser.isBuiltin).toBe(true);
++    expect(laser.locked).toBe(true);
++    // Мод «Автоматический ствол» применён к статам: −1 урон, +1 скорострельность,
++    // +1 дистанция (C→M), снято качество Вплотную.
++    expect(laser.damage).toBe(3);           // 4 − 1
++    expect(laser.fireRate).toBe(3);         // 2 + 1
++    expect(laser.fire_rate).toBe(3);
++    expect(laser.range).toBe('M');
++    expect(laser.qualities.some((q) => q.qualityId === 'quality_close_quarters')).toBe(false);
++    expect(laser.baseWeaponName).toBeTruthy();
++
++    const smg = rightBuiltins.find((w) => w.id === 'weapon_submachine_gun');
++    expect(smg.isBuiltin).toBe(true);
++    expect(smg.damage).toBe(3);
++    expect(smg.fireRate).toBe(3);
++
++    // В инвентаре ладонных оружий нет (они внутри рук)
++    expect(inventoryItems.some((i) => i.weaponId === 'weapon_laser_gun')).toBe(false);
++    expect(inventoryItems.some((i) => i.weaponId === 'weapon_submachine_gun')).toBe(false);
++
++    // Список атак: манипулятор@левая (дедуп по id), лазер@левая, ПП@правая — все built-in
++    const cards = weapons.map((w) => `${w.id}@${w.sourceSlot}${w.isBuiltin ? '[builtin]' : ''}`).sort();
++    expect(cards).toEqual([
++      'robot_weapon_manipulator@leftArm[builtin]',
++      'weapon_laser_gun@leftArm[builtin]',
++      'weapon_submachine_gun@rightArm[builtin]',
++    ]);
++
++    // Заводская броня распределена по слотам
++    expect(slots.head.armor?.id).toBe('robot_armor_factory_optics');
++    expect(slots.body.armor?.id).toBe('robot_armor_factory_body');
++    expect(slots.leftArm.armor?.id).toBe('robot_armor_factory_arms');
++    expect(slots.rightArm.armor?.id).toBe('robot_armor_factory_arms');
++
++    // Нерабочие оружия (ракетница + гранатомёт M79) — предметы инвентаря с флагом requiresMkII
++    const mkII = inventoryItems.filter((i) => i.requiresMkII);
++    expect(mkII.map((i) => i.id || i.weaponId).sort()).toEqual([
++      'weapon_m79_grenade_launcher',
++      'weapon_missile_launcher',
++    ]);
++
++    // Принтер — в инвентаре
++    expect(inventoryItems.some((i) => (i.id || i.itemId) === 'robot_item_printer')).toBe(true);
++
++    expect(modules).toEqual([]);
++  });
++
++  it('полный поток кита в стор: без дублей, MkII-оружия помечены, ладонные — только в слотах', async () => {
++    const { storeItems, slotWeapons } = await simulateKitSelect(KIT_ID, kitData[KIT_ID].items, BODY_PLAN);
++
++    const summary = Object.values(storeItems).map((i) => ({
++      id: i.weaponId || i.id,
++      qty: i.quantity,
++      mods: i.appliedMods && Object.keys(i.appliedMods).length ? Object.keys(i.appliedMods).length : 0,
++      mkII: Boolean(i.requiresMkII),
++    }));
++
++    const byId = (id) => summary.filter((s) => s.id === id);
++
++    // Ладонные оружия в стор НЕ дублируются (они в слотах рук)
++    expect(byId('weapon_laser_gun')).toEqual([]);
++    expect(byId('weapon_submachine_gun')).toEqual([]);
++
++    // Нерабочие оружия — по одной штуке, с флагом requiresMkII
++    expect(byId('weapon_missile_launcher')).toEqual([{ id: 'weapon_missile_launcher', qty: 1, mods: 0, mkII: true }]);
++    expect(byId('weapon_m79_grenade_launcher')).toEqual([{ id: 'weapon_m79_grenade_launcher', qty: 1, mods: 0, mkII: true }]);
++
++    // Принтер — один
++    expect(byId('robot_item_printer')).toEqual([{ id: 'robot_item_printer', qty: 1, mods: 0, mkII: false }]);
++
++    // Аммуниция — по одному стеку
++    expect(byId('ammo_energy_cell').length).toBe(1);
++    expect(byId('ammo_45').length).toBe(1);
++
++    // Все оружия в слотах помечены built-in: лазер, ПП и манипулятор
++    expect(slotWeapons.filter((w) => !w.isBuiltin)).toEqual([]);
++    expect(slotWeapons.map((w) => `${w.id}@${w.sourceSlot}`).sort()).toEqual([
++      'robot_weapon_manipulator@leftArm',
++      'weapon_laser_gun@leftArm',
++      'weapon_submachine_gun@rightArm',
++    ]);
++  });
++
++  it('аммуниция лазера — 14 + 7 CD энергоячеек, ПП — 8 + 4 CD .45', async () => {
++    const resolved = await resolveKitItems({ id: KIT_ID, items: kitData[KIT_ID].items });
++    const laser = resolved.items.find((i) => i.weaponId === 'weapon_laser_gun');
++    const smg = resolved.items.find((i) => i.weaponId === 'weapon_submachine_gun');
++
++    expect(laser._mods.map((m) => m.id)).toEqual(['mod_053']); // автоматический ствол
++    expect(laser.resolvedAmmunition.id).toBe('ammo_energy_cell');
++    // 14 + 7 CD: каждая CD даёт 0–2 (ролл боевых кубиков), итог ∈ [14, 28]
++    expect(laser.resolvedAmmunition.quantity).toBeGreaterThanOrEqual(14);
++    expect(laser.resolvedAmmunition.quantity).toBeLessThanOrEqual(28);
++
++    expect(smg.resolvedAmmunition.id).toBe('ammo_45');
++    expect(smg.resolvedAmmunition.quantity).toBeGreaterThanOrEqual(8);
++    expect(smg.resolvedAmmunition.quantity).toBeLessThanOrEqual(16);
++  });
++});
++
++describe('Ориджин Секьюритрон: переносимый вес', () => {
++  it('база — 150 от корпуса (не 225 протектрона), модификаторы только от брони', async () => {
++    const resolved = await resolveKitItems({ id: KIT_ID, items: kitData[KIT_ID].items });
++    const { slots } = initRobotSlots(BODY_PLAN, resolved.items, loadRobotCatalog());
++    const trait = getTrait();
++
++    expect(slots.body.limb.carryWeight).toBe(150);
++
++    // База без брони: 150 (корпус), STR не влияет (множитель 0)
++    const withoutArmor = { ...slots, body: { ...slots.body, armor: null }, head: { ...slots.head, armor: null }, leftArm: { ...slots.leftArm, armor: null }, rightArm: { ...slots.rightArm, armor: null } };
++    expect(calculateRobotCarryWeight(withoutArmor, trait)).toBe(150);
++
++    // С заводской бронёй: 150 + модификаторы брони (корпус +20, оптика +10, руки +10+10)
++    const withArmor = calculateRobotCarryWeight(slots, trait);
++    const armorMods = 20 + 10 + 10 + 10;
++    expect(withArmor).toBe(150 + armorMods);
++  });
++
++  it('принтер — робо-предмет с именем в обеих локалях', () => {
++    expect(getNameOf(ruRobotItems, 'robot_item_printer')).toBe('Принтер');
++    expect(getNameOf(enRobotItems, 'robot_item_printer')).toBe('Printer');
++  });
++});
++
++describe('Ориджин Секьюритрон: драйвер ОС Mk II', () => {
++  const DRIVER_ID = 'robot_item_mk2_driver';
++
++  it('драйвер — робо-предмет: уникальный, только для секьюритрона, с переводом', () => {
++    const driver = require('../../data/equipment/robotparts.json').robotItems.find((i) => i.id === DRIVER_ID);
++    expect(driver).toBeDefined();
++    expect(driver.itemType).toBe('misc');
++    expect(driver.unique).toBe(true);
++    expect(driver.requiresOriginId).toBe('securitron');
++    expect(getNameOf(ruRobotItems, DRIVER_ID)).toBe('Драйвер ОС Mk II');
++    expect(getNameOf(enRobotItems, DRIVER_ID)).toBe('Mk II OS Driver');
++  });
++
++  it('применяется только к секьюритрону, потребляет предмет, повторно нельзя', () => {
++    const store = useCharacterStore.getState();
++    store.resetCharacterStore();
++    store.initRobot('securitron');
++    store.addNewItem({ weaponId: DRIVER_ID, itemType: 'misc', quantity: 1, name: 'Драйвер ОС Mk II' });
++
++    const driverItem = Object.values(useCharacterStore.getState().items)[0];
++    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(false);
++
++    const res = useCharacterStore.getState().applyMk2Driver(driverItem.id);
++    expect(res).toEqual({ ok: true });
++    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(true);
++    // Предмет израсходован
++    expect(Object.keys(useCharacterStore.getState().items)).toHaveLength(0);
++
++    // Повторное применение невозможно
++    const again = useCharacterStore.getState().applyMk2Driver(driverItem.id);
++    expect(again.ok).toBe(false);
++    expect(again.reason).toBe('mk2.alreadyInstalled');
++  });
++
++  it('не применяется к другим роботам', () => {
++    const store = useCharacterStore.getState();
++    store.resetCharacterStore();
++    store.initRobot('protectron');
++    store.addNewItem({ weaponId: DRIVER_ID, itemType: 'misc', quantity: 1 });
++
++    const driverItem = Object.values(useCharacterStore.getState().items)[0];
++    const res = useCharacterStore.getState().applyMk2Driver(driverItem.id);
++    expect(res.ok).toBe(false);
++    expect(res.reason).toBe('mk2.requiresSecuritron');
++    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(false);
++    // Предмет не израсходован
++    expect(Object.keys(useCharacterStore.getState().items)).toHaveLength(1);
++  });
++
++  it('флаг mk2Installed персистится вместе с robot-срезом (partialize)', () => {
++    const persistOptions = useCharacterStore.persist?.getOptions?.();
++    expect(persistOptions?.partialize).toBeDefined();
++    const partial = persistOptions.partialize(useCharacterStore.getState());
++    expect(partial.robot).toHaveProperty('mk2Installed', false);
++    expect(partial.robot.bodyPlan).toBe('protectron');
++  });
++});
+diff --git a/__tests__/securitron/weaponcard-render.test.js b/__tests__/securitron/weaponcard-render.test.js
+new file mode 100644
+index 0000000..2ecdcb7
+--- /dev/null
++++ b/__tests__/securitron/weaponcard-render.test.js
+@@ -0,0 +1,145 @@
++/**
++ * Рендер-смок тест карточки оружия (WeaponCard).
++ *
++ * ПРАВИЛО ВЛАДЕЛЬЦА: компоненты должны реально РЕНДЕРИТЬСЯ в тестах, а не только
++ * компилироваться — нарушения Правил хуков и краши при монтировании ловятся
++ * только исполнением. Регрессия: хук useCharacterStore в WeaponCard обязан
++ * вызываться БЕЗУСЛОВНО (до раннего return пустого слота) — иначе React падает
++ * «Rendered more hooks than during the previous render» и размонтирует приложение.
++ */
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { createElement as h } from 'react';
++
++vi.mock('react-native', () => {
++  const host = (name) => ({ $$typeof: Symbol.for('react.element'), type: name });
++  return {
++    View: 'View',
++    Text: 'Text',
++    TouchableOpacity: 'TouchableOpacity',
++    ScrollView: 'ScrollView',
++    ImageBackground: 'ImageBackground',
++    SafeAreaView: 'SafeAreaView',
++    Modal: 'Modal',
++    Platform: { OS: 'web', select: (o) => o.web ?? o.default },
++    StyleSheet: { create: (s) => s, flatten: (s) => s },
++  };
++});
++
++vi.mock('../../components/CharacterContext', () => ({
++  useCharacter: () => ({
++    hasTrait: () => false,
++    attributes: [],
++    skills: [],
++    trait: null,
++  }),
++}));
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++// textUtils тянет PNG-ассеты через require — node их не умеет; WeaponCard
++// этот модуль не использует, мокаем.
++vi.mock('../../components/screens/WeaponsAndArmorScreen/textUtils', () => ({
++  renderTextWithIcons: (text) => text,
++}));
++
++// Соседние JSX-компоненты экрана не нужны для рендера WeaponCard —
++// мокаем, чтобы vitest не парсил их исходники (import-analysis без JSX).
++vi.mock('../../components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/WeaponsAndArmorScreen/RobotSlot', () => ({ default: () => null }));
++vi.mock('../../components/screens/CharacterScreen/modals/LimbUpgradeModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/CharacterScreen/modals/ArmorPickerModal', () => ({ default: () => null }));
++
++import TestRenderer from 'react-test-renderer';
++import useCharacterStore from '../../src/store/characterStore';
++import { WeaponCard } from '../../components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
++
++const makeWeapon = (overrides = {}) => ({
++  id: 'weapon_laser_gun',
++  weaponId: 'weapon_laser_gun',
++  name: 'Лазерный пистолет',
++  damage: 4,
++  damageType: 'energy',
++  damage_type: ['energy'],
++  fireRate: 2,
++  fire_rate: 2,
++  range: 'C',
++  range_name: 'C',
++  qualities: [],
++  effects: [],
++  ammoId: '',
++  itemType: 'weapon',
++  ...overrides,
++});
++
++const getTexts = (json, acc = []) => {
++  if (!json) return acc;
++  if (typeof json === 'string') { acc.push(json); return acc; }
++  if (Array.isArray(json)) { json.forEach((j) => getTexts(j, acc)); return acc; }
++  if (json.children) getTexts(json.children, acc);
++  return acc;
++};
++
++describe('WeaponCard рендерится', () => {
++  beforeEach(() => {
++    useCharacterStore.setState({
++      robot: { bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: false },
++    });
++  });
++
++  it('пустой слот → оружие на той же инстанции: без нарушения Правил хуков', () => {
++    let renderer;
++    TestRenderer.act(() => {
++      renderer = TestRenderer.create(h(WeaponCard, { weapon: null }));
++    });
++    // Пере-рендер ТОЙ ЖЕ инстанции с оружием — старый код падал здесь
++    // (хук после раннего return). Ниже — регрессионный гвард.
++    TestRenderer.act(() => {
++      renderer.update(h(WeaponCard, { weapon: makeWeapon() }));
++    });
++    const texts = getTexts(renderer.toJSON());
++    expect(texts.some((t) => t.includes('Лазерный пистолет'))).toBe(true);
++    TestRenderer.act(() => {
++      renderer.update(h(WeaponCard, { weapon: null }));
++    });
++    TestRenderer.act(() => {
++      renderer.update(h(WeaponCard, { weapon: makeWeapon({ id: 'weapon_10mm_pistol', name: '10mm Пистолет' }) }));
++    });
++    const texts2 = getTexts(renderer.toJSON());
++    expect(texts2.some((t) => t.includes('10mm Пистолет'))).toBe(true);
++  });
++
++  it('requiresMkII-оружие: пометка «Требуется ОС Mk II» без установленного драйвера', () => {
++    let renderer;
++    TestRenderer.act(() => {
++      renderer = TestRenderer.create(h(WeaponCard, {
++        weapon: makeWeapon({ id: 'weapon_missile_launcher', name: 'Ракетная установка', requiresMkII: true }),
++      }));
++    });
++    const texts = getTexts(renderer.toJSON());
++    // Пометка «Требуется ОС Mk II» / «Requires Mk II OS» — в обеих локалях «Mk II»
++    expect(texts.some((t) => t.includes('Mk II'))).toBe(true);
++  });
++
++  it('requiresMkII-оружие: пометки нет после установки драйвера', () => {
++    useCharacterStore.setState({
++      robot: { bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: true },
++    });
++    let renderer;
++    TestRenderer.act(() => {
++      renderer = TestRenderer.create(h(WeaponCard, {
++        weapon: makeWeapon({ id: 'weapon_missile_launcher', name: 'Ракетная установка', requiresMkII: true }),
++      }));
++    });
++    const texts = getTexts(renderer.toJSON());
++    expect(texts.some((t) => t.includes('Mk II'))).toBe(false);
++  });
++});
+diff --git a/components/screens/CharacterScreen/modals/ArmorLayerModal.js b/components/screens/CharacterScreen/modals/ArmorLayerModal.js
+index 244927b..53eca9f 100644
+--- a/components/screens/CharacterScreen/modals/ArmorLayerModal.js
++++ b/components/screens/CharacterScreen/modals/ArmorLayerModal.js
+@@ -56,6 +56,7 @@ const SLOT_LOCATION_MAP = {
+   rightLeg:  'Thruster',
+   thruster:  'Thruster',
+   chassis:   'Thruster',
++  wheel:     'Thruster',
+ };
+ 
+ // ---------------------------------------------------------------------------
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index d23750a..831c900 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -122,6 +122,10 @@ const toInventoryItems = (entries) => {
+         quantity: item.quantity || 1,
+         itemType: 'weapon',
+         hasMods: item.hasMods ?? false,
++        // item-level флаги встроенного оружия не лежат в _weapon — переносим явно,
++        // иначе builtinToArm/requiresMkII теряются при фильтрации finalItems.
++        builtinToArm: item.builtinToArm,
++        requiresMkII: item.requiresMkII,
+       });
+ 
+       if (item.resolvedAmmunition) {
+@@ -275,14 +279,33 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+         robotCatalog,
+       );
+ 
+-      const allInventoryItems = [...finalItems.filter(
+-        (item) => {
+-          if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'plating', 'armor', 'frame', 'module'].includes(item.itemType)) return false;
+-          if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
+-          if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
+-          return true;
+-        }
+-      ), ...robotInventory];
++      // Части тела, броня/обшивка/рама и модули уходят в слоты робота
++      // (initRobotSlots) — в инвентарь их копия не нужна.
++      const slotConsumedTypes = new Set([
++        'robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs',
++        'plating', 'armor', 'robotArmor', 'frame', 'module',
++      ]);
++      const finalItemsOnly = finalItems.filter((item) => {
++        if (slotConsumedTypes.has(item.itemType)) return false;
++        if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
++        if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
++        return true;
++      });
++
++      // Предметы, которые уже ушли в слоты/инвентарь через initRobotSlots
++      // (robotInventory), не дублируются копией из finalItems — иначе
++      // addNewItem склеит их в стек ×2 (см. защиту от дублей).
++      const robotInvKeys = new Set(
++        robotInventory
++          .map((i) => i.weaponId || i.id || i.itemId || i.armorId || i.clothingId)
++          .filter(Boolean),
++      );
++      const dedupedFinalItems = finalItemsOnly.filter((item) => {
++        const key = item.weaponId || item.id || item.itemId || item.armorId || item.clothingId;
++        return !key || !robotInvKeys.has(key);
++      });
++
++      const allInventoryItems = [...dedupedFinalItems, ...robotInventory];
+ 
+       onSelectKit({
+         name: kit.name,
+diff --git a/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js b/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+index 8065b35..e7dd9a4 100644
+--- a/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
++++ b/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+@@ -91,6 +91,7 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+     misterHandy: 'misterHandy',
+     protectron: 'protectron',
+     robobrain: 'robobrain',
++    securitron: 'securitron',
+     superMutant: 'supermutant',
+     synth: 'synth',
+     shadow: 'shadow',
+diff --git a/components/screens/CharacterScreen/modals/traits/index.js b/components/screens/CharacterScreen/modals/traits/index.js
+index a1acba6..4e1d78c 100644
+--- a/components/screens/CharacterScreen/modals/traits/index.js
++++ b/components/screens/CharacterScreen/modals/traits/index.js
+@@ -18,6 +18,7 @@ const genericOrigins = [
+   'assaultron',
+   'robobrain',
+   'misterHandy',
++  'securitron',
+   'shadow',
+   'synth',
+   // skill-pick traits:
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 70c20d5..3896735 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -91,6 +91,9 @@ const InventoryScreen = () => {
+   } = useCharacter();
+ 
+   const storeItems = useCharacterStore((state) => state.items);
++  // ОС Mk II (Секьюритрон): нерабочие ракетница/гранатомёт активируются
++  // драйвером из инвентаря; флаг живёт в robot-срезе стора (персистится).
++  const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
+   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
+   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
+   const equipItem = useCharacterStore((state) => state.equipItem);
+@@ -429,6 +432,28 @@ const InventoryScreen = () => {
+     setIsSellModalVisible(true);
+   };
+ 
++  /**
++   * Применить «Драйвер ОС Mk II» к Секьюритрону: потребляет предмет и
++   * активирует нерабочие оружия (ракетница/гранатомёт) в списке атак.
++   */
++  const handleApplyMk2Driver = (item) => {
++    const stackKey = item.stackKey || getStackKey(item);
++    const storeItem = findUnequippedStoreItemByStackKey(stackKey);
++    if (!storeItem) return;
++    const result = useCharacterStore.getState().applyMk2Driver(storeItem.id);
++    if (!result?.ok) {
++      showAlert(
++        tInventory('screen.alerts.mk2ApplyFailedTitle'),
++        tInventory(`screen.alerts.mk2Reason.${result?.reason || 'noDriver'}`),
++      );
++      return;
++    }
++    showAlert(
++      tInventory('screen.alerts.mk2AppliedTitle'),
++      tInventory('screen.alerts.mk2AppliedMessage'),
++    );
++  };
++
+   const handleConfirmSale = (quantity, finalPrice) => {
+     setCaps(prev => prev + finalPrice);
+ 
+@@ -1288,6 +1313,17 @@ const InventoryScreen = () => {
+     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
+     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
+ 
++    // Нерабочее встроенное оружие (ракетница/гранатомёт до ОС Mk II): строка
++    // помечается, пока драйвер не применён (флаг mk2Installed).
++    const mk2Blocked = Boolean(item.requiresMkII) && !mk2Installed;
++    // «Драйвер ОС Mk II»: применим только к Секьюритрону и только один раз.
++    const isMk2Driver = Boolean(
++      !item.isEquipped
++      && !mk2Installed
++      && origin?.id === 'securitron'
++      && (item.weaponId === 'robot_item_mk2_driver' || item.id === 'robot_item_mk2_driver'),
++    );
++
+     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
+     const isBuiltinOrManipulator = Boolean(item?.isBuiltin || item?.isManipulator);
+     // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
+@@ -1380,6 +1416,13 @@ const InventoryScreen = () => {
+                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.apply')}</Text>
+               </TouchableOpacity>
+           )}
++          {isMk2Driver && (
++              <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => handleApplyMk2Driver(item)}>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.apply')}</Text>
++              </TouchableOpacity>
++          )}
+           {!item.isEquipped && (
+               <TouchableOpacity style={[styles.actionButton, styles.sellButton]} onPress={() => handleSellItem(item)}>
+                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.sell')}</Text>
+@@ -1393,6 +1436,9 @@ const InventoryScreen = () => {
+           {item.durabilityTracked && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.durability}/100</Text>
+           )}
++          {mk2Blocked && (
++            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>
++          )}
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
+           {weaponAmmoNames.length > 0 && (
+diff --git a/components/screens/WeaponsAndArmorScreen/RobotSlot.js b/components/screens/WeaponsAndArmorScreen/RobotSlot.js
+index dc72432..08346c8 100644
+--- a/components/screens/WeaponsAndArmorScreen/RobotSlot.js
++++ b/components/screens/WeaponsAndArmorScreen/RobotSlot.js
+@@ -34,6 +34,7 @@ const RobotSlot = ({
+     onOpenArmorPicker,
+     onWeaponPress,
+     hasRadImmunity,
++    bodyPlan,
+   });
+ 
+   return (
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 5fdfc5c..1533e16 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -27,6 +27,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects }
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+ import { getRobotSlotKeys } from '../../../domain/robotEquip';
++import { getBodyPlan } from '../../../domain/bodyplan';
+ import {
+   hasFrame,
+   suppressesLayerAt,
+@@ -277,10 +278,14 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
+ 
+ 
+ 
+-const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
++export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+     const { hasTrait, attributes, skills, trait } = useCharacter();
+     const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+     const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
++    // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
++    // ОС Mk II (драйвер применяется в инвентаре, флаг — в robot-срезе стора).
++    // Хук ВЫЗЫВАЕТСЯ БЕЗУСЛОВНО (Правила хуков): до раннего return пустого слота.
++    const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
+     if (!weapon) {
+       return (
+         <View style={localStyles.weaponCardContainer}>
+@@ -295,6 +300,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+     }
+   
+     const displayWeapon = weapon;
++    const mk2Blocked = Boolean(weapon?.requiresMkII) && !mk2Installed;
+ 
+     // Канонический формат полей оружия
+     const weaponName = displayWeapon.name ?? tWeaponsAndArmorScreen('common.empty');
+@@ -373,11 +379,11 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
+       ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
+       ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
+-      ...(displayWeapon?.withoutMods ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
++      ...((displayWeapon?.withoutMods || mk2Blocked) ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
+     ];
+   
+     return (
+-      <View style={localStyles.weaponCardContainer}>
++      <View style={[localStyles.weaponCardContainer, mk2Blocked && { opacity: 0.55 }]}>
+         <View style={styles.sectionHeader}>
+           <Text style={[styles.sectionTitle, { textAlign: 'center', width: '100%' }]}>{weaponName}</Text>
+           {showSourceSlot && weapon?.sourceSlot ? (
+@@ -385,6 +391,11 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+               {tWeaponsAndArmorScreen(`robotSlot.slotNames.${weapon.sourceSlot}`) || weapon.sourceSlot}
+             </Text>
+           ) : null}
++          {mk2Blocked ? (
++            <Text style={{ fontSize: 10, color: '#e8a33d', textAlign: 'center', width: '100%', marginTop: 2 }}>
++              {tWeaponsAndArmorScreen('weapon.requiresMkII')}
++            </Text>
++          ) : null}
+         </View>
+         <View>
+           {stats.map((stat, index) => (
+@@ -880,7 +891,7 @@ const WeaponsAndArmorScreen = () => {
+             {/* Броня / Слоты робота */}
+             {isRobot && equippedRobotSlots ? (
+               <View style={{ marginBottom: 16 }}>
+-                {chunkSlotKeys(getRobotSlotKeys(bodyPlan), 3).map((chunk, rowIndex) => (
++                {(getBodyPlan(bodyPlan)?.layout || chunkSlotKeys(getRobotSlotKeys(bodyPlan), 3)).map((chunk, rowIndex) => (
+                   <View
+                     key={rowIndex}
+                     style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}
+@@ -925,7 +936,7 @@ const WeaponsAndArmorScreen = () => {
+                     weapon={dedupedEquippedWeapons[rowIndex * 2] ?? null}
+                     onModifyWeapon={handleOpenModificationModal}
+                     onUnequip={isRobot ? null : handleUnequipWeapon}
+-                    showSourceSlot={false}
++                    showSourceSlot={isRobot}
+                     meleeBonus={meleeBonusValue}
+                     equippedWeapons={equippedWeaponsForDisplay}
+                   />
+@@ -933,7 +944,7 @@ const WeaponsAndArmorScreen = () => {
+                     weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                     onModifyWeapon={handleOpenModificationModal}
+                     onUnequip={isRobot ? null : handleUnequipWeapon}
+-                    showSourceSlot={false}
++                    showSourceSlot={isRobot}
+                     meleeBonus={meleeBonusValue}
+                     equippedWeapons={equippedWeaponsForDisplay}
+                   />
+diff --git a/data/bodyplans/bodyplans.json b/data/bodyplans/bodyplans.json
+index 82803e7..ccf6810 100644
+--- a/data/bodyplans/bodyplans.json
++++ b/data/bodyplans/bodyplans.json
+@@ -107,15 +107,59 @@
+       }
+     }
+   },
+-  "assaultron": {
+-    "slots": [
+-      "leftArm",
+-      "head",
+-      "rightArm",
+-      "leftLeg",
+-      "body",
+-      "rightLeg"
+-    ],
++ "securitron": {
++  "slots": [
++   "head",
++   "leftArm",
++   "body",
++   "rightArm",
++   "wheel"
++  ],
++  "defaults": {
++   "head": "robot_head_securitron",
++   "body": "robot_body_securitron",
++   "leftArm": "robot_arm_securitron",
++   "rightArm": "robot_arm_securitron",
++   "wheel": "robot_legs_securitron"
++  },
++  "slotCapabilities": {
++   "leftArm": {
++    "canEquipWeapon": true
++   },
++   "rightArm": {
++    "canEquipWeapon": true
++   }
++  },
++  "layout": [
++   [
++    "head"
++   ],
++   [
++    "leftArm",
++    "body",
++    "rightArm"
++   ],
++   [
++    "wheel"
++   ]
++  ],
++  "hitLocations": {
++   "head": "1-2",
++   "body": "3-11",
++   "leftArm": "12-14",
++   "rightArm": "15-17",
++   "wheel": "18-20"
++  }
++ },
++ "assaultron": {
++  "slots": [
++   "leftArm",
++   "head",
++   "rightArm",
++   "leftLeg",
++   "body",
++   "rightLeg"
++  ],
+     "defaults": {
+       "leftArm": "robot_arm_assaultron",
+       "head": "robot_head_assaultron",
+diff --git a/data/equipment/robot/robotarms.json b/data/equipment/robot/robotarms.json
+index 634c450..3114e43 100644
+--- a/data/equipment/robot/robotarms.json
++++ b/data/equipment/robot/robotarms.json
+@@ -370,5 +370,29 @@
+     "canHoldWeapons": true,
+     "builtinWeaponId": "robot_weapon_smoke_claws",
+     "name": "robot_arm_smoke_manipulator"
++  },
++  {
++    "id": "robot_arm_securitron",
++    "itemType": "robotArm",
++    "compatibleSlots": [
++      "leftArm",
++      "rightArm"
++    ],
++    "maxSlots": 2,
++    "complexity": 4,
++    "perksRequired": [
++      "Robotics Expert 1"
++    ],
++    "skill": "REPAIR",
++    "rarity": 1,
++    "melee": 2,
++    "guns": 2,
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "weaponSlots": 1,
++    "canHoldWeapons": true,
++    "builtinWeaponId": "robot_weapon_manipulator",
++    "name": "robot_arm_securitron"
+   }
+ ]
+diff --git a/data/equipment/robot/robotbody.json b/data/equipment/robot/robotbody.json
+index abf0d44..3e88f02 100644
+--- a/data/equipment/robot/robotbody.json
++++ b/data/equipment/robot/robotbody.json
+@@ -127,5 +127,30 @@
+     "energyDR": 4,
+     "radDR": 0,
+     "name": "robot_body_sentry_bot"
++  },
++  {
++    "id": "robot_body_securitron",
++    "itemType": "robotBody",
++    "robotBodyPlan": "securitron",
++    "replaceable": true,
++    "armorSlots": [
++      "Head",
++      "Main Body",
++      "Left Arm",
++      "Right Arm",
++      "Wheel"
++    ],
++    "complexity": 4,
++    "perksRequired": [
++      "Robotics Expert 1"
++    ],
++    "skill": "REPAIR",
++    "rarity": 1,
++    "body": 5,
++    "carryWeight": 150,
++    "physicalDR": 3,
++    "energyDR": 1,
++    "radDR": 0,
++    "name": "robot_body_securitron"
+   }
+ ]
+diff --git a/data/equipment/robot/robotheads.json b/data/equipment/robot/robotheads.json
+index 97662d0..9e68c7b 100644
+--- a/data/equipment/robot/robotheads.json
++++ b/data/equipment/robot/robotheads.json
+@@ -119,5 +119,24 @@
+     "energyDR": 3,
+     "radDR": 0,
+     "name": "robot_head_sentry_bot"
++  },
++  {
++    "id": "robot_head_securitron",
++    "itemType": "robotHead",
++    "replaceable": false,
++    "defaultForBodyPlan": "securitron",
++    "unique": false,
++    "complexity": 4,
++    "perksRequired": [
++      "Robotics Expert 1"
++    ],
++    "skill": "REPAIR",
++    "rarity": 1,
++    "mind": 5,
++    "other": 2,
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "name": "robot_head_securitron"
+   }
+ ]
+diff --git a/data/equipment/robot/robotlegs.json b/data/equipment/robot/robotlegs.json
+index 18e6f6a..564527f 100644
+--- a/data/equipment/robot/robotlegs.json
++++ b/data/equipment/robot/robotlegs.json
+@@ -90,5 +90,24 @@
+     "energyDR": 3,
+     "radDR": 0,
+     "name": "robot_legs_sentry_bot"
++  },
++  {
++    "id": "robot_legs_securitron",
++    "itemType": "robotLegs",
++    "slot": "Wheel",
++    "compatibleBodyPlans": [
++      "securitron"
++    ],
++    "defaultForBodyPlan": "securitron",
++    "complexity": 3,
++    "perksRequired": [
++      "Robotics Expert 1"
++    ],
++    "skill": "REPAIR",
++    "rarity": 1,
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "name": "robot_legs_securitron"
+   }
+ ]
+diff --git a/data/equipment/robotparts.json b/data/equipment/robotparts.json
+index 8ea864d..f981028 100644
+--- a/data/equipment/robotparts.json
++++ b/data/equipment/robotparts.json
+@@ -21,6 +21,22 @@
+       "weight": 0.5,
+       "cost": 0,
+       "rarity": 0
++    },
++    {
++      "id": "robot_item_printer",
++      "itemType": "misc",
++      "weight": 0,
++      "cost": 0,
++      "rarity": 0
++    },
++    {
++      "id": "robot_item_mk2_driver",
++      "itemType": "misc",
++      "weight": 0,
++      "cost": 0,
++      "rarity": 4,
++      "unique": true,
++      "requiresOriginId": "securitron"
+     }
+   ],
+   "robotModules": [
+diff --git a/data/equipmentKits/securitron.json b/data/equipmentKits/securitron.json
+new file mode 100644
+index 0000000..7fc7829
+--- /dev/null
++++ b/data/equipmentKits/securitron.json
+@@ -0,0 +1,107 @@
++{
++  "securitron_standard": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_securitron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_securitron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_securitron",
++        "itemType": "robotLegs"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_securitron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_securitron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_gun",
++        "itemType": "weapon",
++        "weight": 0,
++        "slot": "left",
++        "builtinToArm": true,
++        "requiresWeaponId": "robot_arm_securitron",
++        "modIds": [
++          "mod_053"
++        ],
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_submachine_gun",
++        "itemType": "weapon",
++        "weight": 0,
++        "slot": "right",
++        "builtinToArm": true,
++        "requiresWeaponId": "robot_arm_securitron",
++        "ammo": {
++          "ammoId": "ammo_45",
++          "quantity": {
++            "base": 8,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_missile_launcher",
++        "itemType": "weapon",
++        "weight": 0,
++        "requiresMkII": true
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_m79_grenade_launcher",
++        "itemType": "weapon",
++        "weight": 0,
++        "requiresMkII": true
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_body",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_optics",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_arms",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_item_printer",
++        "itemType": "misc",
++        "weight": 0
++      }
++    ]
++  }
++}
+diff --git a/data/origins/origins.json b/data/origins/origins.json
+index 5ed676c..fed5363 100644
+--- a/data/origins/origins.json
++++ b/data/origins/origins.json
+@@ -152,10 +152,12 @@
+     "displayNameKey": "origins.securitron.name",
+     "characterType": "robot",
+     "image": "securitron",
+-    "bodyPlan": "protectron",
+-    "traitIds": [],
++    "bodyPlan": "securitron",
++    "traitIds": [
++      "securitron-mark-i"
++    ],
+     "equipmentKitIds": [
+-      "default_caps_only"
++      "securitron_standard"
+     ]
+   },
+   {
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index 52f6282..dbb8b26 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -236,5 +236,17 @@
+       "immunities": ["radiation", "poison"],
+       "effects": ["stealth_boy_addiction"]
+     }
++  },
++  {
++    "id": "securitron-mark-i",
++    "originId": "securitron",
++    "displayNameKey": "traits.securitron.markI.name",
++    "descriptionKey": "traits.securitron.markI.description",
++    "modifiers": {
++      "immunities": ["radiation", "poison"],
++      "carryWeightFixed": 150,
++      "carryWeightStrengthMultiplier": 0,
++      "effects": ["no_consumables_food_rest", "repair_to_heal", "no_hunger_thirst_fatigue"]
++    }
+   }
+ ]
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4e80624..839afb9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,19 @@
+ # Changelog
+ 
++## 48 — Securitron origin
++
++- The Securitron origin is now fully implemented: the "Mark I Securitron" trait (immunity to poison and radiation, 150 lbs carry weight not affected by Strength or perks, no chems/food/drink/rest benefits, repairs only).
++- Own body plan `securitron`: head / body / left arm / right arm / wheel, 1-3-1 layout, hit location table 1-2 / 3-11 / 12-14 / 15-17 / 18-20.
++- New robot parts: head, body (150 lbs), manipulator arm with built-in unarmed attack, wheel — stats modeled after the Protectron, ru/en translations included.
++- `securitron_standard` equipment kit: automatic laser gun (laser gun with automatic barrel, integrated into the left arm, 14 + 7 CD fusion cell shots), submachine gun (integrated into the right arm, 8 + 4 CD rounds of .45 ammunition), missile launcher and grenade launcher (inoperable until the Mk II OS — inert inventory items flagged `requiresMkII`), factory armor for the torso/head/arms, printer (new robot item, equipped by default, cannot be unequipped).
++- The RU prefix of mod `mod_053` now follows the EN convention ("Automatic") so the built-in weapon displays as "Automatic Laser Gun".
++- Robot logic now supports the `wheel` slot (limb installation, armor distribution, armor picker, slot labels) and shows a limb's built-in weapon alongside the weapon held in that hand.
++- Palm weapons (automatic laser gun and submachine gun) are now integrated into the arm slots (left/right) with applied mods, cannot be unequipped; attack cards show the source arm.
++- The kit grenade launcher is the M79 Grenade Launcher.
++- New robot item "Mk II OS Driver" (unique, only applicable to a Securitron): an "Apply" button in the inventory consumes the driver and activates the inoperable weapons. Until installed, the missile launcher and grenade launcher appear in the attack list as disabled cards labelled "Requires Mk II OS" (and in the inventory).
++- The Mk II OS flag lives in the robot store slice and survives save/load.
++- Securitron palms are free: the built-in weapons (laser gun in the left arm, submachine gun in the right) now sit INSIDE the limbs (limb built-in weapons), while the manipulator palms can hold any other weapon or items — regular weapons equip into a hand via the inventory, and the attack card shows the source arm.
++
+ ---
+ 
+ ## 47 — Multiple damage types support
+diff --git a/docs/changelog.md b/docs/changelog.md
+index 654dab9..0518b55 100644
+--- a/docs/changelog.md
++++ b/docs/changelog.md
+@@ -1,5 +1,17 @@
+ # История изменений / Changelog
+ 
++## 48 — Ориджин Секьюритрон / Securitron origin
++
++### RU
++
++- Ориджин «Секьюритрон» наполнен: трейт «Секьюритрон Mk I», свой план тела с колесом (таблица попаданий 1-2 / 3-11 / 12-14 / 15-17 / 18-20), новые робо-части и комплект `securitron_standard` (автоматический лазерный пистолет, пистолет-пулемёт .45, нерабочие ракетница и гранатомёт до ОС Mk II, заводская броня, принтер).
++- RU-префикс мода `mod_053` — «Автоматический» (как в EN), поддержка слота `wheel` в логике роботов.
++
++### EN
++
++- The Securitron origin is fully implemented: the "Mark I Securitron" trait, its own body plan with a wheel (hit locations 1-2 / 3-11 / 12-14 / 15-17 / 18-20), new robot parts and the `securitron_standard` kit (automatic laser gun, .45 submachine gun, missile/grenade launchers inoperable until the Mk II OS, factory armor, printer).
++- The RU prefix of mod `mod_053` is now "Automatic" (matching EN); robot logic supports the `wheel` slot.
++
+ ---
+ 
+ ## 36 — Английская локализация перков / English perk localization
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index fd2b476..674ebd2 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,20 @@
+ 
+ ---
+ 
++## 48 — Ориджин Секьюритрон
++
++- Ориджин «Секьюритрон» наполнен: трейт «Секьюритрон Mk I» (иммунитет к яду и радиации, переносимый вес 150 фунтов без учёта Силы и перков, запрет расходников/еды/питья/отдыха, восстановление только ремонтом).
++- Свой план тела `securitron`: голова / корпус / левая рука / правая рука / колесо, строение 1-3-1, таблица попаданий 1-2 / 3-11 / 12-14 / 15-17 / 18-20.
++- Новые робо-части: голова, корпус (вес 150), рука-манипулятор со встроенной безоружной атакой, колесо — со статами по аналогии с протектроном и переводами ru/en.
++- Комплект `securitron_standard`: автоматический лазерный пистолет (лазерный пистолет с автоматическим стволом, встроен в левую руку, 14 + 7 CD энергоячеек), пистолет-пулемёт (встроен в правую руку, 8 + 4 CD патронов .45), ракетная установка и гранатомёт (нерабочие, до ОС Mk II — инертные предметы инвентаря с флагом `requiresMkII`), заводская броня корпуса/головы/рук, принтер (новый робо-предмет, экипирован по умолчанию, снять нельзя).
++- RU-префикс мода `mod_053` («Автоматический ствол») приведён к EN-конвенции: префикс «Автоматический» — встроенный пистолет теперь называется «Автоматический лазерный пистолет».
++- Поддержка слота `wheel` в логике роботов (установка конечностей, распределение брони, пикер брони, подписи слотов) и отображение встроенного оружия конечности рядом с оружием в руке.
++- Ладонные орудия (автоматический лазерный пистолет и пистолет-пулемёт) теперь встроены в слоты рук (левая/правая) с применёнными модами, снять их нельзя; в списке атак карточки подписаны рукой.
++- Гранатомёт комплекта — «Гранатомёт M79».
++- Новый робо-предмет «Драйвер ОС Mk II» (уникальный, применим только к Секьюритрону): кнопка «Применить» в инвентаре потребляет драйвер и активирует нерабочие оружия. До установки ракетница и гранатомёт показываются в списке атак как неактивные карточки с пометкой «Требуется ОС Mk II» (и в инвентаре).
++- Флаг установки ОС Mk II хранится в robot-срезе стора и переживает сохранение/загрузку.
++- Ладони Секьюритрона свободны: встроенное оружие (лазерный пистолет в левой, пистолет-пулемёт в правой) находится ВНУТРИ руки (встроенное оружие конечности), а манипуляторы-ладони могут держать любое другое оружие (пистолет, винтовку, предметы) — обычное оружие экипируется в руку через инвентарь, карточка подписывается рукой.
++
+ ## 47 — Поддержка множественных типов урона
+ 
+ - Добавлена поддержка комбинированного типа урона для оружия (например, энергетический + физический).
+diff --git a/docs/schema/01-origins.md b/docs/schema/01-origins.md
+index d0434af..a8177ca 100644
+--- a/docs/schema/01-origins.md
++++ b/docs/schema/01-origins.md
+@@ -30,7 +30,7 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
+ | robobrain, securitron, assaultron, misterHandy, protectron | isRobot | **robot** |
+ 
+ ✅ РЕШЕНО: shadow → **mutant**, synth → **cyborg**, savage → **human**.
+-❓ РЕШЕНИЕ-4 (открыто): `securitron` body_plan=protectron — норм или своя схема слотов? (позже)
++✅ РЕШЕНО: `securitron` получил собственную схему слотов (body_plan `securitron`): голова / корпус / левая рука / правая рука / колесо, layout 1-3-1, таблица попаданий 1-2 / 3-11 / 12-14 / 15-17 / 18-20 (реализовано в рамках задачи «Ориджин Секьюритрон», #48).
+ 
+ ### Итоговый маппинг characterType (с учётом решений)
+ - human: brotherhood, ncr, minuteman, childOfAtom, vaultDweller, survivor, brotherhoodOutcast, savage
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index 0148f11..cef8b10 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -170,12 +170,21 @@ export async function resolveWeaponItem(item) {
+   const displayName = [...prefixes, weaponName].join(' ');
+   const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
+ 
++  // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
++  // (finalItems модалки, robotInventory initRobotSlots) нёс моды в стор
++  // одинаково — без потери модов при экипировке встроенного оружия.
++  const appliedMods = {};
++  for (const mod of mods) {
++    if (mod.slot && mod.id) appliedMods[mod.slot] = mod.id;
++  }
++
+   return {
+     ...item,
+     _weapon: weaponData,
+     builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
+     builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
+     _mods: mods,
++    appliedMods,
+     displayName,
+     name: displayName,
+     itemType: 'weapon',
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 8123f2a..321bc48 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -103,6 +103,51 @@ export function buildArmLimb(armEntry, weaponsCatalog = []) {
+   };
+ }
+ 
++// ---------------------------------------------------------------------------
++// Weapon mods (для встроенного оружия конечностей)
++// ---------------------------------------------------------------------------
++
++const RANGE_ORDER = ['C', 'M', 'L', 'E'];
++
++/**
++ * Применяет моды (из kitResolver item._mods) к статам оружия для слота робота.
++ * Дублирует мини-подмножество applyModModifiers из стора, чтобы встроенное
++ * оружие в руке (heldWeapon) показывало корректные статы без захода в стор.
++ */
++const applyWeaponMods = (weapon, mods = []) => {
++  if (!weapon || !Array.isArray(mods) || mods.length === 0) return weapon;
++  let damage = Number(weapon.damage) || 0;
++  let fireRate = Number(weapon.fireRate ?? weapon.fire_rate) || 0;
++  let rangeIndex = RANGE_ORDER.indexOf(weapon.range);
++  let qualities = Array.isArray(weapon.qualities) ? weapon.qualities.map((q) => ({ ...q })) : [];
++  let effects = Array.isArray(weapon.effects) ? weapon.effects.map((e) => ({ ...e })) : [];
++
++  for (const mod of mods) {
++    const dm = mod.damageModifier;
++    if (dm && dm.value) {
++      damage = dm.op === '-' ? damage - Number(dm.value) : damage + Number(dm.value);
++    }
++    const fm = mod.fireRateModifier;
++    if (fm && fm.value) fireRate += Number(fm.value);
++    const rm = mod.rangeModifier;
++    if (rm && rm.value && rangeIndex >= 0) {
++      rangeIndex = Math.min(RANGE_ORDER.length - 1, Math.max(0, rangeIndex + Number(rm.value)));
++    }
++    for (const qc of mod.qualityChanges || []) {
++      if (qc.op === 'lose') qualities = qualities.filter((q) => q.qualityId !== qc.id);
++      else if (qc.op === 'gain' && !qualities.some((q) => q.qualityId === qc.id)) qualities.push({ qualityId: qc.id });
++    }
++    for (const ec of mod.effectChanges || []) {
++      if (ec.op === 'gain' && !effects.some((e) => e.effectId === ec.id)) effects.push({ effectId: ec.id });
++      else if (ec.op === 'lose') effects = effects.filter((e) => e.effectId !== ec.id);
++    }
++  }
++
++  const result = { ...weapon, damage, fireRate, fire_rate: fireRate, qualities, effects };
++  if (rangeIndex >= 0) result.range = RANGE_ORDER[rangeIndex];
++  return result;
++};
++
+ // ---------------------------------------------------------------------------
+ // initRobotSlots
+ // ---------------------------------------------------------------------------
+@@ -177,7 +222,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+         targetKey = 'body';
+       } else if (itype === 'robotLeg' || itype === 'robotLegs') {
+         targetKey = slotKeys.find(k => 
+-          k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster'
++          k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel'
+         );
+       } else if (itype === 'robotArm') {
+         // Просто: left/right или первый свободный
+@@ -223,6 +268,48 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       // Resolve from catalog to pick up flags like builtinToHead that live only in catalog data
+       const resolvedWeapon = weaponId ? resolveWeaponStats(weaponId) : null;
+ 
++      // Нерабочее встроенное оружие (например, ракетница и гранатомёт
++      // Секьюритрона до установки ОС Mk II): не занимает слоты и руки,
++      // остаётся в инвентаре инертным предметом до будущей механики Mk II.
++      if (item.requiresMkII || weaponData.requiresMkII || resolvedWeapon?.requiresMkII) {
++        inventoryItems.push({ ...item, requiresMkII: true });
++        continue;
++      }
++
++      // Оружие, встроенное в руку (ладонные орудия Секьюритрона): уходит ВНУТРЬ
++      // конечности (limb.builtinWeapons) — ладонь остаётся свободной, чтобы
++      // манипуляторы могли держать любое другое оружие/предметы (heldWeapon).
++      // item.slot задаёт сторону: left → leftArm, right → rightArm.
++      if (item.builtinToArm || weaponData.builtinToArm || resolvedWeapon?.builtinToArm) {
++        const direction = item.slot === 'right' ? 'right' : item.slot === 'left' ? 'left' : null;
++        const targetKey = direction ? getSlotForDirection(bodyPlan, direction) : null;
++        if (targetKey && slots[targetKey]?.limb) {
++          const limb = slots[targetKey].limb;
++          const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
++          const fireRate = Number(base.fireRate ?? base.fire_rate) || 0;
++          const builtin = {
++            ...base,
++            fireRate,
++            fire_rate: fireRate,
++            id: weaponId,
++            weaponId,
++            name: item.displayName || weaponData.name || weaponId,
++            baseWeaponName: weaponData.name,
++            isBuiltin: true,
++            builtinToArm: true,
++            locked: true,
++          };
++          slots[targetKey].limb = {
++            ...limb,
++            builtinWeapons: [...(Array.isArray(limb.builtinWeapons) ? limb.builtinWeapons : []), builtin],
++          };
++          continue;
++        }
++        // Нет подходящей руки — не теряем предмет, отдаём в инвентарь.
++        inventoryItems.push({ ...item, builtinToArm: true });
++        continue;
++      }
++
+       // Встроенное оружие в голову
+       if (weaponData.builtinToHead || item.builtinToHead || resolvedWeapon?.builtinToHead) {
+         const weaponStats = resolvedWeapon || resolveWeaponStats(weaponId);
+@@ -272,7 +359,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     }
+ 
+     // Броня
+-    if (['plating', 'armor', 'frame'].includes(itype)) {
++    if (['plating', 'armor', 'frame', 'robotArmor'].includes(itype)) {
+       const armorData = item._armor ?? item;
+       const location = armorData.robotLocation ?? item.robotLocation;
+       const layer = armorData.layer ?? itype;
+@@ -285,9 +372,9 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+           slots[k][layer] = armorData;
+         } else if (location === 'Arms' && k.toLowerCase().includes('arm')) {
+           slots[k][layer] = armorData;
+-        } else if (location === 'Legs' && (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster')) {
++        } else if ((location === 'Legs' || location === 'Wheel') && (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel')) {
+           slots[k][layer] = armorData;
+-        } else if (location === 'Thruster' && k === 'thruster') {
++        } else if (location === 'Thruster' && (k === 'thruster' || k === 'wheel')) {
+           slots[k][layer] = armorData;
+         }
+       }
+@@ -327,7 +414,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     } else if (k === 'body' && defaultBody) {
+       slots[k].limb = defaultBody;
+     } else if (
+-      (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster') &&
++      (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') &&
+       defaultLeg
+     ) {
+       slots[k].limb = defaultLeg;
+@@ -390,7 +477,8 @@ export function getBuiltinWeaponsFromSlots(slots) {
+ 
+     if (heldWeapon) {
+       pushWeapon(heldWeapon, slotKey, limb);
+-      continue;
++      // Встроенное оружие конечности (например, манипулятор) остаётся доступным
++      // и когда в руке зажато оружие — карточки не должны исчезать.
+     }
+ 
+     if (Array.isArray(limb?.builtinWeapons) && limb.builtinWeapons.length > 0) {
+diff --git a/domain/robotSlotLogic.js b/domain/robotSlotLogic.js
+index 26ea119..ed130a5 100644
+--- a/domain/robotSlotLogic.js
++++ b/domain/robotSlotLogic.js
+@@ -2,6 +2,7 @@
+ // Pure logic extracted from RobotSlot for testability (no React, no UI deps).
+ 
+ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
++import { getBodyPlan } from './bodyplan';
+ 
+ /**
+  * Builds the slot title, limb name, and stats array for a RobotSlot.
+@@ -19,7 +20,7 @@ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScr
+  * @returns {{ slotTitle: string, slotSubtitle: string, limbName: string|null, stats: object[] }}
+  */
+ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
+-  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen, hasRadImmunity = false } = callbacks;
++  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen, hasRadImmunity = false, bodyPlan } = callbacks;
+ 
+   const limb = slotData?.limb;
+ 
+@@ -28,7 +29,10 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
+     : t('robotSlot.noLimb');
+ 
+   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
+-  const slotSubtitle = t(`armor.slots.${slotKey}.subtitle`) || '';
++  // Диапазоны попаданий (d20) — из плана тела, если он их объявляет (секьюритрон),
++  // иначе общий словарь armor.slots (человекоподобная таблица).
++  const planHitLocation = bodyPlan ? getBodyPlan(bodyPlan)?.hitLocations?.[slotKey] : null;
++  const slotSubtitle = planHitLocation ?? (t(`armor.slots.${slotKey}.subtitle`) || '');
+ 
+   const stats = [];
+ 
+diff --git a/i18n/en-EN/data/equipment/robot/items.json b/i18n/en-EN/data/equipment/robot/items.json
+index 75df38f..e460bcb 100644
+--- a/i18n/en-EN/data/equipment/robot/items.json
++++ b/i18n/en-EN/data/equipment/robot/items.json
+@@ -7,8 +7,16 @@
+     "id": "robot_item_fertilizer_bag",
+     "name": "Fertilizer Bag"
+   },
+-  {
+-    "id": "food_mutafruit",
+-    "name": "Mutafruit"
+-  }
++ {
++  "id": "food_mutafruit",
++  "name": "Mutafruit"
++ },
++ {
++  "id": "robot_item_printer",
++  "name": "Printer"
++ },
++ {
++  "id": "robot_item_mk2_driver",
++  "name": "Mk II OS Driver"
++ }
+ ]
+diff --git a/i18n/en-EN/data/equipment/robot/robotarms.json b/i18n/en-EN/data/equipment/robot/robotarms.json
+index eda88b9..212bca6 100644
+--- a/i18n/en-EN/data/equipment/robot/robotarms.json
++++ b/i18n/en-EN/data/equipment/robot/robotarms.json
+@@ -18,5 +18,6 @@
+   { "id": "robot_weapon_vice_grip",              "name": "Vice Grip" },
+   { "id": "robot_weapon_claw",                   "name": "Claw" },
+   { "id": "robot_weapon_tesla_arm",              "name": "Tesla Carbine" },
+-  { "id": "robot_arm_smoke_manipulator",         "name": "Smoke Manipulator" }
++  { "id": "robot_arm_smoke_manipulator",         "name": "Smoke Manipulator" },
++  { "id": "robot_arm_securitron",                "name": "Securitron Arm" }
+ ]
+diff --git a/i18n/en-EN/data/equipment/robot/robotbody.json b/i18n/en-EN/data/equipment/robot/robotbody.json
+index eab400d..27e946f 100644
+--- a/i18n/en-EN/data/equipment/robot/robotbody.json
++++ b/i18n/en-EN/data/equipment/robot/robotbody.json
+@@ -3,5 +3,6 @@
+   { "id": "robot_body_protectron",    "name": "Protectron Body" },
+   { "id": "robot_body_assaultron",    "name": "Assaultron Body" },
+   { "id": "robot_body_robobrain",     "name": "Robobrain Body" },
+-  { "id": "robot_body_sentry_bot",    "name": "Sentry Bot Body" }
++  { "id": "robot_body_sentry_bot",    "name": "Sentry Bot Body" },
++  { "id": "robot_body_securitron",    "name": "Securitron Body" }
+ ]
+diff --git a/i18n/en-EN/data/equipment/robot/robotheads.json b/i18n/en-EN/data/equipment/robot/robotheads.json
+index 177cccc..87c59c7 100644
+--- a/i18n/en-EN/data/equipment/robot/robotheads.json
++++ b/i18n/en-EN/data/equipment/robot/robotheads.json
+@@ -4,5 +4,6 @@
+   { "id": "robot_head_assaultron",            "name": "Assaultron Head" },
+   { "id": "robot_head_assaultron_laser",      "name": "Assaultron Head (Laser)" },
+   { "id": "robot_head_robobrain",             "name": "Robobrain Head" },
+-  { "id": "robot_head_sentry_bot",            "name": "Sentry Bot Head" }
++  { "id": "robot_head_sentry_bot",            "name": "Sentry Bot Head" },
++  { "id": "robot_head_securitron",            "name": "Securitron Head" }
+ ]
+diff --git a/i18n/en-EN/data/equipment/robot/robotlegs.json b/i18n/en-EN/data/equipment/robot/robotlegs.json
+index 4e5feb8..93ac7ff 100644
+--- a/i18n/en-EN/data/equipment/robot/robotlegs.json
++++ b/i18n/en-EN/data/equipment/robot/robotlegs.json
+@@ -3,5 +3,6 @@
+   { "id": "robot_legs_protectron",            "name": "Protectron Legs" },
+   { "id": "robot_legs_assaultron",            "name": "Assaultron Legs" },
+   { "id": "robot_legs_robobrain_treads",      "name": "Robobrain Treads" },
+-  { "id": "robot_legs_sentry_bot",            "name": "Sentry Bot Legs" }
++  { "id": "robot_legs_sentry_bot",            "name": "Sentry Bot Legs" },
++  { "id": "robot_legs_securitron",            "name": "Securitron Wheel" }
+ ]
+diff --git a/i18n/en-EN/data/system/equipmentKits.json b/i18n/en-EN/data/system/equipmentKits.json
+index a9c9f12..0cddfd1 100644
+--- a/i18n/en-EN/data/system/equipmentKits.json
++++ b/i18n/en-EN/data/system/equipmentKits.json
+@@ -33,5 +33,6 @@
+   "protectron_firefighter": { "name": "Firefighter" },
+   "protectron_nukatron": { "name": "Nuka-Tron" },
+   "protectron_worker": { "name": "Worker" },
+-  "protectron_model_x": { "name": "Model X" }
++  "protectron_model_x": { "name": "Model X" },
++  "securitron_standard": { "name": "Securitron" }
+ }
+diff --git a/i18n/en-EN/data/system/traits.json b/i18n/en-EN/data/system/traits.json
+index 376e9ea..3b300e2 100644
+--- a/i18n/en-EN/data/system/traits.json
++++ b/i18n/en-EN/data/system/traits.json
+@@ -132,6 +132,12 @@
+         "name": "Shadow",
+         "description": "Your initial Strength and Endurance scores increase by +2 each, and your maximum Strength and Endurance scores increase to 12, but your maximum Intelligence and Charisma scores decrease to 8. You cannot have a rank higher than 4 in any skill. You are completely immune to radiation and poison damage.\n\nYour height is over two meters; your body is bulky and muscular, and your skin is blue. You do not appear to age, but you are infertile. You may only wear armor that was made for super mutants.\n\nYou can easily become addicted to Stealth Boy; its prolonged use has dealt enormous damage to your psyche and mental health. Whenever you use Stealth Boy, roll 1 {CD} per dose you took this session. If any effects come up, you get the following symptoms:\n\nStealth Boy Addiction: A failed addiction check makes you addicted to Stealth Boy. The difficulty of Perception and Intelligence tests increases by +2, and Charisma tests by +1, until cured."
+       }
++    },
++    "securitron": {
++      "markI": {
++        "name": "Mark I Securitron",
++        "description": "You are a robot with the Mk I operating system designed by RobCo Industries. You move on a single wheel: the difficulty of tests relying on balance or stability is increased by 1. Your arms are fitted with manipulator claws, allowing you to roughly manipulate your surroundings and make unarmed melee attacks, and integrated weapons are built into your palms. Missile launchers are mounted in your shoulders, and a grenade launcher is integrated into your left arm, but both are inoperable until you are fitted with the Mk II operating system. Your carry weight is 150 lbs. It cannot be increased by your Strength or perks, but it can be increased by modified armor. You are immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover from your injuries or regain health points without receiving repairs."
++      }
+     }
+   }
+ }
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index b7708cf..81b4e36 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -160,7 +160,8 @@
+     "survivor": "Survivor",
+     "vaultDweller": "Vault Dweller",
+     "shadow": "Shadow",
+-    "synth": "Synth"
++    "synth": "Synth",
++    "securitron": "Securitron"
+   },
+   "attributes": {
+     "STR": "STR",
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 1b7e99b..5d7ffee 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -44,11 +44,24 @@
+     "manipulatorWeightMessage": "This weapon exceeds the manipulator held-weight limit ({maxHeldWeight} lbs).",
+     "robotCannotUseTwoHandedMessage": "Current robot hands/manipulators cannot use two-handed weapons.",
+     "robotArmorOnlyTitle": "Equipment restriction",
+-    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.", "powerArmorNeedsCoreTitle": "Power Armor", "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.", "powerArmorNeedsFrameMessage": "Equip the power armor frame first.", "powerArmorDepletedTitle": "Power depleted", "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory.",
++    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.",
++    "powerArmorNeedsCoreTitle": "Power Armor",
++    "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.",
++    "powerArmorNeedsFrameMessage": "Equip the power armor frame first.",
++    "powerArmorDepletedTitle": "Power depleted",
++    "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory.",
+     "mutantCannotWearStandardArmorTitle": "Equipment restriction",
+     "mutantCannotWearStandardArmorMessage": "Super mutants cannot wear power armor.",
+     "powerArmorChooseCoreTitle": "Fusion Core selection",
+-    "powerArmorBrokenPieceMessage": "This piece is broken (0 HP) and cannot be equipped. Repair it in the inventory."
++    "powerArmorBrokenPieceMessage": "This piece is broken (0 HP) and cannot be equipped. Repair it in the inventory.",
++    "mk2AppliedTitle": "Mk II OS installed",
++    "mk2AppliedMessage": "Missile launcher and grenade launcher are now operational.",
++    "mk2ApplyFailedTitle": "Cannot apply",
++    "mk2Reason": {
++      "requiresSecuritron": "The driver is only compatible with a Securitron.",
++      "alreadyInstalled": "Mk II OS is already installed.",
++      "noDriver": "Driver item not found."
++    }
+   },
+   "actions": {
+     "cancel": "Cancel",
+@@ -84,7 +97,8 @@
+     "totalWeight": "Total weight",
+     "totalPrice": "Total price",
+     "durability": "Durability (HP)",
+-    "ammo": "Ammo"
++    "ammo": "Ammo",
++    "requiresMkII": "Requires Mk II OS"
+   },
+   "powerArmor": {
+     "containerTitle": "Power Armor",
+@@ -100,4 +114,4 @@
+       "rightLeg": "right leg"
+     }
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 01882a4..855f4ce 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -121,7 +121,8 @@
+       "chamber": "Chamber",
+       "unique": "Unique",
+       "other": "Other"
+-    }
++    },
++    "requiresMkII": "Requires Mk II OS"
+   },
+   "robotSlot": {
+     "noLimb": "No Limb",
+@@ -136,7 +137,8 @@
+       "arm2": "Arm 2",
+       "arm3": "Arm 3",
+       "thruster": "Thruster",
+-      "chassis": "Chassis"
++      "chassis": "Chassis",
++      "wheel": "Wheel"
+     },
+     "layers": {
+       "plating": "Plating",
+@@ -254,6 +256,10 @@
+     "robot_weapon_vice_grip": "Vice Grip",
+     "robot_weapon_claw": "Claw",
+     "robot_weapon_tesla_arm": "Tesla Carbine",
+-    "robot_arm_smoke_manipulator": "Smoke Manipulator"
++    "robot_arm_smoke_manipulator": "Smoke Manipulator",
++    "robot_head_securitron": "Securitron Head",
++    "robot_body_securitron": "Securitron Body",
++    "robot_arm_securitron": "Securitron Arm",
++    "robot_legs_securitron": "Securitron Wheel"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 7546904..5b27d7a 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -74,6 +74,7 @@ import dataKitsSuperMutant from '../data/equipmentKits/superMutant.json';
+ import dataKitsVaultDweller from '../data/equipmentKits/vaultDweller.json';
+ import dataKitsWastelander from '../data/equipmentKits/wastelander.json';
+ import dataKitsProtectron from '../data/equipmentKits/protectron.json';
++import dataKitsSecuritron from '../data/equipmentKits/securitron.json';
+ 
+ // Locale-independent technical data (stats, ids, game mechanics)
+ import dataWeapons from '../data/equipment/weapons.json';
+@@ -119,6 +120,7 @@ const ALL_KIT_DATA = {
+   ...dataKitsVaultDweller,
+   ...dataKitsWastelander,
+   ...dataKitsProtectron,
++  ...dataKitsSecuritron,
+ };
+ 
+ const EQUIPMENT_BY_LOCALE = {
+diff --git a/i18n/ru-RU/data/equipment/robot/items.json b/i18n/ru-RU/data/equipment/robot/items.json
+index a0148c1..e3f0f29 100644
+--- a/i18n/ru-RU/data/equipment/robot/items.json
++++ b/i18n/ru-RU/data/equipment/robot/items.json
+@@ -7,8 +7,16 @@
+     "id": "robot_item_fertilizer_bag",
+     "name": "Мешок удобрений"
+   },
+-  {
+-    "id": "food_mutafruit",
+-    "name": "Мутафрукт"
+-  }
++ {
++  "id": "food_mutafruit",
++  "name": "Мутафрукт"
++ },
++ {
++  "id": "robot_item_printer",
++  "name": "Принтер"
++ },
++ {
++  "id": "robot_item_mk2_driver",
++  "name": "Драйвер ОС Mk II"
++ }
+ ]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotarms.json b/i18n/ru-RU/data/equipment/robot/robotarms.json
+index 105e717..9a1ac0e 100644
+--- a/i18n/ru-RU/data/equipment/robot/robotarms.json
++++ b/i18n/ru-RU/data/equipment/robot/robotarms.json
+@@ -18,5 +18,6 @@
+   { "id": "robot_weapon_vice_grip",              "name": "Тиски" },
+   { "id": "robot_weapon_claw",                   "name": "Коготь" },
+   { "id": "robot_weapon_tesla_arm",              "name": "Карабин Теслы" },
+-  { "id": "robot_arm_smoke_manipulator",         "name": "Экстендер с зажимом" }
++  { "id": "robot_arm_smoke_manipulator",         "name": "Экстендер с зажимом" },
++  { "id": "robot_arm_securitron",                "name": "Рука Секьюритрона" }
+ ]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotbody.json b/i18n/ru-RU/data/equipment/robot/robotbody.json
+index b33a930..8ea30d4 100644
+--- a/i18n/ru-RU/data/equipment/robot/robotbody.json
++++ b/i18n/ru-RU/data/equipment/robot/robotbody.json
+@@ -3,5 +3,6 @@
+   { "id": "robot_body_protectron",    "name": "Корпус Протектрона" },
+   { "id": "robot_body_assaultron",    "name": "Корпус Ассолтрона" },
+   { "id": "robot_body_robobrain",     "name": "Корпус Роботмозга" },
+-  { "id": "robot_body_sentry_bot",    "name": "Корпус Сентри-бота" }
++  { "id": "robot_body_sentry_bot",    "name": "Корпус Сентри-бота" },
++  { "id": "robot_body_securitron",    "name": "Корпус Секьюритрона" }
+ ]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotheads.json b/i18n/ru-RU/data/equipment/robot/robotheads.json
+index 7e0cbfb..d126c34 100644
+--- a/i18n/ru-RU/data/equipment/robot/robotheads.json
++++ b/i18n/ru-RU/data/equipment/robot/robotheads.json
+@@ -4,5 +4,6 @@
+   { "id": "robot_head_assaultron",            "name": "Голова Ассолтрона" },
+   { "id": "robot_head_assaultron_laser",      "name": "Голова Ассолтрона (лазер)" },
+   { "id": "robot_head_robobrain",             "name": "Голова Роботмозга" },
+-  { "id": "robot_head_sentry_bot",            "name": "Голова Сентри-бота" }
++  { "id": "robot_head_sentry_bot",            "name": "Голова Сентри-бота" },
++  { "id": "robot_head_securitron",            "name": "Голова Секьюритрона" }
+ ]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotlegs.json b/i18n/ru-RU/data/equipment/robot/robotlegs.json
+index c6f2e03..94d2bce 100644
+--- a/i18n/ru-RU/data/equipment/robot/robotlegs.json
++++ b/i18n/ru-RU/data/equipment/robot/robotlegs.json
+@@ -3,5 +3,6 @@
+   { "id": "robot_legs_protectron",            "name": "Ноги Протектрона" },
+   { "id": "robot_legs_assaultron",            "name": "Ноги Ассолтрона" },
+   { "id": "robot_legs_robobrain_treads",      "name": "Гусеницы Роботмозга" },
+-  { "id": "robot_legs_sentry_bot",            "name": "Ноги Сентри-бота" }
++  { "id": "robot_legs_sentry_bot",            "name": "Ноги Сентри-бота" },
++  { "id": "robot_legs_securitron",            "name": "Колесо Секьюритрона" }
+ ]
+diff --git a/i18n/ru-RU/data/equipment/weapons/weapon_mods.json b/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
+index 68563fa..61cba2c 100644
+--- a/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
++++ b/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
+@@ -314,7 +314,7 @@
+   {
+     "id": "mod_053",
+     "name": "Автоматический ствол",
+-    "prefix": "Автоматический ствол",
++    "prefix": "Автоматический",
+     "effectDescription": "−1 {/CD} урона, +1 Дистанция, +1 Скорость стрельбы, Убирает Вплотную"
+   },
+   {
+diff --git a/i18n/ru-RU/data/system/equipmentKits.json b/i18n/ru-RU/data/system/equipmentKits.json
+index 3d5a4e6..b1df67d 100644
+--- a/i18n/ru-RU/data/system/equipmentKits.json
++++ b/i18n/ru-RU/data/system/equipmentKits.json
+@@ -33,5 +33,6 @@
+   "protectron_firefighter": { "name": "Пожарный" },
+   "protectron_nukatron": { "name": "Нюка-Трон" },
+   "protectron_worker": { "name": "Рабочий" },
+-  "protectron_model_x": { "name": "Модель X" }
++  "protectron_model_x": { "name": "Модель X" },
++  "securitron_standard": { "name": "Секьюритрон" }
+ }
+diff --git a/i18n/ru-RU/data/system/traits.json b/i18n/ru-RU/data/system/traits.json
+index 0c682af..446c5d1 100644
+--- a/i18n/ru-RU/data/system/traits.json
++++ b/i18n/ru-RU/data/system/traits.json
+@@ -132,6 +132,12 @@
+         "name": "Тень",
+         "description": "Ваши начальные атрибуты Силы и Выносливости увеличиваются на +2 каждый, а ваша максимальная Сила и Выносливость увеличиваются до 12, но ваш максимальный Интеллект и Харизма уменьшаются до 8. Вы не можете иметь ранг выше 4-го в любом из навыков. Вы полностью невосприимчивы к урону от радиации и яда.\n\nВаш рост более двух метров в высоту; ваше тело громоздкое и мускулистое, а ваша кожа синяя. Вы, кажется, не стареете, но вы бесплодны. Вы можете носить только броню, которая была сделана для супермутантов.\n\nВы можете легко стать зависимым от Стелс-боя, его длительное использование нанесло огромный урон вашей психике и ментальному здоровью. Всякий раз, когда вы используете Стелс-бой, вы бросаете 1 {CD} за каждую дозу, которую вы приняли в этой сессии. Если выпадают какие-либо эффекты, вы получаете следующие симптомы:\n\nЗависимость от Стелс-боя: Неудавшийся проверка на зависимость делает вас зависимым от Стелс-боя. Сложность тестов на восприятие и интеллект повышается на +2, а тестов на харизму на +1, пока не вылечитесь."
+       }
++    },
++    "securitron": {
++      "markI": {
++        "name": "Секьюритрон Mk I",
++        "description": "Вы — робот с операционной системой Mk I, созданной RobCo Industries. Вы передвигаетесь на одном колесе: сложность тестов на балансировку и устойчивость увеличена на 1. Ваши руки снабжены манипуляторами, с помощью которых вы способны грубо манипулировать окружением и совершать безоружные атаки в ближнем бою, а в ладони встроено оружие. В плечах расположены ракетницы, а в левую руку встроен гранатомёт, но они не работают, пока вы не установите операционную систему Mk II. Переносимый вес составляет 150 фунтов. Его нельзя увеличить за счёт силы или перков, но можно увеличить за счёт модификации. Вы невосприимчивы к радиации и ядам, но не можете использовать препараты, а также получать пользу от еды, питья или отдыха. Вы не можете восстановить свои повреждения или очки здоровья, не получив ремонта."
++      }
+     }
+   }
+ }
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index 16c9fd1..f39c103 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -160,7 +160,8 @@
+     "survivor": "Выживший",
+     "vaultDweller": "Обитатель убежища",
+     "shadow": "Тень",
+-    "synth": "Синт"
++    "synth": "Синт",
++    "securitron": "Секьюритрон"
+   },
+   "attributes": {
+     "STR": "СИЛ",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index ee3d642..58dcc65 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -44,11 +44,24 @@
+     "manipulatorWeightMessage": "Это оружие превышает допустимый удерживаемый вес манипулятора ({maxHeldWeight} фунтов).",
+     "robotCannotUseTwoHandedMessage": "Текущие руки/манипуляторы робота не могут использовать двуручное оружие.",
+     "robotArmorOnlyTitle": "Ограничение экипировки",
+-    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.", "powerArmorNeedsCoreTitle": "Силовая броня", "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.", "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.", "powerArmorDepletedTitle": "Питание исчерпано", "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь.",
++    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.",
++    "powerArmorNeedsCoreTitle": "Силовая броня",
++    "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.",
++    "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.",
++    "powerArmorDepletedTitle": "Питание исчерпано",
++    "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь.",
+     "mutantCannotWearStandardArmorTitle": "Ограничение экипировки",
+     "mutantCannotWearStandardArmorMessage": "Супермутантам силовая броня запрещена.",
+     "powerArmorChooseCoreTitle": "Выбор Ядерного блока",
+-    "powerArmorBrokenPieceMessage": "Прочность части на нуле — её нельзя надеть. Почините её в инвентаре."
++    "powerArmorBrokenPieceMessage": "Прочность части на нуле — её нельзя надеть. Почините её в инвентаре.",
++    "mk2AppliedTitle": "ОС Mk II установлена",
++    "mk2AppliedMessage": "Ракетная установка и гранатомёт активированы.",
++    "mk2ApplyFailedTitle": "Нельзя применить",
++    "mk2Reason": {
++      "requiresSecuritron": "Драйвер совместим только с Секьюритроном.",
++      "alreadyInstalled": "ОС Mk II уже установлена.",
++      "noDriver": "Предмет драйвера не найден."
++    }
+   },
+   "actions": {
+     "cancel": "Отмена",
+@@ -84,7 +97,8 @@
+     "totalWeight": "Общий вес",
+     "totalPrice": "Общая цена",
+     "durability": "Прочность (ОЗ)",
+-    "ammo": "Патрон"
++    "ammo": "Патрон",
++    "requiresMkII": "Требуется ОС Mk II"
+   },
+   "powerArmor": {
+     "containerTitle": "Силовая броня",
+@@ -100,4 +114,4 @@
+       "rightLeg": "правая нога"
+     }
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index ac87467..8ad4706 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -121,7 +121,8 @@
+       "chamber": "Камера",
+       "unique": "Уникальный",
+       "other": "Другое"
+-    }
++    },
++    "requiresMkII": "Требуется ОС Mk II"
+   },
+   "robotSlot": {
+     "noLimb": "Нет конечности",
+@@ -136,7 +137,8 @@
+       "arm2": "Рука 2",
+       "arm3": "Рука 3",
+       "thruster": "Двигатель",
+-      "chassis": "Шасси"
++      "chassis": "Шасси",
++      "wheel": "Колесо"
+     },
+     "layers": {
+       "plating": "Обшивка",
+@@ -254,6 +256,10 @@
+     "robot_weapon_vice_grip": "Тиски",
+     "robot_weapon_claw": "Коготь",
+     "robot_weapon_tesla_arm": "Карабин Теслы",
+-    "robot_arm_smoke_manipulator": "Экстендер с зажимом"
++    "robot_arm_smoke_manipulator": "Экстендер с зажимом",
++    "robot_head_securitron": "Голова Секьюритрона",
++    "robot_body_securitron": "Корпус Секьюритрона",
++    "robot_arm_securitron": "Рука Секьюритрона",
++    "robot_legs_securitron": "Колесо Секьюритрона"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/package.json b/package.json
+index 5d17193..dc1c658 100644
+--- a/package.json
++++ b/package.json
+@@ -36,9 +36,11 @@
+     "zustand": "^5.0.14"
+   },
+   "devDependencies": {
+-    "@babel/core": "^7.20.0",
++    "@babel/core": "^7.29.7",
++    "@babel/plugin-transform-react-jsx": "^7.29.7",
+     "@types/react": "~19.1.10",
+     "fast-check": "^4.7.0",
++    "react-test-renderer": "^19.2.8",
+     "serve": "^14.2.6",
+     "typescript": "~5.9.2",
+     "vitest": "^4.1.5"
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 5cee5fa..6844108 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -643,6 +643,10 @@ const useCharacterStore = create(devtools(
+           // equipped at character creation and cannot be removed via the normal
+           // unequip flow — only by swapping the limb that holds them.
+           locked: Boolean(item.locked),
++          // `requiresMkII` — нерабочее встроенное оружие (ракетница и гранатомёт
++          // Секьюритрона до установки ОС Mk II): хранится в инвентаре, но не
++          // попадает в список атак, пока механика Mk II не реализована.
++          requiresMkII: Boolean(item.requiresMkII),
+           quantity: item.quantity || 1,
+           stackKey: stackKey,
+           appliedMods: appliedMods,
+diff --git a/src/store/robotSlice.js b/src/store/robotSlice.js
+index 0e90a34..0ebf8c7 100644
+--- a/src/store/robotSlice.js
++++ b/src/store/robotSlice.js
+@@ -34,6 +34,7 @@ export const createInitialRobotState = () => ({
+     bodyPlan: null,
+     slots: {},
+     modules: [],
++    mk2Installed: false,
+   },
+ });
+ 
+@@ -56,6 +57,7 @@ export const createRobotActions = (set, get) => ({
+         bodyPlan,
+         slots: createEmptyRobotSlots(bodyPlan),
+         modules: [],
++        mk2Installed: get().robot?.mk2Installed ?? false,
+       },
+     });
+   },
+@@ -75,7 +77,7 @@ export const createRobotActions = (set, get) => ({
+       resolvedKitItems,
+       robotCatalog,
+     );
+-    set({ robot: { bodyPlan, slots, modules } });
++    set({ robot: { bodyPlan, slots, modules, mk2Installed: get().robot?.mk2Installed ?? false } });
+     return { inventoryItems: inventoryItems || [] };
+   },
+ 
+@@ -90,12 +92,49 @@ export const createRobotActions = (set, get) => ({
+         bodyPlan: robotState.bodyPlan ?? get().robot?.bodyPlan ?? null,
+         slots: robotState.slots ?? {},
+         modules: robotState.modules ?? [],
++        mk2Installed: robotState.mk2Installed ?? get().robot?.mk2Installed ?? false,
+       },
+     });
+   },
+ 
+   resetRobot: () => set(createInitialRobotState()),
+ 
++  // --- Mk II operating system (Securitron) ---
++
++  /**
++   * Apply the Mk II OS driver to a Securitron.
++   * Consumes one `robot_item_mk2_driver` from the inventory and activates the
++   * `requiresMkII` weapons (missile launcher, grenade launcher) for attacks.
++   * Only the Securitron body plan can accept the driver.
++   * @param {string} itemId - store id of the driver item
++   * @returns {{ ok: boolean, reason?: string }}
++   */
++  applyMk2Driver: (itemId) => {
++    const state = get();
++    const robot = state.robot || {};
++    if (robot.bodyPlan !== 'securitron') {
++      return { ok: false, reason: 'mk2.requiresSecuritron' };
++    }
++    if (robot.mk2Installed) {
++      return { ok: false, reason: 'mk2.alreadyInstalled' };
++    }
++    const items = { ...state.items };
++    const item = items[itemId];
++    const isDriver = item && (item.weaponId === 'robot_item_mk2_driver' || item.id === 'robot_item_mk2_driver');
++    if (!isDriver) {
++      return { ok: false, reason: 'mk2.noDriver' };
++    }
++    const qty = Number(item.quantity) || 1;
++    if (qty <= 1) {
++      delete items[itemId];
++    } else {
++      items[itemId] = { ...item, quantity: qty - 1 };
++    }
++    set({ items, robot: { ...robot, mk2Installed: true } });
++    get().recalculateDerivedStats?.();
++    return { ok: true };
++  },
++
+   // --- Limbs ---
+ 
+   /**
+@@ -209,6 +248,7 @@ export const createRobotActions = (set, get) => ({
+ export const selectRobotSlots = (state) => state.robot?.slots || {};
+ export const selectRobotModules = (state) => state.robot?.modules || [];
+ export const selectRobotBodyPlan = (state) => state.robot?.bodyPlan ?? null;
++export const selectRobotMk2Installed = (state) => state.robot?.mk2Installed === true;
+ export const selectRobotSlotKeysOrdered = (state) =>
+   getRobotSlotKeys(state.robot?.bodyPlan);
+ 
+diff --git a/vitest.config.js b/vitest.config.js
+index db7be20..55a5308 100644
+--- a/vitest.config.js
++++ b/vitest.config.js
+@@ -1,6 +1,31 @@
+ import { defineConfig } from 'vitest/config';
++import babel from '@babel/core';
++import jsxPlugin from '@babel/plugin-transform-react-jsx';
++
++// Кодовая база — React Native: компоненты лежат в .js с JSX (Metro это
++// переваривает, а rolldown-парсер vitest — нет). Преобразуем JSX в .js через
++// babel до трансформации, чтобы компоненты можно было реально рендерить
++// в тестах (см. __tests__/securitron/weaponcard-render.test.js).
++const JSX_LIKE = /(?:<\/?[A-Za-z][^>]*>|<>|<\/>)/;
++
++const jsxInJs = {
++  name: 'transform-jsx-in-js',
++  enforce: 'pre',
++  transform(code, id) {
++    if (!id.endsWith('.js') || id.includes('node_modules')) return;
++    if (!JSX_LIKE.test(code)) return;
++    const out = babel.transformSync(code, {
++      filename: id,
++      babelrc: false,
++      configFile: false,
++      plugins: [[jsxPlugin, { runtime: 'automatic' }]],
++    });
++    return { code: out.code, map: null };
++  },
++};
+ 
+ export default defineConfig({
++  plugins: [jsxInJs],
+   test: {
+     environment: 'node',
+     setupFiles: ['./src/store/__test-setup__/asyncStorageMock.js'],
+-- 
+2.47.3
+
