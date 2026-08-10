@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
@@ -8,11 +8,17 @@ export default function SettingsModal({ visible, onClose }) {
   const qualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
   const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
   const foldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
+  const weaponCardsMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
 
   const setDurabilityLossEnabled = useAppSettingsStore((state) => state.setWeaponDurabilityLossEnabled);
   const setQualityEnabled = useAppSettingsStore((state) => state.setRandomWeaponQualityEnabled);
   const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
   const setFoldersEnabled = useAppSettingsStore((state) => state.setCharacterFoldersEnabled);
+  const setWeaponCardsMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
+
+  // Меню выбора режима карточек оружия (стрелки ^ / v раскрывают пункты).
+  const [cardsMenuOpen, setCardsMenuOpen] = useState(false);
+  const WEAPON_CARDS_MODES = ['cards', 'spoilers', 'tabs'];
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -66,6 +72,45 @@ export default function SettingsModal({ visible, onClose }) {
             <Switch value={foldersEnabled} onValueChange={setFoldersEnabled} />
           </View>
 
+          <View style={styles.separator} />
+
+          <Text style={styles.sectionTitle}>{tHomeScreen('settings.interfaceTitle')}</Text>
+
+          <View style={styles.row}>
+            <View style={styles.text}>
+              <Text style={styles.label}>{tHomeScreen('settings.weaponCardsTitle')}</Text>
+              <Text style={styles.description}>{tHomeScreen('settings.weaponCardsDescription')}</Text>
+            </View>
+            <View style={styles.cycle}>
+              <TouchableOpacity onPress={() => setCardsMenuOpen((open) => !open)}>
+                <Text style={styles.cycleArrow}>^</Text>
+              </TouchableOpacity>
+              <Text style={styles.cycleValue}>{tHomeScreen(`settings.weaponCards.${weaponCardsMode}`)}</Text>
+              <TouchableOpacity onPress={() => setCardsMenuOpen((open) => !open)}>
+                <Text style={styles.cycleArrow}>v</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {cardsMenuOpen && (
+            <View style={styles.menu}>
+              {WEAPON_CARDS_MODES.map((mode) => (
+                <TouchableOpacity
+                  key={mode}
+                  style={[styles.menuItem, weaponCardsMode === mode && styles.menuItemActive]}
+                  onPress={() => {
+                    setWeaponCardsMode(mode);
+                    setCardsMenuOpen(false);
+                  }}
+                >
+                  <Text style={[styles.menuItemText, weaponCardsMode === mode && styles.menuItemTextActive]}>
+                    {tHomeScreen(`settings.weaponCards.${mode}`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <TouchableOpacity onPress={onClose} style={styles.close}>
             <Text>OK</Text>
           </TouchableOpacity>
@@ -90,5 +135,19 @@ const styles = StyleSheet.create({
   counter: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 20 },
   button: { fontSize: 28, fontWeight: '700', paddingHorizontal: 12 },
   value: { fontSize: 22, minWidth: 45, textAlign: 'center' },
+  cycle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cycleArrow: { fontSize: 22, fontWeight: '700', paddingHorizontal: 8, color: '#555' },
+  cycleValue: { fontSize: 15, fontWeight: '600', minWidth: 70, textAlign: 'center' },
+  menu: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  menuItem: { paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#fafafa' },
+  menuItemActive: { backgroundColor: '#e6eef7' },
+  menuItemText: { fontSize: 15, color: '#333' },
+  menuItemTextActive: { color: '#0a58ca', fontWeight: '700' },
   close: { alignSelf: 'flex-end', marginTop: 18, padding: 10 },
 });

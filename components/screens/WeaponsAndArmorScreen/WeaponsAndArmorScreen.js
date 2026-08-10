@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal } from 'react-native';
+import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -635,6 +635,37 @@ const WeaponsAndArmorScreen = () => {
     [dedupedEquippedWeapons],
   );
 
+  // ── Режим отображения карточек оружия (настройка интерфейса) ─────────────
+  const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
+
+  // Спойлеры: по умолчанию ЗАКРЫТЫ (в объекте хранятся открытые индексы).
+  const [openSpoilers, setOpenSpoilers] = useState({});
+  const toggleSpoiler = (index) => setOpenSpoilers((prev) => ({ ...prev, [index]: !prev[index] }));
+
+  // Табы: активный индекс + свайп по строке табов.
+  const [activeTab, setActiveTab] = useState(0);
+  const weaponsCount = orderedEquippedWeapons.length;
+  useEffect(() => {
+    setActiveTab(0);
+  }, [weaponsCount]);
+
+  const goPrevTab = () => setActiveTab((prev) => Math.max(0, prev - 1));
+  const goNextTab = () => setActiveTab((prev) => Math.min(Math.max(0, weaponsCount - 1), prev + 1));
+
+  const tabsPanResponder = useMemo(
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 20 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx < -30) goNextTab();
+        else if (gesture.dx > 30) goPrevTab();
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [weaponsCount],
+  );
+
   // Состояние для модального окна модификаций
   const [modificationModalVisible, setModificationModalVisible] = useState(false);
   const [selectedWeaponForModification, setSelectedWeaponForModification] = useState(null);
@@ -952,29 +983,137 @@ const WeaponsAndArmorScreen = () => {
               </View>
             )}
             
-            {/* Оружие */}
-            <View style={{ marginBottom: 16 }}>
-              {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
-                <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
-                  <WeaponCard
-                    weapon={orderedEquippedWeapons[rowIndex * 2] ?? null}
-                    onModifyWeapon={handleOpenModificationModal}
-                    onUnequip={isRobot ? null : handleUnequipWeapon}
-                    showSourceSlot={isRobot}
-                    meleeBonus={meleeBonusValue}
-                    equippedWeapons={equippedWeaponsForDisplay}
-                  />
-                  <WeaponCard
-                    weapon={orderedEquippedWeapons[rowIndex * 2 + 1] ?? null}
-                    onModifyWeapon={handleOpenModificationModal}
-                    onUnequip={isRobot ? null : handleUnequipWeapon}
-                    showSourceSlot={isRobot}
-                    meleeBonus={meleeBonusValue}
-                    equippedWeapons={equippedWeaponsForDisplay}
-                  />
-                </View>
-              ))}
-            </View>
+            {/* Оружие — режим отображения из настроек интерфейса */}
+            {weaponCardsDisplayMode === 'cards' && (
+              <View style={{ marginBottom: 16 }}>
+                {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+                  <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
+                    <WeaponCard
+                      weapon={orderedEquippedWeapons[rowIndex * 2] ?? null}
+                      onModifyWeapon={handleOpenModificationModal}
+                      onUnequip={isRobot ? null : handleUnequipWeapon}
+                      showSourceSlot={isRobot}
+                      meleeBonus={meleeBonusValue}
+                      equippedWeapons={equippedWeaponsForDisplay}
+                    />
+                    <WeaponCard
+                      weapon={orderedEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                      onModifyWeapon={handleOpenModificationModal}
+                      onUnequip={isRobot ? null : handleUnequipWeapon}
+                      showSourceSlot={isRobot}
+                      meleeBonus={meleeBonusValue}
+                      equippedWeapons={equippedWeaponsForDisplay}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {weaponCardsDisplayMode === 'spoilers' && (
+              <View style={{ marginBottom: 16 }}>
+                {(orderedEquippedWeapons.length > 0
+                  ? orderedEquippedWeapons.map((weapon, index) => ({ weapon, index }))
+                  : [{ weapon: null, index: 0 }]
+                ).map(({ weapon, index }) => {
+                  const open = openSpoilers[index] === true;
+                  return (
+                    <View key={`spoiler-${index}`} style={localStyles.weaponSpoiler}>
+                      <TouchableOpacity
+                        style={localStyles.weaponSpoilerHeader}
+                        onPress={() => toggleSpoiler(index)}
+                      >
+                        <Text style={localStyles.weaponSpoilerTitle} numberOfLines={1}>
+                          {weapon?.name || tWeaponsAndArmorScreen('weapon.notEquipped')}
+                        </Text>
+                        <Text style={localStyles.weaponSpoilerArrow}>{open ? '▼' : '►'}</Text>
+                      </TouchableOpacity>
+                      {open && (
+                        <View style={localStyles.weaponSpoilerBody}>
+                          <View style={localStyles.weaponSpoilerCard}>
+                            <WeaponCard
+                              weapon={weapon}
+                              onModifyWeapon={handleOpenModificationModal}
+                              onUnequip={isRobot ? null : handleUnequipWeapon}
+                              showSourceSlot={isRobot}
+                              meleeBonus={meleeBonusValue}
+                              equippedWeapons={equippedWeaponsForDisplay}
+                            />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {weaponCardsDisplayMode === 'tabs' && (
+              <View style={{ marginBottom: 16 }}>
+                {weaponsCount === 0 ? (
+                  <View style={localStyles.weaponTabsStage}>
+                    <View style={localStyles.weaponTabCardWrap}>
+                      <View style={localStyles.weaponTabCard}>
+                        <WeaponCard
+                          weapon={null}
+                          onModifyWeapon={handleOpenModificationModal}
+                          onUnequip={isRobot ? null : handleUnequipWeapon}
+                          showSourceSlot={isRobot}
+                          meleeBonus={meleeBonusValue}
+                          equippedWeapons={equippedWeaponsForDisplay}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View {...tabsPanResponder.panHandlers}>
+                    <View style={localStyles.weaponTabsRow}>
+                      {orderedEquippedWeapons.map((weapon, index) => (
+                        <TouchableOpacity
+                          key={`tab-${index}`}
+                          style={[localStyles.weaponTab, index === activeTab && localStyles.weaponTabActive]}
+                          onPress={() => setActiveTab(index)}
+                        >
+                          <Text
+                            numberOfLines={1}
+                            style={[localStyles.weaponTabText, index === activeTab && localStyles.weaponTabTextActive]}
+                          >
+                            {weapon?.name || ''}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={localStyles.weaponTabsStage}>
+                      <TouchableOpacity
+                        onPress={goPrevTab}
+                        disabled={activeTab <= 0}
+                        style={activeTab <= 0 && localStyles.weaponTabNavArrowDisabled}
+                      >
+                        <Text style={localStyles.weaponTabNavArrow}>{'<<'}</Text>
+                      </TouchableOpacity>
+                      <View style={localStyles.weaponTabCardWrap}>
+                        <View style={localStyles.weaponTabCard}>
+                          <WeaponCard
+                            weapon={orderedEquippedWeapons[activeTab] ?? null}
+                            onModifyWeapon={handleOpenModificationModal}
+                            onUnequip={isRobot ? null : handleUnequipWeapon}
+                            showSourceSlot={isRobot}
+                            meleeBonus={meleeBonusValue}
+                            equippedWeapons={equippedWeaponsForDisplay}
+                          />
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={goNextTab}
+                        disabled={activeTab >= weaponsCount - 1}
+                        style={activeTab >= weaponsCount - 1 && localStyles.weaponTabNavArrowDisabled}
+                      >
+                        <Text style={localStyles.weaponTabNavArrow}>{'>>'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
             
 
         </ScrollView>

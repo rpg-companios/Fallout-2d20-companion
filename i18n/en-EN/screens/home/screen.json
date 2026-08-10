@@ -74,7 +74,15 @@
     "qualityTitle": "Random weapon quality",
     "qualityDescription": "Weapons added through \"Loot\" have random durability from 1 to 100. Merchant weapons are always 100%.",
     "foldersTitle": "Character folders",
-    "foldersDescription": "Organize created characters into folders."
+    "foldersDescription": "Organize created characters into folders.",
+    "interfaceTitle": "Interface Settings",
+    "weaponCardsTitle": "Weapon cards display",
+    "weaponCardsDescription": "How weapons are shown on the equipment screen.",
+    "weaponCards": {
+      "cards": "Cards",
+      "spoilers": "Spoilers",
+      "tabs": "Tabs"
+    }
   },
   "folders": {
     "create": "Create folder",

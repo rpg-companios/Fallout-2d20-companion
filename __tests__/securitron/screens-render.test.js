@@ -21,6 +21,7 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'web', select: (o) => o.web ?? o.default },
   StyleSheet: { create: (s) => s, flatten: (s) => s },
   Alert: { alert: () => {} },
+  PanResponder: { create: () => ({ panHandlers: {} }) },
 }));
 
 vi.mock('../../db/Database', async () => {
@@ -87,6 +88,7 @@ vi.mock('../../components/screens/WeaponsAndArmorScreen/textUtils', () => ({
 
 import TestRenderer from 'react-test-renderer';
 import useCharacterStore from '../../src/store/characterStore';
+import useAppSettingsStore from '../../src/store/appSettingsStore';
 import InventoryScreen from '../../components/screens/InventoryScreen/InventoryScreen';
 import WeaponsAndArmorScreen from '../../components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
 
@@ -135,5 +137,74 @@ describe('Экраны рендерятся без TDZ/хук-ошибок', () 
     }).not.toThrow();
     const texts = getTexts(renderer.toJSON());
     expect(texts.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Режимы отображения карточек оружия', () => {
+  beforeEach(() => {
+    useCharacterStore.getState().resetCharacterStore();
+    useCharacterStore.setState({
+      robot: { bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: false },
+    });
+  });
+
+  const renderScreen = () => {
+    let renderer;
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
+    });
+    return renderer;
+  };
+
+  it('по умолчанию — режим "cards" (значение стора)', () => {
+    expect(useAppSettingsStore.getState().weaponCardsDisplayMode).toBe('cards');
+  });
+
+  it('spoilers: экран рендерится, спойлер с заголовком и карточкой', () => {
+    useAppSettingsStore.getState().setWeaponCardsDisplayMode('spoilers');
+    // Оружие в сторе (equipped) — чтобы спойлер получил название.
+    useCharacterStore.getState().addNewItem({
+      weaponId: 'weapon_10mm_pistol',
+      itemType: 'weapon',
+      name: '10mm Pistol',
+      equipped: true,
+    });
+    let renderer;
+    expect(() => {
+      TestRenderer.act(() => {
+        renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
+      });
+    }).not.toThrow();
+    const texts = getTexts(renderer.toJSON());
+    expect(texts.some((t) => t.includes('10mm Pistol'))).toBe(true);
+  });
+
+  it('tabs: экран рендерится с табами и стрелками', () => {
+    useAppSettingsStore.getState().setWeaponCardsDisplayMode('tabs');
+    useCharacterStore.getState().addNewItem({
+      weaponId: 'weapon_10mm_pistol',
+      itemType: 'weapon',
+      name: '10mm Pistol',
+      equipped: true,
+    });
+    let renderer;
+    expect(() => {
+      TestRenderer.act(() => {
+        renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
+      });
+    }).not.toThrow();
+    const texts = getTexts(renderer.toJSON());
+    expect(texts.some((t) => t.includes('10mm Pistol'))).toBe(true);
+  });
+
+  it('возврат к cards после другого режима', () => {
+    useAppSettingsStore.getState().setWeaponCardsDisplayMode('tabs');
+    useAppSettingsStore.getState().setWeaponCardsDisplayMode('cards');
+    let renderer;
+    expect(() => {
+      TestRenderer.act(() => {
+        renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
+      });
+    }).not.toThrow();
   });
 });

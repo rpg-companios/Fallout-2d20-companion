@@ -1,4 +1,9 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
+
+// Скошенный левый верхний угол таба: на web — clip-path, на native — скругление.
+const BEVELED_TAB = Platform.OS === 'web'
+  ? { clipPath: 'polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px)' }
+  : { borderTopLeftRadius: 8 };
 
 const styles = StyleSheet.create({
   background: {
@@ -283,6 +288,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#222',
   },
+
+  // ── Режимы отображения карточек оружия: спойлеры и табы ────────────────
+
+  weaponSpoiler: { marginBottom: 8 },
+  weaponSpoilerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2c2c2c',
+    borderColor: '#5a5a5a',
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  weaponSpoilerTitle: { flex: 1, color: '#fff', fontSize: 14, fontWeight: '600' },
+  weaponSpoilerArrow: { color: '#e8a33d', fontSize: 14, marginLeft: 10, fontWeight: '700' },
+  weaponSpoilerBody: { alignItems: 'center', marginTop: 8 },
+  weaponSpoilerCard: { width: '66.67%' },
+
+  weaponTabsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10, gap: 6 },
+  weaponTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#2c2c2c',
+    borderColor: '#5a5a5a',
+    borderWidth: 1,
+    ...BEVELED_TAB,
+  },
+  weaponTabActive: { backgroundColor: '#4a4a4a', borderColor: '#e8a33d' },
+  weaponTabText: { color: '#aaa', fontSize: 13 },
+  weaponTabTextActive: { color: '#fff', fontWeight: '700' },
+  weaponTabsStage: { flexDirection: 'row', alignItems: 'center' },
+  weaponTabNavArrow: {
+    color: '#e8a33d',
+    fontSize: 20,
+    fontWeight: '700',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  weaponTabNavArrowDisabled: { opacity: 0.25 },
+  weaponTabCardWrap: { flex: 1, alignItems: 'center' },
+  weaponTabCard: { width: '66.67%' },
 });
 
 export default styles;

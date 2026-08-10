@@ -11,10 +11,16 @@ const useAppSettingsStore = create(
       weaponDurabilityLossEnabled: false,
       weaponDurabilityLossPer10Shots: 1,
       characterFoldersEnabled: false,
+      // Режим отображения карточек оружия на экране снаряжения:
+      // 'cards' (по умолчанию) | 'spoilers' | 'tabs'
+      weaponCardsDisplayMode: 'cards',
       setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
       setRandomWeaponQualityEnabled: (enabled) => set({ randomWeaponQualityEnabled: Boolean(enabled) }),
       setWeaponDurabilityLossEnabled: (enabled) => set({ weaponDurabilityLossEnabled: Boolean(enabled) }),
       setWeaponDurabilityLossPer10Shots: (value) => set({ weaponDurabilityLossPer10Shots: clampLoss(value) }),
+      setWeaponCardsDisplayMode: (mode) => set({
+        weaponCardsDisplayMode: ['cards', 'spoilers', 'tabs'].includes(mode) ? mode : 'cards',
+      }),
     }),
     {
       name: 'fallout2d20:settings',
@@ -24,6 +30,7 @@ const useAppSettingsStore = create(
         weaponDurabilityLossEnabled: state.weaponDurabilityLossEnabled,
         characterFoldersEnabled: state.characterFoldersEnabled,
         weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
+        weaponCardsDisplayMode: state.weaponCardsDisplayMode,
       }),
       migrate: (persistedState, version) => {
         // Миграция v0 -> v1: переименование randomWeaponDurabilityEnabled -> randomWeaponQualityEnabled
