@@ -40,6 +40,7 @@ import {
   getCanonicalAttributeKey,
   normalizeAttributeMap,
   getTraitAttributeBonus,
+  isCharacterLocked as isCharacterLockedFn,
 } from "../../../domain/characterCreation";
 // Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
 // базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
@@ -498,6 +499,13 @@ export default function CharacterScreen() {
   };
 
   const handleSelectKit = (kit) => {
+    // Новый комплект заменяет старый: очищаем снаряжение, инвентарь и награды
+    // (атрибуты/навыки сохраняются; навыки сбрасываются только при locked —
+    // см. resetKitAndRewards в confirm-флоу).
+    if (equipment && equipment.id !== kit.id) {
+      resetKitAndRewards();
+    }
+
     // Robots vs humans:
     //   - Humans: kit items go to inventory UNEQUIPPED (`equipped: false`).
     //     Player equips them manually via the WeaponsAndArmor / Inventory screen.
@@ -758,40 +766,61 @@ export default function CharacterScreen() {
     setTrait(null); // Всегда сбрасываем черту при смене происхождения
   };
 
+  // ПРАВИЛО (владелец): смена ориджина/трейта/комплекта.
+  // Пока атрибуты и навыки не распределены (locked=false) — смена свободна
+  // (без подтверждения): комплект сбрасывается вместе с ориджином (зависит от
+  // него), остальное сохраняется. После locked — только с подтверждением
+  // и полным сбросом персонажа.
+  const isCharacterLocked = isCharacterLockedFn(attributesSaved, skillsSaved);
+
   const confirmOriginSelection = (newOrigin) => {
     if (!origin || newOrigin.id === origin.id) {
       handleSelectOrigin(newOrigin);
       return;
     }
 
-    const confirmAndReset = () => {
+    const applyNewOrigin = () => {
       resetCharacter();
       handleSelectOrigin(newOrigin);
     };
 
-    if (Platform.OS === "web") {
-      if (
-        window.confirm(`${tCharacterScreen("warnings.changeOriginTitle")}\n\n${tCharacterScreen("warnings.changeOriginConfirm")}`)
-      ) {
-        confirmAndReset();
+    if (isCharacterLocked) {
+      // После распределения — сброс всего + подтверждение.
+      if (Platform.OS === "web") {
+        if (
+          window.confirm(`${tCharacterScreen("warnings.changeOriginTitle")}\n\n${tCharacterScreen("warnings.changeOriginConfirm")}`)
+        ) {
+          applyNewOrigin();
+        }
+      } else {
+        Alert.alert(
+          tCharacterScreen("warnings.changeOriginTitle"),
+          tCharacterScreen("warnings.changeOriginConfirm"),
+          [
+            { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
+            {
+              text: tCharacterScreen("buttons.yesReset"),
+              onPress: applyNewOrigin,
+              style: "destructive",
+            },
+          ],
+        );
       }
-    } else {
-      Alert.alert(
-        tCharacterScreen("warnings.changeOriginTitle"),
-        tCharacterScreen("warnings.changeOriginConfirm"),
-        [
-          { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
-          {
-            text: tCharacterScreen("buttons.yesReset"),
-            onPress: confirmAndReset,
-            style: "destructive",
-          },
-        ],
-      );
+      return;
     }
+
+    // До распределения — свободно: меняем ориджин, комплект сбрасывается
+    // (он зависит от ориджина), атрибуты/навыки не тронуты.
+    resetKitAndRewards();
+    handleSelectOrigin(newOrigin);
   };
 
   const handleSelectTrait = (traitIds, traitName, newModifiersFromModal) => {
+    // После распределения (locked) смена трейта = полный сброс персонажа.
+    // Пользователь уже подтвердил в модалке (см. onSelect трейта).
+    if (isCharacterLocked) {
+      resetCharacter();
+    }
     // traitIds — массив canonical id (string | string[]); для multi-trait (Survivor) это массив.
     // traitName — локализованное имя черты из модала
     // Комбинируем с модификаторами из модального окна
@@ -920,12 +949,6 @@ export default function CharacterScreen() {
   const handleTraitPress = () => {
     if (!origin) {
       showError(tCharacterScreen("warnings.selectOriginFirst"));
-      return;
-    }
-
-    // Блокируем, если черта уже выбрана и происхождение не предполагает нескольких черт
-    if (trait && !isMultiTraitOrigin(origin.id)) {
-      showAlert(tCharacterScreen("alerts.infoTitle"), tCharacterScreen("warnings.traitAlreadySelected"));
       return;
     }
 
@@ -1180,22 +1203,22 @@ export default function CharacterScreen() {
               disabled={!isSaved}
               onPress={() => {
                 if (localizedOrigin && localizedOrigin.equipmentKits) {
-                  if (equipment) {
-                    // Если снаряжение уже выбрано, показываем предупреждение
+                  // Просмотр комплектов свободен в любой момент.
+                  // Если снаряжение уже выбрано и персонаж зафиксирован
+                  // (атрибуты/навыки распределены) — новый комплект сбрасывает
+                  // инвентарь, навыки и награды (resetKitAndRewards).
+                  const applyKitReset = () => {
+                    resetKitAndRewards();
+                    setIsEquipmentKitModalVisible(true);
+                  };
+                  if (equipment && isCharacterLocked) {
                     if (Platform.OS === "web") {
                       if (
                         window.confirm(
                           tCharacterScreen("warnings.equipmentResetOnWeb"),
                         )
                       ) {
-                        // Сбрасываем инвентарь и надетые предметы
-                        setEquippedWeapons([]);
-                        setEquippedRobotSlots(null);
-                        setEquippedRobotModules([]);
-                        setEquippedArmor(createEmptyEquippedArmor());
-                        setCaps(0);
-                        setEquipment(null);
-                        setIsEquipmentKitModalVisible(true);
+                        applyKitReset();
                       }
                     } else {
                       Alert.alert(
@@ -1205,21 +1228,14 @@ export default function CharacterScreen() {
                           { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
                           {
                             text: tCharacterScreen("buttons.continue"),
-                            onPress: () => {
-                              // Сбрасываем инвентарь и надетые предметы
-                              setEquippedWeapons([]);
-                              setEquippedRobotSlots(null);
-                              setEquippedRobotModules([]);
-                              setEquippedArmor(createEmptyEquippedArmor());
-                              setCaps(0);
-                              setEquipment(null);
-                              setIsEquipmentKitModalVisible(true);
-                            },
+                            onPress: applyKitReset,
                           },
                         ],
                       );
                     }
                   } else {
+                    // До распределения — просто открываем (смена свободна,
+                    // старый комплект заменится при выборе нового).
                     setIsEquipmentKitModalVisible(true);
                   }
                 } else {

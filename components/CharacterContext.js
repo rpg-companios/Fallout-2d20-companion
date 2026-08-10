@@ -1073,6 +1073,32 @@ export const CharacterProvider = ({ children }) => {
     characterIdRef.current = null;
   };
 
+  /**
+   * Сброс комплекта снаряжения (при смене ориджина или комплекта):
+   * очищает инвентарь, награды за навыки (rewardedSkills), снаряжение, слоты
+   * робота и крышки. Атрибуты/навыки и сам персонаж сохраняются.
+   */
+  const resetKitAndRewards = useCallback(() => {
+    setEquipment(null);
+    setEquippedWeapons([]);
+    setEquippedRobotSlots(null);
+    setEquippedRobotModules([]);
+    setEquippedArmor(createEmptyEquippedArmor());
+    setCaps(0);
+    // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
+    const { attributes: legacyAttributes, skills: legacySkills } =
+      denormalizeCharacterState(useCharacterStore.getState());
+    useCharacterStore.getState().resetCharacterStore({
+      attributes: legacyAttributes,
+      skills: legacySkills,
+      rewardedSkills: [],
+    });
+    setSelectedSkills([]);
+    setExtraTaggedSkills([]);
+    setForcedSelectedSkills([]);
+    setSkillsSaved(false);
+  }, []);
+
   const value = {
     characterName, setCharacterName,
     characterId,
@@ -1142,6 +1168,7 @@ export const CharacterProvider = ({ children }) => {
     saveModifiedItem,
     removeModifiedItem,
     resetCharacter,
+    resetKitAndRewards,
     availablePerkAttributePoints,
     addPerkAttributePoints,
     commitAttributeChanges,

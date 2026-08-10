@@ -345,3 +345,10 @@ export const MULTI_TRAIT_ORIGIN_IDS = ['ncr', 'survivor', 'savage'];
 export const isMultiTraitOrigin = (originId) => {
     return MULTI_TRAIT_ORIGIN_IDS.includes(originId);
 };
+
+/**
+ * Персонаж «зафиксирован»: атрибуты или навыки уже распределены — смена
+ * ориджина/трейта/комплекта требует полного сброса.
+ */
+export const isCharacterLocked = (attributesSaved, skillsSaved) =>
+  Boolean(attributesSaved || skillsSaved);
