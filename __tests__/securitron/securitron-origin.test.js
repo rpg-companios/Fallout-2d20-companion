@@ -49,6 +49,8 @@ import { initRobotSlots, getRobotSlotKeys } from '../../domain/robotEquip';
 import { calculateRobotCarryWeight } from '../../domain/characterCreation';
 import { getBodyPlan } from '../../domain/bodyplan';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import { sortWeaponsForDisplay } from '../../domain/weaponDisplay';
+import { findFreeWeaponHand, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
 import useCharacterStore from '../../src/store/characterStore';
 import { selectRobotMk2Installed } from '../../src/store/robotSlice';
 
@@ -468,5 +470,82 @@ describe('Ориджин Секьюритрон: драйвер ОС Mk II', () 
     const partial = persistOptions.partialize(useCharacterStore.getState());
     expect(partial.robot).toHaveProperty('mk2Installed', false);
     expect(partial.robot.bodyPlan).toBe('protectron');
+  });
+});
+
+describe('Порядок оружия на экране снаряжения', () => {
+  const w = (overrides) => ({ id: 'w', weaponId: 'w', name: 'w', weaponType: 'Light', ...overrides });
+
+  it('рукопашные первыми, затем встроенные, затем Mk II, затем остальное (стабильно)', () => {
+    const melee = w({ id: 'unarmed_human', weaponType: 'Unarmed' });
+    const builtinLaser = w({ id: 'weapon_laser_gun', isBuiltin: true });
+    const mk2 = w({ id: 'weapon_missile_launcher', requiresMkII: true });
+    const equipped = w({ id: 'weapon_10mm_pistol' });
+    const builtinSmg = w({ id: 'weapon_submachine_gun', isBuiltin: true });
+
+    const sorted = sortWeaponsForDisplay([equipped, builtinSmg, mk2, melee, builtinLaser]);
+    expect(sorted.map((x) => x.id)).toEqual([
+      'unarmed_human',
+      'weapon_submachine_gun',
+      'weapon_laser_gun',
+      'weapon_missile_launcher',
+      'weapon_10mm_pistol',
+    ]);
+  });
+
+  it('findFreeWeaponHand: первая свободная рука, а не первая по расположению', () => {
+    const arm = { limb: { canHoldWeapons: true, weaponSlots: 1 }, heldWeapon: null };
+    const slots = { leftArm: arm, rightArm: { ...arm } };
+
+    // Обе свободны → левая (первая по порядку)
+    expect(findFreeWeaponHand(slots, [])[0]).toBe('leftArm');
+    // Левая занята оружием из инвентаря → правая
+    expect(findFreeWeaponHand(slots, ['leftArm'])[0]).toBe('rightArm');
+    // Обе заняты → фолбэк на первую способную
+    expect(findFreeWeaponHand(slots, ['leftArm', 'rightArm'])[0]).toBe('leftArm');
+    // Нет рук → null
+    expect(findFreeWeaponHand({ head: { limb: { canHoldWeapons: false } } }, [])).toBeNull();
+  });
+});
+
+describe('Робо-оружие — часть слотов (единый источник)', () => {
+  const armLimb = (builtins) => ({ canHoldWeapons: true, weaponSlots: 1, builtinWeapons: builtins });
+
+  it('оружие в ладони (heldWeapon) возвращается из слотов с sourceSlot', () => {
+    const slots = {
+      leftArm: {
+        limb: armLimb([]),
+        heldWeapon: { id: 'weapon_10mm_pistol', weaponId: 'weapon_10mm_pistol', sourceSlot: 'leftArm' },
+      },
+      rightArm: { limb: armLimb([]), heldWeapon: null },
+    };
+    const weapons = getBuiltinWeaponsFromSlots(slots);
+    expect(weapons.map((w) => w.id)).toEqual(['weapon_10mm_pistol']);
+    expect(weapons[0].sourceSlot).toBe('leftArm');
+  });
+
+  it('встроенное + ладонное оружие отдаются вместе, без дублей', () => {
+    const slots = {
+      leftArm: {
+        limb: armLimb([{ id: 'robot_weapon_manipulator', weaponId: 'robot_weapon_manipulator', isBuiltin: true }]),
+        heldWeapon: { id: 'weapon_10mm_pistol', weaponId: 'weapon_10mm_pistol', sourceSlot: 'leftArm' },
+      },
+    };
+    const weapons = getBuiltinWeaponsFromSlots(slots);
+    expect(weapons.map((w) => w.id).sort()).toEqual(['robot_weapon_manipulator', 'weapon_10mm_pistol']);
+  });
+
+  it('mk2Installed переживает loadRobotState (загрузка персонажа из БД)', () => {
+    const store = useCharacterStore.getState();
+    store.resetCharacterStore();
+    // Загрузка сохранёнки с флагом — флаг восстанавливается
+    store.loadRobotState({ bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: true });
+    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(true);
+    // Повторная загрузка без поля (обёртки контекста, напр. смена конечности) — флаг сохраняется
+    store.loadRobotState({ bodyPlan: 'securitron', slots: {}, modules: [] });
+    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(true);
+    // Старая сохранёнка без флага (явный false из loadCharacter) — сброс в false
+    store.loadRobotState({ bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: false });
+    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(false);
   });
 });

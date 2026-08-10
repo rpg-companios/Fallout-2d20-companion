@@ -1,0 +1,433 @@
+diff --git a/__tests__/securitron/securitron-origin.test.js b/__tests__/securitron/securitron-origin.test.js
+index 8ac8dd9..9ddca8a 100644
+--- a/__tests__/securitron/securitron-origin.test.js
++++ b/__tests__/securitron/securitron-origin.test.js
+@@ -49,6 +49,8 @@ import { initRobotSlots, getRobotSlotKeys } from '../../domain/robotEquip';
+ import { calculateRobotCarryWeight } from '../../domain/characterCreation';
+ import { getBodyPlan } from '../../domain/bodyplan';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { sortWeaponsForDisplay } from '../../domain/weaponDisplay';
++import { findFreeWeaponHand, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
+ import useCharacterStore from '../../src/store/characterStore';
+ import { selectRobotMk2Installed } from '../../src/store/robotSlice';
+ 
+@@ -470,3 +472,80 @@ describe('Ориджин Секьюритрон: драйвер ОС Mk II', ()
+     expect(partial.robot.bodyPlan).toBe('protectron');
+   });
+ });
++
++describe('Порядок оружия на экране снаряжения', () => {
++  const w = (overrides) => ({ id: 'w', weaponId: 'w', name: 'w', weaponType: 'Light', ...overrides });
++
++  it('рукопашные первыми, затем встроенные, затем Mk II, затем остальное (стабильно)', () => {
++    const melee = w({ id: 'unarmed_human', weaponType: 'Unarmed' });
++    const builtinLaser = w({ id: 'weapon_laser_gun', isBuiltin: true });
++    const mk2 = w({ id: 'weapon_missile_launcher', requiresMkII: true });
++    const equipped = w({ id: 'weapon_10mm_pistol' });
++    const builtinSmg = w({ id: 'weapon_submachine_gun', isBuiltin: true });
++
++    const sorted = sortWeaponsForDisplay([equipped, builtinSmg, mk2, melee, builtinLaser]);
++    expect(sorted.map((x) => x.id)).toEqual([
++      'unarmed_human',
++      'weapon_submachine_gun',
++      'weapon_laser_gun',
++      'weapon_missile_launcher',
++      'weapon_10mm_pistol',
++    ]);
++  });
++
++  it('findFreeWeaponHand: первая свободная рука, а не первая по расположению', () => {
++    const arm = { limb: { canHoldWeapons: true, weaponSlots: 1 }, heldWeapon: null };
++    const slots = { leftArm: arm, rightArm: { ...arm } };
++
++    // Обе свободны → левая (первая по порядку)
++    expect(findFreeWeaponHand(slots, [])[0]).toBe('leftArm');
++    // Левая занята оружием из инвентаря → правая
++    expect(findFreeWeaponHand(slots, ['leftArm'])[0]).toBe('rightArm');
++    // Обе заняты → фолбэк на первую способную
++    expect(findFreeWeaponHand(slots, ['leftArm', 'rightArm'])[0]).toBe('leftArm');
++    // Нет рук → null
++    expect(findFreeWeaponHand({ head: { limb: { canHoldWeapons: false } } }, [])).toBeNull();
++  });
++});
++
++describe('Робо-оружие — часть слотов (единый источник)', () => {
++  const armLimb = (builtins) => ({ canHoldWeapons: true, weaponSlots: 1, builtinWeapons: builtins });
++
++  it('оружие в ладони (heldWeapon) возвращается из слотов с sourceSlot', () => {
++    const slots = {
++      leftArm: {
++        limb: armLimb([]),
++        heldWeapon: { id: 'weapon_10mm_pistol', weaponId: 'weapon_10mm_pistol', sourceSlot: 'leftArm' },
++      },
++      rightArm: { limb: armLimb([]), heldWeapon: null },
++    };
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++    expect(weapons.map((w) => w.id)).toEqual(['weapon_10mm_pistol']);
++    expect(weapons[0].sourceSlot).toBe('leftArm');
++  });
++
++  it('встроенное + ладонное оружие отдаются вместе, без дублей', () => {
++    const slots = {
++      leftArm: {
++        limb: armLimb([{ id: 'robot_weapon_manipulator', weaponId: 'robot_weapon_manipulator', isBuiltin: true }]),
++        heldWeapon: { id: 'weapon_10mm_pistol', weaponId: 'weapon_10mm_pistol', sourceSlot: 'leftArm' },
++      },
++    };
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++    expect(weapons.map((w) => w.id).sort()).toEqual(['robot_weapon_manipulator', 'weapon_10mm_pistol']);
++  });
++
++  it('mk2Installed переживает loadRobotState (загрузка персонажа из БД)', () => {
++    const store = useCharacterStore.getState();
++    store.resetCharacterStore();
++    // Загрузка сохранёнки с флагом — флаг восстанавливается
++    store.loadRobotState({ bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: true });
++    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(true);
++    // Повторная загрузка без поля (обёртки контекста, напр. смена конечности) — флаг сохраняется
++    store.loadRobotState({ bodyPlan: 'securitron', slots: {}, modules: [] });
++    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(true);
++    // Старая сохранёнка без флага (явный false из loadCharacter) — сброс в false
++    store.loadRobotState({ bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: false });
++    expect(selectRobotMk2Installed(useCharacterStore.getState())).toBe(false);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index dcc5c30..3ef97a0 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -639,6 +639,8 @@ export const CharacterProvider = ({ children }) => {
+     equippedWeapons,
+     equippedRobotSlots,
+     equippedRobotModules,
++    // ОС Mk II (Секьюритрон) — часть robot-состояния, обязана переживать сейв/загрузку.
++    mk2Installed: useCharacterStore.getState().robot?.mk2Installed ?? false,
+     equippedArmor,
+     equippedPowerArmor,
+     powerArmorRuntime,
+@@ -766,9 +768,13 @@ export const CharacterProvider = ({ children }) => {
+         bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
+         slots: data.equippedRobotSlots ?? {},
+         modules: data.equippedRobotModules ?? [],
++        mk2Installed: data.mk2Installed ?? false,
+       });
+       setEquippedRobotSlots(data.equippedRobotSlots ?? null);
+       setEquippedRobotModules(data.equippedRobotModules ?? []);
++      // Встроенное оружие конечностей (манипуляторы, ладонные орудия) НЕ хранится
++      // в equippedWeapons: экраны читают его из слотов стора (getBuiltinWeaponsFromSlots)
++      // — единый источник, ничего восстанавливать не нужно.
+       setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
+       setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
+       setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 3896735..ddddfc9 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -29,7 +29,7 @@ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
+-import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
++import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+ import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
+@@ -145,13 +145,17 @@ const InventoryScreen = () => {
+ 
+   const equippedWeaponsForDisplay = useMemo(() => {
+     const fromStore = storeEquippedWeapons.map(flattenItemParams);
+-    const robotExtras = (equippedWeapons || []).filter(
+-      (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
+-    );
++    // Роботы: оружие (встроенное и в ладонях) живёт в слотах стора — единый
++    // источник. Люди: встроенные кулаки — в контекстном списке (как было).
++    const robotExtras = isRobot
++      ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
++      : (equippedWeapons || []).filter(
++          (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
++        );
+     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id || w.stackKey));
+     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id || w.stackKey));
+     return [...fromStore, ...extras];
+-  }, [storeEquippedWeapons, equippedWeapons]);
++  }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
+ 
+   const showAlert = (title, message = '') => {
+     const text = message ? `${title}\n\n${message}` : title;
+@@ -685,9 +689,13 @@ const InventoryScreen = () => {
+     if (!isRobotOnlyItem(displayWeapon) && isRobot) {
+       // Robot equip flow: check for arm slot with canHoldWeapons (Requirement 7.2, 7.6)
+       const slots = equippedRobotSlots || {};
+-      const armWithHoldCapability = Object.entries(slots).find(([_key, slotData]) => {
+-        return slotData?.limb?.canHoldWeapons === true;
+-      });
++      // ПРАВИЛО (владелец): оружие встаёт в ПЕРВУЮ СВОБОДНУЮ руку — источником
++      // занятости считаются руки с оружием в ладони (heldWeapon) и уже занятые
++      // sourceSlot'ы. Встроенное оружие руки ладонь не занимает.
++      const occupiedSourceSlots = Object.values(slots)
++        .filter((slotData) => slotData?.heldWeapon?.sourceSlot)
++        .map((slotData) => slotData.heldWeapon.sourceSlot);
++      const armWithHoldCapability = findFreeWeaponHand(slots, occupiedSourceSlots);
+ 
+       if (!armWithHoldCapability) {
+         // No arm that can hold weapons — show warning, no equip button (Requirement 7.2 / design §9)
+@@ -741,8 +749,15 @@ const InventoryScreen = () => {
+         sourceSlot: armSlotKey,
+       };
+ 
+-      setEquippedWeapons(prev => [...prev, weaponEntry]);
+-      equipWeaponInStore(displayWeapon, sourceStackKey);
++      // Оружие в ладони — часть слота руки (как и встроенное): единый источник
++      // в сторе, без дублей в контексте. Предмет уходит из стека инвентаря.
++      const updatedSlots = {
++        ...slots,
++        [armSlotKey]: { ...slots[armSlotKey], heldWeapon: weaponEntry },
++      };
++      setEquippedRobotSlots(updatedSlots);
++      const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
++      if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
+       return;
+     }
+ 
+@@ -765,7 +780,15 @@ const InventoryScreen = () => {
+     }
+ 
+     if (weapon?.sourceSlot) {
+-      setEquippedWeapons((prev) => prev.filter((w) => w?.uniqueId !== weapon.uniqueId));
++      // Оружие в ладони — очищаем слот руки, предмет возвращается в инвентарь.
++      const slots = equippedRobotSlots || {};
++      if (slots[weapon.sourceSlot]?.heldWeapon) {
++        const updatedSlots = {
++          ...slots,
++          [weapon.sourceSlot]: { ...slots[weapon.sourceSlot], heldWeapon: null },
++        };
++        setEquippedRobotSlots(updatedSlots);
++      }
+       const stackKey = weapon.stackKey || getStackKey(weapon);
+       const stackMate = findUnequippedStoreItemByStackKey(stackKey);
+       if (stackMate) {
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 1533e16..183e67c 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -23,10 +23,10 @@ import { resolveItem, findCatalogEntry } from '../../../domain/resolveItem';
+ import { applyArmorMods } from '../../../domain/modsEquip';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+ import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
+-import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects } from '../../../domain/weaponDisplay';
++import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+-import { getRobotSlotKeys } from '../../../domain/robotEquip';
++import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+ import { getBodyPlan } from '../../../domain/bodyplan';
+ import {
+   hasFrame,
+@@ -542,17 +542,24 @@ const WeaponsAndArmorScreen = () => {
+   const updateItem = useCharacterStore((state) => state.updateItem);
+   const unequipItem = useCharacterStore((state) => state.unequipItem);
+ 
++  // isRobot нужен в equippedWeaponsForDisplay ниже — объявлен до него.
++  const isRobot = isRobotCharacter({ origin, trait });
++
+   const equippedWeaponsForDisplay = useMemo(() => {
+     const fromStore = storeEquippedWeapons
+       .filter((item) => item.itemType === 'weapon')
+       .map(storeItemToWeaponDisplay);
+-    const robotExtras = (contextEquippedWeapons || []).filter(
+-      (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
+-    );
++    // Роботы: оружие (встроенное и в ладонях) живёт в слотах стора — единый
++    // источник. Люди: встроенные кулаки — в контекстном списке (как было).
++    const robotExtras = isRobot
++      ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
++      : (contextEquippedWeapons || []).filter(
++          (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
++        );
+     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id));
+     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id));
+     return [...fromStore, ...extras];
+-  }, [storeEquippedWeapons, contextEquippedWeapons]);
++  }, [storeEquippedWeapons, contextEquippedWeapons, isRobot, equippedRobotSlots]);
+ 
+   const equippedArmor = useMemo(() => {
+     const hasStoreArmor = Object.values(storeEquippedArmor).some(
+@@ -564,8 +571,6 @@ const WeaponsAndArmorScreen = () => {
+   const storeEffects = useCharacterStore((state) => state.effects);
+   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
+   const locale = useLocale();
+-
+-  const isRobot = isRobotCharacter({ origin, trait });
+   // §5.6: пока надет каркас, его attributeModifier подменяет базу атрибутов
+   // (каркас: СИЛА = set 11 — значение из данных, не из кода).
+   const attributesEffective = useMemo(
+@@ -622,6 +627,14 @@ const WeaponsAndArmorScreen = () => {
+     return arr.findIndex(x => weaponFingerprint(x) === fp) === idx;
+   });
+ 
++  // ПРАВИЛО (владелец): порядок атак на экране снаряжения — рукопашные первыми,
++  // затем встроенное оружие, затем Mk II (нерабочее), затем экипированное из
++  // инвентаря. Сортировка стабильная (см. domain/weaponDisplay.js).
++  const orderedEquippedWeapons = useMemo(
++    () => sortWeaponsForDisplay(dedupedEquippedWeapons),
++    [dedupedEquippedWeapons],
++  );
++
+   // Состояние для модального окна модификаций
+   const [modificationModalVisible, setModificationModalVisible] = useState(false);
+   const [selectedWeaponForModification, setSelectedWeaponForModification] = useState(null);
+@@ -896,18 +909,29 @@ const WeaponsAndArmorScreen = () => {
+                     key={rowIndex}
+                     style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}
+                   >
+-                    {chunk.map((slotKey) => (
+-                      <RobotSlot
+-                        key={slotKey}
+-                        slotKey={slotKey}
+-                        slotData={equippedRobotSlots[slotKey]}
+-                        bodyPlan={bodyPlan}
+-                        onUpgradeLimb={handleOpenLimbUpgradeModal}
+-                        onOpenArmorPicker={handleOpenArmorPicker}
+-                        onWeaponPress={handleWeaponPress}
+-                        hasRadImmunity={hasRadImmunity}
+-                      />
+-                    ))}
++                    {chunk.map((slotKey) => {
++                      // Одиночные ячейки (голова/колесо у секьюритрона) — размером
++                      // с ячейку ряда из трёх (1/3 ширины), по центру строки.
++                      const single = chunk.length === 1;
++                      const slot = (
++                        <RobotSlot
++                          key={slotKey}
++                          slotKey={slotKey}
++                          slotData={equippedRobotSlots[slotKey]}
++                          bodyPlan={bodyPlan}
++                          onUpgradeLimb={handleOpenLimbUpgradeModal}
++                          onOpenArmorPicker={handleOpenArmorPicker}
++                          onWeaponPress={handleWeaponPress}
++                          hasRadImmunity={hasRadImmunity}
++                        />
++                      );
++                      if (!single) return slot;
++                      return (
++                        <View key={slotKey} style={{ flex: 1, alignItems: 'center' }}>
++                          <View style={{ width: '33.33%' }}>{slot}</View>
++                        </View>
++                      );
++                    })}
+                   </View>
+                 ))}
+               </View>
+@@ -930,10 +954,10 @@ const WeaponsAndArmorScreen = () => {
+             
+             {/* Оружие */}
+             <View style={{ marginBottom: 16 }}>
+-              {Array.from({ length: Math.ceil(dedupedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
++              {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+                 <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
+                   <WeaponCard
+-                    weapon={dedupedEquippedWeapons[rowIndex * 2] ?? null}
++                    weapon={orderedEquippedWeapons[rowIndex * 2] ?? null}
+                     onModifyWeapon={handleOpenModificationModal}
+                     onUnequip={isRobot ? null : handleUnequipWeapon}
+                     showSourceSlot={isRobot}
+@@ -941,7 +965,7 @@ const WeaponsAndArmorScreen = () => {
+                     equippedWeapons={equippedWeaponsForDisplay}
+                   />
+                   <WeaponCard
+-                    weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
++                    weapon={orderedEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                     onModifyWeapon={handleOpenModificationModal}
+                     onUnequip={isRobot ? null : handleUnequipWeapon}
+                     showSourceSlot={isRobot}
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 839afb9..140590c 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -13,6 +13,11 @@
+ - New robot item "Mk II OS Driver" (unique, only applicable to a Securitron): an "Apply" button in the inventory consumes the driver and activates the inoperable weapons. Until installed, the missile launcher and grenade launcher appear in the attack list as disabled cards labelled "Requires Mk II OS" (and in the inventory).
+ - The Mk II OS flag lives in the robot store slice and survives save/load.
+ - Securitron palms are free: the built-in weapons (laser gun in the left arm, submachine gun in the right) now sit INSIDE the limbs (limb built-in weapons), while the manipulator palms can hold any other weapon or items — regular weapons equip into a hand via the inventory, and the attack card shows the source arm.
++- Attack order on the equipment screen: unarmed/melee first (all origins), then built-in weapons, then inoperable Mk II weapons, then weapons equipped from the inventory.
++- Securitron head and wheel cells are now 1/3 width (like a cell in a row of three), centered in the row.
++- Weapons equipped from the inventory go into the first FREE hand (the second weapon goes to the other hand) instead of always the first by position.
++- Robot weapons now live in the store slots (single source of truth): built-in weapons (manipulator, laser gun, SMG) and weapons held in the palms (equipped from the inventory) are stored in the robot slot state instead of the React context. Screens read attacks from the slots — this fixes the bug where built-in weapons disappeared from the attack list after saving/reloading a character (only Mk II weapons remained).
++- The "Mk II OS installed" flag is now stored in the character snapshot and restored on load (previously Mk II weapons became inoperable again after reload).
+ 
+ ---
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 674ebd2..669bed9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -15,6 +15,11 @@
+ - Новый робо-предмет «Драйвер ОС Mk II» (уникальный, применим только к Секьюритрону): кнопка «Применить» в инвентаре потребляет драйвер и активирует нерабочие оружия. До установки ракетница и гранатомёт показываются в списке атак как неактивные карточки с пометкой «Требуется ОС Mk II» (и в инвентаре).
+ - Флаг установки ОС Mk II хранится в robot-срезе стора и переживает сохранение/загрузку.
+ - Ладони Секьюритрона свободны: встроенное оружие (лазерный пистолет в левой, пистолет-пулемёт в правой) находится ВНУТРИ руки (встроенное оружие конечности), а манипуляторы-ладони могут держать любое другое оружие (пистолет, винтовку, предметы) — обычное оружие экипируется в руку через инвентарь, карточка подписывается рукой.
++- Порядок атак на экране снаряжения: рукопашные первыми (все ориджины), затем встроенное оружие, затем нерабочее Mk II, затем экипированное из инвентаря.
++- Ячейки головы и колеса Секьюритрона — размером 1/3 ширины (как ячейка ряда из трёх), по центру строки.
++- Оружие, экипируемое из инвентаря, встаёт в первую СВОБОДНУЮ руку (вторая экипировка — в другую руку), а не всегда в первую по расположению.
++- Робо-оружие перенесено в слоты стора (единый источник): встроенное (манипулятор, лазер, ПП) и оружие в ладонях (экипированное из инвентаря) хранятся в слот-состоянии робота, а не в React-контексте. Экраны читают атаки из слотов — исчез баг, когда после сохранения/перезагрузки встроенное оружие пропадало из списка атак (оставались только Mk II).
++- Флаг «ОС Mk II установлена» теперь сохраняется в снапшот персонажа и восстанавливается при загрузке (раньше после перезагрузки Mk II оружие снова становилось нерабочим).
+ 
+ ## 47 — Поддержка множественных типов урона
+ 
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 321bc48..bd92627 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -658,3 +658,25 @@ export function canEquipWeaponToSlot(weapon, slotData, _character) {
+ 
+   return { allowed: true, reason: null };
+ }
++
++// ---------------------------------------------------------------------------
++// Выбор руки для экипировки оружия из инвентаря
++// ---------------------------------------------------------------------------
++
++/**
++ * Возвращает первую СВОБОДНУЮ руку (может держать оружие), на которой ещё нет
++ * оружия из инвентаря (sourceSlot в occupiedSourceSlots). Если все руки заняты
++ * оружием — возвращает первую способную руку (поведение «как раньше», без
++ * потери возможности экипировать). Возвращает [slotKey, slotData] или null.
++ *
++ * @param {object} slots - equippedRobotSlots
++ * @param {string[]} occupiedSourceSlots - sourceSlot'ы оружия, экипированного из инвентаря
++ * @returns {[string, object] | null}
++ */
++export function findFreeWeaponHand(slots = {}, occupiedSourceSlots = []) {
++  const occupied = new Set(occupiedSourceSlots || []);
++  const arms = Object.entries(slots).filter(([, slotData]) => slotData?.limb?.canHoldWeapons === true);
++  if (arms.length === 0) return null;
++  const free = arms.find(([key]) => !occupied.has(key));
++  return free || arms[0];
++}
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index cc9461a..d6c4dae 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -153,3 +153,24 @@ export function resolveWeaponDamageType(damageType) {
+   // Single string value
+   return labels[arr] || arr;
+ }
++
++// ---------------------------------------------------------------------------
++// Порядок оружия на экране снаряжения (ПРАВИЛО владельца):
++//   1. рукопашные атаки (Melee/Unarmed) — всегда первыми, для всех ориджинов;
++//   2. встроенное оружие конечностей (лазер/ПП секьюритрона и т.п.);
++//   3. нерабочее Mk II оружие (требует установки драйвера) — после встроенного;
++//   4. всё остальное (оружие, экипированное из инвентаря) — в конце.
++// Сортировка стабильная: порядок внутри групп сохраняется.
++// ---------------------------------------------------------------------------
++
++export const getWeaponDisplayPriority = (weapon) => {
++  if (!weapon) return 3;
++  const weaponType = weapon?.weaponType ?? weapon?.weapon_type;
++  if (weaponType === 'Melee' || weaponType === 'Unarmed') return 0;
++  if (weapon?.requiresMkII) return 2;
++  if (weapon?.isBuiltin || weapon?.isManipulator) return 1;
++  return 3;
++};
++
++export const sortWeaponsForDisplay = (weapons = []) =>
++  [...weapons].sort((a, b) => getWeaponDisplayPriority(a) - getWeaponDisplayPriority(b));

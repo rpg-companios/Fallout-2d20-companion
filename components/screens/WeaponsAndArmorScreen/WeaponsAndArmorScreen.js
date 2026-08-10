@@ -23,10 +23,10 @@ import { resolveItem, findCatalogEntry } from '../../../domain/resolveItem';
 import { applyArmorMods } from '../../../domain/modsEquip';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
-import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects } from '../../../domain/weaponDisplay';
+import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
-import { getRobotSlotKeys } from '../../../domain/robotEquip';
+import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
 import { getBodyPlan } from '../../../domain/bodyplan';
 import {
   hasFrame,
@@ -542,17 +542,24 @@ const WeaponsAndArmorScreen = () => {
   const updateItem = useCharacterStore((state) => state.updateItem);
   const unequipItem = useCharacterStore((state) => state.unequipItem);
 
+  // isRobot нужен в equippedWeaponsForDisplay ниже — объявлен до него.
+  const isRobot = isRobotCharacter({ origin, trait });
+
   const equippedWeaponsForDisplay = useMemo(() => {
     const fromStore = storeEquippedWeapons
       .filter((item) => item.itemType === 'weapon')
       .map(storeItemToWeaponDisplay);
-    const robotExtras = (contextEquippedWeapons || []).filter(
-      (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
-    );
+    // Роботы: оружие (встроенное и в ладонях) живёт в слотах стора — единый
+    // источник. Люди: встроенные кулаки — в контекстном списке (как было).
+    const robotExtras = isRobot
+      ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
+      : (contextEquippedWeapons || []).filter(
+          (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
+        );
     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id));
     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id));
     return [...fromStore, ...extras];
-  }, [storeEquippedWeapons, contextEquippedWeapons]);
+  }, [storeEquippedWeapons, contextEquippedWeapons, isRobot, equippedRobotSlots]);
 
   const equippedArmor = useMemo(() => {
     const hasStoreArmor = Object.values(storeEquippedArmor).some(
@@ -564,8 +571,6 @@ const WeaponsAndArmorScreen = () => {
   const storeEffects = useCharacterStore((state) => state.effects);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
   const locale = useLocale();
-
-  const isRobot = isRobotCharacter({ origin, trait });
   // §5.6: пока надет каркас, его attributeModifier подменяет базу атрибутов
   // (каркас: СИЛА = set 11 — значение из данных, не из кода).
   const attributesEffective = useMemo(
@@ -621,6 +626,14 @@ const WeaponsAndArmorScreen = () => {
     const fp = weaponFingerprint(w);
     return arr.findIndex(x => weaponFingerprint(x) === fp) === idx;
   });
+
+  // ПРАВИЛО (владелец): порядок атак на экране снаряжения — рукопашные первыми,
+  // затем встроенное оружие, затем Mk II (нерабочее), затем экипированное из
+  // инвентаря. Сортировка стабильная (см. domain/weaponDisplay.js).
+  const orderedEquippedWeapons = useMemo(
+    () => sortWeaponsForDisplay(dedupedEquippedWeapons),
+    [dedupedEquippedWeapons],
+  );
 
   // Состояние для модального окна модификаций
   const [modificationModalVisible, setModificationModalVisible] = useState(false);
@@ -896,18 +909,29 @@ const WeaponsAndArmorScreen = () => {
                     key={rowIndex}
                     style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}
                   >
-                    {chunk.map((slotKey) => (
-                      <RobotSlot
-                        key={slotKey}
-                        slotKey={slotKey}
-                        slotData={equippedRobotSlots[slotKey]}
-                        bodyPlan={bodyPlan}
-                        onUpgradeLimb={handleOpenLimbUpgradeModal}
-                        onOpenArmorPicker={handleOpenArmorPicker}
-                        onWeaponPress={handleWeaponPress}
-                        hasRadImmunity={hasRadImmunity}
-                      />
-                    ))}
+                    {chunk.map((slotKey) => {
+                      // Одиночные ячейки (голова/колесо у секьюритрона) — размером
+                      // с ячейку ряда из трёх (1/3 ширины), по центру строки.
+                      const single = chunk.length === 1;
+                      const slot = (
+                        <RobotSlot
+                          key={slotKey}
+                          slotKey={slotKey}
+                          slotData={equippedRobotSlots[slotKey]}
+                          bodyPlan={bodyPlan}
+                          onUpgradeLimb={handleOpenLimbUpgradeModal}
+                          onOpenArmorPicker={handleOpenArmorPicker}
+                          onWeaponPress={handleWeaponPress}
+                          hasRadImmunity={hasRadImmunity}
+                        />
+                      );
+                      if (!single) return slot;
+                      return (
+                        <View key={slotKey} style={{ flex: 1, alignItems: 'center' }}>
+                          <View style={{ width: '33.33%' }}>{slot}</View>
+                        </View>
+                      );
+                    })}
                   </View>
                 ))}
               </View>
@@ -930,10 +954,10 @@ const WeaponsAndArmorScreen = () => {
             
             {/* Оружие */}
             <View style={{ marginBottom: 16 }}>
-              {Array.from({ length: Math.ceil(dedupedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+              {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
                 <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
                   <WeaponCard
-                    weapon={dedupedEquippedWeapons[rowIndex * 2] ?? null}
+                    weapon={orderedEquippedWeapons[rowIndex * 2] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={isRobot}
@@ -941,7 +965,7 @@ const WeaponsAndArmorScreen = () => {
                     equippedWeapons={equippedWeaponsForDisplay}
                   />
                   <WeaponCard
-                    weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                    weapon={orderedEquippedWeapons[rowIndex * 2 + 1] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
                     showSourceSlot={isRobot}

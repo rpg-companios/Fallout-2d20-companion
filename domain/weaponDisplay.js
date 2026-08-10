@@ -153,3 +153,24 @@ export function resolveWeaponDamageType(damageType) {
   // Single string value
   return labels[arr] || arr;
 }
+
+// ---------------------------------------------------------------------------
+// Порядок оружия на экране снаряжения (ПРАВИЛО владельца):
+//   1. рукопашные атаки (Melee/Unarmed) — всегда первыми, для всех ориджинов;
+//   2. встроенное оружие конечностей (лазер/ПП секьюритрона и т.п.);
+//   3. нерабочее Mk II оружие (требует установки драйвера) — после встроенного;
+//   4. всё остальное (оружие, экипированное из инвентаря) — в конце.
+// Сортировка стабильная: порядок внутри групп сохраняется.
+// ---------------------------------------------------------------------------
+
+export const getWeaponDisplayPriority = (weapon) => {
+  if (!weapon) return 3;
+  const weaponType = weapon?.weaponType ?? weapon?.weapon_type;
+  if (weaponType === 'Melee' || weaponType === 'Unarmed') return 0;
+  if (weapon?.requiresMkII) return 2;
+  if (weapon?.isBuiltin || weapon?.isManipulator) return 1;
+  return 3;
+};
+
+export const sortWeaponsForDisplay = (weapons = []) =>
+  [...weapons].sort((a, b) => getWeaponDisplayPriority(a) - getWeaponDisplayPriority(b));

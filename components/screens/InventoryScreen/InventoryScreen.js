@@ -29,7 +29,7 @@ import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
-import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
 import styles from '../../../styles/InventoryScreen.styles';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
@@ -143,15 +143,23 @@ const InventoryScreen = () => {
     return true;
   }, [findUnequippedStoreItemByStackKey, adjustStoreItemQuantity, addNewItem, equipItem]);
 
+  // isRobot читается из origin.characterType (domain/origins.js). Объявлен ДО
+  // equippedWeaponsForDisplay, который его использует (иначе TDZ при рендере).
+  const isRobot = isRobotCharacter({ origin, trait });
+
   const equippedWeaponsForDisplay = useMemo(() => {
     const fromStore = storeEquippedWeapons.map(flattenItemParams);
-    const robotExtras = (equippedWeapons || []).filter(
-      (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
-    );
+    // Роботы: оружие (встроенное и в ладонях) живёт в слотах стора — единый
+    // источник. Люди: встроенные кулаки — в контекстном списке (как было).
+    const robotExtras = isRobot
+      ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
+      : (equippedWeapons || []).filter(
+          (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
+        );
     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id || w.stackKey));
     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id || w.stackKey));
     return [...fromStore, ...extras];
-  }, [storeEquippedWeapons, equippedWeapons]);
+  }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
 
   const showAlert = (title, message = '') => {
     const text = message ? `${title}\n\n${message}` : title;
@@ -250,11 +258,6 @@ const InventoryScreen = () => {
     || equippedRobotBodyPart?.robotBodyPlan
     || null;
 
-  // isRobot now reads origin.characterType directly via domain/origins.js.
-  // The previous local override (trait.modifiers.isRobot || robotBodyPlan) is gone:
-  //   - trait.modifiers.isRobot was removed from all 4 robot traits in this refactor
-  //   - robotBodyPlan alone doesn't imply robot (it's a body shape, not the archetype)
-  const isRobot = isRobotCharacter({ origin, trait });
   const robotBodyUpgrade = useMemo(() => {
     if (!robotBodyPlan) return null;
     const parts = Array.isArray(equipmentCatalog?.robotPartsUpgrade) ? equipmentCatalog.robotPartsUpgrade : [];
@@ -685,9 +688,13 @@ const InventoryScreen = () => {
     if (!isRobotOnlyItem(displayWeapon) && isRobot) {
       // Robot equip flow: check for arm slot with canHoldWeapons (Requirement 7.2, 7.6)
       const slots = equippedRobotSlots || {};
-      const armWithHoldCapability = Object.entries(slots).find(([_key, slotData]) => {
-        return slotData?.limb?.canHoldWeapons === true;
-      });
+      // ПРАВИЛО (владелец): оружие встаёт в ПЕРВУЮ СВОБОДНУЮ руку — источником
+      // занятости считаются руки с оружием в ладони (heldWeapon) и уже занятые
+      // sourceSlot'ы. Встроенное оружие руки ладонь не занимает.
+      const occupiedSourceSlots = Object.values(slots)
+        .filter((slotData) => slotData?.heldWeapon?.sourceSlot)
+        .map((slotData) => slotData.heldWeapon.sourceSlot);
+      const armWithHoldCapability = findFreeWeaponHand(slots, occupiedSourceSlots);
 
       if (!armWithHoldCapability) {
         // No arm that can hold weapons — show warning, no equip button (Requirement 7.2 / design §9)
@@ -741,8 +748,15 @@ const InventoryScreen = () => {
         sourceSlot: armSlotKey,
       };
 
-      setEquippedWeapons(prev => [...prev, weaponEntry]);
-      equipWeaponInStore(displayWeapon, sourceStackKey);
+      // Оружие в ладони — часть слота руки (как и встроенное): единый источник
+      // в сторе, без дублей в контексте. Предмет уходит из стека инвентаря.
+      const updatedSlots = {
+        ...slots,
+        [armSlotKey]: { ...slots[armSlotKey], heldWeapon: weaponEntry },
+      };
+      setEquippedRobotSlots(updatedSlots);
+      const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
+      if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
       return;
     }
 
@@ -765,7 +779,15 @@ const InventoryScreen = () => {
     }
 
     if (weapon?.sourceSlot) {
-      setEquippedWeapons((prev) => prev.filter((w) => w?.uniqueId !== weapon.uniqueId));
+      // Оружие в ладони — очищаем слот руки, предмет возвращается в инвентарь.
+      const slots = equippedRobotSlots || {};
+      if (slots[weapon.sourceSlot]?.heldWeapon) {
+        const updatedSlots = {
+          ...slots,
+          [weapon.sourceSlot]: { ...slots[weapon.sourceSlot], heldWeapon: null },
+        };
+        setEquippedRobotSlots(updatedSlots);
+      }
       const stackKey = weapon.stackKey || getStackKey(weapon);
       const stackMate = findUnequippedStoreItemByStackKey(stackKey);
       if (stackMate) {

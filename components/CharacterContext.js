@@ -639,6 +639,8 @@ export const CharacterProvider = ({ children }) => {
     equippedWeapons,
     equippedRobotSlots,
     equippedRobotModules,
+    // ОС Mk II (Секьюритрон) — часть robot-состояния, обязана переживать сейв/загрузку.
+    mk2Installed: useCharacterStore.getState().robot?.mk2Installed ?? false,
     equippedArmor,
     equippedPowerArmor,
     powerArmorRuntime,
@@ -766,9 +768,13 @@ export const CharacterProvider = ({ children }) => {
         bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
         slots: data.equippedRobotSlots ?? {},
         modules: data.equippedRobotModules ?? [],
+        mk2Installed: data.mk2Installed ?? false,
       });
       setEquippedRobotSlots(data.equippedRobotSlots ?? null);
       setEquippedRobotModules(data.equippedRobotModules ?? []);
+      // Встроенное оружие конечностей (манипуляторы, ладонные орудия) НЕ хранится
+      // в equippedWeapons: экраны читают его из слотов стора (getBuiltinWeaponsFromSlots)
+      // — единый источник, ничего восстанавливать не нужно.
       setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
       setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
       setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());

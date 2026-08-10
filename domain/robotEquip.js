@@ -658,3 +658,25 @@ export function canEquipWeaponToSlot(weapon, slotData, _character) {
 
   return { allowed: true, reason: null };
 }
+
+// ---------------------------------------------------------------------------
+// Выбор руки для экипировки оружия из инвентаря
+// ---------------------------------------------------------------------------
+
+/**
+ * Возвращает первую СВОБОДНУЮ руку (может держать оружие), на которой ещё нет
+ * оружия из инвентаря (sourceSlot в occupiedSourceSlots). Если все руки заняты
+ * оружием — возвращает первую способную руку (поведение «как раньше», без
+ * потери возможности экипировать). Возвращает [slotKey, slotData] или null.
+ *
+ * @param {object} slots - equippedRobotSlots
+ * @param {string[]} occupiedSourceSlots - sourceSlot'ы оружия, экипированного из инвентаря
+ * @returns {[string, object] | null}
+ */
+export function findFreeWeaponHand(slots = {}, occupiedSourceSlots = []) {
+  const occupied = new Set(occupiedSourceSlots || []);
+  const arms = Object.entries(slots).filter(([, slotData]) => slotData?.limb?.canHoldWeapons === true);
+  if (arms.length === 0) return null;
+  const free = arms.find(([key]) => !occupied.has(key));
+  return free || arms[0];
+}
