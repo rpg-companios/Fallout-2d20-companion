@@ -34,6 +34,7 @@ export const createInitialRobotState = () => ({
     bodyPlan: null,
     slots: {},
     modules: [],
+    mk2Installed: false,
   },
 });
 
@@ -56,6 +57,7 @@ export const createRobotActions = (set, get) => ({
         bodyPlan,
         slots: createEmptyRobotSlots(bodyPlan),
         modules: [],
+        mk2Installed: get().robot?.mk2Installed ?? false,
       },
     });
   },
@@ -75,7 +77,7 @@ export const createRobotActions = (set, get) => ({
       resolvedKitItems,
       robotCatalog,
     );
-    set({ robot: { bodyPlan, slots, modules } });
+    set({ robot: { bodyPlan, slots, modules, mk2Installed: get().robot?.mk2Installed ?? false } });
     return { inventoryItems: inventoryItems || [] };
   },
 
@@ -90,11 +92,48 @@ export const createRobotActions = (set, get) => ({
         bodyPlan: robotState.bodyPlan ?? get().robot?.bodyPlan ?? null,
         slots: robotState.slots ?? {},
         modules: robotState.modules ?? [],
+        mk2Installed: robotState.mk2Installed ?? get().robot?.mk2Installed ?? false,
       },
     });
   },
 
   resetRobot: () => set(createInitialRobotState()),
+
+  // --- Mk II operating system (Securitron) ---
+
+  /**
+   * Apply the Mk II OS driver to a Securitron.
+   * Consumes one `robot_item_mk2_driver` from the inventory and activates the
+   * `requiresMkII` weapons (missile launcher, grenade launcher) for attacks.
+   * Only the Securitron body plan can accept the driver.
+   * @param {string} itemId - store id of the driver item
+   * @returns {{ ok: boolean, reason?: string }}
+   */
+  applyMk2Driver: (itemId) => {
+    const state = get();
+    const robot = state.robot || {};
+    if (robot.bodyPlan !== 'securitron') {
+      return { ok: false, reason: 'mk2.requiresSecuritron' };
+    }
+    if (robot.mk2Installed) {
+      return { ok: false, reason: 'mk2.alreadyInstalled' };
+    }
+    const items = { ...state.items };
+    const item = items[itemId];
+    const isDriver = item && (item.weaponId === 'robot_item_mk2_driver' || item.id === 'robot_item_mk2_driver');
+    if (!isDriver) {
+      return { ok: false, reason: 'mk2.noDriver' };
+    }
+    const qty = Number(item.quantity) || 1;
+    if (qty <= 1) {
+      delete items[itemId];
+    } else {
+      items[itemId] = { ...item, quantity: qty - 1 };
+    }
+    set({ items, robot: { ...robot, mk2Installed: true } });
+    get().recalculateDerivedStats?.();
+    return { ok: true };
+  },
 
   // --- Limbs ---
 
@@ -209,6 +248,7 @@ export const createRobotActions = (set, get) => ({
 export const selectRobotSlots = (state) => state.robot?.slots || {};
 export const selectRobotModules = (state) => state.robot?.modules || [];
 export const selectRobotBodyPlan = (state) => state.robot?.bodyPlan ?? null;
+export const selectRobotMk2Installed = (state) => state.robot?.mk2Installed === true;
 export const selectRobotSlotKeysOrdered = (state) =>
   getRobotSlotKeys(state.robot?.bodyPlan);
 

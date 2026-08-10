@@ -34,6 +34,7 @@ const RobotSlot = ({
     onOpenArmorPicker,
     onWeaponPress,
     hasRadImmunity,
+    bodyPlan,
   });
 
   return (

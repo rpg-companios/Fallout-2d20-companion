@@ -1,5 +1,17 @@
 # История изменений / Changelog
 
+## 48 — Ориджин Секьюритрон / Securitron origin
+
+### RU
+
+- Ориджин «Секьюритрон» наполнен: трейт «Секьюритрон Mk I», свой план тела с колесом (таблица попаданий 1-2 / 3-11 / 12-14 / 15-17 / 18-20), новые робо-части и комплект `securitron_standard` (автоматический лазерный пистолет, пистолет-пулемёт .45, нерабочие ракетница и гранатомёт до ОС Mk II, заводская броня, принтер).
+- RU-префикс мода `mod_053` — «Автоматический» (как в EN), поддержка слота `wheel` в логике роботов.
+
+### EN
+
+- The Securitron origin is fully implemented: the "Mark I Securitron" trait, its own body plan with a wheel (hit locations 1-2 / 3-11 / 12-14 / 15-17 / 18-20), new robot parts and the `securitron_standard` kit (automatic laser gun, .45 submachine gun, missile/grenade launchers inoperable until the Mk II OS, factory armor, printer).
+- The RU prefix of mod `mod_053` is now "Automatic" (matching EN); robot logic supports the `wheel` slot.
+
 ---
 
 ## 36 — Английская локализация перков / English perk localization

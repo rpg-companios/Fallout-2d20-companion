@@ -104,6 +104,51 @@ export function buildArmLimb(armEntry, weaponsCatalog = []) {
 }
 
 // ---------------------------------------------------------------------------
+// Weapon mods (для встроенного оружия конечностей)
+// ---------------------------------------------------------------------------
+
+const RANGE_ORDER = ['C', 'M', 'L', 'E'];
+
+/**
+ * Применяет моды (из kitResolver item._mods) к статам оружия для слота робота.
+ * Дублирует мини-подмножество applyModModifiers из стора, чтобы встроенное
+ * оружие в руке (heldWeapon) показывало корректные статы без захода в стор.
+ */
+const applyWeaponMods = (weapon, mods = []) => {
+  if (!weapon || !Array.isArray(mods) || mods.length === 0) return weapon;
+  let damage = Number(weapon.damage) || 0;
+  let fireRate = Number(weapon.fireRate ?? weapon.fire_rate) || 0;
+  let rangeIndex = RANGE_ORDER.indexOf(weapon.range);
+  let qualities = Array.isArray(weapon.qualities) ? weapon.qualities.map((q) => ({ ...q })) : [];
+  let effects = Array.isArray(weapon.effects) ? weapon.effects.map((e) => ({ ...e })) : [];
+
+  for (const mod of mods) {
+    const dm = mod.damageModifier;
+    if (dm && dm.value) {
+      damage = dm.op === '-' ? damage - Number(dm.value) : damage + Number(dm.value);
+    }
+    const fm = mod.fireRateModifier;
+    if (fm && fm.value) fireRate += Number(fm.value);
+    const rm = mod.rangeModifier;
+    if (rm && rm.value && rangeIndex >= 0) {
+      rangeIndex = Math.min(RANGE_ORDER.length - 1, Math.max(0, rangeIndex + Number(rm.value)));
+    }
+    for (const qc of mod.qualityChanges || []) {
+      if (qc.op === 'lose') qualities = qualities.filter((q) => q.qualityId !== qc.id);
+      else if (qc.op === 'gain' && !qualities.some((q) => q.qualityId === qc.id)) qualities.push({ qualityId: qc.id });
+    }
+    for (const ec of mod.effectChanges || []) {
+      if (ec.op === 'gain' && !effects.some((e) => e.effectId === ec.id)) effects.push({ effectId: ec.id });
+      else if (ec.op === 'lose') effects = effects.filter((e) => e.effectId !== ec.id);
+    }
+  }
+
+  const result = { ...weapon, damage, fireRate, fire_rate: fireRate, qualities, effects };
+  if (rangeIndex >= 0) result.range = RANGE_ORDER[rangeIndex];
+  return result;
+};
+
+// ---------------------------------------------------------------------------
 // initRobotSlots
 // ---------------------------------------------------------------------------
 
@@ -177,7 +222,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         targetKey = 'body';
       } else if (itype === 'robotLeg' || itype === 'robotLegs') {
         targetKey = slotKeys.find(k => 
-          k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster'
+          k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel'
         );
       } else if (itype === 'robotArm') {
         // Просто: left/right или первый свободный
@@ -222,6 +267,48 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       const weaponId = weaponData.id || item.weaponId;
       // Resolve from catalog to pick up flags like builtinToHead that live only in catalog data
       const resolvedWeapon = weaponId ? resolveWeaponStats(weaponId) : null;
+
+      // Нерабочее встроенное оружие (например, ракетница и гранатомёт
+      // Секьюритрона до установки ОС Mk II): не занимает слоты и руки,
+      // остаётся в инвентаре инертным предметом до будущей механики Mk II.
+      if (item.requiresMkII || weaponData.requiresMkII || resolvedWeapon?.requiresMkII) {
+        inventoryItems.push({ ...item, requiresMkII: true });
+        continue;
+      }
+
+      // Оружие, встроенное в руку (ладонные орудия Секьюритрона): уходит ВНУТРЬ
+      // конечности (limb.builtinWeapons) — ладонь остаётся свободной, чтобы
+      // манипуляторы могли держать любое другое оружие/предметы (heldWeapon).
+      // item.slot задаёт сторону: left → leftArm, right → rightArm.
+      if (item.builtinToArm || weaponData.builtinToArm || resolvedWeapon?.builtinToArm) {
+        const direction = item.slot === 'right' ? 'right' : item.slot === 'left' ? 'left' : null;
+        const targetKey = direction ? getSlotForDirection(bodyPlan, direction) : null;
+        if (targetKey && slots[targetKey]?.limb) {
+          const limb = slots[targetKey].limb;
+          const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
+          const fireRate = Number(base.fireRate ?? base.fire_rate) || 0;
+          const builtin = {
+            ...base,
+            fireRate,
+            fire_rate: fireRate,
+            id: weaponId,
+            weaponId,
+            name: item.displayName || weaponData.name || weaponId,
+            baseWeaponName: weaponData.name,
+            isBuiltin: true,
+            builtinToArm: true,
+            locked: true,
+          };
+          slots[targetKey].limb = {
+            ...limb,
+            builtinWeapons: [...(Array.isArray(limb.builtinWeapons) ? limb.builtinWeapons : []), builtin],
+          };
+          continue;
+        }
+        // Нет подходящей руки — не теряем предмет, отдаём в инвентарь.
+        inventoryItems.push({ ...item, builtinToArm: true });
+        continue;
+      }
 
       // Встроенное оружие в голову
       if (weaponData.builtinToHead || item.builtinToHead || resolvedWeapon?.builtinToHead) {
@@ -272,7 +359,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     }
 
     // Броня
-    if (['plating', 'armor', 'frame'].includes(itype)) {
+    if (['plating', 'armor', 'frame', 'robotArmor'].includes(itype)) {
       const armorData = item._armor ?? item;
       const location = armorData.robotLocation ?? item.robotLocation;
       const layer = armorData.layer ?? itype;
@@ -285,9 +372,9 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
           slots[k][layer] = armorData;
         } else if (location === 'Arms' && k.toLowerCase().includes('arm')) {
           slots[k][layer] = armorData;
-        } else if (location === 'Legs' && (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster')) {
+        } else if ((location === 'Legs' || location === 'Wheel') && (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel')) {
           slots[k][layer] = armorData;
-        } else if (location === 'Thruster' && k === 'thruster') {
+        } else if (location === 'Thruster' && (k === 'thruster' || k === 'wheel')) {
           slots[k][layer] = armorData;
         }
       }
@@ -327,7 +414,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     } else if (k === 'body' && defaultBody) {
       slots[k].limb = defaultBody;
     } else if (
-      (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster') &&
+      (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') &&
       defaultLeg
     ) {
       slots[k].limb = defaultLeg;
@@ -390,7 +477,8 @@ export function getBuiltinWeaponsFromSlots(slots) {
 
     if (heldWeapon) {
       pushWeapon(heldWeapon, slotKey, limb);
-      continue;
+      // Встроенное оружие конечности (например, манипулятор) остаётся доступным
+      // и когда в руке зажато оружие — карточки не должны исчезать.
     }
 
     if (Array.isArray(limb?.builtinWeapons) && limb.builtinWeapons.length > 0) {

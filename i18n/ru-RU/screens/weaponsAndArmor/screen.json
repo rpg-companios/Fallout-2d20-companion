@@ -121,7 +121,8 @@
       "chamber": "Камера",
       "unique": "Уникальный",
       "other": "Другое"
-    }
+    },
+    "requiresMkII": "Требуется ОС Mk II"
   },
   "robotSlot": {
     "noLimb": "Нет конечности",
@@ -136,7 +137,8 @@
       "arm2": "Рука 2",
       "arm3": "Рука 3",
       "thruster": "Двигатель",
-      "chassis": "Шасси"
+      "chassis": "Шасси",
+      "wheel": "Колесо"
     },
     "layers": {
       "plating": "Обшивка",
@@ -254,6 +256,10 @@
     "robot_weapon_vice_grip": "Тиски",
     "robot_weapon_claw": "Коготь",
     "robot_weapon_tesla_arm": "Карабин Теслы",
-    "robot_arm_smoke_manipulator": "Экстендер с зажимом"
+    "robot_arm_smoke_manipulator": "Экстендер с зажимом",
+    "robot_head_securitron": "Голова Секьюритрона",
+    "robot_body_securitron": "Корпус Секьюритрона",
+    "robot_arm_securitron": "Рука Секьюритрона",
+    "robot_legs_securitron": "Колесо Секьюритрона"
   }
 }

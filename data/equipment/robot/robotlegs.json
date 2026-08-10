@@ -90,5 +90,24 @@
     "energyDR": 3,
     "radDR": 0,
     "name": "robot_legs_sentry_bot"
+  },
+  {
+    "id": "robot_legs_securitron",
+    "itemType": "robotLegs",
+    "slot": "Wheel",
+    "compatibleBodyPlans": [
+      "securitron"
+    ],
+    "defaultForBodyPlan": "securitron",
+    "complexity": 3,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "REPAIR",
+    "rarity": 1,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_legs_securitron"
   }
 ]

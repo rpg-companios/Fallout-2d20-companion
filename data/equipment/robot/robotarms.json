@@ -370,5 +370,29 @@
     "canHoldWeapons": true,
     "builtinWeaponId": "robot_weapon_smoke_claws",
     "name": "robot_arm_smoke_manipulator"
+  },
+  {
+    "id": "robot_arm_securitron",
+    "itemType": "robotArm",
+    "compatibleSlots": [
+      "leftArm",
+      "rightArm"
+    ],
+    "maxSlots": 2,
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "REPAIR",
+    "rarity": 1,
+    "melee": 2,
+    "guns": 2,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "weaponSlots": 1,
+    "canHoldWeapons": true,
+    "builtinWeaponId": "robot_weapon_manipulator",
+    "name": "robot_arm_securitron"
   }
 ]

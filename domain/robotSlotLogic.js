@@ -2,6 +2,7 @@
 // Pure logic extracted from RobotSlot for testability (no React, no UI deps).
 
 import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+import { getBodyPlan } from './bodyplan';
 
 /**
  * Builds the slot title, limb name, and stats array for a RobotSlot.
@@ -19,7 +20,7 @@ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScr
  * @returns {{ slotTitle: string, slotSubtitle: string, limbName: string|null, stats: object[] }}
  */
 export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
-  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen, hasRadImmunity = false } = callbacks;
+  const { onUpgradeLimb, onUpgradeArmor, onOpenArmorPicker, t = tWeaponsAndArmorScreen, hasRadImmunity = false, bodyPlan } = callbacks;
 
   const limb = slotData?.limb;
 
@@ -28,7 +29,10 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
     : t('robotSlot.noLimb');
 
   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
-  const slotSubtitle = t(`armor.slots.${slotKey}.subtitle`) || '';
+  // Диапазоны попаданий (d20) — из плана тела, если он их объявляет (секьюритрон),
+  // иначе общий словарь armor.slots (человекоподобная таблица).
+  const planHitLocation = bodyPlan ? getBodyPlan(bodyPlan)?.hitLocations?.[slotKey] : null;
+  const slotSubtitle = planHitLocation ?? (t(`armor.slots.${slotKey}.subtitle`) || '');
 
   const stats = [];
 

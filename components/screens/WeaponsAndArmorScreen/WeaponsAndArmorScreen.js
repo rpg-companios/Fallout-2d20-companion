@@ -27,6 +27,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects }
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { getRobotSlotKeys } from '../../../domain/robotEquip';
+import { getBodyPlan } from '../../../domain/bodyplan';
 import {
   hasFrame,
   suppressesLayerAt,
@@ -277,10 +278,14 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 
 
-const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
     const { hasTrait, attributes, skills, trait } = useCharacter();
     const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
     const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+    // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
+    // ОС Mk II (драйвер применяется в инвентаре, флаг — в robot-срезе стора).
+    // Хук ВЫЗЫВАЕТСЯ БЕЗУСЛОВНО (Правила хуков): до раннего return пустого слота.
+    const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -295,6 +300,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     }
   
     const displayWeapon = weapon;
+    const mk2Blocked = Boolean(weapon?.requiresMkII) && !mk2Installed;
 
     // Канонический формат полей оружия
     const weaponName = displayWeapon.name ?? tWeaponsAndArmorScreen('common.empty');
@@ -373,16 +379,21 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
       ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
       ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
-      ...(displayWeapon?.withoutMods ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
+      ...((displayWeapon?.withoutMods || mk2Blocked) ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
     ];
   
     return (
-      <View style={localStyles.weaponCardContainer}>
+      <View style={[localStyles.weaponCardContainer, mk2Blocked && { opacity: 0.55 }]}>
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { textAlign: 'center', width: '100%' }]}>{weaponName}</Text>
           {showSourceSlot && weapon?.sourceSlot ? (
             <Text style={{ fontSize: 10, color: '#888', textAlign: 'center', width: '100%', marginTop: 2 }}>
               {tWeaponsAndArmorScreen(`robotSlot.slotNames.${weapon.sourceSlot}`) || weapon.sourceSlot}
+            </Text>
+          ) : null}
+          {mk2Blocked ? (
+            <Text style={{ fontSize: 10, color: '#e8a33d', textAlign: 'center', width: '100%', marginTop: 2 }}>
+              {tWeaponsAndArmorScreen('weapon.requiresMkII')}
             </Text>
           ) : null}
         </View>
@@ -880,7 +891,7 @@ const WeaponsAndArmorScreen = () => {
             {/* Броня / Слоты робота */}
             {isRobot && equippedRobotSlots ? (
               <View style={{ marginBottom: 16 }}>
-                {chunkSlotKeys(getRobotSlotKeys(bodyPlan), 3).map((chunk, rowIndex) => (
+                {(getBodyPlan(bodyPlan)?.layout || chunkSlotKeys(getRobotSlotKeys(bodyPlan), 3)).map((chunk, rowIndex) => (
                   <View
                     key={rowIndex}
                     style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}
@@ -925,7 +936,7 @@ const WeaponsAndArmorScreen = () => {
                     weapon={dedupedEquippedWeapons[rowIndex * 2] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
-                    showSourceSlot={false}
+                    showSourceSlot={isRobot}
                     meleeBonus={meleeBonusValue}
                     equippedWeapons={equippedWeaponsForDisplay}
                   />
@@ -933,7 +944,7 @@ const WeaponsAndArmorScreen = () => {
                     weapon={dedupedEquippedWeapons[rowIndex * 2 + 1] ?? null}
                     onModifyWeapon={handleOpenModificationModal}
                     onUnequip={isRobot ? null : handleUnequipWeapon}
-                    showSourceSlot={false}
+                    showSourceSlot={isRobot}
                     meleeBonus={meleeBonusValue}
                     equippedWeapons={equippedWeaponsForDisplay}
                   />

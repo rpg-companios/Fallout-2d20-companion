@@ -121,7 +121,8 @@
       "chamber": "Chamber",
       "unique": "Unique",
       "other": "Other"
-    }
+    },
+    "requiresMkII": "Requires Mk II OS"
   },
   "robotSlot": {
     "noLimb": "No Limb",
@@ -136,7 +137,8 @@
       "arm2": "Arm 2",
       "arm3": "Arm 3",
       "thruster": "Thruster",
-      "chassis": "Chassis"
+      "chassis": "Chassis",
+      "wheel": "Wheel"
     },
     "layers": {
       "plating": "Plating",
@@ -254,6 +256,10 @@
     "robot_weapon_vice_grip": "Vice Grip",
     "robot_weapon_claw": "Claw",
     "robot_weapon_tesla_arm": "Tesla Carbine",
-    "robot_arm_smoke_manipulator": "Smoke Manipulator"
+    "robot_arm_smoke_manipulator": "Smoke Manipulator",
+    "robot_head_securitron": "Securitron Head",
+    "robot_body_securitron": "Securitron Body",
+    "robot_arm_securitron": "Securitron Arm",
+    "robot_legs_securitron": "Securitron Wheel"
   }
 }

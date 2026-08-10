@@ -119,5 +119,24 @@
     "energyDR": 3,
     "radDR": 0,
     "name": "robot_head_sentry_bot"
+  },
+  {
+    "id": "robot_head_securitron",
+    "itemType": "robotHead",
+    "replaceable": false,
+    "defaultForBodyPlan": "securitron",
+    "unique": false,
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "REPAIR",
+    "rarity": 1,
+    "mind": 5,
+    "other": 2,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_head_securitron"
   }
 ]

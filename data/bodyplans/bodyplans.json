@@ -107,15 +107,59 @@
       }
     }
   },
-  "assaultron": {
-    "slots": [
-      "leftArm",
-      "head",
-      "rightArm",
-      "leftLeg",
-      "body",
-      "rightLeg"
-    ],
+ "securitron": {
+  "slots": [
+   "head",
+   "leftArm",
+   "body",
+   "rightArm",
+   "wheel"
+  ],
+  "defaults": {
+   "head": "robot_head_securitron",
+   "body": "robot_body_securitron",
+   "leftArm": "robot_arm_securitron",
+   "rightArm": "robot_arm_securitron",
+   "wheel": "robot_legs_securitron"
+  },
+  "slotCapabilities": {
+   "leftArm": {
+    "canEquipWeapon": true
+   },
+   "rightArm": {
+    "canEquipWeapon": true
+   }
+  },
+  "layout": [
+   [
+    "head"
+   ],
+   [
+    "leftArm",
+    "body",
+    "rightArm"
+   ],
+   [
+    "wheel"
+   ]
+  ],
+  "hitLocations": {
+   "head": "1-2",
+   "body": "3-11",
+   "leftArm": "12-14",
+   "rightArm": "15-17",
+   "wheel": "18-20"
+  }
+ },
+ "assaultron": {
+  "slots": [
+   "leftArm",
+   "head",
+   "rightArm",
+   "leftLeg",
+   "body",
+   "rightLeg"
+  ],
     "defaults": {
       "leftArm": "robot_arm_assaultron",
       "head": "robot_head_assaultron",

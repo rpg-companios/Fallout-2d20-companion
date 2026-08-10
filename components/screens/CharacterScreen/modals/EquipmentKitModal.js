@@ -122,6 +122,10 @@ const toInventoryItems = (entries) => {
         quantity: item.quantity || 1,
         itemType: 'weapon',
         hasMods: item.hasMods ?? false,
+        // item-level флаги встроенного оружия не лежат в _weapon — переносим явно,
+        // иначе builtinToArm/requiresMkII теряются при фильтрации finalItems.
+        builtinToArm: item.builtinToArm,
+        requiresMkII: item.requiresMkII,
       });
 
       if (item.resolvedAmmunition) {
@@ -275,14 +279,33 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         robotCatalog,
       );
 
-      const allInventoryItems = [...finalItems.filter(
-        (item) => {
-          if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'plating', 'armor', 'frame', 'module'].includes(item.itemType)) return false;
-          if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
-          if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
-          return true;
-        }
-      ), ...robotInventory];
+      // Части тела, броня/обшивка/рама и модули уходят в слоты робота
+      // (initRobotSlots) — в инвентарь их копия не нужна.
+      const slotConsumedTypes = new Set([
+        'robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs',
+        'plating', 'armor', 'robotArmor', 'frame', 'module',
+      ]);
+      const finalItemsOnly = finalItems.filter((item) => {
+        if (slotConsumedTypes.has(item.itemType)) return false;
+        if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
+        if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
+        return true;
+      });
+
+      // Предметы, которые уже ушли в слоты/инвентарь через initRobotSlots
+      // (robotInventory), не дублируются копией из finalItems — иначе
+      // addNewItem склеит их в стек ×2 (см. защиту от дублей).
+      const robotInvKeys = new Set(
+        robotInventory
+          .map((i) => i.weaponId || i.id || i.itemId || i.armorId || i.clothingId)
+          .filter(Boolean),
+      );
+      const dedupedFinalItems = finalItemsOnly.filter((item) => {
+        const key = item.weaponId || item.id || item.itemId || item.armorId || item.clothingId;
+        return !key || !robotInvKeys.has(key);
+      });
+
+      const allInventoryItems = [...dedupedFinalItems, ...robotInventory];
 
       onSelectKit({
         name: kit.name,

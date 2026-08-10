@@ -21,6 +21,22 @@
       "weight": 0.5,
       "cost": 0,
       "rarity": 0
+    },
+    {
+      "id": "robot_item_printer",
+      "itemType": "misc",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 0
+    },
+    {
+      "id": "robot_item_mk2_driver",
+      "itemType": "misc",
+      "weight": 0,
+      "cost": 0,
+      "rarity": 4,
+      "unique": true,
+      "requiresOriginId": "securitron"
     }
   ],
   "robotModules": [

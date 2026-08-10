@@ -74,6 +74,7 @@ import dataKitsSuperMutant from '../data/equipmentKits/superMutant.json';
 import dataKitsVaultDweller from '../data/equipmentKits/vaultDweller.json';
 import dataKitsWastelander from '../data/equipmentKits/wastelander.json';
 import dataKitsProtectron from '../data/equipmentKits/protectron.json';
+import dataKitsSecuritron from '../data/equipmentKits/securitron.json';
 
 // Locale-independent technical data (stats, ids, game mechanics)
 import dataWeapons from '../data/equipment/weapons.json';
@@ -119,6 +120,7 @@ const ALL_KIT_DATA = {
   ...dataKitsVaultDweller,
   ...dataKitsWastelander,
   ...dataKitsProtectron,
+  ...dataKitsSecuritron,
 };
 
 const EQUIPMENT_BY_LOCALE = {

@@ -170,12 +170,21 @@ export async function resolveWeaponItem(item) {
   const displayName = [...prefixes, weaponName].join(' ');
   const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
 
+  // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
+  // (finalItems модалки, robotInventory initRobotSlots) нёс моды в стор
+  // одинаково — без потери модов при экипировке встроенного оружия.
+  const appliedMods = {};
+  for (const mod of mods) {
+    if (mod.slot && mod.id) appliedMods[mod.slot] = mod.id;
+  }
+
   return {
     ...item,
     _weapon: weaponData,
     builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
     builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
     _mods: mods,
+    appliedMods,
     displayName,
     name: displayName,
     itemType: 'weapon',

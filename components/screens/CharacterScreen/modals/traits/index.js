@@ -18,6 +18,7 @@ const genericOrigins = [
   'assaultron',
   'robobrain',
   'misterHandy',
+  'securitron',
   'shadow',
   'synth',
   // skill-pick traits:

@@ -91,6 +91,7 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
     misterHandy: 'misterHandy',
     protectron: 'protectron',
     robobrain: 'robobrain',
+    securitron: 'securitron',
     superMutant: 'supermutant',
     synth: 'synth',
     shadow: 'shadow',

@@ -56,6 +56,7 @@ const SLOT_LOCATION_MAP = {
   rightLeg:  'Thruster',
   thruster:  'Thruster',
   chassis:   'Thruster',
+  wheel:     'Thruster',
 };
 
 // ---------------------------------------------------------------------------

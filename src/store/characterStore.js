@@ -643,6 +643,10 @@ const useCharacterStore = create(devtools(
           // equipped at character creation and cannot be removed via the normal
           // unequip flow — only by swapping the limb that holds them.
           locked: Boolean(item.locked),
+          // `requiresMkII` — нерабочее встроенное оружие (ракетница и гранатомёт
+          // Секьюритрона до установки ОС Mk II): хранится в инвентаре, но не
+          // попадает в список атак, пока механика Mk II не реализована.
+          requiresMkII: Boolean(item.requiresMkII),
           quantity: item.quantity || 1,
           stackKey: stackKey,
           appliedMods: appliedMods,

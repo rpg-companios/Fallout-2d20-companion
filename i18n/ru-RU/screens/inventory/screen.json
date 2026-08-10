@@ -44,11 +44,24 @@
     "manipulatorWeightMessage": "Это оружие превышает допустимый удерживаемый вес манипулятора ({maxHeldWeight} фунтов).",
     "robotCannotUseTwoHandedMessage": "Текущие руки/манипуляторы робота не могут использовать двуручное оружие.",
     "robotArmorOnlyTitle": "Ограничение экипировки",
-    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.", "powerArmorNeedsCoreTitle": "Силовая броня", "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.", "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.", "powerArmorDepletedTitle": "Питание исчерпано", "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь.",
+    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.",
+    "powerArmorNeedsCoreTitle": "Силовая броня",
+    "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.",
+    "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.",
+    "powerArmorDepletedTitle": "Питание исчерпано",
+    "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь.",
     "mutantCannotWearStandardArmorTitle": "Ограничение экипировки",
     "mutantCannotWearStandardArmorMessage": "Супермутантам силовая броня запрещена.",
     "powerArmorChooseCoreTitle": "Выбор Ядерного блока",
-    "powerArmorBrokenPieceMessage": "Прочность части на нуле — её нельзя надеть. Почините её в инвентаре."
+    "powerArmorBrokenPieceMessage": "Прочность части на нуле — её нельзя надеть. Почините её в инвентаре.",
+    "mk2AppliedTitle": "ОС Mk II установлена",
+    "mk2AppliedMessage": "Ракетная установка и гранатомёт активированы.",
+    "mk2ApplyFailedTitle": "Нельзя применить",
+    "mk2Reason": {
+      "requiresSecuritron": "Драйвер совместим только с Секьюритроном.",
+      "alreadyInstalled": "ОС Mk II уже установлена.",
+      "noDriver": "Предмет драйвера не найден."
+    }
   },
   "actions": {
     "cancel": "Отмена",
@@ -84,7 +97,8 @@
     "totalWeight": "Общий вес",
     "totalPrice": "Общая цена",
     "durability": "Прочность (ОЗ)",
-    "ammo": "Патрон"
+    "ammo": "Патрон",
+    "requiresMkII": "Требуется ОС Mk II"
   },
   "powerArmor": {
     "containerTitle": "Силовая броня",

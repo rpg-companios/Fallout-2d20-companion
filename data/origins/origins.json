@@ -152,10 +152,12 @@
     "displayNameKey": "origins.securitron.name",
     "characterType": "robot",
     "image": "securitron",
-    "bodyPlan": "protectron",
-    "traitIds": [],
+    "bodyPlan": "securitron",
+    "traitIds": [
+      "securitron-mark-i"
+    ],
     "equipmentKitIds": [
-      "default_caps_only"
+      "securitron_standard"
     ]
   },
   {

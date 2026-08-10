@@ -30,7 +30,7 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
 | robobrain, securitron, assaultron, misterHandy, protectron | isRobot | **robot** |
 
 ✅ РЕШЕНО: shadow → **mutant**, synth → **cyborg**, savage → **human**.
-❓ РЕШЕНИЕ-4 (открыто): `securitron` body_plan=protectron — норм или своя схема слотов? (позже)
+✅ РЕШЕНО: `securitron` получил собственную схему слотов (body_plan `securitron`): голова / корпус / левая рука / правая рука / колесо, layout 1-3-1, таблица попаданий 1-2 / 3-11 / 12-14 / 15-17 / 18-20 (реализовано в рамках задачи «Ориджин Секьюритрон», #48).
 
 ### Итоговый маппинг characterType (с учётом решений)
 - human: brotherhood, ncr, minuteman, childOfAtom, vaultDweller, survivor, brotherhoodOutcast, savage

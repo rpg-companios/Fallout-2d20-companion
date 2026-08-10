@@ -236,5 +236,17 @@
       "immunities": ["radiation", "poison"],
       "effects": ["stealth_boy_addiction"]
     }
+  },
+  {
+    "id": "securitron-mark-i",
+    "originId": "securitron",
+    "displayNameKey": "traits.securitron.markI.name",
+    "descriptionKey": "traits.securitron.markI.description",
+    "modifiers": {
+      "immunities": ["radiation", "poison"],
+      "carryWeightFixed": 150,
+      "carryWeightStrengthMultiplier": 0,
+      "effects": ["no_consumables_food_rest", "repair_to_heal", "no_hunger_thirst_fatigue"]
+    }
   }
 ]

@@ -132,6 +132,12 @@
         "name": "Shadow",
         "description": "Your initial Strength and Endurance scores increase by +2 each, and your maximum Strength and Endurance scores increase to 12, but your maximum Intelligence and Charisma scores decrease to 8. You cannot have a rank higher than 4 in any skill. You are completely immune to radiation and poison damage.\n\nYour height is over two meters; your body is bulky and muscular, and your skin is blue. You do not appear to age, but you are infertile. You may only wear armor that was made for super mutants.\n\nYou can easily become addicted to Stealth Boy; its prolonged use has dealt enormous damage to your psyche and mental health. Whenever you use Stealth Boy, roll 1 {CD} per dose you took this session. If any effects come up, you get the following symptoms:\n\nStealth Boy Addiction: A failed addiction check makes you addicted to Stealth Boy. The difficulty of Perception and Intelligence tests increases by +2, and Charisma tests by +1, until cured."
       }
+    },
+    "securitron": {
+      "markI": {
+        "name": "Mark I Securitron",
+        "description": "You are a robot with the Mk I operating system designed by RobCo Industries. You move on a single wheel: the difficulty of tests relying on balance or stability is increased by 1. Your arms are fitted with manipulator claws, allowing you to roughly manipulate your surroundings and make unarmed melee attacks, and integrated weapons are built into your palms. Missile launchers are mounted in your shoulders, and a grenade launcher is integrated into your left arm, but both are inoperable until you are fitted with the Mk II operating system. Your carry weight is 150 lbs. It cannot be increased by your Strength or perks, but it can be increased by modified armor. You are immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover from your injuries or regain health points without receiving repairs."
+      }
     }
   }
 }

@@ -127,5 +127,30 @@
     "energyDR": 4,
     "radDR": 0,
     "name": "robot_body_sentry_bot"
+  },
+  {
+    "id": "robot_body_securitron",
+    "itemType": "robotBody",
+    "robotBodyPlan": "securitron",
+    "replaceable": true,
+    "armorSlots": [
+      "Head",
+      "Main Body",
+      "Left Arm",
+      "Right Arm",
+      "Wheel"
+    ],
+    "complexity": 4,
+    "perksRequired": [
+      "Robotics Expert 1"
+    ],
+    "skill": "REPAIR",
+    "rarity": 1,
+    "body": 5,
+    "carryWeight": 150,
+    "physicalDR": 3,
+    "energyDR": 1,
+    "radDR": 0,
+    "name": "robot_body_securitron"
   }
 ]

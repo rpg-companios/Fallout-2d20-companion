@@ -91,6 +91,9 @@ const InventoryScreen = () => {
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
+  // ОС Mk II (Секьюритрон): нерабочие ракетница/гранатомёт активируются
+  // драйвером из инвентаря; флаг живёт в robot-срезе стора (персистится).
+  const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
   const equipItem = useCharacterStore((state) => state.equipItem);
@@ -427,6 +430,28 @@ const InventoryScreen = () => {
   const handleSellItem = (item) => {
     setSelectedItemForSale(item);
     setIsSellModalVisible(true);
+  };
+
+  /**
+   * Применить «Драйвер ОС Mk II» к Секьюритрону: потребляет предмет и
+   * активирует нерабочие оружия (ракетница/гранатомёт) в списке атак.
+   */
+  const handleApplyMk2Driver = (item) => {
+    const stackKey = item.stackKey || getStackKey(item);
+    const storeItem = findUnequippedStoreItemByStackKey(stackKey);
+    if (!storeItem) return;
+    const result = useCharacterStore.getState().applyMk2Driver(storeItem.id);
+    if (!result?.ok) {
+      showAlert(
+        tInventory('screen.alerts.mk2ApplyFailedTitle'),
+        tInventory(`screen.alerts.mk2Reason.${result?.reason || 'noDriver'}`),
+      );
+      return;
+    }
+    showAlert(
+      tInventory('screen.alerts.mk2AppliedTitle'),
+      tInventory('screen.alerts.mk2AppliedMessage'),
+    );
   };
 
   const handleConfirmSale = (quantity, finalPrice) => {
@@ -1288,6 +1313,17 @@ const InventoryScreen = () => {
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
 
+    // Нерабочее встроенное оружие (ракетница/гранатомёт до ОС Mk II): строка
+    // помечается, пока драйвер не применён (флаг mk2Installed).
+    const mk2Blocked = Boolean(item.requiresMkII) && !mk2Installed;
+    // «Драйвер ОС Mk II»: применим только к Секьюритрону и только один раз.
+    const isMk2Driver = Boolean(
+      !item.isEquipped
+      && !mk2Installed
+      && origin?.id === 'securitron'
+      && (item.weaponId === 'robot_item_mk2_driver' || item.id === 'robot_item_mk2_driver'),
+    );
+
     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
     const isBuiltinOrManipulator = Boolean(item?.isBuiltin || item?.isManipulator);
     // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
@@ -1380,6 +1416,13 @@ const InventoryScreen = () => {
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.apply')}</Text>
               </TouchableOpacity>
           )}
+          {isMk2Driver && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => handleApplyMk2Driver(item)}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.apply')}</Text>
+              </TouchableOpacity>
+          )}
           {!item.isEquipped && (
               <TouchableOpacity style={[styles.actionButton, styles.sellButton]} onPress={() => handleSellItem(item)}>
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.sell')}</Text>
@@ -1392,6 +1435,9 @@ const InventoryScreen = () => {
           )}
           {item.durabilityTracked && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.durability}/100</Text>
+          )}
+          {mk2Blocked && (
+            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>
           )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
