@@ -191,9 +191,14 @@ export async function resolveNonWeaponItem(item) {
   }
 
   if (item.type === 'rollTable') {
-    const count = resolveTableRollCount(item.roll);
+    const roll = item.roll || {};
+    const count = resolveTableRollCount(roll);
+    // Способ броска берём из спеки: mode 'sum' — сумма `count` костей (для таблиц
+    // с диапазоном >20); sides — из rollType (D20 → 20). По умолчанию separate.
+    const mode = roll.mode === 'sum' ? 'sum' : 'separate';
+    const sides = parseInt(String(roll.rollType || '').replace(/\D/g, ''), 10) || 20;
     const tableId = ROLL_TABLE_TAG[item.tableId] || item.tableId;
-    const resolvedItems = await resolveRandomLootByRoll(tableId, count);
+    const resolvedItems = await resolveRandomLootByRoll(tableId, count, mode, sides);
     // Preserve each rolled item's native itemType (chem/weapon/armor/clothing/misc)
     // so addNewItem stores them under the right inventory category. Previously
     // every roll result was tagged itemType: 'loot', which made inventory

@@ -23,7 +23,8 @@
   "download": {
     "unsupported": "File save/export is available only in web version.",
     "errors": {
-      "notFound": "Character was not found."
+      "notFound": "Character was not found.",
+      "failed": "Failed to save file."
     }
   },
   "deleteConfirm": "Do you really want to delete this character?",
@@ -44,8 +45,9 @@
     "about": "About app",
     "community": "Community",
     "buyCoffee": "Buy author a coffee",
-    "buyCoffeeDescription": "Author support links will be added in future updates.",
-    "checkUpdates": "Check for updates"
+    "buyCoffeeDescription": "Support the app's development on Boosty.",
+    "checkUpdates": "Check for updates",
+    "settings": "Settings"
   },
   "about": {
     "description": "Fallout 2d20 Companion is a character manager for tabletop RPG: create, store, edit, import/export, and sync through cloud."
@@ -61,5 +63,30 @@
     "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
     "androidInstructions": "To install the app on Android:\n\nIn Chrome — tap the menu (⋮) in the top right corner and select «Install app» or «Add to Home screen».\n\nIn Samsung Internet — tap the menu (☰) → «Add page» → «On Home screen».",
     "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
+  },
+  "settings": {
+    "title": "Settings",
+    "survivalModeTitle": "Survival Mode Settings",
+    "durabilityTitle": "Weapon wear on firing",
+    "durabilityDescription": "Enable weapon wear mechanic when firing.",
+    "lossTitle": "Durability loss per 10 shots",
+    "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much.",
+    "qualityTitle": "Random weapon quality",
+    "qualityDescription": "Weapons added through \"Loot\" have random durability from 1 to 100. Merchant weapons are always 100%.",
+    "foldersTitle": "Character folders",
+    "foldersDescription": "Organize created characters into folders."
+  },
+  "folders": {
+    "create": "Create folder",
+    "namePlaceholder": "Folder name",
+    "confirm": "Create",
+    "cancel": "Cancel",
+    "characters": "Characters",
+    "back": "Back",
+    "deleteTitle": "Delete folder?",
+    "deleteMessage": "The folder and all characters inside it will be permanently deleted.",
+    "deleteConfirm": "Delete folder and characters",
+    "moveHint": "Hold the arrow icon, then tap a folder to move the character.",
+    "moving": "Select a destination folder"
   }
 }

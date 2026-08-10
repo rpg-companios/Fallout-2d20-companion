@@ -1,0 +1,53 @@
+--- a/domain/weaponQualityConflicts.js
++++ b/domain/weaponQualityConflicts.js
+@@ -16,0 +17,11 @@
++/** Normalizes a saved array of qualities; for a conflicting pair, the last entry wins. */
++export const resolveMutuallyExclusiveQualities = (qualities) => {
++  if (!Array.isArray(qualities)) return qualities;
++  const byId = new Map();
++  qualities.forEach((quality) => {
++    const qualityId = quality?.qualityId || quality?.id || quality;
++    if (!qualityId) return;
++    applyQualityGain(byId, typeof quality === 'string' ? { qualityId } : quality);
++  });
++  return [...byId.values()];
++};
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -4,0 +5 @@
++import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+@@ -455 +456,26 @@
+-];
++  // v2 -> v3: a weapon cannot retain both members of an opposite-quality pair.
++  // The final saved order is authoritative, so the last conflicting quality wins.
++  (state) => {
++    const normalizeWeapon = (item) => {
++      if (!item || typeof item !== 'object') return item;
++      const raw = item.qualities;
++      if (Array.isArray(raw)) return { ...item, qualities: resolveMutuallyExclusiveQualities(raw) };
++      if (typeof raw === 'string') {
++        try {
++          const parsed = JSON.parse(raw);
++          if (Array.isArray(parsed)) return { ...item, qualities: JSON.stringify(resolveMutuallyExclusiveQualities(parsed)) };
++        } catch (_) {}
++      }
++      return item;
++    };
++    return {
++      ...state,
++      equipment: state.equipment
++        ? { ...state.equipment, items: (state.equipment.items || []).map(normalizeWeapon) }
++        : state.equipment,
++      equippedWeapons: Array.isArray(state.equippedWeapons)
++        ? state.equippedWeapons.map(normalizeWeapon)
++        : state.equippedWeapons,
++    };
++  },
++];
+\ No newline at end of file
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -15 +15,2 @@
+-export const CURRENT_SCHEMA_VERSION = 2;
++// v3 — нормализация взаимоисключающих качеств оружия в старых сохранениях.
++export const CURRENT_SCHEMA_VERSION = 3;

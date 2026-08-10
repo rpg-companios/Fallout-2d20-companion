@@ -10,6 +10,7 @@ import {
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById, getWeaponMods } from '../../../../db/Database';
 import { declinePrefix } from '../../../../domain/modsEquip';
 import { shiftRange } from '../../../../domain/range';
+import { applyQualityGain } from '../../../../domain/weaponQualityConflicts';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../domain/weaponDisplay';
 import styles from '../../../../styles/WeaponModificationModal.styles';
@@ -38,14 +39,29 @@ function normalizeModRow(row) {
     damageModifier: row.damageModifier,
     fireRateModifier: row.fireRateModifier,
     rangeModifier: row.rangeModifier,
+    damageType: row.damageType ?? row.damage_type,
     qualityChanges: row.qualityChanges,
     effectChanges: row.effectChanges,
+    damageTypeOverride: row.damageTypeOverride,
   };
 }
 
 // CRITICAL INVARIANT:
 // Only ONE installed mod per category(slot) is allowed at any time.
 // If a new mod is selected in the same category, it MUST replace the previous one.
+const CONFLICTING_MOD_SLOTS = Object.freeze({
+  grip: 'stock',
+  stock: 'grip',
+});
+
+const setSelectedMod = (selected, slot, mod) => {
+  const next = { ...selected };
+  const oppositeSlot = CONFLICTING_MOD_SLOTS[slot];
+  if (oppositeSlot) delete next[oppositeSlot];
+  next[slot] = mod;
+  return next;
+};
+
 function normalizeSlotKey(slot) {
   const raw = String(slot || '').trim();
   if (!raw) return 'other';
@@ -95,6 +111,21 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   let weight = weightBase;
   let cost = costBase;
   let rangeShift = 0;
+  // Нормализуем базовый damageType в массив
+  let damage_type = baseWeapon.damage_type ?? baseWeapon.damageType;
+  if (typeof damage_type === "string") {
+    try {
+      damage_type = JSON.parse(damage_type);
+    } catch {
+      damage_type = [damage_type];
+    }
+  }
+  if (!Array.isArray(damage_type)) {
+    damage_type = damage_type ? [damage_type] : ["physical"];
+  } else {
+    damage_type = [...damage_type];
+  }
+
   // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
   const qualities = new Map(); // qualityId -> entry
   const effects = new Map();   // effectId -> entry
@@ -138,8 +169,25 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
 
     if (mod.qualityChanges && Array.isArray(mod.qualityChanges)) {
       for (const c of mod.qualityChanges) {
-        if (c.op === 'gain') qualities.set(c.id, c.value != null ? { qualityId: c.id, value: c.value } : { qualityId: c.id });
+        if (c.op === 'gain') applyQualityGain(qualities, { qualityId: c.id, value: c.value });
         if (c.op === 'lose') qualities.delete(c.id);
+      }
+    }
+
+    // Обработка damageTypeOverride (изменение типа урона)
+    if (mod.damageTypeOverride) {
+      const { op, value } = mod.damageTypeOverride;
+      if (op === 'set') {
+        // Замена: полностью перезаписываем массив
+        damage_type = Array.isArray(value) ? [...value] : [value];
+      } else if (op === 'add') {
+        // Добавление: добавляем тип, если его нет
+        const typesToAdd = Array.isArray(value) ? value : [value];
+        for (const t of typesToAdd) {
+          if (!damage_type.includes(t)) {
+            damage_type.push(t);
+          }
+        }
       }
     }
 
@@ -162,7 +210,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   debugLog('weapon.mod.compute', {
     weaponId: baseWeapon?.id ?? baseWeapon?.weaponId,
     baseName,
-    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges })),
+    selectedMods: selectedMods.map((m) => ({ id: m.id, slot: m.slot, rawSlot: m.rawSlot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges, damageTypeOverride: m.damageTypeOverride })),
     baseDamage: damageBase,
     resultDamage: damage,
     baseFireRate: fireRateBase,
@@ -173,6 +221,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     resultCost: cost,
     rangeShift,
     resultRange: range_name,
+    baseDamageType: baseWeapon.damage_type ?? baseWeapon.damageType,
+    resultDamageType: damage_type,
   });
 
   return {
@@ -181,6 +231,8 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     baseWeaponName: baseName,
     damage,
     fire_rate,
+    damage_type,
+    damageType: damage_type, // дублируем для совместимости
     range_name,
     qualities: qualitiesValue,
     effects: effectsValue,
@@ -275,12 +327,14 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
         }
 
         // выбранные моды из appliedMods (если уже есть)
-        const selected = {};
+        let selected = {};
         const applied = weaponWithBase.appliedMods || {};
         for (const [slot, modId] of Object.entries(applied)) {
           const modRow = await getWeaponModById(modId);
           const normalizedSlot = normalizeSlotKey(slot);
-          if (modRow) selected[normalizedSlot] = normalizeModRow(modRow);
+          if (modRow) {
+            selected = setSelectedMod(selected, normalizedSlot, normalizeModRow(modRow));
+          }
         }
 
         if (cancelled) return;
@@ -320,7 +374,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
       newSelected = { ...selectedModifications };
       delete newSelected[slot];
     } else {
-      newSelected = { ...selectedModifications, [slot]: mod };
+      newSelected = setSelectedMod(selectedModifications, slot, mod);
     }
 
     setSelectedModifications(newSelected);

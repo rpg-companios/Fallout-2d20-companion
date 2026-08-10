@@ -85,7 +85,19 @@ export const getEquippedArmor = (state) => {
 export const weaponModPatchToStore = (modifiedWeapon) => {
   const rangeName = modifiedWeapon.range_name ?? modifiedWeapon.rangeName;
   const damageEffects = modifiedWeapon.damage_effects ?? modifiedWeapon.damageEffects;
-  const damageType = modifiedWeapon.damage_type ?? modifiedWeapon.damageType;
+
+  // Нормализуем damageType в массив
+  let damageType = modifiedWeapon.damage_type ?? modifiedWeapon.damageType;
+  if (typeof damageType === 'string') {
+    try {
+      damageType = JSON.parse(damageType);
+    } catch {
+      damageType = [damageType];
+    }
+  }
+  if (!Array.isArray(damageType)) {
+    damageType = damageType ? [damageType] : ['physical'];
+  }
 
   return {
     ...modifiedWeapon,
@@ -98,7 +110,7 @@ export const weaponModPatchToStore = (modifiedWeapon) => {
     damageEffects,
     damage_effects: damageEffects,
     damageType,
-    damage_type: damageType,
+    damage_type: JSON.stringify(damageType), // сохраняем как JSON-строку
     qualities: modifiedWeapon.qualities,
     weight: modifiedWeapon.weight,
     cost: modifiedWeapon.cost,
@@ -116,11 +128,26 @@ export const storeItemToWeaponDisplay = (item) => {
   // name/index) so display + mod-step math share one representation. See domain/range.js.
   const { range_index, range_name } = resolveWeaponRangeFields(flat);
 
+  // Десериализуем damage_type если это JSON-строка
+  let damageType = flat.damageType ?? flat.damage_type;
+  if (typeof damageType === 'string') {
+    try {
+      damageType = JSON.parse(damageType);
+    } catch {
+      damageType = [damageType];
+    }
+  }
+  if (!Array.isArray(damageType)) {
+    damageType = damageType ? [damageType] : ['physical'];
+  }
+
   return {
     ...flat,
+    instanceId: flat.instanceId || flat.id,
     id: flat.weaponId || flat.id,
     fire_rate: flat.fireRate ?? flat.fire_rate,
-    damage_type: flat.damageType ?? flat.damage_type,
+    damage_type: damageType,
+    damageType,
     damage_effects: flat.damageEffects ?? flat.damage_effects,
     range_index,
     range_name,

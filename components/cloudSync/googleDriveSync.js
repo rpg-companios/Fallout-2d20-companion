@@ -2,7 +2,7 @@ import { debugLog } from '../../src/debug/falloutDebug';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
-import { createCharacterExportPayload, parseCharacterImportPayload } from '../screens/HomeScreen/logic/characterTransfer';
+import { createCharacterExportPayload, parseCharacterImportPayload } from '../../domain/characterTransfer';
 
 const ROOT_FOLDER_NAME = 'fallout2d20';
 const SYNC_KEY = 'fallout_cloud_sync_enabled';

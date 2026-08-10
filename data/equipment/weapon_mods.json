@@ -2176,7 +2176,13 @@
         "op": "gain",
         "id": "effect_radioactive"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -2612,7 +2618,11 @@
         "op": "gain",
         "id": "effect_vicious"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "add",
+      "value": "energy"
+    }
   },
   {
     "modType": "weapon",
@@ -2946,7 +2956,13 @@
       "value": 1
     },
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -2973,7 +2989,13 @@
         "op": "gain",
         "id": "effect_persistent"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -3000,7 +3022,13 @@
         "op": "gain",
         "id": "effect_stun"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -3683,8 +3711,15 @@
       "op": "+",
       "value": 2
     },
+    "damageType": "energy",
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -3705,13 +3740,20 @@
       "op": "+",
       "value": 3
     },
+    "damageType": "energy",
     "qualityChanges": [],
     "effectChanges": [
       {
         "op": "gain",
         "id": "effect_stun"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -3783,7 +3825,13 @@
       "value": 1
     },
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -3810,7 +3858,13 @@
         "op": "gain",
         "id": "effect_stun"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -4146,7 +4200,13 @@
       "value": 2
     },
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
   },
   {
     "modType": "weapon",
@@ -4236,7 +4296,11 @@
         "op": "gain",
         "id": "effect_vicious"
       }
-    ]
+    ],
+    "damageTypeOverride": {
+      "op": "add",
+      "value": "energy"
+    }
   },
   {
     "modType": "weapon",

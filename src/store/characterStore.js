@@ -56,6 +56,7 @@ import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
+import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -177,10 +178,36 @@ const applyModModifiers = (item, appliedMods = {}) => {
       });
     }
 
-    // Apply damageType modifier (if mod changes damage type). damageType is a plain
-    // string; just overwrite it.
-    if (mod.damageType) {
-      updatedItem.damageType = mod.damageType;
+    // Apply damageTypeOverride (if mod changes damage type).
+    if (mod.damageTypeOverride) {
+      const { op, value } = mod.damageTypeOverride;
+
+      // Получаем текущий damageType (поддержка массива и строки)
+      let currentType = updatedItem.damageType;
+      if (typeof currentType === 'string') {
+        try {
+          currentType = JSON.parse(currentType);
+        } catch {
+          currentType = [currentType];
+        }
+      }
+      if (!Array.isArray(currentType)) {
+        currentType = currentType ? [currentType] : ['physical'];
+      }
+
+      if (op === 'set') {
+        // Замена: полностью перезаписываем массив
+        updatedItem.damageType = Array.isArray(value) ? value : [value];
+      } else if (op === 'add') {
+        // Добавление: добавляем тип, если его нет
+        const typesToAdd = Array.isArray(value) ? value : [value];
+        for (const t of typesToAdd) {
+          if (!currentType.includes(t)) {
+            currentType.push(t);
+          }
+        }
+        updatedItem.damageType = currentType;
+      }
     }
   });
   
@@ -208,6 +235,8 @@ const useCharacterStore = create(devtools(
       items: {},
       effects: {},
       selectedPerks: [],
+      // Per-character journal: tagged skills whose one-time starting reward was issued.
+      rewardedSkills: [],
       derivedStats: {}, // Calculated derived stats
 
       perkBonuses: {},
@@ -224,6 +253,10 @@ const useCharacterStore = create(devtools(
         get().recalculatePerkBonuses();
         get().recalculateDerivedStats();
       },
+
+      markSkillsAsRewarded: (skills = []) => set((state) => ({
+        rewardedSkills: [...new Set([...(state.rewardedSkills || []), ...skills])],
+      })),
 
       recalculatePerkBonuses: () => {
         set({ perkBonuses: selectPerkBonuses(get(), perksData) });
@@ -445,6 +478,49 @@ const useCharacterStore = create(devtools(
         get().recalculateDerivedStats();
       },
       
+      /** Spend ammunition and update weapon wear in one state transaction. */
+      spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots }) => {
+        const state = get();
+        const weapon = state.items[weaponInstanceId];
+        const amount = Math.max(1, Math.floor(Number(ammoAmount) || 1));
+        if (!weapon) return { ok: false, reason: 'weapon-not-found' };
+        const trackedWeapon = durabilityEnabled && !weapon.durabilityTracked
+          ? { ...weapon, durabilityTracked: true, durability: 100, durabilityAmmoRemainder: 0, durabilityWearRemainder: 0 }
+          : weapon;
+        if (durabilityEnabled && Number(trackedWeapon.durability) <= 0) {
+          return { ok: false, reason: 'broken' };
+        }
+
+        const acceptedAmmoIds = new Set(ammoIds || []);
+        const ammoEntries = Object.entries(state.items).filter(([, item]) =>
+          item.itemType === 'ammo' && acceptedAmmoIds.has(item.weaponId || item.id),
+        );
+        const available = ammoEntries.reduce((sum, [, item]) => sum + (Number(item.quantity) || 1), 0);
+        if (available < amount) return { ok: false, reason: 'not-enough-ammo' };
+
+        const items = { ...state.items };
+        let remaining = amount;
+        for (const [itemId, ammo] of ammoEntries) {
+          if (!remaining) break;
+          const quantity = Number(ammo.quantity) || 1;
+          const spent = Math.min(quantity, remaining);
+          if (quantity === spent) delete items[itemId];
+          else items[itemId] = { ...ammo, quantity: quantity - spent };
+          remaining -= spent;
+        }
+        if (durabilityEnabled) {
+          items[weaponInstanceId] = { ...trackedWeapon, ...applyWeaponWear(trackedWeapon, amount, baseLossPer10Shots) };
+        }
+        set({ items });
+        return { ok: true };
+      },
+
+      repairWeapon: (itemId) => {
+        const item = get().items[itemId];
+        if (!item?.durabilityTracked || Number(item.durability) >= 100) return;
+        get().updateItem(itemId, repairWeaponDurability());
+      },
+
       /**
        * Equip an item (set equipped = true)
        * @param {string} itemId - Item ID
@@ -557,9 +633,11 @@ const useCharacterStore = create(devtools(
         // Normalize item data with parameters
         const normalizedItem = {
           id: itemId,
+          // instanceId survives display enrichment, whose `id` is the catalog id.
+          instanceId: itemId,
           weaponId: weaponId,
           name: item.name || item.weaponName || item.Name || weaponId,
-          itemType: item.itemType || 'weapon',
+          itemType: item.itemType || 'misc',
           equipped: item.equipped || false,
           // `locked: true` marks items that came from a robot kit. They are
           // equipped at character creation and cannot be removed via the normal
@@ -601,6 +679,12 @@ const useCharacterStore = create(devtools(
           ammoId: item.ammoId,
           qualities: item.qualities,
           imageName: item.imageName,
+
+          // Optional weapon durability is instance-specific and never catalog data.
+          durabilityTracked: Boolean(item.durabilityTracked),
+          durability: item.durability,
+          durabilityAmmoRemainder: item.durabilityAmmoRemainder,
+          durabilityWearRemainder: item.durabilityWearRemainder,
 
           // Consumable fields (chems, food, drinks) — preserved verbatim from catalog
           positiveEffect: item.positiveEffect,
@@ -895,6 +979,7 @@ const useCharacterStore = create(devtools(
           items: {},
           effects: {},
           selectedPerks: legacyDefaults?.selectedPerks || [],
+          rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
           derivedStats: {},
           _characterContext: undefined,
@@ -944,6 +1029,7 @@ const useCharacterStore = create(devtools(
         items: state.items,
         effects: state.effects,
         selectedPerks: state.selectedPerks,
+        rewardedSkills: state.rewardedSkills,
         robot: state.robot,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),

@@ -27,9 +27,12 @@ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
 import styles from '../../../styles/InventoryScreen.styles';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
@@ -95,6 +98,8 @@ const InventoryScreen = () => {
   const addNewItem = useCharacterStore((state) => state.addNewItem);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+  const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+  const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
@@ -282,106 +287,10 @@ const InventoryScreen = () => {
   // ПРАВИЛО (от владельца, 2026-07-31): эвристик по названию здесь больше нет.
   const isPowerArmorItem = (item) => getProtectionKind(item) === PROTECTION_KINDS.POWER_ARMOR;
   const toWeight = (value) => parseFloat(String(value ?? 0).replace(',', '.')) || 0;
-  const flattenMiscellaneousItems = (miscCatalog) => {
-    if (Array.isArray(miscCatalog)) return miscCatalog;
-    if (Array.isArray(miscCatalog?.miscellaneous)) {
-      return miscCatalog.miscellaneous.flatMap((group) => group?.items || []);
-    }
-    return [];
-  };
 
-  const resolveLocalizedItem = (item) => {
-    if (!item || !item.id) return item;
-    const itemType = getItemType(item);
-
-    if (itemType === 'weapon') {
-      const base = (equipmentCatalog?.weapons || []).find((entry) => entry.id === item.id);
-      if (!base) return item;
-      return {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-    }
-
-    if (itemType === 'armor') {
-      const base = equipmentCatalog?.armorIndex?.byId?.get(item.id);
-      if (!base) return item;
-      return {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-    }
-
-    if (itemType === 'clothing' || itemType === 'outfit') {
-      const allClothes = (equipmentCatalog?.clothes?.clothes || []).flatMap((group) => group.items || []);
-      const base = allClothes.find((entry) => entry.id === item.id);
-      if (!base) return item;
-      return {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-    }
-
-    if (itemType === 'chem' || itemType === 'chems') {
-      const base = (equipmentCatalog?.chems || []).find((entry) => entry.id === item.id);
-      if (!base) {
-        debugLog('i18n.resolveChem.noBase', { id: item.id, item });
-        return item;
-      }
-      const result = {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-      debugLog('i18n.resolveChem.result', { id: result.id, positiveEffect: result.positiveEffect });
-      return result;
-    }
-
-    if (itemType === 'drinks') {
-      const base = (equipmentCatalog?.drinks || []).find((entry) => entry.id === item.id);
-      if (!base) return item;
-      return {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-    }
-
-    if (itemType === 'food') {
-      const base = (equipmentCatalog?.food || []).find((entry) => entry.id === item.id);
-      if (!base) return item;
-      return {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-    }
-
-    if (itemType === 'ammo') {
-      const base = (equipmentCatalog?.ammoTypes || []).find((entry) => entry.id === item.id);
-      if (!base) return item;
-      return {
-        ...base,
-        ...item,
-        name: base.name,
-      };
-    }
-
-    const miscItems = flattenMiscellaneousItems(equipmentCatalog?.miscellaneous);
-    const base = miscItems.find((entry) => entry.id === item.id)
-      || (equipmentCatalog?.generalGoods || []).find((entry) => entry.id === item.id)
-      || (equipmentCatalog?.robotModules || []).find((entry) => entry.id === item.id)
-      || (equipmentCatalog?.robotItems || []).find((entry) => entry.id === item.id);
-    if (!base) return item;
-    return {
-      ...base,
-      ...item,
-      name: item.name || base.name || item.id,
-    };
-  };
+  // Обогащение инстанса каталожными данными — единая точка (domain/resolveItem):
+  // вес/цена/эффект/имя берутся из каталога по id. Локальной копии логики больше нет.
+  const resolveLocalizedItem = (item) => resolveItem(item, equipmentCatalog);
 
 
   const handleOpenCapsModal = (type) => {
@@ -533,7 +442,7 @@ const InventoryScreen = () => {
     setSelectedItemForSale(null);
   };
 
-  const handleAddItem = (item, quantity = 1) => {
+  const handleAddItem = (item, quantity = 1, source = 'loot') => {
     const localizedItem = resolveLocalizedItem(item);
 
     // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
@@ -585,6 +494,26 @@ const InventoryScreen = () => {
       return;
     }
 
+    // Durability is per weapon instance: tracked weapons must never be stacked.
+    if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
+      for (let index = 0; index < quantity; index += 1) {
+        const durability = source === 'buy' ? 100 : rollWeaponDurability();
+        const uniqueId = `${localizedItem.id}_durability_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`;
+        addNewItem({
+          ...localizedItem,
+          itemType: 'weapon',
+          quantity: 1,
+          uniqueId,
+          stackKey: uniqueId,
+          durabilityTracked: true,
+          durability,
+          durabilityAmmoRemainder: 0,
+          durabilityWearRemainder: 0,
+        });
+      }
+      return;
+    }
+
     const stackKey = getStackKey(localizedItem);
     const existingItem = findUnequippedStoreItemByStackKey(stackKey);
 
@@ -615,7 +544,7 @@ const InventoryScreen = () => {
   const handleConfirmBuy = (quantity, unitPrice) => {
     const finalCost = quantity * unitPrice;
     setCaps((prev) => prev - finalCost);
-    handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity);
+    handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
     setIsBuyItemModalVisible(false);
     setSelectedItemForBuy(null);
   };
@@ -1355,6 +1284,7 @@ const InventoryScreen = () => {
     const showPARepair = Boolean(
       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
     );
+    const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
 
@@ -1399,11 +1329,13 @@ const InventoryScreen = () => {
         }
     };
     
-    const price = parseFloat(
-      localizedDisplayItem.cost ?? localizedDisplayItem.price
-    ) || 0;
-    const weightRaw = localizedDisplayItem.weight;
-    const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
+    const price = getItemPrice(localizedDisplayItem);
+    const weight = getItemWeight(localizedDisplayItem);
+    const weaponAmmoIds = String(localizedDisplayItem?.ammoId ?? localizedDisplayItem?.ammo_id ?? '')
+      .split(',').map((id) => id.trim()).filter((id) => id && id !== 'ammo_anything');
+    const weaponAmmoNames = weaponAmmoIds
+      .map((ammoId) => (equipmentCatalog?.ammoTypes || []).find((ammo) => ammo.id === ammoId)?.name)
+      .filter(Boolean);
 
     return (
       <View style={styles.tableRow}>
@@ -1423,6 +1355,14 @@ const InventoryScreen = () => {
           )}
           {hideEquipButton && (
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+          )}
+
+          {showWeaponRepair && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => repairWeapon(item.id)}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
           )}
 
           {showPARepair && (
@@ -1450,8 +1390,14 @@ const InventoryScreen = () => {
           {Number.isFinite(paMaxHp) && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
           )}
+          {item.durabilityTracked && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.durability}/100</Text>
+          )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
+          {weaponAmmoNames.length > 0 && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.ammo')}: {weaponAmmoNames.join(', ')}</Text>
+          )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
         </View>
       </View>
@@ -1490,7 +1436,7 @@ const InventoryScreen = () => {
       const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
       const modifiedItem = getModifiedItem(itemWithType);
       const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
-      const weight = parseFloat(String(displayItem.weight).replace(',', '.')) || 0;
+      const weight = getItemWeight(displayItem);
       return acc + (weight * (flatItem.quantity || 1));
     }, 0);
 
@@ -1502,25 +1448,16 @@ const InventoryScreen = () => {
         };
         const modifiedWeapon = getModifiedItem(weaponWithType);
         const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
-        
-        const weightRaw = displayWeapon.weight;
-        const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
-        total += weight;
+        total += getItemWeight(displayWeapon);
       }
     });
     
     Object.values(equippedArmor).forEach(slotData => {
       if (slotData.armor) {
-        const displayArmor = resolveLocalizedItem(slotData.armor);
-        const weightRaw = displayArmor.weight;
-        const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
-        total += weight;
+        total += getItemWeight(resolveLocalizedItem(slotData.armor));
       }
       if (slotData.clothing) {
-        const displayClothing = resolveLocalizedItem(slotData.clothing);
-        const weightRaw = displayClothing.weight;
-        const weight = parseFloat(String(weightRaw).replace(',', '.')) || 0;
-        total += weight;
+        total += getItemWeight(resolveLocalizedItem(slotData.clothing));
       }
     });
     
@@ -1535,7 +1472,7 @@ const InventoryScreen = () => {
       const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
       const modifiedItem = getModifiedItem(itemWithType);
       const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
-      const price = parseFloat(displayItem.cost ?? displayItem.price) || 0;
+      const price = getItemPrice(displayItem);
       return acc + (price * (flatItem.quantity || 1));
     }, 0);
 
@@ -1547,22 +1484,16 @@ const InventoryScreen = () => {
         };
         const modifiedWeapon = getModifiedItem(weaponWithType);
         const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
-        
-        const price = parseFloat(displayWeapon.cost ?? displayWeapon.price) || 0;
-        total += price;
+        total += getItemPrice(displayWeapon);
       }
     });
     
     Object.values(equippedArmor).forEach(slotData => {
       if (slotData.armor) {
-        const displayArmor = resolveLocalizedItem(slotData.armor);
-        const price = parseFloat(displayArmor.cost ?? displayArmor.price) || 0;
-        total += price;
+        total += getItemPrice(resolveLocalizedItem(slotData.armor));
       }
       if (slotData.clothing) {
-        const displayClothing = resolveLocalizedItem(slotData.clothing);
-        const price = parseFloat(displayClothing.cost ?? displayClothing.price) || 0;
-        total += price;
+        total += getItemPrice(resolveLocalizedItem(slotData.clothing));
       }
     });
     

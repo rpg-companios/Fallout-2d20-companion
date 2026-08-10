@@ -1,0 +1,312 @@
+diff --git a/components/characterFolders.js b/components/characterFolders.js
+new file mode 100644
+index 0000000..53ef672
+--- /dev/null
++++ b/components/characterFolders.js
+@@ -0,0 +1,26 @@
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++const STORAGE_KEY = 'fallout2d20:character-folders';
++
++const readFolders = async () => {
++  const raw = await AsyncStorage.getItem(STORAGE_KEY);
++  if (!raw) return [];
++  try {
++    const folders = JSON.parse(raw);
++    return Array.isArray(folders) ? folders : [];
++  } catch (_) {
++    return [];
++  }
++};
++
++export const getCharacterFolders = readFolders;
++
++export const createCharacterFolder = async (name) => {
++  const cleanName = String(name || '').trim();
++  if (!cleanName) throw new Error('Folder name is required');
++  const folders = await readFolders();
++  const now = Date.now();
++  const folder = { id: `folder_${now}_${Math.random().toString(36).slice(2, 8)}`, name: cleanName, createdAt: now };
++  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...folders, folder]));
++  return folder;
++};
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 7566e13..43c0e4e 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -11,6 +11,7 @@ import {
+   Platform,
+   Modal,
+   Linking,
++  TextInput,
+ } from 'react-native';
+ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+@@ -29,6 +30,9 @@ import {
+ import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import styles from '../../../styles/HomeScreen.styles';
++import SettingsModal from '../../settings/SettingsModal';
++import useAppSettingsStore from '../../../src/store/appSettingsStore';
++import { getCharacterFolders, createCharacterFolder } from '../../characterFolders';
+ 
+ const getOriginImage = (originName) => {
+   if (!originName) return null;
+@@ -40,7 +44,7 @@ const NUM_COLS = 3;
+ 
+ const ActionCell = ({ icon, label, onPress }) => (
+   <TouchableOpacity style={styles.createCell} onPress={onPress} activeOpacity={0.7}>
+-    <Text style={styles.createPlus}>{icon}</Text>
++    {typeof icon === 'string' ? <Text style={styles.createPlus}>{icon}</Text> : icon}
+     <Text style={styles.createLabel}>{label}</Text>
+   </TouchableOpacity>
+ );
+@@ -97,10 +101,15 @@ export default function HomeScreen({ navigation }) {
+   const locale = useLocale();
+   const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
+   const [characters, setCharacters] = useState([]);
++  const [folders, setFolders] = useState([]);
++  const [folderDraftVisible, setFolderDraftVisible] = useState(false);
++  const [folderName, setFolderName] = useState('');
+   const [loading, setLoading] = useState(true);
++  const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
+   const [menuVisible, setMenuVisible] = useState(false);
+   const [aboutVisible, setAboutVisible] = useState(false);
+   const [communityVisible, setCommunityVisible] = useState(false);
++  const [settingsVisible, setSettingsVisible] = useState(false);
+ 
+   const [installPrompt, setInstallPrompt] = useState(null);
+   const [isStandalone, setIsStandalone] = useState(false);
+@@ -174,9 +183,10 @@ export default function HomeScreen({ navigation }) {
+   const loadList = useCallback(async () => {
+     setLoading(true);
+     try {
+-      const list = await getCharactersList();
++      const [list, savedFolders] = await Promise.all([getCharactersList(), getCharacterFolders()]);
+       list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+       setCharacters(list);
++      setFolders(savedFolders);
+     } catch (e) {
+       setCharacters([]);
+     } finally {
+@@ -190,6 +200,15 @@ export default function HomeScreen({ navigation }) {
+     }, [loadList])
+   );
+ 
++  const handleCreateFolder = async () => {
++    const name = folderName.trim();
++    if (!name) return;
++    await createCharacterFolder(name);
++    setFolderName('');
++    setFolderDraftVisible(false);
++    loadList();
++  };
++
+   const handleCreate = () => {
+     resetCharacter();
+     navigation.navigate('CharacterTab');
+@@ -369,6 +388,9 @@ export default function HomeScreen({ navigation }) {
+   const allItems = [
+     { type: 'create' },
+     { type: 'upload' },
++    { type: 'createFolder' },
++    ...(folderDraftVisible ? [{ type: 'folderDraft' }] : []),
++    ...folders.map(folder => ({ type: 'folder', ...folder })),
+     ...characters.map(c => ({ type: 'character', ...c })),
+   ];
+ 
+@@ -449,6 +471,24 @@ export default function HomeScreen({ navigation }) {
+                     />
+                   );
+                 }
++                if (item.type === 'createFolder') {
++                  return <ActionCell
++                    key="create-folder"
++                    icon={<MaterialCommunityIcons name="folder-plus-outline" size={38} color={characterFoldersEnabled ? '#5a5a5a' : '#aaa'} />}
++                    label={tHomeScreen('folders.create')}
++                    onPress={() => characterFoldersEnabled && setFolderDraftVisible(true)}
++                  />;
++                }
++                if (item.type === 'folderDraft') {
++                  return <View key="folder-draft" style={styles.folderDraftCell}>
++                    <MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" />
++                    <TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} />
++                    <View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View>
++                  </View>;
++                }
++                if (item.type === 'folder') {
++                  return <View key={item.id} style={styles.folderCell}><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text></View>;
++                }
+                 if (item.type === 'empty') {
+                   return <EmptyCell key={item.id} id={item.id} />;
+                 }
+@@ -477,6 +517,10 @@ export default function HomeScreen({ navigation }) {
+       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
+           <Pressable style={styles.menuPanel} onPress={() => {}}>
++            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
++              <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
++              <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
++            </TouchableOpacity>
+             <TouchableOpacity style={styles.menuItem} onPress={handleCloudSync}>
+               <FontAwesome5 name="google-drive" size={18} color="#d4af37" />
+               <Text style={styles.menuText}>{tHomeScreen('menu.sync')}</Text>
+@@ -515,6 +559,8 @@ export default function HomeScreen({ navigation }) {
+         </Pressable>
+       </Modal>
+ 
++      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
++
+       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
+         <View style={styles.modalBackdropCenter}>
+           <View style={styles.infoModal}>
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+new file mode 100644
+index 0000000..4ea4366
+--- /dev/null
++++ b/components/settings/SettingsModal.js
+@@ -0,0 +1,23 @@
++import React from 'react';
++import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
++
++export default function SettingsModal({ visible, onClose }) {
++  const enabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++  const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
++  const setEnabled = useAppSettingsStore((state) => state.setRandomWeaponDurabilityEnabled);
++  const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
++  const foldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
++  const setFoldersEnabled = useAppSettingsStore((state) => state.setCharacterFoldersEnabled);
++  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++    <View style={styles.backdrop}><View style={styles.modal}>
++      <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
++      <View style={styles.row}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text></View><Switch value={enabled} onValueChange={setEnabled} /></View>
++      <View style={[styles.row, styles.loss]}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text></View><Switch value={foldersEnabled} onValueChange={setFoldersEnabled} /></View>
++      {enabled && <View style={styles.loss}><Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text><View style={styles.counter}><TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}><Text style={styles.button}>−</Text></TouchableOpacity><Text style={styles.value}>{loss}</Text><TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}><Text style={styles.button}>+</Text></TouchableOpacity></View><Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text></View>}
++      <TouchableOpacity onPress={onClose} style={styles.close}><Text>OK</Text></TouchableOpacity>
++    </View></View>
++  </Modal>;
++}
++const styles=StyleSheet.create({backdrop:{flex:1,backgroundColor:'rgba(0,0,0,.6)',justifyContent:'center',padding:20},modal:{backgroundColor:'#fff',borderRadius:12,padding:20},title:{fontSize:22,fontWeight:'700',marginBottom:18},row:{flexDirection:'row',gap:12},text:{flex:1},label:{fontSize:16,fontWeight:'700'},description:{fontSize:13,color:'#555',lineHeight:18,marginTop:6},loss:{borderTopWidth:1,borderColor:'#ddd',marginTop:18,paddingTop:16},counter:{flexDirection:'row',alignItems:'center',marginTop:12,gap:20},button:{fontSize:28,fontWeight:'700',paddingHorizontal:12},value:{fontSize:22,minWidth:45,textAlign:'center'},close:{alignSelf:'flex-end',marginTop:18,padding:10}});
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 858d593..048519d 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -46,7 +46,8 @@
+     "community": "Community",
+     "buyCoffee": "Buy author a coffee",
+     "buyCoffeeDescription": "Author support links will be added in future updates.",
+-    "checkUpdates": "Check for updates"
++    "checkUpdates": "Check for updates",
++    "settings": "Settings"
+   },
+   "about": {
+     "description": "Fallout 2d20 Companion is a character manager for tabletop RPG: create, store, edit, import/export, and sync through cloud."
+@@ -62,5 +63,20 @@
+     "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
+     "androidInstructions": "To install the app on Android:\n\nIn Chrome — tap the menu (⋮) in the top right corner and select «Install app» or «Add to Home screen».\n\nIn Samsung Internet — tap the menu (☰) → «Add page» → «On Home screen».",
+     "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
++  },
++  "settings": {
++    "title": "Settings",
++    "durabilityTitle": "Random weapon durability",
++    "durabilityDescription": "Weapons obtained through “Add Loot” have random durability from 1 to 100. Firing weapons consumes durability.",
++    "lossTitle": "Durability loss per 10 shots",
++    "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much.",
++    "foldersTitle": "Character folders",
++    "foldersDescription": "Organize created characters into folders."
++  },
++  "folders": {
++    "create": "Create folder",
++    "namePlaceholder": "Folder name",
++    "confirm": "Create",
++    "cancel": "Cancel"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index e92117b..256ee93 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -46,7 +46,8 @@
+     "community": "Сообщество",
+     "buyCoffee": "Купить автору кофе",
+     "buyCoffeeDescription": "Поддержка автора появится в следующих обновлениях.",
+-    "checkUpdates": "Проверить обновления"
++    "checkUpdates": "Проверить обновления",
++    "settings": "Настройки"
+   },
+   "about": {
+     "description": "Fallout 2d20 Companion — менеджер персонажей для настольной ролевой игры: создание, хранение, редактирование, импорт/экспорт и облачная синхронизация."
+@@ -62,5 +63,20 @@
+     "iosInstructions": "Чтобы установить приложение на iPhone/iPad:\n\n1. Нажмите кнопку «Поделиться» (Share) в нижней панели Safari.\n2. Выберите «На экран «Домой»» (Add to Home Screen).\n3. Нажмите «Добавить».",
+     "androidInstructions": "Чтобы установить приложение на Android:\n\nВ Chrome — нажмите меню (⋮) в правом верхнем углу и выберите «Установить приложение» или «Добавить на главный экран».\n\nВ Samsung Internet — нажмите меню (☰) → «Добавить страницу» → «На главный экран».",
+     "desktopInstructions": "Чтобы установить приложение:\n\nВ Edge / Chrome — найдите значок установки (⊕ или значок компьютера) в правой части адресной строки и нажмите его.\n\nВ Firefox — откройте меню (···) → «Установить сайт как приложение»."
++  },
++  "settings": {
++    "title": "Настройки",
++    "durabilityTitle": "Случайная прочность оружия",
++    "durabilityDescription": "Оружие, получаемое через «Добавить добычу», обладает случайной прочностью от 1 до 100. Выстрелы из оружия тратят прочность.",
++    "lossTitle": "Расход прочности за 10 выстрелов",
++    "lossDescription": "По умолчанию расходуется 1 прочность за 10 выстрелов. «Ненадёжное» оружие тратит в 2 раза больше, а «Надёжное» — в 2 раза меньше.",
++    "foldersTitle": "Каталоги персонажей",
++    "foldersDescription": "Организуйте созданных персонажей по каталогам."
++  },
++  "folders": {
++    "create": "Создать каталог",
++    "namePlaceholder": "Название каталога",
++    "confirm": "Создать",
++    "cancel": "Отмена"
+   }
+ }
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+new file mode 100644
+index 0000000..304048d
+--- /dev/null
++++ b/src/store/appSettingsStore.js
+@@ -0,0 +1,29 @@
++import { create } from 'zustand';
++import { persist, createJSONStorage } from 'zustand/middleware';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++const clampLoss = (value) => Math.min(100, Math.max(1, Math.floor(Number(value) || 1)));
++
++const useAppSettingsStore = create(
++  persist(
++    (set) => ({
++      randomWeaponDurabilityEnabled: false,
++      weaponDurabilityLossPer10Shots: 1,
++      characterFoldersEnabled: false,
++      setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
++      setRandomWeaponDurabilityEnabled: (enabled) => set({ randomWeaponDurabilityEnabled: Boolean(enabled) }),
++      setWeaponDurabilityLossPer10Shots: (value) => set({ weaponDurabilityLossPer10Shots: clampLoss(value) }),
++    }),
++    {
++      name: 'fallout2d20:settings',
++      storage: createJSONStorage(() => AsyncStorage),
++      partialize: (state) => ({
++        randomWeaponDurabilityEnabled: state.randomWeaponDurabilityEnabled,
++        weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
++        characterFoldersEnabled: state.characterFoldersEnabled,
++      }),
++    },
++  ),
++);
++
++export default useAppSettingsStore;
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 0128b4b..11c94e1 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -155,6 +155,11 @@ const styles = StyleSheet.create({
+   },
+   characterLevel: { fontSize: 10, color: '#555', textAlign: 'center', paddingBottom: 4 },
+   emptyCell: { flex: 1, margin: 5, aspectRatio: 0.75 },
++  folderCell: { flex: 1, margin: 5, aspectRatio: 0.75, borderWidth: 1, borderColor: '#d4af37', borderRadius: 8, backgroundColor: 'rgba(17,24,39,0.9)', justifyContent: 'center', alignItems: 'center', padding: 8 },
++  folderName: { color: '#f0e68c', textAlign: 'center', fontWeight: '700', marginTop: 8 },
++  folderDraftCell: { flex: 1, margin: 5, aspectRatio: 0.75, borderWidth: 1, borderStyle: 'dashed', borderColor: '#d4af37', borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.92)', justifyContent: 'center', alignItems: 'center', padding: 8 },
++  folderNameInput: { width: '100%', borderBottomWidth: 1, borderColor: '#555', textAlign: 'center', marginTop: 8, padding: 4 },
++  folderDraftActions: { flexDirection: 'row', gap: 12, marginTop: 12 },
+   modalBackdrop: {
+     flex: 1,
+     backgroundColor: 'rgba(0,0,0,0.45)',

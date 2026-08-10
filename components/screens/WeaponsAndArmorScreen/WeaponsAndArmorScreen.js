@@ -19,6 +19,7 @@ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { resolveItem, findCatalogEntry } from '../../../domain/resolveItem';
 import { applyArmorMods } from '../../../domain/modsEquip';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
@@ -47,6 +48,8 @@ import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
 import { debugLog } from '../../../src/debug/falloutDebug';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import { isAmmoWeapon } from '../../../domain/weaponDurability';
 
 
 const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
@@ -119,12 +122,13 @@ const RadiationCounter = ({ isEnabled }) => {
   );
 };
 
-const WeaponAmmoCell = ({ ammoId, qualities }) => {
+const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
   const storeItems = useCharacterStore((state) => state.items);
-  const updateItem = useCharacterStore((state) => state.updateItem);
+  const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
+  const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+  const baseLossPer10Shots = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
 
   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
-
   let ammoPerShot = 1;
   let parsedQ = qualities;
   if (typeof parsedQ === 'string') {
@@ -134,39 +138,27 @@ const WeaponAmmoCell = ({ ammoId, qualities }) => {
     const hungryQ = parsedQ.find(q => q?.qualityId === 'quality_ammo-hungry_x');
     if (hungryQ?.value != null) ammoPerShot = Math.max(1, Number(hungryQ.value) || 1);
   }
-
   const ammoItems = Object.values(storeItems || {}).filter(
-    item => item.itemType === 'ammo' && ammoIds.includes(item.id)
+    item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
   );
   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  const canSpend = totalAmmo >= ammoPerShot;
+  const isBroken = durabilityLossEnabled && Number(durability) <= 0;
+  const canSpend = totalAmmo >= ammoPerShot && !isBroken;
 
   const handleSpend = () => {
     if (!canSpend) return;
-    let toDeduct = ammoPerShot;
-    for (const item of [...ammoItems]) {
-      if (toDeduct <= 0) break;
-      const qty = item.quantity || 1;
-      const deduct = Math.min(qty, toDeduct);
-      const newQty = qty - deduct;
-      if (newQty <= 0) {
-        const current = { ...useCharacterStore.getState().items };
-        delete current[item.id];
-        useCharacterStore.setState({ items: current });
-      } else {
-        updateItem(item.id, { quantity: newQty });
-      }
-      toDeduct -= deduct;
-    }
+    spendAmmoForWeapon({
+      weaponInstanceId,
+      ammoIds,
+      ammoAmount: ammoPerShot,
+      durabilityEnabled: durabilityLossEnabled,
+      baseLossPer10Shots,
+    });
   };
 
   return (
     <View style={localStyles.weaponAmmoCellContainer}>
-      <TouchableOpacity
-        style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]}
-        onPress={handleSpend}
-        disabled={!canSpend}
-      >
+      <TouchableOpacity style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]} onPress={handleSpend} disabled={!canSpend}>
         <Text style={localStyles.weaponAmmoBtnText}>−</Text>
       </TouchableOpacity>
       <Text style={localStyles.weaponAmmoCount}>{totalAmmo}</Text>
@@ -287,6 +279,8 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
     const { hasTrait, attributes, skills, trait } = useCharacter();
+    const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+    const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -307,7 +301,9 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
     const damageType = resolveWeaponDamageType(displayWeapon.damage_type ?? displayWeapon.damageType);
     const effectsValue = resolveWeaponEffects(displayWeapon.effects) || tWeaponsAndArmorScreen('common.empty');
     const fireRateBase = Number(displayWeapon.fire_rate ?? 0) || 0;
-    const rangeValue = displayWeapon.range_name ?? displayWeapon.rangeName ?? tWeaponsAndArmorScreen('common.empty');
+    const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
+    const range_name_key = displayWeapon.range_name ?? displayWeapon.rangeName ?? '';
+    const rangeValue = rangeNames[range_name_key] || range_name_key || tWeaponsAndArmorScreen('common.empty');
     const qualitiesValue = resolveWeaponQualities(displayWeapon.qualities) || tWeaponsAndArmorScreen('common.empty');
     const mainAttr = displayWeapon.mainAttr ?? displayWeapon.main_attr ?? 'AGI';
     const mainSkill = displayWeapon.mainSkill ?? displayWeapon.main_skill ?? 'SMALL_GUNS';
@@ -364,6 +360,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
 
     const rawAmmoId = displayWeapon?.ammoId ?? displayWeapon?.ammo_id ?? '';
     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
+    const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
+    const showDurability = (randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon);
 
     const stats = [
       { label: tWeaponsAndArmorScreen('weapon.fields.success'), value: `${successValue}` },
@@ -373,7 +371,8 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
       { label: tWeaponsAndArmorScreen('weapon.fields.fireRate'), value: fireRateWithTrait },
       { label: tWeaponsAndArmorScreen('weapon.fields.range'), value: rangeValue },
       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
-      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities }] : []),
+      ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
+      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
       ...(displayWeapon?.withoutMods ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
     ];
   
@@ -392,7 +391,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
             <View key={index} style={[localStyles.weaponStatRow, { borderBottomWidth: 1 }]}>
               <Text style={localStyles.weaponStatLabel}>{stat.label}</Text>
               {stat.type === 'ammo' ? (
-                <WeaponAmmoCell ammoId={stat.ammoId} qualities={stat.qualities} />
+                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} />
               ) : stat.type === 'button' ? (
                 <TouchableOpacity 
                   style={localStyles.weaponModificationButton}
@@ -426,7 +425,7 @@ const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
 
 const findLocalizedWeapon = (catalog, weapon) => {
   if (!weapon?.id) return weapon;
-  const base = (catalog?.weapons || []).find((entry) => entry.id === weapon.id);
+  const base = findCatalogEntry(catalog, weapon.id, 'weapon');
   if (!base) return weapon;
 
   // Если на оружии применены моды (есть baseWeaponName), сохраняем все модифицированные поля.
@@ -450,6 +449,8 @@ const findLocalizedWeapon = (catalog, weapon) => {
       baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
       damage: weapon.damage,
       fire_rate: weapon.fire_rate,
+      damageType: weapon.damageType,
+      damage_type: weapon.damage_type,
       qualities: weapon.qualities,
       range_name: weapon.range_name,
       weight: weapon.weight,
@@ -461,28 +462,11 @@ const findLocalizedWeapon = (catalog, weapon) => {
   };
 };
 
-const findLocalizedArmor = (catalog, armorItem) => {
-  if (!armorItem?.id) return armorItem;
-  const base = catalog?.armorIndex?.byId?.get(armorItem.id);
-  if (!base) return armorItem;
-  return {
-    ...base,
-    ...armorItem,
-    name: base.name || armorItem.name,
-  };
-};
+// Обогащение брони/одежды — единая точка (domain/resolveItem): каталожные данные
+// (имя, рейтинги, зоны защиты) подставляются по id. Локальной копии логики нет.
+const findLocalizedArmor = (catalog, armorItem) => resolveItem(armorItem, catalog);
 
-const findLocalizedClothing = (catalog, clothingItem) => {
-  if (!clothingItem?.id) return clothingItem;
-  const allClothes = (catalog?.clothes?.clothes || []).flatMap((group) => group.items || []);
-  const base = allClothes.find((entry) => entry.id === clothingItem.id);
-  if (!base) return clothingItem;
-  return {
-    ...base,
-    ...clothingItem,
-    name: base.name || clothingItem.name,
-  };
-};
+const findLocalizedClothing = (catalog, clothingItem) => resolveItem(clothingItem, catalog);
 
 const chunkSlotKeys = (keys, size) => {
   const chunks = [];

@@ -1,11 +1,16 @@
 import { evaluateFormula, evaluateFormulaMulti, rollDie } from '../../../../domain/diceRollsLogic';
-import trinkets from '../../../../assets/RandomLoot/trinkets.json';
-import food from '../../../../assets/RandomLoot/food.json';
-import brewery from '../../../../assets/RandomLoot/brewery.json';
-import chems from '../../../../assets/RandomLoot/chems.json';
-import outcast from '../../../../assets/RandomLoot/outcast.json';
+import trinkets from '../../../../data/loot/trinkets.json';
+import food from '../../../../data/loot/food.json';
+import brewery from '../../../../data/loot/brewery.json';
+import chems from '../../../../data/loot/chems.json';
+import outcast from '../../../../data/loot/outcast.json';
+import weaponsMelee from '../../../../data/loot/weapons_melee.json';
+import lootStubs from '../../../../data/loot/_stubs.json';
+import ruLootStubs from '../../../../i18n/ru-RU/data/loot/stubs.json';
+import enLootStubs from '../../../../i18n/en-EN/data/loot/stubs.json';
 import { getWeaponById } from '../../../../db/Database';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+import { getCurrentLocale } from '../../../../i18n/locale';
 
 const lootTables = {
   trinklet: trinkets,
@@ -13,6 +18,7 @@ const lootTables = {
   brewery: brewery,
   chem: chems,
   outcast: outcast,
+  weapons_melee: weaponsMelee,
 };
 
 export const supportedLootTags = Object.keys(lootTables);
@@ -69,6 +75,12 @@ function buildCatalogIndex() {
         addAll(miscItems, 'misc');
     }
 
+    // Loot stubs contain locale-independent item data. Their display names are
+    // resolved by id from the active locale, like the rest of the catalog.
+    const localizedStubNames = getCurrentLocale() === 'en-EN' ? enLootStubs : ruLootStubs;
+    const stubNamesById = new Map(localizedStubNames.map((item) => [item.id, item.name]));
+    addAll(lootStubs.map((item) => ({ ...item, name: stubNamesById.get(item.id) })));
+
     return index;
 }
 
@@ -84,7 +96,12 @@ async function resolveItemFromTable(rollResult, tag, lootTable) {
 
     const foundItem = lootTable.find(loot => loot.roll === rollResult);
     if (!foundItem) {
-        return { name: `[Not found] ${tag}`, quantity: 1, id: `loot_miss_${tag}_${rollResult}` };
+        // Промах (нет записи под этот бросок). По правилам: «если выпадает 1 —
+        // берём 1й предмет». Берём запись с минимальным roll и резолвим её тем же
+        // путём. На полной таблице промаха не бывает — это страховка для неполных.
+        if (!lootTable.length) return null;
+        const firstRoll = lootTable.reduce((m, x) => (Number(x.roll) < Number(m.roll) ? x : m)).roll;
+        return resolveItemFromTable(firstRoll, tag, lootTable);
     }
 
     const { roll, name, ref, ...otherProps } = foundItem;
@@ -188,14 +205,14 @@ export async function resolveRandomLoot(lootFormula) {
     if (quantityFormula.includes(',')) {
         const rolls = evaluateFormulaMulti(quantityFormula);
         const items = await Promise.all(rolls.map(r => resolveItemFromTable(r, tag, lootTable)));
-        return items;
+        return items.filter(Boolean);
     }
 
     const rollResult = evaluateFormula(quantityFormula);
     return resolveItemFromTable(rollResult, tag, lootTable);
 }
 
-export async function resolveRandomLootByRoll(tag, count = 1) {
+export async function resolveRandomLootByRoll(tag, count = 1, mode = 'separate', sides = 20) {
     const normalizedTag = String(tag || '').toLowerCase();
 
     // Таблица диковин — берётся из каталога, не из assets/RandomLoot
@@ -218,8 +235,17 @@ export async function resolveRandomLootByRoll(tag, count = 1) {
 
     const totalRolls = Math.max(0, parseInt(count, 10) || 0);
     const items = [];
+    // mode 'sum': сумма `totalRolls` бросков → один предмет (для таблиц с диапазоном
+    // >20, напр. 2d20 → 2–40). mode 'separate' (по умолчанию): каждый бросок → свой предмет.
+    if (mode === 'sum' && totalRolls > 0) {
+        let sum = 0;
+        for (let i = 0; i < totalRolls; i++) sum += rollDie(sides);
+        const item = await resolveItemFromTable(sum, normalizedTag, lootTable);
+        if (item) items.push(item);
+        return items;
+    }
     for (let i = 0; i < totalRolls; i++) {
-        const rollResult = rollDie(20);
+        const rollResult = rollDie(sides);
         const item = await resolveItemFromTable(rollResult, normalizedTag, lootTable);
         if (item) items.push(item);
     }

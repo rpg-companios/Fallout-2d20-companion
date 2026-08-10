@@ -1,0 +1,149 @@
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 7566e13..29f2d2c 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -70,7 +70,7 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
+         }}
+         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+       >
+-        <Text style={styles.deleteIcon}>🗑</Text>
++        <MaterialCommunityIcons name="trash-can-outline" size={16} color="#8a8a8a" style={styles.deleteIcon} />
+       </TouchableOpacity>
+ 
+       <TouchableOpacity
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index b770af7..38c9a06 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1,4 +1,5 @@
+ import React, { useState, useMemo, useCallback } from 'react';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity, Alert, Platform } from 'react-native';
+ import { useCharacter } from '../../CharacterContext';
+ import useCharacterStore from '../../../src/store/characterStore';
+@@ -218,17 +219,18 @@ const InventoryScreen = () => {
+   const getArmorInstanceKey = (item, slot, type) =>
+     item?.equipInstanceId || `${type || item?.itemType || 'armor'}:${item?.stackKey || getStackKey(item)}:${slot}`;
+   const getItemTypeIcon = (itemType) => {
+-    if (itemType === 'weapon') return '🔫';
+-    if (itemType === 'armor') return '🛡️';
+-    if (itemType === 'clothing' || itemType === 'outfit') return '👕';
+-    if (itemType === 'chem' || itemType === 'chems') return '💊';
+-    if (itemType === 'drinks') return '🥤';
+-    if (itemType === 'food') return '🍖';
+-    if (itemType === 'magazine') return '📖';
+-    if (itemType === 'ammo') return '🔹';
+-    if (itemType === 'powerArmor') return '⚡';
+-    if (itemType === 'misc') return '🔧';
+-    return '📦';
++    if (itemType === 'weapon') return 'pistol';
++    if (itemType === 'armor') return 'account-shield';
++    if (itemType === 'clothing' || itemType === 'outfit') return 'tshirt-crew-outline';
++    if (itemType === 'chem' || itemType === 'chems') return 'pill';
++    if (itemType === 'drinks') return 'cup-water';
++    if (itemType === 'food') return 'food-drumstick-outline';
++    if (itemType === 'magazine') return 'book-open-variant';
++    if (itemType === 'ammo') return 'ammunition';
++    if (itemType === 'powerArmor') return 'weight-lifter';
++    if (itemType === 'misc') return 'wrench';
++    if (String(itemType || '').startsWith('robot') || itemType === 'module' || itemType === 'plating' || itemType === 'robotFrame') return 'robot';
++    return 'package-variant-closed';
+   };
+ 
+   const equippedRobotBodyPart = useMemo(() => {
+@@ -1150,7 +1152,7 @@ const InventoryScreen = () => {
+           <View style={styles.mainRowContent}>
+             <View style={styles.itemNameContainer}>
+               <Text style={[styles.itemNameText, styles.equippedItemText]}>{item.name}</Text>
+-              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
++              <MaterialCommunityIcons name={getItemTypeIcon('powerArmor')} size={16} color="#999" style={styles.itemTypeIcon} />
+             </View>
+           </View>
+           <View style={styles.actionContainer}>
+@@ -1214,7 +1216,7 @@ const InventoryScreen = () => {
+           <View style={styles.mainRowContent}>
+             <View style={styles.itemNameContainer}>
+               <Text style={styles.itemNameText}>{item.name}</Text>
+-              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
++              <MaterialCommunityIcons name={getItemTypeIcon('powerArmor')} size={16} color="#999" style={styles.itemTypeIcon} />
+             </View>
+           </View>
+         </View>
+@@ -1228,7 +1230,7 @@ const InventoryScreen = () => {
+           <View style={styles.mainRowContent}>
+             <View style={styles.itemNameContainer}>
+               <Text style={styles.itemNameText}>{item.name}</Text>
+-              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
++              <MaterialCommunityIcons name={getItemTypeIcon('powerArmor')} size={16} color="#999" style={styles.itemTypeIcon} />
+             </View>
+           </View>
+         </View>
+@@ -1312,7 +1314,7 @@ const InventoryScreen = () => {
+         <View style={styles.mainRowContent}>
+           <View style={styles.itemNameContainer}>
+             <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}{coreChargeSuffix}</Text>
+-            <Text style={styles.itemTypeIcon}>{itemIcon}</Text>
++            <MaterialCommunityIcons name={itemIcon} size={16} color="#999" style={styles.itemTypeIcon} />
+           </View>
+         </View>
+         <View style={styles.actionContainer}>
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index c582be2..a22e213 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -2,28 +2,29 @@ import React, { useState, useMemo, useEffect } from 'react';
+ import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput, StyleSheet } from 'react-native';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { tInventory } from '../logic/inventoryI18n';
+ import { useLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/AddItemModal.styles';
+ 
+ const CATEGORY_ICONS = {
+-  weapon: '🔫',
+-  armor: '🛡️',
+-  powerArmor: '⚡',
+-  clothing: '👕',
+-  ammo: '🔹',
+-  food: '🍖',
+-  drinks: '🥤',
+-  chems: '💊',
+-  items: '🔧',
+-  materials: '🧰',
+-  robotEquipment: '🤖',
+-  robotWeapons: '⚙️',
+-  robotPlating: '🔩',
+-  robotArmorLayer: '🛡️',
+-  robotFrame: '⚙️',
+-  robotBodyParts: '🦾',
+-  robotModules: '💡',
++  weapon: 'pistol',
++  armor: 'account-shield',
++  powerArmor: 'weight-lifter',
++  clothing: 'tshirt-crew-outline',
++  ammo: 'ammunition',
++  food: 'food-drumstick-outline',
++  drinks: 'cup-water',
++  chems: 'pill',
++  items: 'wrench',
++  materials: 'toolbox-outline',
++  robotEquipment: 'robot',
++  robotWeapons: 'cog',
++  robotPlating: 'nut',
++  robotArmorLayer: 'shield-half-full',
++  robotFrame: 'cogs',
++  robotBodyParts: 'robot-arm',
++  robotModules: 'chip',
+ };
+ 
+ const mapWeaponTypeToDbValue = {
+@@ -271,7 +272,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     return (
+       <TouchableOpacity style={styles.itemContainer} onPress={() => handleSelect(item)}>
+         <Text style={styles.itemName}>{isItem ? item.name : item}</Text>
+-        {!isItem && <Text style={styles.itemType}>{CATEGORY_ICONS[Object.keys(CATEGORY_ICONS).find((key) => tInventory(`modals.addItemModal.categories.${key}`) === item)] || '📁'}</Text>}
++        {!isItem && <MaterialCommunityIcons name={CATEGORY_ICONS[Object.keys(CATEGORY_ICONS).find((key) => tInventory(`modals.addItemModal.categories.${key}`) === item)] || 'folder'} size={16} color="#999" style={styles.itemType} />}
+         {isItem && Boolean(itemTypeLabel) && <Text style={styles.itemType}>{itemTypeLabel}</Text>}
+       </TouchableOpacity>
+     );

@@ -2,6 +2,8 @@
 // Минимальные миграционные функции для перехода к нормализованному формату
 
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+import { catalogGetWeaponModById } from '../../db/catalogSource';
 
 /**
  * Преобразует атрибуты из старого формата [{name, value}] в словарь
@@ -58,22 +60,15 @@ export const normalizeSkills = (skillsArray = []) => {
 export const normalizeItems = (equipment = {}, equippedWeapons = []) => {
   const result = {};
   
-  // Helper функция для копирования только нужных полей предмета
-  const copyItemFields = (item) => {
-    const fieldsToCopy = [
-      'id', 'name', 'itemType', 'equipped', 'uniqueId', 'weaponId', 
-      'code', 'Name', 'quantity', 'stackKey', 'appliedMods',
-      'equipInstanceId', 'armorCategoryKey', 'stackKey', 'price'
-    ];
-    
-    const copied = {};
-    fieldsToCopy.forEach(field => {
-      if (item[field] !== undefined) {
-        copied[field] = item[field];
-      }
-    });
-    return copied;
-  };
+  // Сохраняем ВСЕ поля предмета при загрузке из БД — каталожные данные
+  // (вес/цена/эффект/имя) всё равно обогащаются на отображении через
+  // resolveItem по id, но сам инстанс обязан пройти сейв↔загрузку без потерь.
+  //
+  // Прежний короткий fieldsToCopy срезал weight/cost/qualities/effects/
+  // fire_rate/baseWeaponName/positiveEffect/hpHealed/value и т.д. — отсюда
+  // «вес/цена 0» у предметов и слёт пересчитанных статов модов оружия после
+  // перезагрузки персонажа из БД. Каталог = источник истины; инстанс — без потерь.
+  const copyItemFields = (item) => (item && typeof item === 'object' ? { ...item } : {});
   
   // Обычные предметы из инвентаря
   const inventoryItems = equipment?.items || [];
@@ -228,6 +223,7 @@ export const normalizeForStore = (data = {}) => {
     skills: normalizeSkills(data.skills),
     items: normalizeItems(data.equipment, data.equippedWeapons),
     effects: normalizeEffects(data.activeTimedEffects),
+    rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
     schemaVersion: CURRENT_SCHEMA_VERSION,
   };
 };
@@ -323,6 +319,7 @@ export const denormalizeForSave = (storeState = {}) => {
     equipment,
     equippedWeapons,
     activeTimedEffects: denormalizeEffects(storeState.effects || {}),
+    rewardedSkills: Array.isArray(storeState.rewardedSkills) ? storeState.rewardedSkills : [],
   };
 };
 
@@ -446,4 +443,152 @@ const MIGRATIONS = [
     }
     return next;
   },
+  // v1 -> v2: existing saved characters have already received their initial
+  // tagged-skill rewards, so seed their reward journal to prevent duplication.
+  (state) => {
+    const next = { ...state };
+    if (!Array.isArray(next.rewardedSkills)) {
+      next.rewardedSkills = next.skillsSaved
+        ? [...new Set([...(next.selectedSkills || []), ...(next.extraTaggedSkills || [])])]
+        : [];
+    }
+    return next;
+  },
+  // v2 -> v3: a weapon cannot retain both members of an opposite-quality pair.
+  // The final saved order is authoritative, so the last conflicting quality wins.
+  (state) => {
+    const normalizeWeapon = (item) => {
+      if (!item || typeof item !== 'object') return item;
+      const raw = item.qualities;
+      if (Array.isArray(raw)) return { ...item, qualities: resolveMutuallyExclusiveQualities(raw) };
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return { ...item, qualities: JSON.stringify(resolveMutuallyExclusiveQualities(parsed)) };
+        } catch (_) {}
+      }
+      return item;
+    };
+    return {
+      ...state,
+      equipment: state.equipment
+        ? { ...state.equipment, items: (state.equipment.items || []).map(normalizeWeapon) }
+        : state.equipment,
+      equippedWeapons: Array.isArray(state.equippedWeapons)
+        ? state.equippedWeapons.map(normalizeWeapon)
+        : state.equippedWeapons,
+    };
+  },
+
+  // v3 -> v4: damageType из строки в массив (поддержка комбинированного урона).
+  // Миграция преобразует все damageType (строка) в массивы в предметах.
+  // Также пересчитывает моды для оружия, чтобы применить новые damageTypeOverride.
+  // Идемпотентна: если уже массив — не трогает.
+  (state) => {
+    const migrateDamageType = (item) => {
+      if (!item || typeof item !== 'object') return item;
+
+      // Мигрируем damageType и damage_type
+      const migrateField = (value) => {
+        if (!value) return value;
+
+        // Если уже массив — не трогаем
+        if (Array.isArray(value)) return value;
+
+        // Если JSON-строка массива — парсим
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Это обычная строка, оборачиваем в массив
+            return [value];
+          }
+        }
+
+        // Обёртываем строку в массив
+        return [value];
+      };
+
+      const out = { ...item };
+
+      if (out.damageType !== undefined) {
+        out.damageType = migrateField(out.damageType);
+      }
+      if (out.damage_type !== undefined) {
+        out.damage_type = migrateField(out.damage_type);
+      }
+
+      return out;
+    };
+
+    // Пересчитываем моды для оружия (применяем новые damageTypeOverride из каталога)
+    const recalculateWeaponMods = (item) => {
+      if (!item || item.itemType !== 'weapon' || !item.appliedMods) return item;
+
+      try {
+        let updatedItem = { ...item };
+        const appliedMods = item.appliedMods || {};
+
+        Object.entries(appliedMods).forEach(([slot, modId]) => {
+          const mod = catalogGetWeaponModById(modId);
+          if (!mod || !mod.damageTypeOverride) return;
+
+          const { op, value } = mod.damageTypeOverride;
+
+          // Получаем текущий damageType
+          let currentType = updatedItem.damageType;
+          if (typeof currentType === 'string') {
+            try {
+              currentType = JSON.parse(currentType);
+            } catch {
+              currentType = [currentType];
+            }
+          }
+          if (!Array.isArray(currentType)) {
+            currentType = currentType ? [currentType] : ['physical'];
+          }
+
+          if (op === 'set') {
+            updatedItem.damageType = Array.isArray(value) ? value : [value];
+          } else if (op === 'add') {
+            const typesToAdd = Array.isArray(value) ? value : [value];
+            for (const t of typesToAdd) {
+              if (!currentType.includes(t)) {
+                currentType.push(t);
+              }
+            }
+            updatedItem.damageType = currentType;
+          }
+        });
+
+        return updatedItem;
+      } catch (error) {
+        // Если пересчёт модов не удался (например, каталог не загружен),
+        // возвращаем предмет с мигрированным damageType, но без пересчёта модов.
+        // Моды пересчитаются при следующем открытии модалки модов.
+        console.warn('Migration v4: failed to recalculate weapon mods', error);
+        return item;
+      }
+    };
+
+    return {
+      ...state,
+      items: state.items
+        ? Object.fromEntries(
+            Object.entries(state.items).map(([id, item]) => {
+              const migrated = migrateDamageType(item);
+              return [id, recalculateWeaponMods(migrated)];
+            })
+          )
+        : state.items,
+      equipment: state.equipment
+        ? { ...state.equipment, items: (state.equipment.items || []).map(item => recalculateWeaponMods(migrateDamageType(item))) }
+        : state.equipment,
+      equippedWeapons: Array.isArray(state.equippedWeapons)
+        ? state.equippedWeapons.map(item => recalculateWeaponMods(migrateDamageType(item)))
+        : state.equippedWeapons,
+    };
+  },
+
 ];

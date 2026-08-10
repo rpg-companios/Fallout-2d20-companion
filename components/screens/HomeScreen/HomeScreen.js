@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   Platform,
   Modal,
   Linking,
+  TextInput,
+  PanResponder,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,13 +24,15 @@ import * as db from '../../../db';
 import {
   createCharacterExportPayload,
   parseCharacterImportPayload,
-  downloadCharacterPayloadWeb,
-  pickCharacterFileWeb,
+  downloadCharacterPayload,
+  pickCharacterFile,
   IMPORT_ERRORS,
 } from './logic/characterTransfer';
 import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import styles from '../../../styles/HomeScreen.styles';
+import SettingsModal from '../../settings/SettingsModal';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -38,55 +42,35 @@ const getOriginImage = (originName) => {
 
 const NUM_COLS = 3;
 
-const ActionCell = ({ icon, label, onPress }) => (
-  <TouchableOpacity style={styles.createCell} onPress={onPress} activeOpacity={0.7}>
-    <Text style={styles.createPlus}>{icon}</Text>
+const ActionCell = ({ icon, label, onPress, disabled = false }) => (
+  <TouchableOpacity style={[styles.createCell, disabled && styles.disabledCell]} onPress={onPress} disabled={disabled} activeOpacity={0.7}>
+    {typeof icon === 'string' ? <Text style={styles.createPlus}>{icon}</Text> : icon}
     <Text style={styles.createLabel}>{label}</Text>
   </TouchableOpacity>
 );
 
-const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
+const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd }) => {
   const originImage = getOriginImage(character.originName);
+  // PanResponder keeps ownership of the pointer after it leaves the small handle,
+  // which Touchable's touch callbacks do not guarantee on web and native.
+  const callbacks = useRef({});
+  callbacks.current = { character, onDragStart, onDragMove, onDragEnd };
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (_event, gesture) => callbacks.current.onDragStart({ pageX: gesture.x0, pageY: gesture.y0 }, callbacks.current.character),
+    onPanResponderMove: (_event, gesture) => callbacks.current.onDragMove({ pageX: gesture.moveX, pageY: gesture.moveY }),
+    onPanResponderRelease: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+    onPanResponderTerminate: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+  })).current;
   return (
-    <TouchableOpacity
-      style={styles.characterCell}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.characterImageContainer}>
-        {originImage ? (
-          <Image source={originImage} style={styles.characterImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.characterImagePlaceholder}>
-            <Text style={styles.characterImagePlaceholderText}>?</Text>
-          </View>
-        )}
-      </View>
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={(event) => {
-          event?.stopPropagation?.();
-          onDelete();
-        }}
-        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-      >
-        <Text style={styles.deleteIcon}>🗑</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.downloadButton}
-        onPress={(event) => {
-          event?.stopPropagation?.();
-          onDownload();
-        }}
-        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-      >
-        <MaterialCommunityIcons name="download" size={16} color="#8a8a8a" />
-      </TouchableOpacity>
+    <TouchableOpacity style={styles.characterCell} onPress={onPress} activeOpacity={0.8}>
+      <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
+      <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
+      <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><Text style={styles.deleteIcon}>🗑</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.downloadButton} onPress={(event) => { event?.stopPropagation?.(); onDownload(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><MaterialCommunityIcons name="download" size={16} color="#8a8a8a" /></TouchableOpacity>
       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
-      {character.level ? (
-        <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text>
-      ) : null}
+      {character.level ? <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text> : null}
     </TouchableOpacity>
   );
 };
@@ -97,16 +81,35 @@ export default function HomeScreen({ navigation }) {
   const locale = useLocale();
   const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
   const [characters, setCharacters] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [folderCounts, setFolderCounts] = useState({});
+  const [folderDraftVisible, setFolderDraftVisible] = useState(false);
+  const [folderName, setFolderName] = useState('');
+  const [activeFolder, setActiveFolder] = useState(null);
+  const [movingCharacterId, setMovingCharacterId] = useState(null);
+  const [drag, setDrag] = useState(null);
+  const folderRefs = useRef({});
+  const rootDropRef = useRef(null);
+  const dropBounds = useRef({});
+  const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
   const [communityVisible, setCommunityVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [iosInstallVisible, setIosInstallVisible] = useState(false);
   const [androidInstallVisible, setAndroidInstallVisible] = useState(false);
   const [desktopInstallVisible, setDesktopInstallVisible] = useState(false);
+
+  useEffect(() => {
+    if (!characterFoldersEnabled && folderDraftVisible) {
+      setFolderDraftVisible(false);
+      setFolderName('');
+    }
+  }, [characterFoldersEnabled, folderDraftVisible]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -174,21 +177,124 @@ export default function HomeScreen({ navigation }) {
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
-      const list = await getCharactersList();
-      list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setCharacters(list);
+      const savedFolders = await db.getCharacterFolders();
+      const folderLists = await Promise.all(savedFolders.map((folder) => db.getCharactersInFolder(folder.id)));
+      const counts = Object.fromEntries(savedFolders.map((folder, index) => [folder.id, folderLists[index].length]));
+      const visible = activeFolder ? folderLists[savedFolders.findIndex((folder) => folder.id === activeFolder.id)] || [] : await db.getRootCharactersList();
+      visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setCharacters(visible);
+      setFolders(savedFolders);
+      setFolderCounts(counts);
     } catch (e) {
       setCharacters([]);
     } finally {
       setLoading(false);
     }
-  }, [getCharactersList]);
+  }, [getCharactersList, activeFolder]);
 
   useFocusEffect(
     useCallback(() => {
       loadList();
     }, [loadList])
   );
+
+  const handleCreateFolder = async () => {
+    if (!folderName.trim()) return;
+    await db.createCharacterFolder(folderName);
+    setFolderName('');
+    setFolderDraftVisible(false);
+    loadList();
+  };
+
+  const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
+    if (!characterId) return;
+    try {
+      await db.moveCharacterToFolder(characterId, folderId);
+      setMovingCharacterId(null);
+      setDrag(null);
+      dropBounds.current = {};
+      await loadList();
+    } catch (error) {
+      // Keep the drag state visible if persistence fails so the user can retry
+      // instead of losing the intended move silently.
+    }
+  };
+
+  const measureDropTargets = useCallback(() => {
+    const measurements = Object.entries(folderRefs.current)
+      .map(([id, ref]) => new Promise((resolve) => {
+        if (!ref?.measureInWindow) {
+          resolve();
+          return;
+        }
+        ref.measureInWindow((x, y, width, height) => {
+          dropBounds.current[id] = { x, y, width, height };
+          resolve();
+        });
+      }));
+
+    measurements.push(new Promise((resolve) => {
+      if (!rootDropRef.current?.measureInWindow) {
+        resolve();
+        return;
+      }
+      rootDropRef.current.measureInWindow((x, y, width, height) => {
+        dropBounds.current.root = { x, y, width, height };
+        resolve();
+      });
+    }));
+
+    return Promise.all(measurements);
+  }, []);
+
+  // The root drop zone is conditionally rendered after movingCharacterId is
+  // set. Measuring it inside handleDragStart happens before that render, so
+  // rootDropRef is null. Measure again after the zone has mounted.
+  useEffect(() => {
+    if (!movingCharacterId) {
+      delete dropBounds.current.root;
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      measureDropTargets();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [movingCharacterId, activeFolder, measureDropTargets]);
+
+  const handleDragStart = async (event, character) => {
+    dropBounds.current = {};
+    setMovingCharacterId(character.id);
+    setDrag({ character, x: event.pageX, y: event.pageY });
+    await measureDropTargets();
+  };
+  const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
+  const handleDragEnd = async (event) => {
+    // A final measurement covers the case where the pointer is released
+    // immediately after the conditionally rendered root zone appears.
+    await measureDropTargets();
+    const target = Object.entries(dropBounds.current).find(([id, b]) => id !== 'root' && b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height);
+    if (target) await handleMoveToFolder(target[0]);
+    else {
+      const root = dropBounds.current.root;
+      if (root && event.pageX >= root.x && event.pageX <= root.x + root.width && event.pageY >= root.y && event.pageY <= root.y + root.height) await handleMoveToFolder(null);
+      else { setMovingCharacterId(null); setDrag(null); }
+    }
+  };
+
+  const handleDeleteFolder = (folder) => {
+    const remove = async () => {
+      await db.deleteCharacterFolderAndCharacters(folder.id);
+      if (activeFolder?.id === folder.id) setActiveFolder(null);
+      loadList();
+    };
+    const message = `${tHomeScreen('folders.deleteMessage')} ${tHomeScreen('folders.characters')}: ${folderCounts[folder.id] || 0}.`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm(message)) remove();
+      return;
+    }
+    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [{ text: tHomeScreen('folders.cancel'), style: 'cancel' }, { text: tHomeScreen('folders.deleteConfirm'), style: 'destructive', onPress: remove }]);
+  };
 
   const handleCreate = () => {
     resetCharacter();
@@ -235,7 +341,7 @@ export default function HomeScreen({ navigation }) {
 
 
   const handleDownload = async (character) => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    if (false) { // cross-platform
       Alert.alert(
         tHomeScreen('title'),
         tHomeScreen('download.unsupported')
@@ -243,18 +349,33 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const row = await db.loadCharacterById(character.id);
-    if (!row) {
-      Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
-      return;
-    }
+    try {
+      const row = await db.loadCharacterById(character.id);
+      if (!row) {
+        Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
+        return;
+      }
 
-    const payload = createCharacterExportPayload(row);
-    downloadCharacterPayloadWeb(payload, row.name);
+      const payload = createCharacterExportPayload(row);
+      const result = await downloadCharacterPayload(payload, row.name);
+      
+      if (!result.success && !result.aborted) {
+        Alert.alert(
+          tHomeScreen('title'),
+          tHomeScreen('download.errors.failed') || 'Не удалось скачать персонажа. Попробуйте ещё раз или смените браузер.'
+        );
+      }
+    } catch (error) {
+      console.error('Ошибка скачивания файла:', error);
+      Alert.alert(
+        tHomeScreen('title'),
+        'Не удалось скачать персонажа. Проверьте консоль для подробностей.'
+      );
+    }
   };
 
   const handleUpload = async () => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    if (false) { // cross-platform
       Alert.alert(
         tHomeScreen('title'),
         tHomeScreen('upload.unsupported')
@@ -262,61 +383,70 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
-    const rawText = await pickCharacterFileWeb();
-    if (!rawText) return;
+    try {
+      // Вызов pickCharacterFile должен быть первым в обработчике для user activation
+      const rawText = await pickCharacterFile();
+      if (!rawText) return;
 
-    const parsed = parseCharacterImportPayload(rawText);
-    if (parsed.error) {
+      const parsed = parseCharacterImportPayload(rawText);
+      if (parsed.error) {
+        Alert.alert(
+          tHomeScreen('title'),
+          tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
+        );
+        return;
+      }
+
+      const importedCharacter = parsed.character;
+      const existing = characters.find((item) => item.name === importedCharacter.name);
+
+      const persistImport = async () => {
+        const id = existing?.id || importedCharacter.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+        await db.saveCharacter(
+          id,
+          importedCharacter.name,
+          importedCharacter.level ?? 1,
+          importedCharacter.originName ?? null,
+          importedCharacter.data
+        );
+        await loadList();
+      };
+
+      if (!existing) {
+        await persistImport();
+        return;
+      }
+
+      const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const confirmed = window.confirm(overwriteMessage);
+        if (confirmed) {
+          await persistImport();
+        }
+        return;
+      }
+
       Alert.alert(
         tHomeScreen('title'),
-        tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
+        overwriteMessage,
+        [
+          { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
+          {
+            text: tHomeScreen('buttons.yes') || 'Да',
+            style: 'destructive',
+            onPress: persistImport,
+          },
+        ],
+        { cancelable: true }
       );
-      return;
-    }
-
-    const importedCharacter = parsed.character;
-    const existing = characters.find((item) => item.name === importedCharacter.name);
-
-    const persistImport = async () => {
-      const id = existing?.id || importedCharacter.id || `char_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-      await db.saveCharacter(
-        id,
-        importedCharacter.name,
-        importedCharacter.level ?? 1,
-        importedCharacter.originName ?? null,
-        importedCharacter.data
+    } catch (error) {
+      console.error('Ошибка загрузки файла:', error);
+      Alert.alert(
+        tHomeScreen('title'),
+        'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
       );
-      await loadList();
-    };
-
-    if (!existing) {
-      await persistImport();
-      return;
     }
-
-    const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const confirmed = window.confirm(overwriteMessage);
-      if (confirmed) {
-        await persistImport();
-      }
-      return;
-    }
-
-    Alert.alert(
-      tHomeScreen('title'),
-      overwriteMessage,
-      [
-        { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
-        {
-          text: tHomeScreen('buttons.yes') || 'Да',
-          style: 'destructive',
-          onPress: persistImport,
-        },
-      ],
-      { cancelable: true }
-    );
   };
 
   const handleCloudSync = async () => {
@@ -367,8 +497,17 @@ export default function HomeScreen({ navigation }) {
   };
 
   const allItems = [
-    { type: 'create' },
-    { type: 'upload' },
+    ...(activeFolder
+      ? []
+      : [
+          { type: 'create' },
+          { type: 'upload' },
+          ...(characterFoldersEnabled ? [{ type: 'createFolder' }] : []),
+        ]),
+    ...(activeFolder
+      ? []
+      : (folderDraftVisible && characterFoldersEnabled ? [{ type: 'folderDraft' }] : [])),
+    ...(activeFolder ? [] : folders.map((folder) => ({ type: 'folder', ...folder }))),
     ...characters.map(c => ({ type: 'character', ...c })),
   ];
 
@@ -419,6 +558,8 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
+      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
+      {movingCharacterId && !activeFolder && <Text style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -449,6 +590,15 @@ export default function HomeScreen({ navigation }) {
                     />
                   );
                 }
+                if (item.type === 'createFolder') {
+                  return <ActionCell key="create-folder" icon={<MaterialCommunityIcons name="folder-plus-outline" size={38} color={characterFoldersEnabled ? '#5a5a5a' : '#aaa'} />} label={tHomeScreen('folders.create')} disabled={!characterFoldersEnabled} onPress={() => setFolderDraftVisible(true)} />;
+                }
+                if (item.type === 'folderDraft') {
+                  return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
+                }
+                if (item.type === 'folder') {
+                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
                 }
@@ -459,6 +609,10 @@ export default function HomeScreen({ navigation }) {
                     onPress={() => handleOpen(item.id)}
                     onDelete={() => handleDelete(item)}
                     onDownload={() => handleDownload(item)}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    moving={movingCharacterId === item.id}
                   />
                 );
               })}
@@ -466,6 +620,7 @@ export default function HomeScreen({ navigation }) {
           ))
         )}
       </ScrollView>
+      {drag && <View pointerEvents="none" style={[styles.dragPreview, { left: drag.x - 54, top: drag.y - 28 }]}><Text style={styles.dragPreviewText}>{drag.character.name}</Text></View>}
 
       {showInstallButton && (
         <TouchableOpacity style={styles.installButton} onPress={handleInstallPress}>
@@ -477,6 +632,10 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Pressable style={styles.menuPanel} onPress={() => {}}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
+              <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
+              <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={handleCloudSync}>
               <FontAwesome5 name="google-drive" size={18} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.sync')}</Text>
@@ -491,10 +650,7 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => {
               setMenuVisible(false);
-              Alert.alert(
-                tHomeScreen('menu.buyCoffee'),
-                tHomeScreen('menu.buyCoffeeDescription')
-              );
+              openExternalLink('https://boosty.to/fallout2d20ru');
             }}>
               <MaterialCommunityIcons name="coffee-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee')}</Text>
@@ -514,6 +670,8 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
 
       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalBackdropCenter}>

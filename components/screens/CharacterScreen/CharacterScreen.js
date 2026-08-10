@@ -56,6 +56,7 @@ import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
 import { getTimedAttributeModifiers } from "../../../domain/effects";
 import { createEmptyEquippedArmor } from "../../../domain/equippedArmor";
+import { resolveSkillRewards } from "../../../domain/skillRewards";
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../src/debug/falloutDebug";
 import { getEquipmentCatalog } from "../../../i18n/equipmentCatalog";
 
@@ -979,7 +980,7 @@ export default function CharacterScreen() {
     setSkillsSaved(false);
   };
 
-  const handleSaveSkills = () => {
+  const handleSaveSkills = async () => {
     if (!origin) {
       showError(tCharacterScreen("errors.originRequired"));
       return;
@@ -1029,6 +1030,28 @@ export default function CharacterScreen() {
     }
 
     setSkillsSaved(true);
+
+    // Награды за выбранные навыки — молча добавляем в инвентарь.
+    try {
+      const allSkillKeys = [...selectedSkills, ...extraTaggedSkills];
+      if (allSkillKeys.length > 0) {
+        // AmmoId берём прямо из стора — комплект уже резолвился при выборе,
+        // патроны лежат среди items. Никаких index.json и сканирования файлов.
+        const storeItems = Object.values(useCharacterStore.getState().items);
+        const ammoItem = storeItems.find(i => i.itemType === 'ammo');
+        const { addNewItem, rewardedSkills, markSkillsAsRewarded } = useCharacterStore.getState();
+        const unrewardedSkills = allSkillKeys.filter((skill) => !(rewardedSkills || []).includes(skill));
+        if (unrewardedSkills.length > 0) {
+          const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
+          rewardItems.forEach(item => addNewItem(item));
+          // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
+          if (rewardCaps) setCaps(prev => prev + rewardCaps);
+          markSkillsAsRewarded(unrewardedSkills);
+        }
+      }
+    } catch (e) {
+      console.warn('skillRewards:', e?.message);
+    }
   };
 
   const handleResetAttributes = () => {
@@ -1109,7 +1132,16 @@ export default function CharacterScreen() {
                       : styles.saveNameButtonDisabled,
                   ]}
                   onPress={() => {
-                    saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
+                    try {
+                      // Вызов saveCharacter должен быть первым в обработчике для user activation
+                      saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
+                    } catch (error) {
+                      console.error('Ошибка сохранения:', error);
+                      Alert.alert(
+                        tCharacterScreen('title') || 'Ошибка',
+                        'Не удалось сохранить персонажа. Проверьте консоль для подробностей.'
+                      );
+                    }
                   }}
                   disabled={false}
                 >

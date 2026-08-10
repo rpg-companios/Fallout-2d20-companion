@@ -1,0 +1,183 @@
+From efa2e75c118f4971f4c483d6a4797ceabce5d341 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Sat, 8 Aug 2026 07:29:03 +0000
+Subject: [PATCH] Polish folder drag interaction
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ components/screens/HomeScreen/HomeScreen.js | 34 ++++++++++++++++-----
+ components/settings/SettingsModal.js        |  2 +-
+ i18n/en-EN/screens/home/screen.json         |  2 +-
+ i18n/ru-RU/screens/home/screen.json         |  2 +-
+ styles/HomeScreen.styles.js                 |  6 ++--
+ 5 files changed, 33 insertions(+), 13 deletions(-)
+
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 4f05b9c..d02adb7 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -1,4 +1,4 @@
+-import React, { useState, useCallback, useEffect } from 'react';
++import React, { useState, useCallback, useEffect, useRef } from 'react';
+ import {
+   View,
+   Text,
+@@ -48,7 +48,7 @@ const ActionCell = ({ icon, label, onPress, disabled = false }) => (
+   </TouchableOpacity>
+ );
+ 
+-const CharacterCell = ({ character, onPress, onDelete, onDownload, onMoveStart, moving }) => {
++const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd, moving }) => {
+   const originImage = getOriginImage(character.originName);
+   return (
+     <TouchableOpacity
+@@ -56,7 +56,7 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload, onMoveStart,
+       onPress={onPress}
+       activeOpacity={0.8}
+     >
+-      <TouchableOpacity style={styles.dragHandle} onLongPress={onMoveStart} delayLongPress={250} onPress={(event) => event?.stopPropagation?.()}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></TouchableOpacity>
++      <TouchableOpacity style={styles.dragHandle} onPressIn={(event) => onDragStart(event.nativeEvent, character)} onTouchMove={(event) => onDragMove(event.nativeEvent)} onPressOut={(event) => onDragEnd(event.nativeEvent)}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></TouchableOpacity>
+       {moving && <View style={styles.draggingOverlay}><Text style={styles.draggingText}>↕</Text></View>}
+       <View style={styles.characterImageContainer}>
+         {originImage ? (
+@@ -108,6 +108,8 @@ export default function HomeScreen({ navigation }) {
+   const [folderName, setFolderName] = useState('');
+   const [activeFolder, setActiveFolder] = useState(null);
+   const [movingCharacterId, setMovingCharacterId] = useState(null);
++  const [drag, setDrag] = useState(null);
++  const folderRefs = useRef({});
+   const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
+   const [loading, setLoading] = useState(true);
+   const [menuVisible, setMenuVisible] = useState(false);
+@@ -216,13 +218,26 @@ export default function HomeScreen({ navigation }) {
+     loadList();
+   };
+ 
+-  const handleMoveToFolder = async (folderId) => {
+-    if (!movingCharacterId) return;
+-    await db.moveCharacterToFolder(movingCharacterId, folderId);
++  const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
++    if (!characterId) return;
++    await db.moveCharacterToFolder(characterId, folderId);
+     setMovingCharacterId(null);
++    setDrag(null);
+     loadList();
+   };
+ 
++  const handleDragStart = (event, character) => {
++    setMovingCharacterId(character.id);
++    setDrag({ character, x: event.pageX, y: event.pageY });
++    Object.values(folderRefs.current).forEach((ref) => ref?.measureInWindow?.((x, y, width, height) => { ref.__dropBounds = { x, y, width, height }; }));
++  };
++  const handleDragMove = (event) => setDrag((current) => current && { ...current, x: event.pageX, y: event.pageY });
++  const handleDragEnd = async (event) => {
++    const target = Object.entries(folderRefs.current).find(([, ref]) => { const b = ref?.__dropBounds; return b && event.pageX >= b.x && event.pageX <= b.x + b.width && event.pageY >= b.y && event.pageY <= b.y + b.height; });
++    if (target) await handleMoveToFolder(target[0]);
++    else { setMovingCharacterId(null); setDrag(null); }
++  };
++
+   const handleDeleteFolder = (folder) => {
+     const remove = async () => {
+       await db.deleteCharacterFolderAndCharacters(folder.id);
+@@ -506,7 +521,7 @@ export default function HomeScreen({ navigation }) {
+                   return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
+                 }
+                 if (item.type === 'folder') {
+-                  return <TouchableOpacity key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => movingCharacterId ? handleMoveToFolder(item.id) : setActiveFolder(item)}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
++                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => movingCharacterId ? handleMoveToFolder(item.id) : setActiveFolder(item)}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                 }
+                 if (item.type === 'empty') {
+                   return <EmptyCell key={item.id} id={item.id} />;
+@@ -518,7 +533,9 @@ export default function HomeScreen({ navigation }) {
+                     onPress={() => handleOpen(item.id)}
+                     onDelete={() => handleDelete(item)}
+                     onDownload={() => handleDownload(item)}
+-                    onMoveStart={() => setMovingCharacterId(item.id)}
++                    onDragStart={handleDragStart}
++                    onDragMove={handleDragMove}
++                    onDragEnd={handleDragEnd}
+                     moving={movingCharacterId === item.id}
+                   />
+                 );
+@@ -527,6 +544,7 @@ export default function HomeScreen({ navigation }) {
+           ))
+         )}
+       </ScrollView>
++      {drag && <View pointerEvents="none" style={[styles.dragPreview, { left: drag.x - 54, top: drag.y - 28 }]}><Text style={styles.dragPreviewText}>{drag.character.name}</Text></View>}
+ 
+       {showInstallButton && (
+         <TouchableOpacity style={styles.installButton} onPress={handleInstallPress}>
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+index 4ea4366..225f0e9 100644
+--- a/components/settings/SettingsModal.js
++++ b/components/settings/SettingsModal.js
+@@ -14,8 +14,8 @@ export default function SettingsModal({ visible, onClose }) {
+     <View style={styles.backdrop}><View style={styles.modal}>
+       <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
+       <View style={styles.row}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text></View><Switch value={enabled} onValueChange={setEnabled} /></View>
+-      <View style={[styles.row, styles.loss]}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text></View><Switch value={foldersEnabled} onValueChange={setFoldersEnabled} /></View>
+       {enabled && <View style={styles.loss}><Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text><View style={styles.counter}><TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}><Text style={styles.button}>−</Text></TouchableOpacity><Text style={styles.value}>{loss}</Text><TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}><Text style={styles.button}>+</Text></TouchableOpacity></View><Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text></View>}
++      <View style={[styles.row, styles.loss]}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text></View><Switch value={foldersEnabled} onValueChange={setFoldersEnabled} /></View>
+       <TouchableOpacity onPress={onClose} style={styles.close}><Text>OK</Text></TouchableOpacity>
+     </View></View>
+   </Modal>;
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 91e9213..71e54bc 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -79,7 +79,7 @@
+     "confirm": "Create",
+     "cancel": "Cancel",
+     "characters": "Characters",
+-    "back": "Move to character list",
++    "back": "Back",
+     "deleteTitle": "Delete folder?",
+     "deleteMessage": "The folder and all characters inside it will be permanently deleted.",
+     "deleteConfirm": "Delete folder and characters",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 2e8d232..9bb3b8a 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -79,7 +79,7 @@
+     "confirm": "Создать",
+     "cancel": "Отмена",
+     "characters": "Персонажей",
+-    "back": "Вернуть в список персонажей",
++    "back": "Назад",
+     "deleteTitle": "Удалить каталог?",
+     "deleteMessage": "Каталог и все персонажи внутри него будут безвозвратно удалены.",
+     "deleteConfirm": "Удалить каталог и персонажей",
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 53962d6..317b375 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
+     borderTopRightRadius: 8,
+     borderBottomRightRadius: 8,
+   },
+-  langSegmentActive: { backgroundColor: '#f0e68c' },
++  langSegmentActive: { backgroundColor: 'white' },
+   langSegmentTextActive: { color: '#111827', fontWeight: '700' },
+   scrollView: { flex: 1 },
+   scrollContent: { padding: 12, paddingBottom: 24 },
+@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
+   characterLevel: { fontSize: 10, color: '#555', textAlign: 'center', paddingBottom: 4 },
+   emptyCell: { flex: 1, margin: 5, aspectRatio: 0.75 },
+   disabledCell: { opacity: 0.45 },
+-  dragHandle: { position: 'absolute', top: 5, left: 5, zIndex: 20, width: 28, height: 28, borderRadius: 14, backgroundColor: '#f0e68c', alignItems: 'center', justifyContent: 'center' },
++  dragHandle: { position: 'absolute', top: 5, left: 5, zIndex: 20, width: 28, height: 28, borderRadius: 14, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center' },
+   draggingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(212,175,55,0.35)', zIndex: 15, alignItems: 'center', justifyContent: 'center' },
+   draggingText: { fontSize: 36, color: '#111827' },
+   folderCell: { flex: 1, margin: 5, aspectRatio: 0.75, borderWidth: 1, borderColor: '#d4af37', borderRadius: 8, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center', padding: 8 },
+@@ -174,6 +174,8 @@ const styles = StyleSheet.create({
+   rootDropZone: { marginTop: 10, padding: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#d4af37', borderRadius: 6 },
+   rootDropText: { color: '#f0e68c', textAlign: 'center' },
+   moveHint: { color: '#f0e68c', textAlign: 'center', marginHorizontal: 16, marginBottom: 8 },
++  dragPreview: { position: 'absolute', zIndex: 100, width: 108, padding: 8, borderRadius: 8, backgroundColor: '#111827', borderWidth: 2, borderColor: '#d4af37', opacity: 0.92 },
++  dragPreviewText: { color: '#f0e68c', textAlign: 'center', fontWeight: '700' },
+   modalBackdrop: {
+     flex: 1,
+     backgroundColor: 'rgba(0,0,0,0.45)',
+-- 
+2.39.5
+

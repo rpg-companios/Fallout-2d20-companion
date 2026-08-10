@@ -1,0 +1,104 @@
+{
+  "ATHLETICS": {
+    "items": [
+      { "itemId": "clothing_casual_clothes", "itemType": "clothing" },
+      { "itemId": "chem_buffout", "itemType": "chems", "quantity": 1 }
+    ]
+  },
+  "SMALL_GUNS": {
+    "items": [
+      { "rollType": "rollCD", "base": 6, "rollValue": 3, "itemType": "ammo_from_kit" }
+    ]
+  },
+  "BIG_GUNS": {
+    "items": [
+      { "rollType": "rollCD", "base": 4, "rollValue": 2, "itemId": "ammo_flamer_fuel", "itemType": "ammo" }
+    ]
+  },
+  "ENERGY_WEAPONS": {
+    "items": [
+      { "rollType": "rollCD", "base": 6, "rollValue": 3, "itemId": "ammo_energy_cell", "itemType": "ammo" }
+    ]
+  },
+  "MELEE_WEAPONS": {
+    "items": [
+      { "pickOne": [
+          { "itemId": "weapon_machete", "itemType": "weapon" },
+          { "itemId": "weapon_baseball_bat", "itemType": "weapon" }
+        ]
+      }
+    ]
+  },
+  "UNARMED": {
+    "items": [
+      { "itemId": "weapon_knuckles", "itemType": "weapon" }
+    ]
+  },
+  "THROWING": {
+    "items": [
+      { "pickOne": [
+          { "itemId": "weapon_throwing_knife", "itemType": "weapon", "rollType": "rollCD", "base": 4, "rollValue": 2 },
+          { "itemId": "weapon_tomahawk", "itemType": "weapon", "rollType": "rollCD", "base": 2, "rollValue": 1 }
+        ]
+      }
+    ]
+  },
+  "MEDICINE": {
+    "items": [
+      { "itemId": "item_doctors_bag", "itemType": "misc", "quantity": 1 },
+      { "itemId": "chem_stimpak", "itemType": "chems", "quantity": 1 }
+    ]
+  },
+  "SNEAK": {
+    "items": [
+      { "itemId": "chem_calmex", "itemType": "chems", "quantity": 1 }
+    ]
+  },
+  "LOCKPICK": {
+    "items": [
+      { "rollType": "rollCD", "base": 4, "rollValue": 2, "itemId": "item_bobby_pin", "itemType": "misc" }
+    ]
+  },
+  "PILOT": {
+    "items": [
+      { "rollType": "rollD20", "tableId": "trinklet", "quantity": 5, "countItems": true }
+    ]
+  },
+  "BARTER": {
+    "items": [
+      { "itemType": "currency", "rollType": "rollD20", "rollCount": 2 }
+    ]
+  },
+  "EXPLOSIVES": {
+    "items": [
+      { "pickOne": [
+          { "itemId": "weapon_molotov", "itemType": "weapon", "quantity": 2 },
+          { "itemId": "weapon_baseball_grenade", "itemType": "weapon", "quantity": 2 }
+        ]
+      }
+    ]
+  },
+  "SURVIVAL": {
+    "items": [
+      { "itemId": "drink_purified_water", "itemType": "drinks", "quantity": 2 },
+      { "itemId": "food_iguana_on_a_stick", "itemType": "food", "quantity": 2 }
+    ]
+  },
+  "REPAIR": {
+    "items": [
+      { "itemId": "item_multi_tool", "itemType": "misc", "quantity": 1 }
+    ]
+  },
+  "SCIENCE": {
+    "items": [
+      { "itemId": "clothing_lab_coat", "itemType": "clothing" },
+      { "itemId": "chem_mentats", "itemType": "chems", "quantity": 1 }
+    ]
+  },
+  "SPEECH": {
+    "items": [
+      { "itemId": "headwear_casual_hat", "itemType": "clothing" },
+      { "itemId": "clothing_casual_clothes", "itemType": "clothing" }
+    ]
+  }
+}
