@@ -248,5 +248,60 @@
       "carryWeightStrengthMultiplier": 0,
       "effects": ["no_consumables_food_rest", "repair_to_heal", "no_hunger_thirst_fatigue"]
     }
+  },
+  {
+    "id": "tribal-tribal",
+    "originId": "tribal",
+    "displayNameKey": "traits.tribal.tribal.name",
+    "descriptionKey": "traits.tribal.tribal.description",
+    "modifiers": {
+      "isMultiTrait": true,
+      "subTraitIds": [
+        "tribal-mother-wasteland",
+        "tribal-nomad",
+        "tribal-rite-of-passage",
+        "tribal-old-world-tools",
+        "tribal-chosen-one"
+      ]
+    }
+  },
+  {
+    "id": "tribal-mother-wasteland",
+    "originId": "tribal",
+    "displayNameKey": "traits.tribal.motherWasteland.name",
+    "descriptionKey": "traits.tribal.motherWasteland.description",
+    "modifiers": {}
+  },
+  {
+    "id": "tribal-nomad",
+    "originId": "tribal",
+    "displayNameKey": "traits.tribal.nomad.name",
+    "descriptionKey": "traits.tribal.nomad.description",
+    "modifiers": {
+      "bannedTagSkills": ["SCIENCE"]
+    }
+  },
+  {
+    "id": "tribal-rite-of-passage",
+    "originId": "tribal",
+    "displayNameKey": "traits.tribal.riteOfPassage.name",
+    "descriptionKey": "traits.tribal.riteOfPassage.description",
+    "modifiers": {
+      "effects": ["rite_of_passage"]
+    }
+  },
+  {
+    "id": "tribal-old-world-tools",
+    "originId": "tribal",
+    "displayNameKey": "traits.tribal.oldWorldTools.name",
+    "descriptionKey": "traits.tribal.oldWorldTools.description",
+    "modifiers": {}
+  },
+  {
+    "id": "tribal-chosen-one",
+    "originId": "tribal",
+    "displayNameKey": "traits.tribal.chosenOne.name",
+    "descriptionKey": "traits.tribal.chosenOne.description",
+    "modifiers": {}
   }
 ]

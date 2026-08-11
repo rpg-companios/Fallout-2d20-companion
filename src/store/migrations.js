@@ -5,6 +5,7 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
 import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 
+
 /**
  * Преобразует атрибуты из старого формата [{name, value}] в словарь
  */
@@ -591,4 +592,82 @@ const MIGRATIONS = [
     };
   },
 
+  // v4 -> v5: старый сейв, где комплект потерял id/name ({items} без метаданных).
+  // Комплект по сути нужен только для выдачи снаряжения; если предметы на месте,
+  // а какой именно был комплект — неизвестно, проставляем заглушку: id: null,
+  // name: «Комплект снаряжения». UI при нажатии на заглушку покажет список
+  // комплектов, а выбор конкретного предложит сброс (т.к. персонаж locked).
+  (state) => {
+    const next = { ...state };
+    const equipment = next.equipment;
+    if (!equipment || typeof equipment !== 'object') return next;
+    // Уже есть id — не трогаем.
+    if (equipment.id) return next;
+    // Есть предметы (снаряжение получено), но id нет — ставим заглушку.
+    const savedItems = Array.isArray(equipment.items) ? equipment.items : [];
+    if (savedItems.length === 0) return next;
+    next.equipment = {
+      ...equipment,
+      id: null,
+      name: null, // name подставит UI (i18n-ключ заглушки)
+    };
+    return next;
+  },
+
+  // v5 -> v6: ориджин «savage» переименован в «tribal» (каноническое англ.
+  // название — Tribal; savage был заглушкой). Старые сейвы с origin.id
+  // 'savage' переводятся на 'tribal', иначе персонаж потеряет ориджин.
+  (state) => {
+    const next = { ...state };
+    const origin = next.origin;
+    if (!origin) return next;
+    const originId = typeof origin === 'string' ? origin : origin?.id;
+    if (originId === 'savage') {
+      next.origin = typeof origin === 'string'
+        ? 'tribal'
+        : { ...origin, id: 'tribal' };
+    }
+    return next;
+  },
+
 ];
+/**
+ * Мерж комплекта снаряжения при сохранении снапшота.
+ *
+ * Проблема: denormalizeForSave отдаёт equipment как { items: [...] } — БЕЗ
+ * метаданных (id/name/weight/price). preferFilled отдавал предпочтение стору,
+ * и метаданные выбранного комплекта терялись → после перезагрузки комплект
+ * не отображался, а клик по нему «предлагал сбросить».
+ *
+ * Правило: метаданные — из снапшота (контекст хранит выбранный комплект),
+ * items — из стора (там ВСЕ предметы: комплект + купленные/лут), чтобы ничего
+ * не терять. Если комплект не выбран — возвращаем {items} (или null, если
+ * предметов нет).
+ */
+export const mergeEquipmentWithStore = (snapshotEquipment, storeEquipment) => {
+  const storeItems = Array.isArray(storeEquipment?.items) ? storeEquipment.items : [];
+  if (!snapshotEquipment) {
+    return storeItems.length > 0 ? { items: storeItems } : null;
+  }
+  return { ...snapshotEquipment, items: storeItems };
+};
+
+/**
+ * Мерж списков оружия при сохранении снапшота: снапшот — источник метаданных
+ * (встроенные кулаки у людей и т.п.), стор — источник «живых» предметов.
+ * Объединяем по id без дублей.
+ */
+export const mergeEquippedWeapons = (snapshotWeapons, storeWeapons) => {
+  const snapshotList = Array.isArray(snapshotWeapons) ? snapshotWeapons : [];
+  const storeList = Array.isArray(storeWeapons) ? storeWeapons : [];
+  const seen = new Set();
+  const merged = [];
+  [...snapshotList, ...storeList].forEach((w) => {
+    if (!w) return;
+    const id = w.id || w.weaponId || w.uniqueId;
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    merged.push(w);
+  });
+  return merged;
+};

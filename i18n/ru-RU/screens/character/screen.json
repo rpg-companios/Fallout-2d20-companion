@@ -59,7 +59,8 @@
   },
   "placeholders": {
     "selectNone": "Не выбрано",
-    "enterName": "Введите имя"
+    "enterName": "Введите имя",
+    "kitUnknown": "Комплект снаряжения"
   },
   "warnings": {
     "attentionTitle": "Внимание!",
@@ -77,7 +78,9 @@
   "alerts": {
     "errorTitle": "Ошибка",
     "warningTitle": "Предупреждение",
-    "infoTitle": "Информация"
+    "infoTitle": "Информация",
+    "spiritsFavorTitle": "Духи благосклонны",
+    "spiritsFavorMessage": "Духи к вам благосклонны. Вы не тратите очко удачи."
   },
   "errors": {
     "distributeAllPerkAttributePoints": "Вы должны распределить все доступные очки атрибутов.",
@@ -94,7 +97,8 @@
     "spendAllSkillPoints": "Необходимо распределить все очки навыков.",
     "exactBaseSkillsRequired": "Необходимо выбрать ровно {required} основных навыка. Выбрано: {selected}.",
     "exactExtraSkillsRequired": "Необходимо выбрать {required} дополнительных навыка от черты. Выбрано: {selected}.",
-    "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
+    "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}",
+    "cannotTagBannedSkill": "Этот навык нельзя отметить (ограничение черты). Очки вкладывать можно."
   },
   "modals": {
     "ncrCitizen": {
@@ -118,7 +122,8 @@
     },
     "origins": {
       "survivorTitle": "Черта происхождения «Выживший»",
-      "ncrTitle": "Черта происхождения «Житель НКР»"
+      "ncrTitle": "Черта происхождения «Житель НКР»",
+      "tribalTitle": "Черта происхождения «Дикарь»"
     },
     "survivor": {
       "twoTraits": "2 черты",
@@ -143,6 +148,15 @@
       "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные.",
       "choose1": "Выберите 1 навык",
       "chooseN": "Выберите {count} навыка"
+    },
+    "tribal": {
+      "twoTraits": "2 черты",
+      "twoTraitsDesc": "Любая комбинация: 2 Дикаря, 2 Выжившего или 1+1",
+      "oneTraitOnePerk": "1 черта и 1 перк",
+      "selectTwoTraitsHint": "Выберите 2 черты в любой комбинации.",
+      "tribalTraitsList": "Список черт Дикаря",
+      "survivorTraitsList": "Список черт Выжившего",
+      "ncrTraitsList": "Список черт НКР"
     }
   },
   "origins": {

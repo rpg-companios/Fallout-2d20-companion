@@ -3,6 +3,9 @@
 // No React, no UI dependencies. No locale literals — skill identity is the
 // canonical UPPER_SNAKE_CASE key from SKILL_CATALOG_ORDER below.
 
+import originsJson from '../data/origins/origins.json';
+import traitsJson from '../data/traits/traits.json';
+
 // ---------------------------------------------------------------------------
 // Attribute key utilities (from attributeKeyUtils.js)
 // ---------------------------------------------------------------------------
@@ -339,8 +342,14 @@ export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
 // Origin utilities
 // ---------------------------------------------------------------------------
 
-// originId corresponds to the `id` field on origin objects (e.g. 'ncr', 'survivor', 'savage')
-export const MULTI_TRAIT_ORIGIN_IDS = ['ncr', 'survivor', 'savage'];
+// ПРАВИЛО (владелец): никакого хардкода. Мульти-трейт ориджины определяются
+// по данным: ориджин мульти-трейт, если его первый трейт помечен isMultiTrait.
+export const MULTI_TRAIT_ORIGIN_IDS = originsJson
+    .filter((origin) => {
+        const trait = traitsJson.find((t) => t.id === origin.traitIds?.[0]);
+        return trait?.modifiers?.isMultiTrait === true;
+    })
+    .map((origin) => origin.id);
 
 export const isMultiTraitOrigin = (originId) => {
     return MULTI_TRAIT_ORIGIN_IDS.includes(originId);

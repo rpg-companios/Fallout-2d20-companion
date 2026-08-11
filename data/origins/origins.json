@@ -235,12 +235,14 @@
     ]
   },
   {
-    "id": "savage",
-    "displayNameKey": "origins.savage.name",
+    "id": "tribal",
+    "displayNameKey": "origins.tribal.name",
     "characterType": "human",
-    "image": "savage",
+    "image": "tribal",
     "bodyPlan": "humanoid",
-    "traitIds": [],
+    "traitIds": [
+      "tribal-tribal"
+    ],
     "equipmentKitIds": [
       "default_caps_only"
     ]

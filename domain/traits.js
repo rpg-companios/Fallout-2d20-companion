@@ -296,3 +296,44 @@ export function getWeaponDamageBonusFromSources(sources, weapon) {
   }
   return total;
 }
+
+// ---------------------------------------------------------------------------
+// Выбранные под-трейты мульти-ориджинов (NCR/Survivor/Tribal)
+// ---------------------------------------------------------------------------
+
+/**
+ * Возвращает data-записи всех выбранных под-трейтов персонажа (trait.ids),
+ * плюс сам трейт. Пусто, если их нет.
+ */
+export function getSelectedSubTraits(trait) {
+  if (!trait) return [];
+  const ids = Array.isArray(trait.ids) ? trait.ids : (trait.id ? [trait.id] : []);
+  const found = [];
+  for (const id of ids) {
+    const entry = findTraitById(id);
+    if (entry) found.push(entry);
+  }
+  return found;
+}
+
+/**
+ * Навыки, которые нельзя ОТМЕТИТЬ (tag) — union по всем выбранным трейтам.
+ * (Очки вкладывать можно, отметить нельзя — правило владельца.)
+ */
+export function getBannedTagSkills(trait) {
+  const banned = new Set();
+  for (const t of getSelectedSubTraits(trait)) {
+    for (const skill of (t?.modifiers?.bannedTagSkills || [])) banned.add(skill);
+  }
+  return [...banned];
+}
+
+/**
+ * Есть ли у выбранных трейтов эффект с данным id (например, rite_of_passage).
+ */
+export function hasTraitEffect(trait, effectId) {
+  if (!effectId) return false;
+  return getSelectedSubTraits(trait).some((t) =>
+    (t?.modifiers?.effects || []).includes(effectId),
+  );
+}

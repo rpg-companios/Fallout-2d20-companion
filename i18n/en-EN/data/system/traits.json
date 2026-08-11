@@ -138,6 +138,32 @@
         "name": "Mark I Securitron",
         "description": "You are a robot with the Mk I operating system designed by RobCo Industries. You move on a single wheel: the difficulty of tests relying on balance or stability is increased by 1. Your arms are fitted with manipulator claws, allowing you to roughly manipulate your surroundings and make unarmed melee attacks, and integrated weapons are built into your palms. Missile launchers are mounted in your shoulders, and a grenade launcher is integrated into your left arm, but both are inoperable until you are fitted with the Mk II operating system. Your carry weight is 150 lbs. It cannot be increased by your Strength or perks, but it can be increased by modified armor. You are immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover from your injuries or regain health points without receiving repairs."
       }
+    },
+    "tribal": {
+      "tribal": {
+        "name": "Wasteland Tribal",
+        "description": "You may choose two traits from the Tribal traits or two traits from the Survivor origin. You also have the option to choose one trait from the following: Tribal traits, Survivor traits, New California Republic Citizen traits, plus one additional perk. Each trait has a certain advantage and may have its own drawback."
+      },
+      "motherWasteland": {
+        "name": "Mother Wasteland",
+        "description": "ADVANTAGE: Spend 1 Luck Point to gain an insight into a quest, situation, or scene, as if you spent 3 AP to use \"Gather Information\" 3 times. This information is often cryptic and mystical in nature.\n\nDRAWBACK: Complications make it harder to understand scenes involving pre-war artifacts, limiting their use. (Fluff only — no mechanical effect in the app)"
+      },
+      "nomad": {
+        "name": "Nomad",
+        "description": "ADVANTAGE: Reroll 1d20 on Survival tests while traveling, making camp, and foraging for food and water. In addition, ignore the first complication rolled on these tests.\n\nDRAWBACK: The difficulty of Barter and Speech tests is increased, and the complication range when interacting with inhabitants of permanent settlements is increased by 1. The Science skill cannot be tagged (permanently; you may still put points into it, but not tag it)."
+      },
+      "riteOfPassage": {
+        "name": "Rite of Passage",
+        "description": "ADVANTAGE: During a scene, the first time you spend a Luck Point, roll 1 {/CD}. If an effect is rolled, you do not spend that Luck Point.\n\nDRAWBACK: You believe those who have not undergone your rite of passage are unworthy of respect. You cannot help another player character unless you first spend 1 AP."
+      },
+      "oldWorldTools": {
+        "name": "Old World Tools",
+        "description": "ADVANTAGE: You may use the Survival skill instead of the Repair or Science skills when repairing or using pre-war technology.\n\nDRAWBACK: The complication range when passing tests using pre-war technology (not weapons) is increased by 2. (Fluff only — no mechanical effect in the app)"
+      },
+      "chosenOne": {
+        "name": "Chosen One",
+        "description": "ADVANTAGE: When buying dice, you may get your first d20 for free, but only on tests related to your tribe's quest; you can also always succeed at a cost.\n\nDRAWBACK: When a situation directly concerns your quest, the GM adds 2 AP to their pool. (Fluff only — no mechanical effect in the app)"
+      }
     }
   }
 }

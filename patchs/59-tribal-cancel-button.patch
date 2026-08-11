@@ -1,0 +1,18 @@
+diff --git a/components/screens/CharacterScreen/modals/traits/TribalModal.js b/components/screens/CharacterScreen/modals/traits/TribalModal.js
+index 3b75840..968dadc 100644
+--- a/components/screens/CharacterScreen/modals/traits/TribalModal.js
++++ b/components/screens/CharacterScreen/modals/traits/TribalModal.js
+@@ -232,6 +232,13 @@ const TribalModal = ({
+                   >
+                     <Text style={styles.buttonText}>{tCharacterScreen('modals.tribal.oneTraitOnePerk')}</Text>
+                   </TouchableOpacity>
++                  {/* Отмена — закрыть модалку, ничего не выбрав */}
++                  <TouchableOpacity
++                    style={[styles.modalButton, styles.cancelButton]}
++                    onPress={onClose}
++                  >
++                    <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
++                  </TouchableOpacity>
+                 </View>
+               )}
+ 

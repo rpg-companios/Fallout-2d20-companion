@@ -69,7 +69,7 @@ const getOriginImage = (originId) => {
     case 'shadow':              return require('../assets/origins/shadow.png');
     case 'synth':               return require('../assets/origins/synth.png');
     case 'robobrain':           return require('../assets/origins/robobrain.png');
-    case 'savage':              return require('../assets/origins/savage.png');
+    case 'tribal':              return require('../assets/origins/tribal.png');
     default:                    return null;
   }
 };

@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { isCharacterLocked } from '../../domain/characterCreation';
 import useCharacterStore from '../../src/store/characterStore';
+import { mergeEquipmentWithStore, mergeEquippedWeapons, migrateCharacterState } from '../../src/store/migrations';
 
 describe('isCharacterLocked (точка невозврата)', () => {
   it('не зафиксирован, пока ничего не распределено', () => {
@@ -53,5 +54,97 @@ describe('resetKitAndRewards (сброс комплекта)', () => {
     expect(useCharacterStore.getState().rewardedSkills).toEqual([]);
     expect(useCharacterStore.getState().attributes.STR.base).toBe(7);
     expect(useCharacterStore.getState().skills.SMALL_GUNS.base).toBe(2);
+  });
+});
+
+describe('mergeEquipmentWithStore (сохранение комплекта)', () => {
+  it('сохраняет метаданные комплекта из снапшота и items из стора', () => {
+    const snapshotEquipment = {
+      id: 'securitron_standard',
+      name: 'Секьюритрон',
+      weight: 10,
+      price: 20,
+      items: [{ id: 'weapon_laser_gun', name: 'Лазерный пистолет' }],
+    };
+    const storeEquipment = {
+      items: [
+        { id: 'weapon_laser_gun' },
+        { id: 'weapon_missile_launcher' },
+        { id: 'ammo_energy_cell' },
+      ],
+    };
+    const merged = mergeEquipmentWithStore(snapshotEquipment, storeEquipment);
+    expect(merged.id).toBe('securitron_standard');
+    expect(merged.name).toBe('Секьюритрон');
+    // items — из стора (не теряются купленные/добавленные)
+    expect(merged.items.map((i) => i.id).sort()).toEqual([
+      'ammo_energy_cell', 'weapon_laser_gun', 'weapon_missile_launcher',
+    ]);
+  });
+
+  it('без выбранного комплекта: null, если предметов нет', () => {
+    expect(mergeEquipmentWithStore(null, { items: [] })).toBeNull();
+  });
+
+  it('без выбранного комплекта: {items} из стора (лут/купленное не теряется)', () => {
+    const merged = mergeEquipmentWithStore(null, { items: [{ id: 'chem_stimpak' }] });
+    expect(merged).toEqual({ items: [{ id: 'chem_stimpak' }] });
+  });
+});
+
+describe('mergeEquippedWeapons (не теряем встроенное оружие)', () => {
+  it('объединяет снапшот и стор по id, без дублей', () => {
+    const snapshot = [{ id: 'unarmed_human', isBuiltin: true }, { id: 'weapon_laser_gun' }];
+    const store = [{ id: 'weapon_laser_gun' }, { id: 'weapon_missile_launcher' }];
+    const merged = mergeEquippedWeapons(snapshot, store);
+    expect(merged.map((w) => w.id).sort()).toEqual([
+      'unarmed_human', 'weapon_laser_gun', 'weapon_missile_launcher',
+    ]);
+  });
+
+  it('снапшот-метаданные (кулаки) не затираются', () => {
+    const merged = mergeEquippedWeapons([{ id: 'unarmed_human', isBuiltin: true }], []);
+    expect(merged).toEqual([{ id: 'unarmed_human', isBuiltin: true }]);
+  });
+});
+
+describe('Миграция v4→v5: восстановление комплекта в старых сейвах', () => {
+
+  it('ставит заглушку (id=null), если предметы есть, а комплект неизвестен', () => {
+    const state = {
+      schemaVersion: 4,
+      origin: { id: 'securitron' },
+      equipment: {
+        items: [
+          { itemId: 'robot_item_printer' },
+          { weaponId: 'weapon_laser_gun' },
+          { weaponId: 'weapon_missile_launcher' },
+        ],
+      },
+      equippedWeapons: [],
+      rewardedSkills: [],
+    };
+    const migrated = migrateCharacterState(state);
+    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.equipment.id).toBeNull();
+    // Предметы на месте — снаряжение не потеряно
+    expect(migrated.equipment.items).toHaveLength(3);
+  });
+
+  it('не трогает сейв, где id уже есть', () => {
+    const state = {
+      schemaVersion: 4,
+      origin: { id: 'brotherhood' },
+      equipment: { id: 'brotherhood_initiate', name: 'Initiate', items: [{ weaponId: 'weapon_laser_gun' }] },
+    };
+    const migrated = migrateCharacterState(state);
+    expect(migrated.equipment.id).toBe('brotherhood_initiate');
+    expect(migrated.equipment.name).toBe('Initiate');
+  });
+
+  it('без предметов — не трогает (не ломает данные)', () => {
+    const state = { schemaVersion: 4, equipment: { items: [] } };
+    const migrated = migrateCharacterState(state);
+    expect(migrated.equipment.id).toBeUndefined();
   });
 });

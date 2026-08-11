@@ -1,0 +1,1237 @@
+diff --git a/__tests__/securitron/character-reset-rules.test.js b/__tests__/securitron/character-reset-rules.test.js
+index 0b2f0ee..8c81448 100644
+--- a/__tests__/securitron/character-reset-rules.test.js
++++ b/__tests__/securitron/character-reset-rules.test.js
+@@ -125,7 +125,7 @@ describe('Миграция v4→v5: восстановление комплек
+       rewardedSkills: [],
+     };
+     const migrated = migrateCharacterState(state);
+-    expect(migrated.schemaVersion).toBe(5);
++    expect(migrated.schemaVersion).toBe(6);
+     expect(migrated.equipment.id).toBeNull();
+     // Предметы на месте — снаряжение не потеряно
+     expect(migrated.equipment.items).toHaveLength(3);
+diff --git a/__tests__/securitron/tribal-origin.test.js b/__tests__/securitron/tribal-origin.test.js
+new file mode 100644
+index 0000000..933e78f
+--- /dev/null
++++ b/__tests__/securitron/tribal-origin.test.js
+@@ -0,0 +1,181 @@
++/**
++ * Ориджин «Дикарь» (Tribal) + фундамент пакетов правил.
++ *
++ * Дикарь — мультивыборный ориджин: 2 черты (Дикарь или Выживший) ИЛИ
++ * 1 черта (Дикарь/Выживший/НКР) + 1 дополнительный перк.
++ */
++import { describe, it, expect, beforeEach } from 'vitest';
++import originsJson from '../../data/origins/origins.json';
++import traitsJson from '../../data/traits/traits.json';
++import ruOrigins from '../../i18n/ru-RU/data/system/origins.json';
++import enOrigins from '../../i18n/en-EN/data/system/origins.json';
++import ruTraits from '../../i18n/ru-RU/data/system/traits.json';
++import enTraits from '../../i18n/en-EN/data/system/traits.json';
++import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
++import { getBannedTagSkills, hasTraitEffect } from '../../domain/traits';
++import { deepMerge, applyOverridesById, findUnknownOverrideIds } from '../../domain/packMerge';
++import { migrateCharacterState } from '../../src/store/migrations';
++import usePackStore from '../../src/store/packStore';
++
++const getOrigin = () => originsJson.find((o) => o.id === 'tribal');
++const getTrait = (id) => traitsJson.find((t) => t.id === id);
++
++describe('Ориджин Дикарь: данные', () => {
++  it('ориджин: human, humanoid, мульти-трейт, стандартный комплект', () => {
++    const origin = getOrigin();
++    expect(origin).toBeDefined();
++    expect(origin.characterType).toBe('human');
++    expect(origin.bodyPlan).toBe('humanoid');
++    expect(origin.traitIds).toEqual(['tribal-tribal']);
++    expect(origin.equipmentKitIds).toEqual(['default_caps_only']);
++  });
++
++  it('включён в список мульти-трейт ориджинов', () => {
++    expect(MULTI_TRAIT_ORIGIN_IDS).toContain('tribal');
++  });
++
++  it('обёртка: isMultiTrait + 5 под-трейтов', () => {
++    const wrapper = getTrait('tribal-tribal');
++    expect(wrapper.modifiers.isMultiTrait).toBe(true);
++    expect(wrapper.modifiers.subTraitIds).toEqual([
++      'tribal-mother-wasteland',
++      'tribal-nomad',
++      'tribal-rite-of-passage',
++      'tribal-old-world-tools',
++      'tribal-chosen-one',
++    ]);
++  });
++
++  it('все под-трейты существуют и переведены (ru/en)', () => {
++    for (const id of getTrait('tribal-tribal').modifiers.subTraitIds) {
++      expect(getTrait(id), id).toBeDefined();
++      const ru = ruTraits.traits.tribal?.[id.replace('tribal-', '')];
++      const en = enTraits.traits.tribal?.[id.replace('tribal-', '')];
++      // ключи в i18n используют camelCase: motherWasteland, riteOfPassage и т.д.
++      const camel = id
++        .replace('tribal-', '')
++        .replace(/-([a-z])/g, (_, c) => c.toUpperCase());
++      expect(ruTraits.traits.tribal[camel]?.name, `ru ${id}`).toBeTruthy();
++      expect(enTraits.traits.tribal[camel]?.name, `en ${id}`).toBeTruthy();
++      void ru; void en;
++    }
++    expect(ruOrigins.tribal).toBe('Дикарь');
++    expect(enOrigins.tribal).toBe('Tribal');
++  });
++
++  it('Кочевник запрещает отметку «Наука»', () => {
++    const nomad = getTrait('tribal-nomad');
++    expect(nomad.modifiers.bannedTagSkills).toEqual(['SCIENCE']);
++    // Хелпер собирает запреты из выбранных трейтов
++    const trait = { id: 'tribal-tribal', ids: ['tribal-tribal', 'tribal-nomad'] };
++    expect(getBannedTagSkills(trait)).toContain('SCIENCE');
++  });
++
++  it('Обряд Посвящения помечен эффектом rite_of_passage', () => {
++    const rite = getTrait('tribal-rite-of-passage');
++    expect(rite.modifiers.effects).toContain('rite_of_passage');
++    const trait = { id: 'tribal-tribal', ids: ['tribal-tribal', 'tribal-rite-of-passage'] };
++    expect(hasTraitEffect(trait, 'rite_of_passage')).toBe(true);
++    expect(hasTraitEffect(trait, 'nope')).toBe(false);
++  });
++});
++
++describe('Фундамент пакетов правил: deepMerge', () => {
++  it('объекты сливаются рекурсивно, примитивы заменяются, массивы целиком', () => {
++    const base = {
++      modifiers: {
++        attributes: { STR: { baseBonus: 2, min: 6, max: 12 }, INT: { max: 6 } },
++        skillMaxValue: 4,
++        immunities: ['radiation', 'poison'],
++      },
++    };
++    const override = {
++      modifiers: {
++        attributes: { STR: { max: 14 }, INT: { max: 4 } },
++        skillMaxValue: 6,
++        immunities: ['radiation'],
++      },
++    };
++    const merged = deepMerge(base, override);
++    expect(merged.modifiers.attributes.STR).toEqual({ baseBonus: 2, min: 6, max: 14 });
++    expect(merged.modifiers.attributes.INT).toEqual({ max: 4 });
++    expect(merged.modifiers.skillMaxValue).toBe(6);
++    expect(merged.modifiers.immunities).toEqual(['radiation']); // массив заменён
++  });
++
++  it('base не мутируется', () => {
++    const base = { a: { b: 1 } };
++    deepMerge(base, { a: { c: 2 } });
++    expect(base.a).toEqual({ b: 1 });
++  });
++
++  it('null/undefined override — возвращает base', () => {
++    expect(deepMerge({ a: 1 }, null)).toEqual({ a: 1 });
++    expect(deepMerge({ a: 1 }, undefined)).toEqual({ a: 1 });
++  });
++});
++
++describe('Фундамент пакетов правил: applyOverridesById', () => {
++  it('override по id применяется, остальные записи не тронуты', () => {
++    const traits = [
++      { id: 'supermutant-forced-evolution', modifiers: { skillMaxValue: 4 } },
++      { id: 'tribal-tribal', modifiers: { isMultiTrait: true } },
++    ];
++    const out = applyOverridesById(traits, {
++      'supermutant-forced-evolution': { modifiers: { skillMaxValue: 6 } },
++    });
++    expect(out[0].modifiers.skillMaxValue).toBe(6);
++    expect(out[1]).toBe(traits[1]); // не тронут
++  });
++
++  it('findUnknownOverrideIds находит несуществующие id', () => {
++    const traits = [{ id: 'a' }];
++    expect(findUnknownOverrideIds(traits, { a: {}, b: {} })).toEqual(['b']);
++    expect(findUnknownOverrideIds(traits, { a: {} })).toEqual([]);
++  });
++});
++
++describe('Фундамент пакетов правил: packStore', () => {
++  beforeEach(() => {
++    usePackStore.getState().clearPack();
++  });
++
++  it('setPack/clearPack и persist-частичное сохранение', () => {
++    usePackStore.getState().setPack({ id: 'client-alfa', version: 1, overrides: {} });
++    expect(usePackStore.getState().pack?.id).toBe('client-alfa');
++    expect(usePackStore.persist.getOptions().partialize(usePackStore.getState())).toEqual({
++      pack: { id: 'client-alfa', version: 1, overrides: {} },
++    });
++    usePackStore.getState().clearPack();
++    expect(usePackStore.getState().pack).toBeNull();
++  });
++
++  it('setPack игнорирует пакет без id', () => {
++    usePackStore.getState().setPack({ version: 1 });
++    expect(usePackStore.getState().pack).toBeNull();
++  });
++});
++
++describe('Переименование savage → tribal', () => {
++  it('MULTI_TRAIT_ORIGIN_IDS вычисляется из данных (не хардкод): содержит tribal, не содержит savage', () => {
++    expect(MULTI_TRAIT_ORIGIN_IDS).toContain('tribal');
++    expect(MULTI_TRAIT_ORIGIN_IDS).not.toContain('savage');
++    // производный: каждый id — ориджин, чей первый трейт isMultiTrait
++    for (const id of MULTI_TRAIT_ORIGIN_IDS) {
++      const origin = originsJson.find((o) => o.id === id);
++      const trait = traitsJson.find((t) => t.id === origin?.traitIds?.[0]);
++      expect(trait?.modifiers?.isMultiTrait, id).toBe(true);
++    }
++  });
++
++  it('миграция v5→v6: сейв с origin savage → tribal (объект и строка)', () => {
++      const obj = migrateCharacterState({ schemaVersion: 5, origin: { id: 'savage' } });
++    expect(obj.origin.id).toBe('tribal');
++    expect(obj.schemaVersion).toBe(6);
++    const str = migrateCharacterState({ schemaVersion: 5, origin: 'savage' });
++    expect(str.origin).toBe('tribal');
++    // tribal не трогается
++    const tribal = migrateCharacterState({ schemaVersion: 5, origin: { id: 'tribal' } });
++    expect(tribal.origin.id).toBe('tribal');
++  });
++});
+diff --git a/assets/origins/savage.png b/assets/origins/tribal.png
+similarity index 100%
+rename from assets/origins/savage.png
+rename to assets/origins/tribal.png
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 776c896..969b1ee 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -20,7 +20,8 @@ import { useShallow } from 'zustand/react/shallow';
+ import OriginModal from "./modals/OriginModal";
+ import EquipmentKitModal from "./modals/EquipmentKitModal";
+ import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
+-import { loadTraitsData, tTrait } from "../../../domain/traits";
++import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
++import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
+ import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
+ import {
+   createInitialAttributes,
+@@ -293,6 +294,7 @@ export default function CharacterScreen() {
+     skillsSaved,
+     setSkillsSaved,
+     resetCharacter,
++    resetKitAndRewards,
+     availablePerkAttributePoints,
+     commitAttributeChanges,
+     setEquippedWeapons,
+@@ -607,6 +609,13 @@ export default function CharacterScreen() {
+       return;
+     }
+ 
++    // Правило владельца: некоторые трейты запрещают ОТМЕЧАТЬ навык (tag),
++    // очки вкладывать можно (например, «Кочевник» — Наука).
++    if (!isCurrentlySelected && getBannedTagSkills(trait).includes(skillName)) {
++      showError(tCharacterScreen("errors.cannotTagBannedSkill"));
++      return;
++    }
++
+     let skillMax = trait?.modifiers?.skillMaxValue ?? 6;
+     if (level === 1) {
+       skillMax = Math.min(skillMax, 3);
+@@ -973,9 +982,22 @@ export default function CharacterScreen() {
+   };
+ 
+   const handleSpendLuckPoint = () => {
+-    if (luckPoints > 0) {
+-      setLuckPoints((prev) => prev - 1);
++    if (luckPoints <= 0) return;
++
++    // «Обряд Посвящения» (Дикарь): при трате очка удачи бросок 1 {/CD}.
++    // Если выпал эффект — очко не тратится (алерт «Духи к вам благосклонны»).
++    if (hasTraitEffect(trait, "rite_of_passage")) {
++      const { effectCount } = rollCombatDiceEffects(1);
++      if (effectCount > 0) {
++        showAlert(
++          tCharacterScreen("alerts.spiritsFavorTitle"),
++          tCharacterScreen("alerts.spiritsFavorMessage"),
++        );
++        return;
++      }
+     }
++
++    setLuckPoints((prev) => prev - 1);
+   };
+ 
+   const handleRestoreLuckPoint = () => {
+diff --git a/components/screens/CharacterScreen/modals/traits/TribalModal.js b/components/screens/CharacterScreen/modals/traits/TribalModal.js
+new file mode 100644
+index 0000000..3b75840
+--- /dev/null
++++ b/components/screens/CharacterScreen/modals/traits/TribalModal.js
+@@ -0,0 +1,358 @@
++import React, { useMemo, useState } from 'react';
++import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
++import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
++import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
++import { tCharacterScreen, getSkillDisplayName } from '../../logic/characterScreenI18n';
++import { ALL_SKILL_KEYS } from '../../../../../domain/characterCreation';
++
++export const traitConfig = { originId: 'tribal', modalType: 'choice' };
++
++const TRIBAL_TRAIT_IDS = [
++  'tribal-mother-wasteland',
++  'tribal-nomad',
++  'tribal-rite-of-passage',
++  'tribal-old-world-tools',
++  'tribal-chosen-one',
++];
++
++const SURVIVOR_TRAIT_IDS = [
++  'survivor-educated',
++  'survivor-quick-shot',
++  'survivor-gifted',
++  'survivor-heavy-handed',
++  'survivor-small-frame',
++];
++
++const NCR_TRAIT_IDS = [
++  'ncr-good-soul',
++  'ncr-infantryman',
++  'ncr-home-on-the-range',
++  'ncr-technique-of-descent',
++  'ncr-brahmin-baron',
++];
++
++const TribalModal = ({
++  visible,
++  onSelect,
++  onClose,
++  skills, // optional, for "any" skill pick
++}) => {
++  const [selectionMode, setSelectionMode] = useState(null);
++  const [tribalTraits, setTribalTraits] = useState([]);
++  const [survivorTraits, setSurvivorTraits] = useState([]);
++  const [singleTraitPick, setSingleTraitPick] = useState(null);
++
++  // Skill pick state
++  const [skillPickStep, setSkillPickStep] = useState(false);
++  const [pendingTraitData, setPendingTraitData] = useState(null);
++  const [skillPicks, setSkillPicks] = useState([]);
++
++  const traitCatalog = useMemo(() => ({
++    tribal: TRIBAL_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
++    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
++    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
++  }), []);
++
++  const resetState = () => {
++    setSelectionMode(null);
++    setTribalTraits([]);
++    setSurvivorTraits([]);
++    setSingleTraitPick(null);
++    setSkillPickStep(false);
++    setPendingTraitData(null);
++    setSkillPicks([]);
++  };
++
++  const canConfirm = () => {
++    if (selectionMode === 'two_traits') {
++      return tribalTraits.length + survivorTraits.length === 2;
++    }
++    if (selectionMode === 'trait_and_perk') {
++      return !!singleTraitPick;
++    }
++    return false;
++  };
++
++  // --- skill pick helpers ---
++  const getSkillPickMeta = (selectedIds) => {
++    let totalCount = 0;
++    let options = [];
++    let isAny = false;
++    selectedIds.forEach(id => {
++      const dataEntry = findTraitById(id);
++      const spc = dataEntry?.modifiers?.skillPickChoice;
++      if (spc) {
++        totalCount += spc.count || 0;
++        if (spc.from === 'any') {
++          isAny = true;
++        } else if (Array.isArray(spc.from)) {
++          options = [...new Set([...options, ...spc.from])];
++        }
++      }
++    });
++    if (isAny) {
++      options = (skills && skills.length) ? skills.map(s => s.name || s) : ALL_SKILL_KEYS;
++    }
++    return { totalCount, options };
++  };
++
++  const finalizeSelect = (selectedIds, selectedNames, mergedModifiers, extraSkillPicks = []) => {
++    let finalMods = { ...mergedModifiers };
++    if (extraSkillPicks.length > 0) {
++      finalMods = {
++        ...finalMods,
++        skillPickSelected: extraSkillPicks,
++        forcedSkills: [...new Set([...(finalMods.forcedSkills || []), ...extraSkillPicks])],
++        extraSkills: (finalMods.extraSkills || 0) + extraSkillPicks.length,
++      };
++    }
++
++    const traitTitle = selectionMode === 'two_traits'
++      ? `${tCharacterScreen('origins.tribal')}: ${selectedNames.join(' + ')}`
++      : `${tCharacterScreen('origins.tribal')}: ${selectedNames[0]} + ` + tCharacterScreen('labels.onePerk');
++
++    onSelect(selectedIds, traitTitle, {
++      ...finalMods,
++      selectedTraitNames: selectedNames,
++      selectedTraitIds: selectedIds,
++      selectionMode,
++    });
++    resetState();
++    onClose();
++  };
++
++  const handleConfirm = () => {
++    if (!canConfirm()) return;
++
++    let selectedIds = [];
++    if (selectionMode === 'two_traits') {
++      selectedIds = [...tribalTraits, ...survivorTraits];
++    } else if (selectionMode === 'trait_and_perk') {
++      selectedIds = [singleTraitPick];
++    }
++
++    const selectedNames = selectedIds.map((id) => getTraitI18n(id).name);
++
++    const mergedModifiers = selectedIds.reduce((acc, id) => {
++      const dataEntry = findTraitById(id);
++      const baseModifiers = dataEntry?.modifiers || {};
++      return {
++        ...acc,
++        ...baseModifiers,
++        attributes: { ...(acc.attributes || {}), ...(baseModifiers.attributes || {}) },
++        attributePointsBonus: (acc.attributePointsBonus || 0) + (baseModifiers.attributePointsBonus || 0),
++        forcedSkills: [...(acc.forcedSkills || []), ...(baseModifiers.forcedSkills || [])],
++        extraSkills: (acc.extraSkills || 0) + (baseModifiers.extraSkills || 0),
++        bannedTagSkills: [...new Set([...(acc.bannedTagSkills || []), ...(baseModifiers.bannedTagSkills || [])])],
++        effects: [...new Set([...(acc.effects || []), ...(baseModifiers.effects || [])])],
++      };
++    }, {});
++
++    if (selectionMode === 'trait_and_perk') {
++      mergedModifiers.extraPerkSlots = (mergedModifiers.extraPerkSlots || 0) + 1;
++    }
++
++    // Check if any selected trait needs skill pick
++    const { totalCount, options } = getSkillPickMeta(selectedIds);
++    if (totalCount > 0) {
++      setPendingTraitData({ selectedIds, selectedNames, mergedModifiers, totalCount, options });
++      setSkillPicks([]);
++      setSkillPickStep(true);
++      return;
++    }
++
++    finalizeSelect(selectedIds, selectedNames, mergedModifiers, []);
++  };
++
++  const toggleSkillPick = (skillKey) => {
++    const maxCount = pendingTraitData?.totalCount || 0;
++    setSkillPicks(prev => {
++      if (prev.includes(skillKey)) return prev.filter(s => s !== skillKey);
++      if (prev.length >= maxCount) return prev;
++      return [...prev, skillKey];
++    });
++  };
++
++  const confirmSkillPick = () => {
++    if (!pendingTraitData) return;
++    const maxCount = pendingTraitData.totalCount;
++    if (skillPicks.length !== maxCount) return;
++    finalizeSelect(
++      pendingTraitData.selectedIds,
++      pendingTraitData.selectedNames,
++      pendingTraitData.mergedModifiers,
++      skillPicks
++    );
++  };
++
++  const renderTraitButton = (trait, list, setList) => {
++    const isSelected = Array.isArray(list) && list.includes(trait.id);
++    return (
++      <TouchableOpacity
++        key={trait.id}
++        style={[styles.modalButton, styles.skillOption, isSelected && styles.selectedButton]}
++        onPress={() => {
++          if (selectionMode === 'two_traits') {
++            const total = tribalTraits.length + survivorTraits.length;
++            if (list.includes(trait.id)) {
++              setList(list.filter((n) => n !== trait.id));
++            } else if (total < 2) {
++              setList([...list, trait.id]);
++            }
++          } else {
++            setSingleTraitPick(trait.id);
++          }
++        }}
++      >
++        <Text style={styles.buttonText}>{trait.name}</Text>
++        {renderTextWithIcons(trait.description, styles.descriptionText)}
++      </TouchableOpacity>
++    );
++  };
++
++  return (
++    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
++      <View style={styles.modalOverlay}>
++        <View style={styles.modalContainer}>
++          {!skillPickStep ? (
++            <>
++              <Text style={styles.modalTitle}>{tCharacterScreen('modals.origins.tribalTitle')}</Text>
++              {!selectionMode && (
++                <View style={{ width: '100%' }}>
++                  <TouchableOpacity
++                    style={[styles.modalButton, styles.skillOption]}
++                    onPress={() => { setTribalTraits([]); setSurvivorTraits([]); setSelectionMode('two_traits'); }}
++                  >
++                    <Text style={styles.buttonText}>{tCharacterScreen('modals.tribal.twoTraits')}</Text>
++                    <Text style={styles.descriptionText}>{tCharacterScreen('modals.tribal.twoTraitsDesc')}</Text>
++                  </TouchableOpacity>
++                  <TouchableOpacity
++                    style={[styles.modalButton, styles.skillOption]}
++                    onPress={() => setSelectionMode('trait_and_perk')}
++                  >
++                    <Text style={styles.buttonText}>{tCharacterScreen('modals.tribal.oneTraitOnePerk')}</Text>
++                  </TouchableOpacity>
++                </View>
++              )}
++
++              {selectionMode && (
++                <ScrollView style={{ width: '100%', maxHeight: 360 }}>
++                  {selectionMode === 'two_traits' && (
++                    <Text style={styles.hintText}>{tCharacterScreen('modals.tribal.selectTwoTraitsHint')}</Text>
++                  )}
++                  <Text style={styles.sectionTitle}>{tCharacterScreen('modals.tribal.tribalTraitsList')}</Text>
++                  {traitCatalog.tribal.map((trait) =>
++                    renderTraitButton(
++                      { ...trait, isSelected: selectionMode === 'trait_and_perk' ? singleTraitPick === trait.id : tribalTraits.includes(trait.id) },
++                      tribalTraits,
++                      setTribalTraits,
++                    )
++                  )}
++                  <Text style={styles.sectionTitle}>{tCharacterScreen('modals.tribal.survivorTraitsList')}</Text>
++                  {traitCatalog.survivor.map((trait) =>
++                    renderTraitButton(
++                      { ...trait, isSelected: selectionMode === 'trait_and_perk' ? singleTraitPick === trait.id : survivorTraits.includes(trait.id) },
++                      survivorTraits,
++                      setSurvivorTraits,
++                    )
++                  )}
++                  {selectionMode === 'trait_and_perk' && (
++                    <>
++                      <Text style={styles.sectionTitle}>{tCharacterScreen('modals.tribal.ncrTraitsList')}</Text>
++                      {traitCatalog.ncr.map((trait) =>
++                        renderTraitButton(
++                          { ...trait, isSelected: singleTraitPick === trait.id },
++                          null,
++                          () => {},
++                        )
++                      )}
++                    </>
++                  )}
++                  <TouchableOpacity
++                    style={[styles.modalButton, styles.confirmButton, !canConfirm() && styles.disabledButton]}
++                    disabled={!canConfirm()}
++                    onPress={handleConfirm}
++                  >
++                    <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirmSelection')}</Text>
++                  </TouchableOpacity>
++                  {/* Назад — вернуться к выбору режима (2 черты / 1 черта+перк) */}
++                  <TouchableOpacity
++                    style={[styles.modalButton, styles.cancelButton]}
++                    onPress={() => {
++                      setTribalTraits([]);
++                      setSurvivorTraits([]);
++                      setSingleTraitPick(null);
++                      setSelectionMode(null);
++                    }}
++                  >
++                    <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
++                  </TouchableOpacity>
++                </ScrollView>
++              )}
++            </>
++          ) : (
++            <>
++              <Text style={styles.modalTitle}>{tCharacterScreen('modals.skillPick.title')}</Text>
++              <Text style={styles.hintText}>
++                {tCharacterScreen('modals.skillPick.description')}
++                {'\n'}
++                {tCharacterScreen('labels.needToPick')}: {pendingTraitData?.totalCount}
++              </Text>
++              <ScrollView style={{ width: '100%', maxHeight: 320 }}>
++                {(pendingTraitData?.options || []).map((skillKey) => {
++                  const selected = skillPicks.includes(skillKey);
++                  return (
++                    <TouchableOpacity
++                      key={skillKey}
++                      style={[styles.modalButton, styles.skillOption, selected && styles.selectedButton]}
++                      onPress={() => toggleSkillPick(skillKey)}
++                    >
++                      <Text style={styles.buttonText}>{getSkillDisplayName(skillKey)}</Text>
++                    </TouchableOpacity>
++                  );
++                })}
++              </ScrollView>
++              <TouchableOpacity
++                style={[styles.modalButton, styles.confirmButton, skillPicks.length !== (pendingTraitData?.totalCount || 0) && styles.disabledButton]}
++                disabled={skillPicks.length !== (pendingTraitData?.totalCount || 0)}
++                onPress={confirmSkillPick}
++              >
++                <Text style={styles.buttonText}>{tCharacterScreen('buttons.confirm')}</Text>
++              </TouchableOpacity>
++              {/* Назад — вернуться к выбору черт */}
++              <TouchableOpacity
++                style={[styles.modalButton, styles.cancelButton]}
++                onPress={() => {
++                  setSkillPickStep(false);
++                  setSkillPicks([]);
++                  setPendingTraitData(null);
++                }}
++              >
++                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
++              </TouchableOpacity>
++            </>
++          )}
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
++  modalContainer: { width: '85%', maxWidth: 460, backgroundColor: 'white', borderRadius: 10, padding: 20, alignItems: 'center', maxHeight: '85%' },
++  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
++  modalButton: { padding: 12, marginVertical: 5, borderRadius: 6, alignItems: 'center', width: '100%' },
++  skillOption: { backgroundColor: '#2196F3', alignItems: 'flex-start', paddingHorizontal: 15 },
++  cancelButton: { backgroundColor: '#9E9E9E', marginTop: 10 },
++  confirmButton: { backgroundColor: '#4CAF50' },
++  backButton: { backgroundColor: '#757575' },
++  disabledButton: { opacity: 0.5 },
++  sectionTitle: { color: '#000', fontWeight: '700', marginTop: 10, marginBottom: 6, textAlign: 'left', alignSelf: 'flex-start' },
++  hintText: { color: '#333', fontSize: 12, marginBottom: 4, textAlign: 'center' },
++  selectedButton: { borderWidth: 2, borderColor: '#FFFFFF', backgroundColor: '#1976D2' },
++  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
++  descriptionText: { color: 'white', fontSize: 12, marginTop: 5 },
++});
++
++export default TribalModal;
+diff --git a/components/screens/CharacterScreen/modals/traits/index.js b/components/screens/CharacterScreen/modals/traits/index.js
+index 4e1d78c..c625359 100644
+--- a/components/screens/CharacterScreen/modals/traits/index.js
++++ b/components/screens/CharacterScreen/modals/traits/index.js
+@@ -1,5 +1,6 @@
+ import NcrCitizenModal, { traitConfig as ncrCitizenConfig } from './NcrCitizenModal';
+ import SurvivorModal, { traitConfig as survivorConfig } from './SurvivorModal';
++import TribalModal, { traitConfig as tribalConfig } from './TribalModal';
+ import GenericTraitModal from './GenericTraitModal';
+ import React from 'react';
+ 
+@@ -39,12 +40,14 @@ export const TRAIT_MODALS = {
+   // Multi-trait pickers (still custom)
+   [ncrCitizenConfig.originId]: NcrCitizenModal,
+   [survivorConfig.originId]: SurvivorModal,
++  [tribalConfig.originId]: TribalModal,
+   ...genericModals,
+ };
+ 
+ export const TRAIT_CONFIGS = {
+   [ncrCitizenConfig.originId]: ncrCitizenConfig,
+   [survivorConfig.originId]: survivorConfig,
++  [tribalConfig.originId]: tribalConfig,
+   ...genericConfigs,
+ };
+ 
+diff --git a/data/origins/origins.json b/data/origins/origins.json
+index fed5363..d02a2f3 100644
+--- a/data/origins/origins.json
++++ b/data/origins/origins.json
+@@ -235,14 +235,16 @@
+     ]
+   },
+   {
+-    "id": "savage",
+-    "displayNameKey": "origins.savage.name",
++    "id": "tribal",
++    "displayNameKey": "origins.tribal.name",
+     "characterType": "human",
+-    "image": "savage",
++    "image": "tribal",
+     "bodyPlan": "humanoid",
+-    "traitIds": [],
++    "traitIds": [
++      "tribal-tribal"
++    ],
+     "equipmentKitIds": [
+       "default_caps_only"
+     ]
+   }
+-]
++]
+\ No newline at end of file
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+index dbb8b26..839009f 100644
+--- a/data/traits/traits.json
++++ b/data/traits/traits.json
+@@ -248,5 +248,60 @@
+       "carryWeightStrengthMultiplier": 0,
+       "effects": ["no_consumables_food_rest", "repair_to_heal", "no_hunger_thirst_fatigue"]
+     }
++  },
++  {
++    "id": "tribal-tribal",
++    "originId": "tribal",
++    "displayNameKey": "traits.tribal.tribal.name",
++    "descriptionKey": "traits.tribal.tribal.description",
++    "modifiers": {
++      "isMultiTrait": true,
++      "subTraitIds": [
++        "tribal-mother-wasteland",
++        "tribal-nomad",
++        "tribal-rite-of-passage",
++        "tribal-old-world-tools",
++        "tribal-chosen-one"
++      ]
++    }
++  },
++  {
++    "id": "tribal-mother-wasteland",
++    "originId": "tribal",
++    "displayNameKey": "traits.tribal.motherWasteland.name",
++    "descriptionKey": "traits.tribal.motherWasteland.description",
++    "modifiers": {}
++  },
++  {
++    "id": "tribal-nomad",
++    "originId": "tribal",
++    "displayNameKey": "traits.tribal.nomad.name",
++    "descriptionKey": "traits.tribal.nomad.description",
++    "modifiers": {
++      "bannedTagSkills": ["SCIENCE"]
++    }
++  },
++  {
++    "id": "tribal-rite-of-passage",
++    "originId": "tribal",
++    "displayNameKey": "traits.tribal.riteOfPassage.name",
++    "descriptionKey": "traits.tribal.riteOfPassage.description",
++    "modifiers": {
++      "effects": ["rite_of_passage"]
++    }
++  },
++  {
++    "id": "tribal-old-world-tools",
++    "originId": "tribal",
++    "displayNameKey": "traits.tribal.oldWorldTools.name",
++    "descriptionKey": "traits.tribal.oldWorldTools.description",
++    "modifiers": {}
++  },
++  {
++    "id": "tribal-chosen-one",
++    "originId": "tribal",
++    "displayNameKey": "traits.tribal.chosenOne.name",
++    "descriptionKey": "traits.tribal.chosenOne.description",
++    "modifiers": {}
+   }
+ ]
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2209db5..e871199 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,10 @@
+ # Changelog
+ 
++## 58 — Tribal origin + rules-pack foundation
++
++- Added the Tribal origin: multi-select — 2 traits (Tribal or Survivor) OR 1 trait (Tribal/Survivor/NCR) + 1 additional perk. Traits: Mother Wasteland (fluff), Nomad (Science skill cannot be tagged — bannedTagSkills mechanic), Rite of Passage (mechanic: when spending a Luck Point, roll 1 {/CD}; on an effect the point is not spent + "The spirits favor you" alert), Old World Tools (fluff), Chosen One (fluff). Kit is temporarily the standard one (100 caps).
++- Rules-pack foundation (stage 0, not yet wired into behavior): domain/packMerge.js (deepMerge, applyOverridesById, findUnknownOverrideIds), src/store/packStore.js (pack loading/storage, persist).
++
+ ## 48 — Securitron origin
+ 
+ - The Securitron origin is now fully implemented: the "Mark I Securitron" trait (immunity to poison and radiation, 150 lbs carry weight not affected by Strength or perks, no chems/food/drink/rest benefits, repairs only).
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 046632d..9611f27 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,13 @@
+ 
+ ---
+ 
++## 58 — Ориджин Дикарь (Tribal) + фундамент пакетов правил
++
++- Ориджин «Дикарь» (Tribal): мультивыбор — 2 черты (Дикарь или Выживший) ИЛИ 1 черта (Дикарь/Выживший/НКР) + 1 дополнительный перк. Черты: Мать Пустошь (описание), Кочевник (запрет на отметку навыка «Наука» — механика bannedTagSkills), Обряд Посвящения (механика: при трате очка удачи бросок 1 {/CD}, эффект — очко не тратится + алерт «Духи к вам благосклонны»), Инструменты Старого Света (описание), Избранный (описание). Комплект временно — стандартный (100 крышек).
++- Фундамент пакетов правил (этап 0, не подключён к поведению): domain/packMerge.js (deepMerge, applyOverridesById, findUnknownOverrideIds), src/store/packStore.js (загрузка/хранение пакета, persist).
++
++---
++
+ ## 48 — Ориджин Секьюритрон
+ 
+ - Ориджин «Секьюритрон» наполнен: трейт «Секьюритрон Mk I» (иммунитет к яду и радиации, переносимый вес 150 фунтов без учёта Силы и перков, запрет расходников/еды/питья/отдыха, восстановление только ремонтом).
+diff --git a/domain/characterCreation.js b/domain/characterCreation.js
+index 945f069..46c49f3 100644
+--- a/domain/characterCreation.js
++++ b/domain/characterCreation.js
+@@ -3,6 +3,9 @@
+ // No React, no UI dependencies. No locale literals — skill identity is the
+ // canonical UPPER_SNAKE_CASE key from SKILL_CATALOG_ORDER below.
+ 
++import originsJson from '../data/origins/origins.json';
++import traitsJson from '../data/traits/traits.json';
++
+ // ---------------------------------------------------------------------------
+ // Attribute key utilities (from attributeKeyUtils.js)
+ // ---------------------------------------------------------------------------
+@@ -339,8 +342,14 @@ export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
+ // Origin utilities
+ // ---------------------------------------------------------------------------
+ 
+-// originId corresponds to the `id` field on origin objects (e.g. 'ncr', 'survivor', 'savage')
+-export const MULTI_TRAIT_ORIGIN_IDS = ['ncr', 'survivor', 'savage'];
++// ПРАВИЛО (владелец): никакого хардкода. Мульти-трейт ориджины определяются
++// по данным: ориджин мульти-трейт, если его первый трейт помечен isMultiTrait.
++export const MULTI_TRAIT_ORIGIN_IDS = originsJson
++    .filter((origin) => {
++        const trait = traitsJson.find((t) => t.id === origin.traitIds?.[0]);
++        return trait?.modifiers?.isMultiTrait === true;
++    })
++    .map((origin) => origin.id);
+ 
+ export const isMultiTraitOrigin = (originId) => {
+     return MULTI_TRAIT_ORIGIN_IDS.includes(originId);
+diff --git a/domain/origins.js b/domain/origins.js
+index b64aaa6..fae14b7 100644
+--- a/domain/origins.js
++++ b/domain/origins.js
+@@ -69,7 +69,7 @@ const getOriginImage = (originId) => {
+     case 'shadow':              return require('../assets/origins/shadow.png');
+     case 'synth':               return require('../assets/origins/synth.png');
+     case 'robobrain':           return require('../assets/origins/robobrain.png');
+-    case 'savage':              return require('../assets/origins/savage.png');
++    case 'tribal':              return require('../assets/origins/tribal.png');
+     default:                    return null;
+   }
+ };
+diff --git a/domain/packMerge.js b/domain/packMerge.js
+new file mode 100644
+index 0000000..ec972bf
+--- /dev/null
++++ b/domain/packMerge.js
+@@ -0,0 +1,69 @@
++// domain/packMerge.js
++// Фундамент для пользовательских пакетов правил («свои правила»).
++//
++// Этап 0: только чистые функции слияния + применение override'ов. К поведению
++// приложения пока НЕ подключено — база работает как раньше. Подключение к
++// загрузчикам данных (loadTraitsData/loadOriginsData/getEquipmentCatalog)
++// будет добавляться постепенно, вместе с новым контентом.
++//
++// Семантика deep merge:
++//   - вложенные объекты сливаются рекурсивно (override дополняет базу);
++//   - примитивы/числа/строки заменяются значением override;
++//   - массивы заменяются ЦЕЛИКОМ (списки проще переопределять).
++// Пакет имеет приоритет над базой.
++
++/**
++ * Глубокое слияние override в base (base не мутируется).
++ * Объекты сливаются рекурсивно; массивы и примитивы — заменяются.
++ */
++export function deepMerge(base, override) {
++  if (override === undefined || override === null) return base;
++  if (base === null || base === undefined) return override;
++
++  const isPlainObject = (v) =>
++    v !== null && typeof v === 'object' && !Array.isArray(v);
++
++  if (!isPlainObject(base) || !isPlainObject(override)) {
++    // Массивы и примитивы: override заменяет base целиком.
++    return override;
++  }
++
++  const out = { ...base };
++  for (const key of Object.keys(override)) {
++    const baseVal = out[key];
++    const overrideVal = override[key];
++    if (isPlainObject(baseVal) && isPlainObject(overrideVal)) {
++      out[key] = deepMerge(baseVal, overrideVal);
++    } else {
++      out[key] = overrideVal;
++    }
++  }
++  return out;
++}
++
++/**
++ * Применяет override'ы пакета к массиву data-записей по id.
++ * data — массив объектов с id; packOverrides — объект { [id]: override }.
++ * Для каждого id из override'ов: если запись существует — deepMerge;
++ * если записи нет — override игнорируется (валидатор должен был отсечь).
++ */
++export function applyOverridesById(data = [], overrides = {}) {
++  const byId = new Map(data.map((entry) => [entry.id, entry]));
++  const out = data.map((entry) => {
++    const override = overrides[entry.id];
++    return override !== undefined ? deepMerge(entry, override) : entry;
++  });
++  // Дополнительные записи из override'ов, которых нет в базе, НЕ добавляются
++  // автоматически — новые записи объявляются отдельными списками (origins и т.п.).
++  void byId;
++  return out;
++}
++
++/**
++ * Проверка, что все ключи overrides существуют в базе (по id).
++ * Возвращает список неизвестных id (пустой — всё ок).
++ */
++export function findUnknownOverrideIds(data = [], overrides = {}) {
++  const known = new Set(data.map((entry) => entry.id));
++  return Object.keys(overrides || {}).filter((id) => !known.has(id));
++}
+diff --git a/domain/traits.js b/domain/traits.js
+index 2bffaa2..dc9418c 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -296,3 +296,44 @@ export function getWeaponDamageBonusFromSources(sources, weapon) {
+   }
+   return total;
+ }
++
++// ---------------------------------------------------------------------------
++// Выбранные под-трейты мульти-ориджинов (NCR/Survivor/Tribal)
++// ---------------------------------------------------------------------------
++
++/**
++ * Возвращает data-записи всех выбранных под-трейтов персонажа (trait.ids),
++ * плюс сам трейт. Пусто, если их нет.
++ */
++export function getSelectedSubTraits(trait) {
++  if (!trait) return [];
++  const ids = Array.isArray(trait.ids) ? trait.ids : (trait.id ? [trait.id] : []);
++  const found = [];
++  for (const id of ids) {
++    const entry = findTraitById(id);
++    if (entry) found.push(entry);
++  }
++  return found;
++}
++
++/**
++ * Навыки, которые нельзя ОТМЕТИТЬ (tag) — union по всем выбранным трейтам.
++ * (Очки вкладывать можно, отметить нельзя — правило владельца.)
++ */
++export function getBannedTagSkills(trait) {
++  const banned = new Set();
++  for (const t of getSelectedSubTraits(trait)) {
++    for (const skill of (t?.modifiers?.bannedTagSkills || [])) banned.add(skill);
++  }
++  return [...banned];
++}
++
++/**
++ * Есть ли у выбранных трейтов эффект с данным id (например, rite_of_passage).
++ */
++export function hasTraitEffect(trait, effectId) {
++  if (!effectId) return false;
++  return getSelectedSubTraits(trait).some((t) =>
++    (t?.modifiers?.effects || []).includes(effectId),
++  );
++}
+diff --git a/i18n/en-EN/data/system/origins.json b/i18n/en-EN/data/system/origins.json
+index e98da89..0a6862a 100644
+--- a/i18n/en-EN/data/system/origins.json
++++ b/i18n/en-EN/data/system/origins.json
+@@ -15,5 +15,5 @@
+   "protectron": "Protectron",
+   "shadow": "Shadow",
+   "synth": "Synth",
+-  "savage": "Savage"
+-}
++  "tribal": "Tribal"
++}
+\ No newline at end of file
+diff --git a/i18n/en-EN/data/system/traits.json b/i18n/en-EN/data/system/traits.json
+index 3b300e2..2dc77b2 100644
+--- a/i18n/en-EN/data/system/traits.json
++++ b/i18n/en-EN/data/system/traits.json
+@@ -138,6 +138,32 @@
+         "name": "Mark I Securitron",
+         "description": "You are a robot with the Mk I operating system designed by RobCo Industries. You move on a single wheel: the difficulty of tests relying on balance or stability is increased by 1. Your arms are fitted with manipulator claws, allowing you to roughly manipulate your surroundings and make unarmed melee attacks, and integrated weapons are built into your palms. Missile launchers are mounted in your shoulders, and a grenade launcher is integrated into your left arm, but both are inoperable until you are fitted with the Mk II operating system. Your carry weight is 150 lbs. It cannot be increased by your Strength or perks, but it can be increased by modified armor. You are immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover from your injuries or regain health points without receiving repairs."
+       }
++    },
++    "tribal": {
++      "tribal": {
++        "name": "Wasteland Tribal",
++        "description": "You may choose two traits from the Tribal traits or two traits from the Survivor origin. You also have the option to choose one trait from the following: Tribal traits, Survivor traits, New California Republic Citizen traits, plus one additional perk. Each trait has a certain advantage and may have its own drawback."
++      },
++      "motherWasteland": {
++        "name": "Mother Wasteland",
++        "description": "ADVANTAGE: Spend 1 Luck Point to gain an insight into a quest, situation, or scene, as if you spent 3 AP to use \"Gather Information\" 3 times. This information is often cryptic and mystical in nature.\n\nDRAWBACK: Complications make it harder to understand scenes involving pre-war artifacts, limiting their use. (Fluff only — no mechanical effect in the app)"
++      },
++      "nomad": {
++        "name": "Nomad",
++        "description": "ADVANTAGE: Reroll 1d20 on Survival tests while traveling, making camp, and foraging for food and water. In addition, ignore the first complication rolled on these tests.\n\nDRAWBACK: The difficulty of Barter and Speech tests is increased, and the complication range when interacting with inhabitants of permanent settlements is increased by 1. The Science skill cannot be tagged (permanently; you may still put points into it, but not tag it)."
++      },
++      "riteOfPassage": {
++        "name": "Rite of Passage",
++        "description": "ADVANTAGE: During a scene, the first time you spend a Luck Point, roll 1 {/CD}. If an effect is rolled, you do not spend that Luck Point.\n\nDRAWBACK: You believe those who have not undergone your rite of passage are unworthy of respect. You cannot help another player character unless you first spend 1 AP."
++      },
++      "oldWorldTools": {
++        "name": "Old World Tools",
++        "description": "ADVANTAGE: You may use the Survival skill instead of the Repair or Science skills when repairing or using pre-war technology.\n\nDRAWBACK: The complication range when passing tests using pre-war technology (not weapons) is increased by 2. (Fluff only — no mechanical effect in the app)"
++      },
++      "chosenOne": {
++        "name": "Chosen One",
++        "description": "ADVANTAGE: When buying dice, you may get your first d20 for free, but only on tests related to your tribe's quest; you can also always succeed at a cost.\n\nDRAWBACK: When a situation directly concerns your quest, the GM adds 2 AP to their pool. (Fluff only — no mechanical effect in the app)"
++      }
+     }
+   }
+ }
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index 2757b9e..5e498fd 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -78,7 +78,9 @@
+   "alerts": {
+     "errorTitle": "Error",
+     "warningTitle": "Warning",
+-    "infoTitle": "Info"
++    "infoTitle": "Info",
++    "spiritsFavorTitle": "The Spirits Favor You",
++    "spiritsFavorMessage": "The spirits are kind to you. You do not spend a Luck Point."
+   },
+   "errors": {
+     "distributeAllPerkAttributePoints": "You must distribute all available attribute points.",
+@@ -95,7 +97,8 @@
+     "spendAllSkillPoints": "You must distribute all skill points.",
+     "exactBaseSkillsRequired": "You must select exactly {required} base skills. Selected: {selected}.",
+     "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
+-    "maxSkillRank": "Error: maximum skill rank is {maxRank}"
++    "maxSkillRank": "Error: maximum skill rank is {maxRank}",
++    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it."
+   },
+   "modals": {
+     "ncrCitizen": {
+@@ -119,7 +122,8 @@
+     },
+     "origins": {
+       "survivorTitle": "Origin Trait «Survivor»",
+-      "ncrTitle": "Origin Trait «NCR Citizen»"
++      "ncrTitle": "Origin Trait «NCR Citizen»",
++      "tribalTitle": "Origin Trait «Tribal»"
+     },
+     "survivor": {
+       "twoTraits": "2 traits",
+@@ -144,6 +148,15 @@
+       "description": "Choose skills from the provided group. They will be marked as extra.",
+       "choose1": "Choose 1 skill",
+       "chooseN": "Choose {count} skills"
++    },
++    "tribal": {
++      "twoTraits": "2 traits",
++      "twoTraitsDesc": "Any combination: 2 Tribal, 2 Survivor, or 1+1",
++      "oneTraitOnePerk": "1 trait and 1 perk",
++      "selectTwoTraitsHint": "Select 2 traits in any combination.",
++      "tribalTraitsList": "Tribal Traits List",
++      "survivorTraitsList": "Survivor Traits List",
++      "ncrTraitsList": "NCR Traits List"
+     }
+   },
+   "origins": {
+diff --git a/i18n/ru-RU/data/system/origins.json b/i18n/ru-RU/data/system/origins.json
+index 433e862..4be87f2 100644
+--- a/i18n/ru-RU/data/system/origins.json
++++ b/i18n/ru-RU/data/system/origins.json
+@@ -15,5 +15,5 @@
+   "protectron": "Протектрон",
+   "shadow": "Тень",
+   "synth": "Синт",
+-  "savage": "Дикарь"
+-}
++  "tribal": "Дикарь"
++}
+\ No newline at end of file
+diff --git a/i18n/ru-RU/data/system/traits.json b/i18n/ru-RU/data/system/traits.json
+index 446c5d1..e4bce20 100644
+--- a/i18n/ru-RU/data/system/traits.json
++++ b/i18n/ru-RU/data/system/traits.json
+@@ -138,6 +138,32 @@
+         "name": "Секьюритрон Mk I",
+         "description": "Вы — робот с операционной системой Mk I, созданной RobCo Industries. Вы передвигаетесь на одном колесе: сложность тестов на балансировку и устойчивость увеличена на 1. Ваши руки снабжены манипуляторами, с помощью которых вы способны грубо манипулировать окружением и совершать безоружные атаки в ближнем бою, а в ладони встроено оружие. В плечах расположены ракетницы, а в левую руку встроен гранатомёт, но они не работают, пока вы не установите операционную систему Mk II. Переносимый вес составляет 150 фунтов. Его нельзя увеличить за счёт силы или перков, но можно увеличить за счёт модификации. Вы невосприимчивы к радиации и ядам, но не можете использовать препараты, а также получать пользу от еды, питья или отдыха. Вы не можете восстановить свои повреждения или очки здоровья, не получив ремонта."
+       }
++    },
++    "tribal": {
++      "tribal": {
++        "name": "Дикарь из Пустошей",
++        "description": "Вы можете выбрать две черты из предложенных черт Дикаря или две черты из происхождения Выжившего. Также у вас есть возможность выбрать одну черту из следующих вариантов: черты Дикаря, черты Выжившего, черты Жителя Новой Калифорнийской Республики и один дополнительный перк. Каждая черта обладает определённым преимуществом и может иметь свой недостаток."
++      },
++      "motherWasteland": {
++        "name": "Мать Пустошь",
++        "description": "ПРЕИМУЩЕСТВО: Потратьте 1 очко удачи, чтобы получить представление о квесте, ситуации или сцене, как будто вы потратили 3 ОД, чтобы использовать «Получить информацию» 3 раза. Эта информация часто носит загадочный и мистический характер.\n\nНЕДОСТАТОК: Осложнения затрудняют понимание сцен, связанных с довоенными артефактами, что ограничивает их использование. (Черта ничего игромеханически с программой не делает, только описание)"
++      },
++      "nomad": {
++        "name": "Кочевник",
++        "description": "ПРЕИМУЩЕСТВО: Перебросьте 1d20 при проверках на выживание во время путешествия, при разбивке лагеря и добыче еды и воды. Кроме того при выполнении этих проверок игнорируйте первое выпавшее осложнение.\n\nНЕДОСТАТОК: Повышается сложность проверок на Бартер и Красноречие, а так же на 1 увеличивается диапазон усложнений при взаимодействии с обитателями постоянных поселений. Нельзя отметить навык «Наука» (перманентно; вкладывать очки можно, но отметить нельзя)."
++      },
++      "riteOfPassage": {
++        "name": "Обряд Посвящения",
++        "description": "ПРЕИМУЩЕСТВО: Во время сцены, когда вы первый раз за сцену тратите Очко Удачи, бросьте 1 {/CD}. Если выпадает эффект, то вы не тратите это Очко Удачи.\n\nНЕДОСТАТОК: Вы считаете, что те, кто не прошёл через ваш обряд посвящения, не достойны уважения. Вы не можете помочь другому персонажу игрока, если сначала не потратите 1 ОД."
++      },
++      "oldWorldTools": {
++        "name": "Инструменты Старого Света",
++        "description": "ПРЕИМУЩЕСТВО: Вы можете использовать навык «Выживание» вместо навыков «Ремонт» или «Наука» для ремонта или использования довоенных технологий.\n\nНЕДОСТАТОК: Диапазон осложнений при прохождении проверок с использованием довоенной техники (не оружия) увеличен на 2. (Только описание, механик нет)"
++      },
++      "chosenOne": {
++        "name": "Избранный",
++        "description": "ПРЕИМУЩЕСТВО: При покупке кубиков, вы можете получить первый d20 бесплатно, но только в проверках, связанных с заданием вашего племени, также вы всегда можете добиться успеха за расплату.\n\nНЕДОСТАТОК: Когда ситуация напрямую касается вашего задания, ГМ добавляет 2 ОД в свой пул. (Только описание)"
++      }
+     }
+   }
+ }
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index 01849b2..38747c3 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -78,7 +78,9 @@
+   "alerts": {
+     "errorTitle": "Ошибка",
+     "warningTitle": "Предупреждение",
+-    "infoTitle": "Информация"
++    "infoTitle": "Информация",
++    "spiritsFavorTitle": "Духи благосклонны",
++    "spiritsFavorMessage": "Духи к вам благосклонны. Вы не тратите очко удачи."
+   },
+   "errors": {
+     "distributeAllPerkAttributePoints": "Вы должны распределить все доступные очки атрибутов.",
+@@ -95,7 +97,8 @@
+     "spendAllSkillPoints": "Необходимо распределить все очки навыков.",
+     "exactBaseSkillsRequired": "Необходимо выбрать ровно {required} основных навыка. Выбрано: {selected}.",
+     "exactExtraSkillsRequired": "Необходимо выбрать {required} дополнительных навыка от черты. Выбрано: {selected}.",
+-    "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}"
++    "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}",
++    "cannotTagBannedSkill": "Этот навык нельзя отметить (ограничение черты). Очки вкладывать можно."
+   },
+   "modals": {
+     "ncrCitizen": {
+@@ -119,7 +122,8 @@
+     },
+     "origins": {
+       "survivorTitle": "Черта происхождения «Выживший»",
+-      "ncrTitle": "Черта происхождения «Житель НКР»"
++      "ncrTitle": "Черта происхождения «Житель НКР»",
++      "tribalTitle": "Черта происхождения «Дикарь»"
+     },
+     "survivor": {
+       "twoTraits": "2 черты",
+@@ -144,6 +148,15 @@
+       "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные.",
+       "choose1": "Выберите 1 навык",
+       "chooseN": "Выберите {count} навыка"
++    },
++    "tribal": {
++      "twoTraits": "2 черты",
++      "twoTraitsDesc": "Любая комбинация: 2 Дикаря, 2 Выжившего или 1+1",
++      "oneTraitOnePerk": "1 черта и 1 перк",
++      "selectTwoTraitsHint": "Выберите 2 черты в любой комбинации.",
++      "tribalTraitsList": "Список черт Дикаря",
++      "survivorTraitsList": "Список черт Выжившего",
++      "ncrTraitsList": "Список черт НКР"
+     }
+   },
+   "origins": {
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 041ce02..863cd41 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -614,6 +614,22 @@ const MIGRATIONS = [
+     return next;
+   },
+ 
++  // v5 -> v6: ориджин «savage» переименован в «tribal» (каноническое англ.
++  // название — Tribal; savage был заглушкой). Старые сейвы с origin.id
++  // 'savage' переводятся на 'tribal', иначе персонаж потеряет ориджин.
++  (state) => {
++    const next = { ...state };
++    const origin = next.origin;
++    if (!origin) return next;
++    const originId = typeof origin === 'string' ? origin : origin?.id;
++    if (originId === 'savage') {
++      next.origin = typeof origin === 'string'
++        ? 'tribal'
++        : { ...origin, id: 'tribal' };
++    }
++    return next;
++  },
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/packStore.js b/src/store/packStore.js
+new file mode 100644
+index 0000000..1a01705
+--- /dev/null
++++ b/src/store/packStore.js
+@@ -0,0 +1,41 @@
++// src/store/packStore.js
++// Локальное хранилище пользовательского пакета правил («свои правила»).
++//
++// Этап 0: стор готов, но пакет пока НЕ применяется к каталогу/загрузчикам —
++// подключение пойдёт постепенно вместе с новым контентом. Загруженный файл
++// переживает перезагрузку (persist), как настройки.
++//
++// Формат пакета (JSON):
++// {
++//   "id": "client-alfa",
++//   "version": 1,
++//   "origins": [...], "traits": [...], "equipmentKits": [...], "weapons": [...],
++//   "i18n": { "ru-RU": {...}, "en-EN": {...} },
++//   "overrides": { "traits": { "<id>": {...} }, ... }
++// }
++
++import { create } from 'zustand';
++import { persist, createJSONStorage } from 'zustand/middleware';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++
++const usePackStore = create(
++  persist(
++    (set) => ({
++      pack: null, // { id, version, ...данные пакета } | null
++
++      setPack: (pack) => {
++        if (!pack || typeof pack !== 'object' || !pack.id) return;
++        set({ pack });
++      },
++
++      clearPack: () => set({ pack: null }),
++    }),
++    {
++      name: 'fallout2d20:pack',
++      storage: createJSONStorage(() => AsyncStorage),
++      partialize: (state) => ({ pack: state.pack }),
++    },
++  ),
++);
++
++export default usePackStore;
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 680f6af..8084840 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -14,7 +14,7 @@
+ // v2 — журнал уже выданных наград за отмеченные навыки.
+ // v3 — normalize mutually exclusive weapon qualities in legacy saves.
+ // v4 — damageType из строки в массив (поддержка комбинированного урона).
+-export const CURRENT_SCHEMA_VERSION = 5;
++export const CURRENT_SCHEMA_VERSION = 6;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).

@@ -20,7 +20,8 @@ import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
-import { loadTraitsData, tTrait } from "../../../domain/traits";
+import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
+import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
   createInitialAttributes,
@@ -293,6 +294,7 @@ export default function CharacterScreen() {
     skillsSaved,
     setSkillsSaved,
     resetCharacter,
+    resetKitAndRewards,
     availablePerkAttributePoints,
     commitAttributeChanges,
     setEquippedWeapons,
@@ -361,7 +363,12 @@ export default function CharacterScreen() {
 
   const localizedEquipmentName = useMemo(() => {
     if (!equipment) return null;
-    if (!equipment.id) return equipment.name;
+    if (!equipment.id) {
+      // Комплект получен (предметы на месте), но какой именно был выбран —
+      // неизвестно (старый сейв). Показываем заглушку; выбор конкретного
+      // комплекта откроется по нажатию.
+      return tCharacterScreen("placeholders.kitUnknown");
+    }
     const catalog = getEquipmentCatalog(locale);
     return catalog?.equipmentKits?.[equipment.id]?.name || equipment.name;
   }, [equipment, locale]);
@@ -599,6 +606,13 @@ export default function CharacterScreen() {
 
     if (isForcedSkill && isCurrentlySelected) {
       showError(tCharacterScreen("errors.cannotUnselectForcedSkill"));
+      return;
+    }
+
+    // Правило владельца: некоторые трейты запрещают ОТМЕЧАТЬ навык (tag),
+    // очки вкладывать можно (например, «Кочевник» — Наука).
+    if (!isCurrentlySelected && getBannedTagSkills(trait).includes(skillName)) {
+      showError(tCharacterScreen("errors.cannotTagBannedSkill"));
       return;
     }
 
@@ -968,9 +982,22 @@ export default function CharacterScreen() {
   };
 
   const handleSpendLuckPoint = () => {
-    if (luckPoints > 0) {
-      setLuckPoints((prev) => prev - 1);
+    if (luckPoints <= 0) return;
+
+    // «Обряд Посвящения» (Дикарь): при трате очка удачи бросок 1 {/CD}.
+    // Если выпал эффект — очко не тратится (алерт «Духи к вам благосклонны»).
+    if (hasTraitEffect(trait, "rite_of_passage")) {
+      const { effectCount } = rollCombatDiceEffects(1);
+      if (effectCount > 0) {
+        showAlert(
+          tCharacterScreen("alerts.spiritsFavorTitle"),
+          tCharacterScreen("alerts.spiritsFavorMessage"),
+        );
+        return;
+      }
     }
+
+    setLuckPoints((prev) => prev - 1);
   };
 
   const handleRestoreLuckPoint = () => {
@@ -1211,7 +1238,11 @@ export default function CharacterScreen() {
                     resetKitAndRewards();
                     setIsEquipmentKitModalVisible(true);
                   };
-                  if (equipment && isCharacterLocked) {
+                  // Confirm сброса — только если комплект реально выбран (есть id)
+                  // и персонаж зафиксирован. Если комплект неизвестен (id=null,
+                  // старый сейв) — просто открываем список: сбрасывать нечего,
+                  // а выбор конкретного комплекта предложит сброс.
+                  if (equipment?.id && isCharacterLocked) {
                     if (Platform.OS === "web") {
                       if (
                         window.confirm(

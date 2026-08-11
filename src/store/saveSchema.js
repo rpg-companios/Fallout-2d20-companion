@@ -14,7 +14,7 @@
 // v2 — журнал уже выданных наград за отмеченные навыки.
 // v3 — normalize mutually exclusive weapon qualities in legacy saves.
 // v4 — damageType из строки в массив (поддержка комбинированного урона).
-export const CURRENT_SCHEMA_VERSION = 4;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

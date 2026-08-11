@@ -1,5 +1,6 @@
 import NcrCitizenModal, { traitConfig as ncrCitizenConfig } from './NcrCitizenModal';
 import SurvivorModal, { traitConfig as survivorConfig } from './SurvivorModal';
+import TribalModal, { traitConfig as tribalConfig } from './TribalModal';
 import GenericTraitModal from './GenericTraitModal';
 import React from 'react';
 
@@ -39,12 +40,14 @@ export const TRAIT_MODALS = {
   // Multi-trait pickers (still custom)
   [ncrCitizenConfig.originId]: NcrCitizenModal,
   [survivorConfig.originId]: SurvivorModal,
+  [tribalConfig.originId]: TribalModal,
   ...genericModals,
 };
 
 export const TRAIT_CONFIGS = {
   [ncrCitizenConfig.originId]: ncrCitizenConfig,
   [survivorConfig.originId]: survivorConfig,
+  [tribalConfig.originId]: tribalConfig,
   ...genericConfigs,
 };
 

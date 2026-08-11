@@ -59,7 +59,8 @@
   },
   "placeholders": {
     "selectNone": "Not selected",
-    "enterName": "Enter name"
+    "enterName": "Enter name",
+    "kitUnknown": "Equipment Kit"
   },
   "warnings": {
     "attentionTitle": "Attention!",
@@ -77,7 +78,9 @@
   "alerts": {
     "errorTitle": "Error",
     "warningTitle": "Warning",
-    "infoTitle": "Info"
+    "infoTitle": "Info",
+    "spiritsFavorTitle": "The Spirits Favor You",
+    "spiritsFavorMessage": "The spirits are kind to you. You do not spend a Luck Point."
   },
   "errors": {
     "distributeAllPerkAttributePoints": "You must distribute all available attribute points.",
@@ -94,7 +97,8 @@
     "spendAllSkillPoints": "You must distribute all skill points.",
     "exactBaseSkillsRequired": "You must select exactly {required} base skills. Selected: {selected}.",
     "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
-    "maxSkillRank": "Error: maximum skill rank is {maxRank}"
+    "maxSkillRank": "Error: maximum skill rank is {maxRank}",
+    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it."
   },
   "modals": {
     "ncrCitizen": {
@@ -118,7 +122,8 @@
     },
     "origins": {
       "survivorTitle": "Origin Trait «Survivor»",
-      "ncrTitle": "Origin Trait «NCR Citizen»"
+      "ncrTitle": "Origin Trait «NCR Citizen»",
+      "tribalTitle": "Origin Trait «Tribal»"
     },
     "survivor": {
       "twoTraits": "2 traits",
@@ -143,6 +148,15 @@
       "description": "Choose skills from the provided group. They will be marked as extra.",
       "choose1": "Choose 1 skill",
       "chooseN": "Choose {count} skills"
+    },
+    "tribal": {
+      "twoTraits": "2 traits",
+      "twoTraitsDesc": "Any combination: 2 Tribal, 2 Survivor, or 1+1",
+      "oneTraitOnePerk": "1 trait and 1 perk",
+      "selectTwoTraitsHint": "Select 2 traits in any combination.",
+      "tribalTraitsList": "Tribal Traits List",
+      "survivorTraitsList": "Survivor Traits List",
+      "ncrTraitsList": "NCR Traits List"
     }
   },
   "origins": {

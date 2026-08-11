@@ -72,7 +72,7 @@ import { Alert, Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
-import { denormalizeCharacterState, migrateCharacterState } from '../src/store/migrations.js';
+import { denormalizeCharacterState, migrateCharacterState, mergeEquipmentWithStore, mergeEquippedWeapons } from '../src/store/migrations.js';
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/saveSchema.js';
 import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
@@ -174,14 +174,19 @@ const preferFilled = (storeVal, snapshotVal) => {
   return storeVal;
 };
 
+/**
+ * Программа заточена на id: origin/trait/equipment — объекты с id, и их НИКОГДА
+ * нельзя затирать «голым» объектом без id из стора. Если стор-значение — объект
+ * без id, а снапшот имеет id — берём снапшот (метаданные), иначе preferFilled.
+ */
 const mergeSnapshotWithStoreData = (snapshot) => {
   const legacyData = denormalizeCharacterState(useCharacterStore.getState());
   return {
     ...snapshot,
     attributes: preferFilled(legacyData.attributes, snapshot.attributes),
     skills: preferFilled(legacyData.skills, snapshot.skills),
-    equipment: preferFilled(legacyData.equipment, snapshot.equipment),
-    equippedWeapons: preferFilled(legacyData.equippedWeapons, snapshot.equippedWeapons),
+    equipment: mergeEquipmentWithStore(snapshot.equipment, legacyData.equipment),
+    equippedWeapons: mergeEquippedWeapons(snapshot.equippedWeapons, legacyData.equippedWeapons),
     activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
     rewardedSkills: legacyData.rewardedSkills,
   };
