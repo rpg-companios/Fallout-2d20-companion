@@ -1,5 +1,8 @@
 {
   "treefamilies_chairmen": {
+    "requiresTraitIds": [
+      "treefamilies-chairmen"
+    ],
     "items": [
       {
         "type": "fixed",
@@ -60,6 +63,9 @@
     ]
   },
   "treefamilies_omerta": {
+    "requiresTraitIds": [
+      "treefamilies-omerta"
+    ],
     "items": [
       {
         "type": "fixed",
@@ -121,6 +127,9 @@
     ]
   },
   "treefamilies_white_glove": {
+    "requiresTraitIds": [
+      "treefamilies-white-glove"
+    ],
     "items": [
       {
         "type": "fixed",

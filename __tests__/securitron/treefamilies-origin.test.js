@@ -24,8 +24,9 @@ vi.mock('../../db/Database', async () => {
 });
 import { getOrigins, getTraits, getOriginI18n, getTraitI18n, getEquipmentCatalogForLocale } from '../../domain/registry';
 import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
-import { getSelectedSubTraits, hasTraitEffect, getTraitKitId, isKitControlledByTrait } from '../../domain/traits';
+import { getSelectedSubTraits, hasTraitEffect } from '../../domain/traits';
 import { resolveKitItems } from '../../domain/kitResolver';
+import { filterKitsForCharacter } from '../../domain/equipmentKits';
 import moduleOrigins from '../../modules/fallout/data/origins.json';
 import moduleTraits from '../../modules/fallout/data/traits.json';
 
@@ -137,10 +138,12 @@ describe('Комплекты семей (в модуле) и новые пред
     ]);
   });
 
-  it('трейты семей несут equipmentKitId (комплект от трейта)', () => {
-    expect(getTrait('treefamilies-chairmen').modifiers.equipmentKitId).toBe('treefamilies_chairmen');
-    expect(getTrait('treefamilies-omerta').modifiers.equipmentKitId).toBe('treefamilies_omerta');
-    expect(getTrait('treefamilies-white-glove').modifiers.equipmentKitId).toBe('treefamilies_white_glove');
+  it('связь комплекта с семьёй лежит на комплекте (requiresTraitIds), не на трейте', () => {
+    const catalog = getEquipmentCatalogForLocale('ru-RU');
+    expect(getTrait('treefamilies-chairmen').modifiers.equipmentKitId).toBeUndefined();
+    expect(catalog.equipmentKits.treefamilies_chairmen.requiresTraitIds).toEqual(['treefamilies-chairmen']);
+    expect(catalog.equipmentKits.treefamilies_omerta.requiresTraitIds).toEqual(['treefamilies-omerta']);
+    expect(catalog.equipmentKits.treefamilies_white_glove.requiresTraitIds).toEqual(['treefamilies-white-glove']);
   });
 });
 
@@ -177,19 +180,35 @@ describe('Комплект Председателей: резолв', () => {
   });
 });
 
-describe('Комплект от трейта: единый сценарий модалки (данные, не логика)', () => {
-  it('getTraitKitId — equipmentKitId выбранного трейта (семьи)', () => {
-    expect(getTraitKitId({ id: 'treefamilies-omerta', modifiers: { equipmentKitId: 'treefamilies_omerta' } }))
-      .toBe('treefamilies_omerta');
-    expect(getTraitKitId({ id: 'treefamilies-omerta' })).toBeNull();
+describe('Комплекты семей: единый фильтр по данным requiresTraitIds', () => {
+  const getKits = () => {
+    const catalog = getEquipmentCatalogForLocale('ru-RU');
+    const origin = getOrigins().find((o) => o.id === 'TreeFamilies');
+    return origin.equipmentKitIds
+      .map((kitId) => ({ id: kitId, ...(catalog.equipmentKits[kitId] || {}) }))
+      .filter((kit) => Array.isArray(kit.items));
+  };
+
+  it('каждый комплект семьи привязан к своему трейту через requiresTraitIds', () => {
+    const kits = getKits();
+    const byId = Object.fromEntries(kits.map((k) => [k.id, k]));
+    expect(byId.treefamilies_chairmen.requiresTraitIds).toEqual(['treefamilies-chairmen']);
+    expect(byId.treefamilies_omerta.requiresTraitIds).toEqual(['treefamilies-omerta']);
+    expect(byId.treefamilies_white_glove.requiresTraitIds).toEqual(['treefamilies-white-glove']);
   });
 
-  it('isKitControlledByTrait — по данным: TreeFamilies да, обычные ориджины нет', () => {
-    const treeFamilies = getOrigins().find((o) => o.id === 'TreeFamilies');
-    expect(isKitControlledByTrait(treeFamilies)).toBe(true);
-    // ориджин без трейт-комплектов — false
-    const tribal = getOrigins().find((o) => o.id === 'tribal');
-    expect(isKitControlledByTrait(tribal)).toBe(false);
-    expect(isKitControlledByTrait({})).toBe(false);
+  it('трейты семей больше не несут equipmentKitId (связь живёт на комплекте)', () => {
+    for (const t of moduleTraits) {
+      expect(t.modifiers?.equipmentKitId).toBeUndefined();
+    }
+  });
+
+  it('filterKitsForCharacter: выбранная семья видит свой комплект', () => {
+    const kits = getKits();
+    const ids = (trait) => filterKitsForCharacter(kits, trait).map((k) => k.id);
+
+    expect(ids({ ids: ['treefamilies-chairmen'] })).toEqual(['treefamilies_chairmen']);
+    expect(ids({ ids: ['treefamilies-omerta'] })).toEqual(['treefamilies_omerta']);
+    expect(ids({ ids: ['treefamilies-white-glove'] })).toEqual(['treefamilies_white_glove']);
   });
 });

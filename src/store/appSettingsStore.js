@@ -12,7 +12,7 @@ const useAppSettingsStore = create(
       weaponDurabilityLossPer10Shots: 1,
       characterFoldersEnabled: false,
       // Режим отображения карточек оружия на экране снаряжения:
-      // 'cards' (по умолчанию) | 'spoilers' | 'tabs'
+      // 'cards' (по умолчанию) | 'spoilers' | 'tabs' (пока скрыт из UI).
       weaponCardsDisplayMode: 'cards',
       setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
       setRandomWeaponQualityEnabled: (enabled) => set({ randomWeaponQualityEnabled: Boolean(enabled) }),

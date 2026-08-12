@@ -307,6 +307,31 @@ const styles = StyleSheet.create({
   weaponSpoilerBody: { alignItems: 'center', marginTop: 8 },
   weaponSpoilerCard: { width: '66.67%' },
 
+  // Переключатель вида оружия на самом экране снаряжения (две векторные иконки
+  // справа: горизонтальные линии = спойлеры, две вертикальные черты = карточки).
+  weaponDisplayToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  weaponDisplayToggleBtn: {
+    width: 38,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2c2c2c',
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 5,
+  },
+  weaponDisplayToggleBtnActive: {
+    borderColor: '#e8a33d',
+    backgroundColor: '#4a4a4a',
+  },
+
+  // Третий режим (табы) скрыт из переключателя, но стили рендера сохранены.
   weaponTabsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10, gap: 6 },
   weaponTab: {
     paddingHorizontal: 16,

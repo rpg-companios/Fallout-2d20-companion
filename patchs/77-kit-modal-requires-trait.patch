@@ -1,0 +1,500 @@
+diff --git a/__tests__/securitron/treefamilies-origin.test.js b/__tests__/securitron/treefamilies-origin.test.js
+index 1953443..77e09eb 100644
+--- a/__tests__/securitron/treefamilies-origin.test.js
++++ b/__tests__/securitron/treefamilies-origin.test.js
+@@ -24,8 +24,9 @@ vi.mock('../../db/Database', async () => {
+ });
+ import { getOrigins, getTraits, getOriginI18n, getTraitI18n, getEquipmentCatalogForLocale } from '../../domain/registry';
+ import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
+-import { getSelectedSubTraits, hasTraitEffect, getTraitKitId, isKitControlledByTrait } from '../../domain/traits';
++import { getSelectedSubTraits, hasTraitEffect } from '../../domain/traits';
+ import { resolveKitItems } from '../../domain/kitResolver';
++import { filterKitsForCharacter } from '../../domain/equipmentKits';
+ import moduleOrigins from '../../modules/fallout/data/origins.json';
+ import moduleTraits from '../../modules/fallout/data/traits.json';
+ 
+@@ -137,10 +138,12 @@ describe('Комплекты семей (в модуле) и новые пред
+     ]);
+   });
+ 
+-  it('трейты семей несут equipmentKitId (комплект от трейта)', () => {
+-    expect(getTrait('treefamilies-chairmen').modifiers.equipmentKitId).toBe('treefamilies_chairmen');
+-    expect(getTrait('treefamilies-omerta').modifiers.equipmentKitId).toBe('treefamilies_omerta');
+-    expect(getTrait('treefamilies-white-glove').modifiers.equipmentKitId).toBe('treefamilies_white_glove');
++  it('связь комплекта с семьёй лежит на комплекте (requiresTraitIds), не на трейте', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(getTrait('treefamilies-chairmen').modifiers.equipmentKitId).toBeUndefined();
++    expect(catalog.equipmentKits.treefamilies_chairmen.requiresTraitIds).toEqual(['treefamilies-chairmen']);
++    expect(catalog.equipmentKits.treefamilies_omerta.requiresTraitIds).toEqual(['treefamilies-omerta']);
++    expect(catalog.equipmentKits.treefamilies_white_glove.requiresTraitIds).toEqual(['treefamilies-white-glove']);
+   });
+ });
+ 
+@@ -177,19 +180,35 @@ describe('Комплект Председателей: резолв', () => {
+   });
+ });
+ 
+-describe('Комплект от трейта: единый сценарий модалки (данные, не логика)', () => {
+-  it('getTraitKitId — equipmentKitId выбранного трейта (семьи)', () => {
+-    expect(getTraitKitId({ id: 'treefamilies-omerta', modifiers: { equipmentKitId: 'treefamilies_omerta' } }))
+-      .toBe('treefamilies_omerta');
+-    expect(getTraitKitId({ id: 'treefamilies-omerta' })).toBeNull();
++describe('Комплекты семей: единый фильтр по данным requiresTraitIds', () => {
++  const getKits = () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const origin = getOrigins().find((o) => o.id === 'TreeFamilies');
++    return origin.equipmentKitIds
++      .map((kitId) => ({ id: kitId, ...(catalog.equipmentKits[kitId] || {}) }))
++      .filter((kit) => Array.isArray(kit.items));
++  };
++
++  it('каждый комплект семьи привязан к своему трейту через requiresTraitIds', () => {
++    const kits = getKits();
++    const byId = Object.fromEntries(kits.map((k) => [k.id, k]));
++    expect(byId.treefamilies_chairmen.requiresTraitIds).toEqual(['treefamilies-chairmen']);
++    expect(byId.treefamilies_omerta.requiresTraitIds).toEqual(['treefamilies-omerta']);
++    expect(byId.treefamilies_white_glove.requiresTraitIds).toEqual(['treefamilies-white-glove']);
+   });
+ 
+-  it('isKitControlledByTrait — по данным: TreeFamilies да, обычные ориджины нет', () => {
+-    const treeFamilies = getOrigins().find((o) => o.id === 'TreeFamilies');
+-    expect(isKitControlledByTrait(treeFamilies)).toBe(true);
+-    // ориджин без трейт-комплектов — false
+-    const tribal = getOrigins().find((o) => o.id === 'tribal');
+-    expect(isKitControlledByTrait(tribal)).toBe(false);
+-    expect(isKitControlledByTrait({})).toBe(false);
++  it('трейты семей больше не несут equipmentKitId (связь живёт на комплекте)', () => {
++    for (const t of moduleTraits) {
++      expect(t.modifiers?.equipmentKitId).toBeUndefined();
++    }
++  });
++
++  it('filterKitsForCharacter: выбранная семья видит свой комплект', () => {
++    const kits = getKits();
++    const ids = (trait) => filterKitsForCharacter(kits, trait).map((k) => k.id);
++
++    expect(ids({ ids: ['treefamilies-chairmen'] })).toEqual(['treefamilies_chairmen']);
++    expect(ids({ ids: ['treefamilies-omerta'] })).toEqual(['treefamilies_omerta']);
++    expect(ids({ ids: ['treefamilies-white-glove'] })).toEqual(['treefamilies_white_glove']);
+   });
+ });
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 61ff555..c342a45 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -20,7 +20,8 @@ import { useShallow } from 'zustand/react/shallow';
+ import OriginModal from "./modals/OriginModal";
+ import EquipmentKitModal from "./modals/EquipmentKitModal";
+ import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
+-import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect, getTraitKitId, isKitControlledByTrait } from "../../../domain/traits";
++import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
++import { filterKitsForCharacter } from "../../../domain/equipmentKits";
+ import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
+ import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
+ import {
+@@ -354,16 +355,14 @@ export default function CharacterScreen() {
+     return loadEnrichedOrigins().find((entry) => entry.id === origin.id) || { ...origin, name: tOrigin(origin.id) };
+   }, [origin, locale]);
+ 
+-  // Комплекты для модалки формируются ДАННЫМИ, модалка едина:
+-  //   - трейт несёт equipmentKitId (семья) → только комплект семьи;
+-  //   - комплект управляется трейтом, но трейт не выбран → пусто;
+-  //   - иначе → все комплекты ориджина.
++  // ЕДИНАЯ логика для всех комплектов: модалка показывает комплекты ориджина,
++  // отфильтрованные ОДНИМ общим механизмом по данным. Комплект может нести
++  // `requiresTraitIds` (напр. у «Трёх семей» комплект привязан к выбранной
++  // семье) — тогда он показан только при этом трейте. Без требования —
++  // показан всегда. Никаких спец-веток под конкретный ориджин.
+   const equipmentKitsForModal = useMemo(() => {
+     const all = localizedOrigin?.equipmentKits || origin?.equipmentKits || [];
+-    const traitKitId = getTraitKitId(trait);
+-    if (traitKitId) return all.filter((kit) => kit?.id === traitKitId);
+-    if (isKitControlledByTrait(origin)) return [];
+-    return all;
++    return filterKitsForCharacter(all, trait);
+   }, [localizedOrigin, origin, trait]);
+ 
+   const localizedTraitName = useMemo(() => {
+@@ -594,15 +593,6 @@ export default function CharacterScreen() {
+     setIsEquipmentKitModalVisible(false);
+   };
+ 
+-  // ПРАВИЛО (владелец): комплект зависит от выбранной семьи/трейта.
+-  // Всегда открываем модалку комплекта со всем содержимым: игрок видит
+-  // состав и делает выборы («нож или кастеты», «обрез или 10-мм ПП»),
+-  // подтверждение в модалке выдаёт комплект через handleSelectKit.
+-  const openKitModal = () => {
+-    if (!origin) return;
+-    setIsEquipmentKitModalVisible(true);
+-  };
+-
+   const handleToggleSkill = (skillName) => {
+     if (!canDistributeSkills) {
+       showAlert(tCharacterScreen("alerts.warningTitle"), tCharacterScreen("errors.saveAttributesFirst"));
+@@ -983,11 +973,10 @@ export default function CharacterScreen() {
+     setTrait(newTrait);
+     setIsTraitModalVisible(false);
+ 
+-    // Комплект зависит от выбранной семьи: авто-выбор по equipmentKitId трейта.
+-    const traitKitId = newModifiersFromModal?.equipmentKitId;
+-    if (traitKitId) {
+-      openKitModal();
+-    }
++    // ПРАВИЛО (владелец): модалка комплекта вызывается ВРУЧНУЮ, не автопоказ.
++    // После выбора семьи комплект не открывается сам — игрок жмёт строку
++    // «Комплект снаряжения», смотрит состав, делает выборы и подтверждает;
++    // подтверждение закрывает модалку и выдаёт предметы в инвентарь.
+   };
+ 
+   // Обработчик нажатия на строку черты
+@@ -1258,53 +1247,57 @@ export default function CharacterScreen() {
+             <PressableRow
+               title={tCharacterScreen("labels.equipmentKit")}
+               value={localizedEquipmentName || tCharacterScreen("placeholders.selectNone")}
+-              disabled={!isSaved}
++              // Строка неактивна, пока для персонажа нет доступных комплектов:
++              // у семьи это значит «трейт/семья ещё не выбраны» (все комплекты
++              // origin требуют requiresTraitIds, фильтр пуст). Это исключает
++              // открытие пустой модалки.
++              disabled={!isSaved || (!equipment?.id && equipmentKitsForModal.length === 0)}
+               onPress={() => {
+-                if (localizedOrigin && localizedOrigin.equipmentKits) {
+-                  // Просмотр комплектов свободен в любой момент.
+-                  // Если снаряжение уже выбрано и персонаж зафиксирован
+-                  // (атрибуты/навыки распределены) — новый комплект сбрасывает
+-                  // инвентарь, навыки и награды (resetKitAndRewards).
+-                  const applyKitReset = () => {
+-                    resetKitAndRewards();
+-                    setIsEquipmentKitModalVisible(true);
+-                  };
+-                  // Confirm сброса — только если комплект реально выбран (есть id)
+-                  // и персонаж зафиксирован. Если комплект неизвестен (id=null,
+-                  // старый сейв) — просто открываем список: сбрасывать нечего,
+-                  // а выбор конкретного комплекта предложит сброс.
+-                  if (equipment?.id && isCharacterLocked) {
+-                    if (Platform.OS === "web") {
+-                      if (
+-                        window.confirm(
+-                          tCharacterScreen("warnings.equipmentResetOnWeb"),
+-                        )
+-                      ) {
+-                        applyKitReset();
+-                      }
+-                    } else {
+-                      Alert.alert(
+-                          tCharacterScreen("warnings.attentionTitle"),
+-                          tCharacterScreen("warnings.equipmentResetConfirm"),
+-                        [
+-                          { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
+-                          {
+-                            text: tCharacterScreen("buttons.continue"),
+-                            onPress: applyKitReset,
+-                          },
+-                        ],
+-                      );
++                // Доступные комплекты берём из ЕДИНОГО фильтра по данным
++                // (filterKitsForCharacter) — того же, что получает модалка.
++                // Если фильтр пуст (у семьи не выбрана семья/трейт), строка
++                // уже disabled и onPress не вызывается — пустая модалка не
++                // открывается.
++                if (equipmentKitsForModal.length === 0) return;
++
++                // Просмотр комплектов свободен в любой момент.
++                // Если снаряжение уже выбрано и персонаж зафиксирован
++                // (атрибуты/навыки распределены) — новый комплект сбрасывает
++                // инвентарь, навыки и награды (resetKitAndRewards).
++                const applyKitReset = () => {
++                  resetKitAndRewards();
++                  setIsEquipmentKitModalVisible(true);
++                };
++                // Confirm сброса — только если комплект реально выбран (есть id)
++                // и персонаж зафиксирован. Если комплект неизвестен (id=null,
++                // старый сейв) — просто открываем список: сбрасывать нечего,
++                // а выбор конкретного комплекта предложит сброс.
++                if (equipment?.id && isCharacterLocked) {
++                  if (Platform.OS === "web") {
++                    if (
++                      window.confirm(
++                        tCharacterScreen("warnings.equipmentResetOnWeb"),
++                      )
++                    ) {
++                      applyKitReset();
+                     }
+                   } else {
+-                    // До распределения — просто открываем (смена свободна,
+-                    // старый комплект заменится при выборе нового).
+-                    setIsEquipmentKitModalVisible(true);
++                    Alert.alert(
++                        tCharacterScreen("warnings.attentionTitle"),
++                        tCharacterScreen("warnings.equipmentResetConfirm"),
++                      [
++                        { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
++                        {
++                          text: tCharacterScreen("buttons.continue"),
++                          onPress: applyKitReset,
++                        },
++                      ],
++                    );
+                   }
+                 } else {
+-                  showAlert(
+-                    tCharacterScreen("alerts.infoTitle"),
+-                    tCharacterScreen("warnings.noEquipmentForOrigin"),
+-                  );
++                  // До распределения — просто открываем (смена свободна,
++                  // старый комплект заменится при выборе нового).
++                  setIsEquipmentKitModalVisible(true);
+                 }
+               }}
+             />
+diff --git a/domain/traits.js b/domain/traits.js
+index fed7cd4..92f62f3 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -337,32 +337,3 @@ export function hasTraitEffect(trait, effectId) {
+     (t?.modifiers?.effects || []).includes(effectId),
+   );
+ }
+-
+-// ---------------------------------------------------------------------------
+-// Комплект снаряжения, определяемый трейтом («Три семьи» и т.п.)
+-// ---------------------------------------------------------------------------
+-
+-/**
+- * id комплекта, закреплённого за выбранным трейтом (equipmentKitId),
+- * или null. У семей «Трёх семей» комплект несёт каждый под-трейт.
+- */
+-export function getTraitKitId(trait) {
+-  return trait?.modifiers?.equipmentKitId || null;
+-}
+-
+-/**
+- * Определяет, управляется ли комплект ориджина трейтом: у мульти-трейта
+- * ориджина под-трейты несут equipmentKitId (семья → свой комплект).
+- * Решение по данным — без хардкода id ориджинов.
+- */
+-export function isKitControlledByTrait(origin) {
+-  const traitIds = Array.isArray(origin?.traitIds) ? origin.traitIds : [];
+-  const allTraits = getTraits();
+-  return traitIds.some((id) => {
+-    const trait = allTraits.find((x) => x?.id === id);
+-    return (trait?.modifiers?.subTraitIds || []).some((subId) => {
+-      const sub = allTraits.find((x) => x?.id === subId);
+-      return Boolean(sub?.modifiers?.equipmentKitId);
+-    });
+-  });
+-}
+diff --git a/modules/fallout/data/equipmentKits/treefamilies.json b/modules/fallout/data/equipmentKits/treefamilies.json
+index f91202a..c8b7415 100644
+--- a/modules/fallout/data/equipmentKits/treefamilies.json
++++ b/modules/fallout/data/equipmentKits/treefamilies.json
+@@ -1,5 +1,8 @@
+ {
+   "treefamilies_chairmen": {
++    "requiresTraitIds": [
++      "treefamilies-chairmen"
++    ],
+     "items": [
+       {
+         "type": "fixed",
+@@ -60,6 +63,9 @@
+     ]
+   },
+   "treefamilies_omerta": {
++    "requiresTraitIds": [
++      "treefamilies-omerta"
++    ],
+     "items": [
+       {
+         "type": "fixed",
+@@ -121,6 +127,9 @@
+     ]
+   },
+   "treefamilies_white_glove": {
++    "requiresTraitIds": [
++      "treefamilies-white-glove"
++    ],
+     "items": [
+       {
+         "type": "fixed",
+@@ -216,4 +225,4 @@
+       }
+     ]
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/modules/fallout/data/traits.json b/modules/fallout/data/traits.json
+index 325ef9d..13912ac 100644
+--- a/modules/fallout/data/traits.json
++++ b/modules/fallout/data/traits.json
+@@ -21,8 +21,7 @@
+     "modifiers": {
+       "effects": [
+         "chairmen_reroll_cha"
+-      ],
+-      "equipmentKitId": "treefamilies_chairmen"
++      ]
+     }
+   },
+   {
+@@ -33,8 +32,7 @@
+     "modifiers": {
+       "effects": [
+         "omerta_addiction_boost"
+-      ],
+-      "equipmentKitId": "treefamilies_omerta"
++      ]
+     }
+   },
+   {
+@@ -47,8 +45,7 @@
+         "white_glove_food_heal_plus",
+         "white_glove_butcher_extra",
+         "white_glove_cha_complication"
+-      ],
+-      "equipmentKitId": "treefamilies_white_glove"
++      ]
+     }
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/domain/equipmentKits.js b/domain/equipmentKits.js
+new file mode 100644
+--- /dev/null
++++ b/domain/equipmentKits.js
+
+index 0000000..c13e92e
+--- /dev/null
++++ b/domain/equipmentKits.js
+@@ -0,0 +1,68 @@
++// domain/equipmentKits.js
++// Чистая логика комплектов снаряжения: без React, без данных конкретного
++// сеттинга. Состав комплектов и требования к ним — ДАННЫЕ модуля.
++//
++// Движок знает только один механизм: комплект может заявлять требования
++// по выбранным трейтам персонажа (`requiresTraitIds`). UI комплектов
++// вызывает фильтр и показывает то, что прошло по данным. Никаких
++// спец-веток «для семей» и т.п.
++
++import { getSelectedSubTraits } from './traits';
++
++/**
++ * Множество id выбранных трейтов (включая под-трейты мульти-трейтов).
++ * Для обычного одиночного трейта — его id; для семьи — id выбранной семьи.
++ *
++ * Учитывает обе формы хранения:
++ *   - актуальная: trait.ids (массив) + trait.id;
++ *   - legacy: одиночный trait без ids (id попадает в множество из getSelectedSubTraits).
++ *
++ * @param {object|null|undefined} trait
++ * @returns {Set<string>}
++ */
++export function getSelectedTraitIdSet(trait) {
++  const ids = new Set();
++  // Прямые id из объекта трейта — актуальная форма (одиночный трейт или
++  // первичный id мульти-трейта).
++  if (trait?.id) ids.add(trait.id);
++  if (Array.isArray(trait?.ids)) trait.ids.forEach((id) => id && ids.add(id));
++  // Под-трейты из данных (резолв по реестру) — для наследных/составных форм.
++  for (const t of getSelectedSubTraits(trait)) {
++    if (t?.id) ids.add(t.id);
++  }
++  return ids;
++}
++
++/**
++ * Доступен ли комплект персонажу с данным набором выбранных трейтов.
++ *
++ * Правило (по данным, единое для ВСЕХ комплектов):
++ *   - `requiresTraitIds` отсутствует/пуст → комплект доступен всегда;
++ *   - иначе комплект доступен, если ХОТЯ БЫ ОДИН из требуемых трейтов
++ *     выбран у персонажа (комплект «привязан» к этому трейту).
++ *
++ * @param {object} kit                 запись комплекта из каталога
++ * @param {Set<string>} selectedIds    множество id выбранных трейтов
++ * @returns {boolean}
++ */
++export function kitIsAvailableForTraits(kit, selectedIds) {
++  const required = Array.isArray(kit?.requiresTraitIds) ? kit.requiresTraitIds : [];
++  if (required.length === 0) return true;
++  return required.some((id) => selectedIds.has(id));
++}
++
++/**
++ * Фильтрует список комплектов ориджина по требованиям из данных.
++ * Одна общая логика для любых ориджинов: у «Трёх семей» каждый комплект
++ * несёт свой requiresTraitIds и покажется только выбранной семье; у всех
++ * остальных комплектов требования пусты и показываются все.
++ *
++ * @param {Array<object>} kits    записи комплектов ориджина
++ * @param {object|null} trait     выбранный трейт персонажа
++ * @returns {Array<object>}
++ */
++export function filterKitsForCharacter(kits, trait) {
++  if (!Array.isArray(kits) || kits.length === 0) return [];
++  const selectedIds = getSelectedTraitIdSet(trait);
++  return kits.filter((kit) => kitIsAvailableForTraits(kit, selectedIds));
++}
+diff --git a/__tests__/equipment-kits-split/kit-trait-requirement.test.js b/__tests__/equipment-kits-split/kit-trait-requirement.test.js
+new file mode 100644
+--- /dev/null
++++ b/__tests__/equipment-kits-split/kit-trait-requirement.test.js
+
+index 0000000..942300d
+--- /dev/null
++++ b/__tests__/equipment-kits-split/kit-trait-requirement.test.js
+@@ -0,0 +1,52 @@
++import { describe, it, expect, vi } from 'vitest';
++
++vi.mock('../../i18n/locale', () => ({ getCurrentLocale: () => 'ru-RU' }));
++
++import {
++  kitIsAvailableForTraits,
++  filterKitsForCharacter,
++} from '../../domain/equipmentKits';
++
++const kits = [
++  { id: 'kit_open' },
++  { id: 'kit_chairmen', requiresTraitIds: ['treefamilies-chairmen'] },
++  { id: 'kit_omerta', requiresTraitIds: ['treefamilies-omerta'] },
++  { id: 'kit_two', requiresTraitIds: ['a', 'b'] },
++];
++
++describe('equipmentKits — единый фильтр комплектов по требованиям из данных', () => {
++  it('без требования комплект доступен всегда', () => {
++    expect(kitIsAvailableForTraits({ id: 'x' }, new Set())).toBe(true);
++  });
++
++  it('комплект с requiresTraitIds скрыт, пока нужный трейт не выбран', () => {
++    expect(kitIsAvailableForTraits(kits[1], new Set())).toBe(false);
++  });
++
++  it('комплект показан, если выбран один из его требуемых трейтов', () => {
++    expect(kitIsAvailableForTraits(kits[3], new Set(['a']))).toBe(true);
++    expect(kitIsAvailableForTraits(kits[3], new Set(['b']))).toBe(true);
++    expect(kitIsAvailableForTraits(kits[3], new Set(['c']))).toBe(false);
++  });
++
++  it('для семьи Председателей — только их комплект и общие', () => {
++    const trait = { ids: ['treefamilies-chairmen'] };
++    const ids = filterKitsForCharacter(kits, trait).map((k) => k.id);
++    expect(ids).toEqual(['kit_open', 'kit_chairmen']);
++  });
++
++  it('для Омерты — только их комплект и общие', () => {
++    const trait = { id: 'treefamilies-omerta' };
++    const ids = filterKitsForCharacter(kits, trait).map((k) => k.id);
++    expect(ids).toEqual(['kit_open', 'kit_omerta']);
++  });
++
++  it('без выбранного трейта видны только комплекты без требования', () => {
++    expect(filterKitsForCharacter(kits, null).map((k) => k.id)).toEqual(['kit_open']);
++  });
++
++  it('пустой/отсутствующий список — пустой результат', () => {
++    expect(filterKitsForCharacter([], null)).toEqual([]);
++    expect(filterKitsForCharacter(undefined, null)).toEqual([]);
++  });
++});

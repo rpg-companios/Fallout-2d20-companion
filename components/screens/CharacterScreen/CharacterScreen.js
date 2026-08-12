@@ -20,7 +20,7 @@ import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
-import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect, getTraitKitId, isKitControlledByTrait } from "../../../domain/traits";
+import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
 import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
@@ -354,16 +354,13 @@ export default function CharacterScreen() {
     return loadEnrichedOrigins().find((entry) => entry.id === origin.id) || { ...origin, name: tOrigin(origin.id) };
   }, [origin, locale]);
 
-  // Комплекты для модалки формируются ДАННЫМИ, модалка едина:
-  //   - трейт несёт equipmentKitId (семья) → только комплект семьи;
-  //   - комплект управляется трейтом, но трейт не выбран → пусто;
-  //   - иначе → все комплекты ориджина.
+  // ЕДИНАЯ логика для всех комплектов: модалка показывает комплекты ориджина,
+  // отфильтрованные ОДНИМ общим механизмом по данным. Комплект может нести
+  // `requiresTraitIds` (напр. у «Трёх семей» комплект привязан к выбранной
+  // семье) — тогда он показан только при этом трейте. Без требования —
+  // показан всегда. Никаких спец-веток под конкретный ориджин.
   const equipmentKitsForModal = useMemo(() => {
     const all = localizedOrigin?.equipmentKits || origin?.equipmentKits || [];
-    const traitKitId = getTraitKitId(trait);
-    if (traitKitId) return all.filter((kit) => kit?.id === traitKitId);
-    if (isKitControlledByTrait(origin)) return [];
-    return all;
   }, [localizedOrigin, origin, trait]);
 
   const localizedTraitName = useMemo(() => {
@@ -592,15 +589,6 @@ export default function CharacterScreen() {
     }
 
     setIsEquipmentKitModalVisible(false);
-  };
-
-  // ПРАВИЛО (владелец): комплект зависит от выбранной семьи/трейта.
-  // Всегда открываем модалку комплекта со всем содержимым: игрок видит
-  // состав и делает выборы («нож или кастеты», «обрез или 10-мм ПП»),
-  // подтверждение в модалке выдаёт комплект через handleSelectKit.
-  const openKitModal = () => {
-    if (!origin) return;
-    setIsEquipmentKitModalVisible(true);
   };
 
   const handleToggleSkill = (skillName) => {
@@ -983,11 +971,10 @@ export default function CharacterScreen() {
     setTrait(newTrait);
     setIsTraitModalVisible(false);
 
-    // Комплект зависит от выбранной семьи: авто-выбор по equipmentKitId трейта.
-    const traitKitId = newModifiersFromModal?.equipmentKitId;
-    if (traitKitId) {
-      openKitModal();
-    }
+    // ПРАВИЛО (владелец): модалка комплекта вызывается ВРУЧНУЮ, не автопоказ.
+    // После выбора семьи комплект не открывается сам — игрок жмёт строку
+    // «Комплект снаряжения», смотрит состав, делает выборы и подтверждает;
+    // подтверждение закрывает модалку и выдаёт предметы в инвентарь.
   };
 
   // Обработчик нажатия на строку черты

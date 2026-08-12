@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -643,14 +644,16 @@ const WeaponsAndArmorScreen = () => {
     [dedupedEquippedWeapons],
   );
 
-  // ── Режим отображения карточек оружия (настройка интерфейса) ─────────────
+  // ── Режим отображения оружия (переключатель — на этом экране) ───────────
   const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
+  const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
 
   // Спойлеры: по умолчанию ЗАКРЫТЫ (в объекте хранятся открытые индексы).
   const [openSpoilers, setOpenSpoilers] = useState({});
   const toggleSpoiler = (index) => setOpenSpoilers((prev) => ({ ...prev, [index]: !prev[index] }));
 
-  // Табы: активный индекс + свайп по строке табов.
+  // Табы: третий режим пока скрыт из UI переключателя, но код рендера и
+  // поддержка сохранённого значения 'tabs' сохраняются (ПРАВИЛО владельца).
   const [activeTab, setActiveTab] = useState(0);
   const weaponsCount = orderedEquippedWeapons.length;
   useEffect(() => {
@@ -991,7 +994,42 @@ const WeaponsAndArmorScreen = () => {
               </View>
             )}
             
-            {/* Оружие — режим отображения из настроек интерфейса */}
+            {/* Переключение вида оружия — справа между ячейками тела и оружием.
+                Реактивная смена через стор настроек; режимов два: спойлеры и карточки. */}
+            <View style={localStyles.weaponDisplayToggleRow}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
+                onPress={() => setWeaponCardsDisplayMode('spoilers')}
+                style={[
+                  localStyles.weaponDisplayToggleBtn,
+                  weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="menu"
+                  size={20}
+                  color={weaponCardsDisplayMode === 'spoilers' ? '#e8a33d' : '#aaa'}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
+                onPress={() => setWeaponCardsDisplayMode('cards')}
+                style={[
+                  localStyles.weaponDisplayToggleBtn,
+                  weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="view-column-outline"
+                  size={20}
+                  color={weaponCardsDisplayMode === 'cards' ? '#e8a33d' : '#aaa'}
+                />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Оружие — режим отображения выбирается на этом экране */}
             {weaponCardsDisplayMode === 'cards' && (
               <View style={{ marginBottom: 16 }}>
                 {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
@@ -1122,7 +1160,6 @@ const WeaponsAndArmorScreen = () => {
                 )}
               </View>
             )}
-            
 
         </ScrollView>
       </SafeAreaView>
