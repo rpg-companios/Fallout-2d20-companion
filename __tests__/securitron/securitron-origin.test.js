@@ -26,11 +26,11 @@ vi.mock('../../db/Database', async () => {
 import originsJson from '../../data/origins/origins.json';
 import traitsJson from '../../data/traits/traits.json';
 import bodyPlans from '../../data/bodyplans/bodyplans.json';
-import kitData from '../../data/equipmentKits/securitron.json';
+import kitData from '../../modules/fallout/data/equipmentKits/index.js';
 import ruTraits from '../../i18n/ru-RU/data/system/traits.json';
 import enTraits from '../../i18n/en-EN/data/system/traits.json';
-import ruKitNames from '../../i18n/ru-RU/data/system/equipmentKits.json';
-import enKitNames from '../../i18n/en-EN/data/system/equipmentKits.json';
+import moduleRuI18n from '../../modules/fallout/i18n/ru-RU.json';
+import moduleEnI18n from '../../modules/fallout/i18n/en-EN.json';
 import ruRobotHeads from '../../i18n/ru-RU/data/equipment/robot/robotheads.json';
 import enRobotHeads from '../../i18n/en-EN/data/equipment/robot/robotheads.json';
 import ruRobotBodies from '../../i18n/ru-RU/data/equipment/robot/robotbody.json';
@@ -255,8 +255,8 @@ describe('Ориджин Секьюритрон: комплект и слоты 
     expect(kitData[KIT_ID]).toBeDefined();
     expect(Array.isArray(kitData[KIT_ID].items)).toBe(true);
     expect(kitData[KIT_ID].name).toBeUndefined(); // имя — только в i18n
-    expect(ruKitNames[KIT_ID].name).toBeTruthy();
-    expect(enKitNames[KIT_ID].name).toBeTruthy();
+    expect(moduleRuI18n.equipmentKits[KIT_ID].name).toBeTruthy();
+    expect(moduleEnI18n.equipmentKits[KIT_ID].name).toBeTruthy();
   });
 
   it('каталог собирает комплект (name + items) без ошибок каталога', () => {

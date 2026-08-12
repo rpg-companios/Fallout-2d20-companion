@@ -22,7 +22,7 @@ import moduleOrigins from '../modules/fallout/data/origins.json';
 import moduleTraits from '../modules/fallout/data/traits.json';
 import moduleWeapons from '../modules/fallout/data/weapons.json';
 import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits.json';
+import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
 import moduleRuI18n from '../modules/fallout/i18n/ru-RU.json';
 import moduleEnI18n from '../modules/fallout/i18n/en-EN.json';
 

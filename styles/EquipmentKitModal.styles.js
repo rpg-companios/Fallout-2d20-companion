@@ -91,6 +91,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+  emptyState: {
+    paddingVertical: 40,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    color: '#aaa',
+    fontSize: 15,
+    textAlign: 'center',
+  },
 });
 
 export default styles;

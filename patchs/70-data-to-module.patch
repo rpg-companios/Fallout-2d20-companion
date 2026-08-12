@@ -6590,45 +6590,6 @@ index fc76d48..0637a08 100644
 \ No newline at end of file
 +[]
 \ No newline at end of file
-diff --git a/docs/changelog.en.md b/docs/changelog.en.md
-index d480de1..485ca6c 100644
---- a/docs/changelog.en.md
-+++ b/docs/changelog.en.md
-@@ -1,5 +1,13 @@
- # Changelog
- 
-+## 70 — Engine/setting split: food, drinks and weapon mods move to the module entirely
-+
-+- OWNER RULE: setting data lives in the module; the engine (data/) stays empty. First batch: food (76), drinks (22), weapon mods (203) — FULL records (all stats + isMeat/isAlcohol flags + applies_to_ids with weapon_10mm_smg) moved to modules/fallout/data/{food,drinks,weapon_mods}.json; data/consumables/* and data/equipment/weapon_mods.json are empty arrays.
-+- Translations moved too: food/drinks/mods names and flavours moved from i18n/{ru-RU,en-EN}/data/... into the module i18n (sections food/drinks/weaponMods). Engine locale dictionaries for these categories are empty.
-+- The catalog (equipmentCatalog) reads the module for these categories: mergeById(module-data, module-i18n); getEquipmentData.weaponMods — from the module.
-+- Next stages (on command): weapons/armor/clothes, loot tables, perks, etc.
-+- Tests: module-data-move.test.js (3) — full records in the module, data/ empty, the catalog serves flags and names from the module.
-+
- ## 69 — Omerta and White Glove kits (full contents) + auto-reroll + modal choice
- 
- - OMERTA kit: dashing Formal clothes (quality dashing), choice "Combat Knife or Knuckles", Gomorrah casino chip (50 caps), personal trinket (oddity), 2 rolls on the chems table, 1 roll on the drinks table with auto-reroll until alcohol.
-diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
-index 4baaa37..559ca0d 100644
---- a/docs/changelog.ru.md
-+++ b/docs/changelog.ru.md
-@@ -2,6 +2,16 @@
- 
- ---
- 
-+## 70 — Разделение движок/сеттинг: еда, напитки и моды оружия — в модуль целиком
-+
-+- ПРАВИЛО (владелец): данные сеттинга живут в модуле, движок (data/) — пустой. Первая партия переноса: еда (76), напитки (22), моды оружия (203) — ПОЛНЫЕ записи (все статы + флаги isMeat/isAlcohol + applies_to_ids с weapon_10mm_smg) переехали в modules/fallout/data/{food,drinks,weapon_mods}.json; data/consumables/* и data/equipment/weapon_mods.json — пустые массивы.
-+- Переводы тоже в модуль: имена/флейворы еды, напитков и модов перенесены из i18n/{ru-RU,en-EN}/data/... в модульный i18n (секции food/drinks/weaponMods). Движковые словари локалей для этих категорий — пустые.
-+- Каталог (equipmentCatalog) для этих категорий читает модуль: mergeById(модуль-данные, модуль-i18n); getEquipmentData.weaponMods — из модуля.
-+- Следующие этапы (по команде): оружие/броня/одежда, лут-таблицы, перки и т.д.
-+- Тесты: module-data-move.test.js (3) — полные записи в модуле, data/ пустая, каталог отдаёт флаги и имена из модуля.
-+
-+---
-+
- ## 69 — Комплекты Омерты и Белой перчатки (полные составы) + авто-переброс + выбор в модалке
- 
- - Комплект ОМЕРТЫ: дерзкая Формальная одежда (качество dashing), выбор «Боевой нож или Кастеты», фишка казино «Гоморра» (50 крышек), личная безделушка (oddity), 2 броска по таблице препаратов, 1 бросок по таблице напитков с авто-перебросом до алкоголя.
 diff --git a/i18n/en-EN/data/consumables/drinks.json b/i18n/en-EN/data/consumables/drinks.json
 index 9f1badd..0637a08 100644
 --- a/i18n/en-EN/data/consumables/drinks.json

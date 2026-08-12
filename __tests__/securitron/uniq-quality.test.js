@@ -9,27 +9,6 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
-// Тестовые определения качеств в модуле (каталог пока пуст — владелец добавит
-// свои; в этом файле подменяем на тестовые, остальной i18n модуля сохраняем).
-vi.mock('../../modules/fallout/data/uniq_qualities.json', () => ({
-  default: [
-    { id: 'dashing' },
-    { id: 'elegant' },
-  ],
-}));
-vi.mock('../../modules/fallout/i18n/ru-RU.json', async () => {
-  const actual = await vi.importActual('../../modules/fallout/i18n/ru-RU.json');
-  return {
-    default: {
-      ...actual.default,
-      uniqQualities: [
-        { id: 'dashing', name: 'Дерзкая' },
-        { id: 'elegant', name: 'Элегантная' },
-      ],
-    },
-  };
-});
-
 vi.mock('../../db/Database', async () => {
   const catalog = await import('../../db/catalogSource');
   return {

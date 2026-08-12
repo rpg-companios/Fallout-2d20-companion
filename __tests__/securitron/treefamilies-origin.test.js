@@ -24,7 +24,7 @@ vi.mock('../../db/Database', async () => {
 });
 import { getOrigins, getTraits, getOriginI18n, getTraitI18n, getEquipmentCatalogForLocale } from '../../domain/registry';
 import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
-import { getSelectedSubTraits, hasTraitEffect } from '../../domain/traits';
+import { getSelectedSubTraits, hasTraitEffect, getTraitKitId, isKitControlledByTrait } from '../../domain/traits';
 import { resolveKitItems } from '../../domain/kitResolver';
 import moduleOrigins from '../../modules/fallout/data/origins.json';
 import moduleTraits from '../../modules/fallout/data/traits.json';
@@ -174,5 +174,22 @@ describe('Комплект Председателей: резолв', () => {
     );
     expect(extraMisc.length).toBeGreaterThanOrEqual(1); // личная безделушка
     void resolvedIds;
+  });
+});
+
+describe('Комплект от трейта: единый сценарий модалки (данные, не логика)', () => {
+  it('getTraitKitId — equipmentKitId выбранного трейта (семьи)', () => {
+    expect(getTraitKitId({ id: 'treefamilies-omerta', modifiers: { equipmentKitId: 'treefamilies_omerta' } }))
+      .toBe('treefamilies_omerta');
+    expect(getTraitKitId({ id: 'treefamilies-omerta' })).toBeNull();
+  });
+
+  it('isKitControlledByTrait — по данным: TreeFamilies да, обычные ориджины нет', () => {
+    const treeFamilies = getOrigins().find((o) => o.id === 'TreeFamilies');
+    expect(isKitControlledByTrait(treeFamilies)).toBe(true);
+    // ориджин без трейт-комплектов — false
+    const tribal = getOrigins().find((o) => o.id === 'tribal');
+    expect(isKitControlledByTrait(tribal)).toBe(false);
+    expect(isKitControlledByTrait({})).toBe(false);
   });
 });

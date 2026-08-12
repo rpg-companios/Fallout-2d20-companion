@@ -1,5 +1,5 @@
 import { debugLog } from '../../../../src/debug/falloutDebug';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { resolveKitItems } from '../../../../domain/kitResolver';
 import { initRobotSlots } from '../../../../domain/robotEquip';
@@ -216,11 +216,14 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
   const [selectedChoices, setSelectedChoices] = useState({});
   const [calculatedKits, setCalculatedKits] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (!visible || !equipmentKits?.length) {
       setCalculatedKits([]);
       setSelectedChoices({});
+      setExpandedKit(null);
+      submittingRef.current = false;
       return;
     }
 
@@ -268,6 +271,10 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
   };
 
   const handleSelectKit = (kit) => {
+    // Защита от двойного нажатия «Выбрать»: повторный вызов, пока идёт
+    // обработка, игнорируется — иначе комплект выдаётся дважды.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     const chosenEntries = flattenKitItems(kit, selectedChoices);
     const inventoryItems = toInventoryItems(chosenEntries);
     const { finalItems, totalCaps, weight, price } = summarizeItems(inventoryItems);
@@ -363,6 +370,12 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
 
           {isLoading ? (
             <ActivityIndicator size="large" color="#005A9C" style={{ marginVertical: 30 }} />
+          ) : calculatedKits.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                {tCharacterScreen('modals.equipmentKit.empty')}
+              </Text>
+            </View>
           ) : (
             <ScrollView>
               {calculatedKits.map((kit) => {

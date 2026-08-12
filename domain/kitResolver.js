@@ -230,7 +230,38 @@ export async function resolveNonWeaponItem(item) {
     const mode = roll.mode === 'sum' ? 'sum' : 'separate';
     const sides = parseInt(String(roll.rollType || '').replace(/\D/g, ''), 10) || 20;
     const tableId = ROLL_TABLE_TAG[item.tableId] || item.tableId;
-    const resolvedItems = await resolveRandomLootByRoll(tableId, count, mode, sides);
+    // Авто-переброс (rerollUntil): бросаем, пока результат не удовлетворит
+    // условию на поле предмета — { "isAlcohol": true } / { "isMeat": true }.
+    // Побросковый переброс (separate): каждый бросок крутится отдельно, со
+    // своим лимитом попыток (таблица может быть смещена к неподходящим
+    // позициям — лимит защищает от бесконечного цикла; если подходящих нет
+    // вообще — остаётся последний бросок как есть).
+    const rerollUntil = item.rerollUntil;
+    const matchesReroll = (entry) => Object.entries(rerollUntil || {})
+      .every(([field, expected]) => entry?.[field] === expected);
+    let resolvedItems = await resolveRandomLootByRoll(tableId, count, mode, sides);
+    if (rerollUntil && Object.keys(rerollUntil).length && resolvedItems.length) {
+      const rollSingle = () => resolveRandomLootByRoll(tableId, 1, 'separate', sides);
+      if (mode === 'separate') {
+        const rerolled = [];
+        for (const entry of resolvedItems) {
+          let item = entry;
+          for (let attempt = 0; attempt < 50 && item && !matchesReroll(item); attempt += 1) {
+            const again = await rollSingle();
+            item = again?.[0] || item;
+          }
+          rerolled.push(item);
+        }
+        resolvedItems = rerolled;
+      } else {
+        // mode 'sum': одна суммарная кость — перебрасываем партию целиком.
+        for (let attempt = 0; attempt < 50 && !resolvedItems.every(matchesReroll); attempt += 1) {
+          const again = await resolveRandomLootByRoll(tableId, count, mode, sides);
+          if (!again.length) break;
+          resolvedItems = again;
+        }
+      }
+    }
     // Preserve each rolled item's native itemType (chem/weapon/armor/clothing/misc)
     // so addNewItem stores them under the right inventory category. Previously
     // every roll result was tagged itemType: 'loot', which made inventory

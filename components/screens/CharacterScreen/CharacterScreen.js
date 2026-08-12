@@ -19,10 +19,9 @@ import { selectActiveTimedEffects } from "../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
-import { loadEnrichedOrigins, tOrigin, getBuiltinBaseWeapon } from "../../../domain/origins";
-import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
+import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
+import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect, getTraitKitId, isKitControlledByTrait } from "../../../domain/traits";
 import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
-import { resolveKitItems } from "../../../domain/kitResolver";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
   createInitialAttributes,
@@ -355,6 +354,18 @@ export default function CharacterScreen() {
     return loadEnrichedOrigins().find((entry) => entry.id === origin.id) || { ...origin, name: tOrigin(origin.id) };
   }, [origin, locale]);
 
+  // Комплекты для модалки формируются ДАННЫМИ, модалка едина:
+  //   - трейт несёт equipmentKitId (семья) → только комплект семьи;
+  //   - комплект управляется трейтом, но трейт не выбран → пусто;
+  //   - иначе → все комплекты ориджина.
+  const equipmentKitsForModal = useMemo(() => {
+    const all = localizedOrigin?.equipmentKits || origin?.equipmentKits || [];
+    const traitKitId = getTraitKitId(trait);
+    if (traitKitId) return all.filter((kit) => kit?.id === traitKitId);
+    if (isKitControlledByTrait(origin)) return [];
+    return all;
+  }, [localizedOrigin, origin, trait]);
+
   const localizedTraitName = useMemo(() => {
     if (!trait) return null;
     const traitId = trait.id || trait.ids?.[0];
@@ -510,7 +521,11 @@ export default function CharacterScreen() {
     // Новый комплект заменяет старый: очищаем снаряжение, инвентарь и награды
     // (атрибуты/навыки сохраняются; навыки сбрасываются только при locked —
     // см. resetKitAndRewards в confirm-флоу).
-    if (equipment && equipment.id !== kit.id) {
+    // Сброс — при ЛЮБОМ подтверждении, если комплект уже выбран (повторное
+    // «Выбрать» по тому же комплекту перевыдаёт его, а не дублирует предметы:
+    // раньше при equipment.id === kit.id сброса не было → предметы
+    // добавлялись повторно, quantity удваивался).
+    if (equipment) {
       resetKitAndRewards();
     }
 
@@ -580,28 +595,12 @@ export default function CharacterScreen() {
   };
 
   // ПРАВИЛО (владелец): комплект зависит от выбранной семьи/трейта.
-  // Если трейт несёт equipmentKitId — комплект выбирается автоматически.
-  const applyKitById = async (kitId) => {
-    if (!kitId || !origin) return;
-    const catalog = getEquipmentCatalog(locale);
-    const kitMeta = catalog?.equipmentKits?.[kitId];
-    if (!kitMeta || !Array.isArray(kitMeta.items)) return;
-    if (equipment?.id === kitId) return; // уже выбран
-    try {
-      const resolved = await resolveKitItems({ id: kitId, name: kitMeta.name, items: kitMeta.items });
-      const builtin = getBuiltinBaseWeapon({ origin, trait });
-      handleSelectKit({
-        id: kitId,
-        name: kitMeta.name,
-        items: resolved.items,
-        weight: 0,
-        price: 0,
-        caps: 0,
-        unarmedWeaponId: builtin?.id || null,
-      });
-    } catch (err) {
-      debugLog('kit.autoSelect.failed', { kitId, error: err?.message || String(err) });
-    }
+  // Всегда открываем модалку комплекта со всем содержимым: игрок видит
+  // состав и делает выборы («нож или кастеты», «обрез или 10-мм ПП»),
+  // подтверждение в модалке выдаёт комплект через handleSelectKit.
+  const openKitModal = () => {
+    if (!origin) return;
+    setIsEquipmentKitModalVisible(true);
   };
 
   const handleToggleSkill = (skillName) => {
@@ -987,7 +986,7 @@ export default function CharacterScreen() {
     // Комплект зависит от выбранной семьи: авто-выбор по equipmentKitId трейта.
     const traitKitId = newModifiersFromModal?.equipmentKitId;
     if (traitKitId) {
-      applyKitById(traitKitId);
+      openKitModal();
     }
   };
 
@@ -1475,7 +1474,7 @@ export default function CharacterScreen() {
         <EquipmentKitModal
           visible={isEquipmentKitModalVisible}
           onClose={() => setIsEquipmentKitModalVisible(false)}
-          equipmentKits={localizedOrigin?.equipmentKits || origin?.equipmentKits}
+          equipmentKits={equipmentKitsForModal}
           onSelectKit={handleSelectKit}
           setCaps={setCaps}
           character={{ origin, trait }}

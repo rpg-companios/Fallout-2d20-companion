@@ -337,3 +337,32 @@ export function hasTraitEffect(trait, effectId) {
     (t?.modifiers?.effects || []).includes(effectId),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Комплект снаряжения, определяемый трейтом («Три семьи» и т.п.)
+// ---------------------------------------------------------------------------
+
+/**
+ * id комплекта, закреплённого за выбранным трейтом (equipmentKitId),
+ * или null. У семей «Трёх семей» комплект несёт каждый под-трейт.
+ */
+export function getTraitKitId(trait) {
+  return trait?.modifiers?.equipmentKitId || null;
+}
+
+/**
+ * Определяет, управляется ли комплект ориджина трейтом: у мульти-трейта
+ * ориджина под-трейты несут equipmentKitId (семья → свой комплект).
+ * Решение по данным — без хардкода id ориджинов.
+ */
+export function isKitControlledByTrait(origin) {
+  const traitIds = Array.isArray(origin?.traitIds) ? origin.traitIds : [];
+  const allTraits = getTraits();
+  return traitIds.some((id) => {
+    const trait = allTraits.find((x) => x?.id === id);
+    return (trait?.modifiers?.subTraitIds || []).some((subId) => {
+      const sub = allTraits.find((x) => x?.id === subId);
+      return Boolean(sub?.modifiers?.equipmentKitId);
+    });
+  });
+}

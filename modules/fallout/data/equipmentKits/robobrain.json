@@ -76,21 +76,61 @@
       {
         "type": "choice",
         "items": [
-          { "itemId": "robot_arm_smoke_manipulator", "itemType": "robotArm", "slot": "left" },
-          { "weaponId": "robot_weapon_tesla_arm", "itemType": "weapon", "slot": "left" },
-          { "weaponId": "robot_weapon_flamethrower", "itemType": "weapon", "slot": "left" },
-          { "weaponId": "weapon_laser_gun", "itemType": "weapon", "slot": "left" },
-          { "weaponId": "weapon_sledgehammer", "itemType": "weapon", "slot": "left" }
+          {
+            "itemId": "robot_arm_smoke_manipulator",
+            "itemType": "robotArm",
+            "slot": "left"
+          },
+          {
+            "weaponId": "robot_weapon_tesla_arm",
+            "itemType": "weapon",
+            "slot": "left"
+          },
+          {
+            "weaponId": "robot_weapon_flamethrower",
+            "itemType": "weapon",
+            "slot": "left"
+          },
+          {
+            "weaponId": "weapon_laser_gun",
+            "itemType": "weapon",
+            "slot": "left"
+          },
+          {
+            "weaponId": "weapon_sledgehammer",
+            "itemType": "weapon",
+            "slot": "left"
+          }
         ]
       },
       {
         "type": "choice",
         "items": [
-          { "itemId": "robot_arm_smoke_manipulator", "itemType": "robotArm", "slot": "right" },
-          { "weaponId": "robot_weapon_tesla_arm", "itemType": "weapon", "slot": "right" },
-          { "weaponId": "robot_weapon_flamethrower", "itemType": "weapon", "slot": "right" },
-          { "weaponId": "weapon_laser_gun", "itemType": "weapon", "slot": "right" },
-          { "weaponId": "weapon_sledgehammer", "itemType": "weapon", "slot": "right" }
+          {
+            "itemId": "robot_arm_smoke_manipulator",
+            "itemType": "robotArm",
+            "slot": "right"
+          },
+          {
+            "weaponId": "robot_weapon_tesla_arm",
+            "itemType": "weapon",
+            "slot": "right"
+          },
+          {
+            "weaponId": "robot_weapon_flamethrower",
+            "itemType": "weapon",
+            "slot": "right"
+          },
+          {
+            "weaponId": "weapon_laser_gun",
+            "itemType": "weapon",
+            "slot": "right"
+          },
+          {
+            "weaponId": "weapon_sledgehammer",
+            "itemType": "weapon",
+            "slot": "right"
+          }
         ]
       },
       {
