@@ -4,6 +4,7 @@
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
 import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
+import { generateItemId } from '../../domain/itemIdentity';
 
 
 /**
@@ -628,6 +629,50 @@ const MIGRATIONS = [
         : { ...origin, id: 'tribal' };
     }
     return next;
+  },
+
+  // v6 -> v7: «Опасная бритва» — вариант выкидного ножа (trueItemId +
+  // replaceOriginalNameTo): для программы это нож (истинный id), стек
+  // разделяется именем (baseName). Старые сейвы (патч 63) хранили бритву
+  // отдельным предметом weapon_straight_razor — переводим на истинный id
+  // и пересобираем id/stackKey по правилу «id + моды + имя».
+  (state) => {
+    const next = { ...state };
+    const collections = [];
+    if (Array.isArray(next.equipment?.items)) collections.push(next.equipment.items);
+    if (Array.isArray(next.equippedWeapons)) collections.push(next.equippedWeapons);
+    if (collections.length === 0) return state;
+
+    // Отрезаем префиксы установленных модов от сохранённого имени:
+    // «Зазубренное лезвие Опасная бритва» → «Опасная бритва».
+    const stripModPrefixes = (name, appliedMods) => {
+      if (!name) return name;
+      let out = String(name);
+      for (const modId of Object.values(appliedMods || {})) {
+        const mod = catalogGetWeaponModById(modId);
+        const prefix = mod?.prefix;
+        if (prefix && out.startsWith(`${prefix} `)) out = out.slice(prefix.length + 1);
+      }
+      return out.trim();
+    };
+
+    let changed = false;
+    for (const collection of collections) {
+      for (let i = 0; i < collection.length; i += 1) {
+        const item = collection[i];
+        if (!item || item.weaponId !== 'weapon_straight_razor') continue;
+        changed = true;
+        const baseName = stripModPrefixes(item.name, item.appliedMods) || '';
+        const rewritten = {
+          ...item,
+          weaponId: 'weapon_switchblade',
+          ...(baseName ? { baseName } : {}),
+        };
+        const newId = generateItemId(rewritten.weaponId, rewritten.appliedMods || {}, rewritten.baseName || '');
+        collection[i] = { ...rewritten, id: newId, stackKey: newId };
+      }
+    }
+    return changed ? next : state;
   },
 
 ];

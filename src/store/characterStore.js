@@ -57,47 +57,12 @@ import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+// Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+// domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
-// Helper to get weapon mod by ID
-const getWeaponModById = (modId) => {
-  // This will be implemented when weapon mods data is available
-  return null;
-};
-
-/**
- * Generate unique item ID based on weaponId and applied mods
- * - No mods: weaponId (e.g., 'weapon_10mm_pistol')
- * - With mods: weaponId_mods_mod1_mod2 (e.g., 'weapon_10mm_pistol_mods_mod_004_mod_017')
- */
-const generateItemId = (weaponId, appliedMods = {}) => {
-  if (!weaponId) return generateId();
-  
-  const modIds = Object.entries(appliedMods)
-    .sort(([k1], [k2]) => k1.localeCompare(k2))
-    .map(([slot, modId]) => modId)
-    .join('_');
-  
-  return modIds ? `${weaponId}_mods_${modIds}` : weaponId;
-};
-
-/**
- * Generate stackKey for stacking identical items
- * - No mods: weaponId
- * - With mods: weaponId_mods_mod1_mod2
- */
-const generateStackKey = (weaponId, appliedMods = {}) => {
-  if (!weaponId) return generateId();
-  
-  const modIds = Object.entries(appliedMods)
-    .sort(([k1], [k2]) => k1.localeCompare(k2))
-    .map(([slot, modId]) => modId)
-    .join('_');
-  
-  return modIds ? `${weaponId}_mods_${modIds}` : weaponId;
-};
 
 /**
  * Normalize a parameter value to Parameter<T> format
@@ -623,12 +588,28 @@ const useCharacterStore = create(devtools(
         const appliedMods = item.appliedMods || {};
         
         // Generate unique ID for this item instance
-        const itemId = item.uniqueId || generateItemId(weaponId, appliedMods);
+        const itemId = item.uniqueId || generateItemId(
+          weaponId,
+          appliedMods,
+          item.baseName,
+          item.durabilityTracked ? item.durability : undefined,
+          item.uniqQualities,
+        );
         
         // Generate stackKey for stacking identical items.
-        // Предметы со своим ключом (силовая броня, Ядерный Блок — signature
-        // по прочности/зарядам/модам, см. domain/powerArmor) приносят ключ с собой.
-        const stackKey = item.stackKey || generateStackKey(weaponId, appliedMods);
+        // Стек = id + прочие параметры (прочность, моды, уникальные качества)
+        // + имя: два 100% идентичных предмета — один стек; меч 50 и меч 100
+        // прочности — разные; «элегантная» и «дерзкая» форменная одежда
+        // (один id, разные uniq-качества) — разные. Предметы со своим ключом
+        // (силовая броня, Ядерный Блок — signature по прочности/зарядам/модам)
+        // приносят ключ с собой.
+        const stackKey = item.stackKey || generateStackKey(
+          weaponId,
+          appliedMods,
+          item.baseName,
+          item.durabilityTracked ? item.durability : undefined,
+          item.uniqQualities,
+        );
         
         // Normalize item data with parameters
         const normalizedItem = {
@@ -637,6 +618,13 @@ const useCharacterStore = create(devtools(
           instanceId: itemId,
           weaponId: weaponId,
           name: item.name || item.weaponName || item.Name || weaponId,
+          // baseName — оригинальное имя предмета (без префиксов модов):
+          // у вариантов (бритва) отличается от имени истинного предмета,
+          // что разделяет стеки и задаёт базу для имён с модами.
+          baseName: item.baseName || undefined,
+          // uniqQualities — навешиваемые уникальные качества (id): участвуют
+          // в имени предмета и в стек-ключе (см. domain/uniqQuality.js).
+          uniqQualities: item.uniqQualities || undefined,
           itemType: item.itemType || 'misc',
           equipped: item.equipped || false,
           // `locked: true` marks items that came from a robot kit. They are

@@ -27,6 +27,7 @@ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { generateStackKey } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
@@ -105,7 +106,22 @@ const InventoryScreen = () => {
   const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
-    return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
+    if (!stackKey) return undefined;
+    // Прямое совпадение (сторовый stackKey: "weapon_10mm_pistol")
+    const direct = inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
+    if (direct) return direct;
+    // UI-формат stackKey ("weapon:weapon_10mm_pistol:mods:none") — нормализуем:
+    // извлекаем weaponId/каталожный id и ищем по нему в неэкипированных.
+    const match = String(stackKey).match(/^[^:]+:(.+?):mods:/);
+    const catalogId = match ? match[1] : null;
+    if (!catalogId) return undefined;
+    // Точное совпадение по сторовому стек-ключу — учитывает имя варианта:
+    // бритва (weapon_switchblade_as_опасная_бритва) не спутается с ножом.
+    const byStackKey = inventoryItems.find((item) => item.stackKey === catalogId && !item.equipped);
+    if (byStackKey) return byStackKey;
+    return inventoryItems.find((item) =>
+      (item.weaponId || item.id) === catalogId && !item.equipped,
+    );
   }, [inventoryItems]);
 
   const adjustStoreItemQuantity = useCallback((itemId, delta) => {
@@ -223,8 +239,17 @@ const InventoryScreen = () => {
     }
     const itemType = getItemType(item);
     if (itemType === 'weapon') {
-      const baseWeaponId = item?.weaponId || item?.id || getItemName(item);
-      return `weapon:${baseWeaponId}:mods:${getModsSignature(item)}`;
+      // Середина ключа — СТОРОВЫЙ стек-ключ (id + прочие параметры + имя),
+      // чтобы точное совпадение в findUnequippedStoreItemByStackKey не путало
+      // бритву с ножом (у них одинаковый истинный id).
+      const storeKey = item?.stackKey || generateStackKey(
+        item?.weaponId || item?.id || getItemName(item),
+        item?.appliedMods,
+        item?.baseName,
+        item?.durabilityTracked ? item?.durability : undefined,
+        item?.uniqQualities,
+      );
+      return `weapon:${storeKey}:mods:${getModsSignature(item)}`;
     }
     return `${itemType}:${getItemCatalogId(item)}`;
   };
@@ -522,17 +547,16 @@ const InventoryScreen = () => {
       return;
     }
 
-    // Durability is per weapon instance: tracked weapons must never be stacked.
+    // Прочность — параметр стека (закон): два 100% идентичных экземпляра
+    // (та же прочность/моды/имя) склеиваются в один стек; разная прочность
+    // разделяет. addNewItem сам склеит совпавшие (ключ = id + dur + моды + имя).
     if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
       for (let index = 0; index < quantity; index += 1) {
         const durability = source === 'buy' ? 100 : rollWeaponDurability();
-        const uniqueId = `${localizedItem.id}_durability_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`;
         addNewItem({
           ...localizedItem,
           itemType: 'weapon',
           quantity: 1,
-          uniqueId,
-          stackKey: uniqueId,
           durabilityTracked: true,
           durability,
           durabilityAmmoRemainder: 0,

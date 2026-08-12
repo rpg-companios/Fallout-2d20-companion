@@ -1,6 +1,7 @@
 import NcrCitizenModal, { traitConfig as ncrCitizenConfig } from './NcrCitizenModal';
 import SurvivorModal, { traitConfig as survivorConfig } from './SurvivorModal';
 import TribalModal, { traitConfig as tribalConfig } from './TribalModal';
+import TreeFamiliesModal, { traitConfig as treeFamiliesConfig } from './TreeFamiliesModal';
 import GenericTraitModal from './GenericTraitModal';
 import React from 'react';
 
@@ -41,6 +42,7 @@ export const TRAIT_MODALS = {
   [ncrCitizenConfig.originId]: NcrCitizenModal,
   [survivorConfig.originId]: SurvivorModal,
   [tribalConfig.originId]: TribalModal,
+  [treeFamiliesConfig.originId]: TreeFamiliesModal,
   ...genericModals,
 };
 
@@ -48,6 +50,7 @@ export const TRAIT_CONFIGS = {
   [ncrCitizenConfig.originId]: ncrCitizenConfig,
   [survivorConfig.originId]: survivorConfig,
   [tribalConfig.originId]: tribalConfig,
+  [treeFamiliesConfig.originId]: treeFamiliesConfig,
   ...genericConfigs,
 };
 

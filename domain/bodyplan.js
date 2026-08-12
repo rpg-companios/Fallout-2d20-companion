@@ -1,4 +1,5 @@
-const bodyPlansRegistry = require('../data/bodyplans/bodyplans.json');
+import { getBodyPlans } from './registry';
+const bodyPlansRegistry = getBodyPlans();
 
 /**
  * Capability semantics:

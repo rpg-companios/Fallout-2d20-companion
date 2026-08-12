@@ -3,7 +3,19 @@ import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../
 import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+import { getUniqQualityName } from './registry';
+import { composeNameWithUniqQualities } from './uniqQuality';
 import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+
+// Уникальные качества записи комплекта прикрепляются к предмету: поле
+// uniqQualities уходит в стор, имена качеств добавляются к имени предмета
+// («дерзкая» + «форменная одежда» = «дерзкая форменная одежда»).
+const applyUniqQualityNames = (item) => {
+  if (!item?.uniqQualities?.length) return item;
+  const composed = composeNameWithUniqQualities(item.name, item.uniqQualities, getUniqQualityName);
+  if (!composed || composed === item.name) return item;
+  return { ...item, name: composed };
+};
 
 const CURRENCY_ITEM_TYPES = {
   currency: () => tWeaponsAndArmorScreen('kitResolver.currency'),
@@ -167,7 +179,9 @@ export async function resolveWeaponItem(item) {
 
   const prefixes = mods.map((mod) => mod.prefix).filter(Boolean);
   const weaponName = weaponData.name || item.weaponId;
-  const displayName = [...prefixes, weaponName].join(' ');
+  // Уникальные качества — перед именем: «дерзкая» + «Опасная бритва».
+  const uniqNames = (item.uniqQualities || []).map(getUniqQualityName).filter(Boolean);
+  const displayName = [...prefixes, ...uniqNames, weaponName].join(' ');
   const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
 
   // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
@@ -178,8 +192,17 @@ export async function resolveWeaponItem(item) {
     if (mod.slot && mod.id) appliedMods[mod.slot] = mod.id;
   }
 
+  // Вариант предмета (trueItemId, напр. «Опасная бритва» = выкидной нож):
+  // для программы это истинный предмет — выдаём его id, а имя варианта
+  // сохраняем как baseName (оригинальное имя для стека и имён с модами).
+  const trueItemId = weaponData.trueItemId || null;
+  const resolvedWeaponId = trueItemId || item.weaponId;
+
   return {
     ...item,
+    weaponId: resolvedWeaponId,
+    // baseName только у вариантов: у обычного оружия имя — из каталога.
+    baseName: trueItemId ? weaponName : undefined,
     _weapon: weaponData,
     builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
     builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
@@ -223,7 +246,7 @@ export async function resolveNonWeaponItem(item) {
   }
 
   const byId = resolveItemById(item);
-  if (byId) return byId;
+  if (byId) return applyUniqQualityNames(byId);
 
   if (CURRENCY_ITEM_TYPES[item.itemType]) {
     const name = CURRENCY_ITEM_TYPES[item.itemType]();

@@ -11,9 +11,7 @@
 //
 // Image assets stay snake_case (filenames), colocated here because require() cannot live in JSON.
 
-import originsJson from '../data/origins/origins.json';
-import ruOrigins from '../i18n/ru-RU/data/system/origins.json';
-import enOrigins from '../i18n/en-EN/data/system/origins.json';
+import { getOrigins, getOriginI18n } from './registry';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getCurrentLocale } from '../i18n/locale';
 
@@ -45,7 +43,7 @@ const DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE = Object.freeze({
   [CHARACTER_TYPES.CYBORG]: ARMOR_POLICIES.STANDARD,
 });
 
-const ORIGIN_DICTIONARIES = { 'ru-RU': ruOrigins, 'en-EN': enOrigins };
+const ORIGIN_DICTIONARIES = { 'ru-RU': getOriginI18n('ru-RU'), 'en-EN': getOriginI18n('en-EN') };
 
 // ---------------------------------------------------------------------------
 // Image assets (colocated with data, as require() cannot live in JSON)
@@ -70,6 +68,7 @@ const getOriginImage = (originId) => {
     case 'synth':               return require('../assets/origins/synth.png');
     case 'robobrain':           return require('../assets/origins/robobrain.png');
     case 'tribal':              return require('../assets/origins/tribal.png');
+    case 'TreeFamilies':        return require('../assets/origins/3families.png');
     default:                    return null;
   }
 };
@@ -167,7 +166,7 @@ export function tOrigin(id) {
  * Synchronous; JSON is bundled at build time.
  */
 export function loadOriginsData() {
-  return originsJson;
+  return getOrigins();
 }
 
 /**
@@ -176,7 +175,7 @@ export function loadOriginsData() {
  */
 export function loadEnrichedOrigins() {
   const { equipmentKits: kitGroups } = getEquipmentCatalog();
-  return originsJson.map((origin) => {
+  return getOrigins().map((origin) => {
     const kitIds = origin.equipmentKitIds || [];
     const equipmentKits = kitIds
       .map((kitId) => ({ id: kitId, ...(kitGroups[kitId] || {}) }))

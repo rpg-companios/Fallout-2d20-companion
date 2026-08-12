@@ -1,0 +1,53 @@
+{
+  "origins": {
+    "TreeFamilies": "Strip Families"
+  },
+  "traits": {
+    "treeFamilies": {
+      "family": {
+        "name": "Strip Families",
+        "description": "You are a member of one of the three Strip families. Choose your family: each grants its own advantage."
+      },
+      "chairmen": {
+        "name": "The Chairmen",
+        "description": "Once per scene, you may re-roll one d20 when passing a single skill test based on Charisma (CHA)."
+      },
+      "omerta": {
+        "name": "Omerta",
+        "description": "Chems you administer to other characters have their Addiction property increased by 1. If a chem has no Addiction property, it gains Addiction 1."
+      },
+      "whiteGlove": {
+        "name": "White Glove Society",
+        "description": "Food you cook at a Cooking Station restores 1 more HP. When you butcher a corpse for meat, you gain one additional piece. Charisma (CHA) skill tests involving those outside the White Glove Society increase their Complication range by 1."
+      }
+    }
+  },
+  "weapons": [
+    {
+      "id": "weapon_straight_razor",
+      "name": "Straight Razor"
+    }
+  ],
+  "generalGoods": [
+    {
+      "id": "CasinoTopsChip",
+      "name": "Tops Casino Chip"
+    },
+    {
+      "id": "item_marked_cards",
+      "name": "Marked Deck"
+    }
+  ],
+  "equipmentKits": {
+    "treefamilies_chairmen": {
+      "name": "The Chairmen"
+    },
+    "treefamilies_omerta": {
+      "name": "Omerta"
+    },
+    "treefamilies_white_glove": {
+      "name": "White Glove Society"
+    }
+  },
+  "uniqQualities": []
+}

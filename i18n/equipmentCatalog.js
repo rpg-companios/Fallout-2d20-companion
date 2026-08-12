@@ -75,7 +75,11 @@ import dataKitsVaultDweller from '../data/equipmentKits/vaultDweller.json';
 import dataKitsWastelander from '../data/equipmentKits/wastelander.json';
 import dataKitsProtectron from '../data/equipmentKits/protectron.json';
 import dataKitsSecuritron from '../data/equipmentKits/securitron.json';
-
+import moduleWeapons from '../modules/fallout/data/weapons.json';
+import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
+import moduleEquipmentKits from '../modules/fallout/data/equipmentKits.json';
+import moduleRuI18n from '../modules/fallout/i18n/ru-RU.json';
+import moduleEnI18n from '../modules/fallout/i18n/en-EN.json';
 // Locale-independent technical data (stats, ids, game mechanics)
 import dataWeapons from '../data/equipment/weapons.json';
 import dataArmor from '../data/equipment/armor.json';
@@ -106,6 +110,7 @@ import dataGeneralGoods from '../data/equipment/general_goods.json';
 import dataOddities from '../data/equipment/oddities.json';
 
 import { getCurrentLocale, normalizeLocale } from './locale';
+import { expandTrueItems } from '../domain/packMerge';
 
 const ALL_KIT_DATA = {
   ...dataKitsBrotherhood,
@@ -121,6 +126,7 @@ const ALL_KIT_DATA = {
   ...dataKitsWastelander,
   ...dataKitsProtectron,
   ...dataKitsSecuritron,
+  ...moduleEquipmentKits,
 };
 
 const EQUIPMENT_BY_LOCALE = {
@@ -261,7 +267,34 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   const i18n = EQUIPMENT_BY_LOCALE[normalizeLocale(locale)];
 
   // Weapons: merge data/ stats with i18n names/flavour
-  const weapons = mergeById(dataWeapons, i18n.weapons).map((w) => ({ ...w, itemType: 'weapon' }));
+  const moduleI18n = locale === 'en-EN' ? moduleEnI18n : moduleRuI18n;
+  // Базовое оружие (локализованное) — источник механики для вариантов модуля.
+  const baseWeaponsLocalized = mergeById(dataWeapons, i18n.weapons);
+  // Варианты модуля (trueItemId) разворачиваются в полные записи: механика
+  // из истинного предмета, id — свой, имя — из i18n (свойства варианта).
+  // replaceOriginalNameTo: имя берётся из i18n-словаря по указанному ключу
+  // (у бритвы — weapon_straight_razor → «Опасная бритва»).
+  const weaponNameByKey = new Map(
+    [...(i18n.weapons || []), ...(moduleI18n.weapons || [])]
+      .filter((e) => e?.id && e?.name)
+      .map((e) => [e.id, e.name]),
+  );
+  const moduleWeaponsLocalized = expandTrueItems(
+    mergeById(moduleWeapons || [], moduleI18n.weapons || []),
+    baseWeaponsLocalized,
+  )
+    .map((w) => {
+      const renameKey = w?.modifiers?.replaceOriginalNameTo;
+      if (renameKey && weaponNameByKey.has(renameKey)) {
+        return { ...w, name: weaponNameByKey.get(renameKey) };
+      }
+      return w;
+    })
+    .map((w) => ({ ...w, itemType: 'weapon' }));
+  const weapons = [
+    ...baseWeaponsLocalized.map((w) => ({ ...w, itemType: 'weapon' })),
+    ...moduleWeaponsLocalized,
+  ];
   const robotWeapons = mergeById(
     (dataRobotWeapons || []).filter((item) => item.itemType === 'weapon'),
     i18n.robotWeapons || [],
@@ -341,7 +374,11 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   const mergedDrinks = mergeById(dataDrinks, i18n.drinks);
   const mergedFood = mergeById(dataFood, i18n.food);
   const mergedMagazines = mergeById(dataMagazines, i18n.magazines);
-  const mergedGeneralGoods = mergeById(dataGeneralGoods, i18n.generalGoods || []);
+  const moduleGeneralGoodsLocalized = mergeById(moduleGeneralGoods || [], moduleI18n.generalGoods || []);
+  const mergedGeneralGoods = [
+    ...mergeById(dataGeneralGoods, i18n.generalGoods || []),
+    ...moduleGeneralGoodsLocalized,
+  ];
   const mergedOddities = mergeById(dataOddities, i18n.oddities || []);
   const mergedRobotBody = mergeById(dataRobotBody || [], i18n.robotBody || [])
     .map((b) => ({ ...b, itemType: b.itemType || 'robotBody' }));
@@ -354,7 +391,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   const mergedUniqArmorMods = mergeById(dataUniqArmorMods, i18n.uniqArmorMods);
 
   // Equipment kits: merge locale-independent items with i18n names
-  const kitNames = i18n.equipmentKits || {};
+  const kitNames = { ...(i18n.equipmentKits || {}), ...(moduleI18n.equipmentKits || {}) };
   const equipmentKits = Object.fromEntries(
     Object.entries(ALL_KIT_DATA).map(([kitId, kitData]) => {
       const name = kitNames[kitId]?.name;

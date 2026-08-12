@@ -123,7 +123,8 @@
     "origins": {
       "survivorTitle": "Черта происхождения «Выживший»",
       "ncrTitle": "Черта происхождения «Житель НКР»",
-      "tribalTitle": "Черта происхождения «Дикарь»"
+      "tribalTitle": "Черта происхождения «Дикарь»",
+      "treeFamiliesTitle": "Черта происхождения «Три семьи»"
     },
     "survivor": {
       "twoTraits": "2 черты",
@@ -157,6 +158,9 @@
       "tribalTraitsList": "Список черт Дикаря",
       "survivorTraitsList": "Список черт Выжившего",
       "ncrTraitsList": "Список черт НКР"
+    },
+    "treeFamilies": {
+      "selectFamilyHint": "Выберите одну семью: каждая даёт своё преимущество."
     }
   },
   "origins": {
@@ -175,7 +179,8 @@
     "vaultDweller": "Обитатель убежища",
     "shadow": "Тень",
     "synth": "Синт",
-    "securitron": "Секьюритрон"
+    "securitron": "Секьюритрон",
+    "TreeFamilies": "Три семьи"
   },
   "attributes": {
     "STR": "СИЛ",

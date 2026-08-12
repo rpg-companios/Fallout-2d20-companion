@@ -14,7 +14,11 @@
 // v2 — журнал уже выданных наград за отмеченные навыки.
 // v3 — normalize mutually exclusive weapon qualities in legacy saves.
 // v4 — damageType из строки в массив (поддержка комбинированного урона).
-export const CURRENT_SCHEMA_VERSION = 6;
+// v5 — комплект снаряжения без метаданных → заглушка {id: null, name: null}.
+// v6 — ориджин «savage» переименован в «tribal».
+// v7 — «Опасная бритва» переведена на истинный id (weapon_switchblade) +
+//      baseName (вариант предмета; стек = id + моды + имя).
+export const CURRENT_SCHEMA_VERSION = 7;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

@@ -16,6 +16,7 @@ import { getBannedTagSkills, hasTraitEffect } from '../../domain/traits';
 import { deepMerge, applyOverridesById, findUnknownOverrideIds } from '../../domain/packMerge';
 import { migrateCharacterState } from '../../src/store/migrations';
 import usePackStore from '../../src/store/packStore';
+import { getOrigins, getTraits } from '../../domain/registry';
 
 const getOrigin = () => originsJson.find((o) => o.id === 'tribal');
 const getTrait = (id) => traitsJson.find((t) => t.id === id);
@@ -160,10 +161,12 @@ describe('Переименование savage → tribal', () => {
   it('MULTI_TRAIT_ORIGIN_IDS вычисляется из данных (не хардкод): содержит tribal, не содержит savage', () => {
     expect(MULTI_TRAIT_ORIGIN_IDS).toContain('tribal');
     expect(MULTI_TRAIT_ORIGIN_IDS).not.toContain('savage');
-    // производный: каждый id — ориджин, чей первый трейт isMultiTrait
+    // производный: каждый id — ориджин (база + модуль), чей первый трейт isMultiTrait
+    const allOrigins = getOrigins();
+    const allTraits = getTraits();
     for (const id of MULTI_TRAIT_ORIGIN_IDS) {
-      const origin = originsJson.find((o) => o.id === id);
-      const trait = traitsJson.find((t) => t.id === origin?.traitIds?.[0]);
+      const origin = allOrigins.find((o) => o.id === id);
+      const trait = allTraits.find((t) => t.id === origin?.traitIds?.[0]);
       expect(trait?.modifiers?.isMultiTrait, id).toBe(true);
     }
   });
@@ -171,7 +174,7 @@ describe('Переименование savage → tribal', () => {
   it('миграция v5→v6: сейв с origin savage → tribal (объект и строка)', () => {
       const obj = migrateCharacterState({ schemaVersion: 5, origin: { id: 'savage' } });
     expect(obj.origin.id).toBe('tribal');
-    expect(obj.schemaVersion).toBe(6);
+    expect(obj.schemaVersion).toBe(7);
     const str = migrateCharacterState({ schemaVersion: 5, origin: 'savage' });
     expect(str.origin).toBe('tribal');
     // tribal не трогается

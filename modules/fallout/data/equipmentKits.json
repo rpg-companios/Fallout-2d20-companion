@@ -1,0 +1,31 @@
+{
+  "treefamilies_chairmen": {
+    "items": [
+      { "type": "fixed", "clothingId": "clothing_fancy_clothes", "itemType": "clothing" },
+      { "type": "fixed", "clothingId": "headwear_fancy_hat", "itemType": "clothing" },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_9mm_pistol",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_9mm",
+          "quantity": { "base": 12, "rollType": "rollCD", "rollValue": 4, "op": "+" }
+        }
+      },
+      { "type": "fixed", "weaponId": "weapon_straight_razor", "itemType": "weapon" },
+      { "type": "fixed", "itemId": "CasinoTopsChip", "itemType": "misc", "quantity": 1 },
+      { "type": "rollTable", "tableId": "oddity", "roll": { "rollType": "D20", "count": 1, "mode": "separate" } },
+      { "type": "fixed", "itemId": "item_marked_cards", "itemType": "misc", "quantity": 1 }
+    ]
+  },
+  "treefamilies_omerta": {
+    "items": [
+      { "type": "fixed", "itemType": "currency", "quantity": 100 }
+    ]
+  },
+  "treefamilies_white_glove": {
+    "items": [
+      { "type": "fixed", "itemType": "currency", "quantity": 100 }
+    ]
+  }
+}

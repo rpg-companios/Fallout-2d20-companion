@@ -123,7 +123,8 @@
     "origins": {
       "survivorTitle": "Origin Trait «Survivor»",
       "ncrTitle": "Origin Trait «NCR Citizen»",
-      "tribalTitle": "Origin Trait «Tribal»"
+      "tribalTitle": "Origin Trait «Tribal»",
+      "treeFamiliesTitle": "Origin Trait «Strip Families»"
     },
     "survivor": {
       "twoTraits": "2 traits",
@@ -157,6 +158,9 @@
       "tribalTraitsList": "Tribal Traits List",
       "survivorTraitsList": "Survivor Traits List",
       "ncrTraitsList": "NCR Traits List"
+    },
+    "treeFamilies": {
+      "selectFamilyHint": "Choose one family: each grants its own advantage."
     }
   },
   "origins": {
@@ -175,7 +179,8 @@
     "vaultDweller": "Vault Dweller",
     "shadow": "Shadow",
     "synth": "Synth",
-    "securitron": "Securitron"
+    "securitron": "Securitron",
+    "TreeFamilies": "Strip Families"
   },
   "attributes": {
     "STR": "STR",

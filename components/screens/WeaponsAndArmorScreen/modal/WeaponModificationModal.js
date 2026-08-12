@@ -287,7 +287,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           ...(dbWeapon || {}),
           id: weaponId ?? dbWeapon?.id,
           weaponId: weaponId ?? dbWeapon?.id,
-          baseWeaponName: dbWeapon?.name ?? weapon?.name ?? '',
+          // baseName варианта (напр. «Опасная бритва») важнее имени из БД:
+          // моды должны собираться от перезаписанного имени предмета.
+          baseWeaponName: weapon?.baseName || dbWeapon?.name ?? weapon?.name ?? '',
           appliedMods: weapon.appliedMods || {},
         };
 

@@ -1,0 +1,516 @@
+diff --git a/__tests__/securitron/uniq-quality.test.js b/__tests__/securitron/uniq-quality.test.js
+new file mode 100644
+index 0000000..f83b6ad
+--- /dev/null
++++ b/__tests__/securitron/uniq-quality.test.js
+@@ -0,0 +1,162 @@
++/**
++ * Уникальные качества (uniq qualities) — навешиваемые модификаторы экипировки.
++ *
++ * Модель: качество имеет id (учёт/механика) и имя (i18n, добавляется к имени
++ * предмета: «дерзкая» + «форменная одежда» = «дерзкая форменная одежда»).
++ * Качество НЕ вшито в предмет — крепится к экземпляру (поле uniqQualities),
++ * участвует в стек-ключе (uniq_<id>): «элегантная» и «дерзкая» форменная
++ * одежда — один базовый id, разные стеки.
++ */
++import { describe, it, expect, vi, beforeAll } from 'vitest';
++
++// Тестовые определения качеств в модуле (каталог пока пуст — владелец добавит
++// свои; в этом файле подменяем на тестовые, остальной i18n модуля сохраняем).
++vi.mock('../../modules/fallout/data/uniq_qualities.json', () => ({
++  default: [
++    { id: 'dashing' },
++    { id: 'elegant' },
++  ],
++}));
++vi.mock('../../modules/fallout/i18n/ru-RU.json', async () => {
++  const actual = await vi.importActual('../../modules/fallout/i18n/ru-RU.json');
++  return {
++    default: {
++      ...actual.default,
++      uniqQualities: [
++        { id: 'dashing', name: 'Дерзкая' },
++        { id: 'elegant', name: 'Элегантная' },
++      ],
++    },
++  };
++});
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++import { getUniqQualities, getUniqQualityName } from '../../domain/registry';
++import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
++import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
++import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
++import { setCurrentLocale } from '../../i18n/locale';
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import useCharacterStore from '../../src/store/characterStore';
++
++beforeAll(() => {
++  setCurrentLocale('ru-RU');
++});
++
++const NAME_BY_ID = { dashing: 'Дерзкая', elegant: 'Элегантная', homemade: 'Кустарные' };
++const nameById = (id) => NAME_BY_ID[id] || '';
++
++describe('Каталог уникальных качеств (реестр)', () => {
++  it('getUniqQualities читает модуль поверх базы', () => {
++    const all = getUniqQualities();
++    expect(all.some((q) => q.id === 'dashing')).toBe(true);
++    expect(all.some((q) => q.id === 'elegant')).toBe(true);
++  });
++
++  it('getUniqQualityName — имя из i18n модуля; неизвестное — пустая строка', () => {
++    expect(getUniqQualityName('dashing')).toBe('Дерзкая');
++    expect(getUniqQualityName('elegant')).toBe('Элегантная');
++    expect(getUniqQualityName('no_such_quality')).toBe('');
++  });
++});
++
++describe('Композиция имени (чистая функция)', () => {
++  it('«дерзкая» + «форменная одежда» = «Дерзкая форменная одежда»', () => {
++    expect(composeNameWithUniqQualities('форменная одежда', ['dashing'], nameById))
++      .toBe('Дерзкая форменная одежда');
++    expect(composeNameWithUniqQualities('10 мм патроны', ['homemade'], nameById))
++      .toBe('Кустарные 10 мм патроны');
++  });
++
++  it('без имён (нет в словаре) имя не меняется; несколько качеств — по порядку', () => {
++    expect(composeNameWithUniqQualities('шляпа', ['no_name_quality'], nameById)).toBe('шляпа');
++    expect(composeNameWithUniqQualities('шляпа', ['elegant', 'dashing'], nameById))
++      .toBe('Элегантная Дерзкая шляпа');
++    expect(composeNameWithUniqQualities('шляпа', [], nameById)).toBe('шляпа');
++  });
++});
++
++describe('Учёт в стеке: uniq-качества — параметр стека', () => {
++  it('элегантная ≠ дерзкая при одном базовом id; две дерзкие — один стек', () => {
++    const base = generateStackKey('clothing_fancy_clothes');
++    const elegant = generateStackKey('clothing_fancy_clothes', {}, '', undefined, ['elegant']);
++    const dashing = generateStackKey('clothing_fancy_clothes', {}, '', undefined, ['dashing']);
++    expect(base).toBe('clothing_fancy_clothes');
++    expect(elegant).toBe('clothing_fancy_clothes_uniq_elegant');
++    expect(dashing).toBe('clothing_fancy_clothes_uniq_dashing');
++    expect(elegant).not.toBe(dashing); // разные качества → разные стеки
++    expect(generateStackKey('clothing_fancy_clothes', {}, '', undefined, ['elegant'])).toBe(elegant);
++    // порядок крепления не влияет на ключ
++    expect(generateStackKey('clothing_fancy_clothes', {}, '', undefined, ['dashing', 'elegant']))
++      .toBe(generateStackKey('clothing_fancy_clothes', {}, '', undefined, ['elegant', 'dashing']));
++  });
++
++  it('ключ с модами/прочностью/именем варианта + качество', () => {
++    expect(generateStackKey('weapon_switchblade', { Uniques: 'mod_113' }, 'Опасная бритва', 50, ['dashing']))
++      .toBe('weapon_switchblade_dur_50_mods_mod_113_uniq_dashing_опасная_бритва');
++  });
++
++  it('generateItemId учитывает качества', () => {
++    expect(generateItemId('clothing_fancy_clothes', {}, '', undefined, ['dashing']))
++      .toBe('clothing_fancy_clothes_uniq_dashing');
++  });
++});
++
++describe('addNewItem: предметы с качествами', () => {
++  it('одинаковые база+качество — один стек; разные качества — разные стеки; поле сохраняется', () => {
++    const store = useCharacterStore;
++    store.setState({ items: {} });
++    const clothes = { clothingId: 'clothing_fancy_clothes', itemType: 'clothing', name: 'Форменная одежда' };
++    store.getState().addNewItem({ ...clothes, uniqQualities: ['elegant'], name: 'Элегантная форменная одежда' });
++    store.getState().addNewItem({ ...clothes, uniqQualities: ['elegant'], name: 'Элегантная форменная одежда' });
++    let items = store.getState().items;
++    expect(Object.keys(items)).toHaveLength(1);
++    expect(Object.values(items)[0].quantity).toBe(2);
++    expect(Object.values(items)[0].uniqQualities).toEqual(['elegant']);
++
++    store.getState().addNewItem({ ...clothes, uniqQualities: ['dashing'], name: 'Дерзкая форменная одежда' });
++    items = store.getState().items;
++    expect(Object.keys(items)).toHaveLength(2); // элегантная и дерзкая — разные стеки
++  });
++});
++
++describe('Комплект: крепление качества данными', () => {
++  it('запись комплекта с uniqQualities → предмет с качеством и составным именем', async () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const kit = catalog.equipmentKits.treefamilies_chairmen;
++    const resolved = await resolveKitItems({
++      id: 'treefamilies_chairmen',
++      items: [
++        ...kit.items,
++        { type: 'fixed', clothingId: 'headwear_fancy_hat', itemType: 'clothing', uniqQualities: ['dashing'] },
++      ],
++    });
++    // в комплекте уже есть шляпа без качества — ищем именно экземпляр с качеством
++    const hat = resolved.items.find((i) => i.clothingId === 'headwear_fancy_hat' && i.uniqQualities?.includes('dashing'));
++    expect(hat).toBeDefined();
++    expect(hat.uniqQualities).toEqual(['dashing']);
++    expect(hat.name).toBe('Дерзкая Формальная шляпа');
++  });
++
++  it('оружие с качеством: имя = [моды, качества, имя]', async () => {
++    const item = await resolveWeaponItem({
++      type: 'fixed',
++      weaponId: 'weapon_switchblade',
++      itemType: 'weapon',
++      uniqQualities: ['dashing'],
++      modIds: ['mod_113'],
++    });
++    expect(item.uniqQualities).toEqual(['dashing']);
++    expect(item.name).toBe('Зазубренное лезвие Дерзкая Складной нож');
++    expect(item.weaponId).toBe('weapon_switchblade');
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index fa09475..6d30234 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -247,6 +247,7 @@ const InventoryScreen = () => {
+         item?.appliedMods,
+         item?.baseName,
+         item?.durabilityTracked ? item?.durability : undefined,
++        item?.uniqQualities,
+       );
+       return `weapon:${storeKey}:mods:${getModsSignature(item)}`;
+     }
+diff --git a/data/equipment/uniq_qualities.json b/data/equipment/uniq_qualities.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/data/equipment/uniq_qualities.json
+@@ -0,0 +1 @@
++[]
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 129393c..a23d687 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,14 @@
+ # Changelog
+ 
++## 65 — Uniq qualities: attachable equipment modifiers
++
++- MODEL (owner): item "свойства" are called **uniq qualities** (like uniq_armor_mods). A quality is an attachable modifier: it has an id (tracking/mechanics) and a name (i18n); the name joins the item name: "Дерзкая" + "Формальная шляпа" = "Дерзкая Формальная шляпа". Quality effects (like mods) are reserved for the future.
++- A quality is NOT hardwired into the item: it attaches to the instance (store field `uniqQualities`, like `appliedMods` — a list of ids). Attachment: via data (kit entry: `"uniqQualities": ["dashing"]`), in the future via crafting or manually. The mechanism is generic for any equipment: clothes, hats, armor, special outfits, weapons, ammo.
++- Stack: quality is a stack parameter (law: two 100% identical items are one stack). Formula: id + durability + mods + qualities + name — `clothing_fancy_clothes_uniq_dashing` ≠ `..._uniq_elegant` with the same base id ("elegant" and "dashing" clothes are different stacks). The key uses quality ids (not names) — locale-independent; attachment order does not matter.
++- Catalog: `data/equipment/uniq_qualities.json` (base, empty) + `modules/fallout/data/uniq_qualities.json` (module — the owner adds definitions here) + names in module i18n (`uniqQualities`). Registry: getUniqQualities/getUniqQualityName.
++- Name composition: domain/uniqQuality.js — pure function (ready for crafting/manual attachment).
++- Tests: uniq-quality.test.js (10) — catalog, name composition, stack keys, addNewItem, kit attachment (hat and weapon).
++
+ ## 64 — Item variants (trueItemId + modifiers): the Straight Razor is not a standalone item
+ 
+ - MODEL (owner): the razor is NOT a clone and NOT separate weaponry. It is a **variant** of the switchblade; the record reads as modifiers:
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 77c8e7f..d45fb4a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,17 @@
+ 
+ ---
+ 
++## 65 — Уникальные качества (uniq qualities): навешиваемые модификаторы экипировки
++
++- МОДЕЛЬ (владелец): «свойства» экипировки называются **уникальными качествами** (uniq quality, в духе uniq_armor_mods). Качество — навешиваемый модификатор: у него id (учёт/механика) и имя (i18n), имя добавляется к имени предмета: «Дерзкая» + «Формальная шляпа» = «Дерзкая Формальная шляпа». Эффекты качества (как у модов) — зарезервированы на будущее.
++- Качество НЕ вшито в предмет: крепится к экземпляру в инвентаре (поле `uniqQualities`, как `appliedMods` — список id). Крепление: данными (запись комплекта: `"uniqQualities": ["dashing"]`), в будущем — крафтом или вручную. Механизм общий для любой экипировки: одежда, шляпы, броня, спецодежда, оружие, патроны.
++- Стек: качество — параметр стека (закон: два 100% идентичных предмета — один стек). Формула: id + прочность + моды + качества + имя — `clothing_fancy_clothes_uniq_dashing` ≠ `..._uniq_elegant` при одном базовом id («элегантная» и «дерзкая» одежда — разные стеки). Ключ по id качества (не по имени) — не зависит от локали; порядок качеств не влияет.
++- Каталог: `data/equipment/uniq_qualities.json` (база, пустой) + `modules/fallout/data/uniq_qualities.json` (модуль — сюда владелец добавляет определения) + имена в i18n модуля (`uniqQualities`). Реестр: getUniqQualities/getUniqQualityName.
++- Композиция имени: domain/uniqQuality.js — чистая функция (готова для крафта/ручного крепления).
++- Тесты: uniq-quality.test.js (10) — каталог, композиция имени, стек-ключи, addNewItem, крепление из комплекта (шляпа и оружие).
++
++---
++
+ ## 64 — Варианты предметов (trueItemId + modifiers): «Опасная бритва» — не самостоятельный предмет
+ 
+ - МОДЕЛЬ (владелец): бритва — НЕ клон и НЕ отдельное оружие. Это **вариант** выкидного ножа: запись читается как модификаторы —
+diff --git a/domain/itemIdentity.js b/domain/itemIdentity.js
+index 30db900..f71dd95 100644
+--- a/domain/itemIdentity.js
++++ b/domain/itemIdentity.js
+@@ -2,20 +2,21 @@
+ // Идентичность предмета в инвентаре: id и стек-ключ.
+ //
+ // Стек-ключ — простая склейка частей: id + прочие параметры + имя.
+-//   - обычный нож:                 weapon_switchblade
+-//   - нож с модом:                 weapon_switchblade_mods_mod_113
+-//   - нож с прочностью 50:         weapon_switchblade_dur_50
+-//   - бритва (вариант ножа):       weapon_switchblade_опасная_бритва
+-//   - бритва с модом и прочностью: weapon_switchblade_dur_50_mods_mod_113_опасная_бритва
++//   - обычный нож:                        weapon_switchblade
++//   - нож с модом:                        weapon_switchblade_mods_mod_113
++//   - нож с прочностью 50:                weapon_switchblade_dur_50
++//   - одежда с уникальным качеством:      clothing_fancy_clothes_uniq_dashing
++//   - бритва (вариант ножа):              weapon_switchblade_опасная_бритва
++//   - бритва, мод, прочность, качество:   weapon_switchblade_dur_50_mods_mod_113_uniq_dashing_опасная_бритва
+ //
+-// ЗАКОН стека: два 100% идентичных предмета (id + моды + прочность + имя) —
+-// один стек; любой отличающийся параметр разделяет. Прочность входит в ключ
+-// наравне с модами: меч 50 и меч 100 прочности — разные стеки, два меча 50 —
+-// один стек.
++// ЗАКОН стека: два 100% идентичных предмета (id + прочность + моды +
++// уникальные качества + имя) — один стек; любой отличающийся параметр
++// разделяет: меч 50 и меч 100 прочности — разные стеки, «элегантная» и
++// «дерзкая» форменная одежда (один id, разные uniq-качества) — разные стеки.
+ //
+ // Вариант предмета (trueItemId) живёт под истинным id; разделение стека делает
+-// имя (baseName): бритва и нож с одинаковыми id/модами/прочностью — разные
+-// стеки (имена не совпали), две бритвы — один стек.
++// имя (baseName): бритва и нож с одинаковыми параметрами — разные стеки
++// (имена не совпали), две бритвы — один стек.
+ 
+ const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+ 
+@@ -27,14 +28,17 @@ export const slugifyBaseName = (baseName = '') => String(baseName)
+   .slice(0, 40);
+ 
+ /**
+- * Собирает стек-ключ/инстанс-id из частей: id + прочность + моды + имя.
++ * Собирает стек-ключ/инстанс-id из частей: id + прочность + моды +
++ * уникальные качества + имя.
+  * - durability — прочность (только для предметов с отслеживаемой прочностью);
+  * - mods — отсортированные id установленных модов;
++ * - uniqQualities — id уникальных качеств (сортировка — ключ не зависит
++ *   от порядка крепления; id, а не имена — ключ не зависит от локали);
+  * - baseName — перезаписанное имя варианта (иначе имя истинного предмета).
+  * Предметы со своим ключом (силовая броня, Ядерный Блок — signature по
+  * прочности/зарядам/модам, см. domain/powerArmor) приносят ключ с собой.
+  */
+-const buildKey = (weaponId, appliedMods = {}, baseName = '', durability) => {
++const buildKey = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities = []) => {
+   if (!weaponId) return generateId();
+   const modIds = Object.entries(appliedMods || {})
+     .sort(([k1], [k2]) => k1.localeCompare(k2))
+@@ -45,6 +49,8 @@ const buildKey = (weaponId, appliedMods = {}, baseName = '', durability) => {
+     parts.push(`dur_${durability}`);
+   }
+   if (modIds) parts.push(`mods_${modIds}`);
++  const uniqIds = [...(uniqQualities || [])].filter(Boolean).sort();
++  uniqIds.forEach((id) => parts.push(`uniq_${id}`));
+   if (baseName) parts.push(slugifyBaseName(baseName));
+   return parts.join('_');
+ };
+@@ -52,11 +58,11 @@ const buildKey = (weaponId, appliedMods = {}, baseName = '', durability) => {
+ /**
+  * Уникальный id инстанса предмета (см. buildKey).
+  */
+-export const generateItemId = (weaponId, appliedMods = {}, baseName = '', durability) =>
+-  buildKey(weaponId, appliedMods, baseName, durability);
++export const generateItemId = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities) =>
++  buildKey(weaponId, appliedMods, baseName, durability, uniqQualities);
+ 
+ /**
+  * Стек-ключ для склеивания одинаковых предметов (см. buildKey).
+  */
+-export const generateStackKey = (weaponId, appliedMods = {}, baseName = '', durability) =>
+-  buildKey(weaponId, appliedMods, baseName, durability);
++export const generateStackKey = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities) =>
++  buildKey(weaponId, appliedMods, baseName, durability, uniqQualities);
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index f65c3bb..2cc7f11 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -3,8 +3,20 @@ import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../
+ import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
+ import { evaluateRollConfig } from './diceRollsLogic';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import { getUniqQualityName } from './registry';
++import { composeNameWithUniqQualities } from './uniqQuality';
+ import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+ 
++// Уникальные качества записи комплекта прикрепляются к предмету: поле
++// uniqQualities уходит в стор, имена качеств добавляются к имени предмета
++// («дерзкая» + «форменная одежда» = «дерзкая форменная одежда»).
++const applyUniqQualityNames = (item) => {
++  if (!item?.uniqQualities?.length) return item;
++  const composed = composeNameWithUniqQualities(item.name, item.uniqQualities, getUniqQualityName);
++  if (!composed || composed === item.name) return item;
++  return { ...item, name: composed };
++};
++
+ const CURRENCY_ITEM_TYPES = {
+   currency: () => tWeaponsAndArmorScreen('kitResolver.currency'),
+   currency_ncr: () => tWeaponsAndArmorScreen('kitResolver.currencyNcr'),
+@@ -167,7 +179,9 @@ export async function resolveWeaponItem(item) {
+ 
+   const prefixes = mods.map((mod) => mod.prefix).filter(Boolean);
+   const weaponName = weaponData.name || item.weaponId;
+-  const displayName = [...prefixes, weaponName].join(' ');
++  // Уникальные качества — перед именем: «дерзкая» + «Опасная бритва».
++  const uniqNames = (item.uniqQualities || []).map(getUniqQualityName).filter(Boolean);
++  const displayName = [...prefixes, ...uniqNames, weaponName].join(' ');
+   const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
+ 
+   // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
+@@ -232,7 +246,7 @@ export async function resolveNonWeaponItem(item) {
+   }
+ 
+   const byId = resolveItemById(item);
+-  if (byId) return byId;
++  if (byId) return applyUniqQualityNames(byId);
+ 
+   if (CURRENCY_ITEM_TYPES[item.itemType]) {
+     const name = CURRENCY_ITEM_TYPES[item.itemType]();
+diff --git a/domain/registry.js b/domain/registry.js
+index 8edf203..bc7910a 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -27,8 +27,12 @@ import moduleRuI18n from '../modules/fallout/i18n/ru-RU.json';
+ import moduleEnI18n from '../modules/fallout/i18n/en-EN.json';
+ 
+ import baseWeapons from '../data/equipment/weapons.json';
++import baseUniqQualities from '../data/equipment/uniq_qualities.json';
++
++import moduleUniqQualities from '../modules/fallout/data/uniq_qualities.json';
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import { getCurrentLocale } from '../i18n/locale';
+ import { deepMerge, expandTrueItems } from './packMerge';
+ 
+ /**
+@@ -114,12 +118,32 @@ export function getModuleEquipmentKits() {
+ }
+ 
+ /**
+- * Полный i18n-словарь модуля для локали (origins/traits/weapons/generalGoods/equipmentKits).
++ * Полный i18n-словарь модуля для локали (origins/traits/weapons/generalGoods/equipmentKits/uniqQualities).
+  */
+ export function getModuleI18n(locale) {
+   return locale === 'en-EN' ? moduleEnI18n : moduleRuI18n;
+ }
+ 
++/**
++ * Уникальные качества (uniq qualities): навешиваемые на экипировку
++ * модификаторы (имя + эффекты). База + модуль (модуль перекрывает по id).
++ * Сейчас каталог пустой — определения добавляет владелец в модуль.
++ */
++export function getUniqQualities() {
++  return mergeArraysById(baseUniqQualities, moduleUniqQualities);
++}
++
++/**
++ * Имя уникального качества из i18n модуля по id (для локали).
++ * Пустая строка — имя не задано (качество есть, но имени нет).
++ */
++export function getUniqQualityName(id, locale = getCurrentLocale()) {
++  if (!id) return '';
++  const i18n = locale === 'en-EN' ? moduleEnI18n : moduleRuI18n;
++  const entry = (i18n.uniqQualities || []).find((q) => q?.id === id);
++  return entry?.name || '';
++}
++
+ /**
+  * Каталог снаряжения (оружие/броня/комплекты/i18n).
+  */
+diff --git a/domain/uniqQuality.js b/domain/uniqQuality.js
+new file mode 100644
+index 0000000..842f834
+--- /dev/null
++++ b/domain/uniqQuality.js
+@@ -0,0 +1,22 @@
++// domain/uniqQuality.js
++// Уникальные качества (uniq qualities) — навешиваемые модификаторы экипировки.
++//
++// У качества есть id (механика/учёт), имя (i18n, добавляется к имени
++// предмета: «дерзкая» + «форменная одежда» = «дерзкая форменная одежда») и
++// зарезервированные эффекты (механика — на будущее, как у модов).
++//
++// Качество НЕ вшито в предмет: крепится к экземпляру (поле uniqQualities),
++// участвует в стек-ключе (uniq_<id>) и в имени. Крепление: данными
++// (комплект/запись), механикой (крафт), вручную — всё через одно поле.
++
++/**
++ * Чистая композиция имени: [имена качеств..., базовое имя].
++ * nameById(id) → имя качества (или пустая строка, если имени нет —
++ * качество не влияет на имя).
++ */
++export const composeNameWithUniqQualities = (baseName, uniqQualityIds = [], nameById = () => '') => {
++  const names = (uniqQualityIds || [])
++    .map((id) => nameById(id))
++    .filter(Boolean);
++  return [...names, baseName].filter(Boolean).join(' ');
++};
+diff --git a/modules/fallout/data/uniq_qualities.json b/modules/fallout/data/uniq_qualities.json
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/modules/fallout/data/uniq_qualities.json
+@@ -0,0 +1 @@
++[]
+diff --git a/modules/fallout/i18n/en-EN.json b/modules/fallout/i18n/en-EN.json
+index 60e733c..589d687 100644
+--- a/modules/fallout/i18n/en-EN.json
++++ b/modules/fallout/i18n/en-EN.json
+@@ -48,5 +48,6 @@
+     "treefamilies_white_glove": {
+       "name": "White Glove Society"
+     }
+-  }
++  },
++  "uniqQualities": []
+ }
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU.json b/modules/fallout/i18n/ru-RU.json
+index e160ba1..a112fb6 100644
+--- a/modules/fallout/i18n/ru-RU.json
++++ b/modules/fallout/i18n/ru-RU.json
+@@ -48,5 +48,6 @@
+     "treefamilies_white_glove": {
+       "name": "Общество «Белая перчатка»"
+     }
+-  }
++  },
++  "uniqQualities": []
+ }
+\ No newline at end of file
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 78318e5..01d9318 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -588,14 +588,28 @@ const useCharacterStore = create(devtools(
+         const appliedMods = item.appliedMods || {};
+         
+         // Generate unique ID for this item instance
+-        const itemId = item.uniqueId || generateItemId(weaponId, appliedMods, item.baseName, item.durabilityTracked ? item.durability : undefined);
++        const itemId = item.uniqueId || generateItemId(
++          weaponId,
++          appliedMods,
++          item.baseName,
++          item.durabilityTracked ? item.durability : undefined,
++          item.uniqQualities,
++        );
+         
+         // Generate stackKey for stacking identical items.
+-        // Стек = id + прочие параметры (прочность, моды) + имя: два 100%
+-        // идентичных предмета — один стек; меч 50 и меч 100 прочности —
+-        // разные стеки. Предметы со своим ключом (силовая броня, Ядерный
+-        // Блок — signature по прочности/зарядам/модам) приносят ключ с собой.
+-        const stackKey = item.stackKey || generateStackKey(weaponId, appliedMods, item.baseName, item.durabilityTracked ? item.durability : undefined);
++        // Стек = id + прочие параметры (прочность, моды, уникальные качества)
++        // + имя: два 100% идентичных предмета — один стек; меч 50 и меч 100
++        // прочности — разные; «элегантная» и «дерзкая» форменная одежда
++        // (один id, разные uniq-качества) — разные. Предметы со своим ключом
++        // (силовая броня, Ядерный Блок — signature по прочности/зарядам/модам)
++        // приносят ключ с собой.
++        const stackKey = item.stackKey || generateStackKey(
++          weaponId,
++          appliedMods,
++          item.baseName,
++          item.durabilityTracked ? item.durability : undefined,
++          item.uniqQualities,
++        );
+         
+         // Normalize item data with parameters
+         const normalizedItem = {
+@@ -608,6 +622,9 @@ const useCharacterStore = create(devtools(
+           // у вариантов (бритва) отличается от имени истинного предмета,
+           // что разделяет стеки и задаёт базу для имён с модами.
+           baseName: item.baseName || undefined,
++          // uniqQualities — навешиваемые уникальные качества (id): участвуют
++          // в имени предмета и в стек-ключе (см. domain/uniqQuality.js).
++          uniqQualities: item.uniqQualities || undefined,
+           itemType: item.itemType || 'misc',
+           equipped: item.equipped || false,
+           // `locked: true` marks items that came from a robot kit. They are

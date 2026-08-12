@@ -5,14 +5,12 @@
 // Origins-related helpers (loadOriginsData, tOrigin) have moved to
 // domain/origins.js — see that module.
 
-import traitsJson from '../data/traits/traits.json';
-import ruTraits from '../i18n/ru-RU/data/system/traits.json';
-import enTraits from '../i18n/en-EN/data/system/traits.json';
+import { getTraits, getTraitI18n } from './registry';
 import { getCurrentLocale } from '../i18n/locale';
 
 const TRAIT_DICTIONARIES = {
-  'ru-RU': ruTraits,
-  'en-EN': enTraits,
+  'ru-RU': getTraitI18n('ru-RU'),
+  'en-EN': getTraitI18n('en-EN'),
 };
 
 /**
@@ -41,7 +39,7 @@ export function tTrait(key) {
  * Synchronous — JSON is bundled at build time.
  */
 export function loadTraitsData() {
-  return traitsJson;
+  return getTraits();
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +52,7 @@ export function loadTraitsData() {
  */
 export function findTraitByName(name) {
   if (!name) return undefined;
-  return traitsJson.find((t) => t.id === name);
+  return getTraits().find((t) => t.id === name);
 }
 
 /**
@@ -62,7 +60,7 @@ export function findTraitByName(name) {
  */
 export function findTraitById(id) {
   if (!id) return undefined;
-  return traitsJson.find((t) => t.id === id);
+  return getTraits().find((t) => t.id === id);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +172,7 @@ export function getTraitExtraSkills(trait) {
  */
 function findTraitByLocalizedName(name) {
   if (!name) return undefined;
-  return traitsJson.find((t) => tTrait(t.displayNameKey) === name);
+  return getTraits().find((t) => tTrait(t.displayNameKey) === name);
 }
 
 export function getTraitDescriptionKey(trait) {
@@ -208,7 +206,7 @@ export function resolveTraitDisplayName(storedName) {
   const byCurrentLocale = findTraitByLocalizedName(storedName);
   if (byCurrentLocale) return tTrait(byCurrentLocale.displayNameKey) || storedName;
   // Slow path: try every locale dictionary to find the matching trait
-  const found = traitsJson.find((t) =>
+  const found = getTraits().find((t) =>
     Object.values(TRAIT_DICTIONARIES).some((dict) => {
       const parts = t.displayNameKey.split('.');
       let val = dict;

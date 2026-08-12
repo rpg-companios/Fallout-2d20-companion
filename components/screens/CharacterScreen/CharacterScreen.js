@@ -19,9 +19,10 @@ import { selectActiveTimedEffects } from "../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
-import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
+import { loadEnrichedOrigins, tOrigin, getBuiltinBaseWeapon } from "../../../domain/origins";
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
 import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
+import { resolveKitItems } from "../../../domain/kitResolver";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
   createInitialAttributes,
@@ -578,6 +579,31 @@ export default function CharacterScreen() {
     setIsEquipmentKitModalVisible(false);
   };
 
+  // ПРАВИЛО (владелец): комплект зависит от выбранной семьи/трейта.
+  // Если трейт несёт equipmentKitId — комплект выбирается автоматически.
+  const applyKitById = async (kitId) => {
+    if (!kitId || !origin) return;
+    const catalog = getEquipmentCatalog(locale);
+    const kitMeta = catalog?.equipmentKits?.[kitId];
+    if (!kitMeta || !Array.isArray(kitMeta.items)) return;
+    if (equipment?.id === kitId) return; // уже выбран
+    try {
+      const resolved = await resolveKitItems({ id: kitId, name: kitMeta.name, items: kitMeta.items });
+      const builtin = getBuiltinBaseWeapon({ origin, trait });
+      handleSelectKit({
+        id: kitId,
+        name: kitMeta.name,
+        items: resolved.items,
+        weight: 0,
+        price: 0,
+        caps: 0,
+        unarmedWeaponId: builtin?.id || null,
+      });
+    } catch (err) {
+      debugLog('kit.autoSelect.failed', { kitId, error: err?.message || String(err) });
+    }
+  };
+
   const handleToggleSkill = (skillName) => {
     if (!canDistributeSkills) {
       showAlert(tCharacterScreen("alerts.warningTitle"), tCharacterScreen("errors.saveAttributesFirst"));
@@ -957,6 +983,12 @@ export default function CharacterScreen() {
     // Устанавливаем саму новую черту
     setTrait(newTrait);
     setIsTraitModalVisible(false);
+
+    // Комплект зависит от выбранной семьи: авто-выбор по equipmentKitId трейта.
+    const traitKitId = newModifiersFromModal?.equipmentKitId;
+    if (traitKitId) {
+      applyKitById(traitKitId);
+    }
   };
 
   // Обработчик нажатия на строку черты

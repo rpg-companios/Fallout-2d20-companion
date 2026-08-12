@@ -46,6 +46,10 @@ const buildWeaponRow = (w) => {
     id: w.id,
     name: w.name || '',
     weapon_type: w.weaponType || '',
+    // Вариант предмета: истинный id (механика наследуется от него).
+    // Например, «Опасная бритва» — это weapon_switchblade с другим именем.
+    true_item_id: safeStr(w.trueItemId),
+    trueItemId: safeStr(w.trueItemId),
     damage: safeNum(w.damage),
     damage_effects: safeStr(w.damageEffects),
     damage_type: damageType,

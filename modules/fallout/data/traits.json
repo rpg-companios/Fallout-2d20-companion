@@ -1,0 +1,54 @@
+[
+  {
+    "id": "treefamilies-family",
+    "originId": "TreeFamilies",
+    "displayNameKey": "traits.treeFamilies.family.name",
+    "descriptionKey": "traits.treeFamilies.family.description",
+    "modifiers": {
+      "isMultiTrait": true,
+      "subTraitIds": [
+        "treefamilies-chairmen",
+        "treefamilies-omerta",
+        "treefamilies-white-glove"
+      ]
+    }
+  },
+  {
+    "id": "treefamilies-chairmen",
+    "originId": "TreeFamilies",
+    "displayNameKey": "traits.treeFamilies.chairmen.name",
+    "descriptionKey": "traits.treeFamilies.chairmen.description",
+    "modifiers": {
+      "effects": [
+        "chairmen_reroll_cha"
+      ],
+      "equipmentKitId": "treefamilies_chairmen"
+    }
+  },
+  {
+    "id": "treefamilies-omerta",
+    "originId": "TreeFamilies",
+    "displayNameKey": "traits.treeFamilies.omerta.name",
+    "descriptionKey": "traits.treeFamilies.omerta.description",
+    "modifiers": {
+      "effects": [
+        "omerta_addiction_boost"
+      ],
+      "equipmentKitId": "treefamilies_omerta"
+    }
+  },
+  {
+    "id": "treefamilies-white-glove",
+    "originId": "TreeFamilies",
+    "displayNameKey": "traits.treeFamilies.whiteGlove.name",
+    "descriptionKey": "traits.treeFamilies.whiteGlove.description",
+    "modifiers": {
+      "effects": [
+        "white_glove_food_heal_plus",
+        "white_glove_butcher_extra",
+        "white_glove_cha_complication"
+      ],
+      "equipmentKitId": "treefamilies_white_glove"
+    }
+  }
+]
