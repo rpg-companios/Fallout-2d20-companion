@@ -126,6 +126,10 @@ const toInventoryItems = (entries) => {
         // иначе builtinToArm/requiresMkII теряются при фильтрации finalItems.
         builtinToArm: item.builtinToArm,
         requiresMkII: item.requiresMkII,
+        // Вариант (заменённое имя) и уникальные качества — тоже item-level:
+        // без явного переноса бритва/«Дерзкая …» потеряли бы имя и стек.
+        baseName: item.baseName,
+        uniqQualities: item.uniqQualities,
       });
 
       if (item.resolvedAmmunition) {

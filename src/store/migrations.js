@@ -5,6 +5,8 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
 import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { generateItemId } from '../../domain/itemIdentity';
+import { getUniqQualityName } from '../../domain/registry';
+import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 
 
 /**
@@ -670,6 +672,54 @@ const MIGRATIONS = [
         };
         const newId = generateItemId(rewritten.weaponId, rewritten.appliedMods || {}, rewritten.baseName || '');
         collection[i] = { ...rewritten, id: newId, stackKey: newId };
+      }
+    }
+    return changed ? next : state;
+  },
+
+  // v7 -> v8: качество «Элегантная» у формальной одежды/шляпы Председателей
+  // (патч 67). Старые сейвы (комплект с патча 63) хранят одежду без качества —
+  // если персонаж из семьи Председателей, одежда/шляпа получают
+  // uniqQualities ['elegant'], пересобираются id/stackKey (учитывают качество)
+  // и имя («Элегантная Формальная одежда»).
+  (state) => {
+    const next = { ...state };
+    const trait = next.trait;
+    const isChairmen = Boolean(
+      trait
+      && (trait.id === 'treefamilies-chairmen'
+        || (Array.isArray(trait.ids) && trait.ids.includes('treefamilies-chairmen'))),
+    );
+    if (!isChairmen) return state;
+    const collections = [];
+    if (Array.isArray(next.equipment?.items)) collections.push(next.equipment.items);
+    if (Array.isArray(next.equippedWeapons)) collections.push(next.equippedWeapons);
+    if (collections.length === 0) return state;
+
+    const ELEGANT_CLOTHING_IDS = new Set(['clothing_fancy_clothes', 'headwear_fancy_hat']);
+    const qualityName = getUniqQualityName('elegant');
+    let changed = false;
+    for (const collection of collections) {
+      for (let i = 0; i < collection.length; i += 1) {
+        const item = collection[i];
+        if (!item) continue;
+        const baseId = item.weaponId || item.id || item.clothingId || item.itemId;
+        if (!ELEGANT_CLOTHING_IDS.has(baseId)) continue;
+        if (Array.isArray(item.uniqQualities) && item.uniqQualities.includes('elegant')) continue;
+        changed = true;
+        // Имя уже начинается с качества (было выдано после 67, но поле
+        // потеряно) — не дублируем; иначе собираем «Элегантная» + имя.
+        const name = qualityName && item.name && item.name.startsWith(`${qualityName} `)
+          ? item.name
+          : composeNameWithUniqQualities(item.name || baseId, ['elegant'], getUniqQualityName);
+        const newId = generateItemId(baseId, {}, undefined, undefined, ['elegant']);
+        collection[i] = {
+          ...item,
+          uniqQualities: ['elegant'],
+          name: name || item.name,
+          id: newId,
+          stackKey: newId,
+        };
       }
     }
     return changed ? next : state;

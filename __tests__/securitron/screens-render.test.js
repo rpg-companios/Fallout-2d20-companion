@@ -138,6 +138,34 @@ describe('Экраны рендерятся без TDZ/хук-ошибок', () 
     const texts = getTexts(renderer.toJSON());
     expect(texts.length).toBeGreaterThan(0);
   });
+
+  it('экипированная бритва показывается под своим именем, а не «Складной нож»', () => {
+    useCharacterStore.setState({
+      items: {
+        weapon_switchblade_опасная_бритва: {
+          id: 'weapon_switchblade_опасная_бритва',
+          instanceId: 'weapon_switchblade_опасная_бритва',
+          weaponId: 'weapon_switchblade', // истинный id — нож
+          itemType: 'weapon',
+          name: 'Опасная бритва',
+          baseName: 'Опасная бритва', // заменённое имя варианта
+          equipped: true,
+          quantity: 1,
+          stackKey: 'weapon_switchblade_опасная_бритва',
+          damage: 2,
+          fireRate: 0,
+          qualities: [{ qualityId: 'quality_concealed' }],
+        },
+      },
+    });
+    let renderer;
+    TestRenderer.act(() => {
+      renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
+    });
+    const texts = getTexts(renderer.toJSON());
+    expect(texts.some((t) => String(t).includes('Опасная бритва'))).toBe(true);
+    expect(texts.some((t) => String(t) === 'Складной нож')).toBe(false);
+  });
 });
 
 describe('Режимы отображения карточек оружия', () => {

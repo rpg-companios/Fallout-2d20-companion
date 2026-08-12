@@ -46,6 +46,7 @@ import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
 import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
 import { setCurrentLocale } from '../../i18n/locale';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
+import { migrateCharacterState } from '../../src/store/migrations';
 import useCharacterStore from '../../src/store/characterStore';
 
 beforeAll(() => {
@@ -147,6 +148,38 @@ describe('Комплект: крепление качества данными',
     expect(hat.name).toBe('Дерзкая Формальная шляпа');
   });
 
+  it('комплект Председателей: одежда и шляпа с качеством elegant в названии', async () => {
+    const catalog = getEquipmentCatalogForLocale('ru-RU');
+    const kit = catalog.equipmentKits.treefamilies_chairmen;
+    const resolved = await resolveKitItems({ id: 'treefamilies_chairmen', items: kit.items });
+    const clothes = resolved.items.find((i) => i.clothingId === 'clothing_fancy_clothes');
+    const hat = resolved.items.find((i) => i.clothingId === 'headwear_fancy_hat');
+    expect(clothes.uniqQualities).toEqual(['elegant']);
+    expect(clothes.name).toBe('Элегантная Формальная одежда');
+    expect(hat.uniqQualities).toEqual(['elegant']);
+    expect(hat.name).toBe('Элегантная Формальная шляпа');
+  });
+
+  it('полный путь выдачи (как applyKitById): одежда с качеством попадает в стор', async () => {
+    const catalog = getEquipmentCatalogForLocale('ru-RU');
+    const kit = catalog.equipmentKits.treefamilies_chairmen;
+    const resolved = await resolveKitItems({ id: 'treefamilies_chairmen', items: kit.items });
+    const store = useCharacterStore;
+    store.setState({ items: {} });
+    resolved.items.forEach((item) => {
+      if (item.itemType === 'currency' || item.itemType === 'loot') return;
+      store.getState().addNewItem({ ...item, equipped: false, locked: false });
+    });
+    const items = store.getState().items;
+    const clothes = Object.values(items).find((i) => i.weaponId === 'clothing_fancy_clothes');
+    const hat = Object.values(items).find((i) => i.weaponId === 'headwear_fancy_hat');
+    expect(clothes.uniqQualities).toEqual(['elegant']);
+    expect(clothes.name).toBe('Элегантная Формальная одежда');
+    expect(clothes.stackKey).toBe('clothing_fancy_clothes_uniq_elegant');
+    expect(hat.uniqQualities).toEqual(['elegant']);
+    expect(hat.name).toBe('Элегантная Формальная шляпа');
+  });
+
   it('оружие с качеством: имя = [моды, качества, имя]', async () => {
     const item = await resolveWeaponItem({
       type: 'fixed',
@@ -158,5 +191,96 @@ describe('Комплект: крепление качества данными',
     expect(item.uniqQualities).toEqual(['dashing']);
     expect(item.name).toBe('Зазубренное лезвие Дерзкая Складной нож');
     expect(item.weaponId).toBe('weapon_switchblade');
+  });
+});
+
+describe('Миграция v7 → v8 (старые сейвы Председателей)', () => {
+  it('одежда/шляпа без качества получают elegant, ключи и имя пересобраны', () => {
+    const v7 = {
+      schemaVersion: 7,
+      origin: { id: 'TreeFamilies', name: 'x' },
+      trait: { id: 'treefamilies-chairmen', ids: ['treefamilies-chairmen'], name: 'Председатели' },
+      equipment: {
+        items: [
+          {
+            id: 'clothing_fancy_clothes',
+            weaponId: 'clothing_fancy_clothes',
+            name: 'Формальная одежда',
+            itemType: 'clothing',
+            stackKey: 'clothing_fancy_clothes',
+            quantity: 1,
+          },
+          {
+            id: 'headwear_fancy_hat',
+            weaponId: 'headwear_fancy_hat',
+            name: 'Формальная шляпа',
+            itemType: 'clothing',
+            stackKey: 'headwear_fancy_hat',
+            quantity: 1,
+          },
+        ],
+      },
+      equippedWeapons: [],
+    };
+    const migrated = migrateCharacterState(v7);
+    expect(migrated.schemaVersion).toBe(8);
+    const clothes = migrated.equipment.items[0];
+    expect(clothes.uniqQualities).toEqual(['elegant']);
+    expect(clothes.name).toBe('Элегантная Формальная одежда');
+    expect(clothes.id).toBe('clothing_fancy_clothes_uniq_elegant');
+    expect(clothes.stackKey).toBe('clothing_fancy_clothes_uniq_elegant');
+    const hat = migrated.equipment.items[1];
+    expect(hat.uniqQualities).toEqual(['elegant']);
+    expect(hat.name).toBe('Элегантная Формальная шляпа');
+  });
+
+  it('персонаж не из Председателей — одежда не трогается', () => {
+    const v7 = {
+      schemaVersion: 7,
+      origin: { id: 'TreeFamilies', name: 'x' },
+      trait: { id: 'treefamilies-omerta', ids: ['treefamilies-omerta'], name: 'Омерта' },
+      equipment: {
+        items: [
+          {
+            id: 'clothing_fancy_clothes',
+            weaponId: 'clothing_fancy_clothes',
+            name: 'Формальная одежда',
+            itemType: 'clothing',
+            stackKey: 'clothing_fancy_clothes',
+            quantity: 1,
+          },
+        ],
+      },
+      equippedWeapons: [],
+    };
+    const migrated = migrateCharacterState(v7);
+    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.equipment.items[0].uniqQualities).toBeUndefined();
+    expect(migrated.equipment.items[0].id).toBe('clothing_fancy_clothes');
+  });
+
+  it('уже с качеством (после 67) — не дублируется', () => {
+    const v7 = {
+      schemaVersion: 7,
+      origin: { id: 'TreeFamilies', name: 'x' },
+      trait: { id: 'treefamilies-chairmen', ids: ['treefamilies-chairmen'], name: 'Председатели' },
+      equipment: {
+        items: [
+          {
+            id: 'clothing_fancy_clothes_uniq_elegant',
+            weaponId: 'clothing_fancy_clothes',
+            name: 'Элегантная Формальная одежда',
+            uniqQualities: ['elegant'],
+            itemType: 'clothing',
+            stackKey: 'clothing_fancy_clothes_uniq_elegant',
+            quantity: 1,
+          },
+        ],
+      },
+      equippedWeapons: [],
+    };
+    const migrated = migrateCharacterState(v7);
+    expect(migrated.equipment.items[0].name).toBe('Элегантная Формальная одежда');
+    expect(migrated.equipment.items[0].uniqQualities).toEqual(['elegant']);
   });
 });

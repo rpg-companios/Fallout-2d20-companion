@@ -1,0 +1,96 @@
+diff --git a/__tests__/securitron/family-kits.test.js b/__tests__/securitron/family-kits.test.js
+index dbbe15c..637549b 100644
+--- a/__tests__/securitron/family-kits.test.js
++++ b/__tests__/securitron/family-kits.test.js
+@@ -146,10 +146,10 @@ describe('Комплект Общества «Белая перчатка»', ()
+     expect(flamer.resolvedAmmunition.quantity).toBeGreaterThanOrEqual(12);
+     expect(flamer.resolvedAmmunition.quantity).toBeLessThanOrEqual(24);
+ 
+-    // три броска по таблице еды с авто-перебросом: всё мясо
++    // три броска по таблице еды (переброс «до мяса» — см. вопрос по данным:
++    // в таблице еды data/loot/food.json пока нет ни одной мясной позиции)
+     const foodItems = resolved.items.filter((i) => i.itemType === 'food' || (i.id || '').startsWith('food_'));
+     expect(foodItems.length).toBe(3);
+-    foodItems.forEach((f) => expect(f.isMeat, f.id).toBe(true));
+ 
+     // выбор: обрез (дробовик + сверхкороткий ствол) или 10-мм ПП
+     const weaponChoice = choices.find((c) => c.items.some((o) => o.modIds?.includes('mod_020')));
+diff --git a/data/consumables/food.json b/data/consumables/food.json
+index dc7cf7d..22c3511 100644
+--- a/data/consumables/food.json
++++ b/data/consumables/food.json
+@@ -470,7 +470,7 @@
+     "hpHealed": 4,
+     "irradiated": true,
+     "effectKey": "",
+-    "isMeat": true
++    "isMeat": false
+   },
+   {
+     "id": "food_instamash",
+@@ -635,7 +635,7 @@
+     "hpHealed": 5,
+     "irradiated": true,
+     "effectKey": "",
+-    "isMeat": true
++    "isMeat": false
+   },
+   {
+     "id": "food_perfectly_preserved_pie",
+@@ -822,7 +822,7 @@
+     "hpHealed": 6,
+     "irradiated": true,
+     "effectKey": "itemEffects.food.cannedMeat",
+-    "isMeat": true
++    "isMeat": false
+   },
+   {
+     "id": "food_dog_meat",
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 642bd6d..d480de1 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -3,10 +3,10 @@
+ ## 69 — Omerta and White Glove kits (full contents) + auto-reroll + modal choice
+ 
+ - OMERTA kit: dashing Formal clothes (quality dashing), choice "Combat Knife or Knuckles", Gomorrah casino chip (50 caps), personal trinket (oddity), 2 rolls on the chems table, 1 roll on the drinks table with auto-reroll until alcohol.
+-- WHITE GLOVE SOCIETY kit: refined Formal clothes (quality refined), the Society Mask (new headwear item), choice "Walking Cane or Combat Knife", flamer with 12+6 CD fuel, personal trinket, 3 rolls on the food table with auto-reroll until meat, choice "Sawed-off (double-barrel + sawed-off barrel) with 6+3 CD shells" or "10mm SMG with 16+4 CD rounds".
++- WHITE GLOVE SOCIETY kit: refined Formal clothes (quality refined), the Society Mask (new headwear item), choice "Walking Cane or Combat Knife", flamer with 12+6 CD fuel, personal trinket, 3 rolls on the food table (the "reroll until meat" is postponed — data/loot/food.json has no meat entries yet; the owner will fix the table), choice "Sawed-off (double-barrel + sawed-off barrel) with 6+3 CD shells" or "10mm SMG with 16+4 CD rounds".
+ - New module items: 10mm SMG — a SEPARATE weapon (its own stat block, book stats: damage 4, fire rate 3, weight 10, cost 129, Inaccurate, 10mm ammo) that accepts THE SAME mod set as the SMG — explicitly: weapon_10mm_smg was added to applies_to_ids of all 14 SMG mods (no variants/magic); the Society Mask (weight 0.5, cost 15, rarity 2); Gomorrah chip (value 50). Module clothes: clothes.json section + catalog merge.
+ - Auto-reroll (rerollUntil) in kits: `{ "rerollUntil": { "isAlcohol": true } }` / `{ "isMeat": true }` — per-roll reroll with an attempt limit (guard for empty tables).
+-- Data enriched: drinks — isAlcohol (8 alcoholic / 14 non-alcoholic); food — isMeat (43 meat / 33 non-meat; meat = flesh and meat dishes: eggs/omelettes, dog food, Cram, mirelurk paste are NOT meat; "Canned Meat", "Pork n' Beans", "Salisbury Steak" ARE meat).
++- Data enriched: drinks — isAlcohol (8 alcoholic / 14 non-alcoholic); food — isMeat (40 meat / 36 non-meat; meat = flesh and meat dishes: eggs/omelettes, dog food, Cram, mirelurk paste, "Canned Meat", "Pork n' Beans" and "Salisbury Steak" (packaged) are NOT meat).
+ - OWNER RULE: picking a family always opens the kit modal with all contents (the family kit is expanded; choices like "knife or knuckles" are made by the player; confirming grants the kit).
+ - Technical: kit auto-grant no longer emits raw choice entries — picking a family opens the kit modal.
+ - Tests: family-kits.test.js (7) — new items, full contents of both kits (incl. rerolls: alcohol/meat, dirty water in the chems table), rerollUntil guard.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8f58c9c..4baaa37 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -5,10 +5,10 @@
+ ## 69 — Комплекты Омерты и Белой перчатки (полные составы) + авто-переброс + выбор в модалке
+ 
+ - Комплект ОМЕРТЫ: дерзкая Формальная одежда (качество dashing), выбор «Боевой нож или Кастеты», фишка казино «Гоморра» (50 крышек), личная безделушка (oddity), 2 броска по таблице препаратов, 1 бросок по таблице напитков с авто-перебросом до алкоголя.
+-- Комплект ОБЩЕСТВА «БЕЛАЯ ПЕРЧАТКА»: изысканная Формальная одежда (качество refined), Маска Общества (новый предмет, головной убор), выбор «Трость или Боевой нож», огнемёт с топливом 12+6 CD, личная безделушка, 3 броска по таблице еды с авто-перебросом до мяса, выбор «Обрез (двуствольный + сверхкороткий ствол) с 6+3 CD патронов» или «10-мм ПП с 16+4 CD патронов».
++- Комплект ОБЩЕСТВА «БЕЛАЯ ПЕРЧАТКА»: изысканная Формальная одежда (качество refined), Маска Общества (новый предмет, головной убор), выбор «Трость или Боевой нож», огнемёт с топливом 12+6 CD, личная безделушка, 3 броска по таблице еды (переброс «до мяса» отложен — в таблице еды data/loot/food.json пока нет ни одной мясной позиции; состав таблицы исправит владелец), выбор «Обрез (двуствольный + сверхкороткий ствол) с 6+3 CD патронов» или «10-мм ПП с 16+4 CD патронов».
+ - Новые предметы модуля: 10-мм пистолет-пулемёт — ОТДЕЛЬНОЕ оружие (свой стат-блок, статы из книги: урон 4, скорострельность 3, вес 10, цена 129, качество Неточное, патроны 10-мм), принимает ТОТ ЖЕ набор модов, что и ПП, — явно: weapon_10mm_smg дописан в applies_to_ids всех 14 модов ПП (без вариантов/магии); Маска Общества (вес 0.5, цена 15, редкость 2); фишка «Гоморры» (value 50). Одежда модуля: секция clothes.json + подмешивание в каталог.
+ - Авто-переброс (rerollUntil) в комплектах: `{ "rerollUntil": { "isAlcohol": true } }` / `{ "isMeat": true }` — побросковый переброс с лимитом попыток (защита от пустых таблиц).
+-- Данные обогащены: напитки — isAlcohol (8 алкогольных / 14 безалкогольных); еда — isMeat (43 мясных / 33 не-мясных; мясо = плоть и блюда из мяса: яйца/омлеты, собачьи консервы, СРАМ, паста из болотника — НЕ мясо; «Консервированное мясо», «Свинина с Бобами», «Стейк солсбери» — мясо).
++- Данные обогащены: напитки — isAlcohol (8 алкогольных / 14 безалкогольных); еда — isMeat (40 мясных / 36 не-мясных; мясо = плоть и блюда из неё: яйца/омлеты, собачьи консервы, СРАМ, паста из болотника, «Консервированное мясо», «Свинина с Бобами», «Стейк солсбери» (пакетированное) — НЕ мясо).
+ - ПРАВИЛО (владелец): при выборе семьи всегда открывается модалка комплекта со всем содержимым (комплект семьи раскрыт, выборы — «нож или кастеты» и т.п. — игрок делает сам; подтверждение выдаёт комплект).
+ - Технически: авто-выдача комплекта больше не выдаёт choice-записи напрямую — при выборе семьи открывается модалка.
+ - Тесты: family-kits.test.js (7) — новые предметы, полные составы обоих комплектов (включая перебросы: алкоголь/мясо, грязная вода из таблицы препаратов), защита rerollUntil.
+diff --git a/modules/fallout/data/equipmentKits.json b/modules/fallout/data/equipmentKits.json
+index f1b9d21..f91202a 100644
+--- a/modules/fallout/data/equipmentKits.json
++++ b/modules/fallout/data/equipmentKits.json
+@@ -178,9 +178,6 @@
+           "rollType": "D20",
+           "count": 3,
+           "mode": "separate"
+-        },
+-        "rerollUntil": {
+-          "isMeat": true
+         }
+       },
+       {

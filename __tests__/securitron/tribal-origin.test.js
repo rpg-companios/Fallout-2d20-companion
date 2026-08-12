@@ -174,7 +174,7 @@ describe('Переименование savage → tribal', () => {
   it('миграция v5→v6: сейв с origin savage → tribal (объект и строка)', () => {
       const obj = migrateCharacterState({ schemaVersion: 5, origin: { id: 'savage' } });
     expect(obj.origin.id).toBe('tribal');
-    expect(obj.schemaVersion).toBe(7);
+    expect(obj.schemaVersion).toBe(8);
     const str = migrateCharacterState({ schemaVersion: 5, origin: 'savage' });
     expect(str.origin).toBe('tribal');
     // tribal не трогается

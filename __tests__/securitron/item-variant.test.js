@@ -231,7 +231,7 @@ describe('Миграция v6 → v7 (старые сейвы с бритвой)
       equippedWeapons: [],
     };
     const migrated = migrateCharacterState(v6);
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
     const item = migrated.equipment.items[0];
     expect(item.weaponId).toBe('weapon_switchblade');
     expect(item.baseName).toBe('Опасная бритва');

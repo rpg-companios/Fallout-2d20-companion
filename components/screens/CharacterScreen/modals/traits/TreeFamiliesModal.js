@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
-import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
+import { getTraitI18nById, findTraitById } from '../../../../../domain/traits';
 import { tCharacterScreen } from '../../logic/characterScreenI18n';
 
 export const traitConfig = { originId: 'TreeFamilies', modalType: 'choice' };
@@ -16,7 +16,7 @@ const TreeFamiliesModal = ({ visible, onSelect, onClose }) => {
   const [selectedFamily, setSelectedFamily] = useState(null);
 
   const familyCatalog = useMemo(
-    () => FAMILY_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
+    () => FAMILY_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
     [],
   );
 
@@ -25,7 +25,7 @@ const TreeFamiliesModal = ({ visible, onSelect, onClose }) => {
   const handleConfirm = () => {
     if (!selectedFamily) return;
     const dataEntry = findTraitById(selectedFamily);
-    const name = getTraitI18n(selectedFamily).name;
+    const name = getTraitI18nById(selectedFamily).name;
     onSelect(
       [selectedFamily],
       `${tCharacterScreen('origins.TreeFamilies')}: ${name}`,

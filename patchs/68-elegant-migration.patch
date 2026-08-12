@@ -1,0 +1,308 @@
+diff --git a/__tests__/securitron/character-reset-rules.test.js b/__tests__/securitron/character-reset-rules.test.js
+index 971ea38..52d378a 100644
+--- a/__tests__/securitron/character-reset-rules.test.js
++++ b/__tests__/securitron/character-reset-rules.test.js
+@@ -125,7 +125,7 @@ describe('Миграция v4→v5: восстановление комплек
+       rewardedSkills: [],
+     };
+     const migrated = migrateCharacterState(state);
+-    expect(migrated.schemaVersion).toBe(7);
++    expect(migrated.schemaVersion).toBe(8);
+     expect(migrated.equipment.id).toBeNull();
+     // Предметы на месте — снаряжение не потеряно
+     expect(migrated.equipment.items).toHaveLength(3);
+diff --git a/__tests__/securitron/item-variant.test.js b/__tests__/securitron/item-variant.test.js
+index 1667d19..97d33a8 100644
+--- a/__tests__/securitron/item-variant.test.js
++++ b/__tests__/securitron/item-variant.test.js
+@@ -231,7 +231,7 @@ describe('Миграция v6 → v7 (старые сейвы с бритвой)
+       equippedWeapons: [],
+     };
+     const migrated = migrateCharacterState(v6);
+-    expect(migrated.schemaVersion).toBe(7);
++    expect(migrated.schemaVersion).toBe(8);
+     const item = migrated.equipment.items[0];
+     expect(item.weaponId).toBe('weapon_switchblade');
+     expect(item.baseName).toBe('Опасная бритва');
+diff --git a/__tests__/securitron/tribal-origin.test.js b/__tests__/securitron/tribal-origin.test.js
+index 1a2aa51..e68bd3f 100644
+--- a/__tests__/securitron/tribal-origin.test.js
++++ b/__tests__/securitron/tribal-origin.test.js
+@@ -174,7 +174,7 @@ describe('Переименование savage → tribal', () => {
+   it('миграция v5→v6: сейв с origin savage → tribal (объект и строка)', () => {
+       const obj = migrateCharacterState({ schemaVersion: 5, origin: { id: 'savage' } });
+     expect(obj.origin.id).toBe('tribal');
+-    expect(obj.schemaVersion).toBe(7);
++    expect(obj.schemaVersion).toBe(8);
+     const str = migrateCharacterState({ schemaVersion: 5, origin: 'savage' });
+     expect(str.origin).toBe('tribal');
+     // tribal не трогается
+diff --git a/__tests__/securitron/uniq-quality.test.js b/__tests__/securitron/uniq-quality.test.js
+index 6e31f91..eb74e4c 100644
+--- a/__tests__/securitron/uniq-quality.test.js
++++ b/__tests__/securitron/uniq-quality.test.js
+@@ -46,6 +46,7 @@ import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
+ import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
+ import { setCurrentLocale } from '../../i18n/locale';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { migrateCharacterState } from '../../src/store/migrations';
+ import useCharacterStore from '../../src/store/characterStore';
+ 
+ beforeAll(() => {
+@@ -159,6 +160,26 @@ describe('Комплект: крепление качества данными',
+     expect(hat.name).toBe('Элегантная Формальная шляпа');
+   });
+ 
++  it('полный путь выдачи (как applyKitById): одежда с качеством попадает в стор', async () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const kit = catalog.equipmentKits.treefamilies_chairmen;
++    const resolved = await resolveKitItems({ id: 'treefamilies_chairmen', items: kit.items });
++    const store = useCharacterStore;
++    store.setState({ items: {} });
++    resolved.items.forEach((item) => {
++      if (item.itemType === 'currency' || item.itemType === 'loot') return;
++      store.getState().addNewItem({ ...item, equipped: false, locked: false });
++    });
++    const items = store.getState().items;
++    const clothes = Object.values(items).find((i) => i.weaponId === 'clothing_fancy_clothes');
++    const hat = Object.values(items).find((i) => i.weaponId === 'headwear_fancy_hat');
++    expect(clothes.uniqQualities).toEqual(['elegant']);
++    expect(clothes.name).toBe('Элегантная Формальная одежда');
++    expect(clothes.stackKey).toBe('clothing_fancy_clothes_uniq_elegant');
++    expect(hat.uniqQualities).toEqual(['elegant']);
++    expect(hat.name).toBe('Элегантная Формальная шляпа');
++  });
++
+   it('оружие с качеством: имя = [моды, качества, имя]', async () => {
+     const item = await resolveWeaponItem({
+       type: 'fixed',
+@@ -172,3 +193,94 @@ describe('Комплект: крепление качества данными',
+     expect(item.weaponId).toBe('weapon_switchblade');
+   });
+ });
++
++describe('Миграция v7 → v8 (старые сейвы Председателей)', () => {
++  it('одежда/шляпа без качества получают elegant, ключи и имя пересобраны', () => {
++    const v7 = {
++      schemaVersion: 7,
++      origin: { id: 'TreeFamilies', name: 'x' },
++      trait: { id: 'treefamilies-chairmen', ids: ['treefamilies-chairmen'], name: 'Председатели' },
++      equipment: {
++        items: [
++          {
++            id: 'clothing_fancy_clothes',
++            weaponId: 'clothing_fancy_clothes',
++            name: 'Формальная одежда',
++            itemType: 'clothing',
++            stackKey: 'clothing_fancy_clothes',
++            quantity: 1,
++          },
++          {
++            id: 'headwear_fancy_hat',
++            weaponId: 'headwear_fancy_hat',
++            name: 'Формальная шляпа',
++            itemType: 'clothing',
++            stackKey: 'headwear_fancy_hat',
++            quantity: 1,
++          },
++        ],
++      },
++      equippedWeapons: [],
++    };
++    const migrated = migrateCharacterState(v7);
++    expect(migrated.schemaVersion).toBe(8);
++    const clothes = migrated.equipment.items[0];
++    expect(clothes.uniqQualities).toEqual(['elegant']);
++    expect(clothes.name).toBe('Элегантная Формальная одежда');
++    expect(clothes.id).toBe('clothing_fancy_clothes_uniq_elegant');
++    expect(clothes.stackKey).toBe('clothing_fancy_clothes_uniq_elegant');
++    const hat = migrated.equipment.items[1];
++    expect(hat.uniqQualities).toEqual(['elegant']);
++    expect(hat.name).toBe('Элегантная Формальная шляпа');
++  });
++
++  it('персонаж не из Председателей — одежда не трогается', () => {
++    const v7 = {
++      schemaVersion: 7,
++      origin: { id: 'TreeFamilies', name: 'x' },
++      trait: { id: 'treefamilies-omerta', ids: ['treefamilies-omerta'], name: 'Омерта' },
++      equipment: {
++        items: [
++          {
++            id: 'clothing_fancy_clothes',
++            weaponId: 'clothing_fancy_clothes',
++            name: 'Формальная одежда',
++            itemType: 'clothing',
++            stackKey: 'clothing_fancy_clothes',
++            quantity: 1,
++          },
++        ],
++      },
++      equippedWeapons: [],
++    };
++    const migrated = migrateCharacterState(v7);
++    expect(migrated.schemaVersion).toBe(8);
++    expect(migrated.equipment.items[0].uniqQualities).toBeUndefined();
++    expect(migrated.equipment.items[0].id).toBe('clothing_fancy_clothes');
++  });
++
++  it('уже с качеством (после 67) — не дублируется', () => {
++    const v7 = {
++      schemaVersion: 7,
++      origin: { id: 'TreeFamilies', name: 'x' },
++      trait: { id: 'treefamilies-chairmen', ids: ['treefamilies-chairmen'], name: 'Председатели' },
++      equipment: {
++        items: [
++          {
++            id: 'clothing_fancy_clothes_uniq_elegant',
++            weaponId: 'clothing_fancy_clothes',
++            name: 'Элегантная Формальная одежда',
++            uniqQualities: ['elegant'],
++            itemType: 'clothing',
++            stackKey: 'clothing_fancy_clothes_uniq_elegant',
++            quantity: 1,
++          },
++        ],
++      },
++      equippedWeapons: [],
++    };
++    const migrated = migrateCharacterState(v7);
++    expect(migrated.equipment.items[0].name).toBe('Элегантная Формальная одежда');
++    expect(migrated.equipment.items[0].uniqQualities).toEqual(['elegant']);
++  });
++});
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 831c900..f4538dc 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -126,6 +126,10 @@ const toInventoryItems = (entries) => {
+         // иначе builtinToArm/requiresMkII теряются при фильтрации finalItems.
+         builtinToArm: item.builtinToArm,
+         requiresMkII: item.requiresMkII,
++        // Вариант (заменённое имя) и уникальные качества — тоже item-level:
++        // без явного переноса бритва/«Дерзкая …» потеряли бы имя и стек.
++        baseName: item.baseName,
++        uniqQualities: item.uniqQualities,
+       });
+ 
+       if (item.resolvedAmmunition) {
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c38a811..e08c4a8 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,12 @@
+ # Changelog
+ 
++## 68 — "Elegant" quality in old saves (migration v7→v8) + kit-modal field loss fix
++
++- CAUSE: clothes granted by the Chairmen kit BEFORE patch 67 have no `uniqQualities` in the save — inventory and the Equipment screen show them as «Формальная одежда» (only new grants have the quality).
++- Migration v7→v8: if the character is a Chairmen (trait id/ids contains treefamilies-chairmen), the formal clothes and hat without a quality get `uniqQualities: ['elegant']`, the name («Элегантная Формальная одежда/шляпа») and rebuilt id/stackKey (`clothing_fancy_clothes_uniq_elegant` — stacks with new grants). Already with the quality — not duplicated; other families — untouched.
++- FIX: the manual kit modal (EquipmentKitModal → toInventoryItems, weapon branch) dropped `baseName` and `uniqQualities` — the razor/"Дерзкая …" would lose name and stack when picked via the modal. Fields are carried explicitly now.
++- Tests: full grant path (resolveKitItems → addNewItem: clothes with elegant in the store), migration v7→v8 (3 cases: Chairmen, non-Chairmen, already with the quality).
++
+ ## 67 — Equipment screen knows the variant name; "Elegant" quality for the Chairmen
+ 
+ - FIX: the Equipment screen (WeaponsAndArmorScreen) did not know about the name replacement — for it the razor was the "Складной нож": storeItemToWeaponDisplay sets `id = weaponId` (the true knife id), findLocalizedWeapon found the knife in the catalog and overwrote the name. Items with their own identity (variant `baseName` or uniq qualities `uniqQualities`) now show their stored name: «Опасная бритва», «Дерзкая …»; the modded name composes from the replaced one («Зазубренное лезвие Опасная бритва»). Regular weapons — as before (catalog, i18n).
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 7d66c48..59726e9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,15 @@
+ 
+ ---
+ 
++## 68 — Качество «Элегантная» в старых сейвах (миграция v7→v8) + фикс потери полей в модалке комплекта
++
++- ПРИЧИНА: одежда, выданная комплектом Председателей ДО патча 67, лежит в сейве без `uniqQualities` — инвентарь и экран «Снаряжение» показывают её как «Формальная одежда» (качество есть только у новых выдач).
++- Миграция v7→v8: если персонаж — Председатель (trait id/ids содержит treefamilies-chairmen), формальная одежда и шляпа без качества получают `uniqQualities: ['elegant']`, имя («Элегантная Формальная одежда/шляпа») и пересобранные id/stackKey (`clothing_fancy_clothes_uniq_elegant` — склеятся с новыми выдачами). Уже с качеством — не дублируется; персонажи других семей — не трогаются.
++- ФИКС: ручная модалка комплекта (EquipmentKitModal → toInventoryItems, ветка оружия) теряла `baseName` и `uniqQualities` — бритва/«Дерзкая …» при выборе комплекта из модалки остались бы без имени и стека. Поля переносятся явно.
++- Тесты: полный путь выдачи (resolveKitItems → addNewItem: одежда с elegant в сторе), миграция v7→v8 (3 кейса: Председатели, не Председатели, уже с качеством).
++
++---
++
+ ## 67 — Экран «Снаряжение» знает имя варианта; качество «Элегантная» у Председателей
+ 
+ - ФИКС: экран «Снаряжение» (WeaponsAndArmorScreen) не знал о замене имени — для него бритва была «Складным ножом»: `storeItemToWeaponDisplay` подставляет `id = weaponId` (истинный id ножа), `findLocalizedWeapon` находил в каталоге нож и затирал имя. Теперь предметы с собственной идентичностью (вариант `baseName` или уникальные качества `uniqQualities`) показываются под своим именем из стора: «Опасная бритва», «Дерзкая …»; имя с модами собирается от заменённого («Зазубренное лезвие Опасная бритва»). Обычное оружие — как раньше (каталог, i18n).
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index e4eead2..4fdb886 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -5,6 +5,8 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+ import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { generateItemId } from '../../domain/itemIdentity';
++import { getUniqQualityName } from '../../domain/registry';
++import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+ 
+ 
+ /**
+@@ -675,6 +677,54 @@ const MIGRATIONS = [
+     return changed ? next : state;
+   },
+ 
++  // v7 -> v8: качество «Элегантная» у формальной одежды/шляпы Председателей
++  // (патч 67). Старые сейвы (комплект с патча 63) хранят одежду без качества —
++  // если персонаж из семьи Председателей, одежда/шляпа получают
++  // uniqQualities ['elegant'], пересобираются id/stackKey (учитывают качество)
++  // и имя («Элегантная Формальная одежда»).
++  (state) => {
++    const next = { ...state };
++    const trait = next.trait;
++    const isChairmen = Boolean(
++      trait
++      && (trait.id === 'treefamilies-chairmen'
++        || (Array.isArray(trait.ids) && trait.ids.includes('treefamilies-chairmen'))),
++    );
++    if (!isChairmen) return state;
++    const collections = [];
++    if (Array.isArray(next.equipment?.items)) collections.push(next.equipment.items);
++    if (Array.isArray(next.equippedWeapons)) collections.push(next.equippedWeapons);
++    if (collections.length === 0) return state;
++
++    const ELEGANT_CLOTHING_IDS = new Set(['clothing_fancy_clothes', 'headwear_fancy_hat']);
++    const qualityName = getUniqQualityName('elegant');
++    let changed = false;
++    for (const collection of collections) {
++      for (let i = 0; i < collection.length; i += 1) {
++        const item = collection[i];
++        if (!item) continue;
++        const baseId = item.weaponId || item.id || item.clothingId || item.itemId;
++        if (!ELEGANT_CLOTHING_IDS.has(baseId)) continue;
++        if (Array.isArray(item.uniqQualities) && item.uniqQualities.includes('elegant')) continue;
++        changed = true;
++        // Имя уже начинается с качества (было выдано после 67, но поле
++        // потеряно) — не дублируем; иначе собираем «Элегантная» + имя.
++        const name = qualityName && item.name && item.name.startsWith(`${qualityName} `)
++          ? item.name
++          : composeNameWithUniqQualities(item.name || baseId, ['elegant'], getUniqQualityName);
++        const newId = generateItemId(baseId, {}, undefined, undefined, ['elegant']);
++        collection[i] = {
++          ...item,
++          uniqQualities: ['elegant'],
++          name: name || item.name,
++          id: newId,
++          stackKey: newId,
++        };
++      }
++    }
++    return changed ? next : state;
++  },
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index e3ac54b..09c8c22 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -18,7 +18,9 @@
+ // v6 — ориджин «savage» переименован в «tribal».
+ // v7 — «Опасная бритва» переведена на истинный id (weapon_switchblade) +
+ //      baseName (вариант предмета; стек = id + моды + имя).
+-export const CURRENT_SCHEMA_VERSION = 7;
++// v8 — формальная одежда/шляпа Председателей получают качество «Элегантная»
++//      (uniqQualities) — для сейвов с комплектом из патча 63.
++export const CURRENT_SCHEMA_VERSION = 8;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).

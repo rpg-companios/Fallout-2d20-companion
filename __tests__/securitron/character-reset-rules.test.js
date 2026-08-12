@@ -125,7 +125,7 @@ describe('Миграция v4→v5: восстановление комплек�
       rewardedSkills: [],
     };
     const migrated = migrateCharacterState(state);
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
     expect(migrated.equipment.id).toBeNull();
     // Предметы на месте — снаряжение не потеряно
     expect(migrated.equipment.items).toHaveLength(3);

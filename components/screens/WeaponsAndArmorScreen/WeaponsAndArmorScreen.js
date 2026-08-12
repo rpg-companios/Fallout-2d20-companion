@@ -430,8 +430,12 @@ const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
     .map((modId) => (catalog?.weaponMods || []).find((mod) => mod.id === modId)?.prefix)
     .filter(Boolean);
 
-  const localizedBaseName = base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
-  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : (base?.name || weapon?.name);
+  // Имя варианта (baseName, напр. «Опасная бритва») — важнее каталожного имени
+  // истинного предмета («Складной нож»); имя с уникальными качествами — из стора.
+  const localizedBaseName = weapon?.baseName
+    || (weapon?.uniqQualities?.length ? weapon?.name : undefined)
+    || base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
+  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : localizedBaseName;
 };
 
 const findLocalizedWeapon = (catalog, weapon) => {
@@ -442,6 +446,10 @@ const findLocalizedWeapon = (catalog, weapon) => {
   // Если на оружии применены моды (есть baseWeaponName), сохраняем все модифицированные поля.
   // Иначе — catalog-данные имеют приоритет (для i18n).
   const hasAppliedMods = weapon.baseWeaponName != null;
+  // Вариант (baseName) или уникальные качества — предмет имеет собственное имя
+  // («Опасная бритва», «Дерзкая …»), каталог по истинному id его не знает:
+  // имя берём из стора, не затираем каталожным.
+  const hasOwnIdentity = weapon.baseName != null || (weapon.uniqQualities || []).length > 0;
 
   return {
     ...weapon,
@@ -468,7 +476,7 @@ const findLocalizedWeapon = (catalog, weapon) => {
       cost: weapon.cost,
       effects: weapon.effects,
     } : {
-      name: base.name || weapon.name,
+      name: hasOwnIdentity ? (weapon.baseName || weapon.name || base.name) : (base.name || weapon.name),
     }),
   };
 };

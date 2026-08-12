@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
-import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
+import { getTraitI18nById, findTraitById } from '../../../../../domain/traits';
 import { tCharacterScreen, getSkillDisplayName } from '../../logic/characterScreenI18n';
 import { ALL_SKILL_KEYS } from '../../../../../domain/characterCreation';
 
@@ -48,9 +48,9 @@ const TribalModal = ({
   const [skillPicks, setSkillPicks] = useState([]);
 
   const traitCatalog = useMemo(() => ({
-    tribal: TRIBAL_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
-    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
-    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
+    tribal: TRIBAL_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
+    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
+    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
   }), []);
 
   const resetState = () => {
@@ -131,7 +131,7 @@ const TribalModal = ({
       selectedIds = [singleTraitPick];
     }
 
-    const selectedNames = selectedIds.map((id) => getTraitI18n(id).name);
+    const selectedNames = selectedIds.map((id) => getTraitI18nById(id).name);
 
     const mergedModifiers = selectedIds.reduce((acc, id) => {
       const dataEntry = findTraitById(id);

@@ -1,5 +1,24 @@
 # Changelog
 
+## 70 — Engine/setting split: food, drinks and weapon mods move to the module entirely
+
+- OWNER RULE: setting data lives in the module; the engine (data/) stays empty. First batch: food (76), drinks (22), weapon mods (203) — FULL records (all stats + isMeat/isAlcohol flags + applies_to_ids with weapon_10mm_smg) moved to modules/fallout/data/{food,drinks,weapon_mods}.json; data/consumables/* and data/equipment/weapon_mods.json are empty arrays.
+- Translations moved too: food/drinks/mods names and flavours moved from i18n/{ru-RU,en-EN}/data/... into the module i18n (sections food/drinks/weaponMods). Engine locale dictionaries for these categories are empty.
+- The catalog (equipmentCatalog) reads the module for these categories: mergeById(module-data, module-i18n); getEquipmentData.weaponMods — from the module.
+- Next stages (on command): weapons/armor/clothes, loot tables, perks, etc.
+- Tests: module-data-move.test.js (3) — full records in the module, data/ empty, the catalog serves flags and names from the module.
+
+## 69 — Omerta and White Glove kits (full contents) + auto-reroll + modal choice
+
+- OMERTA kit: dashing Formal clothes (quality dashing), choice "Combat Knife or Knuckles", Gomorrah casino chip (50 caps), personal trinket (oddity), 2 rolls on the chems table, 1 roll on the drinks table with auto-reroll until alcohol.
+- WHITE GLOVE SOCIETY kit: refined Formal clothes (quality refined), the Society Mask (new headwear item), choice "Walking Cane or Combat Knife", flamer with 12+6 CD fuel, personal trinket, 3 rolls on the food table (the "reroll until meat" is postponed — data/loot/food.json has no meat entries yet; the owner will fix the table), choice "Sawed-off (double-barrel + sawed-off barrel) with 6+3 CD shells" or "10mm SMG with 16+4 CD rounds".
+- New module items: 10mm SMG — a SEPARATE weapon (its own stat block, book stats: damage 4, fire rate 3, weight 10, cost 129, Inaccurate, 10mm ammo) that accepts THE SAME mod set as the SMG — explicitly: weapon_10mm_smg was added to applies_to_ids of all 14 SMG mods (no variants/magic); the Society Mask (weight 0.5, cost 15, rarity 2); Gomorrah chip (value 50). Module clothes: clothes.json section + catalog merge.
+- Auto-reroll (rerollUntil) in kits: `{ "rerollUntil": { "isAlcohol": true } }` / `{ "isMeat": true }` — per-roll reroll with an attempt limit (guard for empty tables).
+- Data enriched: drinks — isAlcohol (8 alcoholic / 14 non-alcoholic); food — isMeat (40 meat / 36 non-meat; meat = flesh and meat dishes: eggs/omelettes, dog food, Cram, mirelurk paste, "Canned Meat", "Pork n' Beans" and "Salisbury Steak" (packaged) are NOT meat).
+- OWNER RULE: picking a family always opens the kit modal with all contents (the family kit is expanded; choices like "knife or knuckles" are made by the player; confirming grants the kit).
+- Technical: kit auto-grant no longer emits raw choice entries — picking a family opens the kit modal.
+- Tests: family-kits.test.js (7) — new items, full contents of both kits (incl. rerolls: alcohol/meat, dirty water in the chems table), rerollUntil guard.
+
 ## 68 — "Elegant" quality in old saves (migration v7→v8) + kit-modal field loss fix
 
 - CAUSE: clothes granted by the Chairmen kit BEFORE patch 67 have no `uniqQualities` in the save — inventory and the Equipment screen show them as «Формальная одежда» (only new grants have the quality).

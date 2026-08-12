@@ -221,8 +221,10 @@ export function resolveTraitDisplayName(storedName) {
 /**
  * Returns fully resolved { name, description } for a trait by id,
  * using the current locale.
+ * (Назван по id, чтобы не конфликтовать с getTraitI18n(locale) из реестра —
+ * словарём локали.)
  */
-export function getTraitI18n(id) {
+export function getTraitI18nById(id) {
   const dataEntry = findTraitById(id);
   if (!dataEntry) return { name: id, description: '' };
   return {
