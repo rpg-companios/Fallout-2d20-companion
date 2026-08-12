@@ -25,6 +25,7 @@ import { applyArmorMods } from '../../../domain/modsEquip';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
+import { applyUnarmedVisibility } from '../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
@@ -644,9 +645,20 @@ const WeaponsAndArmorScreen = () => {
     [dedupedEquippedWeapons],
   );
 
+  // Виртуальная рукопашная атака (кулаки/манипулятор) всегда есть в первом
+  // слоте, но игрок может СКРЫТЬ её карточку — тогда слот занимает оружие.
+  // Фильтр общий для всех режимов (cards/spoilers/tabs).
+  const visibleEquippedWeapons = useMemo(
+    () => applyUnarmedVisibility(orderedEquippedWeapons, unarmedAttackVisible),
+    [orderedEquippedWeapons, unarmedAttackVisible],
+  );
+
   // ── Режим отображения оружия (переключатель — на этом экране) ───────────
   const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
   const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
+  // Показ/скрытие виртуальной рукопашной атаки (кулаки/манипулятор).
+  const unarmedAttackVisible = useAppSettingsStore((state) => state.unarmedAttackVisible);
+  const setUnarmedAttackVisible = useAppSettingsStore((state) => state.setUnarmedAttackVisible);
 
   // Спойлеры: по умолчанию ЗАКРЫТЫ (в объекте хранятся открытые индексы).
   const [openSpoilers, setOpenSpoilers] = useState({});
@@ -655,7 +667,7 @@ const WeaponsAndArmorScreen = () => {
   // Табы: третий режим пока скрыт из UI переключателя, но код рендера и
   // поддержка сохранённого значения 'tabs' сохраняются (ПРАВИЛО владельца).
   const [activeTab, setActiveTab] = useState(0);
-  const weaponsCount = orderedEquippedWeapons.length;
+  const weaponsCount = visibleEquippedWeapons.length;
   useEffect(() => {
     setActiveTab(0);
   }, [weaponsCount]);
@@ -994,48 +1006,69 @@ const WeaponsAndArmorScreen = () => {
               </View>
             )}
             
-            {/* Переключение вида оружия — справа между ячейками тела и оружием.
-                Реактивная смена через стор настроек; режимов два: спойлеры и карточки. */}
+            {/* Тулбар оружия между ячейками тела и оружием.
+                Слева  — показ/скрытие виртуальной рукопашной атаки (ладонь);
+                справа — переключение раскладки (спойлеры / карточки).
+                Реактивная смена через стор настроек. */}
             <View style={localStyles.weaponDisplayToggleRow}>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
-                onPress={() => setWeaponCardsDisplayMode('spoilers')}
-                style={[
-                  localStyles.weaponDisplayToggleBtn,
-                  weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="menu"
-                  size={20}
-                  color={weaponCardsDisplayMode === 'spoilers' ? '#e8a33d' : '#aaa'}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
-                onPress={() => setWeaponCardsDisplayMode('cards')}
-                style={[
-                  localStyles.weaponDisplayToggleBtn,
-                  weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="view-column-outline"
-                  size={20}
-                  color={weaponCardsDisplayMode === 'cards' ? '#e8a33d' : '#aaa'}
-                />
-              </TouchableOpacity>
+              <View style={localStyles.weaponDisplayToggleGroup}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.unarmed')}
+                  onPress={() => setUnarmedAttackVisible(!unarmedAttackVisible)}
+                  style={[
+                    localStyles.weaponDisplayToggleBtn,
+                    unarmedAttackVisible && localStyles.weaponDisplayToggleBtnActive,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="hand-back-right"
+                    size={20}
+                    color={unarmedAttackVisible ? '#e8a33d' : '#aaa'}
+                  />
+                </TouchableOpacity>
+              </View>
+              <View style={localStyles.weaponDisplayToggleGroup}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
+                  onPress={() => setWeaponCardsDisplayMode('spoilers')}
+                  style={[
+                    localStyles.weaponDisplayToggleBtn,
+                    weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="menu"
+                    size={20}
+                    color={weaponCardsDisplayMode === 'spoilers' ? '#e8a33d' : '#aaa'}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
+                  onPress={() => setWeaponCardsDisplayMode('cards')}
+                  style={[
+                    localStyles.weaponDisplayToggleBtn,
+                    weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="view-column-outline"
+                    size={20}
+                    color={weaponCardsDisplayMode === 'cards' ? '#e8a33d' : '#aaa'}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
             
             {/* Оружие — режим отображения выбирается на этом экране */}
             {weaponCardsDisplayMode === 'cards' && (
               <View style={{ marginBottom: 16 }}>
-                {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+                {Array.from({ length: Math.ceil(visibleEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
                   <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
                     <WeaponCard
-                      weapon={orderedEquippedWeapons[rowIndex * 2] ?? null}
+                      weapon={visibleEquippedWeapons[rowIndex * 2] ?? null}
                       onModifyWeapon={handleOpenModificationModal}
                       onUnequip={isRobot ? null : handleUnequipWeapon}
                       showSourceSlot={isRobot}
@@ -1043,7 +1076,7 @@ const WeaponsAndArmorScreen = () => {
                       equippedWeapons={equippedWeaponsForDisplay}
                     />
                     <WeaponCard
-                      weapon={orderedEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                      weapon={visibleEquippedWeapons[rowIndex * 2 + 1] ?? null}
                       onModifyWeapon={handleOpenModificationModal}
                       onUnequip={isRobot ? null : handleUnequipWeapon}
                       showSourceSlot={isRobot}
@@ -1057,8 +1090,8 @@ const WeaponsAndArmorScreen = () => {
 
             {weaponCardsDisplayMode === 'spoilers' && (
               <View style={{ marginBottom: 16 }}>
-                {(orderedEquippedWeapons.length > 0
-                  ? orderedEquippedWeapons.map((weapon, index) => ({ weapon, index }))
+                {(visibleEquippedWeapons.length > 0
+                  ? visibleEquippedWeapons.map((weapon, index) => ({ weapon, index }))
                   : [{ weapon: null, index: 0 }]
                 ).map(({ weapon, index }) => {
                   const open = openSpoilers[index] === true;
@@ -1113,7 +1146,7 @@ const WeaponsAndArmorScreen = () => {
                 ) : (
                   <View {...tabsPanResponder.panHandlers}>
                     <View style={localStyles.weaponTabsRow}>
-                      {orderedEquippedWeapons.map((weapon, index) => (
+                      {visibleEquippedWeapons.map((weapon, index) => (
                         <TouchableOpacity
                           key={`tab-${index}`}
                           style={[localStyles.weaponTab, index === activeTab && localStyles.weaponTabActive]}
@@ -1139,7 +1172,7 @@ const WeaponsAndArmorScreen = () => {
                       <View style={localStyles.weaponTabCardWrap}>
                         <View style={localStyles.weaponTabCard}>
                           <WeaponCard
-                            weapon={orderedEquippedWeapons[activeTab] ?? null}
+                            weapon={visibleEquippedWeapons[activeTab] ?? null}
                             onModifyWeapon={handleOpenModificationModal}
                             onUnequip={isRobot ? null : handleUnequipWeapon}
                             showSourceSlot={isRobot}

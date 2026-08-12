@@ -1,0 +1,382 @@
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 4baddc5..e163a97 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -25,6 +25,7 @@ import { applyArmorMods } from '../../../domain/modsEquip';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+ import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
+ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
++import { applyUnarmedVisibility } from '../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+ import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
+@@ -644,9 +645,20 @@ const WeaponsAndArmorScreen = () => {
+     [dedupedEquippedWeapons],
+   );
+ 
++  // Виртуальная рукопашная атака (кулаки/манипулятор) всегда есть в первом
++  // слоте, но игрок может СКРЫТЬ её карточку — тогда слот занимает оружие.
++  // Фильтр общий для всех режимов (cards/spoilers/tabs).
++  const visibleEquippedWeapons = useMemo(
++    () => applyUnarmedVisibility(orderedEquippedWeapons, unarmedAttackVisible),
++    [orderedEquippedWeapons, unarmedAttackVisible],
++  );
++
+   // ── Режим отображения оружия (переключатель — на этом экране) ───────────
+   const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
+   const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
++  // Показ/скрытие виртуальной рукопашной атаки (кулаки/манипулятор).
++  const unarmedAttackVisible = useAppSettingsStore((state) => state.unarmedAttackVisible);
++  const setUnarmedAttackVisible = useAppSettingsStore((state) => state.setUnarmedAttackVisible);
+ 
+   // Спойлеры: по умолчанию ЗАКРЫТЫ (в объекте хранятся открытые индексы).
+   const [openSpoilers, setOpenSpoilers] = useState({});
+@@ -655,7 +667,7 @@ const WeaponsAndArmorScreen = () => {
+   // Табы: третий режим пока скрыт из UI переключателя, но код рендера и
+   // поддержка сохранённого значения 'tabs' сохраняются (ПРАВИЛО владельца).
+   const [activeTab, setActiveTab] = useState(0);
+-  const weaponsCount = orderedEquippedWeapons.length;
++  const weaponsCount = visibleEquippedWeapons.length;
+   useEffect(() => {
+     setActiveTab(0);
+   }, [weaponsCount]);
+@@ -994,48 +1006,69 @@ const WeaponsAndArmorScreen = () => {
+               </View>
+             )}
+             
+-            {/* Переключение вида оружия — справа между ячейками тела и оружием.
+-                Реактивная смена через стор настроек; режимов два: спойлеры и карточки. */}
++            {/* Тулбар оружия между ячейками тела и оружием.
++                Слева  — показ/скрытие виртуальной рукопашной атаки (ладонь);
++                справа — переключение раскладки (спойлеры / карточки).
++                Реактивная смена через стор настроек. */}
+             <View style={localStyles.weaponDisplayToggleRow}>
+-              <TouchableOpacity
+-                accessibilityRole="button"
+-                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
+-                onPress={() => setWeaponCardsDisplayMode('spoilers')}
+-                style={[
+-                  localStyles.weaponDisplayToggleBtn,
+-                  weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
+-                ]}
+-              >
+-                <MaterialCommunityIcons
+-                  name="menu"
+-                  size={20}
+-                  color={weaponCardsDisplayMode === 'spoilers' ? '#e8a33d' : '#aaa'}
+-                />
+-              </TouchableOpacity>
+-              <TouchableOpacity
+-                accessibilityRole="button"
+-                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
+-                onPress={() => setWeaponCardsDisplayMode('cards')}
+-                style={[
+-                  localStyles.weaponDisplayToggleBtn,
+-                  weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,
+-                ]}
+-              >
+-                <MaterialCommunityIcons
+-                  name="view-column-outline"
+-                  size={20}
+-                  color={weaponCardsDisplayMode === 'cards' ? '#e8a33d' : '#aaa'}
+-                />
+-              </TouchableOpacity>
++              <View style={localStyles.weaponDisplayToggleGroup}>
++                <TouchableOpacity
++                  accessibilityRole="button"
++                  accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.unarmed')}
++                  onPress={() => setUnarmedAttackVisible(!unarmedAttackVisible)}
++                  style={[
++                    localStyles.weaponDisplayToggleBtn,
++                    unarmedAttackVisible && localStyles.weaponDisplayToggleBtnActive,
++                  ]}
++                >
++                  <MaterialCommunityIcons
++                    name="hand-back-right"
++                    size={20}
++                    color={unarmedAttackVisible ? '#e8a33d' : '#aaa'}
++                  />
++                </TouchableOpacity>
++              </View>
++              <View style={localStyles.weaponDisplayToggleGroup}>
++                <TouchableOpacity
++                  accessibilityRole="button"
++                  accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
++                  onPress={() => setWeaponCardsDisplayMode('spoilers')}
++                  style={[
++                    localStyles.weaponDisplayToggleBtn,
++                    weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
++                  ]}
++                >
++                  <MaterialCommunityIcons
++                    name="menu"
++                    size={20}
++                    color={weaponCardsDisplayMode === 'spoilers' ? '#e8a33d' : '#aaa'}
++                  />
++                </TouchableOpacity>
++                <TouchableOpacity
++                  accessibilityRole="button"
++                  accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
++                  onPress={() => setWeaponCardsDisplayMode('cards')}
++                  style={[
++                    localStyles.weaponDisplayToggleBtn,
++                    weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,
++                  ]}
++                >
++                  <MaterialCommunityIcons
++                    name="view-column-outline"
++                    size={20}
++                    color={weaponCardsDisplayMode === 'cards' ? '#e8a33d' : '#aaa'}
++                  />
++                </TouchableOpacity>
++              </View>
+             </View>
+             
+             {/* Оружие — режим отображения выбирается на этом экране */}
+             {weaponCardsDisplayMode === 'cards' && (
+               <View style={{ marginBottom: 16 }}>
+-                {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
++                {Array.from({ length: Math.ceil(visibleEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+                   <View key={rowIndex} style={[localStyles.statsRow, rowIndex > 0 ? { marginTop: 8 } : null]}>
+                     <WeaponCard
+-                      weapon={orderedEquippedWeapons[rowIndex * 2] ?? null}
++                      weapon={visibleEquippedWeapons[rowIndex * 2] ?? null}
+                       onModifyWeapon={handleOpenModificationModal}
+                       onUnequip={isRobot ? null : handleUnequipWeapon}
+                       showSourceSlot={isRobot}
+@@ -1043,7 +1076,7 @@ const WeaponsAndArmorScreen = () => {
+                       equippedWeapons={equippedWeaponsForDisplay}
+                     />
+                     <WeaponCard
+-                      weapon={orderedEquippedWeapons[rowIndex * 2 + 1] ?? null}
++                      weapon={visibleEquippedWeapons[rowIndex * 2 + 1] ?? null}
+                       onModifyWeapon={handleOpenModificationModal}
+                       onUnequip={isRobot ? null : handleUnequipWeapon}
+                       showSourceSlot={isRobot}
+@@ -1057,8 +1090,8 @@ const WeaponsAndArmorScreen = () => {
+ 
+             {weaponCardsDisplayMode === 'spoilers' && (
+               <View style={{ marginBottom: 16 }}>
+-                {(orderedEquippedWeapons.length > 0
+-                  ? orderedEquippedWeapons.map((weapon, index) => ({ weapon, index }))
++                {(visibleEquippedWeapons.length > 0
++                  ? visibleEquippedWeapons.map((weapon, index) => ({ weapon, index }))
+                   : [{ weapon: null, index: 0 }]
+                 ).map(({ weapon, index }) => {
+                   const open = openSpoilers[index] === true;
+@@ -1113,7 +1146,7 @@ const WeaponsAndArmorScreen = () => {
+                 ) : (
+                   <View {...tabsPanResponder.panHandlers}>
+                     <View style={localStyles.weaponTabsRow}>
+-                      {orderedEquippedWeapons.map((weapon, index) => (
++                      {visibleEquippedWeapons.map((weapon, index) => (
+                         <TouchableOpacity
+                           key={`tab-${index}`}
+                           style={[localStyles.weaponTab, index === activeTab && localStyles.weaponTabActive]}
+@@ -1139,7 +1172,7 @@ const WeaponsAndArmorScreen = () => {
+                       <View style={localStyles.weaponTabCardWrap}>
+                         <View style={localStyles.weaponTabCard}>
+                           <WeaponCard
+-                            weapon={orderedEquippedWeapons[activeTab] ?? null}
++                            weapon={visibleEquippedWeapons[activeTab] ?? null}
+                             onModifyWeapon={handleOpenModificationModal}
+                             onUnequip={isRobot ? null : handleUnequipWeapon}
+                             showSourceSlot={isRobot}
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index cb9bf11..1eb6568 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -264,6 +264,7 @@
+   },
+   "displayToggle": {
+     "spoilers": "List (spoilers)",
+-    "cards": "Weapon cards"
++    "cards": "Weapon cards",
++    "unarmed": "Unarmed attack"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 5f23694..7b3a01b 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -264,6 +264,7 @@
+   },
+   "displayToggle": {
+     "spoilers": "Список (спойлеры)",
+-    "cards": "Карточки оружия"
++    "cards": "Карточки оружия",
++    "unarmed": "Рукопашная атака"
+   }
+ }
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 2e4ab48..c9c1feb 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -14,6 +14,10 @@ const useAppSettingsStore = create(
+       // Режим отображения карточек оружия на экране снаряжения:
+       // 'cards' (по умолчанию) | 'spoilers' | 'tabs' (пока скрыт из UI).
+       weaponCardsDisplayMode: 'cards',
++      // Рукопашная атака (кулаки у людей / манипулятор у роботов) всегда
++      // присутствует как виртуальный первый слот. Этот флаг управляет её
++      // ПОКАЗОМ на экране снаряжения: скрыта — её место занимает оружие.
++      unarmedAttackVisible: true,
+       setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
+       setRandomWeaponQualityEnabled: (enabled) => set({ randomWeaponQualityEnabled: Boolean(enabled) }),
+       setWeaponDurabilityLossEnabled: (enabled) => set({ weaponDurabilityLossEnabled: Boolean(enabled) }),
+@@ -21,6 +25,7 @@ const useAppSettingsStore = create(
+       setWeaponCardsDisplayMode: (mode) => set({
+         weaponCardsDisplayMode: ['cards', 'spoilers', 'tabs'].includes(mode) ? mode : 'cards',
+       }),
++      setUnarmedAttackVisible: (visible) => set({ unarmedAttackVisible: Boolean(visible) }),
+     }),
+     {
+       name: 'fallout2d20:settings',
+@@ -31,6 +36,7 @@ const useAppSettingsStore = create(
+         characterFoldersEnabled: state.characterFoldersEnabled,
+         weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
+         weaponCardsDisplayMode: state.weaponCardsDisplayMode,
++        unarmedAttackVisible: state.unarmedAttackVisible,
+       }),
+       migrate: (persistedState, version) => {
+         // Миграция v0 -> v1: переименование randomWeaponDurabilityEnabled -> randomWeaponQualityEnabled
+@@ -45,6 +51,9 @@ const useAppSettingsStore = create(
+         return {
+           ...persistedState,
+           weaponDurabilityLossEnabled: persistedState?.weaponDurabilityLossEnabled ?? false,
++          // Новый флаг добавляется в v1 без bump версии: старые сейвы без него
++          // получают значение по умолчанию (рукопашная показана).
++          unarmedAttackVisible: persistedState?.unarmedAttackVisible ?? true,
+         };
+       },
+       version: 1,
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index c860b52..5f24d92 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -307,15 +307,19 @@ const styles = StyleSheet.create({
+   weaponSpoilerBody: { alignItems: 'center', marginTop: 8 },
+   weaponSpoilerCard: { width: '66.67%' },
+ 
+-  // Переключатель вида оружия на самом экране снаряжения (две векторные иконки
+-  // справа: горизонтальные линии = спойлеры, две вертикальные черты = карточки).
++  // Тулбар оружия: слева тумблер рукопашной атаки (ладонь), справа —
++  // переключатель раскладки (линии = спойлеры, две черты = карточки).
+   weaponDisplayToggleRow: {
+     flexDirection: 'row',
+-    justifyContent: 'flex-end',
++    justifyContent: 'space-between',
+     alignItems: 'center',
+-    gap: 8,
+     marginBottom: 12,
+   },
++  weaponDisplayToggleGroup: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++  },
+   weaponDisplayToggleBtn: {
+     width: 38,
+     height: 32,
+diff --git a/domain/meleeSlot.js b/domain/meleeSlot.js
+new file mode 100644
+--- /dev/null
++++ b/domain/meleeSlot.js
+
+index 0000000..909d2b6
+--- /dev/null
++++ b/domain/meleeSlot.js
+@@ -0,0 +1,39 @@
++// domain/meleeSlot.js
++// Виртуальная рукопашная атака всегда присутствует в первом слоте оружия:
++//   - у людей — кулаки (`unarmed_human`, weaponType 'Unarmed', isBuiltin);
++//   - у роботов — манипулятор конечности (weaponType 'Unarmed', isBuiltin).
++// Она не предмет инвентаря, её нельзя снять/продать. Экран снаряжения может
++// СКРЫТЬ её карточку по настройке игрока — тогда первый слот занимает обычное
++// оружие. Этот модуль знает только механизм «что считать рукопашной атакой»
++// и как её отфильтровать; никаких данных конкретного сеттинга и UI тут нет.
++
++/**
++ * Является ли оружие виртуальной рукопашной атакой персонажа.
++ *
++ * Критерий — ДАННЫЕ оружия, а не догадки по id ориджина:
++ *   - weaponType / weapon_type === 'Unarmed' (это тип «без оружия/руки»);
++ *   - и при этом оно встроенное (isBuiltin): руки не лежат в инвентаре.
++ * Обычное рукопашное оружие (нож, кастет) имеет weaponType 'Melee' и носится
++ * как предмет — оно НЕ скрывается этим тумблером.
++ *
++ * @param {object|null|undefined} weapon
++ * @returns {boolean}
++ */
++export function isUnarmedAttack(weapon) {
++  if (!weapon) return false;
++  const weaponType = weapon.weaponType ?? weapon.weapon_type;
++  return weaponType === 'Unarmed' && weapon.isBuiltin === true;
++}
++
++/**
++ * Убирает виртуальную рукопашную атаку из списка, если игрок её скрыл.
++ * Прочее оружие (включая Melee-предметы) остаётся без изменений.
++ *
++ * @param {Array<object>} weapons
++ * @param {boolean} visible   показывать ли рукопашную атаку
++ * @returns {Array<object>}
++ */
++export function applyUnarmedVisibility(weapons, visible) {
++  if (visible) return weapons;
++  return (weapons || []).filter((w) => !isUnarmedAttack(w));
++}
+diff --git a/__tests__/equipment/melee-slot.test.js b/__tests__/equipment/melee-slot.test.js
+new file mode 100644
+--- /dev/null
++++ b/__tests__/equipment/melee-slot.test.js
+
+index 0000000..486d9a6
+--- /dev/null
++++ b/__tests__/equipment/melee-slot.test.js
+@@ -0,0 +1,46 @@
++import { describe, it, expect } from 'vitest';
++import { isUnarmedAttack, applyUnarmedVisibility } from '../../domain/meleeSlot';
++
++const fists = { id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true };
++const robotManipulator = { id: 'robot_weapon_manipulator', weapon_type: 'Unarmed', isBuiltin: true };
++const knife = { id: 'weapon_knife', weaponType: 'Melee', isBuiltin: false };
++const pistol = { id: 'weapon_pistol', weaponType: 'Light', isBuiltin: false };
++// не-встроенная Unarmed-защита от дурака: в каталоге таких нет, но фильтр
++// должен скрывать ТОЛЬКО виртуальную встроенную атаку.
++const weirdUnarmedItem = { id: 'weapon_weird', weaponType: 'Unarmed', isBuiltin: false };
++
++describe('meleeSlot — виртуальная рукопашная атака', () => {
++  it('isUnarmedAttack распознаёт кулаки и манипулятор по типу Unarmed + isBuiltin', () => {
++    expect(isUnarmedAttack(fists)).toBe(true);
++    expect(isUnarmedAttack(robotManipulator)).toBe(true);
++  });
++
++  it('не считает рукопашной Melee-оружие и обычное стрелковое', () => {
++    expect(isUnarmedAttack(knife)).toBe(false);
++    expect(isUnarmedAttack(pistol)).toBe(false);
++  });
++
++  it('Unarmed без флага isBuiltin не скрывается (это предмет, а не виртуальная атака)', () => {
++    expect(isUnarmedAttack(weirdUnarmedItem)).toBe(false);
++  });
++
++  it('visible=true — список не меняется', () => {
++    const list = [fists, knife, pistol];
++    expect(applyUnarmedVisibility(list, true)).toBe(list);
++  });
++
++  it('visible=false — кулаки/манипулятор убираются, первый слот занимает оружие', () => {
++    const list = [fists, robotManipulator, knife, pistol];
++    expect(applyUnarmedVisibility(list, false)).toEqual([knife, pistol]);
++  });
++
++  it('visible=false сохраняет Melee-оружие (это предмет, его скрывать нельзя)', () => {
++    const list = [fists, knife];
++    expect(applyUnarmedVisibility(list, false)).toEqual([knife]);
++  });
++
++  it('пустой/отсутствующий список — пустой результат', () => {
++    expect(applyUnarmedVisibility([], false)).toEqual([]);
++    expect(applyUnarmedVisibility(undefined, false)).toEqual([]);
++  });
++});

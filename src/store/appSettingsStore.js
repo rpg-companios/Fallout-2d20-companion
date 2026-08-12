@@ -14,6 +14,10 @@ const useAppSettingsStore = create(
       // Режим отображения карточек оружия на экране снаряжения:
       // 'cards' (по умолчанию) | 'spoilers' | 'tabs' (пока скрыт из UI).
       weaponCardsDisplayMode: 'cards',
+      // Рукопашная атака (кулаки у людей / манипулятор у роботов) всегда
+      // присутствует как виртуальный первый слот. Этот флаг управляет её
+      // ПОКАЗОМ на экране снаряжения: скрыта — её место занимает оружие.
+      unarmedAttackVisible: true,
       setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
       setRandomWeaponQualityEnabled: (enabled) => set({ randomWeaponQualityEnabled: Boolean(enabled) }),
       setWeaponDurabilityLossEnabled: (enabled) => set({ weaponDurabilityLossEnabled: Boolean(enabled) }),
@@ -21,6 +25,7 @@ const useAppSettingsStore = create(
       setWeaponCardsDisplayMode: (mode) => set({
         weaponCardsDisplayMode: ['cards', 'spoilers', 'tabs'].includes(mode) ? mode : 'cards',
       }),
+      setUnarmedAttackVisible: (visible) => set({ unarmedAttackVisible: Boolean(visible) }),
     }),
     {
       name: 'fallout2d20:settings',
@@ -31,6 +36,7 @@ const useAppSettingsStore = create(
         characterFoldersEnabled: state.characterFoldersEnabled,
         weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
         weaponCardsDisplayMode: state.weaponCardsDisplayMode,
+        unarmedAttackVisible: state.unarmedAttackVisible,
       }),
       migrate: (persistedState, version) => {
         // Миграция v0 -> v1: переименование randomWeaponDurabilityEnabled -> randomWeaponQualityEnabled
@@ -45,6 +51,9 @@ const useAppSettingsStore = create(
         return {
           ...persistedState,
           weaponDurabilityLossEnabled: persistedState?.weaponDurabilityLossEnabled ?? false,
+          // Новый флаг добавляется в v1 без bump версии: старые сейвы без него
+          // получают значение по умолчанию (рукопашная показана).
+          unarmedAttackVisible: persistedState?.unarmedAttackVisible ?? true,
         };
       },
       version: 1,

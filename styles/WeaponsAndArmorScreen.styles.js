@@ -307,14 +307,18 @@ const styles = StyleSheet.create({
   weaponSpoilerBody: { alignItems: 'center', marginTop: 8 },
   weaponSpoilerCard: { width: '66.67%' },
 
-  // Переключатель вида оружия на самом экране снаряжения (две векторные иконки
-  // справа: горизонтальные линии = спойлеры, две вертикальные черты = карточки).
+  // Тулбар оружия: слева тумблер рукопашной атаки (ладонь), справа —
+  // переключатель раскладки (линии = спойлеры, две черты = карточки).
   weaponDisplayToggleRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  weaponDisplayToggleGroup: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
   },
   weaponDisplayToggleBtn: {
     width: 38,

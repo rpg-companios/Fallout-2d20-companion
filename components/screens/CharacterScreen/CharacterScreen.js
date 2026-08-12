@@ -21,6 +21,7 @@ import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
+import { filterKitsForCharacter } from "../../../domain/equipmentKits";
 import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
@@ -361,6 +362,7 @@ export default function CharacterScreen() {
   // показан всегда. Никаких спец-веток под конкретный ориджин.
   const equipmentKitsForModal = useMemo(() => {
     const all = localizedOrigin?.equipmentKits || origin?.equipmentKits || [];
+    return filterKitsForCharacter(all, trait);
   }, [localizedOrigin, origin, trait]);
 
   const localizedTraitName = useMemo(() => {
@@ -1245,53 +1247,57 @@ export default function CharacterScreen() {
             <PressableRow
               title={tCharacterScreen("labels.equipmentKit")}
               value={localizedEquipmentName || tCharacterScreen("placeholders.selectNone")}
-              disabled={!isSaved}
+              // Строка неактивна, пока для персонажа нет доступных комплектов:
+              // у семьи это значит «трейт/семья ещё не выбраны» (все комплекты
+              // origin требуют requiresTraitIds, фильтр пуст). Это исключает
+              // открытие пустой модалки.
+              disabled={!isSaved || (!equipment?.id && equipmentKitsForModal.length === 0)}
               onPress={() => {
-                if (localizedOrigin && localizedOrigin.equipmentKits) {
-                  // Просмотр комплектов свободен в любой момент.
-                  // Если снаряжение уже выбрано и персонаж зафиксирован
-                  // (атрибуты/навыки распределены) — новый комплект сбрасывает
-                  // инвентарь, навыки и награды (resetKitAndRewards).
-                  const applyKitReset = () => {
-                    resetKitAndRewards();
-                    setIsEquipmentKitModalVisible(true);
-                  };
-                  // Confirm сброса — только если комплект реально выбран (есть id)
-                  // и персонаж зафиксирован. Если комплект неизвестен (id=null,
-                  // старый сейв) — просто открываем список: сбрасывать нечего,
-                  // а выбор конкретного комплекта предложит сброс.
-                  if (equipment?.id && isCharacterLocked) {
-                    if (Platform.OS === "web") {
-                      if (
-                        window.confirm(
-                          tCharacterScreen("warnings.equipmentResetOnWeb"),
-                        )
-                      ) {
-                        applyKitReset();
-                      }
-                    } else {
-                      Alert.alert(
-                          tCharacterScreen("warnings.attentionTitle"),
-                          tCharacterScreen("warnings.equipmentResetConfirm"),
-                        [
-                          { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
-                          {
-                            text: tCharacterScreen("buttons.continue"),
-                            onPress: applyKitReset,
-                          },
-                        ],
-                      );
+                // Доступные комплекты берём из ЕДИНОГО фильтра по данным
+                // (filterKitsForCharacter) — того же, что получает модалка.
+                // Если фильтр пуст (у семьи не выбрана семья/трейт), строка
+                // уже disabled и onPress не вызывается — пустая модалка не
+                // открывается.
+                if (equipmentKitsForModal.length === 0) return;
+
+                // Просмотр комплектов свободен в любой момент.
+                // Если снаряжение уже выбрано и персонаж зафиксирован
+                // (атрибуты/навыки распределены) — новый комплект сбрасывает
+                // инвентарь, навыки и награды (resetKitAndRewards).
+                const applyKitReset = () => {
+                  resetKitAndRewards();
+                  setIsEquipmentKitModalVisible(true);
+                };
+                // Confirm сброса — только если комплект реально выбран (есть id)
+                // и персонаж зафиксирован. Если комплект неизвестен (id=null,
+                // старый сейв) — просто открываем список: сбрасывать нечего,
+                // а выбор конкретного комплекта предложит сброс.
+                if (equipment?.id && isCharacterLocked) {
+                  if (Platform.OS === "web") {
+                    if (
+                      window.confirm(
+                        tCharacterScreen("warnings.equipmentResetOnWeb"),
+                      )
+                    ) {
+                      applyKitReset();
                     }
                   } else {
-                    // До распределения — просто открываем (смена свободна,
-                    // старый комплект заменится при выборе нового).
-                    setIsEquipmentKitModalVisible(true);
+                    Alert.alert(
+                        tCharacterScreen("warnings.attentionTitle"),
+                        tCharacterScreen("warnings.equipmentResetConfirm"),
+                      [
+                        { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
+                        {
+                          text: tCharacterScreen("buttons.continue"),
+                          onPress: applyKitReset,
+                        },
+                      ],
+                    );
                   }
                 } else {
-                  showAlert(
-                    tCharacterScreen("alerts.infoTitle"),
-                    tCharacterScreen("warnings.noEquipmentForOrigin"),
-                  );
+                  // До распределения — просто открываем (смена свободна,
+                  // старый комплект заменится при выборе нового).
+                  setIsEquipmentKitModalVisible(true);
                 }
               }}
             />
