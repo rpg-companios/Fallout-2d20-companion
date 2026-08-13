@@ -18,9 +18,11 @@ const loadRobotCatalog = () => ({
   weapons: require('../../../../data/equipment/robot/weapons.json'),
 });
 
-const META_CATEGORY_ORDER = ['structure', 'weapon', 'module', 'misc'];
+const META_CATEGORY_ORDER = ['structure', 'apparel', 'weapon', 'module', 'misc'];
 
-// Sub-order inside the "Standard Structure" group: head → body → arm → legs → plating
+// Sub-order inside the "Standard Structure" group: head → body → arm → legs → plating.
+// Сюда входят ТОЛЬКО части тела/конструкции роботов. Одежда и броня человека
+// идут отдельной категорией apparel, чтобы не попадать в «Стандартную конструкцию».
 const STRUCTURE_SUBORDER = {
   robotHead: 0,
   robotBody: 1,
@@ -28,11 +30,11 @@ const STRUCTURE_SUBORDER = {
   robotLeg: 3,
   robotLegs: 3,
   plating: 4,
-  armor: 5,
-  frame: 6,
+  frame: 5,
 };
 
 const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
+const APPAREL_TYPES = new Set(['clothing', 'armor']);
 
 // Currency itemTypes that are NOT inventory items — tracked via caps counter
 const CURRENCY_TYPES = new Set(['currency']);
@@ -40,6 +42,7 @@ const CURRENCY_TYPES = new Set(['currency']);
 const getMetaCategory = (item) => {
   const type = item?.itemType || (item?.weaponId ? 'weapon' : 'misc');
   if (STRUCTURE_TYPES.has(type)) return 'structure';
+  if (APPAREL_TYPES.has(type)) return 'apparel';
   if (type === 'weapon') return 'weapon';
   if (type === 'module') return 'module';
   return 'misc';

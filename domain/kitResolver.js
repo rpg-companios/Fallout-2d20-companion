@@ -177,11 +177,23 @@ export async function resolveWeaponItem(item) {
     if (mod) mods.push(mod);
   }
 
-  const prefixes = mods.map((mod) => mod.prefix).filter(Boolean);
-  const weaponName = weaponData.name || item.weaponId;
+  // Ложа (stock) превращает пистолет в винтовку: имя берём из данных оружия
+  // (stockNames.with), если оно задано. Это правило книги (Any Stock mods
+  // change the weapon to a rifle), обеспеченное ДАННЫМИ — движок лишь знает,
+  // что мод из слота Stocks меняет базовое имя.
+  const hasStock = mods.some((mod) => mod.slot === 'Stocks');
+  // Префикс самой ложи (например, «Стандартная ложа») не пишем — он избыточен,
+  // когда ложа уже меняет имя оружия на винтовку. Префиксы стволов/ёмкостей и
+  // т.п. остаются.
+  const prefixes = mods
+    .filter((mod) => mod.slot !== 'Stocks')
+    .map((mod) => mod.prefix)
+    .filter(Boolean);
+  const stockName = hasStock ? (weaponData.stockNames?.with) : null;
+  const baseName = stockName || weaponData.name || item.weaponId;
   // Уникальные качества — перед именем: «дерзкая» + «Опасная бритва».
   const uniqNames = (item.uniqQualities || []).map(getUniqQualityName).filter(Boolean);
-  const displayName = [...prefixes, ...uniqNames, weaponName].join(' ');
+  const displayName = [...prefixes, ...uniqNames, baseName].join(' ');
   const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
 
   // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
@@ -202,7 +214,7 @@ export async function resolveWeaponItem(item) {
     ...item,
     weaponId: resolvedWeaponId,
     // baseName только у вариантов: у обычного оружия имя — из каталога.
-    baseName: trueItemId ? weaponName : undefined,
+    baseName: trueItemId ? baseName : undefined,
     _weapon: weaponData,
     builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
     builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,

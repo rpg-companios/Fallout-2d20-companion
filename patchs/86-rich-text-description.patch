@@ -1,0 +1,191 @@
+diff -ruN '--exclude=.git' '--exclude=node_modules' r86/__tests__/i18n/rich-text.test.js t86/__tests__/i18n/rich-text.test.js
+--- a/__tests__/i18n/rich-text.test.js	1970-01-01 00:00:00.000000000 +0000
++++ b/__tests__/i18n/rich-text.test.js	2026-08-13 05:53:58.495616176 +0000
+@@ -0,0 +1,49 @@
++import { describe, it, expect } from 'vitest';
++import { renderTextWithIcons } from '../../components/screens/WeaponsAndArmorScreen/textUtils';
++
++// renderTextWithIcons возвращает React-элемент; проверяем структуру через его children.
++const getChildren = (el) => {
++  if (el == null || typeof el !== 'object') return el;
++  const kids = el.props?.children;
++  return Array.isArray(kids) ? kids : [kids];
++};
++
++describe('renderTextWithIcons — разметка описаний', () => {
++  it('возвращает null для пустого текста', () => {
++    expect(renderTextWithIcons('')).toBeNull();
++    expect(renderTextWithIcons(null)).toBeNull();
++  });
++
++  it('разбивает текст по \\n на отдельные строки', () => {
++    const el = renderTextWithIcons('первая\nвторая');
++    const outer = getChildren(el);
++    // две строки-узла
++    const lines = outer.filter((c) => c && typeof c === 'object' && c.props);
++    expect(lines.length).toBe(2);
++  });
++
++  it('**оборачивает в жирный**', () => {
++    const el = renderTextWithIcons('это **важно** сейчас');
++    const json = JSON.stringify(el);
++    expect(json).toContain('fontWeight');
++    expect(json).toContain('700');
++    expect(json).toContain('важно');
++  });
++
++  it('*оборачивает в курсив*', () => {
++    const el = renderTextWithIcons('это *заметка* сейчас');
++    const json = JSON.stringify(el);
++    expect(json).toContain('italic');
++    expect(json).toContain('заметка');
++  });
++
++  it('строки, начинающиеся с "- ", получают маркер списка', () => {
++    const el = renderTextWithIcons('- пункт один\n- пункт два');
++    const json = JSON.stringify(el);
++    // два bullet-маркера
++    const bullets = (json.match(/•/g) || []).length;
++    expect(bullets).toBe(2);
++    expect(json).toContain('пункт один');
++    expect(json).toContain('пункт два');
++  });
++});
+diff -ruN '--exclude=.git' '--exclude=node_modules' r86/components/screens/WeaponsAndArmorScreen/textUtils.js t86/components/screens/WeaponsAndArmorScreen/textUtils.js
+--- a/components/screens/WeaponsAndArmorScreen/textUtils.js	2026-08-13 05:53:58.419616176 +0000
++++ b/components/screens/WeaponsAndArmorScreen/textUtils.js	2026-08-13 05:53:58.495616176 +0000
+@@ -8,34 +8,86 @@
+ 
+ const iconRegex = new RegExp(`(${Object.keys(iconMap).join('|')})`, 'g');
+ 
++// ---------------------------------------------------------------------------
++// Inline-разметка: **жирный**, *курсив*, токены кубика {CD}/{/CD}.
++// Возвращает плоский массив <Text>-узлов внутри одного родительского <Text>
++// (вложенные <Text> в RN наследуют стиль и дают акценты без разрыва строки).
++// ---------------------------------------------------------------------------
++
++const INLINE_TOKEN_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|\{\/?CD\})/g;
++
++const renderInline = (text, baseStyle, keyPrefix = 'it') => {
++  if (text == null) return null;
++  const fontSize = baseStyle?.fontSize || 14;
++  const iconSize = fontSize + 10;
++  const verticalShift = Math.round(iconSize / 6);
++
++  return String(text)
++    .split(INLINE_TOKEN_RE)
++    .filter((part) => part !== '')
++    .map((part, index) => {
++      const key = `${keyPrefix}-${index}`;
++      if (iconMap[part]) {
++        return (
++          <Image
++            key={key}
++            source={iconMap[part]}
++            style={{ width: iconSize, height: iconSize, transform: [{ translateY: verticalShift }] }}
++          />
++        );
++      }
++      if (part.startsWith('**') && part.endsWith('**')) {
++        return (
++          <Text key={key} style={{ fontWeight: '700' }}>
++            {part.slice(2, -2)}
++          </Text>
++        );
++      }
++      if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
++        return (
++          <Text key={key} style={{ fontStyle: 'italic' }}>
++            {part.slice(1, -1)}
++          </Text>
++        );
++      }
++      return <React.Fragment key={key}>{part}</React.Fragment>;
++    });
++};
++
++/**
++ * Рендер форматированного текста.
++ *
++ * Поддерживает:
++ *   - переносы строк (\n) — отдельные строки;
++ *   - маркеры списка «- » в начале строки — bullet;
++ *   - **жирный** и *курсив* в рамках строки;
++ *   - токены {CD}/{/CD} — иконка кубика.
++ *
++ * Используется в описаниях трейтов/перков и любых других блоках, где нужна
++ * простая текстовая разметка, зависящая от данных модуля, а не от кода.
++ *
++ * @param {string} text
++ * @param {object=} style  базовый стиль контейнера/строк
++ */
+ export const renderTextWithIcons = (text, style) => {
+   if (!text) {
+     return null;
+   }
+ 
+-  const fontSize = style?.fontSize || 14;
+-  const iconSize = fontSize + 10;
+-  const verticalShift = Math.round(iconSize / 6);
+-
+-  const parts = String(text).split(iconRegex).filter(Boolean);
++  const lines = String(text).split('\n');
+ 
+   return (
+     <Text style={style}>
+-      {parts.map((part, index) => {
+-        if (iconMap[part]) {
+-          return (
+-            <Image
+-              key={index}
+-              source={iconMap[part]}
+-              style={{
+-                width: iconSize,
+-                height: iconSize,
+-                transform: [{ translateY: verticalShift }]
+-              }}
+-            />
+-          );
+-        }
+-        return <Text key={index}>{part}</Text>;
++      {lines.map((line, lineIndex) => {
++        const isBullet = /^\s*-\s+/.test(line);
++        const content = isBullet ? line.replace(/^\s*-\s+/, '') : line;
++        return (
++          <Text key={`line-${lineIndex}`}>
++            {isBullet ? '•  ' : ''}
++            {renderInline(content, style, `line-${lineIndex}`)}
++            {lineIndex < lines.length - 1 ? '\n' : ''}
++          </Text>
++        );
+       })}
+     </Text>
+   );
+@@ -43,16 +95,16 @@
+ 
+ // Глобальное подключение: один вызов при старте приложения (см. index.js) — и
+ // ЛЮБОЙ <Text> в любом экране/модалке автоматически превращает токены {/CD} (и {CD})
+-// в картинку кубика (assets/CD.png). Поведение renderTextWithIcons не меняется,
+-// переиспользуется тот же iconMap.
++// в картинку кубика (assets/CD.png). Inline-разметка **/* обрабатывается только
++// там, где используется renderTextWithIcons — глобальный патч остаётся узким.
+ export const setupRichText = () => {
+   if (Text.__richTextPatched) return;
+ 
+   const tokenRe = new RegExp(`(${Object.keys(iconMap).map((k) => k.replace(/[{}]/g, (m) => `\\${m}`)).join('|')})`, 'g');
+   const testRe = new RegExp(tokenRe.source); // без флага g — безопасный .test()
+ 
+-  const toNodes = (str, style) => {
+-    const fontSize = style?.fontSize || 14;
++  const toNodes = (str, baseStyle) => {
++    const fontSize = baseStyle?.fontSize || 14;
+     const iconSize = fontSize + 10;
+     const verticalShift = Math.round(iconSize / 6);
+     return String(str).split(tokenRe).filter(Boolean).map((part, index) =>
+@@ -80,4 +132,4 @@
+   };
+ 
+   Text.__richTextPatched = true;
+-}; 
+\ No newline at end of file
++};

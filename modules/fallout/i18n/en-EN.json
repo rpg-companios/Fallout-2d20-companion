@@ -1,6 +1,7 @@
 {
   "origins": {
-    "TreeFamilies": "Strip Families"
+    "TreeFamilies": "Strip Families",
+    "enclaveRemnant": "Enclave Remnant"
   },
   "traits": {
     "treeFamilies": {
@@ -19,6 +20,12 @@
       "whiteGlove": {
         "name": "White Glove Society",
         "description": "Food you cook at a Cooking Station restores 1 more HP. When you butcher a corpse for meat, you gain one additional piece. Charisma (CHA) skill tests involving those outside the White Glove Society increase their Complication range by 1."
+      }
+    },
+    "enclaveRemnant": {
+      "hidden": {
+        "name": "Hidden and Hunted",
+        "description": "Tag one additional skill of your choice: **Sneak** or **Survival**.\n\nThe NCR and the Brotherhood of Steel hunt war criminals like you:\n- the difficulty of reputation tests with the NCR and Brotherhood of Steel is **increased by 2**;\n- if you are exposed, both factions become **hostile**.\n\nOnce per quest (or game session), you may spend **1 Luck point** to locate one of your caches and claim its contents.\n\nIf you have been exposed, upon reaching a cache make a **LCK + Sneak** test with difficulty 1. On a failure, your cache is compromised."
       }
     }
   },
@@ -163,6 +170,12 @@
     },
     "treefamilies_white_glove": {
       "name": "White Glove Society"
+    },
+    "enclave_scientist": {
+      "name": "Former Scientist"
+    },
+    "enclave_soldier": {
+      "name": "Former Soldier"
     }
   },
   "uniqQualities": [
@@ -1907,6 +1920,12 @@
       "name": "mod_203",
       "prefix": "mod_203",
       "effectDescription": "plus 1 Range"
+    },
+    {
+      "id": "mod_204",
+      "name": "Long Barrel",
+      "prefix": "Long-barreled",
+      "effectDescription": "+1 Range, removes Close Quarters"
     }
   ]
 }

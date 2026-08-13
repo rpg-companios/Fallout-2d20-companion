@@ -84,34 +84,13 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
     doFinalSelect(picks);
   };
 
-  const titleKeys = {
-    assaultron: 'assaultron',
-    childOfAtom: 'childOfAtom',
-    ghoul: 'ghoul',
-    misterHandy: 'misterHandy',
-    protectron: 'protectron',
-    robobrain: 'robobrain',
-    securitron: 'securitron',
-    superMutant: 'supermutant',
-    synth: 'synth',
-    shadow: 'shadow',
-    brotherhood: 'brotherhoodOfSteel',
-    brotherhoodOutcast: 'brotherhoodOutcast',
-    minuteman: 'minuteman',
-    vaultDweller: 'vaultDweller',
-  };
-
-  const titleKey = titleKeys[actualOriginId] || actualOriginId;
-  const modalTitle = tCharacterScreen(`origins.${titleKey}`, name || 'Trait');
-
   return (
     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
           {step === 'info' ? (
             <>
-              <Text style={styles.modalTitle}>{modalTitle}</Text>
-              <Text style={styles.traitName}>{name}</Text>
+              <Text style={styles.modalTitle}>{name}</Text>
               {renderTextWithIcons(description, styles.modalText)}
               {skillPickChoice && (
                 <Text style={styles.hintText}>

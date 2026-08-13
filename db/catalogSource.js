@@ -63,6 +63,10 @@ const buildWeaponRow = (w) => {
     ammo_id: safeStr(w.ammoId),
     range: safeStr(w.range),
     range_name: safeStr(w.rangeName),
+    // Имена оружия с ложей/без ложи (лазерный пистолет → лазерная винтовка).
+    // Необходимо для правила «сток-мод меняет пистолет на винтовку».
+    stock_names: w.stockNames ? JSON.stringify(w.stockNames) : null,
+    stockNames: w.stockNames != null ? w.stockNames : null,
     main_attr: safeStr(w.mainAttr),
     main_skill: safeStr(w.mainSkill),
     rules: safeStr(w.rules),

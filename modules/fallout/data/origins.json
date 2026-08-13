@@ -13,5 +13,18 @@
       "treefamilies_omerta",
       "treefamilies_white_glove"
     ]
+  },
+  {
+    "id": "enclaveRemnant",
+    "displayNameKey": "origins.enclaveRemnant.name",
+    "characterType": "human",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "enclaveRemnant-hidden"
+    ],
+    "equipmentKitIds": [
+      "enclave_scientist",
+      "enclave_soldier"
+    ]
   }
 ]

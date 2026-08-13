@@ -39,7 +39,7 @@ describe('Данные в модуле (сеттинг), data/ — пустой 
     const catalog = getEquipmentCatalogForLocale('ru-RU');
     expect(catalog.food.length).toBe(76);
     expect(catalog.drinks.length).toBe(22);
-    expect(catalog.weaponMods.length).toBe(203);
+    expect(catalog.weaponMods.length).toBe(204);
     // флаги на месте
     expect(catalog.drinks.find((d) => d.id === 'drink_beer').isAlcohol).toBe(true);
     expect(catalog.drinks.find((d) => d.id === 'drink_nuka_cola').isAlcohol).toBe(false);

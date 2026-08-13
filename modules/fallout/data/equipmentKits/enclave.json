@@ -1,0 +1,79 @@
+{
+  "enclave_scientist": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_lab_coat",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_gas_mask",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 6,
+            "rollType": "rollCD",
+            "rollValue": 3,
+            "op": "+"
+          }
+        }
+      }
+    ]
+  },
+  "enclave_soldier": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_military_fatigues",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_combat_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_laser_gun",
+            "itemType": "weapon",
+            "modIds": [
+              "mod_058",
+              "mod_204"
+            ],
+            "ammo": {
+              "ammoId": "ammo_energy_cell",
+              "quantity": {
+                "base": 8,
+                "rollType": "rollCD",
+                "rollValue": 4,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_assault_rifle",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_5_56mm",
+              "quantity": {
+                "base": 8,
+                "rollType": "rollCD",
+                "rollValue": 4,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

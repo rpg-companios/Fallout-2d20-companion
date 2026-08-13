@@ -13,6 +13,7 @@ import brotherhood from './brotherhood.json';
 import brotherhoodOutcast from './brotherhoodOutcast.json';
 import childOfAtom from './childOfAtom.json';
 import defaultKit from './default.json';
+import enclave from './enclave.json';
 import minuteman from './minuteman.json';
 import misterHandy from './misterHandy.json';
 import ncr from './ncr.json';
@@ -29,6 +30,7 @@ export default {
   ...brotherhoodOutcast,
   ...childOfAtom,
   ...defaultKit,
+  ...enclave,
   ...minuteman,
   ...misterHandy,
   ...ncr,

@@ -5413,5 +5413,34 @@
     ],
     "effectChanges": [],
     "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_204",
+    "slot": "Barrels",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 24,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
   }
 ]
