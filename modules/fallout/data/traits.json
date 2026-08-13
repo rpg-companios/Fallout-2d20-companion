@@ -47,5 +47,20 @@
         "white_glove_cha_complication"
       ]
     }
+  },
+  {
+    "id": "enclaveRemnant-hidden",
+    "originId": "enclaveRemnant",
+    "displayNameKey": "traits.enclaveRemnant.hidden.name",
+    "descriptionKey": "traits.enclaveRemnant.hidden.description",
+    "modifiers": {
+      "skillPickChoice": {
+        "count": 1,
+        "from": [
+          "SNEAK",
+          "SURVIVAL"
+        ]
+      }
+    }
   }
 ]

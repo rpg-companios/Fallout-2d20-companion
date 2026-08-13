@@ -1,0 +1,220 @@
+diff --git a/components/screens/CharacterScreen/modals/traits/index.js b/components/screens/CharacterScreen/modals/traits/index.js
+index dad3bfc..dfad2bc 100644
+--- a/components/screens/CharacterScreen/modals/traits/index.js
++++ b/components/screens/CharacterScreen/modals/traits/index.js
+@@ -28,6 +28,7 @@ const genericOrigins = [
+   'brotherhoodOutcast',
+   'minuteman',
+   'vaultDweller',
++  'enclaveRemnant',
+ ];
+ 
+ const genericConfigs = {};
+diff --git a/modules/fallout/data/origins.json b/modules/fallout/data/origins.json
+index d54bb42..80048ff 100644
+--- a/modules/fallout/data/origins.json
++++ b/modules/fallout/data/origins.json
+@@ -13,5 +13,17 @@
+       "treefamilies_omerta",
+       "treefamilies_white_glove"
+     ]
++  },
++  {
++    "id": "enclaveRemnant",
++    "displayNameKey": "origins.enclaveRemnant.name",
++    "characterType": "human",
++    "bodyPlan": "humanoid",
++    "traitIds": [
++      "enclaveRemnant-hidden"
++    ],
++    "equipmentKitIds": [
++      "default_caps_only"
++    ]
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/data/traits.json b/modules/fallout/data/traits.json
+index 13912ac..a1e2f60 100644
+--- a/modules/fallout/data/traits.json
++++ b/modules/fallout/data/traits.json
+@@ -47,5 +47,20 @@
+         "white_glove_cha_complication"
+       ]
+     }
++  },
++  {
++    "id": "enclaveRemnant-hidden",
++    "originId": "enclaveRemnant",
++    "displayNameKey": "traits.enclaveRemnant.hidden.name",
++    "descriptionKey": "traits.enclaveRemnant.hidden.description",
++    "modifiers": {
++      "skillPickChoice": {
++        "count": 1,
++        "from": [
++          "SNEAK",
++          "SURVIVAL"
++        ]
++      }
++    }
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN.json b/modules/fallout/i18n/en-EN.json
+index ab77f04..bf653aa 100644
+--- a/modules/fallout/i18n/en-EN.json
++++ b/modules/fallout/i18n/en-EN.json
+@@ -1,6 +1,7 @@
+ {
+   "origins": {
+-    "TreeFamilies": "Strip Families"
++    "TreeFamilies": "Strip Families",
++    "enclaveRemnant": "Enclave Remnant"
+   },
+   "traits": {
+     "treeFamilies": {
+@@ -20,6 +21,12 @@
+         "name": "White Glove Society",
+         "description": "Food you cook at a Cooking Station restores 1 more HP. When you butcher a corpse for meat, you gain one additional piece. Charisma (CHA) skill tests involving those outside the White Glove Society increase their Complication range by 1."
+       }
++    },
++    "enclaveRemnant": {
++      "hidden": {
++        "name": "Hidden and Hunted",
++        "description": "Tag one additional skill of your choice: Sneak or Survival. The NCR and the Brotherhood of Steel hunt war criminals like you. The difficulty of reputation tests with the NCR and Brotherhood of Steel is increased by 2; if you are exposed, both factions become hostile. Once per quest (or game session), you may spend 1 Luck point to locate one of your many caches and claim its contents. If you have been exposed, upon reaching a cache make a LCK + Sneak test with difficulty 1; on a failure your cache is compromised."
++      }
+     }
+   },
+   "weapons": [
+@@ -1909,4 +1916,4 @@
+       "effectDescription": "plus 1 Range"
+     }
+   ]
+-}
+\ No newline at end of file
++}
+diff --git a/modules/fallout/i18n/ru-RU.json b/modules/fallout/i18n/ru-RU.json
+index 613f616..2361977 100644
+--- a/modules/fallout/i18n/ru-RU.json
++++ b/modules/fallout/i18n/ru-RU.json
+@@ -1,6 +1,7 @@
+ {
+   "origins": {
+-    "TreeFamilies": "Три семьи"
++    "TreeFamilies": "Три семьи",
++    "enclaveRemnant": "Осколок Анклава"
+   },
+   "traits": {
+     "treeFamilies": {
+@@ -20,6 +21,12 @@
+         "name": "Общество «Белая перчатка»",
+         "description": "Еда, которую вы готовите на Пункте приготовления пищи, восстанавливает на 1 ОЗ больше. Когда вы разделываете труп для получения мяса, вы получаете один дополнительный кусок. Проверки навыков на основе Харизмы (ХАР), связанные с теми, кто не входит в Общество «Белая перчатка», увеличивают свой Диапазон осложнений на 1."
+       }
++    },
++    "enclaveRemnant": {
++      "hidden": {
++        "name": "Скрытный и преследуемый",
++        "description": "Отметьте один дополнительный навык на выбор: Скрытность или Выживание. НКР и Братство Стали разыскивают таких, как вы. Сложность проверок на репутацию с НКР и Братством Стали повышена на 2; если вас раскроют, обе фракции станут враждебны. Один раз за квест (или игровой сеанс) вы можете потратить 1 очко удачи, чтобы найти один из множества тайников и получить его содержимое. Если вас раскрыли, по прибытии в тайник пройдите проверку УДА + Скрытность со сложностью 1; в случае провала ваш тайник раскрыт."
++      }
+     }
+   },
+   "weapons": [
+@@ -1908,4 +1915,4 @@
+       "effectDescription": "+1 дистанция"
+     }
+   ]
+-}
+\ No newline at end of file
++}
+diff --git a/__tests__/securitron/enclave-remnant-origin.test.js b/__tests__/securitron/enclave-remnant-origin.test.js
+new file mode 100644
+--- /dev/null
++++ b/__tests__/securitron/enclave-remnant-origin.test.js
+
+index 0000000..72767ad
+--- /dev/null
++++ b/__tests__/securitron/enclave-remnant-origin.test.js
+@@ -0,0 +1,84 @@
++/**
++ * Ориджин «Осколок Анклава» (enclaveRemnant).
++ *
++ * Содержимое (трейт «Скрытный и преследуемый», доп. навык Скрытность/Выживание,
++ * 100 стартовых крышек) живёт в модуле modules/fallout. Движковые механики
++ * (репутация, враждебность, тайники за очки удачи, проверка тайника) будут
++ * добавлены отдельно — тут проверяем только то, что уже реализовано данными.
++ */
++import { describe, it, expect, vi, beforeAll } from 'vitest';
++
++import { setCurrentLocale } from '../../i18n/locale';
++
++beforeAll(() => {
++  setCurrentLocale('ru-RU');
++});
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++import { getOrigins, getTraits, getOriginI18n, getTraitI18n, getEquipmentCatalogForLocale } from '../../domain/registry';
++import moduleOrigins from '../../modules/fallout/data/origins.json';
++import moduleTraits from '../../modules/fallout/data/traits.json';
++
++const ORIGIN_ID = 'enclaveRemnant';
++const TRAIT_ID = 'enclaveRemnant-hidden';
++
++const getOrigin = () => getOrigins().find((o) => o.id === ORIGIN_ID);
++const getTrait = (id = TRAIT_ID) => getTraits().find((t) => t.id === id);
++
++describe('Ориджин «Осколок Анклава»: данные (в модуле)', () => {
++  it('ориджин лежит в модуле и читается реестром', () => {
++    expect(moduleOrigins.some((o) => o.id === ORIGIN_ID)).toBe(true);
++    const origin = getOrigin();
++    expect(origin).toBeDefined();
++    expect(origin.characterType).toBe('human');
++    expect(origin.bodyPlan).toBe('humanoid');
++    expect(origin.traitIds).toEqual([TRAIT_ID]);
++    // Снаряжение сейчас — стартовый капс (100 крышек); новый комплект будет позже.
++    expect(origin.equipmentKitIds).toEqual(['default_caps_only']);
++  });
++
++  it('трейт «Скрытный и преследуемый» даёт выбор 1 доп. навыка из Скрытность/Выживание', () => {
++    expect(moduleTraits.some((t) => t.id === TRAIT_ID)).toBe(true);
++    const trait = getTrait();
++    expect(trait.originId).toBe(ORIGIN_ID);
++    expect(trait.modifiers.skillPickChoice).toEqual({
++      count: 1,
++      from: ['SNEAK', 'SURVIVAL'],
++    });
++  });
++
++  it('имена/описания локализованы (ru/en), без сырых ключей', () => {
++    const ruName = getOriginI18n('ru-RU')[ORIGIN_ID];
++    const enName = getOriginI18n('en-EN')[ORIGIN_ID];
++    expect(ruName).toBe('Осколок Анклава');
++    expect(enName).toBe('Enclave Remnant');
++
++    const ruTrait = getTraitI18n('ru-RU').traits?.enclaveRemnant?.hidden;
++    const enTrait = getTraitI18n('en-EN').traits?.enclaveRemnant?.hidden;
++    expect(ruTrait?.name).toBe('Скрытный и преследуемый');
++    expect(typeof ruTrait?.description).toBe('string');
++    expect(ruTrait.description.length).toBeGreaterThan(20);
++    expect(enTrait?.name).toBe('Hidden and Hunted');
++    expect(typeof enTrait?.description).toBe('string');
++  });
++
++  it('стартовый комплект существует и выдаёт 100 крышек (currency)', async () => {
++    const { resolveKitItems } = await import('../../domain/kitResolver');
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const kit = catalog.equipmentKits.default_caps_only;
++    expect(kit).toBeDefined();
++    const resolved = await resolveKitItems({ id: 'default_caps_only', items: kit.items });
++    const caps = resolved.items.find((i) => i.itemType === 'currency');
++    expect(caps).toBeDefined();
++    expect(caps.quantity).toBe(100);
++  });
++});

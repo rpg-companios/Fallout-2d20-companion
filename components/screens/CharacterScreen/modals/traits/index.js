@@ -28,6 +28,7 @@ const genericOrigins = [
   'brotherhoodOutcast',
   'minuteman',
   'vaultDweller',
+  'enclaveRemnant',
 ];
 
 const genericConfigs = {};

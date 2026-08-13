@@ -1,0 +1,227 @@
+diff -ruN -x .git -x node_modules a85/__tests__/securitron/enclave-kits.test.js b85/__tests__/securitron/enclave-kits.test.js
+--- a/__tests__/securitron/enclave-kits.test.js	1970-01-01 00:00:00.000000000 +0000
++++ b/__tests__/securitron/enclave-kits.test.js	2026-08-13 05:26:36.078284490 +0000
+@@ -0,0 +1,79 @@
++/**
++ * Комплекты «Осколка Анклава»: Бывший учёный / Бывший солдат.
++ */
++import { describe, it, expect, vi, beforeAll } from 'vitest';
++
++import { setCurrentLocale } from '../../i18n/locale';
++
++beforeAll(() => setCurrentLocale('ru-RU'));
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { resolveKitItems } from '../../domain/kitResolver';
++import moduleOrigins from '../../modules/fallout/data/origins.json';
++
++const KIT_IDS = ['enclave_scientist', 'enclave_soldier'];
++const getOrigin = () => moduleOrigins.find((o) => o.id === 'enclaveRemnant');
++
++describe('Комплекты Анклава: данные', () => {
++  it('ориджин ссылается на оба комплекта', () => {
++    expect(getOrigin().equipmentKitIds).toEqual(KIT_IDS);
++  });
++
++  it('имена комплектов локализованы', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(catalog.equipmentKits.enclave_scientist.name).toBe('Бывший учёный');
++    expect(catalog.equipmentKits.enclave_soldier.name).toBe('Бывший солдат');
++  });
++
++  it('учёный: халат, противогаз, лазерный пистолет и 6+3 энергоячейки', async () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const resolved = await resolveKitItems({
++      id: 'enclave_scientist',
++      items: catalog.equipmentKits.enclave_scientist.items,
++    });
++    const ids = resolved.items.map((i) => i.clothingId || i.armorId || i.weaponId || i.itemId || i.id);
++    expect(ids).toContain('clothing_lab_coat');
++    expect(ids).toContain('headwear_gas_mask');
++    expect(ids).toContain('weapon_laser_gun');
++
++    const pistol = resolved.items.find((i) => i.weaponId === 'weapon_laser_gun');
++    expect(pistol).toBeDefined();
++    expect(pistol.resolvedAmmunition?.id).toBe('ammo_energy_cell');
++    expect(pistol.resolvedAmmunition?.quantity).toBeGreaterThanOrEqual(6);
++    expect(pistol.resolvedAmmunition?.quantity).toBeLessThanOrEqual(9);
++  });
++
++  it('солдат: военная униформа, нагрудник ББ, выбор лазерной винтовки/штурмовой винтовки с 8+4 боезапаса', async () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const kit = catalog.equipmentKits.enclave_soldier;
++
++    // choice существует и предлагает ровно два варианта оружия
++    const choice = kit.items.find((e) => e.type === 'choice');
++    expect(choice).toBeDefined();
++    expect(choice.items).toHaveLength(2);
++    const optionIds = choice.items.map((o) => o.weaponId);
++    expect(optionIds).toContain('weapon_laser_gun');
++    expect(optionIds).toContain('weapon_assault_rifle');
++
++    // Резолв лазерной винтовки (пистолет + ствольная коробка/ложа mod_058, ствол mod_054)
++    const laserOption = choice.items.find((o) => o.weaponId === 'weapon_laser_gun');
++    expect(laserOption.modIds).toEqual(['mod_058', 'mod_054']);
++
++    const resolved = await resolveKitItems({ id: 'enclave_soldier', items: kit.items });
++    const ids = resolved.items.map((i) => i.clothingId || i.armorId || i.weaponId || i.itemId || i.id);
++    expect(ids).toContain('clothing_military_fatigues');
++    expect(ids).toContain('armor_combat_chest_001');
++    // один из вариантов оружия попал в комплект (по умолчанию choice — первый)
++    expect(ids.some((id) => id === 'weapon_laser_gun' || id === 'weapon_assault_rifle')).toBe(true);
++  });
++});
+diff -ruN -x .git -x node_modules a85/modules/fallout/data/equipmentKits/enclave.json b85/modules/fallout/data/equipmentKits/enclave.json
+--- a/modules/fallout/data/equipmentKits/enclave.json	1970-01-01 00:00:00.000000000 +0000
++++ b/modules/fallout/data/equipmentKits/enclave.json	2026-08-13 05:26:36.074284490 +0000
+@@ -0,0 +1,76 @@
++{
++  "enclave_scientist": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_lab_coat",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_gas_mask",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 6,
++            "rollType": "rollCD",
++            "rollValue": 3,
++            "op": "+"
++          }
++        }
++      }
++    ]
++  },
++  "enclave_soldier": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_military_fatigues",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "armorId": "armor_combat_chest_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_laser_gun",
++            "itemType": "weapon",
++            "modIds": ["mod_058", "mod_054"],
++            "ammo": {
++              "ammoId": "ammo_energy_cell",
++              "quantity": {
++                "base": 8,
++                "rollType": "rollCD",
++                "rollValue": 4,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_assault_rifle",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_5_56mm",
++              "quantity": {
++                "base": 8,
++                "rollType": "rollCD",
++                "rollValue": 4,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      }
++    ]
++  }
++}
+diff -ruN -x .git -x node_modules a85/modules/fallout/data/equipmentKits/index.js b85/modules/fallout/data/equipmentKits/index.js
+--- a/modules/fallout/data/equipmentKits/index.js	2026-08-13 05:26:36.022284490 +0000
++++ b/modules/fallout/data/equipmentKits/index.js	2026-08-13 05:26:36.090284490 +0000
+@@ -13,6 +13,7 @@
+ import brotherhoodOutcast from './brotherhoodOutcast.json';
+ import childOfAtom from './childOfAtom.json';
+ import defaultKit from './default.json';
++import enclave from './enclave.json';
+ import minuteman from './minuteman.json';
+ import misterHandy from './misterHandy.json';
+ import ncr from './ncr.json';
+@@ -29,6 +30,7 @@
+   ...brotherhoodOutcast,
+   ...childOfAtom,
+   ...defaultKit,
++  ...enclave,
+   ...minuteman,
+   ...misterHandy,
+   ...ncr,
+diff -ruN -x .git -x node_modules a85/modules/fallout/data/origins.json b85/modules/fallout/data/origins.json
+--- a/modules/fallout/data/origins.json	2026-08-13 05:26:36.070284490 +0000
++++ b/modules/fallout/data/origins.json	2026-08-13 05:26:36.098284490 +0000
+@@ -23,7 +23,8 @@
+       "enclaveRemnant-hidden"
+     ],
+     "equipmentKitIds": [
+-      "default_caps_only"
++      "enclave_scientist",
++      "enclave_soldier"
+     ]
+   }
+ ]
+diff -ruN -x .git -x node_modules a85/modules/fallout/i18n/en-EN.json b85/modules/fallout/i18n/en-EN.json
+--- a/modules/fallout/i18n/en-EN.json	2026-08-13 05:26:36.070284490 +0000
++++ b/modules/fallout/i18n/en-EN.json	2026-08-13 05:26:36.102284490 +0000
+@@ -170,6 +170,12 @@
+     },
+     "treefamilies_white_glove": {
+       "name": "White Glove Society"
++    },
++    "enclave_scientist": {
++      "name": "Former Scientist"
++    },
++    "enclave_soldier": {
++      "name": "Former Soldier"
+     }
+   },
+   "uniqQualities": [
+diff -ruN -x .git -x node_modules a85/modules/fallout/i18n/ru-RU.json b85/modules/fallout/i18n/ru-RU.json
+--- a/modules/fallout/i18n/ru-RU.json	2026-08-13 05:26:36.070284490 +0000
++++ b/modules/fallout/i18n/ru-RU.json	2026-08-13 05:26:36.102284490 +0000
+@@ -170,6 +170,12 @@
+     },
+     "treefamilies_white_glove": {
+       "name": "Общество «Белая перчатка»"
++    },
++    "enclave_scientist": {
++      "name": "Бывший учёный"
++    },
++    "enclave_soldier": {
++      "name": "Бывший солдат"
+     }
+   },
+   "uniqQualities": [
