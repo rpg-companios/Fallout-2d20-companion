@@ -60,7 +60,9 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
-import { catalogGetWeaponById, catalogGetWeaponModById } from '../../db/catalogSource';
+import { catalogGetWeaponModById } from '../../db/catalogSource';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -586,12 +588,24 @@ const useCharacterStore = create(devtools(
         debugLog('items.add.canonicalId', { weaponId });
 
         // One simple rule for all entry points (kit, loot, buy, migration):
-        // the store row keeps the full weapon snapshot needed by UI. If the caller
-        // only passed a weaponId, fill the rest from the JSON catalog here instead
-        // of teaching every screen/modal to repair missing weapon fields.
-        const itemType = item.itemType || (item.weaponId ? 'weapon' : 'misc');
-        const catalogWeapon = itemType === 'weapon' ? catalogGetWeaponById(weaponId) : null;
-        const sourceItem = catalogWeapon ? { ...catalogWeapon, ...item } : item;
+        // callers may pass only an item id. The store resolves that id against
+        // the active JSON catalog once, then stores the UI-ready snapshot plus
+        // instance state (quantity, equipped, mods, durability, charges, etc.).
+        const catalog = getEquipmentCatalog();
+        const requestedType = item.itemType || inferItemType(item);
+        const idPrefixType = String(weaponId).startsWith('weapon_') ? 'weapon'
+          : String(weaponId).startsWith('ammo_') ? 'ammo'
+            : null;
+        const lookupTypes = [...new Set([
+          requestedType,
+          idPrefixType,
+          'weapon', 'ammo', 'armor', 'clothing', 'chem', 'drinks', 'food', 'magazine', 'misc',
+        ].filter(Boolean))];
+        const catalogItem = lookupTypes
+          .map((type) => ({ type, entry: findCatalogEntry(catalog, weaponId, type) }))
+          .find((result) => result.entry);
+        const itemType = item.itemType || catalogItem?.entry?.itemType || catalogItem?.entry?.item_type || catalogItem?.type || requestedType;
+        const sourceItem = catalogItem ? { ...catalogItem.entry, ...item, itemType } : { ...item, itemType };
 
         // Get applied mods
         const appliedMods = sourceItem.appliedMods || {};
