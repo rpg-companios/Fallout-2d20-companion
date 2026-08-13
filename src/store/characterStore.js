@@ -60,6 +60,7 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+import { catalogGetWeaponModById } from '../../db/catalogSource';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -109,7 +110,7 @@ const applyModModifiers = (item, appliedMods = {}) => {
   
   // For each mod, apply its modifiers to the item parameters
   Object.entries(appliedMods).forEach(([slot, modId]) => {
-    const mod = getWeaponModById(modId);
+    const mod = catalogGetWeaponModById(modId);
     if (!mod) return;
     
     // Apply damage modifier

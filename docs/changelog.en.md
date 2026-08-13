@@ -1,5 +1,42 @@
 # Changelog
 
+---
+
+## Update — Equipment kits, Enclave Remnant, Equipment screen (patches 69–89)
+
+> Recent changes from this week. Older entries (up to 68) follow below in their usual order.
+
+### Equipment kits (engine)
+- One kit modal for all traits/origins: the player makes the choices (weapon, skills), auto-grant no longer silently resolves `choice` entries (71, 73).
+- Kits moved to the setting: `modules/fallout/data/equipmentKits/*.json` (one file per faction) + index; `data/` stays empty (74, 75).
+- A kit can require a trait via `requiresTraitIds` — it is only available to the chosen family/sub-trait. `domain/equipmentKits.js` filters kits the same way for every origin (77).
+- The "Equipment kit" row is disabled until a kit is available (e.g. a family trait not chosen yet) — an empty modal can no longer open (78, 79).
+- Kit modal: human clothes/armor moved into a dedicated "Armor & Clothing" category; "Standard Structure" remains for robot parts only (88).
+
+### Origin "Enclave Remnant" (content)
+- New origin `enclaveRemnant` and the "Hidden and Hunted" trait: tag one extra skill — Sneak or Survival (via `skillPickChoice`) (84).
+- Two kits: "Former Scientist" (lab coat, gas mask, laser pistol + 6+3 {CD} energy cells) and "Former Soldier" (military fatigues, combat armor chest, choice of laser rifle or assault rifle with 8+4 {CD} ammo) (85).
+- New weapon mod `mod_204` "Long Barrel" (for laser/plasma/institute weapons): +1 Range, removes Close Quarters, "Long-barreled" prefix (88).
+- A stock converts a pistol to a rifle: if a Stocks-slot mod is present, the name comes from `stockNames.with` ("Laser Pistol" → "Laser Rifle"); the stock's own prefix is not duplicated. Result for the soldier — "Long-barreled Laser Rifle" (88).
+- The origin-name title was removed from the trait modal — only the trait name (e.g. "Hidden and Hunted") remains (87).
+- Trait descriptions support light markup: `**bold**`, `*italic*`, `- ` bullets, and line breaks via the shared `renderTextWithIcons` (86).
+
+### Equipment screen
+- Weapon-layout toggles live on the screen itself: lines = list (spoilers), two bars = cards. Removed from settings (76).
+- The virtual unarmed attack (fists/manipulator) always occupies the first slot. A hand/palm button on the left of the toolbar shows/hides its card; when hidden, the first slot is taken by a weapon. The setting persists between sessions (80, 81, 82).
+- Attack ordering: Unarmed → Melee → built-in → Mk II → everything else (82).
+
+### Reliability & cleanup
+- FIX: `getWeaponModById is not defined` when granting a kit with weapon mods (affected every kit with mods, not just Enclave). The store now uses synchronous `catalogGetWeaponModById` (89).
+- `stockNames` is now carried through the catalog (`buildWeaponRow`) — without it the "...rifle" name never reached the resolver (88).
+- Removed one-off debug scripts from the repo root (`debug-android-save.js`, `enhanced-debug.js`, `test-android-*.js`, `test-file-transfer.js`).
+
+### Also
+- 69 — Omerta and White Glove Society kits (full contents, auto-reroll, modal choice).
+- 70 — first engine/setting split stage: food, drinks and weapon mods moved to the module entirely.
+
+---
+
 ## 68 — "Elegant" quality in old saves (migration v7→v8) + kit-modal field loss fix
 
 - CAUSE: clothes granted by the Chairmen kit BEFORE patch 67 have no `uniqQualities` in the save — inventory and the Equipment screen show them as «Формальная одежда» (only new grants have the quality).
