@@ -104,6 +104,7 @@ const InventoryScreen = () => {
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
   const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+  const weaponDurabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     if (!stackKey) return undefined;
@@ -1355,6 +1356,12 @@ const InventoryScreen = () => {
     const showPARepair = Boolean(
       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
     );
+    const showWeaponDurability = Boolean(
+      localizedDisplayItem?.itemType === 'weapon'
+      && (randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
+      && isAmmoWeapon(localizedDisplayItem),
+    );
+    const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
     const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
@@ -1479,8 +1486,8 @@ const InventoryScreen = () => {
           {Number.isFinite(paMaxHp) && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
           )}
-          {item.durabilityTracked && (
-            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.durability}/100</Text>
+          {showWeaponDurability && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
           )}
           {mk2Blocked && (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>

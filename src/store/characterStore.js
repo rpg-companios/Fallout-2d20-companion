@@ -41,9 +41,9 @@
 import { create } from 'zustand';
 import { devtools, persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  calculateAttributeTotal, 
-  calculateSkillTotal, 
+import {
+  calculateAttributeTotal,
+  calculateSkillTotal,
   normalizeItemParameters,
   calculateDerivedStats,
   calculateParameterTotal
@@ -61,6 +61,8 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
 
 // Helper function to generate unique IDs
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
@@ -73,15 +75,15 @@ const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2,
  */
 const normalizeParameter = (value, modifier = null) => {
   if (value === undefined || value === null) return undefined;
-  
+
   const baseValue = typeof value === 'number' ? value : value?.base ?? 0;
-  
+
   const parameter = {
     base: baseValue,
     modifiers: [],
     total: baseValue,
   };
-  
+
   // Apply modifier if present
   if (modifier && modifier.value !== undefined) {
     const modValue = Number(modifier.value) || 0;
@@ -93,7 +95,7 @@ const normalizeParameter = (value, modifier = null) => {
     // Recalculate total
     parameter.total = calculateParameterTotal(baseValue, parameter.modifiers);
   }
-  
+
   return parameter;
 };
 
@@ -105,14 +107,14 @@ const normalizeParameter = (value, modifier = null) => {
  */
 const applyModModifiers = (item, appliedMods = {}) => {
   if (!item || Object.keys(appliedMods).length === 0) return item;
-  
+
   const updatedItem = { ...item };
-  
+
   // For each mod, apply its modifiers to the item parameters
   Object.entries(appliedMods).forEach(([slot, modId]) => {
     const mod = catalogGetWeaponModById(modId);
     if (!mod) return;
-    
+
     // Apply damage modifier
     if (mod.damageModifier && updatedItem.damage) {
       const modValue = Number(mod.damageModifier.value) || 0;
@@ -122,7 +124,7 @@ const applyModModifiers = (item, appliedMods = {}) => {
         operation: mod.damageModifier.op || '+',
       });
     }
-    
+
     // Apply fireRate modifier
     if (mod.fireRateModifier && updatedItem.fireRate) {
       const modValue = Number(mod.fireRateModifier.value) || 0;
@@ -132,7 +134,7 @@ const applyModModifiers = (item, appliedMods = {}) => {
         operation: mod.fireRateModifier.op || '+',
       });
     }
-    
+
     // Apply range modifier (if mod has range changes).
     // range is a plain value now; only push a modifier if it is in Parameter shape.
     if (mod.rangeModifier && updatedItem.range && Array.isArray(updatedItem.range.modifiers)) {
@@ -176,7 +178,7 @@ const applyModModifiers = (item, appliedMods = {}) => {
       }
     }
   });
-  
+
   return updatedItem;
 };
 
@@ -230,9 +232,9 @@ const useCharacterStore = create(devtools(
 
       // --- Actions: Robot equipment (delegated to robotSlice) ---
       ...createRobotActions(set, get),
-      
+
       // --- Actions: Attributes ---
-      
+
       /**
        * Update an attribute's base value
        * @param {string} attrId - Attribute ID (e.g., 'STR', 'END')
@@ -241,26 +243,26 @@ const useCharacterStore = create(devtools(
       updateAttribute: (attrId, delta) => {
         const state = get();
         const attributes = { ...state.attributes };
-        
+
         if (!attributes[attrId]) {
           debugLog('store.attrNotFound', { attrId });
           return;
         }
-        
+
         // Create a copy of the attribute and update base value
         const updatedAttribute = {
           ...attributes[attrId],
           base: (attributes[attrId].base || 0) + delta,
         };
-        
+
         // Recalculate total
         updatedAttribute.total = calculateAttributeTotal(updatedAttribute);
         attributes[attrId] = updatedAttribute;
-        
+
         set({ attributes });
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Add a modifier to an attribute
        * @param {string} attrId - Attribute ID
@@ -271,29 +273,29 @@ const useCharacterStore = create(devtools(
       addAttributeModifier: (attrId, source, value, operation = '+') => {
         const state = get();
         const attributes = { ...state.attributes };
-        
+
         if (!attributes[attrId]) {
           debugLog('store.attrNotFound', { attrId });
           return;
         }
-        
+
         // Create a copy of the attribute
         const updatedAttribute = { ...attributes[attrId] };
-        
+
         // Add the new modifier
         updatedAttribute.modifiers = [
           ...(updatedAttribute.modifiers || []),
           { source, value, operation }
         ];
-        
+
         // Recalculate total
         updatedAttribute.total = calculateAttributeTotal(updatedAttribute);
         attributes[attrId] = updatedAttribute;
-        
+
         set({ attributes });
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Remove a modifier from an attribute
        * @param {string} attrId - Attribute ID
@@ -302,29 +304,29 @@ const useCharacterStore = create(devtools(
       removeAttributeModifier: (attrId, source) => {
         const state = get();
         const attributes = { ...state.attributes };
-        
+
         if (!attributes[attrId]) {
           debugLog('store.attrNotFound', { attrId });
           return;
         }
-        
+
         // Create a copy of the attribute
         const updatedAttribute = { ...attributes[attrId] };
-        
+
         // Remove modifiers with matching source
         updatedAttribute.modifiers = (updatedAttribute.modifiers || [])
           .filter(mod => mod.source !== source);
-        
+
         // Recalculate total
         updatedAttribute.total = calculateAttributeTotal(updatedAttribute);
         attributes[attrId] = updatedAttribute;
-        
+
         set({ attributes });
         get().recalculateDerivedStats();
       },
-      
+
       // --- Actions: Skills ---
-      
+
       /**
        * Update a skill's base value
        * @param {string} skillId - Skill ID (e.g., 'SMALL_GUNS', 'MEDICINE')
@@ -333,26 +335,26 @@ const useCharacterStore = create(devtools(
       updateSkill: (skillId, delta) => {
         const state = get();
         const skills = { ...state.skills };
-        
+
         if (!skills[skillId]) {
           debugLog('store.skillNotFound', { skillId });
           return;
         }
-        
+
         // Create a copy of the skill and update base value
         const updatedSkill = {
           ...skills[skillId],
           base: (skills[skillId].base || 0) + delta,
         };
-        
+
         // Recalculate total
         updatedSkill.total = calculateSkillTotal(updatedSkill);
         skills[skillId] = updatedSkill;
-        
+
         set({ skills });
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Add a modifier to a skill
        * @param {string} skillId - Skill ID
@@ -363,29 +365,29 @@ const useCharacterStore = create(devtools(
       addSkillModifier: (skillId, source, value, operation = '+') => {
         const state = get();
         const skills = { ...state.skills };
-        
+
         if (!skills[skillId]) {
           debugLog('store.skillNotFound', { skillId });
           return;
         }
-        
+
         // Create a copy of the skill
         const updatedSkill = { ...skills[skillId] };
-        
+
         // Add the new modifier
         updatedSkill.modifiers = [
           ...(updatedSkill.modifiers || []),
           { source, value, operation }
         ];
-        
+
         // Recalculate total
         updatedSkill.total = calculateSkillTotal(updatedSkill);
         skills[skillId] = updatedSkill;
-        
+
         set({ skills });
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Remove a modifier from a skill
        * @param {string} skillId - Skill ID
@@ -394,29 +396,29 @@ const useCharacterStore = create(devtools(
       removeSkillModifier: (skillId, source) => {
         const state = get();
         const skills = { ...state.skills };
-        
+
         if (!skills[skillId]) {
           debugLog('store.skillNotFound', { skillId });
           return;
         }
-        
+
         // Create a copy of the skill
         const updatedSkill = { ...skills[skillId] };
-        
+
         // Remove modifiers with matching source
         updatedSkill.modifiers = (updatedSkill.modifiers || [])
           .filter(mod => mod.source !== source);
-        
+
         // Recalculate total
         updatedSkill.total = calculateSkillTotal(updatedSkill);
         skills[skillId] = updatedSkill;
-        
+
         set({ skills });
         get().recalculateDerivedStats();
       },
-      
+
       // --- Actions: Items ---
-      
+
       /**
        * Update an item with partial changes
        * @param {string} itemId - Item ID
@@ -425,25 +427,25 @@ const useCharacterStore = create(devtools(
       updateItem: (itemId, patch) => {
         const state = get();
         const items = { ...state.items };
-        
+
         if (!items[itemId]) {
           debugLog('store.itemNotFound', { itemId });
           return;
         }
-        
+
         debugLog('store.updateItem.before', { itemId, oldItem: items[itemId], patch });
         // Merge the patch with existing item data
         const updatedItem = { ...items[itemId], ...patch };
-        
+
         // Normalize item parameters (recalculate totals)
         const normalizedItem = normalizeItemParameters(updatedItem);
         debugLog('store.updateItem.after', { itemId, updatedItem, normalizedItem });
         items[itemId] = normalizedItem;
-        
+
         set({ items });
         get().recalculateDerivedStats();
       },
-      
+
       /** Spend ammunition and update weapon wear in one state transaction. */
       spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots }) => {
         const state = get();
@@ -494,20 +496,20 @@ const useCharacterStore = create(devtools(
       equipItem: (itemId) => {
         const state = get();
         const items = { ...state.items };
-        
+
         if (!items[itemId]) {
           debugLog('store.itemNotFound', { itemId });
           return;
         }
-        
+
         // Create a copy of the item and set equipped to true
         const updatedItem = { ...items[itemId], equipped: true };
         items[itemId] = updatedItem;
-        
+
         set({ items });
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Unequip an item (set equipped = false)
        * @param {string} itemId - Item ID
@@ -536,7 +538,7 @@ const useCharacterStore = create(devtools(
         set({ items });
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Add a new item to the store (inventory).
        *
@@ -568,35 +570,55 @@ const useCharacterStore = create(devtools(
           itemType: item?.itemType,
           id: item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId,
         });
-        
+
         if (!item) {
           debugLog('items.add.invalid', { reason: 'null-or-undefined' });
           return;
         }
-        
+
         // Get weaponId from item — try all known identifier fields so armor/clothing/misc
         // items that may not have resolved a catalog entry still get stored
         const weaponId = item.weaponId || item.id || item.code
           || item.itemId || item.armorId || item.clothingId;
-        
+
         if (!weaponId) {
           debugLog('items.add.invalid', { reason: 'no-id-field', item });
           return;
         }
         debugLog('items.add.canonicalId', { weaponId });
-        
+
+        // One simple rule for all entry points (kit, loot, buy, migration):
+        // callers may pass only an item id. The store resolves that id against
+        // the active JSON catalog once, then stores the UI-ready snapshot plus
+        // instance state (quantity, equipped, mods, durability, charges, etc.).
+        const catalog = getEquipmentCatalog();
+        const requestedType = item.itemType || inferItemType(item);
+        const idPrefixType = String(weaponId).startsWith('weapon_') ? 'weapon'
+          : String(weaponId).startsWith('ammo_') ? 'ammo'
+            : null;
+        const lookupTypes = [...new Set([
+          requestedType,
+          idPrefixType,
+          'weapon', 'ammo', 'armor', 'clothing', 'chem', 'drinks', 'food', 'magazine', 'misc',
+        ].filter(Boolean))];
+        const catalogItem = lookupTypes
+          .map((type) => ({ type, entry: findCatalogEntry(catalog, weaponId, type) }))
+          .find((result) => result.entry);
+        const itemType = item.itemType || catalogItem?.entry?.itemType || catalogItem?.entry?.item_type || catalogItem?.type || requestedType;
+        const sourceItem = catalogItem ? { ...catalogItem.entry, ...item, itemType } : { ...item, itemType };
+
         // Get applied mods
-        const appliedMods = item.appliedMods || {};
-        
+        const appliedMods = sourceItem.appliedMods || {};
+
         // Generate unique ID for this item instance
-        const itemId = item.uniqueId || generateItemId(
+        const itemId = sourceItem.uniqueId || generateItemId(
           weaponId,
           appliedMods,
-          item.baseName,
-          item.durabilityTracked ? item.durability : undefined,
-          item.uniqQualities,
+          sourceItem.baseName,
+          sourceItem.durabilityTracked ? sourceItem.durability : undefined,
+          sourceItem.uniqQualities,
         );
-        
+
         // Generate stackKey for stacking identical items.
         // Стек = id + прочие параметры (прочность, моды, уникальные качества)
         // + имя: два 100% идентичных предмета — один стек; меч 50 и меч 100
@@ -604,104 +626,104 @@ const useCharacterStore = create(devtools(
         // (один id, разные uniq-качества) — разные. Предметы со своим ключом
         // (силовая броня, Ядерный Блок — signature по прочности/зарядам/модам)
         // приносят ключ с собой.
-        const stackKey = item.stackKey || generateStackKey(
+        const stackKey = sourceItem.stackKey || generateStackKey(
           weaponId,
           appliedMods,
-          item.baseName,
-          item.durabilityTracked ? item.durability : undefined,
-          item.uniqQualities,
+          sourceItem.baseName,
+          sourceItem.durabilityTracked ? sourceItem.durability : undefined,
+          sourceItem.uniqQualities,
         );
-        
+
         // Normalize item data with parameters
         const normalizedItem = {
           id: itemId,
           // instanceId survives display enrichment, whose `id` is the catalog id.
           instanceId: itemId,
           weaponId: weaponId,
-          name: item.name || item.weaponName || item.Name || weaponId,
+          name: sourceItem.name || sourceItem.weaponName || sourceItem.Name || weaponId,
           // baseName — оригинальное имя предмета (без префиксов модов):
           // у вариантов (бритва) отличается от имени истинного предмета,
           // что разделяет стеки и задаёт базу для имён с модами.
-          baseName: item.baseName || undefined,
+          baseName: sourceItem.baseName || undefined,
           // uniqQualities — навешиваемые уникальные качества (id): участвуют
           // в имени предмета и в стек-ключе (см. domain/uniqQuality.js).
-          uniqQualities: item.uniqQualities || undefined,
-          itemType: item.itemType || 'misc',
-          equipped: item.equipped || false,
+          uniqQualities: sourceItem.uniqQualities || undefined,
+          itemType,
+          equipped: sourceItem.equipped || false,
           // `locked: true` marks items that came from a robot kit. They are
           // equipped at character creation and cannot be removed via the normal
           // unequip flow — only by swapping the limb that holds them.
-          locked: Boolean(item.locked),
+          locked: Boolean(sourceItem.locked),
           // `requiresMkII` — нерабочее встроенное оружие (ракетница и гранатомёт
           // Секьюритрона до установки ОС Mk II): хранится в инвентаре, но не
           // попадает в список атак, пока механика Mk II не реализована.
-          requiresMkII: Boolean(item.requiresMkII),
-          quantity: item.quantity || 1,
+          requiresMkII: Boolean(sourceItem.requiresMkII),
+          quantity: sourceItem.quantity || 1,
           stackKey: stackKey,
           appliedMods: appliedMods,
-          
+
           // Normalize numeric parameters (damage, fireRate, etc.)
-          damage: normalizeParameter(item.damage, item.damageModifier),
-          fireRate: normalizeParameter(item.fireRate, item.fireRateModifier),
+          damage: normalizeParameter(sourceItem.damage, sourceItem.damageModifier),
+          fireRate: normalizeParameter(sourceItem.fireRate, sourceItem.fireRateModifier),
           // range / damageType are descriptive values (e.g. "Medium", "Physical"),
           // NOT numeric stats. Keeping them as plain values avoids (a) corrupting
           // string values into {base:0} and (b) React error #31 when a screen renders
           // the value directly. See docs/architecture/zustand-diagnosis.md (range/damageType fix).
-          range: item.range,
-          damageType: item.damageType,
-          
+          range: sourceItem.range,
+          damageType: sourceItem.damageType,
+
           // Armor parameters
           physicalDamageRating: normalizeParameter(
-            item.physicalDamageRating, 
-            item.physicalDamageRatingModifier
+            sourceItem.physicalDamageRating,
+            sourceItem.physicalDamageRatingModifier
           ),
           energyDamageRating: normalizeParameter(
-            item.energyDamageRating, 
-            item.energyDamageRatingModifier
+            sourceItem.energyDamageRating,
+            sourceItem.energyDamageRatingModifier
           ),
           radiationDamageRating: normalizeParameter(
-            item.radiationDamageRating, 
-            item.radiationDamageRatingModifier
+            sourceItem.radiationDamageRating,
+            sourceItem.radiationDamageRatingModifier
           ),
-          
+
           // Copy other fields
-          code: item.code,
-          cost: item.cost,
-          rarity: item.rarity,
-          weight: item.weight,
-          ammoId: item.ammoId,
-          qualities: item.qualities,
-          imageName: item.imageName,
+          code: sourceItem.code,
+          cost: sourceItem.cost,
+          rarity: sourceItem.rarity,
+          weight: sourceItem.weight,
+          ammoId: sourceItem.ammoId,
+          qualities: sourceItem.qualities,
+          imageName: sourceItem.imageName,
 
           // Optional weapon durability is instance-specific and never catalog data.
-          durabilityTracked: Boolean(item.durabilityTracked),
-          durability: item.durability,
-          durabilityAmmoRemainder: item.durabilityAmmoRemainder,
-          durabilityWearRemainder: item.durabilityWearRemainder,
+          durabilityTracked: Boolean(sourceItem.durabilityTracked),
+          durability: sourceItem.durability,
+          durabilityAmmoRemainder: sourceItem.durabilityAmmoRemainder,
+          durabilityWearRemainder: sourceItem.durabilityWearRemainder,
 
           // Consumable fields (chems, food, drinks) — preserved verbatim from catalog
-          positiveEffect: item.positiveEffect,
-          positiveEffectDuration: item.positiveEffectDuration,
-          positiveEffectLabel: item.positiveEffectLabel,
-          negativeEffect: item.negativeEffect,
-          negativeEffectDuration: item.negativeEffectDuration,
-          negativeEffectLabel: item.negativeEffectLabel,
-          addictionLevel: item.addictionLevel,
+          positiveEffect: sourceItem.positiveEffect,
+          positiveEffectDuration: sourceItem.positiveEffectDuration,
+          positiveEffectLabel: sourceItem.positiveEffectLabel,
+          negativeEffect: sourceItem.negativeEffect,
+          negativeEffectDuration: sourceItem.negativeEffectDuration,
+          negativeEffectLabel: sourceItem.negativeEffectLabel,
+          addictionLevel: sourceItem.addictionLevel,
 
           // Armor / outfit extra fields
-          protectedAreas: item.protectedAreas,
-          equippedSlots: item.equippedSlots,
-          equipInstanceId: item.equipInstanceId,
+          protectedAreas: sourceItem.protectedAreas,
+          equippedSlots: sourceItem.equippedSlots,
+          equipInstanceId: sourceItem.equipInstanceId,
 
           // Силовая броня / Ядерный Блок (docs/architecture/power-armor-plan.md §4)
-          set: item.set,
-          charges: item.charges,
-          maxCharges: item.maxCharges,
-          hpCurrent: item.hpCurrent,
-          installedPieces: item.installedPieces,
-          installedCore: item.installedCore,
+          set: sourceItem.set,
+          charges: sourceItem.charges,
+          maxCharges: sourceItem.maxCharges,
+          hpCurrent: sourceItem.hpCurrent,
+          installedPieces: sourceItem.installedPieces,
+          installedCore: sourceItem.installedCore,
         };
-        
+
         // Apply mod modifiers to parameters
         const finalItem = applyModModifiers(normalizedItem, appliedMods);
 
@@ -731,19 +753,19 @@ const useCharacterStore = create(devtools(
 
           return existingItemKey;
         }
-        
+
         // Add item to store
         items[itemId] = normalizedFinalItem;
-        
+
         debugLog('items.add.stored', { key: itemId, equipped: finalItem.equipped, itemType: finalItem.itemType });
         set({ items });
         get().recalculateDerivedStats();
-        
+
         return itemId;
       },
-      
+
       // --- Actions: Effects ---
-      
+
       /**
        * Add an effect to the store
        * @param {object} effect - Effect data (without id if new)
@@ -751,10 +773,10 @@ const useCharacterStore = create(devtools(
       addEffect: (effect) => {
         const state = get();
         const effects = { ...state.effects };
-        
+
         // Generate ID if not provided
         const effectId = effect.id || generateId();
-        
+
         // Add effect to store with active flag
         effects[effectId] = {
           ...effect,
@@ -762,11 +784,11 @@ const useCharacterStore = create(devtools(
           active: true,
           createdAt: effect.createdAt || Date.now(),
         };
-        
+
         set({ effects });
         get().triggerDependentCalculations();
       },
-      
+
       /**
        * Mark an effect as expired (set active = false)
        * @param {string} effectId - Effect ID
@@ -774,18 +796,18 @@ const useCharacterStore = create(devtools(
       expireEffect: (effectId) => {
         const state = get();
         const effects = { ...state.effects };
-        
+
         if (!effects[effectId]) {
           debugLog('store.effectNotFound', { effectId });
           return;
         }
-        
+
         // Mark effect as inactive
         effects[effectId] = {
           ...effects[effectId],
           active: false,
         };
-        
+
         set({ effects });
         get().triggerDependentCalculations();
       },
@@ -806,14 +828,14 @@ const useCharacterStore = create(devtools(
         set({ effects });
         get().triggerDependentCalculations();
       },
-      
+
       /**
        * Remove expired effects from the store
        */
       pruneExpiredEffects: () => {
         const state = get();
         const effects = { ...state.effects };
-        
+
         // Filter out effects that are not active
         const activeEffects = {};
         Object.entries(effects).forEach(([id, effect]) => {
@@ -821,7 +843,7 @@ const useCharacterStore = create(devtools(
             activeEffects[id] = effect;
           }
         });
-        
+
         if (Object.keys(activeEffects).length !== Object.keys(effects).length) {
           set({ effects: activeEffects });
           get().triggerDependentCalculations();
@@ -834,16 +856,16 @@ const useCharacterStore = create(devtools(
       triggerDependentCalculations: () => {
         get().recalculateDerivedStats();
       },
-      
+
       // --- Helper Actions ---
-      
+
       /**
        * Trigger recalculation of all parameter totals
        */
       recalculateAll: () => {
         const state = get();
         const { attributes, skills, items } = state;
-        
+
         // Recalculate all attributes
         const updatedAttributes = { ...attributes };
         Object.keys(updatedAttributes).forEach(attrId => {
@@ -855,7 +877,7 @@ const useCharacterStore = create(devtools(
             };
           }
         });
-        
+
         // Recalculate all skills
         const updatedSkills = { ...skills };
         Object.keys(updatedSkills).forEach(skillId => {
@@ -867,7 +889,7 @@ const useCharacterStore = create(devtools(
             };
           }
         });
-        
+
         // Recalculate all items
         const updatedItems = { ...items };
         Object.keys(updatedItems).forEach(itemId => {
@@ -876,17 +898,17 @@ const useCharacterStore = create(devtools(
             updatedItems[itemId] = normalizeItemParameters(item);
           }
         });
-        
+
         set({
           attributes: updatedAttributes,
           skills: updatedSkills,
           items: updatedItems,
         });
-        
+
         get().recalculatePerkBonuses();
         get().recalculateDerivedStats();
       },
-      
+
       /**
        * Recalculate derived stats based on current state
        * This should be called when trait, level, or equipment changes
@@ -924,7 +946,7 @@ const useCharacterStore = create(devtools(
 
         set({ derivedStats });
       },
-      
+
       /**
        * Set character context for derived stats calculation
        * @param {Object} context - { trait, level, equipmentState }
@@ -932,7 +954,7 @@ const useCharacterStore = create(devtools(
       setCharacterContext: (context) => {
         // Store context for derived stats calculation
         // This would typically be called by CharacterContext
-        set({ 
+        set({
           _characterContext: {
             trait: context.trait || null,
             level: context.level || 1,
@@ -941,9 +963,9 @@ const useCharacterStore = create(devtools(
         });
         get().recalculateDerivedStats(context);
       },
-      
+
       // --- Migration Actions ---
-      
+
       /**
        * Загрузить данные в store из старого формата (массивов)
        * Используется при начальной загрузке из базы данных
@@ -982,7 +1004,7 @@ const useCharacterStore = create(devtools(
         get().recalculatePerkBonuses();
         get().recalculateAll();
       },
-      
+
       /**
        * Экспортировать данные в старый формат для сохранения в БД
        */
@@ -990,7 +1012,7 @@ const useCharacterStore = create(devtools(
         const state = get();
         return denormalizeForSave(state);
       },
-      
+
     }),
     {
       name: 'character-store',
