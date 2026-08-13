@@ -593,13 +593,25 @@ const useCharacterStore = create(devtools(
         // instance state (quantity, equipped, mods, durability, charges, etc.).
         const catalog = getEquipmentCatalog();
         const requestedType = item.itemType || inferItemType(item);
-        const idPrefixType = String(weaponId).startsWith('weapon_') ? 'weapon'
-          : String(weaponId).startsWith('ammo_') ? 'ammo'
-            : null;
+        // Определяем класс предмета по префиксу id. Это нужно для универсального
+        // движка: вызыватель может передать только id — тип подскажет сам id.
+        const idUpper = String(weaponId);
+        const idPrefixType = idUpper.startsWith('weapon_') ? 'weapon'
+          : idUpper.startsWith('ammo_') ? 'ammo'
+          : idUpper.startsWith('armor_') ? 'armor'
+          : idUpper.startsWith('clothing_') || idUpper.startsWith('headwear_') ? 'clothing'
+          : idUpper.startsWith('chem_') ? 'chem'
+          : idUpper.startsWith('drink_') ? 'drinks'
+          : idUpper.startsWith('food_') ? 'food'
+          : idUpper.startsWith('mag_') || idUpper.startsWith('magazine_') ? 'magazine'
+          : idUpper.startsWith('robot_') ? 'robotPart'
+          : idUpper.startsWith('pa_') || idUpper.startsWith('power_') ? 'powerArmor'
+          : null;
         const lookupTypes = [...new Set([
           requestedType,
           idPrefixType,
-          'weapon', 'ammo', 'armor', 'clothing', 'chem', 'drinks', 'food', 'magazine', 'misc',
+          'weapon', 'ammo', 'armor', 'clothing', 'chem', 'drinks', 'food', 'magazine',
+          'powerArmor', 'robotPart', 'misc',
         ].filter(Boolean))];
         const catalogItem = lookupTypes
           .map((type) => ({ type, entry: findCatalogEntry(catalog, weaponId, type) }))

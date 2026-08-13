@@ -65,6 +65,26 @@ export const findCatalogEntry = (catalog, id, itemType) => {
       return search(catalog.food);
     case 'magazine':
       return search(catalog.magazines);
+    case 'powerArmor':
+      // Силовая броня: каркас, части, ядерный блок — плоский список.
+      return search(catalog.powerArmorList);
+    case 'robotArm':
+      return search(catalog.robotArms);
+    case 'robotBody':
+      return search(catalog.robotBody);
+    case 'robotLeg':
+    case 'robotLegs':
+      return search(catalog.robotLegs);
+    case 'robotHead':
+      return search(catalog.robotHeads);
+    case 'robotPart':
+      // Универсальный поиск по любым робочастям.
+      return search(catalog.robotArms)
+        || search(catalog.robotBody)
+        || search(catalog.robotLegs)
+        || search(catalog.robotHeads)
+        || search(catalog.robotPlating)
+        || search(catalog.robotFrames);
     case 'misc':
     default: {
       const misc = flattenMisc(catalog.miscellaneous);
