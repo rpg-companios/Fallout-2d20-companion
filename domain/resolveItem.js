@@ -108,7 +108,11 @@ const INSTANCE_FIELDS = [
 export const resolveItem = (instance, catalog) => {
   if (!instance || !instance.id) return instance;
   const itemType = instance.itemType || inferItemType(instance);
-  const base = findCatalogEntry(catalog, instance.id, itemType);
+  // Store rows use `id` as the inventory instance key. The catalog id lives in
+  // `weaponId` for weapons and most normalized items, so enrichment must look up
+  // the catalog by that canonical id instead of the instance key.
+  const catalogId = instance.weaponId || instance.id;
+  const base = findCatalogEntry(catalog, catalogId, itemType);
   if (!base) return instance;
   const instanceState = {};
   INSTANCE_FIELDS.forEach((f) => { if (instance[f] !== undefined) instanceState[f] = instance[f]; });
