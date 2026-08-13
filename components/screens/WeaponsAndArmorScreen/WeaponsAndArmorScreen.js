@@ -645,6 +645,15 @@ const WeaponsAndArmorScreen = () => {
     [dedupedEquippedWeapons],
   );
 
+  // ── Настройки отображения оружия (переключатели — на этом экране) ───────
+  // Объявляются ДО visibleEquippedWeapons, т.к. он использует
+  // unarmedAttackVisible (иначе TDZ: Cannot access before initialization).
+  const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
+  const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
+  // Показ/скрытие виртуальной рукопашной атаки (кулаки/манипулятор).
+  const unarmedAttackVisible = useAppSettingsStore((state) => state.unarmedAttackVisible);
+  const setUnarmedAttackVisible = useAppSettingsStore((state) => state.setUnarmedAttackVisible);
+
   // Виртуальная рукопашная атака (кулаки/манипулятор) всегда есть в первом
   // слоте, но игрок может СКРЫТЬ её карточку — тогда слот занимает оружие.
   // Фильтр общий для всех режимов (cards/spoilers/tabs).
@@ -652,13 +661,6 @@ const WeaponsAndArmorScreen = () => {
     () => applyUnarmedVisibility(orderedEquippedWeapons, unarmedAttackVisible),
     [orderedEquippedWeapons, unarmedAttackVisible],
   );
-
-  // ── Режим отображения оружия (переключатель — на этом экране) ───────────
-  const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
-  const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
-  // Показ/скрытие виртуальной рукопашной атаки (кулаки/манипулятор).
-  const unarmedAttackVisible = useAppSettingsStore((state) => state.unarmedAttackVisible);
-  const setUnarmedAttackVisible = useAppSettingsStore((state) => state.setUnarmedAttackVisible);
 
   // Спойлеры: по умолчанию ЗАКРЫТЫ (в объекте хранятся открытые индексы).
   const [openSpoilers, setOpenSpoilers] = useState({});

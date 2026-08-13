@@ -476,21 +476,33 @@ describe('Ориджин Секьюритрон: драйвер ОС Mk II', () 
 describe('Порядок оружия на экране снаряжения', () => {
   const w = (overrides) => ({ id: 'w', weaponId: 'w', name: 'w', weaponType: 'Light', ...overrides });
 
-  it('рукопашные первыми, затем встроенные, затем Mk II, затем остальное (стабильно)', () => {
-    const melee = w({ id: 'unarmed_human', weaponType: 'Unarmed' });
+  it('рукопашная атака (Unarmed) всегда первой, затем Melee, встроенные, Mk II, остальное (стабильно)', () => {
+    const fists = w({ id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true });
+    const knife = w({ id: 'weapon_combat_knife', weaponType: 'Melee' });
     const builtinLaser = w({ id: 'weapon_laser_gun', isBuiltin: true });
     const mk2 = w({ id: 'weapon_missile_launcher', requiresMkII: true });
     const equipped = w({ id: 'weapon_10mm_pistol' });
     const builtinSmg = w({ id: 'weapon_submachine_gun', isBuiltin: true });
 
-    const sorted = sortWeaponsForDisplay([equipped, builtinSmg, mk2, melee, builtinLaser]);
+    const sorted = sortWeaponsForDisplay([equipped, knife, builtinSmg, mk2, fists, builtinLaser]);
     expect(sorted.map((x) => x.id)).toEqual([
       'unarmed_human',
+      'weapon_combat_knife',
       'weapon_submachine_gun',
       'weapon_laser_gun',
       'weapon_missile_launcher',
       'weapon_10mm_pistol',
     ]);
+  });
+
+  it('Unarmed всегда в 1-м слоте, даже если экипировано Melee-оружие и кулаки идут последними в исходном списке', () => {
+    const knife = w({ id: 'weapon_combat_knife', weaponType: 'Melee' });
+    const fists = w({ id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true });
+
+    // кулаки добавляются в список ПОСЛЕ оружия (extras после fromStore) —
+    // сортировка обязана вынести их на первое место.
+    const sorted = sortWeaponsForDisplay([knife, fists]);
+    expect(sorted.map((x) => x.id)).toEqual(['unarmed_human', 'weapon_combat_knife']);
   });
 
   it('findFreeWeaponHand: первая свободная рука, а не первая по расположению', () => {

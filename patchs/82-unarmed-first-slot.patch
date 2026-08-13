@@ -1,0 +1,78 @@
+diff --git a/__tests__/securitron/securitron-origin.test.js b/__tests__/securitron/securitron-origin.test.js
+index 68b317a..5292ed0 100644
+--- a/__tests__/securitron/securitron-origin.test.js
++++ b/__tests__/securitron/securitron-origin.test.js
+@@ -476,16 +476,18 @@ describe('Ориджин Секьюритрон: драйвер ОС Mk II', ()
+ describe('Порядок оружия на экране снаряжения', () => {
+   const w = (overrides) => ({ id: 'w', weaponId: 'w', name: 'w', weaponType: 'Light', ...overrides });
+ 
+-  it('рукопашные первыми, затем встроенные, затем Mk II, затем остальное (стабильно)', () => {
+-    const melee = w({ id: 'unarmed_human', weaponType: 'Unarmed' });
++  it('рукопашная атака (Unarmed) всегда первой, затем Melee, встроенные, Mk II, остальное (стабильно)', () => {
++    const fists = w({ id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true });
++    const knife = w({ id: 'weapon_combat_knife', weaponType: 'Melee' });
+     const builtinLaser = w({ id: 'weapon_laser_gun', isBuiltin: true });
+     const mk2 = w({ id: 'weapon_missile_launcher', requiresMkII: true });
+     const equipped = w({ id: 'weapon_10mm_pistol' });
+     const builtinSmg = w({ id: 'weapon_submachine_gun', isBuiltin: true });
+ 
+-    const sorted = sortWeaponsForDisplay([equipped, builtinSmg, mk2, melee, builtinLaser]);
++    const sorted = sortWeaponsForDisplay([equipped, knife, builtinSmg, mk2, fists, builtinLaser]);
+     expect(sorted.map((x) => x.id)).toEqual([
+       'unarmed_human',
++      'weapon_combat_knife',
+       'weapon_submachine_gun',
+       'weapon_laser_gun',
+       'weapon_missile_launcher',
+@@ -493,6 +495,16 @@ describe('Порядок оружия на экране снаряжения', (
+     ]);
+   });
+ 
++  it('Unarmed всегда в 1-м слоте, даже если экипировано Melee-оружие и кулаки идут последними в исходном списке', () => {
++    const knife = w({ id: 'weapon_combat_knife', weaponType: 'Melee' });
++    const fists = w({ id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true });
++
++    // кулаки добавляются в список ПОСЛЕ оружия (extras после fromStore) —
++    // сортировка обязана вынести их на первое место.
++    const sorted = sortWeaponsForDisplay([knife, fists]);
++    expect(sorted.map((x) => x.id)).toEqual(['unarmed_human', 'weapon_combat_knife']);
++  });
++
+   it('findFreeWeaponHand: первая свободная рука, а не первая по расположению', () => {
+     const arm = { limb: { canHoldWeapons: true, weaponSlots: 1 }, heldWeapon: null };
+     const slots = { leftArm: arm, rightArm: { ...arm } };
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index d6c4dae..5c0c0aa 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -156,20 +156,23 @@ export function resolveWeaponDamageType(damageType) {
+ 
+ // ---------------------------------------------------------------------------
+ // Порядок оружия на экране снаряжения (ПРАВИЛО владельца):
+-//   1. рукопашные атаки (Melee/Unarmed) — всегда первыми, для всех ориджинов;
++//   0. виртуальная рукопашная атака (Unarmed: кулаки/манипулятор) — ВСЕГДА
++//      в 1-м слоте, для всех ориджинов, независимо от надетого оружия;
++//   1. рукопашное оружие (Melee: ножи, кастеты — это предмет инвентаря);
+ //   2. встроенное оружие конечностей (лазер/ПП секьюритрона и т.п.);
+ //   3. нерабочее Mk II оружие (требует установки драйвера) — после встроенного;
+-//   4. всё остальное (оружие, экипированное из инвентаря) — в конце.
++//   4. всё остальное (стрелковое, экипированное из инвентаря) — в конце.
+ // Сортировка стабильная: порядок внутри групп сохраняется.
+ // ---------------------------------------------------------------------------
+ 
+ export const getWeaponDisplayPriority = (weapon) => {
+-  if (!weapon) return 3;
++  if (!weapon) return 4;
+   const weaponType = weapon?.weaponType ?? weapon?.weapon_type;
+-  if (weaponType === 'Melee' || weaponType === 'Unarmed') return 0;
+-  if (weapon?.requiresMkII) return 2;
+-  if (weapon?.isBuiltin || weapon?.isManipulator) return 1;
+-  return 3;
++  if (weaponType === 'Unarmed') return 0;
++  if (weaponType === 'Melee') return 1;
++  if (weapon?.requiresMkII) return 3;
++  if (weapon?.isBuiltin || weapon?.isManipulator) return 2;
++  return 4;
+ };
+ 
+ export const sortWeaponsForDisplay = (weapons = []) =>
