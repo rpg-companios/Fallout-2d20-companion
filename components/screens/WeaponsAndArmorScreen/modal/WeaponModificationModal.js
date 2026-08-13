@@ -35,11 +35,11 @@ function normalizeModRow(row) {
     weight: row.weight ?? 0,
     cost: row.cost ?? 0,
     // Localized description for UI (i18n effectDescription, locale-driven).
-    effectDescription: row.effectDescription || row.effect_description || row.effects || '',
+    effectDescription: row.effectDescription || row.effects || '',
     damageModifier: row.damageModifier,
     fireRateModifier: row.fireRateModifier,
     rangeModifier: row.rangeModifier,
-    damageType: row.damageType ?? row.damage_type,
+    damageType: row.damageType,
     qualityChanges: row.qualityChanges,
     effectChanges: row.effectChanges,
     damageTypeOverride: row.damageTypeOverride,
@@ -102,7 +102,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   const name = prefixesRu.length ? `${prefixesRu.join(' ')} ${baseName}` : baseName;
 
   const damageBase = toNumber(baseWeapon.damage);
-  const fireRateBase = toNumber(baseWeapon.fire_rate);
+  const fireRateBase = toNumber(baseWeapon.fireRate);
   const weightBase = toNumber(baseWeapon.weight);
   const costBase = toNumber(baseWeapon.cost);
 
@@ -112,7 +112,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   let cost = costBase;
   let rangeShift = 0;
   // Нормализуем базовый damageType в массив
-  let damage_type = baseWeapon.damage_type ?? baseWeapon.damageType;
+  let damage_type = baseWeapon.damageType;
   if (typeof damage_type === "string") {
     try {
       damage_type = JSON.parse(damage_type);
@@ -221,7 +221,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     resultCost: cost,
     rangeShift,
     resultRange: range_name,
-    baseDamageType: baseWeapon.damage_type ?? baseWeapon.damageType,
+    baseDamageType: baseWeapon.damageType,
     resultDamageType: damage_type,
   });
 
@@ -230,10 +230,9 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     name,
     baseWeaponName: baseName,
     damage,
-    fire_rate,
-    damage_type,
-    damageType: damage_type, // дублируем для совместимости
-    range_name,
+    fireRate: fire_rate,
+    damageType: damage_type,
+    rangeName: range_name,
     qualities: qualitiesValue,
     effects: effectsValue,
     weight: String(weight),
@@ -317,7 +316,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           }
         } else {
           // Fallback: если weapon_mod_slots для оружия не заполнен,
-          // используем weapon_mods.applies_to_ids и группируем по slot.
+          // используем weapon_mods.appliesToIds и группируем по slot.
           const mods = await getWeaponMods(resolvedWeaponId);
           for (const m of (mods || [])) {
             const nm = normalizeModRow(m);
@@ -428,7 +427,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             <View style={styles.weaponInfo}>
               <Text style={styles.weaponTitle}>{weapon?.name || tWeaponsAndArmorScreen('modals.unknownWeapon')}</Text>
               <Text style={styles.weaponStats}>
-                {tWeaponsAndArmorScreen('modals.weaponDamage')}: {weapon?.damage ?? 0} | {tWeaponsAndArmorScreen('modals.weaponFireRate')}: {weapon?.fire_rate ?? 0} |
+                {tWeaponsAndArmorScreen('modals.weaponDamage')}: {weapon?.damage ?? 0} | {tWeaponsAndArmorScreen('modals.weaponFireRate')}: {weapon?.fireRate ?? 0} |
                 {tWeaponsAndArmorScreen('modals.weaponRange')}: {weapon?.range_name ?? tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {weapon?.weight ?? 0} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {weapon?.cost ?? 0}
               </Text>
             </View>
@@ -490,7 +489,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                     {modifiedWeapon?.name || tWeaponsAndArmorScreen('common.empty')}
                   </Text>
                   <Text style={styles.previewStats}>
-                    {tWeaponsAndArmorScreen('modals.weaponDamage')}: {modifiedWeapon.damage} | {tWeaponsAndArmorScreen('modals.weaponFireRate')}: {modifiedWeapon.fire_rate} |
+                    {tWeaponsAndArmorScreen('modals.weaponDamage')}: {modifiedWeapon.damage} | {tWeaponsAndArmorScreen('modals.weaponFireRate')}: {modifiedWeapon.fireRate} |
                     {tWeaponsAndArmorScreen('modals.weaponRange')}: {modifiedWeapon.range_name || tWeaponsAndArmorScreen('weapon.rangeDefault')} | {tWeaponsAndArmorScreen('modals.weaponWeight')}: {modifiedWeapon.weight} | {tWeaponsAndArmorScreen('modals.weaponCost')}: {modifiedWeapon.cost}
                   </Text>
                   <Text style={styles.previewEffects}>

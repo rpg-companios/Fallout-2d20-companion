@@ -297,7 +297,7 @@ describe('Ориджин Секьюритрон: комплект и слоты 
     // +1 дистанция (C→M), снято качество Вплотную.
     expect(laser.damage).toBe(3);           // 4 − 1
     expect(laser.fireRate).toBe(3);         // 2 + 1
-    expect(laser.fire_rate).toBe(3);
+    expect(laser.fireRate).toBe(3);
     expect(laser.range).toBe('M');
     expect(laser.qualities.some((q) => q.qualityId === 'quality_close_quarters')).toBe(false);
     expect(laser.baseWeaponName).toBeTruthy();

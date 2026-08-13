@@ -67,7 +67,7 @@ describe('Новые предметы модуля', () => {
     expect(item.baseName).toBeUndefined();
     expect(item.name).toBe('10-мм пистолет-пулемёт');
     expect(item._weapon.damage).toBe(4);
-    expect(item._weapon.ammo_id).toBe('ammo_10mm');
+    expect(item.ammoId).toBe('ammo_10mm');
   });
 
   it('маска Общества «Белая перчатка» в каталоге одежды', () => {

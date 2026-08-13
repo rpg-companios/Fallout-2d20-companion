@@ -83,11 +83,11 @@ export const getEquippedArmor = (state) => {
  * Build store patch from weapon modification modal result
  */
 export const weaponModPatchToStore = (modifiedWeapon) => {
-  const rangeName = modifiedWeapon.range_name ?? modifiedWeapon.rangeName;
-  const damageEffects = modifiedWeapon.damage_effects ?? modifiedWeapon.damageEffects;
+  const rangeName = modifiedWeapon.rangeName;
+  const damageEffects = modifiedWeapon.damageEffects;
 
   // Нормализуем damageType в массив
-  let damageType = modifiedWeapon.damage_type ?? modifiedWeapon.damageType;
+  let damageType = modifiedWeapon.damageType;
   if (typeof damageType === 'string') {
     try {
       damageType = JSON.parse(damageType);
@@ -104,17 +104,14 @@ export const weaponModPatchToStore = (modifiedWeapon) => {
     name: modifiedWeapon.name,
     baseWeaponName: modifiedWeapon.baseWeaponName,
     damage: modifiedWeapon.damage,
-    fireRate: modifiedWeapon.fire_rate ?? modifiedWeapon.fireRate,
+    fireRate: modifiedWeapon.fireRate,
     rangeName,
-    range_name: rangeName,
     damageEffects,
-    damage_effects: damageEffects,
     damageType,
-    damage_type: JSON.stringify(damageType), // сохраняем как JSON-строку
     qualities: modifiedWeapon.qualities,
     weight: modifiedWeapon.weight,
     cost: modifiedWeapon.cost,
-    ammoId: modifiedWeapon.ammoId ?? modifiedWeapon.ammo_id,
+    ammoId: modifiedWeapon.ammoId,
     appliedMods: modifiedWeapon.appliedMods,
   };
 };
@@ -129,7 +126,7 @@ export const storeItemToWeaponDisplay = (item) => {
   const { range_index, range_name } = resolveWeaponRangeFields(flat);
 
   // Десериализуем damage_type если это JSON-строка
-  let damageType = flat.damageType ?? flat.damage_type;
+  let damageType = flat.damageType;
   if (typeof damageType === 'string') {
     try {
       damageType = JSON.parse(damageType);
@@ -145,15 +142,13 @@ export const storeItemToWeaponDisplay = (item) => {
     ...flat,
     instanceId: flat.instanceId || flat.id,
     id: flat.weaponId || flat.id,
-    fire_rate: flat.fireRate ?? flat.fire_rate,
-    damage_type: damageType,
+    fireRate: flat.fireRate,
     damageType,
-    damage_effects: flat.damageEffects ?? flat.damage_effects,
-    range_index,
-    range_name,
+    damageEffects: flat.damageEffects,
+    rangeIndex: range_index,
     rangeName: range_name,
-    weapon_type: flat.weaponType ?? flat.weapon_type,
-    ammoId: flat.ammoId ?? flat.ammo_id,
+    weaponType: flat.weaponType,
+    ammoId: flat.ammoId,
   };
 };
 

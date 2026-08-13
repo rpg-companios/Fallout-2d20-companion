@@ -45,33 +45,30 @@ const buildWeaponRow = (w) => {
   return {
     id: w.id,
     name: w.name || '',
-    weapon_type: w.weaponType || '',
+    weaponType: w.weaponType || '',
     // Вариант предмета: истинный id (механика наследуется от него).
     // Например, «Опасная бритва» — это weapon_switchblade с другим именем.
-    true_item_id: safeStr(w.trueItemId),
     trueItemId: safeStr(w.trueItemId),
     damage: safeNum(w.damage),
-    damage_effects: safeStr(w.damageEffects),
-    damage_type: damageType,
-    damageType: damageType, // camelCase для совместимости с UI
-    fire_rate: safeStr(w.fireRate),
+    damageEffects: safeStr(w.damageEffects),
+    damageType,
+    fireRate: safeStr(w.fireRate),
     qualities: Array.isArray(w.qualities) ? JSON.stringify(w.qualities) : safeStr(w.qualities),
     effects: Array.isArray(w.effects) ? JSON.stringify(w.effects) : safeStr(w.effects),
     weight: safeStr(w.weight),
     cost: safeStr(w.cost),
     rarity: safeStr(w.rarity),
-    ammo_id: safeStr(w.ammoId),
+    ammoId: safeStr(w.ammoId),
     range: safeStr(w.range),
-    range_name: safeStr(w.rangeName),
+    rangeName: safeStr(w.rangeName),
     // Имена оружия с ложей/без ложи (лазерный пистолет → лазерная винтовка).
     // Необходимо для правила «сток-мод меняет пистолет на винтовку».
-    stock_names: w.stockNames ? JSON.stringify(w.stockNames) : null,
     stockNames: w.stockNames != null ? w.stockNames : null,
-    main_attr: safeStr(w.mainAttr),
-    main_skill: safeStr(w.mainSkill),
+    mainAttr: safeStr(w.mainAttr),
+    mainSkill: safeStr(w.mainSkill),
     rules: safeStr(w.rules),
     flavour: safeStr(w.flavour),
-    mods_config: w.modsConfig != null ? safeStr(w.modsConfig) : null,
+    modsConfig: w.modsConfig != null ? safeStr(w.modsConfig) : null,
   };
 };
 
@@ -94,7 +91,6 @@ const buildWeaponModRow = (m) => {
     materials: safeStr(m.materials),
     cost: safeNum(m.cost),
     effects: safeStr(m.effects),
-    effect_description: safeStr(m.effectDescription),
     effectDescription: safeStr(m.effectDescription),
     weight: safeStr(m.weight),
     damageModifier: m.damageModifier || null,
@@ -106,7 +102,8 @@ const buildWeaponModRow = (m) => {
     damageType: safeStr(m.damageType),
     ammoOverride: safeStr(m.ammoOverride),
     ammoPerShotDelta: m.ammoPerShotDelta ?? null,
-    applies_to_ids: appliesToIds.length ? JSON.stringify(appliesToIds) : null,
+    // Список оружия, к которому подходит мод (JSON-строка для фильтра).
+    appliesToIds: appliesToIds.length ? JSON.stringify(appliesToIds) : null,
   };
 };
 
@@ -239,9 +236,9 @@ export const invalidateCatalogCache = () => { _cache = null; _cacheLocale = null
 
 export const catalogGetWeapons = (weaponType = null) => {
   const list = build().weapons;
-  const out = weaponType ? list.filter((w) => w.weapon_type === weaponType) : [...list];
+  const out = weaponType ? list.filter((w) => w.weaponType === weaponType) : [...list];
   return out.sort((a, b) =>
-    (a.weapon_type || '').localeCompare(b.weapon_type || '') || (a.name || '').localeCompare(b.name || ''));
+    (a.weaponType || '').localeCompare(b.weaponType || '') || (a.name || '').localeCompare(b.name || ''));
 };
 export const catalogGetWeaponById = (id) => build().weapons.find((w) => w.id === id) || null;
 export const catalogSearchWeapons = (q) =>
@@ -251,7 +248,7 @@ export const catalogGetWeaponByName = (name) => build().weapons.find((w) => w.na
 export const catalogGetWeaponMods = (weaponId = null) => {
   const list = build().weaponMods;
   if (weaponId) {
-    return list.filter((m) => typeof m.applies_to_ids === 'string' && m.applies_to_ids.includes(weaponId));
+    return list.filter((m) => typeof m.appliesToIds === 'string' && m.appliesToIds.includes(weaponId));
   }
   return [...list].sort((a, b) => (a.slot || '').localeCompare(b.slot || '') || (a.name || '').localeCompare(b.name || ''));
 };

@@ -194,7 +194,7 @@ export async function resolveWeaponItem(item) {
   // Уникальные качества — перед именем: «дерзкая» + «Опасная бритва».
   const uniqNames = (item.uniqQualities || []).map(getUniqQualityName).filter(Boolean);
   const displayName = [...prefixes, ...uniqNames, baseName].join(' ');
-  const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
+  const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammoId);
 
   // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
   // (finalItems модалки, robotInventory initRobotSlots) нёс моды в стор

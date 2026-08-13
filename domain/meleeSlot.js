@@ -7,7 +7,7 @@
 
 export function isUnarmedAttack(weapon) {
   if (!weapon) return false;
-  const weaponType = weapon.weaponType ?? weapon.weapon_type;
+  const weaponType = weapon.weaponType;
   return weaponType === 'Unarmed' && weapon.isBuiltin === true;
 }
 

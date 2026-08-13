@@ -64,10 +64,10 @@ export const applyModification = (weapon, modification) => {
     // --- fire rate ---
     const fr = modification.fireRateModifier;
     if (fr) {
-        const base = Number(result.fireRate ?? result.fire_rate ?? 0);
+        const base = Number(result.fireRate ?? 0);
         const next = fr.op === '-' ? base - fr.value : base + fr.value;
         result.fireRate = Math.max(0, next);
-        result.fire_rate = result.fireRate;
+        
     }
 
     // --- range ---
@@ -142,10 +142,10 @@ export const removeModificationEffects = (weapon, modification) => {
 
     const fr = modification.fireRateModifier;
     if (fr) {
-        const base = Number(result.fireRate ?? result.fire_rate ?? 0);
+        const base = Number(result.fireRate ?? 0);
         const next = fr.op === '-' ? base + fr.value : base - fr.value;
         result.fireRate = Math.max(0, next);
-        result.fire_rate = result.fireRate;
+        
     }
 
     const rm = modification.rangeModifier;
@@ -194,8 +194,8 @@ export const getOrCreateBaseStats = (weapon) => {
     return {
         name: weapon.name,
         damage: weapon.damage,
-        fireRate: weapon.fireRate ?? weapon.fire_rate,
-        fire_rate: weapon.fire_rate ?? weapon.fireRate,
+        fireRate: weapon.fireRate,
+        fireRate: weapon.fireRate,
         range_index: weapon.range_index ?? 0,
         range_name: weapon.range_name,
         weight: weapon.weight,

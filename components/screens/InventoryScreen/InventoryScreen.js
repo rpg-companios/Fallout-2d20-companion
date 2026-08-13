@@ -1413,7 +1413,7 @@ const InventoryScreen = () => {
     
     const price = getItemPrice(localizedDisplayItem);
     const weight = getItemWeight(localizedDisplayItem);
-    const weaponAmmoIds = String(localizedDisplayItem?.ammoId ?? localizedDisplayItem?.ammo_id ?? '')
+    const weaponAmmoIds = String(localizedDisplayItem?.ammoId ?? '')
       .split(',').map((id) => id.trim()).filter((id) => id && id !== 'ammo_anything');
     const weaponAmmoNames = weaponAmmoIds
       .map((ammoId) => (equipmentCatalog?.ammoTypes || []).find((ammo) => ammo.id === ammoId)?.name)

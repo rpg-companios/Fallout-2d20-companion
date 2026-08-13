@@ -1,7 +1,7 @@
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 export const isAmmoWeapon = (weapon) => {
-  const ammoId = weapon?.ammoId ?? weapon?.ammo_id;
+  const ammoId = weapon?.ammoId;
   return Boolean(ammoId && ammoId !== 'ammo_anything');
 };
 

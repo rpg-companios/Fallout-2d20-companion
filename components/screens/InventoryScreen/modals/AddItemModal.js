@@ -60,7 +60,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
             Object.entries(mapWeaponTypeToDbValue).map(([k, v]) => [v.toLowerCase(), k])
           );
           for (const weapon of catalog.weapons || []) {
-            const groupKey = typeMap[(weapon.weaponType || weapon.weapon_type || '').toLowerCase()];
+            const groupKey = typeMap[(weapon.weaponType || '').toLowerCase()];
             if (!groupKey) continue;
             const label = tInventory(`modals.addItemModal.weaponTypeLabels.${groupKey}`);
             if (!grouped[label]) grouped[label] = [];
@@ -84,7 +84,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                 return {
                   ...weapon,
                   ...(catalogEntry ? { qualities: catalogEntry.qualities, damageType: catalogEntry.damageType } : {}),
-                  weaponType: weapon.weapon_type || weapon.weaponType,
+                  weaponType: weapon.weaponType,
                   itemType: 'weapon',
                   name: weapon.name,
                 };

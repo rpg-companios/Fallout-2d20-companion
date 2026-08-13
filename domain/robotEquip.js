@@ -117,7 +117,7 @@ const RANGE_ORDER = ['C', 'M', 'L', 'E'];
 const applyWeaponMods = (weapon, mods = []) => {
   if (!weapon || !Array.isArray(mods) || mods.length === 0) return weapon;
   let damage = Number(weapon.damage) || 0;
-  let fireRate = Number(weapon.fireRate ?? weapon.fire_rate) || 0;
+  let fireRate = Number(weapon.fireRate) || 0;
   let rangeIndex = RANGE_ORDER.indexOf(weapon.range);
   let qualities = Array.isArray(weapon.qualities) ? weapon.qualities.map((q) => ({ ...q })) : [];
   let effects = Array.isArray(weapon.effects) ? weapon.effects.map((e) => ({ ...e })) : [];
@@ -143,7 +143,7 @@ const applyWeaponMods = (weapon, mods = []) => {
     }
   }
 
-  const result = { ...weapon, damage, fireRate, fire_rate: fireRate, qualities, effects };
+  const result = { ...weapon, damage, fireRate, qualities, effects };
   if (rangeIndex >= 0) result.range = RANGE_ORDER[rangeIndex];
   return result;
 };
@@ -286,11 +286,10 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         if (targetKey && slots[targetKey]?.limb) {
           const limb = slots[targetKey].limb;
           const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
-          const fireRate = Number(base.fireRate ?? base.fire_rate) || 0;
+          const fireRate = Number(base.fireRate) || 0;
           const builtin = {
             ...base,
             fireRate,
-            fire_rate: fireRate,
             id: weaponId,
             weaponId,
             name: item.displayName || weaponData.name || weaponId,

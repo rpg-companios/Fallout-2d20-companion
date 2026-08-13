@@ -306,15 +306,15 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
 
     // Канонический формат полей оружия
     const weaponName = displayWeapon.name ?? tWeaponsAndArmorScreen('common.empty');
-    const damageType = resolveWeaponDamageType(displayWeapon.damage_type ?? displayWeapon.damageType);
+    const damageType = resolveWeaponDamageType(displayWeapon.damageType);
     const effectsValue = resolveWeaponEffects(displayWeapon.effects) || tWeaponsAndArmorScreen('common.empty');
-    const fireRateBase = Number(displayWeapon.fire_rate ?? 0) || 0;
+    const fireRateBase = Number(displayWeapon.fireRate ?? 0) || 0;
     const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
     const range_name_key = displayWeapon.range_name ?? displayWeapon.rangeName ?? '';
     const rangeValue = rangeNames[range_name_key] || range_name_key || tWeaponsAndArmorScreen('common.empty');
     const qualitiesValue = resolveWeaponQualities(displayWeapon.qualities) || tWeaponsAndArmorScreen('common.empty');
-    const mainAttr = displayWeapon.mainAttr ?? displayWeapon.main_attr ?? 'AGI';
-    const mainSkill = displayWeapon.mainSkill ?? displayWeapon.main_skill ?? 'SMALL_GUNS';
+    const mainAttr = displayWeapon.mainAttr ?? displayWeapon.mainAttr ?? 'AGI';
+    const mainSkill = displayWeapon.mainSkill ?? displayWeapon.mainSkill ?? 'SMALL_GUNS';
 
     // Skill identity is canonical UPPER_SNAKE_CASE (SKILL_CATALOG_ORDER).
     // No localized aliases — skills[].name on main is already the canonical key.
@@ -349,24 +349,24 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
       ? getWeaponDamageBonusFromSources(weaponDamageSources, weaponMatch)
       : 0;
     const damageWithNcr = Number(displayWeapon.damage ?? 0) + weaponDamageBonusValue;
-    const weaponType = displayWeapon?.weaponType ?? displayWeapon?.weapon_type;
+    const weaponType = displayWeapon?.weaponType;
     const appliesMeleeBonus = displayWeapon?.meleeBonusApplies === true || ['Melee', 'Unarmed'].includes(weaponType);
     const visibleDamage = appliesMeleeBonus ? damageWithNcr + (Number(meleeBonus) || 0) : damageWithNcr;
 
     // Снижение базовой скорострельности на 1 при "Техника спуска" для стрелкового и энергооружия
     const equippedWeaponTypes = (equippedWeapons || [])
       .filter(Boolean)
-      .map((w) => w?.weapon_type);
+      .map((w) => w?.weaponType);
     const hasLightAndEnergyEquipped =
       equippedWeaponTypes.includes('Light') && equippedWeaponTypes.includes('Energy');
     const isLightOrEnergy = (weapon?.itemType === 'weapon') && (
-      weapon.weapon_type === 'Light' || weapon.weapon_type === 'Energy'
+      weapon.weaponType === 'Light' || weapon.weaponType === 'Energy'
     );
     const fireRateWithTrait = hasTrait('ncr-technique-of-descent') && hasLightAndEnergyEquipped && isLightOrEnergy
       ? Math.max(0, fireRateBase - 1)
       : fireRateBase;
 
-    const rawAmmoId = displayWeapon?.ammoId ?? displayWeapon?.ammo_id ?? '';
+    const rawAmmoId = displayWeapon?.ammoId ?? '';
     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
     const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
     const showDurability = (randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon);
@@ -469,9 +469,9 @@ const findLocalizedWeapon = (catalog, weapon) => {
       name: getLocalizedModifiedWeaponName(catalog, weapon, base),
       baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
       damage: weapon.damage,
-      fire_rate: weapon.fire_rate,
+      fireRate: weapon.fireRate,
       damageType: weapon.damageType,
-      damage_type: weapon.damage_type,
+      damageType: weapon.damageType,
       qualities: weapon.qualities,
       range_name: weapon.range_name,
       weight: weapon.weight,
@@ -621,8 +621,8 @@ const WeaponsAndArmorScreen = () => {
   useEffect(() => {
     debugLog('weapon.display.list', {
       locale,
-      equippedWeaponsForDisplay: equippedWeaponsForDisplay.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fire_rate: w.fire_rate, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
-      localizedEquippedWeapons: localizedEquippedWeapons.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fire_rate: w.fire_rate, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+      equippedWeaponsForDisplay: equippedWeaponsForDisplay.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+      localizedEquippedWeapons: localizedEquippedWeapons.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
     });
   }, [locale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
 

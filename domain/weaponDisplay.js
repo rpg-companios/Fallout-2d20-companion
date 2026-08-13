@@ -167,7 +167,7 @@ export function resolveWeaponDamageType(damageType) {
 
 export const getWeaponDisplayPriority = (weapon) => {
   if (!weapon) return 4;
-  const weaponType = weapon?.weaponType ?? weapon?.weapon_type;
+  const weaponType = weapon?.weaponType;
   if (weaponType === 'Unarmed') return 0;
   if (weaponType === 'Melee') return 1;
   if (weapon?.requiresMkII) return 3;
