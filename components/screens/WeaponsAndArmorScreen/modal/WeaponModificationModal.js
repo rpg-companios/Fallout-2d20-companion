@@ -141,6 +141,9 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   loadBase('qualities', qualities, 'qualityId');
   loadBase('effects', effects, 'effectId');
 
+  // Базовый тип патронов; мод может его переопределить через ammoOverride.
+  let ammoId = baseWeapon.ammoId;
+
   // Применяем структурированные модификаторы из JSON
   for (const mod of selectedMods) {
     if (mod.damageModifier) {
@@ -191,6 +194,11 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
       }
     }
 
+    // Тип патронов переопределяется модом (канонический ammoId из данных).
+    if (mod.ammoOverride) {
+      ammoId = mod.ammoOverride;
+    }
+
     // Вес/цена модов
     weight += toNumber(mod.weight);
     cost += toNumber(mod.cost);
@@ -237,6 +245,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     effects: effectsValue,
     weight: String(weight),
     cost,
+    ammoId,
     // сохраняем выбранные моды
     appliedMods: Object.fromEntries(
       Object.entries(selectedBySlot).map(([slot, mod]) => [slot, mod?.id]).filter(([, id]) => !!id)

@@ -223,6 +223,7 @@ export async function resolveWeaponItem(item) {
     displayName,
     name: displayName,
     itemType: 'weapon',
+    ammoId: weaponData.ammoId ?? item.ammoId ?? null,
     resolvedAmmunition,
     hasMods: weaponData.hasMods ?? false,
   };

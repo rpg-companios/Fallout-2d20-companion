@@ -1,0 +1,128 @@
+diff --git a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 244f222..c48820f 100644
+--- a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -141,6 +141,9 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+   loadBase('qualities', qualities, 'qualityId');
+   loadBase('effects', effects, 'effectId');
+ 
++  // Базовый тип патронов; мод может его переопределить через ammoOverride.
++  let ammoId = baseWeapon.ammoId;
++
+   // Применяем структурированные модификаторы из JSON
+   for (const mod of selectedMods) {
+     if (mod.damageModifier) {
+@@ -191,6 +194,11 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+       }
+     }
+ 
++    // Тип патронов переопределяется модом (канонический ammoId из данных).
++    if (mod.ammoOverride) {
++      ammoId = mod.ammoOverride;
++    }
++
+     // Вес/цена модов
+     weight += toNumber(mod.weight);
+     cost += toNumber(mod.cost);
+@@ -237,6 +245,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+     effects: effectsValue,
+     weight: String(weight),
+     cost,
++    ammoId,
+     // сохраняем выбранные моды
+     appliedMods: Object.fromEntries(
+       Object.entries(selectedBySlot).map(([slot, mod]) => [slot, mod?.id]).filter(([, id]) => !!id)
+diff --git a/modules/fallout/data/weapon_mods.json b/modules/fallout/data/weapon_mods.json
+index b5d6f4f..37b69e3 100644
+--- a/modules/fallout/data/weapon_mods.json
++++ b/modules/fallout/data/weapon_mods.json
+@@ -297,7 +297,7 @@
+       "op": "set",
+       "value": 4
+     },
+-    "ammoOverride": ".38",
++    "ammoOverride": "ammo_38",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -321,7 +321,7 @@
+       "op": "set",
+       "value": 7
+     },
+-    "ammoOverride": ".308",
++    "ammoOverride": "ammo_308",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -344,7 +344,7 @@
+       "op": "set",
+       "value": 4
+     },
+-    "ammoOverride": ".45",
++    "ammoOverride": "ammo_45",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -368,7 +368,7 @@
+       "op": "set",
+       "value": 8
+     },
+-    "ammoOverride": ".50",
++    "ammoOverride": "ammo_50_cal",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -4477,7 +4477,7 @@
+       "op": "-",
+       "value": 1
+     },
+-    "ammoOverride": "changes to Fusion Cell",
++    "ammoOverride": "ammo_fusion_cell",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -4688,7 +4688,7 @@
+       "op": "+",
+       "value": 1
+     },
+-    "ammoOverride": "40mm Grenades",
++    "ammoOverride": "ammo_40mm_grenade",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -4755,7 +4755,7 @@
+       "op": "-",
+       "value": 1
+     },
+-    "ammoOverride": "fusion cell",
++    "ammoOverride": "ammo_fusion_cell",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -5111,7 +5111,7 @@
+       "op": "+",
+       "value": 1
+     },
+-    "ammoOverride": "9mm",
++    "ammoOverride": "ammo_9mm",
+     "effectChanges": [],
+     "qualityChanges": []
+   },
+@@ -5129,7 +5129,7 @@
+       "value": 5
+     },
+     "qualityChanges": [],
+-    "ammoOverride": ".357",
++    "ammoOverride": "ammo_357_magnum",
+     "effectChanges": [
+       {
+         "op": "gain",
+@@ -5212,7 +5212,7 @@
+       "op": "+",
+       "value": 2
+     },
+-    "ammoOverride": "25mm Grenade",
++    "ammoOverride": "ammo_25mm_grenade",
+     "effectChanges": [],
+     "qualityChanges": []
+   },

@@ -162,6 +162,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
         [tInventory('modals.addItemModal.categories.robotFrame')]: equipmentCatalog.robotFrames || [],
         [tInventory('modals.addItemModal.categories.robotBodyParts')]: equipmentCatalog.robotBody || [],
         [tInventory('modals.addItemModal.categories.robotModules')]: equipmentCatalog.robotModules || [],
+        [tInventory('modals.addItemModal.categories.robotMisc')]: equipmentCatalog.robotItems || [],
       },
     };
   }, [locale]);
