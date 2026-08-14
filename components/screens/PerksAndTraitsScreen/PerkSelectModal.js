@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import styles from '../../../styles/PerkSelectModal.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
 import { getPerkDisplay } from './perksDisplay';
 
+const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
+
 const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
-  const [selectedPerks, setSelectedPerks] = useState([]);
+  const [selectedPerk, setSelectedPerk] = useState(null);
+
+  useEffect(() => {
+    if (visible) {
+      setExpandedIndex(null);
+      setSelectedPerk(null);
+    }
+  }, [visible]);
 
   return (
     <Modal
@@ -24,10 +33,9 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
               const { perk, available, unmet } = entry;
               const isExpanded = expandedIndex === index;
               const display = getPerkDisplay(perk);
-              const isSelected = selectedPerks.some((selected) => selected.id === perk.id);
+              const isSelected = isSamePerkRank(selectedPerk, perk);
               
-              // Для выбранных перков - если они не развернуты вручную, показываем их свернутыми
-              // Для непр-selected перков - обычное поведение
+              // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
               const shouldShowExpanded = isExpanded && !isSelected;
               
               return (
@@ -37,8 +45,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
                 >
                   <TouchableOpacity
                     onPress={() => {
-                      // При клике на заголовок перка - переключаем его состояние развертывания
-                      // Для выбранных перков - разворачиваем/сворачиваем по желанию пользователя
+                      // При клике на заголовок перка переключаем показ описания.
                       setExpandedIndex(isExpanded ? null : index);
                     }}
                     style={[styles.perkHeader, isSelected && styles.selectedPerk]}
@@ -71,12 +78,12 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
                       )}
                       <TouchableOpacity
                         onPress={() => {
-                          if (selectedPerks.some((selected) => selected.id === perk.id)) {
+                          if (isSelected) {
                             // Отменить выбор
-                            setSelectedPerks(selectedPerks.filter((selected) => selected.id !== perk.id));
+                            setSelectedPerk(null);
                           } else {
-                            // Выбрать перк
-                            setSelectedPerks([...selectedPerks, perk]);
+                            // Выбрать один перк для текущего открытия модального окна
+                            setSelectedPerk(perk);
                           }
                         }}
                         style={[
@@ -101,14 +108,12 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
             <TouchableOpacity 
               style={[styles.modalButton, styles.confirmButton]} 
               onPress={() => {
-                if (selectedPerks.length > 0) {
-                  // Выбираем только первый перк, так как в нашем случае выбирается один перк за раз
-                  const chosenPerk = selectedPerks[0];
-                  onChoosePerk && onChoosePerk(chosenPerk);
+                if (selectedPerk) {
+                  onChoosePerk && onChoosePerk(selectedPerk);
                 }
                 onClose();
               }}
-              disabled={selectedPerks.length === 0}
+              disabled={!selectedPerk}
             >
               <Text style={styles.modalButtonText}>{tPerksAndTraits('modal.buttons.confirm')}</Text>
             </TouchableOpacity>

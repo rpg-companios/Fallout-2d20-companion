@@ -440,8 +440,9 @@ const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
 };
 
 const findLocalizedWeapon = (catalog, weapon) => {
-  if (!weapon?.id) return weapon;
-  const base = findCatalogEntry(catalog, weapon.id, 'weapon');
+  const catalogId = weapon?.weaponId || weapon?.id;
+  if (!catalogId) return weapon;
+  const base = findCatalogEntry(catalog, catalogId, 'weapon');
   if (!base) return weapon;
 
   // Если на оружии применены моды, эффективные поля считаются из каталога + appliedMods.
@@ -462,6 +463,8 @@ const findLocalizedWeapon = (catalog, weapon) => {
   return {
     ...weapon,
     ...base,
+    id: catalogId,
+    weaponId: catalogId,
     // мета-поля из weapon сохраняем всегда
     sourceSlot: weapon.sourceSlot,
     isBuiltin: weapon.isBuiltin,
@@ -540,6 +543,7 @@ const WeaponsAndArmorScreen = () => {
     equippedArmor: contextEquippedArmor,
     setEquippedArmor,
     equippedRobotSlots,
+    setEquippedRobotSlots,
     saveModifiedItem,
     attributesSaved,
     trait,
@@ -729,6 +733,35 @@ const WeaponsAndArmorScreen = () => {
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
+    if (selectedWeaponForModification?.sourceSlot && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon) {
+      const sourceSlot = selectedWeaponForModification.sourceSlot;
+      setEquippedRobotSlots((prev) => {
+        const currentSlot = prev?.[sourceSlot];
+        const currentWeapon = currentSlot?.heldWeapon;
+        if (!currentWeapon) return prev;
+        const sameWeapon = currentWeapon.uniqueId === selectedWeaponForModification.uniqueId
+          || currentWeapon.stackKey === selectedWeaponForModification.stackKey
+          || currentWeapon.weaponId === selectedWeaponForModification.weaponId
+          || currentWeapon.id === selectedWeaponForModification.id;
+        if (!sameWeapon) return prev;
+        return {
+          ...prev,
+          [sourceSlot]: {
+            ...currentSlot,
+            heldWeapon: {
+              ...currentWeapon,
+              ...modifiedWeapon,
+              sourceSlot,
+              uniqueId: currentWeapon.uniqueId,
+              stackKey: currentWeapon.stackKey,
+              itemType: 'weapon',
+            },
+          },
+        };
+      });
+      return;
+    }
+
     if (itemId) {
       const patch = weaponModPatchToStore(modifiedWeapon);
       debugLog('weapon.mod.apply.screen.patch', { itemId, patch });
@@ -742,7 +775,7 @@ const WeaponsAndArmorScreen = () => {
         ? modifiedWeapon
         : w
     )));
-  }, [selectedWeaponForModification, updateItem, saveModifiedItem, setEquippedWeapons]);
+  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, saveModifiedItem, setEquippedWeapons]);
 
   const handleUnequipWeapon = useCallback((weapon) => {
     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;

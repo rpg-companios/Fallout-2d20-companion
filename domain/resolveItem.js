@@ -123,6 +123,15 @@ const getAppliedWeaponMods = (catalog, appliedMods = {}) => {
   return modIds.map((modId) => mods.find((mod) => mod?.id === modId)).filter(Boolean);
 };
 
+const getWeaponNameWithAppliedMods = (weapon, selectedMods) => {
+  const baseName = weapon?.baseName || weapon?.name || weapon?.baseWeaponName || '';
+  const prefixes = selectedMods
+    .map((mod) => (mod?.prefix || mod?.name || '').trim())
+    .filter(Boolean);
+  const uniquePrefixes = [...new Set(prefixes)];
+  return uniquePrefixes.length ? `${uniquePrefixes.join(' ')} ${baseName}` : baseName;
+};
+
 const applyNumberModifier = (baseValue, modifier) => {
   if (!modifier) return baseValue;
   const baseNumber = Number(baseValue) || 0;
@@ -137,7 +146,7 @@ export const resolveWeaponWithAppliedMods = (weapon, catalog) => {
   const selectedMods = getAppliedWeaponMods(catalog, weapon.appliedMods);
   if (selectedMods.length === 0) return weapon;
 
-  return selectedMods.reduce((resolved, mod) => {
+  const resolvedWeapon = selectedMods.reduce((resolved, mod) => {
     const next = { ...resolved };
     if (mod.damageModifier) next.damage = applyNumberModifier(next.damage, mod.damageModifier);
     if (mod.fireRateModifier) next.fireRate = applyNumberModifier(next.fireRate, mod.fireRateModifier);
@@ -151,6 +160,12 @@ export const resolveWeaponWithAppliedMods = (weapon, catalog) => {
     }
     return next;
   }, weapon);
+
+  return {
+    ...resolvedWeapon,
+    name: getWeaponNameWithAppliedMods(weapon, selectedMods),
+    baseWeaponName: weapon.baseName || weapon.baseWeaponName || weapon.name,
+  };
 };
 
 const EFFECTIVE_ITEM_RESOLVERS = {
