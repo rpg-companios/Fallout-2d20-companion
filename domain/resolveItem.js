@@ -13,6 +13,8 @@
 // Модуль чистый: каталог передаётся аргументом (getEquipmentCatalog(locale)),
 // никаких RN-зависимостей.
 
+import { applyArmorMods } from './modsEquip.js';
+
 // itemType, когда у предмета нет явного itemType (для запасных/старых записей).
 export const inferItemType = (item) => {
   if (!item) return 'misc';
@@ -100,17 +102,75 @@ export const findCatalogEntry = (catalog, id, itemType) => {
 // Поля СОСТОЯНИЯ экземпляра — берутся из инстанса (стора/сейва), НЕ из каталога.
 // Всё остальное (вес, цена, эффект, статы, имя, зоны защиты, rarity…) — из каталога,
 // чтобы правки данных JSON применялись сразу и не перекрывались устаревшим инстансом.
-// Модифицированное оружие детализирует findLocalizedWeapon (свои пересчёты статов),
-// а моды брони — applyArmorMods; resolveItem их не касается.
+// Производные поля (моды оружия/брони) считаются после обогащения из каталога:
+// в состоянии хранится только выбор модов, а не скопированные характеристики.
 const INSTANCE_FIELDS = [
   'id', 'weaponId', 'code', 'Name',          // идентификаторы / ключ экземпляра
   'itemType',                                 // тип хранится на инстансе
   'quantity', 'equipped', 'locked',           // состояние инвентаря
   'appliedMods', 'stackKey',                  // моды и подпись стопки
+  'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
+  'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
   'equipInstanceId', 'uniqueId',              // идентификаторы экипировки
   'charges', 'hpCurrent',                     // заряд Ядерного Блока / прочность части СБ
   'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', // мета отображения / роботов
 ];
+
+const getAppliedWeaponMods = (catalog, appliedMods = {}) => {
+  const modIds = Object.values(appliedMods).filter(Boolean);
+  if (modIds.length === 0) return [];
+  const mods = catalog?.weaponMods || [];
+  return modIds.map((modId) => mods.find((mod) => mod?.id === modId)).filter(Boolean);
+};
+
+const applyNumberModifier = (baseValue, modifier) => {
+  if (!modifier) return baseValue;
+  const baseNumber = Number(baseValue) || 0;
+  const modValue = Number(modifier.value) || 0;
+  if (modifier.op === 'set') return modValue;
+  if (modifier.op === '-') return Math.max(0, baseNumber - modValue);
+  return baseNumber + modValue;
+};
+
+export const resolveWeaponWithAppliedMods = (weapon, catalog) => {
+  if (!weapon || !catalog) return weapon;
+  const selectedMods = getAppliedWeaponMods(catalog, weapon.appliedMods);
+  if (selectedMods.length === 0) return weapon;
+
+  return selectedMods.reduce((resolved, mod) => {
+    const next = { ...resolved };
+    if (mod.damageModifier) next.damage = applyNumberModifier(next.damage, mod.damageModifier);
+    if (mod.fireRateModifier) next.fireRate = applyNumberModifier(next.fireRate, mod.fireRateModifier);
+    if (mod.ammoOverride) next.ammoId = mod.ammoOverride;
+    if (mod.weight != null) next.weight = Number(next.weight ?? 0) + Number(mod.weight);
+    if (mod.cost != null) next.cost = Number(next.cost ?? 0) + Number(mod.cost);
+    if (mod.damageTypeOverride?.op === 'set') {
+      next.damageType = Array.isArray(mod.damageTypeOverride.value)
+        ? [...mod.damageTypeOverride.value]
+        : [mod.damageTypeOverride.value];
+    }
+    return next;
+  }, weapon);
+};
+
+const EFFECTIVE_ITEM_RESOLVERS = {
+  weapon: (item, catalog) => resolveWeaponWithAppliedMods(item, catalog),
+  armor: (item, catalog) => applyArmorMods(item, catalog).item,
+  clothing: (item, catalog) => applyArmorMods(item, catalog, {
+    standardKey: 'appliedClothingModId',
+    uniqueKey: 'unusedUniqueArmorModId',
+  }).item,
+  outfit: (item, catalog) => applyArmorMods(item, catalog, {
+    standardKey: 'appliedClothingModId',
+    uniqueKey: 'unusedUniqueArmorModId',
+  }).item,
+};
+
+export const resolveEffectiveItem = (item, catalog) => {
+  const itemType = item?.itemType || inferItemType(item);
+  const resolver = EFFECTIVE_ITEM_RESOLVERS[itemType];
+  return resolver ? resolver(item, catalog) : item;
+};
 
 /**
  * Обогатить инстанс предмета каталожными данными по id.
@@ -136,7 +196,7 @@ export const resolveItem = (instance, catalog) => {
   if (!base) return instance;
   const instanceState = {};
   INSTANCE_FIELDS.forEach((f) => { if (instance[f] !== undefined) instanceState[f] = instance[f]; });
-  return { ...base, ...instanceState, name: base.name };
+  return resolveEffectiveItem({ ...base, ...instanceState, name: base.name }, catalog);
 };
 
 /**

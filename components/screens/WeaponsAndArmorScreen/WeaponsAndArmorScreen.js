@@ -20,8 +20,7 @@ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { resolveItem, findCatalogEntry } from '../../../domain/resolveItem';
-import { applyArmorMods } from '../../../domain/modsEquip';
+import { resolveItem, findCatalogEntry, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
@@ -445,9 +444,16 @@ const findLocalizedWeapon = (catalog, weapon) => {
   const base = findCatalogEntry(catalog, weapon.id, 'weapon');
   if (!base) return weapon;
 
-  // Если на оружии применены моды (есть baseWeaponName), сохраняем все модифицированные поля.
+  // Если на оружии применены моды, эффективные поля считаются из каталога + appliedMods.
   // Иначе — catalog-данные имеют приоритет (для i18n).
-  const hasAppliedMods = weapon.baseWeaponName != null;
+  const hasAppliedMods = Object.values(weapon.appliedMods || {}).some(Boolean);
+  const effectiveWeapon = resolveWeaponWithAppliedMods({
+    ...base,
+    id: weapon.id,
+    weaponId: weapon.weaponId,
+    instanceId: weapon.instanceId,
+    appliedMods: weapon.appliedMods,
+  }, catalog);
   // Вариант (baseName) или уникальные качества — предмет имеет собственное имя
   // («Опасная бритва», «Дерзкая …»), каталог по истинному id его не знает:
   // имя берём из стора, не затираем каталожным.
@@ -468,15 +474,15 @@ const findLocalizedWeapon = (catalog, weapon) => {
     ...(hasAppliedMods ? {
       name: getLocalizedModifiedWeaponName(catalog, weapon, base),
       baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
-      damage: weapon.damage,
-      fireRate: weapon.fireRate,
-      damageType: weapon.damageType,
-      damageType: weapon.damageType,
-      qualities: weapon.qualities,
-      range_name: weapon.range_name,
-      weight: weapon.weight,
-      cost: weapon.cost,
-      effects: weapon.effects,
+      damage: effectiveWeapon.damage,
+      fireRate: effectiveWeapon.fireRate,
+      damageType: effectiveWeapon.damageType,
+      qualities: effectiveWeapon.qualities,
+      range_name: effectiveWeapon.range_name,
+      weight: effectiveWeapon.weight,
+      cost: effectiveWeapon.cost,
+      effects: effectiveWeapon.effects,
+      ammoId: effectiveWeapon.ammoId,
     } : {
       name: hasOwnIdentity ? (weapon.baseName || weapon.name || base.name) : (base.name || weapon.name),
     }),
@@ -890,8 +896,8 @@ const WeaponsAndArmorScreen = () => {
       );
     }
 
-    const { item: modifiedArmor } = applyArmorMods(armorItem, equipmentCatalog);
-    const { item: modifiedClothing } = applyArmorMods(clothingItem, equipmentCatalog, { standardKey: 'appliedClothingModId', uniqueKey: 'unused' });
+    const modifiedArmor = resolveItem(armorItem, equipmentCatalog);
+    const modifiedClothing = resolveItem(clothingItem, equipmentCatalog);
 
     const physDef = Math.max(Number(modifiedArmor?.physicalDamageRating || 0), Number(modifiedClothing?.physicalDamageRating || 0)) + (timedDR.physical || 0);
     const energyDef = Math.max(Number(modifiedArmor?.energyDamageRating || 0), Number(modifiedClothing?.energyDamageRating || 0)) + (timedDR.energy || 0);
