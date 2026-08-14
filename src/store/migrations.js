@@ -725,6 +725,68 @@ const MIGRATIONS = [
     return changed ? next : state;
   },
 
+  // v8 -> v9: старые сейвы хранят числовые статы предметов (damage,
+  // fireRate, защиты брони) строками/числами ("2", 5). Текущий формат —
+  // объект { base, modifiers, total }. Приводим все предметы к объекту,
+  // чтобы нормализаторы не пытались писать .total в примитив.
+  (state) => {
+    const toParam = (value) => {
+      if (value === undefined || value === null || value === '') return undefined;
+      if (typeof value === 'number') return { base: value, modifiers: [], total: value };
+      if (typeof value === 'object') return value;
+      const n = Number(value);
+      return Number.isNaN(n) ? value : { base: n, modifiers: [], total: n };
+    };
+    const migrateItem = (item) => {
+      if (!item || typeof item !== 'object') return item;
+      const out = { ...item };
+      if ('damage' in out) out.damage = toParam(out.damage);
+      if ('fireRate' in out) out.fireRate = toParam(out.fireRate);
+      if ('physicalDamageRating' in out) out.physicalDamageRating = toParam(out.physicalDamageRating);
+      if ('energyDamageRating' in out) out.energyDamageRating = toParam(out.energyDamageRating);
+      if ('radiationDamageRating' in out) out.radiationDamageRating = toParam(out.radiationDamageRating);
+      return out;
+    };
+    const migrateWeapon = (w) => {
+      if (!w) return w;
+      const out = migrateItem(w);
+      // встроенное оружие конечностей робота лежит в limb.builtinWeapons
+      if (Array.isArray(out.builtinWeapons)) {
+        out.builtinWeapons = out.builtinWeapons.map(migrateWeapon);
+      }
+      return out;
+    };
+    const migrateSlot = (slot) => {
+      if (!slot || typeof slot !== 'object') return slot;
+      return {
+        ...slot,
+        // limb может содержать встроенное оружие (builtinWeapons) — мигрируем его целиком.
+        limb: migrateWeapon(slot.limb),
+        heldWeapon: migrateWeapon(slot.heldWeapon),
+      };
+    };
+
+    let changed = false;
+    const next = { ...state };
+
+    if (Array.isArray(next.equipment?.items)) {
+      next.equipment = { ...next.equipment, items: next.equipment.items.map(migrateItem) };
+      changed = true;
+    }
+    if (Array.isArray(next.equippedWeapons)) {
+      next.equippedWeapons = next.equippedWeapons.map(migrateWeapon);
+      changed = true;
+    }
+    if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
+      const slots = {};
+      for (const [k, v] of Object.entries(next.equippedRobotSlots)) slots[k] = migrateSlot(v);
+      next.equippedRobotSlots = slots;
+      changed = true;
+    }
+
+    return changed ? next : state;
+  },
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.

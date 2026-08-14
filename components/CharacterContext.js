@@ -812,6 +812,7 @@ export const CharacterProvider = ({ children }) => {
       characterIdRef.current = id;
       return true;
     } catch (e) {
+      console.error('[loadCharacter] failed:', e);
       return false;
     }
   }, []);
