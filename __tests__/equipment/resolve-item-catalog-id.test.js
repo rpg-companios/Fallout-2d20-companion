@@ -23,6 +23,39 @@ describe('resolveItem catalog enrichment', () => {
     expect(resolved.weight).toBeTruthy();
   });
 
+  it('preserves mod-overridden weapon ammo when enriching an inventory instance', () => {
+    const catalog = getEquipmentCatalog('ru-RU');
+    const resolved = resolveItem({
+      id: 'weapon_pipe_bolt_action:Receivers=mod_013',
+      weaponId: 'weapon_pipe_bolt_action',
+      itemType: 'weapon',
+      quantity: 1,
+      equipped: true,
+      appliedMods: { Receivers: 'mod_013' },
+    }, catalog);
+
+    expect(resolved.weaponId).toBe('weapon_pipe_bolt_action');
+    expect(resolved.appliedMods).toEqual({ Receivers: 'mod_013' });
+    expect(resolved.ammoId).toBe('ammo_50_cal');
+  });
+
+  it('computes armor mods from catalog data and stored mod state', () => {
+    const catalog = getEquipmentCatalog('ru-RU');
+    const base = resolveItem({
+      id: 'armor_raider_chest_001',
+      itemType: 'armor',
+    }, catalog);
+    const resolved = resolveItem({
+      id: 'armor_raider_chest_001',
+      itemType: 'armor',
+      appliedArmorModId: 'mod_std_laminate',
+    }, catalog);
+
+    expect(resolved.appliedArmorModId).toBe('mod_std_laminate');
+    expect(resolved.physicalDamageRating).toBe(Number(base.physicalDamageRating || 0) + 1);
+    expect(resolved.energyDamageRating).toBe(Number(base.energyDamageRating || 0) + 1);
+  });
+
   it('resolves power armor pieces by id (powerArmor catalog list)', () => {
     const catalog = getEquipmentCatalog('ru-RU');
     const resolved = resolveItem({

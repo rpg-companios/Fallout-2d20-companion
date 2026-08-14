@@ -106,7 +106,7 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
 
   const apply = () => {
     if (!localizedTargetItem) return;
-    const payload = { ...localizedTargetItem, [stdKey]: selectedStd || null };
+    const payload = { ...targetItem, [stdKey]: selectedStd || null };
     if (uniqKey) payload[uniqKey] = selectedUniq || null;
     onApply(payload);
     onClose();

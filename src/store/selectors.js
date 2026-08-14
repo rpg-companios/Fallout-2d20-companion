@@ -83,36 +83,8 @@ export const getEquippedArmor = (state) => {
  * Build store patch from weapon modification modal result
  */
 export const weaponModPatchToStore = (modifiedWeapon) => {
-  const rangeName = modifiedWeapon.rangeName;
-  const damageEffects = modifiedWeapon.damageEffects;
-
-  // Нормализуем damageType в массив
-  let damageType = modifiedWeapon.damageType;
-  if (typeof damageType === 'string') {
-    try {
-      damageType = JSON.parse(damageType);
-    } catch {
-      damageType = [damageType];
-    }
-  }
-  if (!Array.isArray(damageType)) {
-    damageType = damageType ? [damageType] : ['physical'];
-  }
-
   return {
-    ...modifiedWeapon,
-    name: modifiedWeapon.name,
-    baseWeaponName: modifiedWeapon.baseWeaponName,
-    damage: modifiedWeapon.damage,
-    fireRate: modifiedWeapon.fireRate,
-    rangeName,
-    damageEffects,
-    damageType,
-    qualities: modifiedWeapon.qualities,
-    weight: modifiedWeapon.weight,
-    cost: modifiedWeapon.cost,
-    ammoId: modifiedWeapon.ammoId,
-    appliedMods: modifiedWeapon.appliedMods,
+    appliedMods: modifiedWeapon?.appliedMods || {},
   };
 };
 
