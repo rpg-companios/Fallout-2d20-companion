@@ -865,43 +865,6 @@ const MIGRATIONS = [
     return next;
   },
 
-  // v11 -> v12: «Тень» — полный сброс состояния распределения очков.
-  // Решение владельца (уточнено): персонаж должен выглядеть как после
-  // создания — можно заново распределить и АТРИБУТЫ, и НАВЫКИ.
-  // Сбрасываем флаги attributesSaved/skillsSaved (иначе UI считает очки
-  // распределёнными и не показывает их) и значения навыков к стартовым
-  // (отмеченные (tagged) = 2, остальные = 0). Оружие/предметы/уровень/
-  // ориджин/трейт/выбор отмеченных навыков — НЕ трогаем (награды за
-  // отмеченные навыки не задвоятся: журнал rewardedSkills сохраняется).
-  (state) => {
-    const next = { ...state };
-    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
-    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
-    if (traitId !== 'shadow' && originId !== 'shadow') return state;
-
-    const tagged = new Set([
-      ...(Array.isArray(next.selectedSkills) ? next.selectedSkills : []),
-      ...(Array.isArray(next.extraTaggedSkills) ? next.extraTaggedSkills : []),
-    ]);
-
-    let changed = false;
-    if (next.attributesSaved !== false) { next.attributesSaved = false; changed = true; }
-    if (next.skillsSaved !== false) { next.skillsSaved = false; changed = true; }
-
-    if (Array.isArray(next.skills)) {
-      next.skills = next.skills.map((skill) => {
-        if (!skill || typeof skill !== 'object') return skill;
-        const name = String(skill.name || '');
-        const start = tagged.has(name) ? 2 : 0;
-        if (Number(skill.value) === start) return skill;
-        changed = true;
-        return { ...skill, name, value: start };
-      });
-    }
-
-    return changed ? next : state;
-  },
-
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.
