@@ -787,6 +787,84 @@ const MIGRATIONS = [
     return changed ? next : state;
   },
 
+  // v9 -> v10: ориджин «Тень» (shadow) — лимиты SPECIAL не применялись
+  // (трейт объявлял их в формате attributeBonus/attributeLimits, который
+  // движок не читал; формат исправлен на канонический attributes).
+  // Уже созданные персонажи-Тени могли иметь атрибуты ВНЕ лимитов
+  // (STR/END <6 или >12, CHA/INT >8). Решение владельца: ПОЛНЫЙ сброс
+  // всех атрибутов Тени к стартовым значениям — STR/END = 6 (4 + бонус 2),
+  // остальные = 4; очки возвращаются в пул распределения. Навыки и
+  // остальные данные не трогаются.
+  //
+  // ВАЖНО: атрибуты в сейве — МАССИВ [{ name, value }] (формат БД/контекста).
+  // (Первая версия этой миграции обрабатывала их как словарь и ломала
+  // формат — исправлено в v9->v10, починка повреждённых сейвов — v10->v11.)
+  (state) => {
+    const next = { ...state };
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    const isShadow = traitId === 'shadow' || originId === 'shadow';
+    if (!isShadow) return state;
+
+    const attrs = next.attributes;
+    if (!Array.isArray(attrs)) return state;
+
+    const SHADOW_START = {
+      STR: 6, // 4 + бонус 2
+      END: 6,
+      PER: 4,
+      AGI: 4,
+      INT: 4,
+      CHA: 4,
+      LCK: 4,
+    };
+    next.attributes = attrs.map((attr) => {
+      if (!attr || typeof attr !== 'object') return attr;
+      const name = String(attr.name || '').toUpperCase();
+      const start = SHADOW_START[name];
+      if (start === undefined) return attr; // неизвестные атрибуты не трогаем
+      return { ...attr, name, value: start };
+    });
+    return next;
+  },
+
+  // v10 -> v11: починка сейвов, повреждённых багом первой версии миграции
+  // v9->v10 (атрибуты превращались из массива [{ name, value }] в объект
+  // { '0': {...}, '1': {...} } — приложение падало с
+  // «attributes.find is not a function»). Восстанавливаем массив и для
+  // Тени повторно применяем сброс к стартовым значениям.
+  (state) => {
+    const next = { ...state };
+    const attrs = next.attributes;
+    if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) return state;
+
+    const values = Object.values(attrs);
+    const looksLikeAttributes = values.length > 0
+      && values.every((v) => v && typeof v === 'object' && (v.name !== undefined || v.id !== undefined));
+    if (!looksLikeAttributes) return state;
+
+    // восстановление массива в формате БД [{ name, value }]
+    next.attributes = values.map((v) => ({
+      name: v.name || v.id || '',
+      value: v.value ?? v.base ?? v.total ?? 0,
+    }));
+
+    // если персонаж — Тень, повторно сбрасываем атрибуты к стартовым
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return next;
+
+    const SHADOW_START = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    next.attributes = next.attributes.map((attr) => {
+      if (!attr || typeof attr !== 'object') return attr;
+      const name = String(attr.name || '').toUpperCase();
+      const start = SHADOW_START[name];
+      if (start === undefined) return attr;
+      return { ...attr, name, value: start };
+    });
+    return next;
+  },
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.
