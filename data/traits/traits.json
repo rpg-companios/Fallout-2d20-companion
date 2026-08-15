@@ -9,7 +9,11 @@
       "forcedSkills": [],
       "skillPickChoice": {
         "count": 1,
-        "from": ["ENERGY_WEAPONS", "SCIENCE", "REPAIR"]
+        "from": [
+          "ENERGY_WEAPONS",
+          "SCIENCE",
+          "REPAIR"
+        ]
       }
     }
   },
@@ -23,7 +27,11 @@
       "forcedSkills": [],
       "skillPickChoice": {
         "count": 1,
-        "from": ["ENERGY_WEAPONS", "SCIENCE", "REPAIR"]
+        "from": [
+          "ENERGY_WEAPONS",
+          "SCIENCE",
+          "REPAIR"
+        ]
       }
     }
   },
@@ -34,13 +42,28 @@
     "descriptionKey": "traits.superMutant.forcedEvolution.description",
     "modifiers": {
       "attributes": {
-        "STR": { "baseBonus": 2, "min": 6, "max": 12 },
-        "END": { "baseBonus": 2, "min": 6, "max": 12 },
-        "CHA": { "max": 6 },
-        "INT": { "max": 6 }
+        "STR": {
+          "baseBonus": 2,
+          "min": 6,
+          "max": 12
+        },
+        "END": {
+          "baseBonus": 2,
+          "min": 6,
+          "max": 12
+        },
+        "CHA": {
+          "max": 6
+        },
+        "INT": {
+          "max": 6
+        }
       },
       "skillMaxValue": 4,
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "armorConstraint": "mutantOnly"
     }
   },
@@ -50,9 +73,18 @@
     "displayNameKey": "traits.ghoul.necroticPosthuman.name",
     "descriptionKey": "traits.ghoul.necroticPosthuman.description",
     "modifiers": {
-      "immunities": ["radiation"],
-      "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"],
-      "forcedSkills": ["SURVIVAL"],
+      "immunities": [
+        "radiation"
+      ],
+      "effects": [
+        "radiation_healing",
+        "slow_aging",
+        "infertility",
+        "discrimination"
+      ],
+      "forcedSkills": [
+        "SURVIVAL"
+      ],
       "extraSkills": 1
     }
   },
@@ -64,8 +96,20 @@
     "modifiers": {
       "extraSkills": 0,
       "forcedSkills": [],
-      "skillPickChoice": { "count": 1, "from": ["SMALL_GUNS", "SURVIVAL", "SPEECH"] },
-      "effects": ["improved_caravans", "base_defense_4", "cover_dr_bonus", "outnumbered_damage_bonus"]
+      "skillPickChoice": {
+        "count": 1,
+        "from": [
+          "SMALL_GUNS",
+          "SURVIVAL",
+          "SPEECH"
+        ]
+      },
+      "effects": [
+        "improved_caravans",
+        "base_defense_4",
+        "cover_dr_bonus",
+        "outnumbered_damage_bonus"
+      ]
     }
   },
   {
@@ -76,7 +120,11 @@
     "modifiers": {
       "extraPerks": 1,
       "radiationResistance": 1,
-      "effects": ["extra_perk_level_1", "radiation_absorption", "radiation_melee_charge"]
+      "effects": [
+        "extra_perk_level_1",
+        "radiation_absorption",
+        "radiation_melee_charge"
+      ]
     }
   },
   {
@@ -87,8 +135,15 @@
     "modifiers": {
       "extraSkills": 0,
       "forcedSkills": [],
-      "skillPickChoice": { "count": 1, "from": "any" },
-      "effects": ["reduced_end_check_difficulty", "disease_resistance", "luck_restore_on_complication"]
+      "skillPickChoice": {
+        "count": 1,
+        "from": "any"
+      },
+      "effects": [
+        "reduced_end_check_difficulty",
+        "disease_resistance",
+        "luck_restore_on_complication"
+      ]
     }
   },
   {
@@ -97,10 +152,19 @@
     "displayNameKey": "traits.protectron.protectOrDestroy.name",
     "descriptionKey": "traits.protectron.protectOrDestroy.description",
     "modifiers": {
-      "immunities": ["disease", "radiation", "poison"],
+      "immunities": [
+        "disease",
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 225,
       "carryWeightStrengthMultiplier": 0,
-      "effects": ["hazard_reroll", "no_consumables_food_rest", "repair_to_heal", "model_check_discount"]
+      "effects": [
+        "hazard_reroll",
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "model_check_discount"
+      ]
     }
   },
   {
@@ -109,11 +173,20 @@
     "displayNameKey": "traits.assaultron.designedForFrontline.name",
     "descriptionKey": "traits.assaultron.designedForFrontline.description",
     "modifiers": {
-      "immunities": ["disease", "radiation", "poison"],
+      "immunities": [
+        "disease",
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
       "meleeBonusDelta": 1,
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "built_in_laser",
+        "self_destruct"
+      ]
     }
   },
   {
@@ -123,7 +196,13 @@
     "descriptionKey": "traits.ncr.resident.description",
     "modifiers": {
       "isMultiTrait": true,
-      "subTraitIds": ["ncr-good-soul", "ncr-infantryman", "ncr-home-on-the-range", "ncr-technique-of-descent", "ncr-brahmin-baron"]
+      "subTraitIds": [
+        "ncr-good-soul",
+        "ncr-infantryman",
+        "ncr-home-on-the-range",
+        "ncr-technique-of-descent",
+        "ncr-brahmin-baron"
+      ]
     }
   },
   {
@@ -132,7 +211,16 @@
     "displayNameKey": "traits.ncr.goodSoul.name",
     "descriptionKey": "traits.ncr.goodSoul.description",
     "modifiers": {
-      "skillPickChoice": { "count": 2, "from": ["SPEECH", "MEDICINE", "REPAIR", "SCIENCE", "BARTER"] }
+      "skillPickChoice": {
+        "count": 2,
+        "from": [
+          "SPEECH",
+          "MEDICINE",
+          "REPAIR",
+          "SCIENCE",
+          "BARTER"
+        ]
+      }
     }
   },
   {
@@ -141,7 +229,18 @@
     "displayNameKey": "traits.ncr.infantryman.name",
     "descriptionKey": "traits.ncr.infantryman.description",
     "modifiers": {
-      "weaponDamageBonus": [{ "weaponIds": ["weapon_submachine_gun", "weapon_black_powder_rifle", "weapon_assault_rifle", "weapon_frag_grenade", "weapon_combat_knife"], "bonus": 1 }]
+      "weaponDamageBonus": [
+        {
+          "weaponIds": [
+            "weapon_submachine_gun",
+            "weapon_black_powder_rifle",
+            "weapon_assault_rifle",
+            "weapon_frag_grenade",
+            "weapon_combat_knife"
+          ],
+          "bonus": 1
+        }
+      ]
     }
   },
   {
@@ -149,21 +248,33 @@
     "originId": "ncr",
     "displayNameKey": "traits.ncr.homeOnTheRange.name",
     "descriptionKey": "traits.ncr.homeOnTheRange.description",
-    "modifiers": { "effects": ["home_on_the_range_label"] }
+    "modifiers": {
+      "effects": [
+        "home_on_the_range_label"
+      ]
+    }
   },
   {
     "id": "ncr-technique-of-descent",
     "originId": "ncr",
     "displayNameKey": "traits.ncr.techniqueOfDescent.name",
     "descriptionKey": "traits.ncr.techniqueOfDescent.description",
-    "modifiers": { "effects": ["technique_of_descent_label"] }
+    "modifiers": {
+      "effects": [
+        "technique_of_descent_label"
+      ]
+    }
   },
   {
     "id": "ncr-brahmin-baron",
     "originId": "ncr",
     "displayNameKey": "traits.ncr.brahminBaron.name",
     "descriptionKey": "traits.ncr.brahminBaron.description",
-    "modifiers": { "effects": ["brahmin_baron_label"] }
+    "modifiers": {
+      "effects": [
+        "brahmin_baron_label"
+      ]
+    }
   },
   {
     "id": "survivor-survivor",
@@ -172,7 +283,13 @@
     "descriptionKey": "traits.survivor.survivor.description",
     "modifiers": {
       "isMultiTrait": true,
-      "subTraitIds": ["survivor-educated", "survivor-quick-shot", "survivor-gifted", "survivor-heavy-handed", "survivor-small-frame"]
+      "subTraitIds": [
+        "survivor-educated",
+        "survivor-quick-shot",
+        "survivor-gifted",
+        "survivor-heavy-handed",
+        "survivor-small-frame"
+      ]
     }
   },
   {
@@ -182,23 +299,69 @@
     "descriptionKey": "traits.survivor.educated.description",
     "modifiers": {
       "extraSkills": 0,
-      "skillPickChoice": { "count": 1, "from": "any" }
+      "skillPickChoice": {
+        "count": 1,
+        "from": "any"
+      }
     }
   },
-  { "id": "survivor-quick-shot", "originId": "survivor", "displayNameKey": "traits.survivor.quickShot.name", "descriptionKey": "traits.survivor.quickShot.description", "modifiers": { "effects": ["quick_shot_label"] } },
-  { "id": "survivor-gifted", "originId": "survivor", "displayNameKey": "traits.survivor.gifted.name", "descriptionKey": "traits.survivor.gifted.description", "modifiers": { "attributePointsBonus": 2, "luckMaxDelta": -1 } },
-  { "id": "survivor-heavy-handed", "originId": "survivor", "displayNameKey": "traits.survivor.heavyHanded.name", "descriptionKey": "traits.survivor.heavyHanded.description", "modifiers": { "meleeBonusDelta": 1 } },
-  { "id": "survivor-small-frame", "originId": "survivor", "displayNameKey": "traits.survivor.smallFrame.name", "descriptionKey": "traits.survivor.smallFrame.description", "modifiers": { "carryWeightStrengthMultiplier": 5 } },
+  {
+    "id": "survivor-quick-shot",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.quickShot.name",
+    "descriptionKey": "traits.survivor.quickShot.description",
+    "modifiers": {
+      "effects": [
+        "quick_shot_label"
+      ]
+    }
+  },
+  {
+    "id": "survivor-gifted",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.gifted.name",
+    "descriptionKey": "traits.survivor.gifted.description",
+    "modifiers": {
+      "attributePointsBonus": 2,
+      "luckMaxDelta": -1
+    }
+  },
+  {
+    "id": "survivor-heavy-handed",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.heavyHanded.name",
+    "descriptionKey": "traits.survivor.heavyHanded.description",
+    "modifiers": {
+      "meleeBonusDelta": 1
+    }
+  },
+  {
+    "id": "survivor-small-frame",
+    "originId": "survivor",
+    "displayNameKey": "traits.survivor.smallFrame.name",
+    "descriptionKey": "traits.survivor.smallFrame.description",
+    "modifiers": {
+      "carryWeightStrengthMultiplier": 5
+    }
+  },
   {
     "id": "misterhandy-robot-mr-handy",
     "originId": "misterHandy",
     "displayNameKey": "traits.misterHandy.robotMrHandy.name",
     "descriptionKey": "traits.misterHandy.robotMrHandy.description",
     "modifiers": {
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "hover_movement", "360_vision"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "hover_movement",
+        "360_vision"
+      ]
     }
   },
   {
@@ -208,9 +371,22 @@
     "descriptionKey": "traits.synth.moreThanHuman.description",
     "modifiers": {
       "extraSkills": 0,
-      "skillPickChoice": { "count": 1, "from": "any" },
-      "immunities": ["radiation", "poison", "disease"],
-      "effects": ["no_sleep_needed", "no_eat_drink_needed", "no_aging", "synth_charisma_penalty_if_known", "institute_codeword_incapacitation"]
+      "skillPickChoice": {
+        "count": 1,
+        "from": "any"
+      },
+      "immunities": [
+        "radiation",
+        "poison",
+        "disease"
+      ],
+      "effects": [
+        "no_sleep_needed",
+        "no_eat_drink_needed",
+        "no_aging",
+        "synth_charisma_penalty_if_known",
+        "institute_codeword_incapacitation"
+      ]
     }
   },
   {
@@ -219,23 +395,52 @@
     "displayNameKey": "traits.robobrain.robotWithBrains.name",
     "descriptionKey": "traits.robobrain.robotWithBrains.description",
     "modifiers": {
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "ir_vision", "ignore_darkness_penalty"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "ir_vision",
+        "ignore_darkness_penalty"
+      ]
     }
   },
   {
-  "modifiers": {
-  "attributes": {
-    "STR": { "baseBonus": 2, "min": 6, "max": 12 },
-    "END": { "baseBonus": 2, "min": 6, "max": 12 },
-    "CHA": { "max": 8 },
-    "INT": { "max": 8 }
-  },
-  "skillMaxValue": 4,
-  "immunities": ["radiation", "poison"],
-  "effects": ["stealth_boy_addiction"]
-}
+    "modifiers": {
+      "attributes": {
+        "STR": {
+          "baseBonus": 2,
+          "min": 6,
+          "max": 12
+        },
+        "END": {
+          "baseBonus": 2,
+          "min": 6,
+          "max": 12
+        },
+        "CHA": {
+          "max": 8
+        },
+        "INT": {
+          "max": 8
+        }
+      },
+      "skillMaxValue": 4,
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
+      "effects": [
+        "stealth_boy_addiction"
+      ]
+    },
+    "id": "shadow",
+    "originId": "shadow",
+    "displayNameKey": "traits.shadow.shadow.name",
+    "descriptionKey": "traits.shadow.shadow.description"
   },
   {
     "id": "securitron-mark-i",
@@ -243,10 +448,17 @@
     "displayNameKey": "traits.securitron.markI.name",
     "descriptionKey": "traits.securitron.markI.description",
     "modifiers": {
-      "immunities": ["radiation", "poison"],
+      "immunities": [
+        "radiation",
+        "poison"
+      ],
       "carryWeightFixed": 150,
       "carryWeightStrengthMultiplier": 0,
-      "effects": ["no_consumables_food_rest", "repair_to_heal", "no_hunger_thirst_fatigue"]
+      "effects": [
+        "no_consumables_food_rest",
+        "repair_to_heal",
+        "no_hunger_thirst_fatigue"
+      ]
     }
   },
   {
@@ -278,7 +490,9 @@
     "displayNameKey": "traits.tribal.nomad.name",
     "descriptionKey": "traits.tribal.nomad.description",
     "modifiers": {
-      "bannedTagSkills": ["SCIENCE"]
+      "bannedTagSkills": [
+        "SCIENCE"
+      ]
     }
   },
   {
@@ -287,7 +501,9 @@
     "displayNameKey": "traits.tribal.riteOfPassage.name",
     "descriptionKey": "traits.tribal.riteOfPassage.description",
     "modifiers": {
-      "effects": ["rite_of_passage"]
+      "effects": [
+        "rite_of_passage"
+      ]
     }
   },
   {
