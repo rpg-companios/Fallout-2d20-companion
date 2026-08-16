@@ -32,5 +32,37 @@
         "effectId": "effect_burst"
       }
     ]
+  },
+  {
+    "id": "weapon_bumper_sword",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "12",
+    "cost": 125,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Bumper Sword",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_recoil_x",
+        "value": 7
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x",
+        "value": 1
+      }
+    ]
   }
 ]

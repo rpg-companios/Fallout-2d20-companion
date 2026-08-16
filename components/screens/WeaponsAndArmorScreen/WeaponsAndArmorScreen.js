@@ -22,7 +22,7 @@ import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { resolveItem, findCatalogEntry, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
-import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
+import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus, getTimedDefenseBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
 import { applyUnarmedVisibility } from '../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
@@ -598,7 +598,7 @@ const WeaponsAndArmorScreen = () => {
     [attributes, equippedPowerArmor],
   );
   const initiative = calculateInitiative(attributesEffective);
-  const defense = calculateDefense(attributesEffective);
+const defense = calculateDefense(attributesEffective) + getTimedDefenseBonus(activeTimedEffects);  
   const meleeBonus = calculateMeleeBonus(attributesEffective, trait);
   const meleeBonusValue = calculateMeleeBonusValue(attributesEffective, trait);
   const maxHealth = attributesSaved ? calculateMaxHealth(attributesEffective, level) : 0;

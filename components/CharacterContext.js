@@ -62,6 +62,7 @@ import {
   FUSION_CORE_ID,
 } from '../domain/powerArmor';
 import { canEquipArmor } from '../domain/equipEquip';
+import { resolveKitItems } from '../domain/kitResolver';
 import dataPowerArmor from '../data/equipment/powerArmor.json';
 import dataAmmo from '../data/equipment/ammo.json';
 import { getCurrentLocale } from '../i18n/locale';
@@ -807,6 +808,28 @@ export const CharacterProvider = ({ children }) => {
       // This normalizes attributes, skills, items, and effects into the store
       useCharacterStore.getState().loadFromLegacyData(data);
       
+      // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
+      // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
+      // выдаём здесь, после загрузки. Крышки: старый комплект (100) уже
+      // в data.caps — оставляем как есть (комплект NIGHTKIN крышек не даёт).
+      if (data.nightkinKitPending && data.equipment?.id === 'nightkin') {
+        try {
+          const catalog = getEquipmentCatalog();
+          const kit = catalog?.equipmentKits?.nightkin;
+          if (kit && Array.isArray(kit.items)) {
+            const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
+            (resolved.items || []).forEach((item) => {
+              useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+            });
+            setEquipment({ id: 'nightkin', name: 'Тень', items: resolved.items || [] });
+            // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
+            data.nightkinKitPending = false;
+          }
+        } catch (e) {
+          console.warn('[loadCharacter] nightkin kit grant failed:', e);
+        }
+      }
+      
       setIsSaved(true);
       isSavedRef.current = true;
       characterIdRef.current = id;
@@ -910,7 +933,20 @@ export const CharacterProvider = ({ children }) => {
 
     // 2. removeCondition (аддиктол, антибиотики)
     const { conditions: nextConditions, removed } = applyRemoveConditions(item, conditions);
-    if (removed.length > 0) setConditions(nextConditions);
+    if (removed.length > 0) {
+      setConditions(nextConditions);
+      // Снятие зависимости (аддиктол): удаляем перманентный эффект
+      // «Зависимость: Стелс-бой» из активных эффектов.
+      if (removed.includes('addicted')) {
+        const storeNow = useCharacterStore.getState();
+        const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+        const withoutAddiction = currentEffects.filter(
+          (effect) => !(effect.isPermanent && String(effect.effectName || '').includes('Зависимость')),
+        );
+        syncTimedEffectsToStore(withoutAddiction, storeNow);
+        setActiveTimedEffects(withoutAddiction);
+      }
+    }
 
     // 3. Зависимость
     // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
@@ -919,15 +955,41 @@ export const CharacterProvider = ({ children }) => {
       Boolean(useCharacterStore.getState().perkBonuses?.alcoholAddictionImmune);
 
     let addictionResult = null;
+    // Стелс-бой: зависимость возможна ТОЛЬКО у Тени (решение владельца).
+    // У остальных ориджинов применения Стелс-боя не дают зависимости
+    // (ни броска, ни негативного эффекта).
+    const isShadowCharacter = origin?.id === 'shadow' || trait?.id === 'shadow';
+    const isStealthBoy = item?.id === 'stealth_boy';
     if (
       item?.addictionLevel > 0 &&
       item?.negativeEffect === 'addiction' &&
-      !hasPartyBoyImmunity
+      !hasPartyBoyImmunity &&
+      (!isStealthBoy || isShadowCharacter)
     ) {
       const dosesToday = recordChemDose(item.id || item.name);
-      addictionResult = checkAddiction(item, dosesToday);
+      // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
+      // (бросок CD, грани 5/6 = эффект).
+      const anyEffect = isShadowCharacter && isStealthBoy;
+      addictionResult = checkAddiction(item, dosesToday, { anyEffect });
       if (addictionResult.addicted && !conditions.includes('addicted')) {
         setConditions((prev) => [...prev, 'addicted']);
+        // Перманентный эффект зависимости: отображается в карточке эффектов,
+        // не истекает по сценам; снимается аддиктолом (removeCondition).
+        if (isStealthBoy) {
+          const addictionEffect = {
+            id: `negative-addiction-stealth-boy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            effectName: 'Зависимость: Стелс-бой',
+            effectLabel: 'Сложность тестов на восприятие и интеллект повышается на +2, а тестов на харизму на +1, пока не вылечитесь.',
+            effectKind: 'negative',
+            sourceName: 'Стелс-бой',
+            createdAt: Date.now(),
+            isPermanent: true,
+            scenesLeft: 9999,
+          };
+          const store2 = useCharacterStore.getState();
+          syncTimedEffectsToStore([...normalizedResult.effects, addictionEffect], store2);
+          setActiveTimedEffects([...normalizedResult.effects, addictionEffect]);
+        }
       }
     }
 

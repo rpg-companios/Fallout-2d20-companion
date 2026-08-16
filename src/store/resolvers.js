@@ -104,6 +104,7 @@ import {
 import {
   getTimedMaxHpBonus,
   getTimedDamageResistanceBonus,
+  getTimedDefenseBonus,
 } from '../../domain/effects.js';
 
 import { effectsDictToLegacyArray } from './effectsSync.js';
@@ -185,8 +186,16 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   stats.initiative.base = calculateInitiative(attributesEffective);
   stats.initiative.total = calculateAttributeTotal(stats.initiative);
   
-  // Defense: AGI >= 9 ? 2 : 1
+  // Defense: AGI >= 9 ? 2 : 1 (+ бонусы timed-эффектов, напр. Стелс-бой +2)
   stats.defense.base = calculateDefense(attributesEffective);
+  const defenseBonus = getTimedDefenseBonus(effectsArray);
+  if (defenseBonus !== 0) {
+    stats.defense.modifiers.push({
+      source: 'timedEffects',
+      value: defenseBonus,
+      operation: '+',
+    });
+  }
   stats.defense.total = calculateAttributeTotal(stats.defense);
   
   // Melee Bonus: STR-based

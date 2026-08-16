@@ -1,0 +1,61 @@
+{
+  "nightkin": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "modIds": [
+          "mod_058"
+        ],
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 8,
+            "rollType": "rollCD",
+            "rollValue": 6,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_bumper_sword",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_hand_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_leg_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 2,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "brewery",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      }
+    ]
+  }
+}

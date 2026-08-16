@@ -37,6 +37,11 @@
     {
       "id": "weapon_10mm_smg",
       "name": "10-мм пистолет-пулемёт"
+    },
+    {
+      "id": "weapon_bumper_sword",
+      "name": "Меч из бампера",
+      "rangeName": "Близкая"
     }
   ],
   "generalGoods": [
@@ -180,6 +185,9 @@
     },
     "enclave_soldier": {
       "name": "Бывший солдат"
+    },
+    "nightkin": {
+      "name": "Тень"
     }
   },
   "uniqQualities": [

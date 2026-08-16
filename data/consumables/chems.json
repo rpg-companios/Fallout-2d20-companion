@@ -395,5 +395,17 @@
     "positiveEffectDuration": "lasting",
     "negativeEffectDuration": "",
     "addictionLevel": 1
+  },
+  {
+    "id": "chem_stealth_boy",
+    "itemType": "chems",
+    "weight": 1,
+    "cost": 100,
+    "rarity": 3,
+    "positiveEffect": { "defenseModifier": { "op": "+", "value": 2 } },
+    "negativeEffect": "addiction",
+    "positiveEffectDuration": "lasting",
+    "negativeEffectDuration": "",
+    "addictionLevel": 1
   }
 ]

@@ -69,7 +69,7 @@ const normalizeRemovalEffects = (list) => {
         .filter(Boolean);
 };
 
-const buildTimedEffect = ({ effectName, effectLabel, effectKind, scenes, sourceName, maxHpModifier, damageResistanceModifier, damageModifier, apModifier }) => ({
+const buildTimedEffect = ({ effectName, effectLabel, effectKind, scenes, sourceName, maxHpModifier, damageResistanceModifier, damageModifier, apModifier, defenseModifier }) => ({
     id: `${effectKind}-${effectName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     effectName,
     effectLabel,
@@ -83,6 +83,7 @@ const buildTimedEffect = ({ effectName, effectLabel, effectKind, scenes, sourceN
     ...(damageResistanceModifier ? { damageResistanceModifier } : {}),
     ...(damageModifier ? { damageModifier } : {}),
     ...(apModifier ? { apModifier } : {}),
+    ...(defenseModifier ? { defenseModifier } : {}),
 });
 
 const applyOrStackEffect = (activeEffects, newEffect) => {
@@ -111,6 +112,9 @@ const applyOrStackEffect = (activeEffects, newEffect) => {
 
 const normalizeTimedEffectWithClock = (effect, nowMs) => {
     if (!effect) return { normalized: effect, expired: false, changed: false };
+    if (effect.isPermanent) {
+        return { expired: false, changed: false, normalized: effect };
+    }
     const currentScenes = Math.max(0, Number(effect.scenesLeft) || 0);
     const hasExpiresAt = Number.isFinite(Number(effect.expiresAt));
     const expiresAt = hasExpiresAt
@@ -321,6 +325,24 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
         }
     }
 
+    // defenseModifier — timed-эффект на защиту (defense), напр. Стелс-бой (+2)
+    if (positiveEffectIsObject && positiveEffectRaw?.defenseModifier && positiveDuration.scenes > 0) {
+        const mod = positiveEffectRaw.defenseModifier;
+        const value = Number(mod?.value) || 0;
+        if (value !== 0) {
+            const effectName = `def:${mod.op}${value}`;
+            nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                effectName,
+                effectLabel: effectName,
+                effectKind: 'positive',
+                scenes: positiveDuration.scenes,
+                sourceName: name,
+                defenseModifier: mod,
+            }));
+            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+        }
+    }
+
     // Строковый/label positiveEffect — timed-эффект для отображения
     const positiveName = toStringSafe(item?.positiveEffectLabel || (!positiveEffectIsObject ? positiveEffectRaw : ''));
     const positiveLabel = toStringSafe(item?.positiveEffectLabel);
@@ -459,6 +481,19 @@ export const getTimedDamageResistanceBonus = (activeEffects = []) =>
     }, {});
 
 /**
+ * Суммирует бонус к защите (defense) из активных timed-эффектов
+ * (например, Стелс-бой: +2 к защите на 1 сцену).
+ */
+export const getTimedDefenseBonus = (activeEffects = []) =>
+    activeEffects.reduce((sum, effect) => {
+        if (!effect || effect.effectKind !== 'positive') return sum;
+        const mod = effect.defenseModifier;
+        if (!mod) return sum;
+        const val = Number(mod.value) || 0;
+        return mod.op === '+' ? sum + val : sum - val;
+    }, 0);
+
+/**
  * Суммирует бонус к урону из активных timed-эффектов (Overdrive, Psycho и т.д.).
  * Возвращает число — суммарный бонус к броску урона.
  */
@@ -500,6 +535,7 @@ export default {
     getTimedDamageResistanceBonus,
     getTimedDamageBonus,
     getTimedApBonus,
+    getTimedDefenseBonus,
     getInstantHealAmount,
     getEffectTimeText,
 };

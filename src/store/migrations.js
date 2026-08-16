@@ -958,6 +958,34 @@ const MIGRATIONS = [
     return next;
   },
 
+  // v13 -> v14: Тень со старым комплектом («Стартовый капитал»,
+  // default_caps_only) получает новый комплект NIGHTKIN.
+  // Синхронная часть: заменяем метаданные комплекта и ставим флаг
+  // nightkinKitPending=true — предметы выдаются ПОСЛЕ загрузки
+  // (resolveKitItems асинхронный: rollTable бросает кубики),
+  // см. loadCharacter в CharacterContext.
+  (state) => {
+    const next = { ...state };
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (originId !== 'shadow') return state;
+    const equipment = next.equipment;
+    if (!equipment || typeof equipment !== 'object') return state;
+    const kitId = equipment.id;
+    if (kitId === 'nightkin') return state; // уже новый комплект
+    if (kitId !== 'default_caps_only' && kitId != null) return state; // не стартовый капитал
+
+    // Заменяем метаданные комплекта; предметы выдадим после загрузки.
+    next.equipment = {
+      ...equipment,
+      id: 'nightkin',
+      name: 'Тень',
+      items: [],
+    };
+    next.nightkinKitPending = true;
+    return next;
+  },
+
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.

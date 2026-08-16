@@ -37,6 +37,11 @@
     {
       "id": "weapon_10mm_smg",
       "name": "10mm SMG"
+    },
+    {
+      "id": "weapon_bumper_sword",
+      "name": "Bumper Sword",
+      "rangeName": "Close"
     }
   ],
   "generalGoods": [
@@ -180,6 +185,9 @@
     },
     "enclave_soldier": {
       "name": "Former Soldier"
+    },
+    "nightkin": {
+      "name": "NIGHTKIN"
     }
   },
   "uniqQualities": [
