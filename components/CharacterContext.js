@@ -932,22 +932,27 @@ export const CharacterProvider = ({ children }) => {
       Boolean(useCharacterStore.getState().perkBonuses?.alcoholAddictionImmune);
 
     let addictionResult = null;
+    // Стелс-бой: зависимость возможна ТОЛЬКО у Тени (решение владельца).
+    // У остальных ориджинов применения Стелс-боя не дают зависимости
+    // (ни броска, ни негативного эффекта).
+    const isShadowCharacter = origin?.id === 'shadow' || trait?.id === 'shadow';
+    const isStealthBoy = item?.id === 'stealth_boy';
     if (
       item?.addictionLevel > 0 &&
       item?.negativeEffect === 'addiction' &&
-      !hasPartyBoyImmunity
+      !hasPartyBoyImmunity &&
+      (!isStealthBoy || isShadowCharacter)
     ) {
       const dosesToday = recordChemDose(item.id || item.name);
-      // Стелс-бой: Тень становится зависимой при ЛЮБОМ эффекте на боевом
-      // кубике (проверка зависимости — бросок CD, грани 5/6 = эффект).
-      const isShadowCharacter = origin?.id === 'shadow' || trait?.id === 'shadow';
-      const anyEffect = isShadowCharacter && item?.id === 'stealth_boy';
+      // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
+      // (бросок CD, грани 5/6 = эффект).
+      const anyEffect = isShadowCharacter && isStealthBoy;
       addictionResult = checkAddiction(item, dosesToday, { anyEffect });
       if (addictionResult.addicted && !conditions.includes('addicted')) {
         setConditions((prev) => [...prev, 'addicted']);
         // Перманентный эффект зависимости: отображается в карточке эффектов,
         // не истекает по сценам; снимается аддиктолом (removeCondition).
-        if (item?.id === 'stealth_boy') {
+        if (isStealthBoy) {
           const addictionEffect = {
             id: `negative-addiction-stealth-boy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             effectName: 'Зависимость: Стелс-бой',
