@@ -63,8 +63,8 @@ import {
 } from '../domain/powerArmor';
 import { canEquipArmor } from '../domain/equipEquip';
 import { resolveKitItems } from '../domain/kitResolver';
-import dataPowerArmor from '../data/equipment/powerArmor.json';
-import dataAmmo from '../data/equipment/ammo.json';
+import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
 import { getCurrentLocale } from '../i18n/locale';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';

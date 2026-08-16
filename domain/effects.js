@@ -1,5 +1,5 @@
-import ruEffects from '../i18n/ru-RU/data/system/effects.json';
-import enEffects from '../i18n/en-EN/data/system/effects.json';
+import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
+import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
 import { getCurrentLocale } from '../i18n/locale';
 import { rollCombatDiceEffects } from './diceRollsLogic';
 
@@ -112,8 +112,14 @@ const applyOrStackEffect = (activeEffects, newEffect) => {
 
 const normalizeTimedEffectWithClock = (effect, nowMs) => {
     if (!effect) return { normalized: effect, expired: false, changed: false };
+    // Перманентный эффект (например, зависимость от Стелс-боя у Тени):
+    // не истекает по сценам, снимается только аддиктолом (removeCondition).
     if (effect.isPermanent) {
-        return { expired: false, changed: false, normalized: effect };
+        return {
+            expired: false,
+            changed: false,
+            normalized: effect,
+        };
     }
     const currentScenes = Math.max(0, Number(effect.scenesLeft) || 0);
     const hasExpiresAt = Number.isFinite(Number(effect.expiresAt));
@@ -181,16 +187,21 @@ export const getTimedAttributeModifiers = (activeEffects = []) => (
  *
  * @param {object} item          — предмет с полем addictionLevel
  * @param {number} dosesToday    — сколько доз этого препарата принято за 24 ч (включая текущую)
+ * @param {object} [options]     — { anyEffect?: boolean } (Тень и Стелс-бой:
+ *                                 зависимость при ЛЮБОМ эффекте на кубике)
  * @returns {{ addicted: boolean, effectCount: number, faces: number[], addictionLevel: number }}
  */
-export const checkAddiction = (item, dosesToday) => {
+export const checkAddiction = (item, dosesToday, options = {}) => {
     const addictionLevel = Number(item?.addictionLevel) || 0;
     if (addictionLevel === 0 || !item?.negativeEffect) {
         return { addicted: false, effectCount: 0, faces: [], addictionLevel: 0 };
     }
     const { effectCount, faces } = rollCombatDiceEffects(dosesToday);
+    const addicted = options.anyEffect
+        ? effectCount > 0 // Тень: любой эффект на кубике → зависимость
+        : effectCount >= addictionLevel;
     return {
-        addicted: effectCount >= addictionLevel,
+        addicted,
         effectCount,
         faces,
         addictionLevel,
@@ -300,6 +311,24 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 scenes: positiveDuration.scenes,
                 sourceName: name,
                 apModifier: mod,
+            }));
+            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+        }
+    }
+
+    // defenseModifier — timed-эффект на защиту (defense), напр. Стелс-бой (+2)
+    if (positiveEffectIsObject && positiveEffectRaw?.defenseModifier && positiveDuration.scenes > 0) {
+        const mod = positiveEffectRaw.defenseModifier;
+        const value = Number(mod?.value) || 0;
+        if (value !== 0) {
+            const effectName = `def:${mod.op}${value}`;
+            nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                effectName,
+                effectLabel: effectName,
+                effectKind: 'positive',
+                scenes: positiveDuration.scenes,
+                sourceName: name,
+                defenseModifier: mod,
             }));
             events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
         }

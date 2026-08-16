@@ -22,7 +22,7 @@ import {
   hasFrame,
   FUSION_CORE_ID,
 } from '../../../domain/powerArmor';
-import dataPowerArmor from '../../../data/equipment/powerArmor.json';
+import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale } from '../../../i18n/locale';
@@ -32,7 +32,7 @@ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolv
 import { isRobotCharacter } from '../../../domain/origins';
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
 import styles from '../../../styles/InventoryScreen.styles';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled } from '../../../src/store/appSettingsStore';
 import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
 
 const PARAM_FIELDS = [
@@ -103,8 +103,8 @@ const InventoryScreen = () => {
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
-  const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
-  const weaponDurabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+  const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
+  const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     if (!stackKey) return undefined;

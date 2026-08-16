@@ -15,20 +15,20 @@ import { getCurrentLocale } from '../../../../i18n/locale';
 // ---------------------------------------------------------------------------
 // Static data imports — raw stats
 // ---------------------------------------------------------------------------
-import dataPlating from '../../../../data/equipment/robot/armor_plating.json';
-import dataArmor   from '../../../../data/equipment/robot/armor.json';
-import dataFrames  from '../../../../data/equipment/robot/frames.json';
+import dataPlating from '../../../../modules/fallout/data/equipment/robot/armor_plating.json';
+import dataArmor   from '../../../../modules/fallout/data/equipment/robot/armor.json';
+import dataFrames  from '../../../../modules/fallout/data/equipment/robot/frames.json';
 
 // ---------------------------------------------------------------------------
 // i18n imports
 // ---------------------------------------------------------------------------
-import ruPlating from '../../../../i18n/ru-RU/data/equipment/robot/plating.json';
-import ruArmor   from '../../../../i18n/ru-RU/data/equipment/robot/armor.json';
-import ruFrames  from '../../../../i18n/ru-RU/data/equipment/robot/frames.json';
+import ruPlating from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
+import ruArmor   from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
+import ruFrames  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
 
-import enPlating from '../../../../i18n/en-EN/data/equipment/robot/plating.json';
-import enArmor   from '../../../../i18n/en-EN/data/equipment/robot/armor.json';
-import enFrames  from '../../../../i18n/en-EN/data/equipment/robot/frames.json';
+import enPlating from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
+import enArmor   from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
+import enFrames  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 

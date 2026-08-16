@@ -1,0 +1,4440 @@
+diff --git a/__tests__/securitron/perks-module-move.test.js b/__tests__/securitron/perks-module-move.test.js
+new file mode 100644
+index 0000000..3d88258
+--- /dev/null
++++ b/__tests__/securitron/perks-module-move.test.js
+@@ -0,0 +1,32 @@
++/**
++ * Разделение движок/сеттинг (патч 115): перки перенесены в модуль
++ * ЦЕЛИКОМ. data/perks/perks.json и легаси i18n — пустые движковые базы.
++ */
++import { describe, it, expect } from 'vitest';
++import modulePerks from '../../modules/fallout/data/perks/perks.json';
++import moduleRuPerks from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
++import moduleEnPerks from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
++import dataPerks from '../../data/perks/perks.json';
++import legacyRuPerks from '../../i18n/ru-RU/data/perks/perks.json';
++import legacyEnPerks from '../../i18n/en-EN/data/perks/perks.json';
++
++describe('Перки в модуле (сеттинг), data/ — пустой движок', () => {
++  it('модуль содержит 94 перка с механикой и переводы обеих локалей', () => {
++    expect(modulePerks).toHaveLength(94);
++    expect(modulePerks[0]).toHaveProperty('prerequisites');
++    expect(modulePerks[0]).toHaveProperty('maxRanks');
++    for (const i18n of [moduleRuPerks, moduleEnPerks]) {
++      expect(i18n).toHaveLength(94);
++      expect(i18n.every((p) => p.name?.length > 0 && p.effect?.length > 0)).toBe(true);
++    }
++    const ids = new Set(modulePerks.map((p) => p.id));
++    expect(new Set(moduleRuPerks.map((p) => p.id))).toEqual(ids);
++    expect(new Set(moduleEnPerks.map((p) => p.id))).toEqual(ids);
++  });
++
++  it('data/ и легаси i18n пусты', () => {
++    expect(dataPerks).toEqual([]);
++    expect(legacyRuPerks).toEqual([]);
++    expect(legacyEnPerks).toEqual([]);
++  });
++});
+diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index dc49489..ba9ec62 100644
+--- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react
+ import { useCharacter } from '../../CharacterContext';
+ import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
+ import { useLocale } from '../../../i18n/locale';
+-import perksData from '../../../data/perks/perks.json';
++import perksData from '../../../modules/fallout/data/perks/perks.json';
+ import PerkSelectModal from './PerkSelectModal';
+ import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
+ import styles from '../../../styles/PerksAndTraitsScreen.styles';
+diff --git a/components/screens/PerksAndTraitsScreen/perksDisplay.js b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+index 09f6e98..04ca55f 100644
+--- a/components/screens/PerksAndTraitsScreen/perksDisplay.js
++++ b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+@@ -1,5 +1,5 @@
+-import ruPerksData from '../../../i18n/ru-RU/data/perks/perks.json';
+-import enPerksData from '../../../i18n/en-EN/data/perks/perks.json';
++import ruPerksData from '../../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
++import enPerksData from '../../../modules/fallout/i18n/en-EN/data/perks/perks.json';
+ import { getCurrentLocale } from '../../../i18n/locale';
+ 
+ const DICTIONARIES = {
+diff --git a/data/perks/perks.json b/data/perks/perks.json
+index 9d77a6a..fe51488 100644
+--- a/data/perks/perks.json
++++ b/data/perks/perks.json
+@@ -1,1201 +1 @@
+-[
+-  {
+-    "id": "animalFriend",
+-    "nameKey": "perks.animalFriend.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 6
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.animalFriend.effect",
+-    "effect": "animalFriend"
+-  },
+-  {
+-    "id": "aquaboy",
+-    "nameKey": "perks.aquaboy.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "END": 5
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 3
+-    },
+-    "effectKey": "perks.aquaboy.effect",
+-    "effect": "aquaboy"
+-  },
+-  {
+-    "id": "radResistant",
+-    "nameKey": "perks.radResistant.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "END": 8
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.radResistant.effect",
+-    "effect": "radResistant"
+-  },
+-  {
+-    "id": "armorer",
+-    "nameKey": "perks.armorer.name",
+-    "maxRanks": 4,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 5,
+-        "INT": 6
+-      },
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.armorer.effect",
+-    "effect": "armorer"
+-  },
+-  {
+-    "id": "barbarian",
+-    "nameKey": "perks.barbarian.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 7
+-      },
+-      "level": 4,
+-      "notForRobots": true
+-    },
+-    "effectKey": "perks.barbarian.effect",
+-    "effect": "barbarian"
+-  },
+-  {
+-    "id": "gunFu",
+-    "nameKey": "perks.gunFu.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 7
+-      }
+-    },
+-    "effectKey": "perks.gunFu.effect",
+-    "effect": "gunFu"
+-  },
+-  {
+-    "id": "silverTongue",
+-    "nameKey": "perks.silverTongue.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 6
+-      }
+-    },
+-    "effectKey": "perks.silverTongue.effect",
+-    "effect": "silverTongue"
+-  },
+-  {
+-    "id": "blitz",
+-    "nameKey": "perks.blitz.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 9
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 3
+-    },
+-    "effectKey": "perks.blitz.effect",
+-    "effect": "blitz"
+-  },
+-  {
+-    "id": "leadBelly",
+-    "nameKey": "perks.leadBelly.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.leadBelly.effect",
+-    "effect": "leadBelly"
+-  },
+-  {
+-    "id": "juryRigging",
+-    "nameKey": "perks.juryRigging.name",
+-    "maxRanks": 1,
+-    "prerequisites": {},
+-    "effectKey": "perks.juryRigging.effect",
+-    "effect": "juryRigging"
+-  },
+-  {
+-    "id": "scoundrel",
+-    "nameKey": "perks.scoundrel.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 7
+-      }
+-    },
+-    "effectKey": "perks.scoundrel.effect",
+-    "effect": "scoundrel"
+-  },
+-  {
+-    "id": "dogmeat",
+-    "nameKey": "perks.dogmeat.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 5
+-      }
+-    },
+-    "effectKey": "perks.dogmeat.effect",
+-    "effect": "dogmeat"
+-  },
+-  {
+-    "id": "hunter",
+-    "nameKey": "perks.hunter.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6
+-      }
+-    },
+-    "effectKey": "perks.hunter.effect",
+-    "effect": "hunter"
+-  },
+-  {
+-    "id": "chemist",
+-    "nameKey": "perks.chemist.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 7
+-      }
+-    },
+-    "effectKey": "perks.chemist.effect",
+-    "effect": "chemist"
+-  },
+-  {
+-    "id": "shotgunSurgeon",
+-    "nameKey": "perks.shotgunSurgeon.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 5,
+-        "AGI": 7
+-      }
+-    },
+-    "effectKey": "perks.shotgunSurgeon.effect",
+-    "effect": "shotgunSurgeon"
+-  },
+-  {
+-    "id": "movingTarget",
+-    "nameKey": "perks.movingTarget.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 6
+-      }
+-    },
+-    "effectKey": "perks.movingTarget.effect",
+-    "effect": "movingTarget"
+-  },
+-  {
+-    "id": "basher",
+-    "nameKey": "perks.basher.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 6
+-      }
+-    },
+-    "effectKey": "perks.basher.effect",
+-    "effect": "basher"
+-  },
+-  {
+-    "id": "laserCommander",
+-    "nameKey": "perks.laserCommander.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 8
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.laserCommander.effect",
+-    "effect": "laserCommander"
+-  },
+-  {
+-    "id": "commando",
+-    "nameKey": "perks.commando.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 8
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 3
+-    },
+-    "effectKey": "perks.commando.effect",
+-    "effect": "commando"
+-  },
+-  {
+-    "id": "comprehension",
+-    "nameKey": "perks.comprehension.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 6
+-      }
+-    },
+-    "effectKey": "perks.comprehension.effect",
+-    "effect": "comprehension"
+-  },
+-  {
+-    "id": "canOpener",
+-    "nameKey": "perks.canOpener.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 5
+-      }
+-    },
+-    "effectKey": "perks.canOpener.effect",
+-    "effect": "canOpener"
+-  },
+-  {
+-    "id": "betterCriticals",
+-    "nameKey": "perks.betterCriticals.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 9
+-      }
+-    },
+-    "effectKey": "perks.betterCriticals.effect",
+-    "effect": "betterCriticals"
+-  },
+-  {
+-    "id": "quickDraw",
+-    "nameKey": "perks.quickDraw.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 6
+-      }
+-    },
+-    "effectKey": "perks.quickDraw.effect",
+-    "effect": "quickDraw"
+-  },
+-  {
+-    "id": "fortuneFinder",
+-    "nameKey": "perks.fortuneFinder.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 5
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.fortuneFinder.effect",
+-    "effect": "fortuneFinder"
+-  },
+-  {
+-    "id": "solarPowered",
+-    "nameKey": "perks.solarPowered.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "END": 7
+-      }
+-    },
+-    "effectKey": "perks.solarPowered.effect",
+-    "effect": "solarPowered"
+-  },
+-  {
+-    "id": "entomologist",
+-    "nameKey": "perks.entomologist.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 7
+-      }
+-    },
+-    "effectKey": "perks.entomologist.effect",
+-    "effect": "entomologist"
+-  },
+-  {
+-    "id": "intenseTraining",
+-    "nameKey": "perks.intenseTraining.name",
+-    "maxRanks": 10,
+-    "prerequisites": {
+-      "level": 2,
+-      "levelIncreasePerRank": 2
+-    },
+-    "effectKey": "perks.intenseTraining.effect",
+-    "effect": "intenseTraining"
+-  },
+-  {
+-    "id": "demolitionExpert",
+-    "nameKey": "perks.demolitionExpert.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 6,
+-        "CHA": 6
+-      }
+-    },
+-    "effectKey": "perks.demolitionExpert.effect",
+-    "effect": "demolitionExpert"
+-  },
+-  {
+-    "id": "roboticsExpert",
+-    "nameKey": "perks.roboticsExpert.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 8
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.roboticsExpert.effect",
+-    "effect": "roboticsExpert"
+-  },
+-  {
+-    "id": "gunNut",
+-    "nameKey": "perks.gunNut.name",
+-    "maxRanks": 4,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 6
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.gunNut.effect",
+-    "effect": "gunNut"
+-  },
+-  {
+-    "id": "capCollector",
+-    "nameKey": "perks.capCollector.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 5
+-      }
+-    },
+-    "effectKey": "perks.capCollector.effect",
+-    "effect": "capCollector"
+-  },
+-  {
+-    "id": "ghost",
+-    "nameKey": "perks.ghost.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 5,
+-        "AGI": 6
+-      }
+-    },
+-    "effectKey": "perks.ghost.effect",
+-    "effect": "ghost"
+-  },
+-  {
+-    "id": "scrounger",
+-    "nameKey": "perks.scrounger.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 6
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.scrounger.effect",
+-    "effect": "scrounger"
+-  },
+-  {
+-    "id": "pharmaFarmer",
+-    "nameKey": "perks.pharmaFarmer.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 6
+-      }
+-    },
+-    "effectKey": "perks.pharmaFarmer.effect",
+-    "effect": "pharmaFarmer"
+-  },
+-  {
+-    "id": "partyBoy",
+-    "nameKey": "perks.partyBoy.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6,
+-        "CHA": 7
+-      }
+-    },
+-    "effectKey": "perks.partyBoy.effect",
+-    "effect": "partyBoy"
+-  },
+-  {
+-    "id": "finesse",
+-    "nameKey": "perks.finesse.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 9
+-      }
+-    },
+-    "effectKey": "perks.finesse.effect",
+-    "effect": "finesse"
+-  },
+-  {
+-    "id": "heavyHitter",
+-    "nameKey": "perks.heavyHitter.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 8
+-      }
+-    },
+-    "effectKey": "perks.heavyHitter.effect",
+-    "effect": "heavyHitter"
+-  },
+-  {
+-    "id": "blacksmith",
+-    "nameKey": "perks.blacksmith.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 6
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.blacksmith.effect",
+-    "effect": "blacksmith"
+-  },
+-  {
+-    "id": "piercingStrike",
+-    "nameKey": "perks.piercingStrike.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 7
+-      }
+-    },
+-    "effectKey": "perks.piercingStrike.effect",
+-    "effect": "piercingStrike"
+-  },
+-  {
+-    "id": "rifleman",
+-    "nameKey": "perks.rifleman.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 7
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.rifleman.effect",
+-    "effect": "rifleman"
+-  },
+-  {
+-    "id": "meltdown",
+-    "nameKey": "perks.meltdown.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 10
+-      }
+-    },
+-    "effectKey": "perks.meltdown.effect",
+-    "effect": "meltdown"
+-  },
+-  {
+-    "id": "fastHealer",
+-    "nameKey": "perks.fastHealer.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6
+-      },
+-      "notForRobots": true
+-    },
+-    "effectKey": "perks.fastHealer.effect",
+-    "effect": "fastHealer"
+-  },
+-  {
+-    "id": "medic",
+-    "nameKey": "perks.medic.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 7
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.medic.effect",
+-    "effect": "medic"
+-  },
+-  {
+-    "id": "heaveHo",
+-    "nameKey": "perks.heaveHo.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 8
+-      }
+-    },
+-    "effectKey": "perks.heaveHo.effect",
+-    "effect": "heaveHo"
+-  },
+-  {
+-    "id": "actionBoy",
+-    "nameKey": "perks.actionBoy.name",
+-    "maxRanks": 1,
+-    "prerequisites": {},
+-    "effectKey": "perks.actionBoy.effect",
+-    "effect": "actionBoy"
+-  },
+-  {
+-    "id": "infiltrator",
+-    "nameKey": "perks.infiltrator.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 8
+-      }
+-    },
+-    "effectKey": "perks.infiltrator.effect",
+-    "effect": "infiltrator"
+-  },
+-  {
+-    "id": "nurse",
+-    "nameKey": "perks.nurse.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 8
+-      }
+-    },
+-    "effectKey": "perks.nurse.effect",
+-    "effect": "nurse"
+-  },
+-  {
+-    "id": "sizeMatters",
+-    "nameKey": "perks.sizeMatters.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "END": 7,
+-        "AGI": 6
+-      },
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.sizeMatters.effect",
+-    "effect": "sizeMatters"
+-  },
+-  {
+-    "id": "bullRush",
+-    "nameKey": "perks.bullRush.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 9,
+-        "END": 7
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.bullRush.effect",
+-    "effect": "bullRush"
+-  },
+-  {
+-    "id": "quickHands",
+-    "nameKey": "perks.quickHands.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 8
+-      }
+-    },
+-    "effectKey": "perks.quickHands.effect",
+-    "effect": "quickHands"
+-  },
+-  {
+-    "id": "masterThief",
+-    "nameKey": "perks.masterThief.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 8,
+-        "AGI": 9
+-      }
+-    },
+-    "effectKey": "perks.masterThief.effect",
+-    "effect": "masterThief"
+-  },
+-  {
+-    "id": "sandman",
+-    "nameKey": "perks.sandman.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 9
+-      }
+-    },
+-    "effectKey": "perks.sandman.effect",
+-    "effect": "sandman"
+-  },
+-  {
+-    "id": "fastMetabolism",
+-    "nameKey": "perks.fastMetabolism.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 3,
+-      "notForRobots": true
+-    },
+-    "effectKey": "perks.fastMetabolism.effect",
+-    "effect": "fastMetabolism"
+-  },
+-  {
+-    "id": "mysteriousStranger",
+-    "nameKey": "perks.mysteriousStranger.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 7
+-      }
+-    },
+-    "effectKey": "perks.mysteriousStranger.effect",
+-    "effect": "mysteriousStranger"
+-  },
+-  {
+-    "id": "daringNature",
+-    "nameKey": "perks.daringNature.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 7
+-      },
+-      "excludedPerks": [
+-        "cautiousNature"
+-      ]
+-    },
+-    "effectKey": "perks.daringNature.effect",
+-    "effect": "daringNature"
+-  },
+-  {
+-    "id": "cautiousNature",
+-    "nameKey": "perks.cautiousNature.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 7
+-      },
+-      "excludedPerks": [
+-        "daringNature"
+-      ]
+-    },
+-    "effectKey": "perks.cautiousNature.effect",
+-    "effect": "cautiousNature"
+-  },
+-  {
+-    "id": "ninja",
+-    "nameKey": "perks.ninja.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 8
+-      }
+-    },
+-    "effectKey": "perks.ninja.effect",
+-    "effect": "ninja"
+-  },
+-  {
+-    "id": "nightPerson",
+-    "nameKey": "perks.nightPerson.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 7
+-      }
+-    },
+-    "effectKey": "perks.nightPerson.effect",
+-    "effect": "nightPerson"
+-  },
+-  {
+-    "id": "paralyzingPalm",
+-    "nameKey": "perks.paralyzingPalm.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 8
+-      }
+-    },
+-    "effectKey": "perks.paralyzingPalm.effect",
+-    "effect": "paralyzingPalm"
+-  },
+-  {
+-    "id": "nuclearPhysicist",
+-    "nameKey": "perks.nuclearPhysicist.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 9
+-      }
+-    },
+-    "effectKey": "perks.nuclearPhysicist.effect",
+-    "effect": "nuclearPhysicist"
+-  },
+-  {
+-    "id": "pickpocket",
+-    "nameKey": "perks.pickpocket.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 8,
+-        "AGI": 8
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 3
+-    },
+-    "effectKey": "perks.pickpocket.effect",
+-    "effect": "pickpocket"
+-  },
+-  {
+-    "id": "lightStep",
+-    "nameKey": "perks.lightStep.name",
+-    "maxRanks": 1,
+-    "prerequisites": {},
+-    "effectKey": "perks.lightStep.effect",
+-    "effect": "lightStep"
+-  },
+-  {
+-    "id": "hacker",
+-    "nameKey": "perks.hacker.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 8
+-      }
+-    },
+-    "effectKey": "perks.hacker.effect",
+-    "effect": "hacker"
+-  },
+-  {
+-    "id": "pathfinder",
+-    "nameKey": "perks.pathfinder.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 6,
+-        "END": 6
+-      }
+-    },
+-    "effectKey": "perks.pathfinder.effect",
+-    "effect": "pathfinder"
+-  },
+-  {
+-    "id": "gunslinger",
+-    "nameKey": "perks.gunslinger.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 7
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.gunslinger.effect",
+-    "effect": "gunslinger"
+-  },
+-  {
+-    "id": "ironFist",
+-    "nameKey": "perks.ironFist.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 6
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.ironFist.effect",
+-    "effect": "ironFist"
+-  },
+-  {
+-    "id": "adrenalineRush",
+-    "nameKey": "perks.adrenalineRush.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 7
+-      }
+-    },
+-    "effectKey": "perks.adrenalineRush.effect",
+-    "effect": "adrenalineRush"
+-  },
+-  {
+-    "id": "intimidation",
+-    "nameKey": "perks.intimidation.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 6,
+-        "CHA": 8
+-      },
+-      "level": 3,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.intimidation.effect",
+-    "effect": "intimidation"
+-  },
+-  {
+-    "id": "pyromaniac",
+-    "nameKey": "perks.pyromaniac.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.pyromaniac.effect",
+-    "effect": "pyromaniac"
+-  },
+-  {
+-    "id": "nerdRage",
+-    "nameKey": "perks.nerdRage.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 8
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.nerdRage.effect",
+-    "effect": "nerdRage"
+-  },
+-  {
+-    "id": "snakeater",
+-    "nameKey": "perks.snakeater.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "END": 7
+-      }
+-    },
+-    "effectKey": "perks.snakeater.effect",
+-    "effect": "snakeater"
+-  },
+-  {
+-    "id": "scrapper",
+-    "nameKey": "perks.scrapper.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "level": 3,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.scrapper.effect",
+-    "effect": "scrapper"
+-  },
+-  {
+-    "id": "refractor",
+-    "nameKey": "perks.refractor.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 6,
+-        "CHA": 7
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.refractor.effect",
+-    "effect": "refractor"
+-  },
+-  {
+-    "id": "strongBack",
+-    "nameKey": "perks.strongBack.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 5
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 2
+-    },
+-    "effectKey": "perks.strongBack.effect",
+-    "effect": "strongBack"
+-  },
+-  {
+-    "id": "chemResistant",
+-    "nameKey": "perks.chemResistant.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "END": 7
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.chemResistant.effect",
+-    "effect": "chemResistant"
+-  },
+-  {
+-    "id": "ricochet",
+-    "nameKey": "perks.ricochet.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 10
+-      },
+-      "level": 5
+-    },
+-    "effectKey": "perks.ricochet.effect",
+-    "effect": "ricochet"
+-  },
+-  {
+-    "id": "toughness",
+-    "nameKey": "perks.toughness.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "END": 6,
+-        "CHA": 6
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.toughness.effect",
+-    "effect": "toughness"
+-  },
+-  {
+-    "id": "bloodyMess",
+-    "nameKey": "perks.bloodyMess.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 6
+-      }
+-    },
+-    "effectKey": "perks.bloodyMess.effect",
+-    "effect": "bloodyMess"
+-  },
+-  {
+-    "id": "science",
+-    "nameKey": "perks.science.name",
+-    "maxRanks": 4,
+-    "prerequisites": {
+-      "special": {
+-        "INT": 6
+-      },
+-      "level": 2,
+-      "levelIncreasePerRank": 4
+-    },
+-    "effectKey": "perks.science.effect",
+-    "effect": "science"
+-  },
+-  {
+-    "id": "awareness",
+-    "nameKey": "perks.awareness.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 7
+-      }
+-    },
+-    "effectKey": "perks.awareness.effect",
+-    "effect": "awareness"
+-  },
+-  {
+-    "id": "sniper",
+-    "nameKey": "perks.sniper.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 8,
+-        "AGI": 6
+-      }
+-    },
+-    "effectKey": "perks.sniper.effect",
+-    "effect": "sniper"
+-  },
+-  {
+-    "id": "inspirational",
+-    "nameKey": "perks.inspirational.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 8
+-      }
+-    },
+-    "effectKey": "perks.inspirational.effect",
+-    "effect": "inspirational"
+-  },
+-  {
+-    "id": "tag",
+-    "nameKey": "perks.tag.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "level": 5
+-    },
+-    "effectKey": "perks.tag.effect",
+-    "effect": "tag"
+-  },
+-  {
+-    "id": "adamantiumSkeleton",
+-    "nameKey": "perks.adamantiumSkeleton.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "END": 7
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 3
+-    },
+-    "effectKey": "perks.adamantiumSkeleton.effect",
+-    "effect": "adamantiumSkeleton"
+-  },
+-  {
+-    "id": "educated",
+-    "nameKey": "perks.educated.name",
+-    "maxRanks": 10,
+-    "prerequisites": {
+-      "level": 3,
+-      "levelIncreasePerRank": 3
+-    },
+-    "effectKey": "perks.educated.effect",
+-    "effect": "educated"
+-  },
+-  {
+-    "id": "concentratedFire",
+-    "nameKey": "perks.concentratedFire.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "PER": 8,
+-        "AGI": 6
+-      }
+-    },
+-    "effectKey": "perks.concentratedFire.effect",
+-    "effect": "concentratedFire"
+-  },
+-  {
+-    "id": "slacker",
+-    "nameKey": "perks.slacker.name",
+-    "maxRanks": 2,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 6
+-      },
+-      "level": 4,
+-      "levelIncreasePerRank": 6
+-    },
+-    "effectKey": "perks.slacker.effect",
+-    "effect": "slacker"
+-  },
+-  {
+-    "id": "triggerRush",
+-    "nameKey": "perks.triggerRush.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 10
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.triggerRush.effect",
+-    "effect": "triggerRush"
+-  },
+-  {
+-    "id": "slayer",
+-    "nameKey": "perks.slayer.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 8
+-      }
+-    },
+-    "effectKey": "perks.slayer.effect",
+-    "effect": "slayer"
+-  },
+-  {
+-    "id": "killer",
+-    "nameKey": "perks.killer.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 8
+-      }
+-    },
+-    "effectKey": "perks.killer.effect",
+-    "effect": "killer"
+-  },
+-  {
+-    "id": "junktownVendor",
+-    "nameKey": "perks.junktownVendor.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 8
+-      }
+-    },
+-    "effectKey": "perks.junktownVendor.effect",
+-    "effect": "junktownVendor"
+-  },
+-  {
+-    "id": "blackWidow",
+-    "nameKey": "perks.blackWidow.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "CHA": 6
+-      }
+-    },
+-    "effectKey": "perks.blackWidow.effect",
+-    "effect": "blackWidow"
+-  },
+-  {
+-    "id": "steadyAim",
+-    "nameKey": "perks.steadyAim.name",
+-    "maxRanks": 1,
+-    "prerequisites": {
+-      "special": {
+-        "STR": 8,
+-        "AGI": 7
+-      }
+-    },
+-    "effectKey": "perks.steadyAim.effect",
+-    "effect": "steadyAim"
+-  },
+-  {
+-    "id": "lifeGiver",
+-    "nameKey": "perks.lifeGiver.name",
+-    "maxRanks": 5,
+-    "prerequisites": {
+-      "level": 5,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.lifeGiver.effect",
+-    "effect": "lifeGiver"
+-  }
+-]
++[]
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index 2f575ac..0ba7097 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -12,9 +12,9 @@
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import { getCurrentLocale } from '../i18n/locale';
+-import perksData from '../data/perks/perks.json';
+-import ruPerksData from '../i18n/ru-RU/data/perks/perks.json';
+-import enPerksData from '../i18n/en-EN/data/perks/perks.json';
++import perksData from '../modules/fallout/data/perks/perks.json';
++import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
++import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
+ 
+ // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
+ const safeStr = (v) => (v === null || v === undefined ? null : String(v));
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 19a5b73..42ceb42 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -75,6 +75,7 @@ modules/fallout/
+ | clothes | 31 (3 группы, включая модульную headwear) | 0 (`{clothes: []}`) | патч 112 |
+ | general_goods | 35 (31 база + 4 модуля) | 0 (`[]`) | патч 113 |
+ | robot | 8 файлов (104 детали) + robotparts | 0 (`[]`/`{}`) | патч 114 |
++| perks | 94 | 0 (`[]`) | патч 115 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -100,7 +101,6 @@ modules/fallout/
+ 
+ | Категория | Файл | Объём |
+ |---|---|---|
+-| Перки | `data/perks/perks.json` | 94 |
+ | Ориджины (база) | `data/origins/origins.json` | 17 |
+ | Трейты (база) | `data/traits/traits.json` | 32 |
+ | Награды навыков | `data/skillRewards.json` | словарь |
+diff --git a/i18n/en-EN/data/perks/perks.json b/i18n/en-EN/data/perks/perks.json
+index bbff941..fe51488 100644
+--- a/i18n/en-EN/data/perks/perks.json
++++ b/i18n/en-EN/data/perks/perks.json
+@@ -1,472 +1 @@
+-[
+-  {
+-    "id": "animalFriend",
+-    "name": "Animal Friend",
+-    "effect": "Rank 1: Mammal, Lizard or Insect creatures roll 1 CD before attacking you. No Effect = they don't attack. Rank 2: CHR+Survival test difficulty 2 to befriend an animal."
+-  },
+-  {
+-    "id": "aquaboy",
+-    "name": "Aquaboy/Aquagirl",
+-    "effect": "Rank 1: Immune to radiation damage in irradiated water, hold breath 2x longer. Rank 2: +2 difficulty to spot you underwater."
+-  },
+-  {
+-    "id": "radResistant",
+-    "name": "Rad Resistance",
+-    "effect": "Your radiation damage resistance increases by +1 per rank."
+-  },
+-  {
+-    "id": "armorer",
+-    "name": "Armorer",
+-    "effect": "You can modify armor with mods. Each rank unlocks mods of that rank."
+-  },
+-  {
+-    "id": "barbarian",
+-    "name": "Barbarian",
+-    "effect": "Your Strength affects your ballistic DR. STR 7-8: +1, STR 9-10: +2, STR 11+: +3. Doesn't work in power armor."
+-  },
+-  {
+-    "id": "gunFu",
+-    "name": "Center Mass",
+-    "effect": "When making a ranged attack, you can target the Torso without increasing difficulty. You can reroll 1d20 of your attack."
+-  },
+-  {
+-    "id": "silverTongue",
+-    "name": "Smooth Talker",
+-    "effect": "Re-roll 1d20 on opposed tests involving Barter or Speech."
+-  },
+-  {
+-    "id": "blitz",
+-    "name": "Blitz",
+-    "effect": "Rank 1: When you move into reach and make a melee attack, reroll 1d20. Rank 2: +1 CD damage."
+-  },
+-  {
+-    "id": "leadBelly",
+-    "name": "Lead Belly",
+-    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink."
+-  },
+-  {
+-    "id": "juryRigging",
+-    "name": "Jury Rigging",
+-    "effect": "You can repair an item without spare parts. The repair is temporary: the item breaks on the next complication."
+-  },
+-  {
+-    "id": "scoundrel",
+-    "name": "Scoundrel",
+-    "effect": "You can ignore the first complication on any CHR+Speech test to convince someone of a lie."
+-  },
+-  {
+-    "id": "dogmeat",
+-    "name": "Dogmeat",
+-    "effect": "You have a dog companion (see Dogmeat profile). Its level increases with yours."
+-  },
+-  {
+-    "id": "hunter",
+-    "name": "Hunter",
+-    "effect": "Your attacks against Mammals, Lizards, Insects and Mutants gain the Vicious effect if they don't already have it."
+-  },
+-  {
+-    "id": "chemist",
+-    "name": "Chemist",
+-    "effect": "The effect duration of drugs you create is doubled. You unlock recipes requiring this perk."
+-  },
+-  {
+-    "id": "shotgunSurgeon",
+-    "name": "Shotgun Surgeon",
+-    "effect": "Shotgun attacks gain Piercing 1. If already Piercing, the value increases by 1."
+-  },
+-  {
+-    "id": "movingTarget",
+-    "name": "Moving Target",
+-    "effect": "When you sprint, +1 Defense until the start of your next turn."
+-  },
+-  {
+-    "id": "basher",
+-    "name": "Basher",
+-    "effect": "When you make a melee attack by bashing with your firearm, the attack gains the Vicious effect."
+-  },
+-  {
+-    "id": "laserCommander",
+-    "name": "Laser Commander",
+-    "effect": "With a ranged energy weapon, +1 CD damage per rank."
+-  },
+-  {
+-    "id": "commando",
+-    "name": "Commando",
+-    "effect": "With a ranged weapon with fire rate ≥3 (except heavy weapons), +1 CD damage per rank."
+-  },
+-  {
+-    "id": "comprehension",
+-    "name": "Comprehension",
+-    "effect": "After using a magazine bonus, roll 1 CD. On Effect, use it one more time."
+-  },
+-  {
+-    "id": "canOpener",
+-    "name": "Can Do!",
+-    "effect": "When scavenging a location with food, you find one additional food item for free."
+-  },
+-  {
+-    "id": "betterCriticals",
+-    "name": "Better Criticals",
+-    "effect": "When you deal damage, spend 1 luck point to automatically inflict a critical hit."
+-  },
+-  {
+-    "id": "quickDraw",
+-    "name": "Quick Draw",
+-    "effect": "Each turn, draw one weapon or item without using a minor action."
+-  },
+-  {
+-    "id": "fortuneFinder",
+-    "name": "Fortune Finder",
+-    "effect": "When you find caps: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD."
+-  },
+-  {
+-    "id": "solarPowered",
+-    "name": "Solar Powered",
+-    "effect": "You heal 1 radiation damage per hour in direct sunlight."
+-  },
+-  {
+-    "id": "entomologist",
+-    "name": "Entomologist",
+-    "effect": "Your attacks against Insects gain Piercing 1. If already Piercing, the value increases by 1."
+-  },
+-  {
+-    "id": "intenseTraining",
+-    "name": "Intense Training",
+-    "effect": "Increase one S.P.E.C.I.A.L. attribute by 1 (max 10)."
+-  },
+-  {
+-    "id": "demolitionExpert",
+-    "name": "Demolition Expert",
+-    "effect": "Attacks with Blast gain Vicious. You unlock explosive recipes."
+-  },
+-  {
+-    "id": "roboticsExpert",
+-    "name": "Robotics Expert",
+-    "effect": "Rank 1: Modify robots with rank 1 mods. Rank 2: Rank 2 mods, -1 difficulty robot repair. Rank 3: Rank 3 mods, reprogramming possible."
+-  },
+-  {
+-    "id": "gunNut",
+-    "name": "Gun Nut",
+-    "effect": "You can modify small guns. Each rank unlocks mods of that rank."
+-  },
+-  {
+-    "id": "capCollector",
+-    "name": "Cap Collector",
+-    "effect": "You can modify buy/sell prices by 10%."
+-  },
+-  {
+-    "id": "ghost",
+-    "name": "Ghost",
+-    "effect": "On AGI+Sneak test in shadow/darkness, the first extra d20 is free."
+-  },
+-  {
+-    "id": "scrounger",
+-    "name": "Scrounger",
+-    "effect": "When you find ammo: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD (same type as found)."
+-  },
+-  {
+-    "id": "pharmaFarmer",
+-    "name": "Pharma Farma",
+-    "effect": "When scavenging a location with medicine/chems, you find one additional item for free."
+-  },
+-  {
+-    "id": "partyBoy",
+-    "name": "Party Boy/Girl",
+-    "effect": "You cannot become addicted to alcoholic beverages. Each alcoholic drink heals +2 HP."
+-  },
+-  {
+-    "id": "finesse",
+-    "name": "Finesse",
+-    "effect": "Once per combat, reroll all CD of a damage roll without spending a luck point."
+-  },
+-  {
+-    "id": "heavyHitter",
+-    "name": "Big Leagues",
+-    "effect": "Two-handed melee attacks gain the Vicious effect."
+-  },
+-  {
+-    "id": "blacksmith",
+-    "name": "Blacksmith",
+-    "effect": "You can modify melee weapons. Each rank unlocks mods of that rank."
+-  },
+-  {
+-    "id": "piercingStrike",
+-    "name": "Piercing Strike",
+-    "effect": "Your unarmed or bladed melee weapon attacks gain Piercing 1. If already Piercing, +1."
+-  },
+-  {
+-    "id": "rifleman",
+-    "name": "Rifleman",
+-    "effect": "With a two-handed weapon with fire rate ≤2 (except heavy weapons), +1 CD per rank. Rank 2: +Piercing 1."
+-  },
+-  {
+-    "id": "meltdown",
+-    "name": "Meltdown",
+-    "effect": "When you kill an enemy with an energy weapon, they explode. Nearby creatures take energy damage."
+-  },
+-  {
+-    "id": "fastHealer",
+-    "name": "Faster Healing",
+-    "effect": "On END+Survival test to heal yourself, the first extra d20 is free."
+-  },
+-  {
+-    "id": "medic",
+-    "name": "Healer",
+-    "effect": "When you heal with First Aid, +1 HP healed per rank."
+-  },
+-  {
+-    "id": "heaveHo",
+-    "name": "Heave Ho!",
+-    "effect": "With a thrown ranged attack, spend 1 AP to increase range by one step."
+-  },
+-  {
+-    "id": "actionBoy",
+-    "name": "Action Boy/Girl",
+-    "effect": "When you spend AP for an additional major action, no difficulty increase."
+-  },
+-  {
+-    "id": "infiltrator",
+-    "name": "Infiltrator",
+-    "effect": "Reroll 1d20 on any Lockpick test for a door or container."
+-  },
+-  {
+-    "id": "nurse",
+-    "name": "Medic",
+-    "effect": "Re-roll 1d20 on First Aid actions."
+-  },
+-  {
+-    "id": "sizeMatters",
+-    "name": "Size Matters",
+-    "effect": "Ranged attack with a heavy weapon, +1 CD damage per rank."
+-  },
+-  {
+-    "id": "bullRush",
+-    "name": "Pain Train",
+-    "effect": "Rank 1: Gain Charge major action to damage and knock prone enemies with a Str + Athletics test. Rank 2: +1 CD damage and Stun damage effect."
+-  },
+-  {
+-    "id": "quickHands",
+-    "name": "Quick Hands",
+-    "effect": "Reload faster. On ranged attack, spend 2 AP for +2 fire rate for this attack."
+-  },
+-  {
+-    "id": "masterThief",
+-    "name": "Master Thief",
+-    "effect": "On tests to pick locks or pick pockets, +1 difficulty for others to spot you."
+-  },
+-  {
+-    "id": "sandman",
+-    "name": "Mister Sandman",
+-    "effect": "On sneak attack with silenced weapon, +2 CD damage. Doesn't work in power armor."
+-  },
+-  {
+-    "id": "fastMetabolism",
+-    "name": "Fast Metabolism",
+-    "effect": "When you recover HP by means other than rest, +1 HP recovered per rank."
+-  },
+-  {
+-    "id": "mysteriousStranger",
+-    "name": "Mysterious Stranger",
+-    "effect": "At the start of combat, spend 1 luck point. The Mysterious Stranger appears and attacks an enemy."
+-  },
+-  {
+-    "id": "daringNature",
+-    "name": "Daring Nature",
+-    "effect": "On skill test with 1d20 while granting AP to GM, reroll 1d20. Incompatible with Cautious Nature."
+-  },
+-  {
+-    "id": "cautiousNature",
+-    "name": "Cautious Nature",
+-    "effect": "On skill test with at least 1d20 bought with AP, reroll 1d20. Incompatible with Daring Nature."
+-  },
+-  {
+-    "id": "ninja",
+-    "name": "Ninja",
+-    "effect": "On sneak attack unarmed or melee, +2 CD damage. Doesn't work in power armor."
+-  },
+-  {
+-    "id": "nightPerson",
+-    "name": "Night Person",
+-    "effect": "Reduce by 1 the difficulty increase due to darkness."
+-  },
+-  {
+-    "id": "paralyzingPalm",
+-    "name": "Paralyzing Palm",
+-    "effect": "On unarmed attack targeting a location, the attack gains the Stun effect."
+-  },
+-  {
+-    "id": "nuclearPhysicist",
+-    "name": "Nuclear Physicist",
+-    "effect": "With a radiation weapon or Radioactive, each Effect deals +1 radiation damage. Fusion cores have +3 charges."
+-  },
+-  {
+-    "id": "pickpocket",
+-    "name": "Pickpocket",
+-    "effect": "Rank 1: Ignore first AGI+Sneak complication when stealing. Rank 2: Reroll 1d20 for pickpocketing. Rank 3: -1 difficulty."
+-  },
+-  {
+-    "id": "lightStep",
+-    "name": "Light Step",
+-    "effect": "On AGI test based on complication, ignore one complication per AP. Reroll 1d20 to avoid pressure plate traps."
+-  },
+-  {
+-    "id": "hacker",
+-    "name": "Hacker",
+-    "effect": "Reduce by 1 (min 0) the difficulty of your tests to hack computers."
+-  },
+-  {
+-    "id": "pathfinder",
+-    "name": "Pathfinder",
+-    "effect": "On long distance travel, a successful PER+Survival test halves travel time."
+-  },
+-  {
+-    "id": "gunslinger",
+-    "name": "Gunslinger",
+-    "effect": "With a one-handed ranged weapon with fire rate ≤2, +1 CD per rank. Reroll the location die."
+-  },
+-  {
+-    "id": "ironFist",
+-    "name": "Iron Fist",
+-    "effect": "Rank 1: +1 CD to unarmed attacks. Rank 2: +Vicious effect."
+-  },
+-  {
+-    "id": "adrenalineRush",
+-    "name": "Adrenaline Rush",
+-    "effect": "When your HP is not at maximum, consider STR = 10 for tests and melee attacks."
+-  },
+-  {
+-    "id": "intimidation",
+-    "name": "Terrifying Presence",
+-    "effect": "Rank 1: Reroll 1d20 to threaten/frighten. Rank 2: Major action to threaten, STR+Speech test difficulty 2."
+-  },
+-  {
+-    "id": "pyromaniac",
+-    "name": "Pyromaniac",
+-    "effect": "With a fire-based weapon, +1 CD damage per rank."
+-  },
+-  {
+-    "id": "nerdRage",
+-    "name": "Nerd Rage!",
+-    "effect": "When below 1/4 max HP, +1 ballistic and energy DR and +1 CD damage per rank."
+-  },
+-  {
+-    "id": "snakeater",
+-    "name": "Snakeater",
+-    "effect": "Your poison damage resistance increases by 2."
+-  },
+-  {
+-    "id": "scrapper",
+-    "name": "Scrapper",
+-    "effect": "Rank 1: When scrapping, also get uncommon components. Rank 2: Also get rare components."
+-  },
+-  {
+-    "id": "refractor",
+-    "name": "Refractor",
+-    "effect": "Your energy damage resistance increases by +1 per rank."
+-  },
+-  {
+-    "id": "strongBack",
+-    "name": "Strong Back",
+-    "effect": "Your maximum carry weight increases by 12.5 kg per rank."
+-  },
+-  {
+-    "id": "chemResistant",
+-    "name": "Chem Resistant",
+-    "effect": "Rank 1: Roll 1 fewer CD to determine addiction. Rank 2: Immune to drug addiction."
+-  },
+-  {
+-    "id": "ricochet",
+-    "name": "Ricochet",
+-    "effect": "If an enemy gets a complication attacking you at range, spend 1 luck point to have the ricochet hit them."
+-  },
+-  {
+-    "id": "toughness",
+-    "name": "Toughness",
+-    "effect": "Your ballistic damage resistance increases by +1 per rank."
+-  },
+-  {
+-    "id": "bloodyMess",
+-    "name": "Bloody Mess",
+-    "effect": "On a critical hit, roll 1 CD. On Effect, inflict an additional injury to a random location."
+-  },
+-  {
+-    "id": "science",
+-    "name": "Science!",
+-    "effect": "You can modify energy weapons and craft certain advanced armor mods. Each rank unlocks mods of that rank."
+-  },
+-  {
+-    "id": "awareness",
+-    "name": "Awareness",
+-    "effect": "When Aiming at a target at short range or less, the next attack gains Piercing 1 (or +1 if already)."
+-  },
+-  {
+-    "id": "sniper",
+-    "name": "Sniper",
+-    "effect": "When Aiming with a two-handed Accurate weapon, choose the hit location without increasing difficulty."
+-  },
+-  {
+-    "id": "inspirational",
+-    "name": "Inspirational",
+-    "effect": "The group AP pool can hold 1 additional AP thanks to you."
+-  },
+-  {
+-    "id": "tag",
+-    "name": "Tag!",
+-    "effect": "Choose an additional tag skill. Increase that skill by 2 ranks (max 6) and check the \"tag skill\" box."
+-  },
+-  {
+-    "id": "adamantiumSkeleton",
+-    "name": "Adamantium Skeleton",
+-    "effect": "The damage required to inflict a critical hit on you increases by your ranks in this perk."
+-  },
+-  {
+-    "id": "educated",
+-    "name": "Skilled",
+-    "effect": "Add +1 to two skills or +2 to any skill as long as it does not go above 6."
+-  },
+-  {
+-    "id": "concentratedFire",
+-    "name": "Concentrated Fire",
+-    "effect": "On ranged attack with extra ammo, reroll up to 3 damage CD."
+-  },
+-  {
+-    "id": "slacker",
+-    "name": "Dodger",
+-    "effect": "Rank 1: On Defend action, -1 difficulty to test. Rank 2: Improving defense costs only 1 AP."
+-  },
+-  {
+-    "id": "triggerRush",
+-    "name": "Gun Fu",
+-    "effect": "On successful ranged attack, spend 1 AP and 1 ammo to hit an additional target at short range. +1 target per rank."
+-  },
+-  {
+-    "id": "slayer",
+-    "name": "Slayer",
+-    "effect": "On unarmed or melee attack with at least 1 damage, spend 1 luck point to inflict a critical hit."
+-  },
+-  {
+-    "id": "killer",
+-    "name": "Grim Reaper's Sprint",
+-    "effect": "When you kill an enemy, roll 1 CD. On Effect, +2 AP to group pool."
+-  },
+-  {
+-    "id": "junktownVendor",
+-    "name": "Junktown Vendor",
+-    "effect": "Reduce by 1 (min 0) the difficulty of any CHR+Barter test to buy or sell."
+-  },
+-  {
+-    "id": "blackWidow",
+-    "name": "Black Widow/Lady Killer",
+-    "effect": "Reroll 1d20 on any CHR test to influence a character of the chosen gender. Your attacks deal +1 CD to them."
+-  },
+-  {
+-    "id": "steadyAim",
+-    "name": "Steady Aim",
+-    "effect": "When Aiming, reroll 2d20 of your first attack this turn OR reroll 1d20 of all your attacks this turn."
+-  },
+-  {
+-    "id": "lifeGiver",
+-    "name": "Lifegiver",
+-    "effect": "Add your Endurance value to your maximum hit points."
+-  }
+-]
++[]
+diff --git a/i18n/ru-RU/data/perks/perks.json b/i18n/ru-RU/data/perks/perks.json
+index 3923a5f..fe51488 100644
+--- a/i18n/ru-RU/data/perks/perks.json
++++ b/i18n/ru-RU/data/perks/perks.json
+@@ -1,472 +1 @@
+-[
+-  {
+-    "id": "animalFriend",
+-    "name": "ДРУГ ЖИВОТНЫХ",
+-    "effect": "Каждый раз, когда NPC-существо с ключевым словом в описании 'Млекопитающее', 'Ящерица' или 'Насекомое' атакует вас, бросьте 1 {/CD}: если вам выпадет результат, отличный от Эффекта, то существо решает не атаковать вас, хотя оно все еще может атаковать другого персонажа, на которого оно может нацелиться."
+-  },
+-  {
+-    "id": "aquaboy",
+-    "name": "АКВАБОЙ или АКВАГЁРЛ",
+-    "effect": "Вода - ваш союзник. Вы больше не получаете урона от радиации при купании в облученной воде и можете задерживать дыхание в два раза дольше обычного."
+-  },
+-  {
+-    "id": "radResistant",
+-    "name": "УСТОЙЧИВОСТЬ К РАДИАЦИИ",
+-    "effect": "Сопротивление урону от радиации всех частей тела увеличивается на +1."
+-  },
+-  {
+-    "id": "armorer",
+-    "name": "БРОННИК",
+-    "effect": "Вы можете улучшать броню с помощью модификаций. Открывает 1 ранг модификаций."
+-  },
+-  {
+-    "id": "barbarian",
+-    "name": "ВАРВАР",
+-    "effect": "Сопротивление физическому урону увеличивается во всех местах поражения на основе вашей СИЛ. СИЛ 7–8: +1 физического СУ; СИЛ 9–10: +2 физического СУ; СИЛ 11+: +3 физического СУ. Вы не получаете это преимущество, пока носите Силовую броню."
+-  },
+-  {
+-    "id": "gunFu",
+-    "name": "ГАН-ФУ",
+-    "effect": "Когда вы добиваетесь успеха в дальнобойной атаке, вы можете потратить 1 ОД и 1 боеприпас, чтобы поразить вторую цель в пределах близкой дистанции от вашей первой цели. Вторая цель получает тот же урон, что и первая цель."
+-  },
+-  {
+-    "id": "silverTongue",
+-    "name": "ТРЕПАЧ",
+-    "effect": "Когда вы проводите тест на бартер или проверку на Красноречие, как часть встречной проверки, вы можете перебросить 1d20."
+-  },
+-  {
+-    "id": "blitz",
+-    "name": "БЛИЦ",
+-    "effect": "Когда вы перемещаетесь в зону досягаемости противника и совершаете против него атаку в ближнем бою в один ход, вы можете перебросить один d20 в своей атаке."
+-  },
+-  {
+-    "id": "leadBelly",
+-    "name": "СВИНЦОВОЕ БРЮХО",
+-    "effect": "Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков."
+-  },
+-  {
+-    "id": "juryRigging",
+-    "name": "ОЧУМЕЛЫЕ РУЧКИ",
+-    "effect": "Вы можете починить предмет, не затрачивая на это никаких компонентов. Однако ремонт будет временным, и предмет снова сломается при следующем осложнении, которое вы получите при его использовании. Диапазон осложнений при проверках на умение пользоваться этим предметом увеличивается на 1, до значения на броске 19-20."
+-  },
+-  {
+-    "id": "scoundrel",
+-    "name": "НЕГОДЯЙ",
+-    "effect": "Когда вы совершаете проверку на ХАР + Красноречие, чтобы убедить кого-то во лжи, вы можете игнорировать первое выпавшее осложнение."
+-  },
+-  {
+-    "id": "dogmeat",
+-    "name": "ПСИНА",
+-    "effect": "У вас есть верная собака, которая служит вам другом и союзником. У собаки есть характеристики: ТЕЛО 5, РАЗУМ 4, Б.БОЙ 2, ОЗ 6, ИНИЦИАТИВА как у игрока, ЗАЩИТА 1, ПЕРЕНОСИМЫЙ ВЕС 50 фунтов. Атака: УКУС (ТЕЛО + Б.БОЙ (ЗУ 7), 2 {/CD} Порочный, физический урон). Особенности: ОБОСТРЁННЫЕ ЧУВСТВА (снижают сложность проверок на ВОС на 1), АТАКА СОБАКИ (наносит урон в ближнем бою при помощи), КОМПАНЬОН (уровень собаки равен вашему, увеличивается ТЕЛО или РАЗУМ на +1 на нечетных уровнях после 3, ОЗ +1 за уровень и при повышении ТЕЛО, урон от укуса +1 {/CD} на 5 уровне и каждые 5 уровней). Если собака умирает, вы находите новую или обмениваете перк."
+-  },
+-  {
+-    "id": "hunter",
+-    "name": "ОХОТНИК",
+-    "effect": "Когда вы атакуете NPC с одним из ключевых слов 'Млекопитающее', 'Ящерица' или 'Насекомое' и ключевым словом 'Мутировавший', ваша атака получает эффект 'Порочный урон', если у нее еще не было этого эффекта."
+-  },
+-  {
+-    "id": "chemist",
+-    "name": "ХИМИК",
+-    "effect": "Созданные вами препараты действуют в два раза дольше обычных. Кроме того, вы разблокируете рецепты препаратов, для которых этот перк является обязательным условием."
+-  },
+-  {
+-    "id": "shotgunSurgeon",
+-    "name": "ХИРУРГ С ДРОБОВИКОМ",
+-    "effect": "Ваши дальнобойные атаки с использованием дробовика получают эффект 'Проникающий' 1 урон или добавляют +1 к уже имеющемуся у оружия эффекту 'Проникающий' X урон."
+-  },
+-  {
+-    "id": "movingTarget",
+-    "name": "ДВИЖУЩАЯСЯ МИШЕНЬ",
+-    "effect": "Когда вы выполняете действие 'Спринт', ваша защита увеличивается на +1 до начала вашего следующего хода."
+-  },
+-  {
+-    "id": "basher",
+-    "name": "УДАРНИК",
+-    "effect": "Когда вы совершаете атаку в ближнем бою ударяя своим оружием, ваша атака получает эффект урона 'Порочный'."
+-  },
+-  {
+-    "id": "laserCommander",
+-    "name": "ЛАЗЕРОВ НАЧАЛЬНИК",
+-    "effect": "Когда вы атакуете дальнобойным энергооружием, урон увеличивается на +1 {/CD} за ранг этого перка."
+-  },
+-  {
+-    "id": "commando",
+-    "name": "КОММАНДОС",
+-    "effect": "Когда вы совершаете дальнобойную атаку любым оружием со скорострельностью 3 или выше (кроме тяжелого оружия), вы добавляете +1 {/CD} за ранг к урону оружия."
+-  },
+-  {
+-    "id": "comprehension",
+-    "name": "ПОНИМАНИЕ",
+-    "effect": "После того как вы использовали бонус, полученный за чтение журнала, бросьте 1 {/CD}. Если у вас выпал Эффект, вы можете использовать этот бонус еще один раз."
+-  },
+-  {
+-    "id": "canOpener",
+-    "name": "КОНСЕРВАТОР!",
+-    "effect": "Когда вы обыскиваете местность, где есть еда, вы получаете 1 дополнительный случайный предмет еды, не тратя ОД."
+-  },
+-  {
+-    "id": "betterCriticals",
+-    "name": "УЛУЧШЕННЫЕ КРИТЫ",
+-    "effect": "Когда вы наносите врагу одну или более единиц урона, вы можете потратить 1 очко удачи, чтобы автоматически нанести критическое попадание, вызывающее увечье."
+-  },
+-  {
+-    "id": "quickDraw",
+-    "name": "БЫСТРЫЙ ДОСТУП",
+-    "effect": "Каждый ход вы можете достать одно оружие или предмет, который носите при себе, не используя второстепенное действие."
+-  },
+-  {
+-    "id": "fortuneFinder",
+-    "name": "ИСКАТЕЛЬ УДАЧИ",
+-    "effect": "Каждый раз, когда вы делаете бросок, чтобы определить, сколько вы находите денег, вы получаете +3 {/CD} дополнительных крышек."
+-  },
+-  {
+-    "id": "solarPowered",
+-    "name": "СОЛНЕЧНАЯ БАТАРЕЙКА",
+-    "effect": "За каждый час, проведенный под прямыми солнечными лучами, вы излечиваете 1 повреждение от радиации."
+-  },
+-  {
+-    "id": "entomologist",
+-    "name": "ЭНТОМОЛОГ",
+-    "effect": "Когда вы атакуете NPC с ключевым словом 'Насекомое', ваша атака получает эффект 'Проникающий' 1 урон или повышает рейтинг любого эффекта 'Проникающий' X, который есть у оружия, на +1."
+-  },
+-  {
+-    "id": "intenseTraining",
+-    "name": "ИНТЕНСИВНЫЕ ТРЕНИРОВКИ",
+-    "effect": "Повысьте любой атрибут S.P.E.C.I.A.L на 1 ранг. Атрибуты S.P.E.C.I.A.L по прежнему не могут быть увеличены выше 10 с помощью этого метода."
+-  },
+-  {
+-    "id": "demolitionExpert",
+-    "name": "ЭКСПЕРТ ПОДРЫВНИК",
+-    "effect": "Когда вы атакуете оружием с качеством 'Взрыв', эта атака получает эффект 'Порочного' урона. Кроме того, вы открываете рецепты взрывчатых веществ, для которых этот перк является обязательным условием."
+-  },
+-  {
+-    "id": "roboticsExpert",
+-    "name": "ЭКСПЕРТ ПО РОБОТОТЕХНИКЕ",
+-    "effect": "Вы можете модифицировать броню, оружие и модули роботов с помощью модификаций 1-го ранга."
+-  },
+-  {
+-    "id": "gunNut",
+-    "name": "ФАНАТИК ОРУЖИЯ",
+-    "effect": "Вы можете улучшать стрелковое и тяжелое оружие с помощью модификаций. Открывает 1-й ранг модификаций."
+-  },
+-  {
+-    "id": "capCollector",
+-    "name": "КОЛЛЕКЦИОНЕР КРЫШЕК",
+-    "effect": "Когда вы покупаете или продаете товары, вы можете увеличить или уменьшить цену продаваемых товаров на 10%."
+-  },
+-  {
+-    "id": "ghost",
+-    "name": "ПРИЗРАК",
+-    "effect": "Когда вы пытаетесь пройти проверку на ЛОВ + Скрытность, находясь в тени или темноте, первый дополнительный d20 вы получаете бесплатно. При этом обычный максимум - 5d20 - остается в силе."
+-  },
+-  {
+-    "id": "scrounger",
+-    "name": "МУСОРЩИК",
+-    "effect": "Когда вы разбираете предмет на составляющие, вы можете получить как необычные, так и обычные материалы."
+-  },
+-  {
+-    "id": "pharmaFarmer",
+-    "name": "ФАРМА-ФЕРМЕР",
+-    "effect": "Когда вы обыскиваете место, где есть лекарства или препараты, вы находите один дополнительный предмет, определяемый случайным образом, не тратя ОД."
+-  },
+-  {
+-    "id": "partyBoy",
+-    "name": "ТУСОВЩИК",
+-    "effect": "Вы не можете стать зависимым от алкогольных напитков, и всякий раз, когда вы выпиваете алкоголь, вы исцеляетесь на +2 ОЗ."
+-  },
+-  {
+-    "id": "finesse",
+-    "name": "ТОЧНОСТЬ",
+-    "effect": "Один раз за бой вы можете перебросить все D за один бросок урона, не тратя очков удачи."
+-  },
+-  {
+-    "id": "heavyHitter",
+-    "name": "ВЫСШАЯ ЛИГА",
+-    "effect": "Когда вы атакуете двуручным оружием ближнего боя, оружие получает эффект урона 'Порочный'."
+-  },
+-  {
+-    "id": "blacksmith",
+-    "name": "КУЗНЕЦ",
+-    "effect": "Вы можете улучшать оружие ближнего боя с помощью модов на оружие. Открывает модификации 1-го ранга."
+-  },
+-  {
+-    "id": "piercingStrike",
+-    "name": "ПРОНИКАЮЩИЙ УДАР",
+-    "effect": "Ваши рукопашные атаки и атаки ближнего боя оружием типа 'клинок' получают эффект 'Проникающий' 1 урон или добавляют +1 к рейтингу любого эффекта 'Пронзающий' X урон, который у них уже был."
+-  },
+-  {
+-    "id": "rifleman",
+-    "name": "КАРАБИНЕР",
+-    "effect": "Когда вы совершаете дальнобойную атаку любым двуручным оружием со скорострельностью 2 или ниже (кроме тяжелого оружия), добавьте +1 {/CD} к урону оружия за ранг."
+-  },
+-  {
+-    "id": "meltdown",
+-    "name": "РАСПЫЛЕНИЕ",
+-    "effect": "Когда вы убиваете врага энергетическим оружием, он взрывается. Бросьте количество D, равное половине рейтинга урона оружия (округлите вниз). За каждый выпавший эффект одно существо в пределах близкой дистанции от взорвавшегося противника (начиная с ближайшего) получает энергетический урон, равный сумме, выпавшей на D."
+-  },
+-  {
+-    "id": "fastHealer",
+-    "name": "БЫСТРОЕ ИСЦЕЛЕНИЕ",
+-    "effect": "Когда вы делаете проверку на ВЫН + Выживание, чтобы вылечить свои раны, первый дополнительный d20 вы получаете бесплатно. При этом обычный максимум - 5d20 - остается в силе."
+-  },
+-  {
+-    "id": "medic",
+-    "name": "МЕДИК",
+-    "effect": "Когда вы используете действие 'Первая помощь', чтобы попытаться вылечить травму, вы можете повторно бросить 1d20."
+-  },
+-  {
+-    "id": "heaveHo",
+-    "name": "ЛОВИ!",
+-    "effect": "Когда вы атакуете метательным оружием, вы можете потратить 1 ОД, чтобы увеличить дистанцию применения оружия на один шаг - с ближней до средней или со средней до дальней дистанции."
+-  },
+-  {
+-    "id": "actionBoy",
+-    "name": "ЭКШН БОЙ или ГЁРЛ",
+-    "effect": "Когда вы тратите ОД на дополнительное основное действие, сложность проверки навыков во время второго действия не увеличивается."
+-  },
+-  {
+-    "id": "infiltrator",
+-    "name": "ЛАЗУТЧИК",
+-    "effect": "Когда вы пытаетесь провести проверку на владение навыком 'Отмычки', чтобы отпереть дверь или контейнер, вы можете перебросить 1d20."
+-  },
+-  {
+-    "id": "nurse",
+-    "name": "ЛЕКАРЬ",
+-    "effect": "Когда вы восстанавливаете ОЗ пациента с помощью действия 'Первая помощь', количество исцеленных ОЗ увеличивается на +1."
+-  },
+-  {
+-    "id": "sizeMatters",
+-    "name": "РАЗМЕР ИМЕЕТ ЗНАЧЕНИЕ",
+-    "effect": "Когда вы совершаете дальнобойную атаку любым тяжелым оружием, вы добавляете +1 {/CD} к урону оружия за ранг."
+-  },
+-  {
+-    "id": "bullRush",
+-    "name": "ПОЕЗД БОЛИ",
+-    "effect": "Вы можете использовать 'Заряд' в качестве основного действия. Это действие движения, и вы не можете перемещаться или совершать спринт в один и тот же ход. Вы перемещаетесь в зону досягаемости противника в пределах средней дистанции (1 зона) и делаете проверку на СИЛ + Атлетика со сложностью 2. Если вы добиваетесь успеха, противник получает урон, равный вашему обычному рукопашному урону, и будет сбит с ног."
+-  },
+-  {
+-    "id": "quickHands",
+-    "name": "ЛОВКИЕ РУКИ",
+-    "effect": "Вы можете быстрее перезаряжать огнестрельное оружие. Когда вы совершаете дальнобойную атаку, вы можете потратить 2 ОД, чтобы удвоить скорострельность вашего оружия для этой атаки."
+-  },
+-  {
+-    "id": "masterThief",
+-    "name": "МАСТЕР ВОР",
+-    "effect": "Когда вы пытаетесь взломать замок или ограбить кого-нибудь, сложность проверок противника на обнаружение вас увеличивается на +1."
+-  },
+-  {
+-    "id": "sandman",
+-    "name": "ПЕСОЧНЫЙ ЧЕЛОВЕК",
+-    "effect": "Когда вы совершаете скрытую атаку с помощью тихого оружия (пневматическая винтовка, арбалет и т.п.) или с глушителем, урон увеличивается на +2 {/CD}."
+-  },
+-  {
+-    "id": "fastMetabolism",
+-    "name": "БЫСТРЫЙ МЕТАБОЛИЗМ",
+-    "effect": "Когда вы восстанавливаете одно или более ОЗ за счет любого средства, кроме отдыха, увеличивайте общее количество восстановленных ОЗ на +1."
+-  },
+-  {
+-    "id": "mysteriousStranger",
+-    "name": "ТАИНСТВЕННЫЙ НЕЗНАКОМЕЦ",
+-    "effect": "В начале боевого столкновения вы можете потратить 1 очко удачи. Если вы это сделаете, ГМ может заставить появиться Таинственного незнакомца, который наносит одну дальнобойную атаку по врагу, которого вы атаковали или который только что атаковал вас, а затем исчезает. Незнакомец имеет ЛОВ 10, навык 'Стрелковое оружие' 6, бросает 3D20, использует револьвер .44 Магнум, наносящий 8 {/CD} Пронзающий 1, порочный физический урон. Если незнакомец не появляется, ГМ возвращает очко удачи."
+-  },
+-  {
+-    "id": "daringNature",
+-    "name": "ДЕРЗКАЯ НАТУРА",
+-    "effect": "Каждый раз, когда вы пытаетесь провести проверку навыка и покупаете один или несколько d20, давая гейммастеру очки действий, вы можете перебросить 1d20 на эту проверку."
+-  },
+-  {
+-    "id": "cautiousNature",
+-    "name": "ОСТОРОЖНАЯ НАТУРА",
+-    "effect": "Когда вы пытаетесь пройти проверку навыка и покупаете один или несколько d20, тратя очки действий, вы можете перебросить 1d20 в этой проверке."
+-  },
+-  {
+-    "id": "ninja",
+-    "name": "НИНДЗЯ",
+-    "effect": "Когда вы совершаете скрытную атаку оружием ближнего боя или в рукопашную, урон увеличивается на +2 {/CD}. Вы не можете получить это преимущество, находясь в силовой броне."
+-  },
+-  {
+-    "id": "nightPerson",
+-    "name": "НОЧНОЕ СУЩЕСТВО",
+-    "effect": "Уменьшите любое повышение сложности, возникшее из-за темноты, на 1."
+-  },
+-  {
+-    "id": "paralyzingPalm",
+-    "name": "ПАРАЛИЗУЮЩАЯ ЛАДОНЬ",
+-    "effect": "Когда вы совершаете рукопашную атаку и выбираете определенное место для удара, ваша атака получает эффект оглушения."
+-  },
+-  {
+-    "id": "nuclearPhysicist",
+-    "name": "ФИЗИК-ЯДЕРЩИК",
+-    "effect": "Каждый раз, когда вы используете оружие, которое наносит урон радиацией или имеет эффект Радиоактивный урон, каждый эффект, который выпадает вам, наносит одно дополнительное очко радиационного урона. Кроме того, используемые вами ядерные блоки плавления имеют 3 дополнительных заряда."
+-  },
+-  {
+-    "id": "pickpocket",
+-    "name": "КАРМАННИК",
+-    "effect": "Вы можете игнорировать первое осложнение, когда совершаете проверку на ЛОВ + Скрытность, чтобы украсть предмет у другого человека или подбросить ему что-то."
+-  },
+-  {
+-    "id": "lightStep",
+-    "name": "ЛЁГКИЙ ШАГ",
+-    "effect": "Когда вы делаете бросок на создание каких-либо осложнений, связанных с ловкостью, вы можете игнорировать одно осложнение за каждый потраченный 1 ОД. Кроме того, вы можете перебросить 1d20 на любую проверку на ЛОВ + Атлетику, чтобы избежать ловушек, типа нажимных плит или подобных механизмов. Вы не можете получить это преимущество, находясь в силовой броне."
+-  },
+-  {
+-    "id": "hacker",
+-    "name": "ХАКЕР",
+-    "effect": "Сложность проверки на умение взламывать компьютеры уменьшается на 1, вплоть до минимального значения 0."
+-  },
+-  {
+-    "id": "pathfinder",
+-    "name": "ПЕРВОПРОХОДЕЦ",
+-    "effect": "При путешествии на большие расстояния по дикой местности успешная проверка на ВОС + Выживание (со сложностью, определяемой ГМом в зависимости от местности) сокращает время путешествия вдвое."
+-  },
+-  {
+-    "id": "gunslinger",
+-    "name": "СТРЕЛОК",
+-    "effect": "Когда вы атакуете одноручным оружием дальнего боя со скорострельностью 2 или ниже, вы увеличиваете урон оружия на +1 {/CD} за ранг. Кроме того, вы можете повторно бросить кубик, определяющий место поражения."
+-  },
+-  {
+-    "id": "ironFist",
+-    "name": "ЖЕЛЕЗНЫЙ КУЛАК",
+-    "effect": "Ваши рукопашные атаки наносят +1 {/CD} урона."
+-  },
+-  {
+-    "id": "adrenalineRush",
+-    "name": "ВЫБРОС АДРЕНАЛИНА",
+-    "effect": "Когда ваше здоровье ниже максимального значения, при совершении проверок на СИЛ или для совершения атаки в ближнем бою вы считаете свой показатель СИЛ равным 10."
+-  },
+-  {
+-    "id": "intimidation",
+-    "name": "УЖАСАЮЩЕЕ ПРИСУТСТВИЕ",
+-    "effect": "Когда вы проводите проверку на Красноречие, чтобы угрожать или напугать кого-то, вы можете повторно бросить 1d20."
+-  },
+-  {
+-    "id": "pyromaniac",
+-    "name": "ПИРОМАНЬЯК",
+-    "effect": "Урон, наносимый вами оружием, использующим огонь, увеличивается на +1 {/CD} за ранг."
+-  },
+-  {
+-    "id": "nerdRage",
+-    "name": "ЯРОСТЬ БОТАНИКА!",
+-    "effect": "Пока ваше здоровье меньше ¼ от максимального, вы добавляете +1 к вашему физическому СУ, +1 к вашему энерго СУ и +1 {/CD} к урону всех ваших атак."
+-  },
+-  {
+-    "id": "snakeater",
+-    "name": "ПОЖИРАТЕЛЬ ЗМЕЙ",
+-    "effect": "Сопротивление урону от яда увеличивается на +2."
+-  },
+-  {
+-    "id": "scrapper",
+-    "name": "РУБАКА",
+-    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание - и тем самым нанести увечье конечности."
+-  },
+-  {
+-    "id": "refractor",
+-    "name": "РЕФРАКТОР",
+-    "effect": "Сопротивление энергетическому урону на всех частях тела увеличивается на +1."
+-  },
+-  {
+-    "id": "strongBack",
+-    "name": "КРЕПКИЙ ХРЕБЕТ",
+-    "effect": "Ваш максимальный переносимый вес увеличивается на +25 фунтов."
+-  },
+-  {
+-    "id": "chemResistant",
+-    "name": "УСТОЙЧИВОСТЬ К ХИМИИ",
+-    "effect": "Бросьте меньше на один D для определения того, становитесь ли вы зависимым от препаратов, сложность проверки уменьшается вплоть до 0."
+-  },
+-  {
+-    "id": "ricochet",
+-    "name": "РИКОШЕТ",
+-    "effect": "Если противник совершает дальнобойную атаку и ему выпадает осложнение, вы можете потратить одно очко удачи, чтобы рикошетом попасть в него. Отразите выпавший урон против атакующего противника."
+-  },
+-  {
+-    "id": "toughness",
+-    "name": "ПРОЧНОСТЬ",
+-    "effect": "Ваше сопротивление физическому урону во всех частях тела увеличивается на +1."
+-  },
+-  {
+-    "id": "bloodyMess",
+-    "name": "КРОВАВАЯ БАНЯ",
+-    "effect": "Когда вы наносите критический удар, бросьте 1 {/CD}; если выпадает эффект, вы наносите одно дополнительное увечье в случайное место."
+-  },
+-  {
+-    "id": "science",
+-    "name": "НАУКА!",
+-    "effect": "Вы можете модифицировать энергетическое оружие с помощью модификаций, а также создавать некоторые усовершенствованные модификации брони. Открывает модификации 1-го ранга."
+-  },
+-  {
+-    "id": "awareness",
+-    "name": "ОСВЕДОМЛЁННОСТЬ",
+-    "effect": "Когда вы выполняете второстепенное действие 'Прицеливание' в противника, находящегося на близкой дистанции, вы замечаете его слабые места и можете атаковать более эффективно. Следующая атака, которую вы совершите по этой цели, получит эффект урона 'Проникающий' 1 или повысит рейтинг любого существующего эффекта урона 'Проникающий' X на 1."
+-  },
+-  {
+-    "id": "sniper",
+-    "name": "СНАЙПЕР",
+-    "effect": "Когда вы выполняете второстепенное действие 'Прицелиться', а затем совершаете дальнобойную атаку двуручным оружием с качеством 'Точный', вы можете указать часть тела для попадания без увеличения сложности атаки."
+-  },
+-  {
+-    "id": "inspirational",
+-    "name": "ВДОХНОВЛЯЮЩИЙ",
+-    "effect": "Поскольку вы являетесь примером для подражания, максимальное количество ОД, которое группа может сохранить, увеличивается на 1."
+-  },
+-  {
+-    "id": "tag",
+-    "name": "ОТМЕТКА!",
+-    "effect": "Вы можете выбрать один дополнительный навык. Повысьте ранг навыка на 2, максимум до 6, и отметьте его. Это позволит вам добиваться критического успеха при проверке навыков, если при проверке на d20 выпадет результат, равный или меньший чем уровень этого навыка."
+-  },
+-  {
+-    "id": "adamantiumSkeleton",
+-    "name": "АДАМАНТИЕВЫЙ СКЕЛЕТ",
+-    "effect": "Когда вы получаете урон, количество повреждений, необходимых для нанесения критического удара по вам, увеличивается на ваш ранг в этом перке. Например, если у вас один ранг этого перка, вы получите критическое попадание от 6 и более единиц урона, а не от 5."
+-  },
+-  {
+-    "id": "educated",
+-    "name": "ТРЕНИРОВАННЫЙ",
+-    "effect": "Добавьте +1 ранг к двум навыкам или добавьте +2 ранга к одному навыку. Ни один навык не может превышать 6-й ранг."
+-  },
+-  {
+-    "id": "concentratedFire",
+-    "name": "СОСРЕДОТОЧЕННЫЙ ОГОНЬ",
+-    "effect": "Когда вы совершаете дальнобойную атаку и тратите боеприпасы, чтобы увеличить урон, вы можете перебросить до 3 {/CD} для нанесения урона."
+-  },
+-  {
+-    "id": "slacker",
+-    "name": "ЛОВКАЧ",
+-    "effect": "При выполнении основного действия 'Защита' вы снижаете сложность проверки навыка на 1."
+-  },
+-  {
+-    "id": "triggerRush",
+-    "name": "ХАЛЯВЩИК",
+-    "effect": "Каждый раз, когда вы совершаете бросок, чтобы узнать, сколько патронов вы нашли, вы находите +3 {/CD} дополнительных патронов."
+-  },
+-  {
+-    "id": "slayer",
+-    "name": "РУБАКА",
+-    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание - и тем самым нанести увечье конечности."
+-  },
+-  {
+-    "id": "killer",
+-    "name": "СПРИНТ МРАЧНОГО ЖНЕЦА",
+-    "effect": "Когда вы совершаете атаку, убивающую одного или нескольких врагов, бросьте 1 {/CD}. Если выпал эффект, добавьте 2 ОД в пул группы."
+-  },
+-  {
+-    "id": "junktownVendor",
+-    "name": "ПРОДАВЕЦ ВЯЛЕНОГО МЯСА ИЗ ДЖАНКТАУНА",
+-    "effect": "Сложность любой проверки на ХАР + Бартер, с помощью которой вы пытаетесь купить или продать товары, снижается на 1, вплоть до 0."
+-  },
+-  {
+-    "id": "blackWidow",
+-    "name": "ЧЕРНАЯ ВДОВА или УБИЙЦА ЖЕНЩИН",
+-    "effect": "Перк 'Черная вдова' действует на мужчин и персонажей мужского пола, а перк 'Убийца Женщин' - на женщин и персонажей женского пола. Когда вы пытаетесь пройти проверку навыков основанных на ХАР, чтобы повлиять на персонажа выбранного пола, вы можете перебросить 1d20. Кроме того, ваши атаки наносят +1 {/CD} дополнительного урона против персонажей выбранного пола."
+-  },
+-  {
+-    "id": "steadyAim",
+-    "name": "СТАБИЛЬНЫЙ ПРИЦЕЛ",
+-    "effect": "Когда вы выполняете второстепенное действие 'Прицеливание', вы можете либо перебросить 2d20 при первой атаке, которую вы совершаете в этот ход, либо перебросить 1d20 при всех атаках, которые вы совершаете в этот ход."
+-  },
+-  {
+-    "id": "lifeGiver",
+-    "name": "ДАЮЩИЙ ЖИЗНЬ",
+-    "effect": "Увеличьте максимальное количество очков здоровья на уровень Выносливости."
+-  }
+-]
+\ No newline at end of file
++[]
+diff --git a/modules/fallout/data/perks/perks.json b/modules/fallout/data/perks/perks.json
+new file mode 100644
+index 0000000..9d77a6a
+--- /dev/null
++++ b/modules/fallout/data/perks/perks.json
+@@ -0,0 +1,1201 @@
++[
++  {
++    "id": "animalFriend",
++    "nameKey": "perks.animalFriend.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.animalFriend.effect",
++    "effect": "animalFriend"
++  },
++  {
++    "id": "aquaboy",
++    "nameKey": "perks.aquaboy.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "END": 5
++      },
++      "level": 1,
++      "levelIncreasePerRank": 3
++    },
++    "effectKey": "perks.aquaboy.effect",
++    "effect": "aquaboy"
++  },
++  {
++    "id": "radResistant",
++    "nameKey": "perks.radResistant.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "END": 8
++      },
++      "level": 1,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.radResistant.effect",
++    "effect": "radResistant"
++  },
++  {
++    "id": "armorer",
++    "nameKey": "perks.armorer.name",
++    "maxRanks": 4,
++    "prerequisites": {
++      "special": {
++        "STR": 5,
++        "INT": 6
++      },
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.armorer.effect",
++    "effect": "armorer"
++  },
++  {
++    "id": "barbarian",
++    "nameKey": "perks.barbarian.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 7
++      },
++      "level": 4,
++      "notForRobots": true
++    },
++    "effectKey": "perks.barbarian.effect",
++    "effect": "barbarian"
++  },
++  {
++    "id": "gunFu",
++    "nameKey": "perks.gunFu.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      }
++    },
++    "effectKey": "perks.gunFu.effect",
++    "effect": "gunFu"
++  },
++  {
++    "id": "silverTongue",
++    "nameKey": "perks.silverTongue.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      }
++    },
++    "effectKey": "perks.silverTongue.effect",
++    "effect": "silverTongue"
++  },
++  {
++    "id": "blitz",
++    "nameKey": "perks.blitz.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "AGI": 9
++      },
++      "level": 1,
++      "levelIncreasePerRank": 3
++    },
++    "effectKey": "perks.blitz.effect",
++    "effect": "blitz"
++  },
++  {
++    "id": "leadBelly",
++    "nameKey": "perks.leadBelly.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 1,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.leadBelly.effect",
++    "effect": "leadBelly"
++  },
++  {
++    "id": "juryRigging",
++    "nameKey": "perks.juryRigging.name",
++    "maxRanks": 1,
++    "prerequisites": {},
++    "effectKey": "perks.juryRigging.effect",
++    "effect": "juryRigging"
++  },
++  {
++    "id": "scoundrel",
++    "nameKey": "perks.scoundrel.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      }
++    },
++    "effectKey": "perks.scoundrel.effect",
++    "effect": "scoundrel"
++  },
++  {
++    "id": "dogmeat",
++    "nameKey": "perks.dogmeat.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 5
++      }
++    },
++    "effectKey": "perks.dogmeat.effect",
++    "effect": "dogmeat"
++  },
++  {
++    "id": "hunter",
++    "nameKey": "perks.hunter.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      }
++    },
++    "effectKey": "perks.hunter.effect",
++    "effect": "hunter"
++  },
++  {
++    "id": "chemist",
++    "nameKey": "perks.chemist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 7
++      }
++    },
++    "effectKey": "perks.chemist.effect",
++    "effect": "chemist"
++  },
++  {
++    "id": "shotgunSurgeon",
++    "nameKey": "perks.shotgunSurgeon.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 5,
++        "AGI": 7
++      }
++    },
++    "effectKey": "perks.shotgunSurgeon.effect",
++    "effect": "shotgunSurgeon"
++  },
++  {
++    "id": "movingTarget",
++    "nameKey": "perks.movingTarget.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 6
++      }
++    },
++    "effectKey": "perks.movingTarget.effect",
++    "effect": "movingTarget"
++  },
++  {
++    "id": "basher",
++    "nameKey": "perks.basher.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      }
++    },
++    "effectKey": "perks.basher.effect",
++    "effect": "basher"
++  },
++  {
++    "id": "laserCommander",
++    "nameKey": "perks.laserCommander.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.laserCommander.effect",
++    "effect": "laserCommander"
++  },
++  {
++    "id": "commando",
++    "nameKey": "perks.commando.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "AGI": 8
++      },
++      "level": 2,
++      "levelIncreasePerRank": 3
++    },
++    "effectKey": "perks.commando.effect",
++    "effect": "commando"
++  },
++  {
++    "id": "comprehension",
++    "nameKey": "perks.comprehension.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 6
++      }
++    },
++    "effectKey": "perks.comprehension.effect",
++    "effect": "comprehension"
++  },
++  {
++    "id": "canOpener",
++    "nameKey": "perks.canOpener.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 5
++      }
++    },
++    "effectKey": "perks.canOpener.effect",
++    "effect": "canOpener"
++  },
++  {
++    "id": "betterCriticals",
++    "nameKey": "perks.betterCriticals.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 9
++      }
++    },
++    "effectKey": "perks.betterCriticals.effect",
++    "effect": "betterCriticals"
++  },
++  {
++    "id": "quickDraw",
++    "nameKey": "perks.quickDraw.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 6
++      }
++    },
++    "effectKey": "perks.quickDraw.effect",
++    "effect": "quickDraw"
++  },
++  {
++    "id": "fortuneFinder",
++    "nameKey": "perks.fortuneFinder.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "CHA": 5
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.fortuneFinder.effect",
++    "effect": "fortuneFinder"
++  },
++  {
++    "id": "solarPowered",
++    "nameKey": "perks.solarPowered.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      }
++    },
++    "effectKey": "perks.solarPowered.effect",
++    "effect": "solarPowered"
++  },
++  {
++    "id": "entomologist",
++    "nameKey": "perks.entomologist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 7
++      }
++    },
++    "effectKey": "perks.entomologist.effect",
++    "effect": "entomologist"
++  },
++  {
++    "id": "intenseTraining",
++    "nameKey": "perks.intenseTraining.name",
++    "maxRanks": 10,
++    "prerequisites": {
++      "level": 2,
++      "levelIncreasePerRank": 2
++    },
++    "effectKey": "perks.intenseTraining.effect",
++    "effect": "intenseTraining"
++  },
++  {
++    "id": "demolitionExpert",
++    "nameKey": "perks.demolitionExpert.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 6,
++        "CHA": 6
++      }
++    },
++    "effectKey": "perks.demolitionExpert.effect",
++    "effect": "demolitionExpert"
++  },
++  {
++    "id": "roboticsExpert",
++    "nameKey": "perks.roboticsExpert.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "INT": 8
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.roboticsExpert.effect",
++    "effect": "roboticsExpert"
++  },
++  {
++    "id": "gunNut",
++    "nameKey": "perks.gunNut.name",
++    "maxRanks": 4,
++    "prerequisites": {
++      "special": {
++        "INT": 6
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.gunNut.effect",
++    "effect": "gunNut"
++  },
++  {
++    "id": "capCollector",
++    "nameKey": "perks.capCollector.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 5
++      }
++    },
++    "effectKey": "perks.capCollector.effect",
++    "effect": "capCollector"
++  },
++  {
++    "id": "ghost",
++    "nameKey": "perks.ghost.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 5,
++        "AGI": 6
++      }
++    },
++    "effectKey": "perks.ghost.effect",
++    "effect": "ghost"
++  },
++  {
++    "id": "scrounger",
++    "nameKey": "perks.scrounger.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.scrounger.effect",
++    "effect": "scrounger"
++  },
++  {
++    "id": "pharmaFarmer",
++    "nameKey": "perks.pharmaFarmer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      }
++    },
++    "effectKey": "perks.pharmaFarmer.effect",
++    "effect": "pharmaFarmer"
++  },
++  {
++    "id": "partyBoy",
++    "nameKey": "perks.partyBoy.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6,
++        "CHA": 7
++      }
++    },
++    "effectKey": "perks.partyBoy.effect",
++    "effect": "partyBoy"
++  },
++  {
++    "id": "finesse",
++    "nameKey": "perks.finesse.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 9
++      }
++    },
++    "effectKey": "perks.finesse.effect",
++    "effect": "finesse"
++  },
++  {
++    "id": "heavyHitter",
++    "nameKey": "perks.heavyHitter.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8
++      }
++    },
++    "effectKey": "perks.heavyHitter.effect",
++    "effect": "heavyHitter"
++  },
++  {
++    "id": "blacksmith",
++    "nameKey": "perks.blacksmith.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.blacksmith.effect",
++    "effect": "blacksmith"
++  },
++  {
++    "id": "piercingStrike",
++    "nameKey": "perks.piercingStrike.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 7
++      }
++    },
++    "effectKey": "perks.piercingStrike.effect",
++    "effect": "piercingStrike"
++  },
++  {
++    "id": "rifleman",
++    "nameKey": "perks.rifleman.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.rifleman.effect",
++    "effect": "rifleman"
++  },
++  {
++    "id": "meltdown",
++    "nameKey": "perks.meltdown.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 10
++      }
++    },
++    "effectKey": "perks.meltdown.effect",
++    "effect": "meltdown"
++  },
++  {
++    "id": "fastHealer",
++    "nameKey": "perks.fastHealer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "notForRobots": true
++    },
++    "effectKey": "perks.fastHealer.effect",
++    "effect": "fastHealer"
++  },
++  {
++    "id": "medic",
++    "nameKey": "perks.medic.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "INT": 7
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.medic.effect",
++    "effect": "medic"
++  },
++  {
++    "id": "heaveHo",
++    "nameKey": "perks.heaveHo.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8
++      }
++    },
++    "effectKey": "perks.heaveHo.effect",
++    "effect": "heaveHo"
++  },
++  {
++    "id": "actionBoy",
++    "nameKey": "perks.actionBoy.name",
++    "maxRanks": 1,
++    "prerequisites": {},
++    "effectKey": "perks.actionBoy.effect",
++    "effect": "actionBoy"
++  },
++  {
++    "id": "infiltrator",
++    "nameKey": "perks.infiltrator.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      }
++    },
++    "effectKey": "perks.infiltrator.effect",
++    "effect": "infiltrator"
++  },
++  {
++    "id": "nurse",
++    "nameKey": "perks.nurse.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 8
++      }
++    },
++    "effectKey": "perks.nurse.effect",
++    "effect": "nurse"
++  },
++  {
++    "id": "sizeMatters",
++    "nameKey": "perks.sizeMatters.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "END": 7,
++        "AGI": 6
++      },
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.sizeMatters.effect",
++    "effect": "sizeMatters"
++  },
++  {
++    "id": "bullRush",
++    "nameKey": "perks.bullRush.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "STR": 9,
++        "END": 7
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.bullRush.effect",
++    "effect": "bullRush"
++  },
++  {
++    "id": "quickHands",
++    "nameKey": "perks.quickHands.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 8
++      }
++    },
++    "effectKey": "perks.quickHands.effect",
++    "effect": "quickHands"
++  },
++  {
++    "id": "masterThief",
++    "nameKey": "perks.masterThief.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8,
++        "AGI": 9
++      }
++    },
++    "effectKey": "perks.masterThief.effect",
++    "effect": "masterThief"
++  },
++  {
++    "id": "sandman",
++    "nameKey": "perks.sandman.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 9
++      }
++    },
++    "effectKey": "perks.sandman.effect",
++    "effect": "sandman"
++  },
++  {
++    "id": "fastMetabolism",
++    "nameKey": "perks.fastMetabolism.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 1,
++      "levelIncreasePerRank": 3,
++      "notForRobots": true
++    },
++    "effectKey": "perks.fastMetabolism.effect",
++    "effect": "fastMetabolism"
++  },
++  {
++    "id": "mysteriousStranger",
++    "nameKey": "perks.mysteriousStranger.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      }
++    },
++    "effectKey": "perks.mysteriousStranger.effect",
++    "effect": "mysteriousStranger"
++  },
++  {
++    "id": "daringNature",
++    "nameKey": "perks.daringNature.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      },
++      "excludedPerks": [
++        "cautiousNature"
++      ]
++    },
++    "effectKey": "perks.daringNature.effect",
++    "effect": "daringNature"
++  },
++  {
++    "id": "cautiousNature",
++    "nameKey": "perks.cautiousNature.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 7
++      },
++      "excludedPerks": [
++        "daringNature"
++      ]
++    },
++    "effectKey": "perks.cautiousNature.effect",
++    "effect": "cautiousNature"
++  },
++  {
++    "id": "ninja",
++    "nameKey": "perks.ninja.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 8
++      }
++    },
++    "effectKey": "perks.ninja.effect",
++    "effect": "ninja"
++  },
++  {
++    "id": "nightPerson",
++    "nameKey": "perks.nightPerson.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 7
++      }
++    },
++    "effectKey": "perks.nightPerson.effect",
++    "effect": "nightPerson"
++  },
++  {
++    "id": "paralyzingPalm",
++    "nameKey": "perks.paralyzingPalm.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8
++      }
++    },
++    "effectKey": "perks.paralyzingPalm.effect",
++    "effect": "paralyzingPalm"
++  },
++  {
++    "id": "nuclearPhysicist",
++    "nameKey": "perks.nuclearPhysicist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 9
++      }
++    },
++    "effectKey": "perks.nuclearPhysicist.effect",
++    "effect": "nuclearPhysicist"
++  },
++  {
++    "id": "pickpocket",
++    "nameKey": "perks.pickpocket.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "PER": 8,
++        "AGI": 8
++      },
++      "level": 1,
++      "levelIncreasePerRank": 3
++    },
++    "effectKey": "perks.pickpocket.effect",
++    "effect": "pickpocket"
++  },
++  {
++    "id": "lightStep",
++    "nameKey": "perks.lightStep.name",
++    "maxRanks": 1,
++    "prerequisites": {},
++    "effectKey": "perks.lightStep.effect",
++    "effect": "lightStep"
++  },
++  {
++    "id": "hacker",
++    "nameKey": "perks.hacker.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 8
++      }
++    },
++    "effectKey": "perks.hacker.effect",
++    "effect": "hacker"
++  },
++  {
++    "id": "pathfinder",
++    "nameKey": "perks.pathfinder.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 6,
++        "END": 6
++      }
++    },
++    "effectKey": "perks.pathfinder.effect",
++    "effect": "pathfinder"
++  },
++  {
++    "id": "gunslinger",
++    "nameKey": "perks.gunslinger.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.gunslinger.effect",
++    "effect": "gunslinger"
++  },
++  {
++    "id": "ironFist",
++    "nameKey": "perks.ironFist.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.ironFist.effect",
++    "effect": "ironFist"
++  },
++  {
++    "id": "adrenalineRush",
++    "nameKey": "perks.adrenalineRush.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 7
++      }
++    },
++    "effectKey": "perks.adrenalineRush.effect",
++    "effect": "adrenalineRush"
++  },
++  {
++    "id": "intimidation",
++    "nameKey": "perks.intimidation.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "STR": 6,
++        "CHA": 8
++      },
++      "level": 3,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.intimidation.effect",
++    "effect": "intimidation"
++  },
++  {
++    "id": "pyromaniac",
++    "nameKey": "perks.pyromaniac.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.pyromaniac.effect",
++    "effect": "pyromaniac"
++  },
++  {
++    "id": "nerdRage",
++    "nameKey": "perks.nerdRage.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "INT": 8
++      },
++      "level": 2,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.nerdRage.effect",
++    "effect": "nerdRage"
++  },
++  {
++    "id": "snakeater",
++    "nameKey": "perks.snakeater.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      }
++    },
++    "effectKey": "perks.snakeater.effect",
++    "effect": "snakeater"
++  },
++  {
++    "id": "scrapper",
++    "nameKey": "perks.scrapper.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "level": 3,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.scrapper.effect",
++    "effect": "scrapper"
++  },
++  {
++    "id": "refractor",
++    "nameKey": "perks.refractor.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "PER": 6,
++        "CHA": 7
++      },
++      "level": 1,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.refractor.effect",
++    "effect": "refractor"
++  },
++  {
++    "id": "strongBack",
++    "nameKey": "perks.strongBack.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "STR": 5
++      },
++      "level": 1,
++      "levelIncreasePerRank": 2
++    },
++    "effectKey": "perks.strongBack.effect",
++    "effect": "strongBack"
++  },
++  {
++    "id": "chemResistant",
++    "nameKey": "perks.chemResistant.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 1,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.chemResistant.effect",
++    "effect": "chemResistant"
++  },
++  {
++    "id": "ricochet",
++    "nameKey": "perks.ricochet.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 10
++      },
++      "level": 5
++    },
++    "effectKey": "perks.ricochet.effect",
++    "effect": "ricochet"
++  },
++  {
++    "id": "toughness",
++    "nameKey": "perks.toughness.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "END": 6,
++        "CHA": 6
++      },
++      "level": 1,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.toughness.effect",
++    "effect": "toughness"
++  },
++  {
++    "id": "bloodyMess",
++    "nameKey": "perks.bloodyMess.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      }
++    },
++    "effectKey": "perks.bloodyMess.effect",
++    "effect": "bloodyMess"
++  },
++  {
++    "id": "science",
++    "nameKey": "perks.science.name",
++    "maxRanks": 4,
++    "prerequisites": {
++      "special": {
++        "INT": 6
++      },
++      "level": 2,
++      "levelIncreasePerRank": 4
++    },
++    "effectKey": "perks.science.effect",
++    "effect": "science"
++  },
++  {
++    "id": "awareness",
++    "nameKey": "perks.awareness.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 7
++      }
++    },
++    "effectKey": "perks.awareness.effect",
++    "effect": "awareness"
++  },
++  {
++    "id": "sniper",
++    "nameKey": "perks.sniper.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8,
++        "AGI": 6
++      }
++    },
++    "effectKey": "perks.sniper.effect",
++    "effect": "sniper"
++  },
++  {
++    "id": "inspirational",
++    "nameKey": "perks.inspirational.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8
++      }
++    },
++    "effectKey": "perks.inspirational.effect",
++    "effect": "inspirational"
++  },
++  {
++    "id": "tag",
++    "nameKey": "perks.tag.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "level": 5
++    },
++    "effectKey": "perks.tag.effect",
++    "effect": "tag"
++  },
++  {
++    "id": "adamantiumSkeleton",
++    "nameKey": "perks.adamantiumSkeleton.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 1,
++      "levelIncreasePerRank": 3
++    },
++    "effectKey": "perks.adamantiumSkeleton.effect",
++    "effect": "adamantiumSkeleton"
++  },
++  {
++    "id": "educated",
++    "nameKey": "perks.educated.name",
++    "maxRanks": 10,
++    "prerequisites": {
++      "level": 3,
++      "levelIncreasePerRank": 3
++    },
++    "effectKey": "perks.educated.effect",
++    "effect": "educated"
++  },
++  {
++    "id": "concentratedFire",
++    "nameKey": "perks.concentratedFire.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8,
++        "AGI": 6
++      }
++    },
++    "effectKey": "perks.concentratedFire.effect",
++    "effect": "concentratedFire"
++  },
++  {
++    "id": "slacker",
++    "nameKey": "perks.slacker.name",
++    "maxRanks": 2,
++    "prerequisites": {
++      "special": {
++        "AGI": 6
++      },
++      "level": 4,
++      "levelIncreasePerRank": 6
++    },
++    "effectKey": "perks.slacker.effect",
++    "effect": "slacker"
++  },
++  {
++    "id": "triggerRush",
++    "nameKey": "perks.triggerRush.name",
++    "maxRanks": 3,
++    "prerequisites": {
++      "special": {
++        "AGI": 10
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.triggerRush.effect",
++    "effect": "triggerRush"
++  },
++  {
++    "id": "slayer",
++    "nameKey": "perks.slayer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8
++      }
++    },
++    "effectKey": "perks.slayer.effect",
++    "effect": "slayer"
++  },
++  {
++    "id": "killer",
++    "nameKey": "perks.killer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8
++      }
++    },
++    "effectKey": "perks.killer.effect",
++    "effect": "killer"
++  },
++  {
++    "id": "junktownVendor",
++    "nameKey": "perks.junktownVendor.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8
++      }
++    },
++    "effectKey": "perks.junktownVendor.effect",
++    "effect": "junktownVendor"
++  },
++  {
++    "id": "blackWidow",
++    "nameKey": "perks.blackWidow.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      }
++    },
++    "effectKey": "perks.blackWidow.effect",
++    "effect": "blackWidow"
++  },
++  {
++    "id": "steadyAim",
++    "nameKey": "perks.steadyAim.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8,
++        "AGI": 7
++      }
++    },
++    "effectKey": "perks.steadyAim.effect",
++    "effect": "steadyAim"
++  },
++  {
++    "id": "lifeGiver",
++    "nameKey": "perks.lifeGiver.name",
++    "maxRanks": 5,
++    "prerequisites": {
++      "level": 5,
++      "levelIncreasePerRank": 5
++    },
++    "effectKey": "perks.lifeGiver.effect",
++    "effect": "lifeGiver"
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/perks/perks.json b/modules/fallout/i18n/en-EN/data/perks/perks.json
+new file mode 100644
+index 0000000..bbff941
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/perks/perks.json
+@@ -0,0 +1,472 @@
++[
++  {
++    "id": "animalFriend",
++    "name": "Animal Friend",
++    "effect": "Rank 1: Mammal, Lizard or Insect creatures roll 1 CD before attacking you. No Effect = they don't attack. Rank 2: CHR+Survival test difficulty 2 to befriend an animal."
++  },
++  {
++    "id": "aquaboy",
++    "name": "Aquaboy/Aquagirl",
++    "effect": "Rank 1: Immune to radiation damage in irradiated water, hold breath 2x longer. Rank 2: +2 difficulty to spot you underwater."
++  },
++  {
++    "id": "radResistant",
++    "name": "Rad Resistance",
++    "effect": "Your radiation damage resistance increases by +1 per rank."
++  },
++  {
++    "id": "armorer",
++    "name": "Armorer",
++    "effect": "You can modify armor with mods. Each rank unlocks mods of that rank."
++  },
++  {
++    "id": "barbarian",
++    "name": "Barbarian",
++    "effect": "Your Strength affects your ballistic DR. STR 7-8: +1, STR 9-10: +2, STR 11+: +3. Doesn't work in power armor."
++  },
++  {
++    "id": "gunFu",
++    "name": "Center Mass",
++    "effect": "When making a ranged attack, you can target the Torso without increasing difficulty. You can reroll 1d20 of your attack."
++  },
++  {
++    "id": "silverTongue",
++    "name": "Smooth Talker",
++    "effect": "Re-roll 1d20 on opposed tests involving Barter or Speech."
++  },
++  {
++    "id": "blitz",
++    "name": "Blitz",
++    "effect": "Rank 1: When you move into reach and make a melee attack, reroll 1d20. Rank 2: +1 CD damage."
++  },
++  {
++    "id": "leadBelly",
++    "name": "Lead Belly",
++    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink."
++  },
++  {
++    "id": "juryRigging",
++    "name": "Jury Rigging",
++    "effect": "You can repair an item without spare parts. The repair is temporary: the item breaks on the next complication."
++  },
++  {
++    "id": "scoundrel",
++    "name": "Scoundrel",
++    "effect": "You can ignore the first complication on any CHR+Speech test to convince someone of a lie."
++  },
++  {
++    "id": "dogmeat",
++    "name": "Dogmeat",
++    "effect": "You have a dog companion (see Dogmeat profile). Its level increases with yours."
++  },
++  {
++    "id": "hunter",
++    "name": "Hunter",
++    "effect": "Your attacks against Mammals, Lizards, Insects and Mutants gain the Vicious effect if they don't already have it."
++  },
++  {
++    "id": "chemist",
++    "name": "Chemist",
++    "effect": "The effect duration of drugs you create is doubled. You unlock recipes requiring this perk."
++  },
++  {
++    "id": "shotgunSurgeon",
++    "name": "Shotgun Surgeon",
++    "effect": "Shotgun attacks gain Piercing 1. If already Piercing, the value increases by 1."
++  },
++  {
++    "id": "movingTarget",
++    "name": "Moving Target",
++    "effect": "When you sprint, +1 Defense until the start of your next turn."
++  },
++  {
++    "id": "basher",
++    "name": "Basher",
++    "effect": "When you make a melee attack by bashing with your firearm, the attack gains the Vicious effect."
++  },
++  {
++    "id": "laserCommander",
++    "name": "Laser Commander",
++    "effect": "With a ranged energy weapon, +1 CD damage per rank."
++  },
++  {
++    "id": "commando",
++    "name": "Commando",
++    "effect": "With a ranged weapon with fire rate ≥3 (except heavy weapons), +1 CD damage per rank."
++  },
++  {
++    "id": "comprehension",
++    "name": "Comprehension",
++    "effect": "After using a magazine bonus, roll 1 CD. On Effect, use it one more time."
++  },
++  {
++    "id": "canOpener",
++    "name": "Can Do!",
++    "effect": "When scavenging a location with food, you find one additional food item for free."
++  },
++  {
++    "id": "betterCriticals",
++    "name": "Better Criticals",
++    "effect": "When you deal damage, spend 1 luck point to automatically inflict a critical hit."
++  },
++  {
++    "id": "quickDraw",
++    "name": "Quick Draw",
++    "effect": "Each turn, draw one weapon or item without using a minor action."
++  },
++  {
++    "id": "fortuneFinder",
++    "name": "Fortune Finder",
++    "effect": "When you find caps: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD."
++  },
++  {
++    "id": "solarPowered",
++    "name": "Solar Powered",
++    "effect": "You heal 1 radiation damage per hour in direct sunlight."
++  },
++  {
++    "id": "entomologist",
++    "name": "Entomologist",
++    "effect": "Your attacks against Insects gain Piercing 1. If already Piercing, the value increases by 1."
++  },
++  {
++    "id": "intenseTraining",
++    "name": "Intense Training",
++    "effect": "Increase one S.P.E.C.I.A.L. attribute by 1 (max 10)."
++  },
++  {
++    "id": "demolitionExpert",
++    "name": "Demolition Expert",
++    "effect": "Attacks with Blast gain Vicious. You unlock explosive recipes."
++  },
++  {
++    "id": "roboticsExpert",
++    "name": "Robotics Expert",
++    "effect": "Rank 1: Modify robots with rank 1 mods. Rank 2: Rank 2 mods, -1 difficulty robot repair. Rank 3: Rank 3 mods, reprogramming possible."
++  },
++  {
++    "id": "gunNut",
++    "name": "Gun Nut",
++    "effect": "You can modify small guns. Each rank unlocks mods of that rank."
++  },
++  {
++    "id": "capCollector",
++    "name": "Cap Collector",
++    "effect": "You can modify buy/sell prices by 10%."
++  },
++  {
++    "id": "ghost",
++    "name": "Ghost",
++    "effect": "On AGI+Sneak test in shadow/darkness, the first extra d20 is free."
++  },
++  {
++    "id": "scrounger",
++    "name": "Scrounger",
++    "effect": "When you find ammo: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD (same type as found)."
++  },
++  {
++    "id": "pharmaFarmer",
++    "name": "Pharma Farma",
++    "effect": "When scavenging a location with medicine/chems, you find one additional item for free."
++  },
++  {
++    "id": "partyBoy",
++    "name": "Party Boy/Girl",
++    "effect": "You cannot become addicted to alcoholic beverages. Each alcoholic drink heals +2 HP."
++  },
++  {
++    "id": "finesse",
++    "name": "Finesse",
++    "effect": "Once per combat, reroll all CD of a damage roll without spending a luck point."
++  },
++  {
++    "id": "heavyHitter",
++    "name": "Big Leagues",
++    "effect": "Two-handed melee attacks gain the Vicious effect."
++  },
++  {
++    "id": "blacksmith",
++    "name": "Blacksmith",
++    "effect": "You can modify melee weapons. Each rank unlocks mods of that rank."
++  },
++  {
++    "id": "piercingStrike",
++    "name": "Piercing Strike",
++    "effect": "Your unarmed or bladed melee weapon attacks gain Piercing 1. If already Piercing, +1."
++  },
++  {
++    "id": "rifleman",
++    "name": "Rifleman",
++    "effect": "With a two-handed weapon with fire rate ≤2 (except heavy weapons), +1 CD per rank. Rank 2: +Piercing 1."
++  },
++  {
++    "id": "meltdown",
++    "name": "Meltdown",
++    "effect": "When you kill an enemy with an energy weapon, they explode. Nearby creatures take energy damage."
++  },
++  {
++    "id": "fastHealer",
++    "name": "Faster Healing",
++    "effect": "On END+Survival test to heal yourself, the first extra d20 is free."
++  },
++  {
++    "id": "medic",
++    "name": "Healer",
++    "effect": "When you heal with First Aid, +1 HP healed per rank."
++  },
++  {
++    "id": "heaveHo",
++    "name": "Heave Ho!",
++    "effect": "With a thrown ranged attack, spend 1 AP to increase range by one step."
++  },
++  {
++    "id": "actionBoy",
++    "name": "Action Boy/Girl",
++    "effect": "When you spend AP for an additional major action, no difficulty increase."
++  },
++  {
++    "id": "infiltrator",
++    "name": "Infiltrator",
++    "effect": "Reroll 1d20 on any Lockpick test for a door or container."
++  },
++  {
++    "id": "nurse",
++    "name": "Medic",
++    "effect": "Re-roll 1d20 on First Aid actions."
++  },
++  {
++    "id": "sizeMatters",
++    "name": "Size Matters",
++    "effect": "Ranged attack with a heavy weapon, +1 CD damage per rank."
++  },
++  {
++    "id": "bullRush",
++    "name": "Pain Train",
++    "effect": "Rank 1: Gain Charge major action to damage and knock prone enemies with a Str + Athletics test. Rank 2: +1 CD damage and Stun damage effect."
++  },
++  {
++    "id": "quickHands",
++    "name": "Quick Hands",
++    "effect": "Reload faster. On ranged attack, spend 2 AP for +2 fire rate for this attack."
++  },
++  {
++    "id": "masterThief",
++    "name": "Master Thief",
++    "effect": "On tests to pick locks or pick pockets, +1 difficulty for others to spot you."
++  },
++  {
++    "id": "sandman",
++    "name": "Mister Sandman",
++    "effect": "On sneak attack with silenced weapon, +2 CD damage. Doesn't work in power armor."
++  },
++  {
++    "id": "fastMetabolism",
++    "name": "Fast Metabolism",
++    "effect": "When you recover HP by means other than rest, +1 HP recovered per rank."
++  },
++  {
++    "id": "mysteriousStranger",
++    "name": "Mysterious Stranger",
++    "effect": "At the start of combat, spend 1 luck point. The Mysterious Stranger appears and attacks an enemy."
++  },
++  {
++    "id": "daringNature",
++    "name": "Daring Nature",
++    "effect": "On skill test with 1d20 while granting AP to GM, reroll 1d20. Incompatible with Cautious Nature."
++  },
++  {
++    "id": "cautiousNature",
++    "name": "Cautious Nature",
++    "effect": "On skill test with at least 1d20 bought with AP, reroll 1d20. Incompatible with Daring Nature."
++  },
++  {
++    "id": "ninja",
++    "name": "Ninja",
++    "effect": "On sneak attack unarmed or melee, +2 CD damage. Doesn't work in power armor."
++  },
++  {
++    "id": "nightPerson",
++    "name": "Night Person",
++    "effect": "Reduce by 1 the difficulty increase due to darkness."
++  },
++  {
++    "id": "paralyzingPalm",
++    "name": "Paralyzing Palm",
++    "effect": "On unarmed attack targeting a location, the attack gains the Stun effect."
++  },
++  {
++    "id": "nuclearPhysicist",
++    "name": "Nuclear Physicist",
++    "effect": "With a radiation weapon or Radioactive, each Effect deals +1 radiation damage. Fusion cores have +3 charges."
++  },
++  {
++    "id": "pickpocket",
++    "name": "Pickpocket",
++    "effect": "Rank 1: Ignore first AGI+Sneak complication when stealing. Rank 2: Reroll 1d20 for pickpocketing. Rank 3: -1 difficulty."
++  },
++  {
++    "id": "lightStep",
++    "name": "Light Step",
++    "effect": "On AGI test based on complication, ignore one complication per AP. Reroll 1d20 to avoid pressure plate traps."
++  },
++  {
++    "id": "hacker",
++    "name": "Hacker",
++    "effect": "Reduce by 1 (min 0) the difficulty of your tests to hack computers."
++  },
++  {
++    "id": "pathfinder",
++    "name": "Pathfinder",
++    "effect": "On long distance travel, a successful PER+Survival test halves travel time."
++  },
++  {
++    "id": "gunslinger",
++    "name": "Gunslinger",
++    "effect": "With a one-handed ranged weapon with fire rate ≤2, +1 CD per rank. Reroll the location die."
++  },
++  {
++    "id": "ironFist",
++    "name": "Iron Fist",
++    "effect": "Rank 1: +1 CD to unarmed attacks. Rank 2: +Vicious effect."
++  },
++  {
++    "id": "adrenalineRush",
++    "name": "Adrenaline Rush",
++    "effect": "When your HP is not at maximum, consider STR = 10 for tests and melee attacks."
++  },
++  {
++    "id": "intimidation",
++    "name": "Terrifying Presence",
++    "effect": "Rank 1: Reroll 1d20 to threaten/frighten. Rank 2: Major action to threaten, STR+Speech test difficulty 2."
++  },
++  {
++    "id": "pyromaniac",
++    "name": "Pyromaniac",
++    "effect": "With a fire-based weapon, +1 CD damage per rank."
++  },
++  {
++    "id": "nerdRage",
++    "name": "Nerd Rage!",
++    "effect": "When below 1/4 max HP, +1 ballistic and energy DR and +1 CD damage per rank."
++  },
++  {
++    "id": "snakeater",
++    "name": "Snakeater",
++    "effect": "Your poison damage resistance increases by 2."
++  },
++  {
++    "id": "scrapper",
++    "name": "Scrapper",
++    "effect": "Rank 1: When scrapping, also get uncommon components. Rank 2: Also get rare components."
++  },
++  {
++    "id": "refractor",
++    "name": "Refractor",
++    "effect": "Your energy damage resistance increases by +1 per rank."
++  },
++  {
++    "id": "strongBack",
++    "name": "Strong Back",
++    "effect": "Your maximum carry weight increases by 12.5 kg per rank."
++  },
++  {
++    "id": "chemResistant",
++    "name": "Chem Resistant",
++    "effect": "Rank 1: Roll 1 fewer CD to determine addiction. Rank 2: Immune to drug addiction."
++  },
++  {
++    "id": "ricochet",
++    "name": "Ricochet",
++    "effect": "If an enemy gets a complication attacking you at range, spend 1 luck point to have the ricochet hit them."
++  },
++  {
++    "id": "toughness",
++    "name": "Toughness",
++    "effect": "Your ballistic damage resistance increases by +1 per rank."
++  },
++  {
++    "id": "bloodyMess",
++    "name": "Bloody Mess",
++    "effect": "On a critical hit, roll 1 CD. On Effect, inflict an additional injury to a random location."
++  },
++  {
++    "id": "science",
++    "name": "Science!",
++    "effect": "You can modify energy weapons and craft certain advanced armor mods. Each rank unlocks mods of that rank."
++  },
++  {
++    "id": "awareness",
++    "name": "Awareness",
++    "effect": "When Aiming at a target at short range or less, the next attack gains Piercing 1 (or +1 if already)."
++  },
++  {
++    "id": "sniper",
++    "name": "Sniper",
++    "effect": "When Aiming with a two-handed Accurate weapon, choose the hit location without increasing difficulty."
++  },
++  {
++    "id": "inspirational",
++    "name": "Inspirational",
++    "effect": "The group AP pool can hold 1 additional AP thanks to you."
++  },
++  {
++    "id": "tag",
++    "name": "Tag!",
++    "effect": "Choose an additional tag skill. Increase that skill by 2 ranks (max 6) and check the \"tag skill\" box."
++  },
++  {
++    "id": "adamantiumSkeleton",
++    "name": "Adamantium Skeleton",
++    "effect": "The damage required to inflict a critical hit on you increases by your ranks in this perk."
++  },
++  {
++    "id": "educated",
++    "name": "Skilled",
++    "effect": "Add +1 to two skills or +2 to any skill as long as it does not go above 6."
++  },
++  {
++    "id": "concentratedFire",
++    "name": "Concentrated Fire",
++    "effect": "On ranged attack with extra ammo, reroll up to 3 damage CD."
++  },
++  {
++    "id": "slacker",
++    "name": "Dodger",
++    "effect": "Rank 1: On Defend action, -1 difficulty to test. Rank 2: Improving defense costs only 1 AP."
++  },
++  {
++    "id": "triggerRush",
++    "name": "Gun Fu",
++    "effect": "On successful ranged attack, spend 1 AP and 1 ammo to hit an additional target at short range. +1 target per rank."
++  },
++  {
++    "id": "slayer",
++    "name": "Slayer",
++    "effect": "On unarmed or melee attack with at least 1 damage, spend 1 luck point to inflict a critical hit."
++  },
++  {
++    "id": "killer",
++    "name": "Grim Reaper's Sprint",
++    "effect": "When you kill an enemy, roll 1 CD. On Effect, +2 AP to group pool."
++  },
++  {
++    "id": "junktownVendor",
++    "name": "Junktown Vendor",
++    "effect": "Reduce by 1 (min 0) the difficulty of any CHR+Barter test to buy or sell."
++  },
++  {
++    "id": "blackWidow",
++    "name": "Black Widow/Lady Killer",
++    "effect": "Reroll 1d20 on any CHR test to influence a character of the chosen gender. Your attacks deal +1 CD to them."
++  },
++  {
++    "id": "steadyAim",
++    "name": "Steady Aim",
++    "effect": "When Aiming, reroll 2d20 of your first attack this turn OR reroll 1d20 of all your attacks this turn."
++  },
++  {
++    "id": "lifeGiver",
++    "name": "Lifegiver",
++    "effect": "Add your Endurance value to your maximum hit points."
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/perks/perks.json b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+new file mode 100644
+index 0000000..994e53a
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+@@ -0,0 +1,472 @@
++[
++  {
++    "id": "animalFriend",
++    "name": "ДРУГ ЖИВОТНЫХ",
++    "effect": "Каждый раз, когда NPC-существо с ключевым словом в описании 'Млекопитающее', 'Ящерица' или 'Насекомое' атакует вас, бросьте 1 {/CD}: если вам выпадет результат, отличный от Эффекта, то существо решает не атаковать вас, хотя оно все еще может атаковать другого персонажа, на которого оно может нацелиться."
++  },
++  {
++    "id": "aquaboy",
++    "name": "АКВАБОЙ или АКВАГЁРЛ",
++    "effect": "Вода - ваш союзник. Вы больше не получаете урона от радиации при купании в облученной воде и можете задерживать дыхание в два раза дольше обычного."
++  },
++  {
++    "id": "radResistant",
++    "name": "УСТОЙЧИВОСТЬ К РАДИАЦИИ",
++    "effect": "Сопротивление урону от радиации всех частей тела увеличивается на +1."
++  },
++  {
++    "id": "armorer",
++    "name": "БРОННИК",
++    "effect": "Вы можете улучшать броню с помощью модификаций. Открывает 1 ранг модификаций."
++  },
++  {
++    "id": "barbarian",
++    "name": "ВАРВАР",
++    "effect": "Сопротивление физическому урону увеличивается во всех местах поражения на основе вашей СИЛ. СИЛ 7–8: +1 физического СУ; СИЛ 9–10: +2 физического СУ; СИЛ 11+: +3 физического СУ. Вы не получаете это преимущество, пока носите Силовую броню."
++  },
++  {
++    "id": "gunFu",
++    "name": "ГАН-ФУ",
++    "effect": "Когда вы добиваетесь успеха в дальнобойной атаке, вы можете потратить 1 ОД и 1 боеприпас, чтобы поразить вторую цель в пределах близкой дистанции от вашей первой цели. Вторая цель получает тот же урон, что и первая цель."
++  },
++  {
++    "id": "silverTongue",
++    "name": "ТРЕПАЧ",
++    "effect": "Когда вы проводите тест на бартер или проверку на Красноречие, как часть встречной проверки, вы можете перебросить 1d20."
++  },
++  {
++    "id": "blitz",
++    "name": "БЛИЦ",
++    "effect": "Когда вы перемещаетесь в зону досягаемости противника и совершаете против него атаку в ближнем бою в один ход, вы можете перебросить один d20 в своей атаке."
++  },
++  {
++    "id": "leadBelly",
++    "name": "СВИНЦОВОЕ БРЮХО",
++    "effect": "Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков."
++  },
++  {
++    "id": "juryRigging",
++    "name": "ОЧУМЕЛЫЕ РУЧКИ",
++    "effect": "Вы можете починить предмет, не затрачивая на это никаких компонентов. Однако ремонт будет временным, и предмет снова сломается при следующем осложнении, которое вы получите при его использовании. Диапазон осложнений при проверках на умение пользоваться этим предметом увеличивается на 1, до значения на броске 19-20."
++  },
++  {
++    "id": "scoundrel",
++    "name": "НЕГОДЯЙ",
++    "effect": "Когда вы совершаете проверку на ХАР + Красноречие, чтобы убедить кого-то во лжи, вы можете игнорировать первое выпавшее осложнение."
++  },
++  {
++    "id": "dogmeat",
++    "name": "ПСИНА",
++    "effect": "У вас есть верная собака, которая служит вам другом и союзником. У собаки есть характеристики: ТЕЛО 5, РАЗУМ 4, Б.БОЙ 2, ОЗ 6, ИНИЦИАТИВА как у игрока, ЗАЩИТА 1, ПЕРЕНОСИМЫЙ ВЕС 50 фунтов. Атака: УКУС (ТЕЛО + Б.БОЙ (ЗУ 7), 2 {/CD} Порочный, физический урон). Особенности: ОБОСТРЁННЫЕ ЧУВСТВА (снижают сложность проверок на ВОС на 1), АТАКА СОБАКИ (наносит урон в ближнем бою при помощи), КОМПАНЬОН (уровень собаки равен вашему, увеличивается ТЕЛО или РАЗУМ на +1 на нечетных уровнях после 3, ОЗ +1 за уровень и при повышении ТЕЛО, урон от укуса +1 {/CD} на 5 уровне и каждые 5 уровней). Если собака умирает, вы находите новую или обмениваете перк."
++  },
++  {
++    "id": "hunter",
++    "name": "ОХОТНИК",
++    "effect": "Когда вы атакуете NPC с одним из ключевых слов 'Млекопитающее', 'Ящерица' или 'Насекомое' и ключевым словом 'Мутировавший', ваша атака получает эффект 'Порочный урон', если у нее еще не было этого эффекта."
++  },
++  {
++    "id": "chemist",
++    "name": "ХИМИК",
++    "effect": "Созданные вами препараты действуют в два раза дольше обычных. Кроме того, вы разблокируете рецепты препаратов, для которых этот перк является обязательным условием."
++  },
++  {
++    "id": "shotgunSurgeon",
++    "name": "ХИРУРГ С ДРОБОВИКОМ",
++    "effect": "Ваши дальнобойные атаки с использованием дробовика получают эффект 'Проникающий' 1 урон или добавляют +1 к уже имеющемуся у оружия эффекту 'Проникающий' X урон."
++  },
++  {
++    "id": "movingTarget",
++    "name": "ДВИЖУЩАЯСЯ МИШЕНЬ",
++    "effect": "Когда вы выполняете действие 'Спринт', ваша защита увеличивается на +1 до начала вашего следующего хода."
++  },
++  {
++    "id": "basher",
++    "name": "УДАРНИК",
++    "effect": "Когда вы совершаете атаку в ближнем бою ударяя своим оружием, ваша атака получает эффект урона 'Порочный'."
++  },
++  {
++    "id": "laserCommander",
++    "name": "ЛАЗЕРОВ НАЧАЛЬНИК",
++    "effect": "Когда вы атакуете дальнобойным энергооружием, урон увеличивается на +1 {/CD} за ранг этого перка."
++  },
++  {
++    "id": "commando",
++    "name": "КОММАНДОС",
++    "effect": "Когда вы совершаете дальнобойную атаку любым оружием со скорострельностью 3 или выше (кроме тяжелого оружия), вы добавляете +1 {/CD} за ранг к урону оружия."
++  },
++  {
++    "id": "comprehension",
++    "name": "ПОНИМАНИЕ",
++    "effect": "После того как вы использовали бонус, полученный за чтение журнала, бросьте 1 {/CD}. Если у вас выпал Эффект, вы можете использовать этот бонус еще один раз."
++  },
++  {
++    "id": "canOpener",
++    "name": "КОНСЕРВАТОР!",
++    "effect": "Когда вы обыскиваете местность, где есть еда, вы получаете 1 дополнительный случайный предмет еды, не тратя ОД."
++  },
++  {
++    "id": "betterCriticals",
++    "name": "УЛУЧШЕННЫЕ КРИТЫ",
++    "effect": "Когда вы наносите врагу одну или более единиц урона, вы можете потратить 1 очко удачи, чтобы автоматически нанести критическое попадание, вызывающее увечье."
++  },
++  {
++    "id": "quickDraw",
++    "name": "БЫСТРЫЙ ДОСТУП",
++    "effect": "Каждый ход вы можете достать одно оружие или предмет, который носите при себе, не используя второстепенное действие."
++  },
++  {
++    "id": "fortuneFinder",
++    "name": "ИСКАТЕЛЬ УДАЧИ",
++    "effect": "Каждый раз, когда вы делаете бросок, чтобы определить, сколько вы находите денег, вы получаете +3 {/CD} дополнительных крышек."
++  },
++  {
++    "id": "solarPowered",
++    "name": "СОЛНЕЧНАЯ БАТАРЕЙКА",
++    "effect": "За каждый час, проведенный под прямыми солнечными лучами, вы излечиваете 1 повреждение от радиации."
++  },
++  {
++    "id": "entomologist",
++    "name": "ЭНТОМОЛОГ",
++    "effect": "Когда вы атакуете NPC с ключевым словом 'Насекомое', ваша атака получает эффект 'Проникающий' 1 урон или повышает рейтинг любого эффекта 'Проникающий' X, который есть у оружия, на +1."
++  },
++  {
++    "id": "intenseTraining",
++    "name": "ИНТЕНСИВНЫЕ ТРЕНИРОВКИ",
++    "effect": "Повысьте любой атрибут S.P.E.C.I.A.L на 1 ранг. Атрибуты S.P.E.C.I.A.L по прежнему не могут быть увеличены выше 10 с помощью этого метода."
++  },
++  {
++    "id": "demolitionExpert",
++    "name": "ЭКСПЕРТ ПОДРЫВНИК",
++    "effect": "Когда вы атакуете оружием с качеством 'Взрыв', эта атака получает эффект 'Порочного' урона. Кроме того, вы открываете рецепты взрывчатых веществ, для которых этот перк является обязательным условием."
++  },
++  {
++    "id": "roboticsExpert",
++    "name": "ЭКСПЕРТ ПО РОБОТОТЕХНИКЕ",
++    "effect": "Вы можете модифицировать броню, оружие и модули роботов с помощью модификаций 1-го ранга."
++  },
++  {
++    "id": "gunNut",
++    "name": "ФАНАТИК ОРУЖИЯ",
++    "effect": "Вы можете улучшать стрелковое и тяжелое оружие с помощью модификаций. Открывает 1-й ранг модификаций."
++  },
++  {
++    "id": "capCollector",
++    "name": "КОЛЛЕКЦИОНЕР КРЫШЕК",
++    "effect": "Когда вы покупаете или продаете товары, вы можете увеличить или уменьшить цену продаваемых товаров на 10%."
++  },
++  {
++    "id": "ghost",
++    "name": "ПРИЗРАК",
++    "effect": "Когда вы пытаетесь пройти проверку на ЛОВ + Скрытность, находясь в тени или темноте, первый дополнительный d20 вы получаете бесплатно. При этом обычный максимум - 5d20 - остается в силе."
++  },
++  {
++    "id": "scrounger",
++    "name": "МУСОРЩИК",
++    "effect": "Когда вы разбираете предмет на составляющие, вы можете получить как необычные, так и обычные материалы."
++  },
++  {
++    "id": "pharmaFarmer",
++    "name": "ФАРМА-ФЕРМЕР",
++    "effect": "Когда вы обыскиваете место, где есть лекарства или препараты, вы находите один дополнительный предмет, определяемый случайным образом, не тратя ОД."
++  },
++  {
++    "id": "partyBoy",
++    "name": "ТУСОВЩИК",
++    "effect": "Вы не можете стать зависимым от алкогольных напитков, и всякий раз, когда вы выпиваете алкоголь, вы исцеляетесь на +2 ОЗ."
++  },
++  {
++    "id": "finesse",
++    "name": "ТОЧНОСТЬ",
++    "effect": "Один раз за бой вы можете перебросить все D за один бросок урона, не тратя очков удачи."
++  },
++  {
++    "id": "heavyHitter",
++    "name": "ВЫСШАЯ ЛИГА",
++    "effect": "Когда вы атакуете двуручным оружием ближнего боя, оружие получает эффект урона 'Порочный'."
++  },
++  {
++    "id": "blacksmith",
++    "name": "КУЗНЕЦ",
++    "effect": "Вы можете улучшать оружие ближнего боя с помощью модов на оружие. Открывает модификации 1-го ранга."
++  },
++  {
++    "id": "piercingStrike",
++    "name": "ПРОНИКАЮЩИЙ УДАР",
++    "effect": "Ваши рукопашные атаки и атаки ближнего боя оружием типа 'клинок' получают эффект 'Проникающий' 1 урон или добавляют +1 к рейтингу любого эффекта 'Пронзающий' X урон, который у них уже был."
++  },
++  {
++    "id": "rifleman",
++    "name": "КАРАБИНЕР",
++    "effect": "Когда вы совершаете дальнобойную атаку любым двуручным оружием со скорострельностью 2 или ниже (кроме тяжелого оружия), добавьте +1 {/CD} к урону оружия за ранг."
++  },
++  {
++    "id": "meltdown",
++    "name": "РАСПЫЛЕНИЕ",
++    "effect": "Когда вы убиваете врага энергетическим оружием, он взрывается. Бросьте количество D, равное половине рейтинга урона оружия (округлите вниз). За каждый выпавший эффект одно существо в пределах близкой дистанции от взорвавшегося противника (начиная с ближайшего) получает энергетический урон, равный сумме, выпавшей на D."
++  },
++  {
++    "id": "fastHealer",
++    "name": "БЫСТРОЕ ИСЦЕЛЕНИЕ",
++    "effect": "Когда вы делаете проверку на ВЫН + Выживание, чтобы вылечить свои раны, первый дополнительный d20 вы получаете бесплатно. При этом обычный максимум - 5d20 - остается в силе."
++  },
++  {
++    "id": "medic",
++    "name": "МЕДИК",
++    "effect": "Когда вы используете действие 'Первая помощь', чтобы попытаться вылечить травму, вы можете повторно бросить 1d20."
++  },
++  {
++    "id": "heaveHo",
++    "name": "ЛОВИ!",
++    "effect": "Когда вы атакуете метательным оружием, вы можете потратить 1 ОД, чтобы увеличить дистанцию применения оружия на один шаг - с ближней до средней или со средней до дальней дистанции."
++  },
++  {
++    "id": "actionBoy",
++    "name": "ЭКШН БОЙ или ГЁРЛ",
++    "effect": "Когда вы тратите ОД на дополнительное основное действие, сложность проверки навыков во время второго действия не увеличивается."
++  },
++  {
++    "id": "infiltrator",
++    "name": "ЛАЗУТЧИК",
++    "effect": "Когда вы пытаетесь провести проверку на владение навыком 'Отмычки', чтобы отпереть дверь или контейнер, вы можете перебросить 1d20."
++  },
++  {
++    "id": "nurse",
++    "name": "ЛЕКАРЬ",
++    "effect": "Когда вы восстанавливаете ОЗ пациента с помощью действия 'Первая помощь', количество исцеленных ОЗ увеличивается на +1."
++  },
++  {
++    "id": "sizeMatters",
++    "name": "РАЗМЕР ИМЕЕТ ЗНАЧЕНИЕ",
++    "effect": "Когда вы совершаете дальнобойную атаку любым тяжелым оружием, вы добавляете +1 {/CD} к урону оружия за ранг."
++  },
++  {
++    "id": "bullRush",
++    "name": "ПОЕЗД БОЛИ",
++    "effect": "Вы можете использовать 'Заряд' в качестве основного действия. Это действие движения, и вы не можете перемещаться или совершать спринт в один и тот же ход. Вы перемещаетесь в зону досягаемости противника в пределах средней дистанции (1 зона) и делаете проверку на СИЛ + Атлетика со сложностью 2. Если вы добиваетесь успеха, противник получает урон, равный вашему обычному рукопашному урону, и будет сбит с ног."
++  },
++  {
++    "id": "quickHands",
++    "name": "ЛОВКИЕ РУКИ",
++    "effect": "Вы можете быстрее перезаряжать огнестрельное оружие. Когда вы совершаете дальнобойную атаку, вы можете потратить 2 ОД, чтобы удвоить скорострельность вашего оружия для этой атаки."
++  },
++  {
++    "id": "masterThief",
++    "name": "МАСТЕР ВОР",
++    "effect": "Когда вы пытаетесь взломать замок или ограбить кого-нибудь, сложность проверок противника на обнаружение вас увеличивается на +1."
++  },
++  {
++    "id": "sandman",
++    "name": "ПЕСОЧНЫЙ ЧЕЛОВЕК",
++    "effect": "Когда вы совершаете скрытую атаку с помощью тихого оружия (пневматическая винтовка, арбалет и т.п.) или с глушителем, урон увеличивается на +2 {/CD}."
++  },
++  {
++    "id": "fastMetabolism",
++    "name": "БЫСТРЫЙ МЕТАБОЛИЗМ",
++    "effect": "Когда вы восстанавливаете одно или более ОЗ за счет любого средства, кроме отдыха, увеличивайте общее количество восстановленных ОЗ на +1."
++  },
++  {
++    "id": "mysteriousStranger",
++    "name": "ТАИНСТВЕННЫЙ НЕЗНАКОМЕЦ",
++    "effect": "В начале боевого столкновения вы можете потратить 1 очко удачи. Если вы это сделаете, ГМ может заставить появиться Таинственного незнакомца, который наносит одну дальнобойную атаку по врагу, которого вы атаковали или который только что атаковал вас, а затем исчезает. Незнакомец имеет ЛОВ 10, навык 'Стрелковое оружие' 6, бросает 3D20, использует револьвер .44 Магнум, наносящий 8 {/CD} Пронзающий 1, порочный физический урон. Если незнакомец не появляется, ГМ возвращает очко удачи."
++  },
++  {
++    "id": "daringNature",
++    "name": "ДЕРЗКАЯ НАТУРА",
++    "effect": "Каждый раз, когда вы пытаетесь провести проверку навыка и покупаете один или несколько d20, давая гейммастеру очки действий, вы можете перебросить 1d20 на эту проверку."
++  },
++  {
++    "id": "cautiousNature",
++    "name": "ОСТОРОЖНАЯ НАТУРА",
++    "effect": "Когда вы пытаетесь пройти проверку навыка и покупаете один или несколько d20, тратя очки действий, вы можете перебросить 1d20 в этой проверке."
++  },
++  {
++    "id": "ninja",
++    "name": "НИНДЗЯ",
++    "effect": "Когда вы совершаете скрытную атаку оружием ближнего боя или в рукопашную, урон увеличивается на +2 {/CD}. Вы не можете получить это преимущество, находясь в силовой броне."
++  },
++  {
++    "id": "nightPerson",
++    "name": "НОЧНОЕ СУЩЕСТВО",
++    "effect": "Уменьшите любое повышение сложности, возникшее из-за темноты, на 1."
++  },
++  {
++    "id": "paralyzingPalm",
++    "name": "ПАРАЛИЗУЮЩАЯ ЛАДОНЬ",
++    "effect": "Когда вы совершаете рукопашную атаку и выбираете определенное место для удара, ваша атака получает эффект оглушения."
++  },
++  {
++    "id": "nuclearPhysicist",
++    "name": "ФИЗИК-ЯДЕРЩИК",
++    "effect": "Каждый раз, когда вы используете оружие, которое наносит урон радиацией или имеет эффект Радиоактивный урон, каждый эффект, который выпадает вам, наносит одно дополнительное очко радиационного урона. Кроме того, используемые вами ядерные блоки плавления имеют 3 дополнительных заряда."
++  },
++  {
++    "id": "pickpocket",
++    "name": "КАРМАННИК",
++    "effect": "Вы можете игнорировать первое осложнение, когда совершаете проверку на ЛОВ + Скрытность, чтобы украсть предмет у другого человека или подбросить ему что-то."
++  },
++  {
++    "id": "lightStep",
++    "name": "ЛЁГКИЙ ШАГ",
++    "effect": "Когда вы делаете бросок на создание каких-либо осложнений, связанных с ловкостью, вы можете игнорировать одно осложнение за каждый потраченный 1 ОД. Кроме того, вы можете перебросить 1d20 на любую проверку на ЛОВ + Атлетику, чтобы избежать ловушек, типа нажимных плит или подобных механизмов. Вы не можете получить это преимущество, находясь в силовой броне."
++  },
++  {
++    "id": "hacker",
++    "name": "ХАКЕР",
++    "effect": "Сложность проверки на умение взламывать компьютеры уменьшается на 1, вплоть до минимального значения 0."
++  },
++  {
++    "id": "pathfinder",
++    "name": "ПЕРВОПРОХОДЕЦ",
++    "effect": "При путешествии на большие расстояния по дикой местности успешная проверка на ВОС + Выживание (со сложностью, определяемой ГМом в зависимости от местности) сокращает время путешествия вдвое."
++  },
++  {
++    "id": "gunslinger",
++    "name": "СТРЕЛОК",
++    "effect": "Когда вы атакуете одноручным оружием дальнего боя со скорострельностью 2 или ниже, вы увеличиваете урон оружия на +1 {/CD} за ранг. Кроме того, вы можете повторно бросить кубик, определяющий место поражения."
++  },
++  {
++    "id": "ironFist",
++    "name": "ЖЕЛЕЗНЫЙ КУЛАК",
++    "effect": "Ваши рукопашные атаки наносят +1 {/CD} урона."
++  },
++  {
++    "id": "adrenalineRush",
++    "name": "ВЫБРОС АДРЕНАЛИНА",
++    "effect": "Когда ваше здоровье ниже максимального значения, при совершении проверок на СИЛ или для совершения атаки в ближнем бою вы считаете свой показатель СИЛ равным 10."
++  },
++  {
++    "id": "intimidation",
++    "name": "УЖАСАЮЩЕЕ ПРИСУТСТВИЕ",
++    "effect": "Когда вы проводите проверку на Красноречие, чтобы угрожать или напугать кого-то, вы можете повторно бросить 1d20."
++  },
++  {
++    "id": "pyromaniac",
++    "name": "ПИРОМАНЬЯК",
++    "effect": "Урон, наносимый вами оружием, использующим огонь, увеличивается на +1 {/CD} за ранг."
++  },
++  {
++    "id": "nerdRage",
++    "name": "ЯРОСТЬ БОТАНИКА!",
++    "effect": "Пока ваше здоровье меньше ¼ от максимального, вы добавляете +1 к вашему физическому СУ, +1 к вашему энерго СУ и +1 {/CD} к урону всех ваших атак."
++  },
++  {
++    "id": "snakeater",
++    "name": "ПОЖИРАТЕЛЬ ЗМЕЙ",
++    "effect": "Сопротивление урону от яда увеличивается на +2."
++  },
++  {
++    "id": "scrapper",
++    "name": "РУБАКА",
++    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание - и тем самым нанести увечье конечности."
++  },
++  {
++    "id": "refractor",
++    "name": "РЕФРАКТОР",
++    "effect": "Сопротивление энергетическому урону на всех частях тела увеличивается на +1."
++  },
++  {
++    "id": "strongBack",
++    "name": "КРЕПКИЙ ХРЕБЕТ",
++    "effect": "Ваш максимальный переносимый вес увеличивается на +25 фунтов."
++  },
++  {
++    "id": "chemResistant",
++    "name": "УСТОЙЧИВОСТЬ К ХИМИИ",
++    "effect": "Бросьте меньше на один D для определения того, становитесь ли вы зависимым от препаратов, сложность проверки уменьшается вплоть до 0."
++  },
++  {
++    "id": "ricochet",
++    "name": "РИКОШЕТ",
++    "effect": "Если противник совершает дальнобойную атаку и ему выпадает осложнение, вы можете потратить одно очко удачи, чтобы рикошетом попасть в него. Отразите выпавший урон против атакующего противника."
++  },
++  {
++    "id": "toughness",
++    "name": "ПРОЧНОСТЬ",
++    "effect": "Ваше сопротивление физическому урону во всех частях тела увеличивается на +1."
++  },
++  {
++    "id": "bloodyMess",
++    "name": "КРОВАВАЯ БАНЯ",
++    "effect": "Когда вы наносите критический удар, бросьте 1 {/CD}; если выпадает эффект, вы наносите одно дополнительное увечье в случайное место."
++  },
++  {
++    "id": "science",
++    "name": "НАУКА!",
++    "effect": "Вы можете модифицировать энергетическое оружие с помощью модификаций, а также создавать некоторые усовершенствованные модификации брони. Открывает модификации 1-го ранга."
++  },
++  {
++    "id": "awareness",
++    "name": "ОСВЕДОМЛЁННОСТЬ",
++    "effect": "Когда вы выполняете второстепенное действие 'Прицеливание' в противника, находящегося на близкой дистанции, вы замечаете его слабые места и можете атаковать более эффективно. Следующая атака, которую вы совершите по этой цели, получит эффект урона 'Проникающий' 1 или повысит рейтинг любого существующего эффекта урона 'Проникающий' X на 1."
++  },
++  {
++    "id": "sniper",
++    "name": "СНАЙПЕР",
++    "effect": "Когда вы выполняете второстепенное действие 'Прицелиться', а затем совершаете дальнобойную атаку двуручным оружием с качеством 'Точный', вы можете указать часть тела для попадания без увеличения сложности атаки."
++  },
++  {
++    "id": "inspirational",
++    "name": "ВДОХНОВЛЯЮЩИЙ",
++    "effect": "Поскольку вы являетесь примером для подражания, максимальное количество ОД, которое группа может сохранить, увеличивается на 1."
++  },
++  {
++    "id": "tag",
++    "name": "ОТМЕТКА!",
++    "effect": "Вы можете выбрать один дополнительный навык. Повысьте ранг навыка на 2, максимум до 6, и отметьте его. Это позволит вам добиваться критического успеха при проверке навыков, если при проверке на d20 выпадет результат, равный или меньший чем уровень этого навыка."
++  },
++  {
++    "id": "adamantiumSkeleton",
++    "name": "АДАМАНТИЕВЫЙ СКЕЛЕТ",
++    "effect": "Когда вы получаете урон, количество повреждений, необходимых для нанесения критического удара по вам, увеличивается на ваш ранг в этом перке. Например, если у вас один ранг этого перка, вы получите критическое попадание от 6 и более единиц урона, а не от 5."
++  },
++  {
++    "id": "educated",
++    "name": "ТРЕНИРОВАННЫЙ",
++    "effect": "Добавьте +1 ранг к двум навыкам или добавьте +2 ранга к одному навыку. Ни один навык не может превышать 6-й ранг."
++  },
++  {
++    "id": "concentratedFire",
++    "name": "СОСРЕДОТОЧЕННЫЙ ОГОНЬ",
++    "effect": "Когда вы совершаете дальнобойную атаку и тратите боеприпасы, чтобы увеличить урон, вы можете перебросить до 3 {/CD} для нанесения урона."
++  },
++  {
++    "id": "slacker",
++    "name": "ЛОВКАЧ",
++    "effect": "При выполнении основного действия 'Защита' вы снижаете сложность проверки навыка на 1."
++  },
++  {
++    "id": "triggerRush",
++    "name": "ХАЛЯВЩИК",
++    "effect": "Каждый раз, когда вы совершаете бросок, чтобы узнать, сколько патронов вы нашли, вы находите +3 {/CD} дополнительных патронов."
++  },
++  {
++    "id": "slayer",
++    "name": "РУБАКА",
++    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание - и тем самым нанести увечье конечности."
++  },
++  {
++    "id": "killer",
++    "name": "СПРИНТ МРАЧНОГО ЖНЕЦА",
++    "effect": "Когда вы совершаете атаку, убивающую одного или нескольких врагов, бросьте 1 {/CD}. Если выпал эффект, добавьте 2 ОД в пул группы."
++  },
++  {
++    "id": "junktownVendor",
++    "name": "ПРОДАВЕЦ ВЯЛЕНОГО МЯСА ИЗ ДЖАНКТАУНА",
++    "effect": "Сложность любой проверки на ХАР + Бартер, с помощью которой вы пытаетесь купить или продать товары, снижается на 1, вплоть до 0."
++  },
++  {
++    "id": "blackWidow",
++    "name": "ЧЕРНАЯ ВДОВА или УБИЙЦА ЖЕНЩИН",
++    "effect": "Перк 'Черная вдова' действует на мужчин и персонажей мужского пола, а перк 'Убийца Женщин' - на женщин и персонажей женского пола. Когда вы пытаетесь пройти проверку навыков основанных на ХАР, чтобы повлиять на персонажа выбранного пола, вы можете перебросить 1d20. Кроме того, ваши атаки наносят +1 {/CD} дополнительного урона против персонажей выбранного пола."
++  },
++  {
++    "id": "steadyAim",
++    "name": "СТАБИЛЬНЫЙ ПРИЦЕЛ",
++    "effect": "Когда вы выполняете второстепенное действие 'Прицеливание', вы можете либо перебросить 2d20 при первой атаке, которую вы совершаете в этот ход, либо перебросить 1d20 при всех атаках, которые вы совершаете в этот ход."
++  },
++  {
++    "id": "lifeGiver",
++    "name": "ДАЮЩИЙ ЖИЗНЬ",
++    "effect": "Увеличьте максимальное количество очков здоровья на уровень Выносливости."
++  }
++]
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 5c19745..8d88dee 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -54,7 +54,7 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
+ import { legacyEffectToStore } from './effectsSync.js';
+ import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+ import { debugLog } from '../debug/falloutDebug.js';
+-import perksData from '../../data/perks/perks.json';
++import perksData from '../../modules/fallout/data/perks/perks.json';
+ import { selectPerkBonuses } from '../../domain/perks.js';
+ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в

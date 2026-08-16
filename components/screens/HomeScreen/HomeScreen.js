@@ -32,7 +32,7 @@ import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudS
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useAppSettingsStore, { selectCharacterFoldersEnabled } from '../../../src/store/appSettingsStore';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -91,7 +91,7 @@ export default function HomeScreen({ navigation }) {
   const folderRefs = useRef({});
   const rootDropRef = useRef(null);
   const dropBounds = useRef({});
-  const characterFoldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
+  const characterFoldersEnabled = useAppSettingsStore(selectCharacterFoldersEnabled);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);

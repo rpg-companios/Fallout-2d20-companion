@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import dataClothes from '../../data/equipment/clothes.json';
+import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
 import {
   createEmptyEquippedArmor,
   resolveTargetLayer,
@@ -11,7 +11,7 @@ import {
 // ВЫЧИСЛЕНИЕМ (blocksArmorOver), а не переездом в чужой слот.
 // ПРАВИЛО ВЛАДЕЛЬЦА (2026-07-31): никакого легаси, нормализаторов и фоллбэков.
 const getClothing = (id) =>
-  dataClothes.clothes
+  moduleClothes.clothes
     .flatMap((g) => g.items.map((it) => ({ ...g, ...it, type: g.type })))
     .find((i) => i.id === id);
 

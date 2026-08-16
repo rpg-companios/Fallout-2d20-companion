@@ -1,0 +1,1083 @@
+diff --git a/__tests__/securitron/system-i18n-module-move.test.js b/__tests__/securitron/system-i18n-module-move.test.js
+new file mode 100644
+index 0000000..8d308ae
+--- /dev/null
++++ b/__tests__/securitron/system-i18n-module-move.test.js
+@@ -0,0 +1,42 @@
++/**
++ * Разделение движок/сеттинг (патч 118): системные словари переводов
++ * (qualities 30, effects, damageEffects 10, miscellaneous 2) перенесены
++ * в модуль. Легаси i18n — пустые базы. Каталог отдаёт их из модуля.
++ */
++import { describe, it, expect, beforeAll } from 'vitest';
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { setCurrentLocale } from '../../i18n/locale';
++import moduleRuQualities from '../../modules/fallout/i18n/ru-RU/data/system/qualities.json';
++import moduleEnQualities from '../../modules/fallout/i18n/en-EN/data/system/qualities.json';
++import moduleRuEffects from '../../modules/fallout/i18n/ru-RU/data/system/effects.json';
++import moduleRuDamageEffects from '../../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
++import moduleRuItems from '../../modules/fallout/i18n/ru-RU/data/equipment/items.json';
++import legacyRuQualities from '../../i18n/ru-RU/data/system/qualities.json';
++import legacyEnQualities from '../../i18n/en-EN/data/system/qualities.json';
++
++describe('Системные i18n в модуле (сеттинг), легаси — пуст', () => {
++  beforeAll(() => setCurrentLocale('ru-RU'));
++
++  it('модуль содержит качества (30), эффекты, damageEffects и miscellaneous', () => {
++    expect(moduleRuQualities).toHaveLength(30);
++    expect(moduleEnQualities).toHaveLength(30);
++    expect(moduleRuQualities[0]).toHaveProperty('name');
++    expect(moduleRuEffects).toHaveProperty('duration');
++    expect(moduleRuDamageEffects).toHaveLength(10);
++    expect(moduleRuItems).toHaveLength(2);
++  });
++
++  it('легаси i18n пусты', () => {
++    expect(legacyRuQualities).toEqual([]);
++    expect(legacyEnQualities).toEqual([]);
++  });
++
++  it('каталог отдаёт qualities/effects/miscellaneous из модуля', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(catalog.qualities).toHaveLength(30);
++    expect(catalog.qualities[0].name.length).toBeGreaterThan(0);
++    expect(catalog.effects).toBeDefined();
++    expect(catalog.damageEffects).toHaveLength(10);
++    expect(catalog.miscellaneous).toHaveLength(2);
++  });
++});
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index c71db5c..0993a53 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -79,6 +79,7 @@ modules/fallout/
+ | skillRewards | 17 навыков | 0 (`{}`) | патч 116 |
+ | origins (база) | 19 (17+2) | 0 (`[]`) | патч 117 |
+ | traits (база) | 37 (32+5) | 0 (`[]`) | патч 117 |
++| system i18n (qualities/effects/damageEffects/items) | 30+3+10+2 | 0 (`[]`/`{}`) | патч 118 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+diff --git a/domain/effects.js b/domain/effects.js
+index ae274c9..d061abb 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -1,5 +1,5 @@
+-import ruEffects from '../i18n/ru-RU/data/system/effects.json';
+-import enEffects from '../i18n/en-EN/data/system/effects.json';
++import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
++import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
+ import { getCurrentLocale } from '../i18n/locale';
+ import { rollCombatDiceEffects } from './diceRollsLogic';
+ 
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index 314a5c6..72faf97 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -4,10 +4,10 @@
+  * from structured data to localized human-readable strings.
+  */
+ 
+-import ruQualities from '../i18n/ru-RU/data/system/qualities.json';
+-import enQualities from '../i18n/en-EN/data/system/qualities.json';
+-import ruEffects from '../i18n/ru-RU/data/system/damageEffects.json';
+-import enEffects from '../i18n/en-EN/data/system/damageEffects.json';
++import ruQualities from '../modules/fallout/i18n/ru-RU/data/system/qualities.json';
++import enQualities from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
++import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
++import enEffects from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
+ import { getCurrentLocale } from '../i18n/locale';
+ 
+ const QUALITY_DICTS = {
+diff --git a/i18n/en-EN/data/equipment/items.json b/i18n/en-EN/data/equipment/items.json
+index 92f57d3..fe51488 100644
+--- a/i18n/en-EN/data/equipment/items.json
++++ b/i18n/en-EN/data/equipment/items.json
+@@ -1,4 +1 @@
+-[
+-  { "name": "Holographic Dog Tags" },
+-  { "name": "Caps" }
+-]
++[]
+diff --git a/i18n/en-EN/data/system/damageEffects.json b/i18n/en-EN/data/system/damageEffects.json
+index 42a6769..fe51488 100644
+--- a/i18n/en-EN/data/system/damageEffects.json
++++ b/i18n/en-EN/data/system/damageEffects.json
+@@ -1,42 +1 @@
+-[
+-  {
+-    "id": "effect_arc",
+-    "name": "Arc"
+-  },
+-  {
+-    "id": "effect_breaking",
+-    "name": "Breaking"
+-  },
+-  {
+-    "id": "effect_burst",
+-    "name": "Burst"
+-  },
+-  {
+-    "id": "effect_freeze",
+-    "name": "Freeze"
+-  },
+-  {
+-    "id": "effect_persistent",
+-    "name": "Persistent"
+-  },
+-  {
+-    "id": "effect_piercing_x",
+-    "name": "Piercing"
+-  },
+-  {
+-    "id": "effect_radioactive",
+-    "name": "Radioactive"
+-  },
+-  {
+-    "id": "effect_spread",
+-    "name": "Spread"
+-  },
+-  {
+-    "id": "effect_stun",
+-    "name": "Stun"
+-  },
+-  {
+-    "id": "effect_vicious",
+-    "name": "Vicious"
+-  }
+-]
++[]
+diff --git a/i18n/en-EN/data/system/effects.json b/i18n/en-EN/data/system/effects.json
+index 0c47b6e..0967ef4 100644
+--- a/i18n/en-EN/data/system/effects.json
++++ b/i18n/en-EN/data/system/effects.json
+@@ -1,22 +1 @@
+-{
+-  "duration": {
+-    "none": "none",
+-    "instant": "instantly",
+-    "sceneUnit": "scene"
+-  },
+-  "events": {
+-    "effectsCleared": "Effects cleared: {{effects}}",
+-    "effectsClearedAll": "all negative",
+-    "instantPositive": "Instant positive effect: {{name}}",
+-    "instantNegative": "Instant negative effect: {{name}}",
+-    "positiveApplied": "Positive effect {{name}}: +{{scenes}} scenes.",
+-    "negativeApplied": "Negative effect {{name}}: +{{scenes}} scenes.",
+-    "conditionsRemoved": "Condition removed: {{conditions}}",
+-    "addictionRoll": "Addiction roll: {{faces}} — {{effectCount}} effect(s) of {{addictionLevel}} needed.",
+-    "addictionGained": "You became addicted.",
+-    "addictionAvoided": "Addiction avoided."
+-  },
+-  "display": {
+-    "scenesAndMinutes": "{{scenes}} scenes ({{minutes}} min)"
+-  }
+-}
++{}
+diff --git a/i18n/en-EN/data/system/qualities.json b/i18n/en-EN/data/system/qualities.json
+index 716ca9f..fe51488 100644
+--- a/i18n/en-EN/data/system/qualities.json
++++ b/i18n/en-EN/data/system/qualities.json
+@@ -1,126 +1 @@
+-[
+-  {
+-    "id": "quality_accurate",
+-    "name": "Accurate",
+-    "opposite": "Inaccurate"
+-  },
+-  {
+-    "id": "quality_blast",
+-    "name": "Blast"
+-  },
+-  {
+-    "id": "quality_close_quarters",
+-    "name": "Close Quarters"
+-  },
+-  {
+-    "id": "quality_concealed",
+-    "name": "Concealed"
+-  },
+-  {
+-    "id": "quality_debilitating",
+-    "name": "Debilitating"
+-  },
+-  {
+-    "id": "quality_gatling",
+-    "name": "Gatling"
+-  },
+-  {
+-    "id": "quality_inaccurate",
+-    "name": "Inaccurate",
+-    "opposite": "Accurate"
+-  },
+-  {
+-    "id": "quality_mine",
+-    "name": "Mine"
+-  },
+-  {
+-    "id": "quality_night_vision",
+-    "name": "Night Vision"
+-  },
+-  {
+-    "id": "quality_parry",
+-    "name": "Parry"
+-  },
+-  {
+-    "id": "quality_recon",
+-    "name": "Recon"
+-  },
+-  {
+-    "id": "quality_reliable",
+-    "name": "Reliable",
+-    "opposite": "Unreliable"
+-  },
+-  {
+-    "id": "quality_suppressed",
+-    "name": "Suppressed"
+-  },
+-  {
+-    "id": "quality_two-handed",
+-    "name": "Two-Handed"
+-  },
+-  {
+-    "id": "quality_unreliable",
+-    "name": "Unreliable",
+-    "opposite": "Reliable"
+-  },
+-  {
+-    "id": "quality_re-roll_hit_location",
+-    "name": "Re-roll Hit Location"
+-  },
+-  {
+-    "id": "quality_bayonet",
+-    "name": "Bayonet"
+-  },
+-  {
+-    "id": "quality_crank_x",
+-    "name": "Crank X"
+-  },
+-  {
+-    "id": "quality_shredder",
+-    "name": "Shredder"
+-  },
+-  {
+-    "id": "quality_disarm",
+-    "name": "Disarm"
+-  },
+-  {
+-    "id": "quality_sneak_attack",
+-    "name": "Sneak Attack"
+-  },
+-  {
+-    "id": "quality_targetting_computer",
+-    "name": "Targetting Computer"
+-  },
+-  {
+-    "id": "quality_slow_load",
+-    "name": "Slow Load"
+-  },
+-  {
+-    "id": "quality_recoil_x",
+-    "name": "Recoil X"
+-  },
+-  {
+-    "id": "quality_ammo-hungry_x",
+-    "name": "Ammo-Hungry X"
+-  },
+-  {
+-    "id": "quality_surge",
+-    "name": "Surge"
+-  },
+-  {
+-    "id": "quality_bombard",
+-    "name": "Bombard"
+-  },
+-  {
+-    "id": "quality_thrown",
+-    "name": "Thrown"
+-  },
+-  {
+-    "id": "quality_underwater",
+-    "name": "Underwater"
+-  },
+-  {
+-    "id": "quality_tranq_x",
+-    "name": "Tranquilizer X"
+-  }
+-]
++[]
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 792dd5d..1d942d3 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -1,5 +1,4 @@
+ // Locale-specific display data (names, descriptions, flavour text)
+-import ruMiscItems from './ru-RU/data/equipment/items.json';
+ import moduleRuRobotWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
+ import moduleRuRobotArmsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
+ import moduleRuRobotArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
+@@ -11,10 +10,7 @@ import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment
+ import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+ import moduleRuRobotHeadsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
+ import moduleRuRobotLegsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
+-import ruQualities from './ru-RU/data/system/qualities.json';
+-import ruEffects from './ru-RU/data/system/effects.json';
+ 
+-import enMiscItems from './en-EN/data/equipment/items.json';
+ import moduleEnRobotWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
+ import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
+ import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
+@@ -26,8 +22,6 @@ import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment
+ import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+ import moduleEnRobotHeadsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
+ import moduleEnRobotLegsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
+-import enQualities from './en-EN/data/system/qualities.json';
+-import enEffects from './en-EN/data/system/effects.json';
+ 
+ // Locale-independent kit data (items composition, no names)
+ import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+@@ -46,6 +40,14 @@ import moduleRuPowerArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment
+ import moduleEnPowerArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
+ import moduleRuOdditiesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/oddities.json';
+ import moduleEnOdditiesI18n from '../modules/fallout/i18n/en-EN/data/equipment/oddities.json';
++import moduleRuItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/items.json';
++import moduleEnItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/items.json';
++import moduleRuQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/qualities.json';
++import moduleEnQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
++import moduleRuEffectsI18n from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
++import moduleEnEffectsI18n from '../modules/fallout/i18n/en-EN/data/system/effects.json';
++import moduleRuDamageEffectsI18n from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
++import moduleEnDamageEffectsI18n from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
+ import moduleRuAmmoI18n from '../modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json';
+ import moduleEnAmmoI18n from '../modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json';
+ import moduleRuArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json';
+@@ -108,6 +110,10 @@ const moduleRuI18n = {
+   armor: moduleRuArmorI18n,
+   powerArmor: moduleRuPowerArmorI18n,
+   ammoTypes: moduleRuAmmoI18n,
++  miscellaneous: moduleRuItemsI18n,
++  qualities: moduleRuQualitiesI18n,
++  effects: moduleRuEffectsI18n,
++  damageEffects: moduleRuDamageEffectsI18n,
+   oddities: moduleRuOdditiesI18n,
+   armorMods: moduleRuArmorModsI18n,
+   uniqArmorMods: moduleRuUniqArmorModsI18n,
+@@ -129,6 +135,10 @@ const moduleEnI18n = {
+   armor: moduleEnArmorI18n,
+   powerArmor: moduleEnPowerArmorI18n,
+   ammoTypes: moduleEnAmmoI18n,
++  miscellaneous: moduleEnItemsI18n,
++  qualities: moduleEnQualitiesI18n,
++  effects: moduleEnEffectsI18n,
++  damageEffects: moduleEnDamageEffectsI18n,
+   oddities: moduleEnOdditiesI18n,
+   armorMods: moduleEnArmorModsI18n,
+   uniqArmorMods: moduleEnUniqArmorModsI18n,
+@@ -152,11 +162,8 @@ const ALL_KIT_DATA = {
+ 
+ const EQUIPMENT_BY_LOCALE = {
+   'ru-RU': {
+-    qualities: ruQualities,
+-    effects: ruEffects,
+     chems: ruChems,
+     magazines: ruMagazines,
+-    miscellaneous: ruMiscItems,
+     robotWeapons: moduleRuRobotWeaponsI18n,
+     robotArms: moduleRuRobotArmsI18n,
+     robotArmor: moduleRuRobotArmorI18n,
+@@ -170,11 +177,8 @@ const EQUIPMENT_BY_LOCALE = {
+     robotLegs: moduleRuRobotLegsI18n,
+   },
+   'en-EN': {
+-    qualities: enQualities,
+-    effects: enEffects,
+     chems: enChems,
+     magazines: enMagazines,
+-    miscellaneous: enMiscItems,
+     robotWeapons: moduleEnRobotWeaponsI18n,
+     robotArms: moduleEnRobotArmsI18n,
+     robotArmor: moduleEnRobotArmorI18n,
+@@ -345,6 +349,9 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+ 
+   // Consumables
+   const mergedAmmo = mergeAmmoById(moduleAmmo, moduleI18n.ammoTypes);
++  const mergedQualities = moduleI18n.qualities || [];
++  const mergedEffects = moduleI18n.effects || {};
++  const mergedDamageEffects = moduleI18n.damageEffects || [];
+   const mergedChems = mergeById(moduleChems, moduleI18n.chems);
+   const mergedDrinks = mergeById(moduleDrinks, moduleI18n.drinks);
+   const mergedFood = mergeById(moduleFood, moduleI18n.food);
+@@ -388,6 +395,10 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+     powerArmorRaw: modulePowerArmor,
+     clothes: { clothes: allClothesGroups },
+     ammoTypes: mergedAmmo,
++    qualities: mergedQualities,
++    effects: mergedEffects,
++    damageEffects: mergedDamageEffects,
++    miscellaneous: moduleI18n.miscellaneous || [],
+     chems: mergedChems,
+     drinks: mergedDrinks,
+     food: mergedFood,
+diff --git a/i18n/ru-RU/data/equipment/items.json b/i18n/ru-RU/data/equipment/items.json
+index 4be0f44..fe51488 100644
+--- a/i18n/ru-RU/data/equipment/items.json
++++ b/i18n/ru-RU/data/equipment/items.json
+@@ -1,4 +1 @@
+-[
+-  { "name": "Голографические жетоны" },
+-  { "name": "Крышки" }
+-]
++[]
+diff --git a/i18n/ru-RU/data/system/damageEffects.json b/i18n/ru-RU/data/system/damageEffects.json
+index 88e397e..fe51488 100644
+--- a/i18n/ru-RU/data/system/damageEffects.json
++++ b/i18n/ru-RU/data/system/damageEffects.json
+@@ -1,42 +1 @@
+-[
+-  {
+-    "id": "effect_arc",
+-    "name": "Дуга"
+-  },
+-  {
+-    "id": "effect_breaking",
+-    "name": "Разрушающий"
+-  },
+-  {
+-    "id": "effect_burst",
+-    "name": "Очередь"
+-  },
+-  {
+-    "id": "effect_freeze",
+-    "name": "Замораживающий"
+-  },
+-  {
+-    "id": "effect_persistent",
+-    "name": "Устойчивый"
+-  },
+-  {
+-    "id": "effect_piercing_x",
+-    "name": "Проникающий"
+-  },
+-  {
+-    "id": "effect_radioactive",
+-    "name": "Радиоактивный"
+-  },
+-  {
+-    "id": "effect_spread",
+-    "name": "Разброс"
+-  },
+-  {
+-    "id": "effect_stun",
+-    "name": "Оглушающий"
+-  },
+-  {
+-    "id": "effect_vicious",
+-    "name": "Порочный"
+-  }
+-]
++[]
+diff --git a/i18n/ru-RU/data/system/effects.json b/i18n/ru-RU/data/system/effects.json
+index b310420..0967ef4 100644
+--- a/i18n/ru-RU/data/system/effects.json
++++ b/i18n/ru-RU/data/system/effects.json
+@@ -1,22 +1 @@
+-{
+-  "duration": {
+-    "none": "нет",
+-    "instant": "мгновенно",
+-    "sceneUnit": "сцен"
+-  },
+-  "events": {
+-    "effectsCleared": "Сняты эффекты: {{effects}}",
+-    "effectsClearedAll": "все негативные",
+-    "instantPositive": "Моментальный положительный эффект: {{name}}",
+-    "instantNegative": "Моментальный отрицательный эффект: {{name}}",
+-    "positiveApplied": "Положительный эффект {{name}}: +{{scenes}} сцен.",
+-    "negativeApplied": "Отрицательный эффект {{name}}: +{{scenes}} сцен.",
+-    "conditionsRemoved": "Снято состояние: {{conditions}}",
+-    "addictionRoll": "Бросок на зависимость: {{faces}} — {{effectCount}} эффект(ов) из {{addictionLevel}} нужных.",
+-    "addictionGained": "Вы стали зависимы.",
+-    "addictionAvoided": "Зависимость не наступила."
+-  },
+-  "display": {
+-    "scenesAndMinutes": "{{scenes}} сцен ({{minutes}} мин)"
+-  }
+-}
++{}
+diff --git a/i18n/ru-RU/data/system/qualities.json b/i18n/ru-RU/data/system/qualities.json
+index d9974a1..fe51488 100644
+--- a/i18n/ru-RU/data/system/qualities.json
++++ b/i18n/ru-RU/data/system/qualities.json
+@@ -1,126 +1 @@
+-[
+-  {
+-    "id": "quality_accurate",
+-    "name": "Точное",
+-    "opposite": "Inaccurate"
+-  },
+-  {
+-    "id": "quality_blast",
+-    "name": "Врыв"
+-  },
+-  {
+-    "id": "quality_close_quarters",
+-    "name": "Вплотную"
+-  },
+-  {
+-    "id": "quality_concealed",
+-    "name": "Скрытное"
+-  },
+-  {
+-    "id": "quality_debilitating",
+-    "name": "Изнуряющий"
+-  },
+-  {
+-    "id": "quality_gatling",
+-    "name": "Гатлинг"
+-  },
+-  {
+-    "id": "quality_inaccurate",
+-    "name": "Неточное",
+-    "opposite": "Accurate"
+-  },
+-  {
+-    "id": "quality_mine",
+-    "name": "Мина"
+-  },
+-  {
+-    "id": "quality_night_vision",
+-    "name": "Ночное Видение"
+-  },
+-  {
+-    "id": "quality_parry",
+-    "name": "Паррирование"
+-  },
+-  {
+-    "id": "quality_recon",
+-    "name": "Разведовательный"
+-  },
+-  {
+-    "id": "quality_reliable",
+-    "name": "Надежное",
+-    "opposite": "Unreliable"
+-  },
+-  {
+-    "id": "quality_suppressed",
+-    "name": "Тихое"
+-  },
+-  {
+-    "id": "quality_two-handed",
+-    "name": "Двуручное"
+-  },
+-  {
+-    "id": "quality_unreliable",
+-    "name": "Ненадежное",
+-    "opposite": "Reliable"
+-  },
+-  {
+-    "id": "quality_re-roll_hit_location",
+-    "name": "Перевыбрать конечность"
+-  },
+-  {
+-    "id": "quality_bayonet",
+-    "name": "Штык"
+-  },
+-  {
+-    "id": "quality_crank_x",
+-    "name": "Ствол X"
+-  },
+-  {
+-    "id": "quality_shredder",
+-    "name": "Крушащий"
+-  },
+-  {
+-    "id": "quality_disarm",
+-    "name": "Обезоруживающий"
+-  },
+-  {
+-    "id": "quality_sneak_attack",
+-    "name": "Скрытная атака"
+-  },
+-  {
+-    "id": "quality_targetting_computer",
+-    "name": "Компьютер наведения"
+-  },
+-  {
+-    "id": "quality_slow_load",
+-    "name": "Медленная перезарядка"
+-  },
+-  {
+-    "id": "quality_recoil_x",
+-    "name": "Отдача X"
+-  },
+-  {
+-    "id": "quality_ammo-hungry_x",
+-    "name": "Пожиратель патронов X"
+-  },
+-  {
+-    "id": "quality_surge",
+-    "name": "Импульсный"
+-  },
+-  {
+-    "id": "quality_bombard",
+-    "name": "Бомбарда"
+-  },
+-  {
+-    "id": "quality_thrown",
+-    "name": "Метательное"
+-  },
+-  {
+-    "id": "quality_underwater",
+-    "name": "Подводное"
+-  },
+-  {
+-    "id": "quality_tranq_x",
+-    "name": "Усмирение X"
+-  }
+-]
++[]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/items.json b/modules/fallout/i18n/en-EN/data/equipment/items.json
+new file mode 100644
+index 0000000..fb182c5
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/equipment/items.json
+@@ -0,0 +1,8 @@
++[
++  {
++    "name": "Holographic Dog Tags"
++  },
++  {
++    "name": "Caps"
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/system/damageEffects.json b/modules/fallout/i18n/en-EN/data/system/damageEffects.json
+new file mode 100644
+index 0000000..42a6769
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/system/damageEffects.json
+@@ -0,0 +1,42 @@
++[
++  {
++    "id": "effect_arc",
++    "name": "Arc"
++  },
++  {
++    "id": "effect_breaking",
++    "name": "Breaking"
++  },
++  {
++    "id": "effect_burst",
++    "name": "Burst"
++  },
++  {
++    "id": "effect_freeze",
++    "name": "Freeze"
++  },
++  {
++    "id": "effect_persistent",
++    "name": "Persistent"
++  },
++  {
++    "id": "effect_piercing_x",
++    "name": "Piercing"
++  },
++  {
++    "id": "effect_radioactive",
++    "name": "Radioactive"
++  },
++  {
++    "id": "effect_spread",
++    "name": "Spread"
++  },
++  {
++    "id": "effect_stun",
++    "name": "Stun"
++  },
++  {
++    "id": "effect_vicious",
++    "name": "Vicious"
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/system/effects.json b/modules/fallout/i18n/en-EN/data/system/effects.json
+new file mode 100644
+index 0000000..0c47b6e
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/system/effects.json
+@@ -0,0 +1,22 @@
++{
++  "duration": {
++    "none": "none",
++    "instant": "instantly",
++    "sceneUnit": "scene"
++  },
++  "events": {
++    "effectsCleared": "Effects cleared: {{effects}}",
++    "effectsClearedAll": "all negative",
++    "instantPositive": "Instant positive effect: {{name}}",
++    "instantNegative": "Instant negative effect: {{name}}",
++    "positiveApplied": "Positive effect {{name}}: +{{scenes}} scenes.",
++    "negativeApplied": "Negative effect {{name}}: +{{scenes}} scenes.",
++    "conditionsRemoved": "Condition removed: {{conditions}}",
++    "addictionRoll": "Addiction roll: {{faces}} — {{effectCount}} effect(s) of {{addictionLevel}} needed.",
++    "addictionGained": "You became addicted.",
++    "addictionAvoided": "Addiction avoided."
++  },
++  "display": {
++    "scenesAndMinutes": "{{scenes}} scenes ({{minutes}} min)"
++  }
++}
+diff --git a/modules/fallout/i18n/en-EN/data/system/qualities.json b/modules/fallout/i18n/en-EN/data/system/qualities.json
+new file mode 100644
+index 0000000..716ca9f
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/system/qualities.json
+@@ -0,0 +1,126 @@
++[
++  {
++    "id": "quality_accurate",
++    "name": "Accurate",
++    "opposite": "Inaccurate"
++  },
++  {
++    "id": "quality_blast",
++    "name": "Blast"
++  },
++  {
++    "id": "quality_close_quarters",
++    "name": "Close Quarters"
++  },
++  {
++    "id": "quality_concealed",
++    "name": "Concealed"
++  },
++  {
++    "id": "quality_debilitating",
++    "name": "Debilitating"
++  },
++  {
++    "id": "quality_gatling",
++    "name": "Gatling"
++  },
++  {
++    "id": "quality_inaccurate",
++    "name": "Inaccurate",
++    "opposite": "Accurate"
++  },
++  {
++    "id": "quality_mine",
++    "name": "Mine"
++  },
++  {
++    "id": "quality_night_vision",
++    "name": "Night Vision"
++  },
++  {
++    "id": "quality_parry",
++    "name": "Parry"
++  },
++  {
++    "id": "quality_recon",
++    "name": "Recon"
++  },
++  {
++    "id": "quality_reliable",
++    "name": "Reliable",
++    "opposite": "Unreliable"
++  },
++  {
++    "id": "quality_suppressed",
++    "name": "Suppressed"
++  },
++  {
++    "id": "quality_two-handed",
++    "name": "Two-Handed"
++  },
++  {
++    "id": "quality_unreliable",
++    "name": "Unreliable",
++    "opposite": "Reliable"
++  },
++  {
++    "id": "quality_re-roll_hit_location",
++    "name": "Re-roll Hit Location"
++  },
++  {
++    "id": "quality_bayonet",
++    "name": "Bayonet"
++  },
++  {
++    "id": "quality_crank_x",
++    "name": "Crank X"
++  },
++  {
++    "id": "quality_shredder",
++    "name": "Shredder"
++  },
++  {
++    "id": "quality_disarm",
++    "name": "Disarm"
++  },
++  {
++    "id": "quality_sneak_attack",
++    "name": "Sneak Attack"
++  },
++  {
++    "id": "quality_targetting_computer",
++    "name": "Targetting Computer"
++  },
++  {
++    "id": "quality_slow_load",
++    "name": "Slow Load"
++  },
++  {
++    "id": "quality_recoil_x",
++    "name": "Recoil X"
++  },
++  {
++    "id": "quality_ammo-hungry_x",
++    "name": "Ammo-Hungry X"
++  },
++  {
++    "id": "quality_surge",
++    "name": "Surge"
++  },
++  {
++    "id": "quality_bombard",
++    "name": "Bombard"
++  },
++  {
++    "id": "quality_thrown",
++    "name": "Thrown"
++  },
++  {
++    "id": "quality_underwater",
++    "name": "Underwater"
++  },
++  {
++    "id": "quality_tranq_x",
++    "name": "Tranquilizer X"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/items.json b/modules/fallout/i18n/ru-RU/data/equipment/items.json
+new file mode 100644
+index 0000000..57c5bb5
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/equipment/items.json
+@@ -0,0 +1,8 @@
++[
++  {
++    "name": "Голографические жетоны"
++  },
++  {
++    "name": "Крышки"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/system/damageEffects.json b/modules/fallout/i18n/ru-RU/data/system/damageEffects.json
+new file mode 100644
+index 0000000..88e397e
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/system/damageEffects.json
+@@ -0,0 +1,42 @@
++[
++  {
++    "id": "effect_arc",
++    "name": "Дуга"
++  },
++  {
++    "id": "effect_breaking",
++    "name": "Разрушающий"
++  },
++  {
++    "id": "effect_burst",
++    "name": "Очередь"
++  },
++  {
++    "id": "effect_freeze",
++    "name": "Замораживающий"
++  },
++  {
++    "id": "effect_persistent",
++    "name": "Устойчивый"
++  },
++  {
++    "id": "effect_piercing_x",
++    "name": "Проникающий"
++  },
++  {
++    "id": "effect_radioactive",
++    "name": "Радиоактивный"
++  },
++  {
++    "id": "effect_spread",
++    "name": "Разброс"
++  },
++  {
++    "id": "effect_stun",
++    "name": "Оглушающий"
++  },
++  {
++    "id": "effect_vicious",
++    "name": "Порочный"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/system/effects.json b/modules/fallout/i18n/ru-RU/data/system/effects.json
+new file mode 100644
+index 0000000..b310420
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/system/effects.json
+@@ -0,0 +1,22 @@
++{
++  "duration": {
++    "none": "нет",
++    "instant": "мгновенно",
++    "sceneUnit": "сцен"
++  },
++  "events": {
++    "effectsCleared": "Сняты эффекты: {{effects}}",
++    "effectsClearedAll": "все негативные",
++    "instantPositive": "Моментальный положительный эффект: {{name}}",
++    "instantNegative": "Моментальный отрицательный эффект: {{name}}",
++    "positiveApplied": "Положительный эффект {{name}}: +{{scenes}} сцен.",
++    "negativeApplied": "Отрицательный эффект {{name}}: +{{scenes}} сцен.",
++    "conditionsRemoved": "Снято состояние: {{conditions}}",
++    "addictionRoll": "Бросок на зависимость: {{faces}} — {{effectCount}} эффект(ов) из {{addictionLevel}} нужных.",
++    "addictionGained": "Вы стали зависимы.",
++    "addictionAvoided": "Зависимость не наступила."
++  },
++  "display": {
++    "scenesAndMinutes": "{{scenes}} сцен ({{minutes}} мин)"
++  }
++}
+diff --git a/modules/fallout/i18n/ru-RU/data/system/qualities.json b/modules/fallout/i18n/ru-RU/data/system/qualities.json
+new file mode 100644
+index 0000000..d9974a1
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/system/qualities.json
+@@ -0,0 +1,126 @@
++[
++  {
++    "id": "quality_accurate",
++    "name": "Точное",
++    "opposite": "Inaccurate"
++  },
++  {
++    "id": "quality_blast",
++    "name": "Врыв"
++  },
++  {
++    "id": "quality_close_quarters",
++    "name": "Вплотную"
++  },
++  {
++    "id": "quality_concealed",
++    "name": "Скрытное"
++  },
++  {
++    "id": "quality_debilitating",
++    "name": "Изнуряющий"
++  },
++  {
++    "id": "quality_gatling",
++    "name": "Гатлинг"
++  },
++  {
++    "id": "quality_inaccurate",
++    "name": "Неточное",
++    "opposite": "Accurate"
++  },
++  {
++    "id": "quality_mine",
++    "name": "Мина"
++  },
++  {
++    "id": "quality_night_vision",
++    "name": "Ночное Видение"
++  },
++  {
++    "id": "quality_parry",
++    "name": "Паррирование"
++  },
++  {
++    "id": "quality_recon",
++    "name": "Разведовательный"
++  },
++  {
++    "id": "quality_reliable",
++    "name": "Надежное",
++    "opposite": "Unreliable"
++  },
++  {
++    "id": "quality_suppressed",
++    "name": "Тихое"
++  },
++  {
++    "id": "quality_two-handed",
++    "name": "Двуручное"
++  },
++  {
++    "id": "quality_unreliable",
++    "name": "Ненадежное",
++    "opposite": "Reliable"
++  },
++  {
++    "id": "quality_re-roll_hit_location",
++    "name": "Перевыбрать конечность"
++  },
++  {
++    "id": "quality_bayonet",
++    "name": "Штык"
++  },
++  {
++    "id": "quality_crank_x",
++    "name": "Ствол X"
++  },
++  {
++    "id": "quality_shredder",
++    "name": "Крушащий"
++  },
++  {
++    "id": "quality_disarm",
++    "name": "Обезоруживающий"
++  },
++  {
++    "id": "quality_sneak_attack",
++    "name": "Скрытная атака"
++  },
++  {
++    "id": "quality_targetting_computer",
++    "name": "Компьютер наведения"
++  },
++  {
++    "id": "quality_slow_load",
++    "name": "Медленная перезарядка"
++  },
++  {
++    "id": "quality_recoil_x",
++    "name": "Отдача X"
++  },
++  {
++    "id": "quality_ammo-hungry_x",
++    "name": "Пожиратель патронов X"
++  },
++  {
++    "id": "quality_surge",
++    "name": "Импульсный"
++  },
++  {
++    "id": "quality_bombard",
++    "name": "Бомбарда"
++  },
++  {
++    "id": "quality_thrown",
++    "name": "Метательное"
++  },
++  {
++    "id": "quality_underwater",
++    "name": "Подводное"
++  },
++  {
++    "id": "quality_tranq_x",
++    "name": "Усмирение X"
++  }
++]

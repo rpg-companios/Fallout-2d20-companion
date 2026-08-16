@@ -1,0 +1,22 @@
+{
+  "duration": {
+    "none": "none",
+    "instant": "instantly",
+    "sceneUnit": "scene"
+  },
+  "events": {
+    "effectsCleared": "Effects cleared: {{effects}}",
+    "effectsClearedAll": "all negative",
+    "instantPositive": "Instant positive effect: {{name}}",
+    "instantNegative": "Instant negative effect: {{name}}",
+    "positiveApplied": "Positive effect {{name}}: +{{scenes}} scenes.",
+    "negativeApplied": "Negative effect {{name}}: +{{scenes}} scenes.",
+    "conditionsRemoved": "Condition removed: {{conditions}}",
+    "addictionRoll": "Addiction roll: {{faces}} — {{effectCount}} effect(s) of {{addictionLevel}} needed.",
+    "addictionGained": "You became addicted.",
+    "addictionAvoided": "Addiction avoided."
+  },
+  "display": {
+    "scenesAndMinutes": "{{scenes}} scenes ({{minutes}} min)"
+  }
+}

@@ -54,7 +54,7 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
 import { legacyEffectToStore } from './effectsSync.js';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
-import perksData from '../../data/perks/perks.json';
+import perksData from '../../modules/fallout/data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в

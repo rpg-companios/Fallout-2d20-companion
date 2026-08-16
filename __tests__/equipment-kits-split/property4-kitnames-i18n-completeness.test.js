@@ -3,8 +3,8 @@
  *
  * Для каждого уникального kit ID из `equipmentKitIds` всех origins
  * (data/origins + modules/fallout/data/origins) этот kit ID должен
- * присутствовать в секции `equipmentKits` модульного i18n
- * (modules/fallout/i18n/{ru-RU,en-EN}.json) с полем name.
+ * присутствовать в модульном i18n сеттинга
+ * (modules/fallout/i18n/{ru-RU,en-EN}/data/system/equipmentKits.json) с полем name.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -14,12 +14,12 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ORIGINS_FILES = [
-  path.resolve(__dirname, '../../data/origins/origins.json'),
-  path.resolve(__dirname, '../../modules/fallout/data/origins.json'),
+  path.resolve(__dirname, '../../modules/fallout/data/origins/origins.json'),
+  path.resolve(__dirname, '../../modules/fallout/data/origins/origins.json'),
 ];
 const MODULE_I18N_FILES = {
-  'ru-RU': path.resolve(__dirname, '../../modules/fallout/i18n/ru-RU.json'),
-  'en-EN': path.resolve(__dirname, '../../modules/fallout/i18n/en-EN.json'),
+  'ru-RU': path.resolve(__dirname, '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json'),
+  'en-EN': path.resolve(__dirname, '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json'),
 };
 
 function loadAllKitIdsFromOrigins() {
@@ -39,8 +39,8 @@ function loadAllKitIdsFromOrigins() {
 function loadModuleKitNames(locale) {
   const file = MODULE_I18N_FILES[locale];
   if (!fs.existsSync(file)) return null;
-  const content = JSON.parse(fs.readFileSync(file, 'utf-8'));
-  return content.equipmentKits || {};
+  // Файл и есть словарь имён комплектов: { [kitId]: { name } }
+  return JSON.parse(fs.readFileSync(file, 'utf-8'));
 }
 
 describe('Property 4: Полнота KitNames в модульном i18n', () => {

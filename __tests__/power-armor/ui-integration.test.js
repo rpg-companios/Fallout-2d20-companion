@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
-import dataPowerArmor from '../../data/equipment/powerArmor.json';
-import dataAmmo from '../../data/equipment/ammo.json';
+import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+import dataAmmo from '../../modules/fallout/data/equipment/ammo.json';
 import {
   FUSION_CORE_ID,
   applyFrameAttributeModifiers,

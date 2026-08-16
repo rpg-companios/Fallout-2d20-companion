@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react
 import { useCharacter } from '../../CharacterContext';
 import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
 import { useLocale } from '../../../i18n/locale';
-import perksData from '../../../data/perks/perks.json';
+import perksData from '../../../modules/fallout/data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
 import styles from '../../../styles/PerksAndTraitsScreen.styles';

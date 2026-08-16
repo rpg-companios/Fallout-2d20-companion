@@ -14,6 +14,8 @@
 // никаких RN-зависимостей.
 
 import { applyArmorMods } from './modsEquip.js';
+import { enrichWeaponItem } from './enrichItem.js';
+import { getUniqQualityName } from './registry.js';
 
 // itemType, когда у предмета нет явного itemType (для запасных/старых записей).
 export const inferItemType = (item) => {
@@ -116,57 +118,15 @@ const INSTANCE_FIELDS = [
   'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', // мета отображения / роботов
 ];
 
-const getAppliedWeaponMods = (catalog, appliedMods = {}) => {
-  const modIds = Object.values(appliedMods).filter(Boolean);
-  if (modIds.length === 0) return [];
-  const mods = catalog?.weaponMods || [];
-  return modIds.map((modId) => mods.find((mod) => mod?.id === modId)).filter(Boolean);
-};
-
-const getWeaponNameWithAppliedMods = (weapon, selectedMods) => {
-  const baseName = weapon?.baseName || weapon?.name || weapon?.baseWeaponName || '';
-  const prefixes = selectedMods
-    .map((mod) => (mod?.prefix || mod?.name || '').trim())
-    .filter(Boolean);
-  const uniquePrefixes = [...new Set(prefixes)];
-  return uniquePrefixes.length ? `${uniquePrefixes.join(' ')} ${baseName}` : baseName;
-};
-
-const applyNumberModifier = (baseValue, modifier) => {
-  if (!modifier) return baseValue;
-  const baseNumber = Number(baseValue) || 0;
-  const modValue = Number(modifier.value) || 0;
-  if (modifier.op === 'set') return modValue;
-  if (modifier.op === '-') return Math.max(0, baseNumber - modValue);
-  return baseNumber + modValue;
-};
-
-export const resolveWeaponWithAppliedMods = (weapon, catalog) => {
-  if (!weapon || !catalog) return weapon;
-  const selectedMods = getAppliedWeaponMods(catalog, weapon.appliedMods);
-  if (selectedMods.length === 0) return weapon;
-
-  const resolvedWeapon = selectedMods.reduce((resolved, mod) => {
-    const next = { ...resolved };
-    if (mod.damageModifier) next.damage = applyNumberModifier(next.damage, mod.damageModifier);
-    if (mod.fireRateModifier) next.fireRate = applyNumberModifier(next.fireRate, mod.fireRateModifier);
-    if (mod.ammoOverride) next.ammoId = mod.ammoOverride;
-    if (mod.weight != null) next.weight = Number(next.weight ?? 0) + Number(mod.weight);
-    if (mod.cost != null) next.cost = Number(next.cost ?? 0) + Number(mod.cost);
-    if (mod.damageTypeOverride?.op === 'set') {
-      next.damageType = Array.isArray(mod.damageTypeOverride.value)
-        ? [...mod.damageTypeOverride.value]
-        : [mod.damageTypeOverride.value];
-    }
-    return next;
-  }, weapon);
-
-  return {
-    ...resolvedWeapon,
-    name: getWeaponNameWithAppliedMods(weapon, selectedMods),
-    baseWeaponName: weapon.baseName || weapon.baseWeaponName || weapon.name,
-  };
-};
+/**
+ * Обогащение оружия — через ЕДИНЫЙ конвейер (domain/enrichItem.js):
+ * база из каталога + моды (все структурированные поля) + качества,
+ * имя по правилам владельца (моды → качества → база; ложа меняет имя
+ * только при stockNames.with). Все пути (карточка, комплекты, экраны)
+ * используют одну реализацию.
+ */
+export const resolveWeaponWithAppliedMods = (weapon, catalog) =>
+  enrichWeaponItem(weapon, catalog, { qualityNameById: getUniqQualityName });
 
 const EFFECTIVE_ITEM_RESOLVERS = {
   weapon: (item, catalog) => resolveWeaponWithAppliedMods(item, catalog),

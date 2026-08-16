@@ -113,7 +113,7 @@ import { effectsDictToLegacyArray } from './effectsSync.js';
 // К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
 // атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
 import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
-import dataPowerArmor from '../../data/equipment/powerArmor.json';
+import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
 
 const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
 
@@ -304,6 +304,22 @@ export const applyEffectToStats = (stats, effect) => {
         updatedStats.damageResistance[type]
       );
     }
+  }
+
+  if (effect.defenseModifier) {
+    const mod = effect.defenseModifier;
+    if (!updatedStats.defense) {
+      updatedStats.defense = { base: 0, modifiers: [], total: 0 };
+    }
+    updatedStats.defense.modifiers = [
+      ...(updatedStats.defense.modifiers || []),
+      {
+        source: effect.id,
+        value: Number(mod.value) || 0,
+        operation: mod.op || '+',
+      },
+    ];
+    updatedStats.defense.total = calculateAttributeTotal(updatedStats.defense);
   }
   
   return updatedStats;

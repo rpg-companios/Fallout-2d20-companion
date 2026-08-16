@@ -1,0 +1,825 @@
+diff --git a/__tests__/securitron/general-goods-module-move.test.js b/__tests__/securitron/general-goods-module-move.test.js
+new file mode 100644
+index 0000000..8e8e623
+--- /dev/null
++++ b/__tests__/securitron/general-goods-module-move.test.js
+@@ -0,0 +1,39 @@
++/**
++ * Разделение движок/сеттинг (патч 113): общие товары перенесены в модуль
++ * ЦЕЛИКОМ (база 31 + модуль 4 объединены по id). data/ и легаси i18n —
++ * пустые движковые базы.
++ */
++import { describe, it, expect, beforeAll } from 'vitest';
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { setCurrentLocale } from '../../i18n/locale';
++import moduleGeneralGoods from '../../modules/fallout/data/equipment/general_goods.json';
++import moduleRuGeneralGoods from '../../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
++import moduleEnGeneralGoods from '../../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
++import dataGeneralGoods from '../../data/equipment/general_goods.json';
++import legacyRuGeneralGoods from '../../i18n/ru-RU/data/equipment/general_goods.json';
++import legacyEnGeneralGoods from '../../i18n/en-EN/data/equipment/general_goods.json';
++
++describe('Общие товары в модуле (сеттинг), data/ — пустой движок', () => {
++  beforeAll(() => setCurrentLocale('ru-RU'));
++
++  it('модуль содержит все записи (35: 31 база + 4 модуля) и переводы', () => {
++    expect(moduleGeneralGoods).toHaveLength(35);
++    expect(moduleGeneralGoods[0]).toHaveProperty('value');
++    for (const i18n of [moduleRuGeneralGoods, moduleEnGeneralGoods]) {
++      expect(i18n).toHaveLength(35);
++      expect(i18n.every((x) => x.name?.length > 0)).toBe(true);
++    }
++  });
++
++  it('data/ и легаси i18n пусты', () => {
++    expect(dataGeneralGoods).toEqual([]);
++    expect(legacyRuGeneralGoods).toEqual([]);
++    expect(legacyEnGeneralGoods).toEqual([]);
++  });
++
++  it('каталог отдаёт общие товары из модуля', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(catalog.generalGoods).toHaveLength(35);
++    expect(catalog.generalGoods[0].name.length).toBeGreaterThan(0);
++  });
++});
+diff --git a/data/equipment/general_goods.json b/data/equipment/general_goods.json
+index fef9be8..fe51488 100644
+--- a/data/equipment/general_goods.json
++++ b/data/equipment/general_goods.json
+@@ -1,33 +1 @@
+-[
+-  { "id": "item_bobby_pin",            "itemType": "misc", "subtype": "tool",     "value": 1,   "rarity": 0, "weight": 0.1 },
+-  { "id": "item_backpack_small",       "itemType": "misc", "subtype": "tool",     "value": 30,  "rarity": 1, "weight": 0   },
+-  { "id": "item_signal_flare",         "itemType": "misc", "subtype": "tool",     "value": 10,  "rarity": 1, "weight": 0.1 },
+-  { "id": "item_torch",                "itemType": "misc", "subtype": "tool",     "value": 10,  "rarity": 1, "weight": 0.5 },
+-  { "id": "item_common_materials",     "itemType": "misc", "subtype": "material", "value": 1,   "rarity": 1, "weight": 1   },
+-  { "id": "item_backpack_large",       "itemType": "misc", "subtype": "tool",     "value": 60,  "rarity": 2, "weight": 0   },
+-  { "id": "item_first_aid_kit",        "itemType": "misc", "subtype": "tool",     "value": 200, "rarity": 2, "weight": 2   },
+-  { "id": "item_holotags",             "itemType": "misc", "subtype": "tool",     "value": 5,   "rarity": 2, "weight": 0.1 },
+-  { "id": "item_holotape_player",      "itemType": "misc", "subtype": "tool",     "value": 250, "rarity": 2, "weight": 1.5 },
+-  { "id": "item_lantern",              "itemType": "misc", "subtype": "tool",     "value": 15,  "rarity": 2, "weight": 1.5 },
+-  { "id": "item_lock_pick_set",        "itemType": "misc", "subtype": "tool",     "value": 150, "rarity": 2, "weight": 1   },
+-  { "id": "item_multi_tool",           "itemType": "misc", "subtype": "tool",     "value": 100, "rarity": 2, "weight": 0.5 },
+-  { "id": "item_radio",                "itemType": "misc", "subtype": "tool",     "value": 75,  "rarity": 2, "weight": 1   },
+-  { "id": "item_uncommon_materials",   "itemType": "misc", "subtype": "material", "value": 3,   "rarity": 2, "weight": 1   },
+-  { "id": "item_deluxe_toolkit",       "itemType": "misc", "subtype": "tool",     "value": 150, "rarity": 3, "weight": 10  },
+-  { "id": "item_doctors_bag",          "itemType": "misc", "subtype": "tool",     "value": 300, "rarity": 3, "weight": 5   },
+-  { "id": "item_flashlight",           "itemType": "misc", "subtype": "tool",     "value": 100, "rarity": 3, "weight": 1   },
+-  { "id": "item_geiger_counter",       "itemType": "misc", "subtype": "tool",     "value": 325, "rarity": 3, "weight": 4   },
+-  { "id": "item_pack_brahmin",         "itemType": "misc", "subtype": "tool",     "value": 200, "rarity": 3, "weight": 0   },
+-  { "id": "item_rare_materials",       "itemType": "misc", "subtype": "material", "value": 5,   "rarity": 3, "weight": 1   },
+-  { "id": "item_electronic_lockpicker","itemType": "misc", "subtype": "tool",     "value": 375, "rarity": 4, "weight": 2   },
+-  { "id": "item_pip_boy",              "itemType": "misc", "subtype": "tool",     "value": 500, "rarity": 5, "weight": 2   },
+-  { "id": "item_pre_war_money",        "itemType": "misc", "subtype": "oddity",   "value": 50,  "rarity": 3, "weight": 0.1 },
+-  { "id": "item_holotape",             "itemType": "misc", "subtype": "oddity",   "value": 15,  "rarity": 2, "weight": 0.1 },
+-  { "id": "item_container",            "itemType": "misc", "subtype": "oddity",   "value": 0,   "rarity": 2, "weight": 0   },
+-  { "id": "item_key",                  "itemType": "misc", "subtype": "oddity",   "value": 0,   "rarity": 2, "weight": 0.1 },
+-  { "id": "item_locked_container",     "itemType": "misc", "subtype": "oddity",   "value": 0,   "rarity": 3, "weight": 0   },
+-  { "id": "item_fertilizer_bag",       "itemType": "misc", "subtype": "tool",     "value": 15,  "rarity": 1, "weight": 5   },
+-  { "id": "item_playing_cards",         "itemType": "misc", "subtype": "oddity",   "value": 5,   "rarity": 1, "weight": 0.1 },
+-  { "id": "item_settlement_job_posting","itemType": "misc", "subtype": "oddity",   "value": 0,   "rarity": 2, "weight": 0.1 },
+-  { "id": "robot_item_repair_kit",      "itemType": "misc", "subtype": "tool",     "value": 0,   "rarity": 0, "weight": 0, "healAmount": 6 }
+-]
++[]
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 454a6fc..d2e7b71 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -73,6 +73,7 @@ modules/fallout/
+ | oddities | 20 | 0 (`[]`) | патч 110 |
+ | ammo | 42 | 0 (`[]`) | патч 111 |
+ | clothes | 31 (3 группы, включая модульную headwear) | 0 (`{clothes: []}`) | патч 112 |
++| general_goods | 35 (31 база + 4 модуля) | 0 (`[]`) | патч 113 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -99,7 +100,6 @@ modules/fallout/
+ | Категория | Файл | Объём |
+ |---|---|---|
+ | Перки | `data/perks/perks.json` | 94 |
+-| Общие товары (база) | `data/equipment/general_goods.json` | 31 |
+ | Роботы | `data/equipment/robot/*` (8 файлов) + `robotparts.json` | 11+104 |
+ | Ориджины (база) | `data/origins/origins.json` | 17 |
+ | Трейты (база) | `data/traits/traits.json` | 32 |
+diff --git a/i18n/en-EN/data/equipment/general_goods.json b/i18n/en-EN/data/equipment/general_goods.json
+index fad03a8..fe51488 100644
+--- a/i18n/en-EN/data/equipment/general_goods.json
++++ b/i18n/en-EN/data/equipment/general_goods.json
+@@ -1,33 +1 @@
+-[
+-  { "id": "item_bobby_pin",             "name": "Bobby Pin",                  "effectLabel": "Helps with lock picking" },
+-  { "id": "item_backpack_small",        "name": "Backpack, Small",            "effectLabel": "+25 carry weight" },
+-  { "id": "item_signal_flare",          "name": "Signal Flare",               "effectLabel": "Sends a visual signal" },
+-  { "id": "item_torch",                 "name": "Torch",                      "effectLabel": "Illuminates dark areas" },
+-  { "id": "item_common_materials",      "name": "Common Materials",           "effectLabel": "" },
+-  { "id": "item_backpack_large",        "name": "Backpack, Large",            "effectLabel": "+50 carry weight" },
+-  { "id": "item_first_aid_kit",         "name": "First Aid Kit",              "effectLabel": "Reduces Medicine check difficulty by 1" },
+-  { "id": "item_holotags",              "name": "Holotags",                   "effectLabel": "Identification tags" },
+-  { "id": "item_holotape_player",       "name": "Holotape Player",            "effectLabel": "Plays holotapes" },
+-  { "id": "item_lantern",               "name": "Lantern",                    "effectLabel": "Illuminates dark areas" },
+-  { "id": "item_lock_pick_set",         "name": "Lock Pick Set",              "effectLabel": "Reduces lock pick difficulty by 1" },
+-  { "id": "item_multi_tool",            "name": "Multi-Tool",                 "effectLabel": "Reduces Repair check difficulty by 1" },
+-  { "id": "item_radio",                 "name": "Radio",                      "effectLabel": "Allows long-range communication" },
+-  { "id": "item_uncommon_materials",    "name": "Uncommon Materials",         "effectLabel": "" },
+-  { "id": "item_deluxe_toolkit",        "name": "Deluxe Toolkit",             "effectLabel": "Reduces Repair check difficulty by 2" },
+-  { "id": "item_doctors_bag",           "name": "Doctor's Bag",               "effectLabel": "Reduces Medicine check difficulty by 2" },
+-  { "id": "item_flashlight",            "name": "Flashlight",                 "effectLabel": "Illuminates dark areas" },
+-  { "id": "item_geiger_counter",        "name": "Geiger Counter",             "effectLabel": "Detects radiation levels" },
+-  { "id": "item_pack_brahmin",          "name": "Pack Brahmin",               "effectLabel": "+150 party carry weight" },
+-  { "id": "item_rare_materials",        "name": "Rare Materials",             "effectLabel": "" },
+-  { "id": "item_electronic_lockpicker", "name": "Electronic Lockpicker",      "effectLabel": "Reduces lock pick difficulty by 2" },
+-  { "id": "item_pip_boy",               "name": "Pip-Boy",                    "effectLabel": "Multifunctional wrist computer" },
+-  { "id": "item_pre_war_money",         "name": "Pre-war Money (50 caps)",    "effectLabel": "Worth 50 caps" },
+-  { "id": "item_holotape",              "name": "Holotape",                   "effectLabel": "Contains recorded information" },
+-  { "id": "item_container",             "name": "Container",                  "effectLabel": "" },
+-  { "id": "item_key",                   "name": "Key",                        "effectLabel": "" },
+-  { "id": "item_locked_container",      "name": "Locked Container",           "effectLabel": "" },
+-  { "id": "item_fertilizer_bag",        "name": "Fertilizer Bag",             "effectLabel": "" },
+-  { "id": "item_playing_cards",          "name": "Playing Cards",               "effectLabel": "" },
+-  { "id": "item_settlement_job_posting", "name": "Settlement Job Posting",      "effectLabel": "" },
+-  { "id": "robot_item_repair_kit",       "name": "Robot Repair Kit",            "effectLabel": "Restores 6 HP to a robot" }
+-]
++[]
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 1bbd172..1d50d1f 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -12,7 +12,6 @@ import ruRobotBody from './ru-RU/data/equipment/robot/robotbody.json';
+ import ruRobotHeads from './ru-RU/data/equipment/robot/robotheads.json';
+ import ruRobotLegs from './ru-RU/data/equipment/robot/robotlegs.json';
+ import ruQualities from './ru-RU/data/system/qualities.json';
+-import ruGeneralGoods from './ru-RU/data/equipment/general_goods.json';
+ import ruEffects from './ru-RU/data/system/effects.json';
+ 
+ import enMiscItems from './en-EN/data/equipment/items.json';
+@@ -28,7 +27,6 @@ import enRobotBody from './en-EN/data/equipment/robot/robotbody.json';
+ import enRobotHeads from './en-EN/data/equipment/robot/robotheads.json';
+ import enRobotLegs from './en-EN/data/equipment/robot/robotlegs.json';
+ import enQualities from './en-EN/data/system/qualities.json';
+-import enGeneralGoods from './en-EN/data/equipment/general_goods.json';
+ import enEffects from './en-EN/data/system/effects.json';
+ 
+ // Locale-independent kit data (items composition, no names)
+@@ -97,7 +95,6 @@ import dataRobotPlating from '../data/equipment/robot/armor_plating.json';
+ import dataRobotFrames from '../data/equipment/robot/frames.json';
+ import dataRobotWeapons from '../data/equipment/robot/weapons.json';
+ 
+-import dataGeneralGoods from '../data/equipment/general_goods.json';
+ 
+ 
+ import { getCurrentLocale, normalizeLocale } from './locale';
+@@ -160,7 +157,6 @@ const EQUIPMENT_BY_LOCALE = {
+     chems: ruChems,
+     magazines: ruMagazines,
+     miscellaneous: ruMiscItems,
+-    generalGoods: ruGeneralGoods,
+     robotWeapons: ruRobotWeapons,
+     robotArms: ruRobotArms,
+     robotArmor: ruRobotArmor,
+@@ -179,7 +175,6 @@ const EQUIPMENT_BY_LOCALE = {
+     chems: enChems,
+     magazines: enMagazines,
+     miscellaneous: enMiscItems,
+-    generalGoods: enGeneralGoods,
+     robotWeapons: enRobotWeapons,
+     robotArms: enRobotArms,
+     robotArmor: enRobotArmor,
+@@ -355,10 +350,8 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+   const mergedFood = mergeById(moduleFood, moduleI18n.food);
+   const mergedMagazines = mergeById(moduleMagazines, moduleI18n.magazines);
+   const moduleGeneralGoodsLocalized = mergeById(moduleGeneralGoods || [], moduleI18n.generalGoods || []);
+-  const mergedGeneralGoods = [
+-    ...mergeById(dataGeneralGoods, i18n.generalGoods || []),
+-    ...moduleGeneralGoodsLocalized,
+-  ];
++  const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
++
+   const mergedOddities = mergeById(moduleOddities, moduleI18n.oddities || []);
+   const mergedRobotBody = mergeById(dataRobotBody || [], i18n.robotBody || [])
+     .map((b) => ({ ...b, itemType: b.itemType || 'robotBody' }));
+diff --git a/i18n/ru-RU/data/equipment/general_goods.json b/i18n/ru-RU/data/equipment/general_goods.json
+index 1c77212..fe51488 100644
+--- a/i18n/ru-RU/data/equipment/general_goods.json
++++ b/i18n/ru-RU/data/equipment/general_goods.json
+@@ -1,33 +1 @@
+-[
+-  { "id": "item_bobby_pin",             "name": "Шпилька",                    "effectLabel": "Помогает при взломе замков" },
+-  { "id": "item_backpack_small",        "name": "Рюкзак (малый)",             "effectLabel": "+25 к грузоподъёмности" },
+-  { "id": "item_signal_flare",          "name": "Сигнальная ракета",          "effectLabel": "Подаёт визуальный сигнал" },
+-  { "id": "item_torch",                 "name": "Факел",                      "effectLabel": "Освещает тёмные места" },
+-  { "id": "item_common_materials",      "name": "Обычные материалы",          "effectLabel": "" },
+-  { "id": "item_backpack_large",        "name": "Рюкзак (большой)",           "effectLabel": "+50 к грузоподъёмности" },
+-  { "id": "item_first_aid_kit",         "name": "Аптечка",                    "effectLabel": "Снижает сложность проверок Медицины на 1" },
+-  { "id": "item_holotags",              "name": "Голотеги",                   "effectLabel": "Идентификационные жетоны" },
+-  { "id": "item_holotape_player",       "name": "Плеер гололент",             "effectLabel": "Воспроизводит гололенты" },
+-  { "id": "item_lantern",               "name": "Фонарь",                     "effectLabel": "Освещает тёмные места" },
+-  { "id": "item_lock_pick_set",         "name": "Набор отмычек",              "effectLabel": "Снижает сложность взлома замков на 1" },
+-  { "id": "item_multi_tool",            "name": "Мультитул",                  "effectLabel": "Снижает сложность проверок Ремонта на 1" },
+-  { "id": "item_radio",                 "name": "Радио",                      "effectLabel": "Позволяет связываться на расстоянии" },
+-  { "id": "item_uncommon_materials",    "name": "Необычные материалы",        "effectLabel": "" },
+-  { "id": "item_deluxe_toolkit",        "name": "Набор инструментов (люкс)",  "effectLabel": "Снижает сложность проверок Ремонта на 2" },
+-  { "id": "item_doctors_bag",           "name": "Докторский саквояж",         "effectLabel": "Снижает сложность проверок Медицины на 2" },
+-  { "id": "item_flashlight",            "name": "Фонарик",                    "effectLabel": "Освещает тёмные места" },
+-  { "id": "item_geiger_counter",        "name": "Счётчик Гейгера",            "effectLabel": "Определяет уровень радиации" },
+-  { "id": "item_pack_brahmin",          "name": "Вьючный брамин",             "effectLabel": "+150 к грузоподъёмности отряда" },
+-  { "id": "item_rare_materials",        "name": "Редкие материалы",           "effectLabel": "" },
+-  { "id": "item_electronic_lockpicker", "name": "Электронная отмычка",        "effectLabel": "Снижает сложность взлома замков на 2" },
+-  { "id": "item_pip_boy",               "name": "Пип-бой",                    "effectLabel": "Многофункциональный наручный компьютер" },
+-  { "id": "item_pre_war_money",         "name": "Довоенные деньги (50 кр.)",  "effectLabel": "Стоит 50 крышек" },
+-  { "id": "item_holotape",              "name": "Гололента",                  "effectLabel": "Содержит записанную информацию" },
+-  { "id": "item_container",             "name": "Контейнер",                  "effectLabel": "" },
+-  { "id": "item_key",                   "name": "Ключ",                       "effectLabel": "" },
+-  { "id": "item_locked_container",      "name": "Запертый контейнер",         "effectLabel": "" },
+-  { "id": "item_fertilizer_bag",        "name": "Мешок удобрений",            "effectLabel": "" },
+-  { "id": "item_playing_cards",          "name": "Игральные карты",             "effectLabel": "" },
+-  { "id": "item_settlement_job_posting", "name": "Объявление о найме",          "effectLabel": "" },
+-  { "id": "robot_item_repair_kit",       "name": "Ремкомплект для роботов",     "effectLabel": "Восстанавливает 6 ОЗ роботу" }
+-]
++[]
+diff --git a/modules/fallout/data/equipment/general_goods.json b/modules/fallout/data/equipment/general_goods.json
+index 6593f9b..b1ed99a 100644
+--- a/modules/fallout/data/equipment/general_goods.json
++++ b/modules/fallout/data/equipment/general_goods.json
+@@ -1,4 +1,253 @@
+ [
++  {
++    "id": "item_bobby_pin",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 1,
++    "rarity": 0,
++    "weight": 0.1
++  },
++  {
++    "id": "item_backpack_small",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 30,
++    "rarity": 1,
++    "weight": 0
++  },
++  {
++    "id": "item_signal_flare",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 10,
++    "rarity": 1,
++    "weight": 0.1
++  },
++  {
++    "id": "item_torch",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 10,
++    "rarity": 1,
++    "weight": 0.5
++  },
++  {
++    "id": "item_common_materials",
++    "itemType": "misc",
++    "subtype": "material",
++    "value": 1,
++    "rarity": 1,
++    "weight": 1
++  },
++  {
++    "id": "item_backpack_large",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 60,
++    "rarity": 2,
++    "weight": 0
++  },
++  {
++    "id": "item_first_aid_kit",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 200,
++    "rarity": 2,
++    "weight": 2
++  },
++  {
++    "id": "item_holotags",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 5,
++    "rarity": 2,
++    "weight": 0.1
++  },
++  {
++    "id": "item_holotape_player",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 250,
++    "rarity": 2,
++    "weight": 1.5
++  },
++  {
++    "id": "item_lantern",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 15,
++    "rarity": 2,
++    "weight": 1.5
++  },
++  {
++    "id": "item_lock_pick_set",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 150,
++    "rarity": 2,
++    "weight": 1
++  },
++  {
++    "id": "item_multi_tool",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 100,
++    "rarity": 2,
++    "weight": 0.5
++  },
++  {
++    "id": "item_radio",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 75,
++    "rarity": 2,
++    "weight": 1
++  },
++  {
++    "id": "item_uncommon_materials",
++    "itemType": "misc",
++    "subtype": "material",
++    "value": 3,
++    "rarity": 2,
++    "weight": 1
++  },
++  {
++    "id": "item_deluxe_toolkit",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 150,
++    "rarity": 3,
++    "weight": 10
++  },
++  {
++    "id": "item_doctors_bag",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 300,
++    "rarity": 3,
++    "weight": 5
++  },
++  {
++    "id": "item_flashlight",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 100,
++    "rarity": 3,
++    "weight": 1
++  },
++  {
++    "id": "item_geiger_counter",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 325,
++    "rarity": 3,
++    "weight": 4
++  },
++  {
++    "id": "item_pack_brahmin",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 200,
++    "rarity": 3,
++    "weight": 0
++  },
++  {
++    "id": "item_rare_materials",
++    "itemType": "misc",
++    "subtype": "material",
++    "value": 5,
++    "rarity": 3,
++    "weight": 1
++  },
++  {
++    "id": "item_electronic_lockpicker",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 375,
++    "rarity": 4,
++    "weight": 2
++  },
++  {
++    "id": "item_pip_boy",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 500,
++    "rarity": 5,
++    "weight": 2
++  },
++  {
++    "id": "item_pre_war_money",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 50,
++    "rarity": 3,
++    "weight": 0.1
++  },
++  {
++    "id": "item_holotape",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 15,
++    "rarity": 2,
++    "weight": 0.1
++  },
++  {
++    "id": "item_container",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 0,
++    "rarity": 2,
++    "weight": 0
++  },
++  {
++    "id": "item_key",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 0,
++    "rarity": 2,
++    "weight": 0.1
++  },
++  {
++    "id": "item_locked_container",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 0,
++    "rarity": 3,
++    "weight": 0
++  },
++  {
++    "id": "item_fertilizer_bag",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 15,
++    "rarity": 1,
++    "weight": 5
++  },
++  {
++    "id": "item_playing_cards",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 5,
++    "rarity": 1,
++    "weight": 0.1
++  },
++  {
++    "id": "item_settlement_job_posting",
++    "itemType": "misc",
++    "subtype": "oddity",
++    "value": 0,
++    "rarity": 2,
++    "weight": 0.1
++  },
++  {
++    "id": "robot_item_repair_kit",
++    "itemType": "misc",
++    "subtype": "tool",
++    "value": 0,
++    "rarity": 0,
++    "weight": 0,
++    "healAmount": 6
++  },
+   {
+     "id": "CasinoTopsChip",
+     "itemType": "misc",
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/general_goods.json b/modules/fallout/i18n/en-EN/data/equipment/general_goods.json
+index c0658a2..08bbe3c 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/general_goods.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/general_goods.json
+@@ -1,4 +1,159 @@
+ [
++  {
++    "id": "item_bobby_pin",
++    "name": "Bobby Pin",
++    "effectLabel": "Helps with lock picking"
++  },
++  {
++    "id": "item_backpack_small",
++    "name": "Backpack, Small",
++    "effectLabel": "+25 carry weight"
++  },
++  {
++    "id": "item_signal_flare",
++    "name": "Signal Flare",
++    "effectLabel": "Sends a visual signal"
++  },
++  {
++    "id": "item_torch",
++    "name": "Torch",
++    "effectLabel": "Illuminates dark areas"
++  },
++  {
++    "id": "item_common_materials",
++    "name": "Common Materials",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_backpack_large",
++    "name": "Backpack, Large",
++    "effectLabel": "+50 carry weight"
++  },
++  {
++    "id": "item_first_aid_kit",
++    "name": "First Aid Kit",
++    "effectLabel": "Reduces Medicine check difficulty by 1"
++  },
++  {
++    "id": "item_holotags",
++    "name": "Holotags",
++    "effectLabel": "Identification tags"
++  },
++  {
++    "id": "item_holotape_player",
++    "name": "Holotape Player",
++    "effectLabel": "Plays holotapes"
++  },
++  {
++    "id": "item_lantern",
++    "name": "Lantern",
++    "effectLabel": "Illuminates dark areas"
++  },
++  {
++    "id": "item_lock_pick_set",
++    "name": "Lock Pick Set",
++    "effectLabel": "Reduces lock pick difficulty by 1"
++  },
++  {
++    "id": "item_multi_tool",
++    "name": "Multi-Tool",
++    "effectLabel": "Reduces Repair check difficulty by 1"
++  },
++  {
++    "id": "item_radio",
++    "name": "Radio",
++    "effectLabel": "Allows long-range communication"
++  },
++  {
++    "id": "item_uncommon_materials",
++    "name": "Uncommon Materials",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_deluxe_toolkit",
++    "name": "Deluxe Toolkit",
++    "effectLabel": "Reduces Repair check difficulty by 2"
++  },
++  {
++    "id": "item_doctors_bag",
++    "name": "Doctor's Bag",
++    "effectLabel": "Reduces Medicine check difficulty by 2"
++  },
++  {
++    "id": "item_flashlight",
++    "name": "Flashlight",
++    "effectLabel": "Illuminates dark areas"
++  },
++  {
++    "id": "item_geiger_counter",
++    "name": "Geiger Counter",
++    "effectLabel": "Detects radiation levels"
++  },
++  {
++    "id": "item_pack_brahmin",
++    "name": "Pack Brahmin",
++    "effectLabel": "+150 party carry weight"
++  },
++  {
++    "id": "item_rare_materials",
++    "name": "Rare Materials",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_electronic_lockpicker",
++    "name": "Electronic Lockpicker",
++    "effectLabel": "Reduces lock pick difficulty by 2"
++  },
++  {
++    "id": "item_pip_boy",
++    "name": "Pip-Boy",
++    "effectLabel": "Multifunctional wrist computer"
++  },
++  {
++    "id": "item_pre_war_money",
++    "name": "Pre-war Money (50 caps)",
++    "effectLabel": "Worth 50 caps"
++  },
++  {
++    "id": "item_holotape",
++    "name": "Holotape",
++    "effectLabel": "Contains recorded information"
++  },
++  {
++    "id": "item_container",
++    "name": "Container",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_key",
++    "name": "Key",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_locked_container",
++    "name": "Locked Container",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_fertilizer_bag",
++    "name": "Fertilizer Bag",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_playing_cards",
++    "name": "Playing Cards",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_settlement_job_posting",
++    "name": "Settlement Job Posting",
++    "effectLabel": ""
++  },
++  {
++    "id": "robot_item_repair_kit",
++    "name": "Robot Repair Kit",
++    "effectLabel": "Restores 6 HP to a robot"
++  },
+   {
+     "id": "CasinoTopsChip",
+     "name": "Tops Casino Chip"
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json b/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json
+index f6254b4..520be61 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/general_goods.json
+@@ -1,4 +1,159 @@
+ [
++  {
++    "id": "item_bobby_pin",
++    "name": "Шпилька",
++    "effectLabel": "Помогает при взломе замков"
++  },
++  {
++    "id": "item_backpack_small",
++    "name": "Рюкзак (малый)",
++    "effectLabel": "+25 к грузоподъёмности"
++  },
++  {
++    "id": "item_signal_flare",
++    "name": "Сигнальная ракета",
++    "effectLabel": "Подаёт визуальный сигнал"
++  },
++  {
++    "id": "item_torch",
++    "name": "Факел",
++    "effectLabel": "Освещает тёмные места"
++  },
++  {
++    "id": "item_common_materials",
++    "name": "Обычные материалы",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_backpack_large",
++    "name": "Рюкзак (большой)",
++    "effectLabel": "+50 к грузоподъёмности"
++  },
++  {
++    "id": "item_first_aid_kit",
++    "name": "Аптечка",
++    "effectLabel": "Снижает сложность проверок Медицины на 1"
++  },
++  {
++    "id": "item_holotags",
++    "name": "Голотеги",
++    "effectLabel": "Идентификационные жетоны"
++  },
++  {
++    "id": "item_holotape_player",
++    "name": "Плеер гололент",
++    "effectLabel": "Воспроизводит гололенты"
++  },
++  {
++    "id": "item_lantern",
++    "name": "Фонарь",
++    "effectLabel": "Освещает тёмные места"
++  },
++  {
++    "id": "item_lock_pick_set",
++    "name": "Набор отмычек",
++    "effectLabel": "Снижает сложность взлома замков на 1"
++  },
++  {
++    "id": "item_multi_tool",
++    "name": "Мультитул",
++    "effectLabel": "Снижает сложность проверок Ремонта на 1"
++  },
++  {
++    "id": "item_radio",
++    "name": "Радио",
++    "effectLabel": "Позволяет связываться на расстоянии"
++  },
++  {
++    "id": "item_uncommon_materials",
++    "name": "Необычные материалы",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_deluxe_toolkit",
++    "name": "Набор инструментов (люкс)",
++    "effectLabel": "Снижает сложность проверок Ремонта на 2"
++  },
++  {
++    "id": "item_doctors_bag",
++    "name": "Докторский саквояж",
++    "effectLabel": "Снижает сложность проверок Медицины на 2"
++  },
++  {
++    "id": "item_flashlight",
++    "name": "Фонарик",
++    "effectLabel": "Освещает тёмные места"
++  },
++  {
++    "id": "item_geiger_counter",
++    "name": "Счётчик Гейгера",
++    "effectLabel": "Определяет уровень радиации"
++  },
++  {
++    "id": "item_pack_brahmin",
++    "name": "Вьючный брамин",
++    "effectLabel": "+150 к грузоподъёмности отряда"
++  },
++  {
++    "id": "item_rare_materials",
++    "name": "Редкие материалы",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_electronic_lockpicker",
++    "name": "Электронная отмычка",
++    "effectLabel": "Снижает сложность взлома замков на 2"
++  },
++  {
++    "id": "item_pip_boy",
++    "name": "Пип-бой",
++    "effectLabel": "Многофункциональный наручный компьютер"
++  },
++  {
++    "id": "item_pre_war_money",
++    "name": "Довоенные деньги (50 кр.)",
++    "effectLabel": "Стоит 50 крышек"
++  },
++  {
++    "id": "item_holotape",
++    "name": "Гололента",
++    "effectLabel": "Содержит записанную информацию"
++  },
++  {
++    "id": "item_container",
++    "name": "Контейнер",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_key",
++    "name": "Ключ",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_locked_container",
++    "name": "Запертый контейнер",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_fertilizer_bag",
++    "name": "Мешок удобрений",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_playing_cards",
++    "name": "Игральные карты",
++    "effectLabel": ""
++  },
++  {
++    "id": "item_settlement_job_posting",
++    "name": "Объявление о найме",
++    "effectLabel": ""
++  },
++  {
++    "id": "robot_item_repair_kit",
++    "name": "Ремкомплект для роботов",
++    "effectLabel": "Восстанавливает 6 ОЗ роботу"
++  },
+   {
+     "id": "CasinoTopsChip",
+     "name": "Фишки казино «Топс»"

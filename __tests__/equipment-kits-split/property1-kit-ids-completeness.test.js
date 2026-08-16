@@ -15,8 +15,8 @@ import moduleEquipmentKits from '../../modules/fallout/data/equipmentKits/index.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ORIGINS_FILES = [
-  path.resolve(__dirname, '../../data/origins/origins.json'),
-  path.resolve(__dirname, '../../modules/fallout/data/origins.json'),
+  path.resolve(__dirname, '../../modules/fallout/data/origins/origins.json'),
+  path.resolve(__dirname, '../../modules/fallout/data/origins/origins.json'),
 ];
 
 function loadModuleKitIds() {

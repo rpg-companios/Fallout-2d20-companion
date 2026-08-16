@@ -1,0 +1,271 @@
+diff --git a/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js b/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js
+index aa295c5..e1830b9 100644
+--- a/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js
++++ b/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js
+@@ -16,7 +16,7 @@ import moduleEquipmentKits from '../../modules/fallout/data/equipmentKits/index.
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const ORIGINS_FILES = [
+   path.resolve(__dirname, '../../data/origins/origins.json'),
+-  path.resolve(__dirname, '../../modules/fallout/data/origins.json'),
++  path.resolve(__dirname, '../../modules/fallout/data/origins/origins.json'),
+ ];
+ 
+ function loadModuleKitIds() {
+diff --git a/__tests__/equipment-kits-split/property4-kitnames-i18n-completeness.test.js b/__tests__/equipment-kits-split/property4-kitnames-i18n-completeness.test.js
+index ab27658..c859697 100644
+--- a/__tests__/equipment-kits-split/property4-kitnames-i18n-completeness.test.js
++++ b/__tests__/equipment-kits-split/property4-kitnames-i18n-completeness.test.js
+@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const ORIGINS_FILES = [
+   path.resolve(__dirname, '../../data/origins/origins.json'),
+-  path.resolve(__dirname, '../../modules/fallout/data/origins.json'),
++  path.resolve(__dirname, '../../modules/fallout/data/origins/origins.json'),
+ ];
+ const MODULE_I18N_FILES = {
+   'ru-RU': path.resolve(__dirname, '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json'),
+diff --git a/__tests__/securitron/enclave-kits.test.js b/__tests__/securitron/enclave-kits.test.js
+index 50e61d8..be5d098 100644
+--- a/__tests__/securitron/enclave-kits.test.js
++++ b/__tests__/securitron/enclave-kits.test.js
+@@ -19,7 +19,7 @@ vi.mock('../../db/Database', async () => {
+ 
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+ import { resolveKitItems } from '../../domain/kitResolver';
+-import moduleOrigins from '../../modules/fallout/data/origins.json';
++import moduleOrigins from '../../modules/fallout/data/origins/origins.json';
+ 
+ const KIT_IDS = ['enclave_scientist', 'enclave_soldier'];
+ const getOrigin = () => moduleOrigins.find((o) => o.id === 'enclaveRemnant');
+diff --git a/__tests__/securitron/enclave-remnant-origin.test.js b/__tests__/securitron/enclave-remnant-origin.test.js
+index 72767ad..401f627 100644
+--- a/__tests__/securitron/enclave-remnant-origin.test.js
++++ b/__tests__/securitron/enclave-remnant-origin.test.js
+@@ -25,8 +25,8 @@ vi.mock('../../db/Database', async () => {
+ });
+ 
+ import { getOrigins, getTraits, getOriginI18n, getTraitI18n, getEquipmentCatalogForLocale } from '../../domain/registry';
+-import moduleOrigins from '../../modules/fallout/data/origins.json';
+-import moduleTraits from '../../modules/fallout/data/traits.json';
++import moduleOrigins from '../../modules/fallout/data/origins/origins.json';
++import moduleTraits from '../../modules/fallout/data/traits/traits.json';
+ 
+ const ORIGIN_ID = 'enclaveRemnant';
+ const TRAIT_ID = 'enclaveRemnant-hidden';
+diff --git a/__tests__/securitron/item-variant.test.js b/__tests__/securitron/item-variant.test.js
+index 97d33a8..72c34c8 100644
+--- a/__tests__/securitron/item-variant.test.js
++++ b/__tests__/securitron/item-variant.test.js
+@@ -31,7 +31,7 @@ import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
+ import { migrateCharacterState } from '../../src/store/migrations';
+ import { setCurrentLocale } from '../../i18n/locale';
+ import useCharacterStore from '../../src/store/characterStore';
+-import moduleWeapons from '../../modules/fallout/data/weapons.json';
++import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
+ import dataWeapons from '../../data/equipment/weapons.json';
+ 
+ beforeAll(() => {
+diff --git a/__tests__/securitron/module-data-move.test.js b/__tests__/securitron/module-data-move.test.js
+index c08ec15..8de1b0c 100644
+--- a/__tests__/securitron/module-data-move.test.js
++++ b/__tests__/securitron/module-data-move.test.js
+@@ -6,9 +6,9 @@
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+ import { setCurrentLocale } from '../../i18n/locale';
+-import moduleFood from '../../modules/fallout/data/food.json';
+-import moduleDrinks from '../../modules/fallout/data/drinks.json';
+-import moduleWeaponMods from '../../modules/fallout/data/weapon_mods.json';
++import moduleFood from '../../modules/fallout/data/consumables/food.json';
++import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
++import moduleWeaponMods from '../../modules/fallout/data/equipment/weapon_mods.json';
+ import dataFood from '../../data/consumables/food.json';
+ import dataDrinks from '../../data/consumables/drinks.json';
+ import dataWeaponMods from '../../data/equipment/weapon_mods.json';
+diff --git a/__tests__/securitron/module-data-structure.test.js b/__tests__/securitron/module-data-structure.test.js
+new file mode 100644
+index 0000000..d9f3274
+--- /dev/null
++++ b/__tests__/securitron/module-data-structure.test.js
+@@ -0,0 +1,53 @@
++/**
++ * Контракт структуры данных модуля сеттинга (патч 97).
++ *
++ * Правило: данные модуля лежат ЗЕРКАЛОМ раскладки data/ — по одному файлу
++ * на категорию в тех же подпапках (consumables/, equipment/, origins/,
++ * traits/, equipmentKits/, ...). Плоские файлы в корне modules/fallout/data/
++ * (формат патча 70) — легаси-формат, запрещены.
++ */
++import { describe, it, expect } from 'vitest';
++import fs from 'fs';
++import path from 'path';
++import { fileURLToPath } from 'url';
++
++const __dirname = path.dirname(fileURLToPath(import.meta.url));
++const MODULE_DATA_ROOT = path.resolve(__dirname, '../../modules/fallout/data');
++
++const MIRRORED_FILES = [
++  'consumables/food.json',
++  'consumables/drinks.json',
++  'equipment/weapon_mods.json',
++  'equipment/uniq_qualities.json',
++  'equipment/weapons.json',
++  'equipment/clothes.json',
++  'equipment/general_goods.json',
++  'origins/origins.json',
++  'traits/traits.json',
++];
++
++const FORBIDDEN_FLAT_FILES = [
++  'food.json',
++  'drinks.json',
++  'weapon_mods.json',
++  'uniq_qualities.json',
++  'weapons.json',
++  'clothes.json',
++  'general_goods.json',
++  'origins.json',
++  'traits.json',
++];
++
++describe('Модульные данные: раскладка зеркалом data/', () => {
++  it('файлы категорий на зеркальных путях', () => {
++    for (const rel of MIRRORED_FILES) {
++      expect(fs.existsSync(path.join(MODULE_DATA_ROOT, rel)), rel).toBe(true);
++    }
++  });
++
++  it('плоские файлы в корне модуля запрещены (легаси-формат патча 70)', () => {
++    for (const name of FORBIDDEN_FLAT_FILES) {
++      expect(fs.existsSync(path.join(MODULE_DATA_ROOT, name)), name).toBe(false);
++    }
++  });
++});
+diff --git a/__tests__/securitron/treefamilies-origin.test.js b/__tests__/securitron/treefamilies-origin.test.js
+index 77e09eb..819811b 100644
+--- a/__tests__/securitron/treefamilies-origin.test.js
++++ b/__tests__/securitron/treefamilies-origin.test.js
+@@ -27,8 +27,8 @@ import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
+ import { getSelectedSubTraits, hasTraitEffect } from '../../domain/traits';
+ import { resolveKitItems } from '../../domain/kitResolver';
+ import { filterKitsForCharacter } from '../../domain/equipmentKits';
+-import moduleOrigins from '../../modules/fallout/data/origins.json';
+-import moduleTraits from '../../modules/fallout/data/traits.json';
++import moduleOrigins from '../../modules/fallout/data/origins/origins.json';
++import moduleTraits from '../../modules/fallout/data/traits/traits.json';
+ 
+ const getOrigin = () => getOrigins().find((o) => o.id === 'TreeFamilies');
+ const getTrait = (id) => getTraits().find((t) => t.id === id);
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index b652b1f..59fb075 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -20,9 +20,11 @@
+ ```
+ modules/fallout/
+   manifest.json          — id: fallout, name, version, requiresCore, locales
+-  data/
+-    food.json (77)  drinks.json (22)  weapon_mods.json (204)  uniq_qualities.json (3)
+-    weapons.json (2)  origins.json (2)  traits.json (5)  clothes.json (1)  general_goods.json (4)
++  data/                  — зеркало раскладки data/ (патч 97)
++    consumables/food.json (77)  consumables/drinks.json (22)
++    equipment/weapon_mods.json (204)  equipment/uniq_qualities.json (3)
++    equipment/weapons.json (2)  equipment/clothes.json (1)  equipment/general_goods.json (4)
++    origins/origins.json (2)  traits/traits.json (5)
+     equipmentKits/ — 15 файлов (по фракции) + index.js → 41 комплект
+   i18n/
+     ru-RU/data/  en-EN/data/  — переводы по категориям, зеркало раскладки i18n/<locale>/data/
+diff --git a/domain/registry.js b/domain/registry.js
+index dc8c304..6af18a3 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -18,10 +18,10 @@ import ruTraitsDict from '../i18n/ru-RU/data/system/traits.json';
+ import enTraitsDict from '../i18n/en-EN/data/system/traits.json';
+ 
+ // ── Модуль сеттинга (modules/fallout) ──────────────────────────────────────
+-import moduleOrigins from '../modules/fallout/data/origins.json';
+-import moduleTraits from '../modules/fallout/data/traits.json';
+-import moduleWeapons from '../modules/fallout/data/weapons.json';
+-import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
++import moduleOrigins from '../modules/fallout/data/origins/origins.json';
++import moduleTraits from '../modules/fallout/data/traits/traits.json';
++import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
++import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+ import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+ 
+ // i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
+@@ -49,7 +49,7 @@ import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/d
+ import baseWeapons from '../data/equipment/weapons.json';
+ import baseUniqQualities from '../data/equipment/uniq_qualities.json';
+ 
+-import moduleUniqQualities from '../modules/fallout/data/uniq_qualities.json';
++import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import { getCurrentLocale } from '../i18n/locale';
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 24950d2..f5d743f 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -54,8 +54,8 @@ import enOddities from './en-EN/data/equipment/oddities.json';
+ import enEffects from './en-EN/data/system/effects.json';
+ 
+ // Locale-independent kit data (items composition, no names)
+-import moduleWeapons from '../modules/fallout/data/weapons.json';
+-import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
++import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
++import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+ import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+ // i18n модуля сеттинга — по категориям (зеркало раскладки i18n/<locale>/data/).
+ import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
+@@ -83,10 +83,10 @@ import dataArmorMods from '../data/equipment/armor_mods.json';
+ import dataUniqArmorMods from '../data/equipment/uniq_armor_mods.json';
+ import dataArmorEffects from '../data/equipment/armor_effects.json';
+ import dataClothes from '../data/equipment/clothes.json';
+-import moduleClothesData from '../modules/fallout/data/clothes.json';
+-import moduleFood from '../modules/fallout/data/food.json';
+-import moduleDrinks from '../modules/fallout/data/drinks.json';
+-import moduleWeaponMods from '../modules/fallout/data/weapon_mods.json';
++import moduleClothesData from '../modules/fallout/data/equipment/clothes.json';
++import moduleFood from '../modules/fallout/data/consumables/food.json';
++import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
++import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+ import dataPowerArmor from '../data/equipment/powerArmor.json';
+ import dataAmmo from '../data/equipment/ammo.json';
+ import dataRobotParts from '../data/equipment/robotparts.json';
+diff --git a/modules/fallout/data/drinks.json b/modules/fallout/data/consumables/drinks.json
+similarity index 100%
+rename from modules/fallout/data/drinks.json
+rename to modules/fallout/data/consumables/drinks.json
+diff --git a/modules/fallout/data/food.json b/modules/fallout/data/consumables/food.json
+similarity index 100%
+rename from modules/fallout/data/food.json
+rename to modules/fallout/data/consumables/food.json
+diff --git a/modules/fallout/data/clothes.json b/modules/fallout/data/equipment/clothes.json
+similarity index 100%
+rename from modules/fallout/data/clothes.json
+rename to modules/fallout/data/equipment/clothes.json
+diff --git a/modules/fallout/data/general_goods.json b/modules/fallout/data/equipment/general_goods.json
+similarity index 100%
+rename from modules/fallout/data/general_goods.json
+rename to modules/fallout/data/equipment/general_goods.json
+diff --git a/modules/fallout/data/uniq_qualities.json b/modules/fallout/data/equipment/uniq_qualities.json
+similarity index 100%
+rename from modules/fallout/data/uniq_qualities.json
+rename to modules/fallout/data/equipment/uniq_qualities.json
+diff --git a/modules/fallout/data/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+similarity index 100%
+rename from modules/fallout/data/weapon_mods.json
+rename to modules/fallout/data/equipment/weapon_mods.json
+diff --git a/modules/fallout/data/weapons.json b/modules/fallout/data/equipment/weapons.json
+similarity index 100%
+rename from modules/fallout/data/weapons.json
+rename to modules/fallout/data/equipment/weapons.json
+diff --git a/modules/fallout/data/origins.json b/modules/fallout/data/origins/origins.json
+similarity index 100%
+rename from modules/fallout/data/origins.json
+rename to modules/fallout/data/origins/origins.json
+diff --git a/modules/fallout/data/traits.json b/modules/fallout/data/traits/traits.json
+similarity index 100%
+rename from modules/fallout/data/traits.json
+rename to modules/fallout/data/traits/traits.json

@@ -1,4 +1,5 @@
 import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodyplan';
+import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
 
 // domain/robotEquip.js
 // Pure functions for robot equipment logic.
@@ -81,8 +82,8 @@ export function getSlotForDirection(bodyPlan, direction) {
  * in a slot. Resolves `builtinWeaponId` against `weaponsCatalog` so that
  * `getBuiltinWeaponsFromSlots` can produce attack cards.
  *
- * @param {object} armEntry        - entry from data/equipment/robot/robotarms.json (optionally merged with i18n)
- * @param {object[]} weaponsCatalog - entries from data/equipment/robot/weapons.json (optionally merged with i18n)
+ * @param {object} armEntry        - entry from modules/fallout/data/equipment/robot/robotarms.json (optionally merged with i18n)
+ * @param {object[]} weaponsCatalog - entries from modules/fallout/data/equipment/robot/weapons.json (optionally merged with i18n)
  * @returns {object} normalized limb object
  */
 export function buildArmLimb(armEntry, weaponsCatalog = []) {
@@ -107,44 +108,22 @@ export function buildArmLimb(armEntry, weaponsCatalog = []) {
 // Weapon mods (для встроенного оружия конечностей)
 // ---------------------------------------------------------------------------
 
-const RANGE_ORDER = ['C', 'M', 'L', 'E'];
-
 /**
- * Применяет моды (из kitResolver item._mods) к статам оружия для слота робота.
- * Дублирует мини-подмножество applyModModifiers из стора, чтобы встроенное
- * оружие в руке (heldWeapon) показывало корректные статы без захода в стор.
+ * Применяет моды к статам оружия для слота робота — через ЕДИНЫЙ конвейер
+ * (domain/enrichItem.js applyWeaponMods). Раньше здесь была локальная копия
+ * механики модов (урезанная: без damageTypeOverride/ammoOverride/сложения
+ * уровней качеств) — источник расхождений «в одном месте так, в другом
+ * иначе». Конвейер возвращает range_index/range_name; для робо-оружия
+ * сохраняем прежнее буквенное поле range (C/M/L/E).
  */
+const RANGE_LETTERS = ['C', 'M', 'L', 'E'];
+
 const applyWeaponMods = (weapon, mods = []) => {
   if (!weapon || !Array.isArray(mods) || mods.length === 0) return weapon;
-  let damage = Number(weapon.damage) || 0;
-  let fireRate = Number(weapon.fireRate) || 0;
-  let rangeIndex = RANGE_ORDER.indexOf(weapon.range);
-  let qualities = Array.isArray(weapon.qualities) ? weapon.qualities.map((q) => ({ ...q })) : [];
-  let effects = Array.isArray(weapon.effects) ? weapon.effects.map((e) => ({ ...e })) : [];
-
-  for (const mod of mods) {
-    const dm = mod.damageModifier;
-    if (dm && dm.value) {
-      damage = dm.op === '-' ? damage - Number(dm.value) : damage + Number(dm.value);
-    }
-    const fm = mod.fireRateModifier;
-    if (fm && fm.value) fireRate += Number(fm.value);
-    const rm = mod.rangeModifier;
-    if (rm && rm.value && rangeIndex >= 0) {
-      rangeIndex = Math.min(RANGE_ORDER.length - 1, Math.max(0, rangeIndex + Number(rm.value)));
-    }
-    for (const qc of mod.qualityChanges || []) {
-      if (qc.op === 'lose') qualities = qualities.filter((q) => q.qualityId !== qc.id);
-      else if (qc.op === 'gain' && !qualities.some((q) => q.qualityId === qc.id)) qualities.push({ qualityId: qc.id });
-    }
-    for (const ec of mod.effectChanges || []) {
-      if (ec.op === 'gain' && !effects.some((e) => e.effectId === ec.id)) effects.push({ effectId: ec.id });
-      else if (ec.op === 'lose') effects = effects.filter((e) => e.effectId !== ec.id);
-    }
+  const result = applyWeaponModsPipeline(weapon, mods);
+  if (result.range_index != null) {
+    result.range = RANGE_LETTERS[result.range_index] || weapon.range;
   }
-
-  const result = { ...weapon, damage, fireRate, qualities, effects };
-  if (rangeIndex >= 0) result.range = RANGE_ORDER[rangeIndex];
   return result;
 };
 

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import dataArmor from '../../data/equipment/armor.json';
-import dataClothes from '../../data/equipment/clothes.json';
-import dataArmorMods from '../../data/equipment/armor_mods.json';
-import dataUniqArmorMods from '../../data/equipment/uniq_armor_mods.json';
+import moduleArmor from '../../modules/fallout/data/equipment/armor.json';
+import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
+import moduleArmorMods from '../../modules/fallout/data/equipment/armor_mods.json';
+import moduleUniqArmorMods from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
 import {
   getAvailableArmorMods,
   isUniqueModAllowedForArmor,
@@ -13,9 +13,9 @@ import { getProtectionKind, resolveArmorCategoryKey, PROTECTION_KINDS } from '..
 // Тест читает сырые JSON-данные напрямую (без react/db), собирая минимальный
 // «каталог» в том же виде, в каком его отдаёт i18n/equipmentCatalog.
 const catalog = {
-  armorRaw: dataArmor,
-  armorMods: dataArmorMods,
-  uniqArmorMods: dataUniqArmorMods,
+  armorRaw: moduleArmor,
+  armorMods: moduleArmorMods,
+  uniqArmorMods: moduleUniqArmorMods,
   armorEffects: {},
 };
 
@@ -32,7 +32,7 @@ const FAMILY = {
 };
 
 const onePiece = (categoryKey) => {
-  const tiers = dataArmor[categoryKey]?.tiers || {};
+  const tiers = moduleArmor[categoryKey]?.tiers || {};
   const pieces = Object.values(tiers).flatMap((t) => t.pieces || []);
   if (!pieces.length) throw new Error(`no pieces for ${categoryKey}`);
   return { ...pieces[0], armorCategoryKey: categoryKey };
@@ -43,7 +43,7 @@ describe('unique armor mods — строго по типу брони', () => {
     for (const [categoryKey, modCategory] of Object.entries(FAMILY)) {
       const piece = onePiece(categoryKey);
       const { uniqueMods } = getAvailableArmorMods(piece, catalog);
-      const expected = dataUniqArmorMods.filter((m) => m.modCategory === modCategory);
+      const expected = moduleUniqArmorMods.filter((m) => m.modCategory === modCategory);
       expect(new Set(uniqueMods.map((m) => m.modCategory)), categoryKey)
         .toEqual(expected.length ? new Set([modCategory]) : new Set());
       expect(uniqueMods.length, categoryKey).toBe(expected.length);
@@ -51,7 +51,7 @@ describe('unique armor mods — строго по типу брони', () => {
   });
 
   it('ни один уникальный мод не доступен чужой категории', () => {
-    for (const mod of dataUniqArmorMods) {
+    for (const mod of moduleUniqArmorMods) {
       for (const categoryKey of Object.keys(FAMILY)) {
         const piece = onePiece(categoryKey);
         const allowed = isUniqueModAllowedForArmor(mod, piece, catalog);
@@ -86,8 +86,8 @@ describe('unique armor mods — строго по типу брони', () => {
 
   it('applyArmorMods НЕ применяет уникальный мод чужой категории', () => {
     const metalChest = onePiece('metalArmor');
-    const foreign = dataUniqArmorMods.find((m) => m.modCategory === 'leatherUniqueMods');
-    const own = dataUniqArmorMods.find((m) => m.modCategory === 'metalUniqueMods');
+    const foreign = moduleUniqArmorMods.find((m) => m.modCategory === 'leatherUniqueMods');
+    const own = moduleUniqArmorMods.find((m) => m.modCategory === 'metalUniqueMods');
 
     const withForeign = applyArmorMods({ ...metalChest, appliedUniqueArmorModId: foreign.id }, catalog);
     expect(withForeign.item.physicalDamageRating).toBe(metalChest.physicalDamageRating);
@@ -99,7 +99,7 @@ describe('unique armor mods — строго по типу брони', () => {
 
   it('данные неизменны: у каждой категории брони заявлен ровно один семейный набор уникальных модов', () => {
     for (const [categoryKey, modCategory] of Object.entries(FAMILY)) {
-      expect(dataArmor[categoryKey].allowedUniqueModCategories).toEqual([modCategory]);
+      expect(moduleArmor[categoryKey].allowedUniqueModCategories).toEqual([modCategory]);
     }
   });
 });
@@ -109,7 +109,7 @@ describe('unique armor mods — строго по типу брони', () => {
 // экипирована в слот брони (outfit с allowsArmor:false) и имеет protectedAreas.
 describe('одежда не является бронёй — моды брони недоступны', () => {
   const getClothing = (id) =>
-    dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
+    moduleClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
 
   it.each(['clothing_sturdy_clothes', 'clothing_nomad_outfit'])(
     '%s (обмундирование/костюм) не получает ни стандартных, ни уникальных модов',
@@ -124,8 +124,8 @@ describe('одежда не является бронёй — моды брон�
 
   it('applyArmorMods не применяет никакие моды к одежде (даже записанные ранее)', () => {
     const suit = getClothing('clothing_sturdy_clothes');
-    const std = dataArmorMods[0];
-    const uniq = dataUniqArmorMods[0];
+    const std = moduleArmorMods[0];
+    const uniq = moduleUniqArmorMods[0];
     const { item } = applyArmorMods(
       { ...suit, appliedArmorModId: std.id, appliedUniqueArmorModId: uniq.id },
       catalog,
@@ -137,7 +137,7 @@ describe('одежда не является бронёй — моды брон�
 
   it('броня по-прежнему получает моды (контроль регресса)', () => {
     const metalChest = onePiece('metalArmor');
-    const own = dataUniqArmorMods.find((m) => m.modCategory === 'metalUniqueMods');
+    const own = moduleUniqArmorMods.find((m) => m.modCategory === 'metalUniqueMods');
     const { item } = applyArmorMods({ ...metalChest, appliedUniqueArmorModId: own.id }, catalog);
     expect(item.physicalDamageRating).not.toBe(metalChest.physicalDamageRating);
   });
@@ -156,7 +156,7 @@ describe('getProtectionKind — единый определитель вида �
 
   it('одежда → clothing: обмундирование, костюм, головной убор (реальные данные)', () => {
     const getClothing = (id) =>
-      dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
+      moduleClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
     expect(getProtectionKind(getClothing('clothing_nomad_outfit'))).toBe(PROTECTION_KINDS.CLOTHING);
     expect(getProtectionKind(getClothing('clothing_sturdy_clothes'))).toBe(PROTECTION_KINDS.CLOTHING);
     expect(getProtectionKind(getClothing('headwear_gas_mask'))).toBe(PROTECTION_KINDS.CLOTHING);

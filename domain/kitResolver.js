@@ -4,6 +4,7 @@ import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/l
 import { evaluateRollConfig } from './diceRollsLogic';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getUniqQualityName } from './registry';
+import { enrichWeaponItem } from './enrichItem';
 import { composeNameWithUniqQualities } from './uniqQuality';
 import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
 
@@ -180,21 +181,12 @@ export async function resolveWeaponItem(item) {
   // Ложа (stock) превращает пистолет в винтовку: имя берём из данных оружия
   // (stockNames.with), если оно задано. Это правило книги (Any Stock mods
   // change the weapon to a rifle), обеспеченное ДАННЫМИ — движок лишь знает,
-  // что мод из слота Stocks меняет базовое имя.
-  const hasStock = mods.some((mod) => mod.slot === 'Stocks');
-  // Префикс самой ложи (например, «Стандартная ложа») не пишем — он избыточен,
-  // когда ложа уже меняет имя оружия на винтовку. Префиксы стволов/ёмкостей и
-  // т.п. остаются.
-  const prefixes = mods
-    .filter((mod) => mod.slot !== 'Stocks')
-    .map((mod) => mod.prefix)
-    .filter(Boolean);
-  const stockName = hasStock ? (weaponData.stockNames?.with) : null;
+  // что мод из слота Stocks меняет базовое имя. У оружия без stockNames.with
+  // ложа — обычный мод со своим префиксом (решение владельца, патч 106).
+  const trueItemId = weaponData.trueItemId || null;
+  const hasStock = mods.some((mod) => mod.slot === 'Stocks' && weaponData.stockNames?.with);
+  const stockName = hasStock ? weaponData.stockNames.with : null;
   const baseName = stockName || weaponData.name || item.weaponId;
-  // Уникальные качества — перед именем: «дерзкая» + «Опасная бритва».
-  const uniqNames = (item.uniqQualities || []).map(getUniqQualityName).filter(Boolean);
-  const displayName = [...prefixes, ...uniqNames, baseName].join(' ');
-  const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammoId);
 
   // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
   // (finalItems модалки, robotInventory initRobotSlots) нёс моды в стор
@@ -204,10 +196,21 @@ export async function resolveWeaponItem(item) {
     if (mod.slot && mod.id) appliedMods[mod.slot] = mod.id;
   }
 
-  // Вариант предмета (trueItemId, напр. «Опасная бритва» = выкидной нож):
-  // для программы это истинный предмет — выдаём его id, а имя варианта
-  // сохраняем как baseName (оригинальное имя для стека и имён с модами).
-  const trueItemId = weaponData.trueItemId || null;
+  // ЕДИНЫЙ конвейер (domain/enrichItem.js): имя и статы собираются там же,
+  // где и для карточки — [префиксы модов] [качества] [базовое имя].
+  const enriched = enrichWeaponItem({
+    weaponId: item.weaponId,
+    itemType: 'weapon',
+    appliedMods,
+    uniqQualities: item.uniqQualities,
+    // Вариант (trueItemId, напр. «Опасная бритва» = выкидной нож):
+    // для программы это истинный предмет — выдаём его id, а имя варианта
+    // сохраняем как baseName (оригинальное имя для стека и имён с модами).
+    baseName: trueItemId ? baseName : undefined,
+  }, catalog, { qualityNameById: getUniqQualityName });
+  const displayName = enriched.displayName;
+
+  const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammoId);
   const resolvedWeaponId = trueItemId || item.weaponId;
 
   return {

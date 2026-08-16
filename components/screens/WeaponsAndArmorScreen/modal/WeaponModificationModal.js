@@ -7,7 +7,7 @@ import {
   ScrollView,
   Alert
 } from 'react-native';
-import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById, getWeaponMods } from '../../../../db/Database';
+import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../db/Database';
 import { declinePrefix } from '../../../../domain/modsEquip';
 import { shiftRange } from '../../../../domain/range';
 import { applyQualityGain } from '../../../../domain/weaponQualityConflicts';
@@ -314,6 +314,10 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
         const slots = await getSlotsForWeapon(resolvedWeaponId);
         const bySlot = {};
 
+        // ПРАВИЛО (владелец, патч 108): источник слотов — ТОЛЬКО
+        // weapon_mod_slots (контент модуля). Фолбэк на appliesToIds удалён:
+        // если для оружия записей нет — моды не предлагаются, данные
+        // дополняются в модуле (weapon_mod_slots).
         if (slots && slots.length) {
           for (const slot of slots) {
             const normalizedSlot = normalizeSlotKey(slot);
@@ -322,17 +326,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             normalizedMods.forEach((m) => debugLog('weapon.mod.row', { weaponId: resolvedWeaponId, slot, normalizedSlot, id: m.id, name: m.name, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier, rangeModifier: m.rangeModifier, qualityChanges: m.qualityChanges, effectDescription: m.effectDescription }));
             if (!bySlot[normalizedSlot]) bySlot[normalizedSlot] = [];
             bySlot[normalizedSlot].push(...normalizedMods);
-          }
-        } else {
-          // Fallback: если weapon_mod_slots для оружия не заполнен,
-          // используем weapon_mods.appliesToIds и группируем по slot.
-          const mods = await getWeaponMods(resolvedWeaponId);
-          for (const m of (mods || [])) {
-            const nm = normalizeModRow(m);
-            if (!nm) continue;
-            const slot = normalizeSlotKey(nm.slot || nm.rawSlot || 'other');
-            if (!bySlot[slot]) bySlot[slot] = [];
-            bySlot[slot].push(nm);
           }
         }
 

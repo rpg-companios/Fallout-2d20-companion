@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
-import dataArmor from '../../data/equipment/armor.json';
-import ruArmorFile from '../../i18n/ru-RU/data/equipment/armor/armor.json';
-import enArmorFile from '../../i18n/en-EN/data/equipment/armor/armor.json';
+import moduleArmor from '../../modules/fallout/data/equipment/armor.json';
+import ruArmorFile from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/armor.json';
+import enArmorFile from '../../modules/fallout/i18n/en-EN/data/equipment/armor/armor.json';
 
 // Инвариант исправления «молчаливой» неэкипировки брони (EN):
 // единый источник механики брони — data/equipment/armor.json; i18n-файлы
@@ -23,7 +23,7 @@ const MECHANICS = [
 ];
 
 const dataPiecesById = Object.fromEntries(
-  Object.values(dataArmor).flatMap((category) =>
+  Object.values(moduleArmor).flatMap((category) =>
     Object.values(category?.tiers || {}).flatMap((tier) => (tier?.pieces || [])),
   ).map((piece) => [piece.id, piece]),
 );

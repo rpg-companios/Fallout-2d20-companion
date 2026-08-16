@@ -1,0 +1,1132 @@
+diff --git a/__tests__/securitron/weapon-mod-slots-module-move.test.js b/__tests__/securitron/weapon-mod-slots-module-move.test.js
+new file mode 100644
+index 0000000..949d426
+--- /dev/null
++++ b/__tests__/securitron/weapon-mod-slots-module-move.test.js
+@@ -0,0 +1,40 @@
++/**
++ * Разделение движок/сеттинг (патч 103): weapon_mod_slots (какие моды
++ * в какие слоты какого оружия) — контент сеттинга, перенесён в модуль
++ * целиком. data/equipment/weapon_mod_slots.json — пустая движковая база
++ * ({} — это словарь, не массив).
++ */
++import { describe, it, expect, beforeAll } from 'vitest';
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { setCurrentLocale } from '../../i18n/locale';
++import moduleSlots from '../../modules/fallout/data/equipment/weapon_mod_slots.json';
++import dataSlots from '../../data/equipment/weapon_mod_slots.json';
++
++describe('weapon_mod_slots в модуле (сеттинг), data/ — пустой движок', () => {
++  beforeAll(() => setCurrentLocale('ru-RU'));
++
++  it('модуль содержит словарь слотов: { weaponId: { slot: [modIds] } }', () => {
++    expect(moduleSlots).toBeDefined();
++    const weaponIds = Object.keys(moduleSlots);
++    expect(weaponIds.length).toBeGreaterThan(0);
++    for (const weaponId of weaponIds) {
++      const slots = moduleSlots[weaponId];
++      expect(typeof slots).toBe('object');
++      for (const [slot, modIds] of Object.entries(slots)) {
++        expect(slot.length).toBeGreaterThan(0);
++        expect(Array.isArray(modIds)).toBe(true);
++        expect(modIds.length).toBeGreaterThan(0);
++      }
++    }
++  });
++
++  it('data/ для слотов пуст (движок без сеттинга)', () => {
++    expect(dataSlots).toEqual({});
++  });
++
++  it('каталог отдаёт modsOverrides из модуля', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(catalog.modsOverrides).toBe(moduleSlots);
++    expect(catalog.modsOverrides.weapon_chinese_assault_rifle.Receiver).toContain('mod_007');
++  });
++});
+diff --git a/data/equipment/weapon_mod_slots.json b/data/equipment/weapon_mod_slots.json
+index 3d25152..0967ef4 100644
+--- a/data/equipment/weapon_mod_slots.json
++++ b/data/equipment/weapon_mod_slots.json
+@@ -1,231 +1 @@
+-{
+-  "weapon_alien_blaster": {
+-    "Barrel": [
+-      "mod_017", "mod_053", "mod_054", "mod_055"
+-    ],
+-    "Grip": ["mod_027"],
+-    "Stock": ["mod_058", "mod_059"],
+-    "Sights": ["mod_062", "mod_034"]
+-  },
+-  "weapon_chinese_assault_rifle": {
+-    "Receiver": ["mod_007", "mod_005", "mod_004", "mod_006"],
+-    "Barrel": ["mod_017", "mod_018", "mod_019"],
+-    "Magazine": ["mod_023", "mod_024", "mod_025"],
+-    "Sight": ["mod_033"],
+-    "Muzzle": ["mod_040", "mod_039", "mod_042"]
+-  },
+-  "weapon_mesmetron": {
+-    "Capacitor": ["mod_043"],
+-    "Grips": ["mod_027"],
+-    "Sights": ["mod_062"]
+-  },
+-  "weapon_tesla_rifle": {
+-    "Barrel": ["mod_053", "mod_052", "mod_054"],
+-    "Sights": ["mod_062"]
+-  },
+-  "weapon_357_magnum_revolver": {
+-    "Receiver": ["mod_009"],
+-    "Barrel": ["mod_017"],
+-    "Magazine": ["mod_023"]
+-  },
+-  "weapon_12_7mm_pistol": {
+-    "Receiver": ["mod_007", "mod_004", "mod_009", "mod_005", "mod_006", "mod_002", "mod_010"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Grip": ["mod_026", "mod_027"],
+-    "Magazine": ["mod_023", "mod_024"],
+-    "Sights": ["mod_033"],
+-    "Muzzle": ["mod_042"]
+-  },
+-  "weapon_12_7mm_smg": {
+-    "Receiver": ["mod_004", "mod_005", "mod_002"],
+-    "Grip": ["mod_028", "mod_030"],
+-    "Magazine": ["mod_023"],
+-    "Sights": ["mod_033"],
+-    "Muzzle": ["mod_042"]
+-  },
+-  "weapon_25mm_grenade_apw": {
+-    "Receiver": ["mod_009"],
+-    "Barrel": ["mod_017"],
+-    "Magazine": ["mod_023"]
+-  },
+-  "weapon_9mm_pistol": {
+-    "Receiver": ["mod_008", "mod_007", "mod_004", "mod_009", "mod_078"],
+-    "Grip": ["mod_026"],
+-    "Magazine": ["mod_023"],
+-    "Sights": ["mod_033", "mod_034"],
+-    "Muzzle": ["mod_042"]
+-  },
+-  "weapon_anti_materiel_rifle": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Magazine": ["mod_023"],
+-    "Sights": ["mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_042"]
+-  },
+-  "weapon_battle_rifle": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017"],
+-    "Sights": ["mod_033", "mod_034"],
+-    "Muzzle": ["mod_039"]
+-  },
+-  "weapon_black_powder_blunderbuss": { 
+-  },
+-  "weapon_black_powder_pistol": { 
+-  },
+-  "weapon_black_powder_rifle": {
+-    "Muzzle": ["mod_039"]
+-  },
+-  "weapon_gauss_pistol": {
+-    "Barrel": ["mod_021"],
+-    "Capacitors": ["mod_031", "mod_032"],
+-    "Sights": ["mod_033"]
+-  },
+-  "weapon_gauss_shotgun": {
+-    "Barrel": ["mod_021"],
+-    "Capacitors": ["mod_031", "mod_032"]
+-  },
+-  "weapon_lever_action_rifle": {
+-    "Receiver": ["mod_007", "mod_004", "mod_005", "mod_006", "mod_010", "mod_010"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_029"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037"],
+-    "Muzzle": ["mod_042"]
+-  },
+-  "weapon_light_machine_gun": {
+-    "Receiver": ["mod_007", "mod_004", "mod_005", "mod_011", "mod_010"],
+-    "Barrel": ["mod_017", "mod_018", "mod_019"],
+-    "Magazine": ["mod_023", "mod_024", "mod_025"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033"],
+-    "Muzzle": ["mod_040", "mod_041"]
+-  },
+-  "weapon_pump_action_shotgun": {
+-    "Receiver": ["mod_007", "mod_009", "mod_004", "mod_005", "mod_006", "mod_010"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_radium_rifle": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_sniper_rifle": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_bow": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_alien_atomizer": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_alien_disintegrator": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_arc_welder": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_microwave_emitter": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_50_cal_machine_gun": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_auto_grenade_launcher": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_drone_cannon": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_gatling_gun": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_gatling_plasma": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_gauss_minigun": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_plasma_caster": {
+-    "Receiver": ["mod_004", "mod_005", "mod_009"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_030"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037", "mod_038"],
+-    "Muzzle": ["mod_039", "mod_040", "mod_041", "mod_042"]
+-  },
+-  "weapon_ghoul_rifle": {
+-    "Receiver": ["mod_007", "mod_005", "mod_008", "mod_004", "mod_006", "mod_007", "mod_187"],
+-    "Barrel": ["mod_017", "mod_018"],
+-    "Stock": ["mod_028", "mod_029"],
+-    "Sights": ["mod_033", "mod_034", "mod_035", "mod_036", "mod_037"],
+-    "Muzzle": ["mod_042"]
+-  },
+-  "weapon_magnum_monicon": {
+-    "Receiver": ["mod_004", "mod_005", "mod_006"],
+-    "Barrel": ["mod_015", "mod_016"],
+-    "Grip": ["mod_026"],
+-    "Sights": ["mod_033", "mod_034", "mod_038"]
+-  },
+-  "weapon_eugene": {
+-    "Barrel": ["mod_096"],
+-    "Sights": ["mod_033"]
+-  },
+-  "weapon_crossbow": {
+-    "Frame": ["mod_198"],
+-    "Sights": ["mod_199", "mod_200"]
+-  },
+-  "weapon_boarding_pistol": {
+-    "Winch": ["mod_201", "mod_202"],
+-    "Barrel": ["mod_017", "mod_203"]
+-  }
+-}
++{}
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 66d404c..a8f6c4f 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -57,6 +57,7 @@ modules/fallout/
+ | magazines | 95 | 0 (`[]`) | патч 100 |
+ | loot | 7 файлов + стабы | 0 (`[]`) | патч 101 |
+ | weapons | 120 (118 база + 2 варианта, самодостаточно) | 0 (`[]`) | патч 102 |
++| weapon_mod_slots | 38 оружий (словарь) | 0 (`{}`) | патч 103 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -92,7 +93,6 @@ modules/fallout/
+ | Диковины | `data/equipment/oddities.json` | 20 |
+ | Общие товары (база) | `data/equipment/general_goods.json` | 31 |
+ | Одежда (база) | `data/equipment/clothes.json` | 3 |
+-| Слоты модов | `data/equipment/weapon_mod_slots.json` | 38 оружий |
+ | Роботы | `data/equipment/robot/*` (8 файлов) + `robotparts.json` | 11+104 |
+ | Ориджины (база) | `data/origins/origins.json` | 17 |
+ | Трейты (база) | `data/traits/traits.json` | 32 |
+@@ -129,7 +129,7 @@ modules/fallout/
+ 
+ Дальше:
+ 1. **Оружие (патч 102) — ВЫПОЛНЕНО**: модуль самодостаточен (120 записей, варианты `trueItemId` разворачиваются внутри модуля), i18n 120×2 в модуле, `data/equipment/weapons.json` и легаси-i18n пусты, каталог/реестр читают только модуль.
+-2. **weapon_mod_slots (патч 103)** (какие моды в какие слоты) — контент сеттинга → модуль (после оружия, т.к. ссылается на id оружия).
++2. **weapon_mod_slots (патч 103) — ВЫПОЛНЕНО**: словарь слотов (38 оружий) в модуле, каталог отдаёт его как modsOverrides, data/ пуст.
+ 3. **Броня и моды брони** (armor, armor_mods, uniq_armor_mods, armor_effects) + **силовая броня** + **диковины** + база **clothes/general_goods/ammo**.
+ 4. **Роботы** (8 файлов + robotparts) — по файлам, структура сохраняется.
+ 5. **Перки** (94) + **skillRewards** + база **origins/traits**.
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 98a1757..45d02a6 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -89,7 +89,7 @@ import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json
+ import dataPowerArmor from '../data/equipment/powerArmor.json';
+ import dataAmmo from '../data/equipment/ammo.json';
+ import dataRobotParts from '../data/equipment/robotparts.json';
+-import dataWeaponModSlots from '../data/equipment/weapon_mod_slots.json';
++import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
+ import dataRobotBody from '../data/equipment/robot/robotbody.json';
+ import dataRobotHeads from '../data/equipment/robot/robotheads.json';
+ import dataRobotLegs from '../data/equipment/robot/robotlegs.json';
+@@ -425,7 +425,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+     weaponMods: mergedWeaponMods,
+     armorMods: mergedArmorMods,
+     uniqArmorMods: mergedUniqArmorMods,
+-    modsOverrides: dataWeaponModSlots,
++    modsOverrides: moduleWeaponModSlots,
+     armorEffects: dataArmorEffects,
+     robotWeaponsOnly: robotWeapons,
+     robotArms,
+diff --git a/modules/fallout/data/equipment/weapon_mod_slots.json b/modules/fallout/data/equipment/weapon_mod_slots.json
+new file mode 100644
+index 0000000..8a044dd
+--- /dev/null
++++ b/modules/fallout/data/equipment/weapon_mod_slots.json
+@@ -0,0 +1,792 @@
++{
++  "weapon_alien_blaster": {
++    "Barrel": [
++      "mod_017",
++      "mod_053",
++      "mod_054",
++      "mod_055"
++    ],
++    "Grip": [
++      "mod_027"
++    ],
++    "Stock": [
++      "mod_058",
++      "mod_059"
++    ],
++    "Sights": [
++      "mod_062",
++      "mod_034"
++    ]
++  },
++  "weapon_chinese_assault_rifle": {
++    "Receiver": [
++      "mod_007",
++      "mod_005",
++      "mod_004",
++      "mod_006"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018",
++      "mod_019"
++    ],
++    "Magazine": [
++      "mod_023",
++      "mod_024",
++      "mod_025"
++    ],
++    "Sight": [
++      "mod_033"
++    ],
++    "Muzzle": [
++      "mod_040",
++      "mod_039",
++      "mod_042"
++    ]
++  },
++  "weapon_mesmetron": {
++    "Capacitor": [
++      "mod_043"
++    ],
++    "Grips": [
++      "mod_027"
++    ],
++    "Sights": [
++      "mod_062"
++    ]
++  },
++  "weapon_tesla_rifle": {
++    "Barrel": [
++      "mod_053",
++      "mod_052",
++      "mod_054"
++    ],
++    "Sights": [
++      "mod_062"
++    ]
++  },
++  "weapon_357_magnum_revolver": {
++    "Receiver": [
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017"
++    ],
++    "Magazine": [
++      "mod_023"
++    ]
++  },
++  "weapon_12_7mm_pistol": {
++    "Receiver": [
++      "mod_007",
++      "mod_004",
++      "mod_009",
++      "mod_005",
++      "mod_006",
++      "mod_002",
++      "mod_010"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Grip": [
++      "mod_026",
++      "mod_027"
++    ],
++    "Magazine": [
++      "mod_023",
++      "mod_024"
++    ],
++    "Sights": [
++      "mod_033"
++    ],
++    "Muzzle": [
++      "mod_042"
++    ]
++  },
++  "weapon_12_7mm_smg": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_002"
++    ],
++    "Grip": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Magazine": [
++      "mod_023"
++    ],
++    "Sights": [
++      "mod_033"
++    ],
++    "Muzzle": [
++      "mod_042"
++    ]
++  },
++  "weapon_25mm_grenade_apw": {
++    "Receiver": [
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017"
++    ],
++    "Magazine": [
++      "mod_023"
++    ]
++  },
++  "weapon_9mm_pistol": {
++    "Receiver": [
++      "mod_008",
++      "mod_007",
++      "mod_004",
++      "mod_009",
++      "mod_078"
++    ],
++    "Grip": [
++      "mod_026"
++    ],
++    "Magazine": [
++      "mod_023"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034"
++    ],
++    "Muzzle": [
++      "mod_042"
++    ]
++  },
++  "weapon_anti_materiel_rifle": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Magazine": [
++      "mod_023"
++    ],
++    "Sights": [
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_042"
++    ]
++  },
++  "weapon_battle_rifle": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034"
++    ],
++    "Muzzle": [
++      "mod_039"
++    ]
++  },
++  "weapon_black_powder_blunderbuss": {},
++  "weapon_black_powder_pistol": {},
++  "weapon_black_powder_rifle": {
++    "Muzzle": [
++      "mod_039"
++    ]
++  },
++  "weapon_gauss_pistol": {
++    "Barrel": [
++      "mod_021"
++    ],
++    "Capacitors": [
++      "mod_031",
++      "mod_032"
++    ],
++    "Sights": [
++      "mod_033"
++    ]
++  },
++  "weapon_gauss_shotgun": {
++    "Barrel": [
++      "mod_021"
++    ],
++    "Capacitors": [
++      "mod_031",
++      "mod_032"
++    ]
++  },
++  "weapon_lever_action_rifle": {
++    "Receiver": [
++      "mod_007",
++      "mod_004",
++      "mod_005",
++      "mod_006",
++      "mod_010",
++      "mod_010"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_029"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037"
++    ],
++    "Muzzle": [
++      "mod_042"
++    ]
++  },
++  "weapon_light_machine_gun": {
++    "Receiver": [
++      "mod_007",
++      "mod_004",
++      "mod_005",
++      "mod_011",
++      "mod_010"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018",
++      "mod_019"
++    ],
++    "Magazine": [
++      "mod_023",
++      "mod_024",
++      "mod_025"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033"
++    ],
++    "Muzzle": [
++      "mod_040",
++      "mod_041"
++    ]
++  },
++  "weapon_pump_action_shotgun": {
++    "Receiver": [
++      "mod_007",
++      "mod_009",
++      "mod_004",
++      "mod_005",
++      "mod_006",
++      "mod_010"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_radium_rifle": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_sniper_rifle": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_bow": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_alien_atomizer": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_alien_disintegrator": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_arc_welder": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_microwave_emitter": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_50_cal_machine_gun": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_auto_grenade_launcher": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_drone_cannon": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_gatling_gun": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_gatling_plasma": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_gauss_minigun": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_plasma_caster": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_009"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_030"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037",
++      "mod_038"
++    ],
++    "Muzzle": [
++      "mod_039",
++      "mod_040",
++      "mod_041",
++      "mod_042"
++    ]
++  },
++  "weapon_ghoul_rifle": {
++    "Receiver": [
++      "mod_007",
++      "mod_005",
++      "mod_008",
++      "mod_004",
++      "mod_006",
++      "mod_007",
++      "mod_187"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_018"
++    ],
++    "Stock": [
++      "mod_028",
++      "mod_029"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_035",
++      "mod_036",
++      "mod_037"
++    ],
++    "Muzzle": [
++      "mod_042"
++    ]
++  },
++  "weapon_magnum_monicon": {
++    "Receiver": [
++      "mod_004",
++      "mod_005",
++      "mod_006"
++    ],
++    "Barrel": [
++      "mod_015",
++      "mod_016"
++    ],
++    "Grip": [
++      "mod_026"
++    ],
++    "Sights": [
++      "mod_033",
++      "mod_034",
++      "mod_038"
++    ]
++  },
++  "weapon_eugene": {
++    "Barrel": [
++      "mod_096"
++    ],
++    "Sights": [
++      "mod_033"
++    ]
++  },
++  "weapon_crossbow": {
++    "Frame": [
++      "mod_198"
++    ],
++    "Sights": [
++      "mod_199",
++      "mod_200"
++    ]
++  },
++  "weapon_boarding_pistol": {
++    "Winch": [
++      "mod_201",
++      "mod_202"
++    ],
++    "Barrel": [
++      "mod_017",
++      "mod_203"
++    ]
++  }
++}

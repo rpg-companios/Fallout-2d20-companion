@@ -47,7 +47,7 @@ import {
 // Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
 // базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
 import { applyFrameAttributeModifiers, hasFrame } from "../../../domain/powerArmor";
-import dataPowerArmor from "../../../data/equipment/powerArmor.json";
+import dataPowerArmor from "../../../modules/fallout/data/equipment/powerArmor.json";
 import {
   getSkillDisplayName,
   tCharacterScreen,
