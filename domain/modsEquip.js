@@ -38,6 +38,14 @@ export const applyArmorModToItem = (armorItem, mod) => {
 };
 
 // Apply standard and unique armor mods from a catalog to an armor item.
+const DEFAULT_EFFECTS = { bonusEffects: [], rules: [] };
+export const getArmorCategoryConfig = (item, catalog) => {
+    const categoryKey = resolveArmorCategoryKey(item);
+    if (!categoryKey) return null;
+    const raw = catalog?.armorRaw?.[categoryKey];
+    if (!raw) return null;
+    return raw;
+};
 export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     if (!armorItem) return { item: armorItem, effects: DEFAULT_EFFECTS };
 
