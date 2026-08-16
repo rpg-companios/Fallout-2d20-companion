@@ -327,7 +327,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
   const powerArmorList = powerArmorGroups.flatMap((group) => group.items);
 
   // Clothes: механика и имена — из модуля сеттинга (патч 112).
-  const i18nClothesMap = Object.fromEntries(
+  const moduleI18nClothesMap = Object.fromEntries(
     (moduleI18n.clothes?.clothes || []).flatMap((g) => (g.items || []).map((item) => [item.id, item]))
   );
   const clothes = (moduleClothesData?.clothes || []).map((group) => ({
