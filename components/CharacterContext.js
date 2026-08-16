@@ -959,7 +959,7 @@ export const CharacterProvider = ({ children }) => {
     // У остальных ориджинов применения Стелс-боя не дают зависимости
     // (ни броска, ни негативного эффекта).
     const isShadowCharacter = origin?.id === 'shadow' || trait?.id === 'shadow';
-    const isStealthBoy = item?.id === 'stealth_boy';
+    const isStealthBoy = item?.id === 'chem_stealth_boy' || item?.id === 'stealth_boy';
     if (
       item?.addictionLevel > 0 &&
       item?.negativeEffect === 'addiction' &&
