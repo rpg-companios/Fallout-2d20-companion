@@ -162,8 +162,6 @@ const ALL_KIT_DATA = {
 
 const EQUIPMENT_BY_LOCALE = {
   'ru-RU': {
-    chems: ruChems,
-    magazines: ruMagazines,
     robotWeapons: moduleRuRobotWeaponsI18n,
     robotArms: moduleRuRobotArmsI18n,
     robotArmor: moduleRuRobotArmorI18n,
@@ -177,8 +175,6 @@ const EQUIPMENT_BY_LOCALE = {
     robotLegs: moduleRuRobotLegsI18n,
   },
   'en-EN': {
-    chems: enChems,
-    magazines: enMagazines,
     robotWeapons: moduleEnRobotWeaponsI18n,
     robotArms: moduleEnRobotArmsI18n,
     robotArmor: moduleEnRobotArmorI18n,
