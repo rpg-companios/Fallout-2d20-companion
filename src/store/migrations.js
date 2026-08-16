@@ -787,6 +787,177 @@ const MIGRATIONS = [
     return changed ? next : state;
   },
 
+  // v9 -> v10: ориджин «Тень» (shadow) — лимиты SPECIAL не применялись
+  // (трейт объявлял их в формате attributeBonus/attributeLimits, который
+  // движок не читал; формат исправлен на канонический attributes).
+  // Уже созданные персонажи-Тени могли иметь атрибуты ВНЕ лимитов
+  // (STR/END <6 или >12, CHA/INT >8). Решение владельца: ПОЛНЫЙ сброс
+  // всех атрибутов Тени к стартовым значениям — STR/END = 6 (4 + бонус 2),
+  // остальные = 4; очки возвращаются в пул распределения. Навыки и
+  // остальные данные не трогаются.
+  //
+  // ВАЖНО: атрибуты в сейве — МАССИВ [{ name, value }] (формат БД/контекста).
+  // (Первая версия этой миграции обрабатывала их как словарь и ломала
+  // формат — исправлено в v9->v10, починка повреждённых сейвов — v10->v11.)
+  (state) => {
+    const next = { ...state };
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    const isShadow = traitId === 'shadow' || originId === 'shadow';
+    if (!isShadow) return state;
+
+    const attrs = next.attributes;
+    if (!Array.isArray(attrs)) return state;
+
+    const SHADOW_START = {
+      STR: 6, // 4 + бонус 2
+      END: 6,
+      PER: 4,
+      AGI: 4,
+      INT: 4,
+      CHA: 4,
+      LCK: 4,
+    };
+    next.attributes = attrs.map((attr) => {
+      if (!attr || typeof attr !== 'object') return attr;
+      const name = String(attr.name || '').toUpperCase();
+      const start = SHADOW_START[name];
+      if (start === undefined) return attr; // неизвестные атрибуты не трогаем
+      return { ...attr, name, value: start };
+    });
+    return next;
+  },
+
+  // v10 -> v11: починка сейвов, повреждённых багом первой версии миграции
+  // v9->v10 (атрибуты превращались из массива [{ name, value }] в объект
+  // { '0': {...}, '1': {...} } — приложение падало с
+  // «attributes.find is not a function»). Восстанавливаем массив и для
+  // Тени повторно применяем сброс к стартовым значениям.
+  (state) => {
+    const next = { ...state };
+    const attrs = next.attributes;
+    if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) return state;
+
+    const values = Object.values(attrs);
+    const looksLikeAttributes = values.length > 0
+      && values.every((v) => v && typeof v === 'object' && (v.name !== undefined || v.id !== undefined));
+    if (!looksLikeAttributes) return state;
+
+    // восстановление массива в формате БД [{ name, value }]
+    next.attributes = values.map((v) => ({
+      name: v.name || v.id || '',
+      value: v.value ?? v.base ?? v.total ?? 0,
+    }));
+
+    // если персонаж — Тень, повторно сбрасываем атрибуты к стартовым
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return next;
+
+    const SHADOW_START = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    next.attributes = next.attributes.map((attr) => {
+      if (!attr || typeof attr !== 'object') return attr;
+      const name = String(attr.name || '').toUpperCase();
+      const start = SHADOW_START[name];
+      if (start === undefined) return attr;
+      return { ...attr, name, value: start };
+    });
+    return next;
+  },
+
+  // v11 -> v12: «Тень» — полный сброс состояния распределения очков.
+  // Решение владельца (уточнено): персонаж должен выглядеть как после
+  // создания — можно заново распределить и АТРИБУТЫ, и НАВЫКИ.
+  // Сбрасываем флаги attributesSaved/skillsSaved (иначе UI считает очки
+  // распределёнными и не показывает их) и значения навыков к стартовым
+  // (отмеченные (tagged) = 2, остальные = 0). Оружие/предметы/уровень/
+  // ориджин/трейт/выбор отмеченных навыков — НЕ трогаем (награды за
+  // отмеченные навыки не задвоятся: журнал rewardedSkills сохраняется).
+  (state) => {
+    const next = { ...state };
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return state;
+
+    const tagged = new Set([
+      ...(Array.isArray(next.selectedSkills) ? next.selectedSkills : []),
+      ...(Array.isArray(next.extraTaggedSkills) ? next.extraTaggedSkills : []),
+    ]);
+
+    let changed = false;
+    if (next.attributesSaved !== false) { next.attributesSaved = false; changed = true; }
+    if (next.skillsSaved !== false) { next.skillsSaved = false; changed = true; }
+
+    if (Array.isArray(next.skills)) {
+      next.skills = next.skills.map((skill) => {
+        if (!skill || typeof skill !== 'object') return skill;
+        const name = String(skill.name || '');
+        const start = tagged.has(name) ? 2 : 0;
+        if (Number(skill.value) === start) return skill;
+        changed = true;
+        return { ...skill, name, value: start };
+      });
+    }
+
+    return changed ? next : state;
+  },
+
+  // v12 -> v13: сейвы Тени, созданные/пересохранённые до исправления трейта,
+  // хранят трейт ЦЕЛИКОМ со старым форматом modifiers (attributeBonus/
+  // attributeLimits). При загрузке используется трейт из сейва (setTrait),
+  // а не из файла данных — поэтому бонусы/лимиты не работают даже при
+  // исправленном traits.json. Чиним трейт в сейве (→ канонический
+  // attributes) и, так как бонусы ранее не применялись (атрибуты могли
+  // остаться 4/4), сбрасываем атрибуты Тени к стартовым (STR/END 6,
+  // остальные 4), флаги распределения и навыки к стартовым
+  // (tagged 2, иные 0). Инвентарь/уровень/награды не трогаем.
+  // Если трейт уже канонический — сейв не трогаем (защита от повторного
+  // сброса уже перераспределённого персонажа).
+  (state) => {
+    const next = { ...state };
+    const trait = next.trait;
+    const traitId = typeof trait === 'string' ? trait : trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return state;
+    if (!trait || typeof trait !== 'object' || !trait.modifiers) return state;
+    const m = trait.modifiers;
+    if (!m.attributeLimits && !m.attributeBonus) return state; // уже канонический
+
+    const attributes = {
+      STR: { baseBonus: m.attributeBonus?.STR ?? 0, min: m.attributeLimits?.STR?.min ?? 4, max: m.attributeLimits?.STR?.max ?? 10 },
+      END: { baseBonus: m.attributeBonus?.END ?? 0, min: m.attributeLimits?.END?.min ?? 4, max: m.attributeLimits?.END?.max ?? 10 },
+      CHA: { max: m.attributeLimits?.CHA?.max ?? 10 },
+      INT: { max: m.attributeLimits?.INT?.max ?? 10 },
+    };
+    const newModifiers = { attributes };
+    for (const key of ['skillMaxValue', 'immunities', 'effects', 'armorConstraint',
+      'skillPickSelected', 'goodSoulSelectedSkills', 'forcedSkills']) {
+      if (m[key] !== undefined) newModifiers[key] = m[key];
+    }
+    next.trait = { ...trait, modifiers: newModifiers };
+
+    const start = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    if (Array.isArray(next.attributes)) {
+      next.attributes = next.attributes.map((a) =>
+        a && typeof a === 'object' && start[a.name] !== undefined
+          ? { ...a, name: a.name, value: start[a.name] }
+          : a);
+    }
+    next.attributesSaved = false;
+    next.skillsSaved = false;
+    if (Array.isArray(next.skills)) {
+      const tagged = new Set([
+        ...(Array.isArray(next.selectedSkills) ? next.selectedSkills : []),
+        ...(Array.isArray(next.extraTaggedSkills) ? next.extraTaggedSkills : []),
+      ]);
+      next.skills = next.skills.map((s) =>
+        s && typeof s === 'object' && s.name
+          ? { ...s, name: s.name, value: tagged.has(s.name) ? 2 : 0 }
+          : s);
+    }
+    return next;
+  },
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.

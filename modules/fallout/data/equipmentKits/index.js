@@ -17,6 +17,7 @@ import enclave from './enclave.json';
 import minuteman from './minuteman.json';
 import misterHandy from './misterHandy.json';
 import ncr from './ncr.json';
+import nightkin from './nightkin.json';
 import protectron from './protectron.json';
 import robobrain from './robobrain.json';
 import securitron from './securitron.json';
@@ -34,6 +35,7 @@ export default {
   ...minuteman,
   ...misterHandy,
   ...ncr,
+  ...nightkin,
   ...protectron,
   ...robobrain,
   ...securitron,

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "weaponDurabilityLossEnabled",
+    "type": "boolean",
+    "sectionKey": "survivalMode",
+    "labelKey": "settings.durabilityTitle",
+    "descriptionKey": "settings.durabilityDescription",
+    "defaultValue": false
+  },
+  {
+    "id": "weaponDurabilityLossPer10Shots",
+    "type": "number",
+    "sectionKey": "survivalMode",
+    "labelKey": "settings.lossTitle",
+    "descriptionKey": "settings.lossDescription",
+    "defaultValue": 1,
+    "min": 1,
+    "max": 100,
+    "dependsOn": "weaponDurabilityLossEnabled"
+  },
+  {
+    "id": "randomWeaponQualityEnabled",
+    "type": "boolean",
+    "sectionKey": "survivalMode",
+    "labelKey": "settings.qualityTitle",
+    "descriptionKey": "settings.qualityDescription",
+    "defaultValue": false,
+    "dependsOn": "weaponDurabilityLossEnabled"
+  },
+  {
+    "id": "unarmedAttackVisible",
+    "type": "boolean",
+    "sectionKey": "combat",
+    "labelKey": "settings.unarmedTitle",
+    "descriptionKey": "settings.unarmedDescription",
+    "defaultValue": true
+  },
+  {
+    "id": "language",
+    "type": "select",
+    "sectionKey": "interface",
+    "labelKey": "settings.languageTitle",
+    "descriptionKey": "settings.languageDescription",
+    "defaultValue": "ru-RU",
+    "options": [
+      { "value": "ru-RU", "labelKey": "settings.language.ru" },
+      { "value": "en-EN", "labelKey": "settings.language.en" }
+    ]
+  }
+]

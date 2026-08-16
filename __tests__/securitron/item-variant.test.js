@@ -31,8 +31,7 @@ import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
 import { migrateCharacterState } from '../../src/store/migrations';
 import { setCurrentLocale } from '../../i18n/locale';
 import useCharacterStore from '../../src/store/characterStore';
-import moduleWeapons from '../../modules/fallout/data/weapons.json';
-import dataWeapons from '../../data/equipment/weapons.json';
+import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
 
 beforeAll(() => {
   // catalogSource строит каталог по текущей локали (в CI Intl даёт en-EN).
@@ -95,7 +94,7 @@ describe('Разворачивание варианта в каталоге', ()
   it('точечный модификатор стата: «быстрый нож» наследует нож, fireRate +1', () => {
     const fastKnife = expandTrueItems(
       [{ id: 'weapon_test_fast_knife', trueItemId: 'weapon_switchblade', modifiers: { fireRateModifier: { op: '+', value: 1 } } }],
-      dataWeapons,
+      moduleWeapons,
     )[0];
     expect(fastKnife.damage).toBe(2); // 90% параметров — от ножа
     expect(fastKnife.fireRate).toBe(1); // точечная правка

@@ -1,0 +1,134 @@
+[
+  {
+    "id": "mod_std_laminate",
+    "name": "Laminate"
+  },
+  {
+    "id": "mod_std_rubberized",
+    "name": "Rubberized"
+  },
+  {
+    "id": "mod_std_microcarbon",
+    "name": "Microcarbon"
+  },
+  {
+    "id": "mod_std_soft_padding",
+    "name": "Soft Padding",
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_2",
+        "description": "+2 resistance to explosive damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_asbestos_lining",
+    "name": "Asbestos Lining",
+    "specialEffects": [
+      {
+        "id": "effect_ignore_energy_persistent",
+        "description": "Ignore persistent energy damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_dense",
+    "name": "Dense",
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_4",
+        "description": "+4 resistance to explosive damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_biocomponents_mesh",
+    "name": "Biocomponents Mesh",
+    "specialEffects": [
+      {
+        "id": "effect_chems_duration_double",
+        "description": "Double the duration of chems effects."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_pneumatic",
+    "name": "Pneumatic",
+    "specialEffects": [
+      {
+        "id": "effect_stun_immunity",
+        "description": "Immunity to stun (threshold 2)."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_melee",
+    "name": "Melee",
+    "specialEffects": [
+      {
+        "id": "effect_unarmed_melee_damage_1",
+        "description": "+1 to unarmed melee damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_parrying",
+    "name": "Parrying",
+    "specialEffects": [
+      {
+        "id": "effect_melee_damage_resistance_2",
+        "description": "+2 resistance to melee damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_balanced",
+    "name": "Balanced",
+    "specialEffects": [
+      {
+        "id": "effect_aimed_ranged_damage_1",
+        "description": "+1 to aimed ranged damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_aerodynamic",
+    "name": "Aerodynamic",
+    "specialEffects": [
+      {
+        "id": "effect_ap_bonus_damage_melee",
+        "description": "+4 AP bonus damage for melee."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_lightweight_arms",
+    "name": "Lightweight",
+    "specialEffects": [
+      {
+        "id": "effect_melee_piercing_1",
+        "description": "Melee attacks gain the Piercing 1 quality."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_soft_padding_legs",
+    "name": "Soft Padding",
+    "specialEffects": [
+      {
+        "id": "effect_fall_damage_resistance",
+        "description": "+2 resistance to fall damage."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_soundproofed",
+    "name": "Soundproofed",
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "description": "Once per scene, reroll a Sneak check."
+      }
+    ]
+  }
+]

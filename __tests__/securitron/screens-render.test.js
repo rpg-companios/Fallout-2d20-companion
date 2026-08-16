@@ -185,7 +185,7 @@ describe('Режимы отображения карточек оружия', ()
   };
 
   it('по умолчанию — режим "cards" (значение стора)', () => {
-    expect(useAppSettingsStore.getState().weaponCardsDisplayMode).toBe('cards');
+    expect(useAppSettingsStore.getState().getSettingValue('weaponCardsDisplayMode')).toBe('cards');
   });
 
   it('spoilers: экран рендерится, спойлер с заголовком и карточкой', () => {

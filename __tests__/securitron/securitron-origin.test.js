@@ -23,24 +23,24 @@ vi.mock('../../db/Database', async () => {
   };
 });
 
-import originsJson from '../../data/origins/origins.json';
-import traitsJson from '../../data/traits/traits.json';
+import originsJson from '../../modules/fallout/data/origins/origins.json';
+import traitsJson from '../../modules/fallout/data/traits/traits.json';
 import bodyPlans from '../../data/bodyplans/bodyplans.json';
 import kitData from '../../modules/fallout/data/equipmentKits/index.js';
-import ruTraits from '../../i18n/ru-RU/data/system/traits.json';
-import enTraits from '../../i18n/en-EN/data/system/traits.json';
-import moduleRuI18n from '../../modules/fallout/i18n/ru-RU.json';
-import moduleEnI18n from '../../modules/fallout/i18n/en-EN.json';
-import ruRobotHeads from '../../i18n/ru-RU/data/equipment/robot/robotheads.json';
-import enRobotHeads from '../../i18n/en-EN/data/equipment/robot/robotheads.json';
-import ruRobotBodies from '../../i18n/ru-RU/data/equipment/robot/robotbody.json';
-import enRobotBodies from '../../i18n/en-EN/data/equipment/robot/robotbody.json';
-import ruRobotArms from '../../i18n/ru-RU/data/equipment/robot/robotarms.json';
-import enRobotArms from '../../i18n/en-EN/data/equipment/robot/robotarms.json';
-import ruRobotLegs from '../../i18n/ru-RU/data/equipment/robot/robotlegs.json';
-import enRobotLegs from '../../i18n/en-EN/data/equipment/robot/robotlegs.json';
-import ruRobotItems from '../../i18n/ru-RU/data/equipment/robot/items.json';
-import enRobotItems from '../../i18n/en-EN/data/equipment/robot/items.json';
+import ruTraits from '../../modules/fallout/i18n/ru-RU/data/system/traits.json';
+import enTraits from '../../modules/fallout/i18n/en-EN/data/system/traits.json';
+import moduleRuKitNames from '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+import moduleEnKitNames from '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+import ruRobotHeads from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
+import enRobotHeads from '../../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
+import ruRobotBodies from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+import enRobotBodies from '../../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+import ruRobotArms from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
+import enRobotArms from '../../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
+import ruRobotLegs from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
+import enRobotLegs from '../../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
+import ruRobotItems from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/items.json';
+import enRobotItems from '../../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
 import ruWaAScreen from '../../i18n/ru-RU/screens/weaponsAndArmor/screen.json';
 import enWaAScreen from '../../i18n/en-EN/screens/weaponsAndArmor/screen.json';
 
@@ -133,11 +133,11 @@ const KIT_ID = 'securitron_standard';
 const BODY_PLAN = 'securitron';
 
 const loadRobotCatalog = () => ({
-  heads: require('../../data/equipment/robot/robotheads.json'),
-  bodies: require('../../data/equipment/robot/robotbody.json'),
-  arms: require('../../data/equipment/robot/robotarms.json'),
-  legs: require('../../data/equipment/robot/robotlegs.json'),
-  weapons: require('../../data/equipment/robot/weapons.json'),
+  heads: require('../../modules/fallout/data/equipment/robot/robotheads.json'),
+  bodies: require('../../modules/fallout/data/equipment/robot/robotbody.json'),
+  arms: require('../../modules/fallout/data/equipment/robot/robotarms.json'),
+  legs: require('../../modules/fallout/data/equipment/robot/robotlegs.json'),
+  weapons: require('../../modules/fallout/data/equipment/robot/weapons.json'),
 });
 
 const getOrigin = () => originsJson.find((o) => o.id === ORIGIN_ID);
@@ -255,8 +255,8 @@ describe('Ориджин Секьюритрон: комплект и слоты 
     expect(kitData[KIT_ID]).toBeDefined();
     expect(Array.isArray(kitData[KIT_ID].items)).toBe(true);
     expect(kitData[KIT_ID].name).toBeUndefined(); // имя — только в i18n
-    expect(moduleRuI18n.equipmentKits[KIT_ID].name).toBeTruthy();
-    expect(moduleEnI18n.equipmentKits[KIT_ID].name).toBeTruthy();
+    expect(moduleRuKitNames[KIT_ID].name).toBeTruthy();
+    expect(moduleEnKitNames[KIT_ID].name).toBeTruthy();
   });
 
   it('каталог собирает комплект (name + items) без ошибок каталога', () => {
@@ -419,7 +419,7 @@ describe('Ориджин Секьюритрон: драйвер ОС Mk II', () 
   const DRIVER_ID = 'robot_item_mk2_driver';
 
   it('драйвер — робо-предмет: уникальный, только для секьюритрона, с переводом', () => {
-    const driver = require('../../data/equipment/robotparts.json').robotItems.find((i) => i.id === DRIVER_ID);
+    const driver = require('../../modules/fallout/data/equipment/robotparts.json').robotItems.find((i) => i.id === DRIVER_ID);
     expect(driver).toBeDefined();
     expect(driver.itemType).toBe('misc');
     expect(driver.unique).toBe(true);

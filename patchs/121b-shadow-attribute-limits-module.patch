@@ -1,0 +1,24 @@
+diff --git a/modules/fallout/data/traits/traits.json b/modules/fallout/data/traits/traits.json
+index fd4eb51..a738727 100644
+--- a/modules/fallout/data/traits/traits.json
++++ b/modules/fallout/data/traits/traits.json
+@@ -414,16 +414,14 @@
+     "displayNameKey": "traits.shadow.shadow.name",
+     "descriptionKey": "traits.shadow.shadow.description",
+     "modifiers": {
+-      "attributeBonus": {
+-        "STR": 2,
+-        "END": 2
+-      },
+-      "attributeLimits": {
++      "attributes": {
+         "STR": {
++          "baseBonus": 2,
+           "min": 6,
+           "max": 12
+         },
+         "END": {
++          "baseBonus": 2,
+           "min": 6,
+           "max": 12
+         },

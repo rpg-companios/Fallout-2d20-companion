@@ -27,8 +27,8 @@ import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
 import { getSelectedSubTraits, hasTraitEffect } from '../../domain/traits';
 import { resolveKitItems } from '../../domain/kitResolver';
 import { filterKitsForCharacter } from '../../domain/equipmentKits';
-import moduleOrigins from '../../modules/fallout/data/origins.json';
-import moduleTraits from '../../modules/fallout/data/traits.json';
+import moduleOrigins from '../../modules/fallout/data/origins/origins.json';
+import moduleTraits from '../../modules/fallout/data/traits/traits.json';
 
 const getOrigin = () => getOrigins().find((o) => o.id === 'TreeFamilies');
 const getTrait = (id) => getTraits().find((t) => t.id === id);

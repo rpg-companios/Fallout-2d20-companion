@@ -1,0 +1,19 @@
+{
+  "survivalMode": "Survival mode settings",
+  "combat": "Combat",
+  "interface": "Interface",
+  "durabilityTitle": "Weapon wear on shots",
+  "durabilityDescription": "Enable weapon wear mechanics on shots.",
+  "lossTitle": "Durability loss per 10 shots",
+  "lossDescription": "By default 1 durability is spent per 10 shots. Unreliable weapons spend twice as much, Reliable — half.",
+  "qualityTitle": "Random weapon quality",
+  "qualityDescription": "Weapons added via Loot have random durability from 1 to 100. Merchant weapons are always 100%.",
+  "unarmedTitle": "Show unarmed attack",
+  "unarmedDescription": "The unarmed attack (fists/manipulator) is always in the first slot; this toggle controls its display on the equipment screen.",
+  "languageTitle": "Interface language",
+  "languageDescription": "Application and data language.",
+  "language": {
+    "ru": "Russian",
+    "en": "English"
+  }
+}

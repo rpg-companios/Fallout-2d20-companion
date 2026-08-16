@@ -1,0 +1,1822 @@
+diff --git a/__tests__/armor-mod-categories/unique-mods-per-category.test.js b/__tests__/armor-mod-categories/unique-mods-per-category.test.js
+index 977a2ae..1b4ba70 100644
+--- a/__tests__/armor-mod-categories/unique-mods-per-category.test.js
++++ b/__tests__/armor-mod-categories/unique-mods-per-category.test.js
+@@ -1,6 +1,6 @@
+ import { describe, it, expect } from 'vitest';
+ import moduleArmor from '../../modules/fallout/data/equipment/armor.json';
+-import dataClothes from '../../data/equipment/clothes.json';
++import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
+ import moduleArmorMods from '../../modules/fallout/data/equipment/armor_mods.json';
+ import moduleUniqArmorMods from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
+ import {
+@@ -109,7 +109,7 @@ describe('unique armor mods — строго по типу брони', () => {
+ // экипирована в слот брони (outfit с allowsArmor:false) и имеет protectedAreas.
+ describe('одежда не является бронёй — моды брони недоступны', () => {
+   const getClothing = (id) =>
+-    dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
++    moduleClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
+ 
+   it.each(['clothing_sturdy_clothes', 'clothing_nomad_outfit'])(
+     '%s (обмундирование/костюм) не получает ни стандартных, ни уникальных модов',
+@@ -156,7 +156,7 @@ describe('getProtectionKind — единый определитель вида 
+ 
+   it('одежда → clothing: обмундирование, костюм, головной убор (реальные данные)', () => {
+     const getClothing = (id) =>
+-      dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
++      moduleClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
+     expect(getProtectionKind(getClothing('clothing_nomad_outfit'))).toBe(PROTECTION_KINDS.CLOTHING);
+     expect(getProtectionKind(getClothing('clothing_sturdy_clothes'))).toBe(PROTECTION_KINDS.CLOTHING);
+     expect(getProtectionKind(getClothing('headwear_gas_mask'))).toBe(PROTECTION_KINDS.CLOTHING);
+diff --git a/__tests__/equipped-armor/slot-routing.test.js b/__tests__/equipped-armor/slot-routing.test.js
+index d20b081..f4c3e77 100644
+--- a/__tests__/equipped-armor/slot-routing.test.js
++++ b/__tests__/equipped-armor/slot-routing.test.js
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from 'vitest';
+-import dataClothes from '../../data/equipment/clothes.json';
++import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
+ import {
+   createEmptyEquippedArmor,
+   resolveTargetLayer,
+@@ -11,7 +11,7 @@ import {
+ // ВЫЧИСЛЕНИЕМ (blocksArmorOver), а не переездом в чужой слот.
+ // ПРАВИЛО ВЛАДЕЛЬЦА (2026-07-31): никакого легаси, нормализаторов и фоллбэков.
+ const getClothing = (id) =>
+-  dataClothes.clothes
++  moduleClothes.clothes
+     .flatMap((g) => g.items.map((it) => ({ ...g, ...it, type: g.type })))
+     .find((i) => i.id === id);
+ 
+diff --git a/__tests__/securitron/clothes-module-move.test.js b/__tests__/securitron/clothes-module-move.test.js
+new file mode 100644
+index 0000000..59f0435
+--- /dev/null
++++ b/__tests__/securitron/clothes-module-move.test.js
+@@ -0,0 +1,58 @@
++/**
++ * Разделение движок/сеттинг (патч 112): одежда перенесена в модуль
++ * ЦЕЛИКОМ (база 3 группы + модульная группа headwear объединены).
++ * data/equipment/clothes.json — пустая движковая база ({clothes: []}),
++ * легаси i18n — тоже. Группы: suit (9), outfit (11), headwear (11,
++ * включая маску Белой перчатки из модуля).
++ */
++import { describe, it, expect, beforeAll } from 'vitest';
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { setCurrentLocale } from '../../i18n/locale';
++import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
++import moduleRuClothes from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
++import moduleEnClothes from '../../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
++import dataClothes from '../../data/equipment/clothes.json';
++import legacyRuClothes from '../../i18n/ru-RU/data/equipment/armor/clothes.json';
++import legacyEnClothes from '../../i18n/en-EN/data/equipment/armor/clothes.json';
++
++const countItems = (groups) => groups.reduce((sum, g) => sum + (g.items || []).length, 0);
++
++describe('Одежда в модуле (сеттинг), data/ — пустой движок', () => {
++  beforeAll(() => setCurrentLocale('ru-RU'));
++
++  it('модуль содержит все группы: suit, outfit, headwear (31 предмет)', () => {
++    const groups = moduleClothes.clothes;
++    expect(groups.map((g) => g.clothingType).sort()).toEqual(['headwear', 'outfit', 'suit']);
++    expect(countItems(groups)).toBe(31);
++    expect(groups.find((g) => g.clothingType === 'suit').items).toHaveLength(9);
++    expect(groups.find((g) => g.clothingType === 'outfit').items).toHaveLength(11);
++    const headwear = groups.find((g) => g.clothingType === 'headwear');
++    expect(headwear.items).toHaveLength(11);
++    // модульная запись (маска Белой перчатки) на месте
++    expect(headwear.items.some((i) => i.id === 'headwear_white_glove_mask')).toBe(true);
++  });
++
++  it('переводы покрывают все предметы в обеих локалях', () => {
++    for (const i18n of [moduleRuClothes, moduleEnClothes]) {
++      expect(countItems(i18n.clothes)).toBe(31);
++      for (const g of i18n.clothes) {
++        for (const item of g.items) expect(item.name.length).toBeGreaterThan(0);
++      }
++    }
++  });
++
++  it('data/ и легаси i18n пусты', () => {
++    expect(dataClothes).toEqual({ clothes: [] });
++    expect(legacyRuClothes).toEqual({ clothes: [] });
++    expect(legacyEnClothes).toEqual({ clothes: [] });
++  });
++
++  it('каталог отдаёт одежду из модуля (имена + механика)', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const items = catalog.clothes.clothes.flatMap((g) => g.items || []);
++    expect(items).toHaveLength(31);
++    const mask = items.find((i) => i.id === 'headwear_white_glove_mask');
++    expect(mask.name.length).toBeGreaterThan(0);
++    expect(mask.protectedAreas).toBeDefined();
++  });
++});
+diff --git a/data/equipment/clothes.json b/data/equipment/clothes.json
+index da6ef6f..73c1efe 100644
+--- a/data/equipment/clothes.json
++++ b/data/equipment/clothes.json
+@@ -1,452 +1 @@
+-{
+-  "clothes": [
+-    {
+-      "type": "suits",
+-      "clothingType": "suit",
+-      "allowsArmor": true,
+-      "items": [
+-        {
+-          "id": "clothing_harness",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 5,
+-          "rarity": 0,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_bos_uniform",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 1,
+-          "weight": 1,
+-          "cost": 20,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_casual_clothes",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 1,
+-          "cost": 20,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_road_leathers",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 5,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_sturdy_clothes",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 1.5,
+-          "cost": 20,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_military_fatigues",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 1.5,
+-          "cost": 12,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_vault_jumpsuit",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 2,
+-          "weight": 0.5,
+-          "cost": 20,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_lab_coat",
+-          "protectedAreas": ["Body", "Hand"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 1,
+-          "weight": 0.5,
+-          "cost": 15,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        },
+-        {
+-          "id": "clothing_blouse",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 1,
+-          "cost": 10,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "suit",
+-          "allowsArmor": true
+-        }
+-      ]
+-    },
+-    {
+-      "type": "outfits",
+-      "clothingType": "outfit",
+-      "allowsArmor": false,
+-      "items": [
+-        {
+-          "id": "clothing_nomad_outfit",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 35,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_hides",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 13,
+-          "rarity": 0,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_cage_armor",
+-          "protectedAreas": ["Head", "Body", "Hand", "Leg"],
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 16.5,
+-          "cost": 110,
+-          "rarity": 3,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_engineer_armor",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 1,
+-          "cost": 15,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_heavy_coat",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 1,
+-          "weight": 1,
+-          "cost": 20,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_work_coveralls",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 1,
+-          "cost": 12,
+-          "rarity": 1,
+-          "specialEffects": [
+-            { "id": "effect_carry_capacity", "value": 5 }
+-          ],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_fancy_clothes",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 1,
+-          "cost": 30,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_bos_scribe_armor",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 2,
+-          "weight": 2,
+-          "cost": 20,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_bos_fatigues",
+-          "protectedAreas": ["Body", "Hand", "Leg"],
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 2,
+-          "weight": 2,
+-          "cost": 20,
+-          "rarity": 3,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_hazmat_suit",
+-          "protectedAreas": ["Head", "Body", "Hand", "Leg"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 2.5,
+-          "cost": 85,
+-          "rarity": 3,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "clothing_spiked_armor",
+-          "protectedAreas": ["Head", "Body", "Hand", "Leg"],
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 8.5,
+-          "cost": 65,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "outfit",
+-          "allowsArmor": false
+-        }
+-      ]
+-    },
+-    {
+-      "type": "headwear",
+-      "clothingType": "headwear",
+-      "allowsArmor": false,
+-      "items": [
+-        {
+-          "id": "headwear_casual_hat",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 15,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false,
+-          "canRobotWear": true
+-        },
+-        {
+-          "id": "headwear_military_helmet",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 1.5,
+-          "cost": 20,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "headwear_bos_scribe_hat",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 8,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "headwear_bos_hood",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 12,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "headwear_sack_hood",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 2,
+-          "weight": 0.5,
+-          "cost": 5,
+-          "rarity": 0,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "headwear_hood",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 1,
+-          "weight": 1,
+-          "cost": 5,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "headwear_hard_hat",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 15,
+-          "rarity": 1,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false,
+-          "canRobotWear": true
+-        },
+-        {
+-          "id": "headwear_welding_mask",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 20,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        },
+-        {
+-          "id": "headwear_fancy_hat",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 0,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 0.5,
+-          "cost": 15,
+-          "rarity": 2,
+-          "specialEffects": [],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false,
+-          "canRobotWear": true
+-        },
+-        {
+-          "id": "headwear_gas_mask",
+-          "protectedAreas": ["Head"],
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 3,
+-          "weight": 1.5,
+-          "cost": 10,
+-          "rarity": 2,
+-          "specialEffects": [
+-            { "id": "effect_poison_resistance", "value": 3 }
+-          ],
+-          "itemType": "clothing",
+-          "clothingType": "headwear",
+-          "allowsArmor": false
+-        }
+-      ]
+-    }
+-  ]
+-}
++{ "clothes": [] }
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 9e8ce35..454a6fc 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -72,6 +72,7 @@ modules/fallout/
+ | powerArmor | 21 (6 сетов) | 0 (`{}`) | патч 109 |
+ | oddities | 20 | 0 (`[]`) | патч 110 |
+ | ammo | 42 | 0 (`[]`) | патч 111 |
++| clothes | 31 (3 группы, включая модульную headwear) | 0 (`{clothes: []}`) | патч 112 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -99,7 +100,6 @@ modules/fallout/
+ |---|---|---|
+ | Перки | `data/perks/perks.json` | 94 |
+ | Общие товары (база) | `data/equipment/general_goods.json` | 31 |
+-| Одежда (база) | `data/equipment/clothes.json` | 3 |
+ | Роботы | `data/equipment/robot/*` (8 файлов) + `robotparts.json` | 11+104 |
+ | Ориджины (база) | `data/origins/origins.json` | 17 |
+ | Трейты (база) | `data/traits/traits.json` | 32 |
+diff --git a/i18n/en-EN/data/equipment/armor/clothes.json b/i18n/en-EN/data/equipment/armor/clothes.json
+index fcffc29..73c1efe 100644
+--- a/i18n/en-EN/data/equipment/armor/clothes.json
++++ b/i18n/en-EN/data/equipment/armor/clothes.json
+@@ -1,95 +1 @@
+-{
+-  "clothes": [
+-    {
+-      "type": "Suits",
+-      "clothingType": "suit",
+-      "items": [
+-        { "id": "clothing_harness", "name": "Harness" },
+-        { "id": "clothing_bos_uniform", "name": "Brotherhood of Steel Uniform" },
+-        { "id": "clothing_casual_clothes", "name": "Casual Clothes" },
+-        { "id": "clothing_road_leathers", "name": "Road Leathers" },
+-        { "id": "clothing_sturdy_clothes", "name": "Sturdy Clothes" },
+-        { "id": "clothing_military_fatigues", "name": "Military Fatigues" },
+-        { "id": "clothing_vault_jumpsuit", "name": "Vault Jumpsuit" },
+-        {
+-          "id": "clothing_lab_coat",
+-          "name": "Lab Coat",
+-          "specialEffects": [
+-            { "description": "Once per scene, you may reroll 1d20 on an Intelligence skill test." }
+-          ]
+-        },
+-        { "id": "clothing_blouse", "name": "Blouse" }
+-      ]
+-    },
+-    {
+-      "type": "Outfits",
+-      "clothingType": "outfit",
+-      "items": [
+-        { "id": "clothing_nomad_outfit", "name": "Nomad Outfit" },
+-        { "id": "clothing_hides", "name": "Hides" },
+-        { "id": "clothing_cage_armor", "name": "Cage Armor" },
+-        { "id": "clothing_engineer_armor", "name": "Engineer Armor" },
+-        {
+-          "id": "clothing_heavy_coat",
+-          "name": "Heavy Coat",
+-          "specialEffects": [
+-            { "description": "Once per scene, you may reroll 1d20 on an Endurance skill test." }
+-          ]
+-        },
+-        {
+-          "id": "clothing_work_coveralls",
+-          "name": "Work Coveralls",
+-          "specialEffects": [
+-            { "id": "effect_carry_capacity", "description": "+5 to maximum carry capacity." }
+-          ]
+-        },
+-        { "id": "clothing_fancy_clothes", "name": "Fancy Clothes" },
+-        { "id": "clothing_bos_scribe_armor", "name": "Brotherhood Field Scribe Armor" },
+-        { "id": "clothing_bos_fatigues", "name": "Brotherhood of Steel Fatigues" },
+-        {
+-          "id": "clothing_hazmat_suit",
+-          "name": "Hazmat Suit",
+-          "specialEffects": [
+-            { "description": "Complete immunity to radiation damage and radiation effects." }
+-          ]
+-        },
+-        { "id": "clothing_spiked_armor", "name": "Spiked Armor" }
+-      ]
+-    },
+-    {
+-      "type": "Headwear",
+-      "clothingType": "headwear",
+-      "items": [
+-        {
+-          "id": "headwear_casual_hat",
+-          "name": "Casual Hat",
+-          "specialEffects": [
+-            { "description": "Ignore difficulty increase from bright or blinding light." }
+-          ]
+-        },
+-        { "id": "headwear_military_helmet", "name": "Military Helmet" },
+-        { "id": "headwear_bos_scribe_hat", "name": "Brotherhood Field Scribe Hat" },
+-        { "id": "headwear_bos_hood", "name": "Brotherhood of Steel Hood" },
+-        { "id": "headwear_sack_hood", "name": "Sack Hood" },
+-        { "id": "headwear_hood", "name": "Hood" },
+-        { "id": "headwear_hard_hat", "name": "Hard Hat" },
+-        { "id": "headwear_welding_mask", "name": "Welding Mask" },
+-        {
+-          "id": "headwear_fancy_hat",
+-          "name": "Fancy Hat",
+-          "specialEffects": [
+-            { "description": "Once per scene, you may reroll 1d20 on a Charisma skill test." }
+-          ]
+-        },
+-        {
+-          "id": "headwear_gas_mask",
+-          "name": "Gas Mask",
+-          "specialEffects": [
+-            { "id": "effect_poison_resistance", "description": "+3 to resistance against poison damage." },
+-            { "description": "Immune to gas and dust effects. All Speech tests suffer +1 difficulty." }
+-          ]
+-        }
+-      ]
+-    }
+-  ]
+-}
++{ "clothes": [] }
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index f631fd7..1bbd172 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -1,5 +1,4 @@
+ // Locale-specific display data (names, descriptions, flavour text)
+-import ruClothes from './ru-RU/data/equipment/armor/clothes.json';
+ import ruMiscItems from './ru-RU/data/equipment/items.json';
+ import ruRobotWeapons from './ru-RU/data/equipment/robot/weapons.json';
+ import ruRobotArms from './ru-RU/data/equipment/robot/robotarms.json';
+@@ -16,7 +15,6 @@ import ruQualities from './ru-RU/data/system/qualities.json';
+ import ruGeneralGoods from './ru-RU/data/equipment/general_goods.json';
+ import ruEffects from './ru-RU/data/system/effects.json';
+ 
+-import enClothes from './en-EN/data/equipment/armor/clothes.json';
+ import enMiscItems from './en-EN/data/equipment/items.json';
+ import enRobotWeapons from './en-EN/data/equipment/robot/weapons.json';
+ import enRobotArms from './en-EN/data/equipment/robot/robotarms.json';
+@@ -75,7 +73,6 @@ import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/ch
+ import moduleRuMagazinesI18n from '../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
+ import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
+ // Locale-independent technical data (stats, ids, game mechanics)
+-import dataClothes from '../data/equipment/clothes.json';
+ import moduleArmor from '../modules/fallout/data/equipment/armor.json';
+ import modulePowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+ import moduleOddities from '../modules/fallout/data/equipment/oddities.json';
+@@ -160,7 +157,6 @@ const EQUIPMENT_BY_LOCALE = {
+   'ru-RU': {
+     qualities: ruQualities,
+     effects: ruEffects,
+-    clothes: ruClothes,
+     chems: ruChems,
+     magazines: ruMagazines,
+     miscellaneous: ruMiscItems,
+@@ -180,7 +176,6 @@ const EQUIPMENT_BY_LOCALE = {
+   'en-EN': {
+     qualities: enQualities,
+     effects: enEffects,
+-    clothes: enClothes,
+     chems: enChems,
+     magazines: enMagazines,
+     miscellaneous: enMiscItems,
+@@ -336,27 +331,11 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+   });
+   const powerArmorList = powerArmorGroups.flatMap((group) => group.items);
+ 
+-  // Clothes: merge data/ mechanics with i18n names per item, grouped by clothingType
++  // Clothes: механика и имена — из модуля сеттинга (патч 112).
+   const i18nClothesMap = Object.fromEntries(
+-    (i18n.clothes?.clothes || []).flatMap((g) => (g.items || []).map((item) => [item.id, item]))
+-  );
+-  const clothes = (dataClothes.clothes || []).map((group) => ({
+-    ...group,
+-    type: (i18n.clothes?.clothes || []).find((g) => g.clothingType === group.clothingType)?.type || group.type,
+-    items: (group.items || []).map((dataItem) => {
+-      const i18nItem = i18nClothesMap[dataItem.id];
+-      if (!i18nItem?.name) {
+-        throw new Error(`[equipmentCatalog] Missing clothes i18n name for id: ${dataItem.id}`);
+-      }
+-      return { ...dataItem, ...i18nItem, name: i18nItem.name };
+-    }),
+-  }));
+-  // Одежда модуля (новые предметы, напр. маска Белой перчатки): механика —
+-  // из модуля, имена — из i18n модуля, группы добавляются к базовым.
+-  const moduleI18nClothesMap = Object.fromEntries(
+     (moduleI18n.clothes?.clothes || []).flatMap((g) => (g.items || []).map((item) => [item.id, item]))
+   );
+-  const moduleClothes = (moduleClothesData?.clothes || []).map((group) => ({
++  const clothes = (moduleClothesData?.clothes || []).map((group) => ({
+     ...group,
+     type: (moduleI18n.clothes?.clothes || []).find((g) => g.clothingType === group.clothingType)?.type || group.type,
+     items: (group.items || []).map((dataItem) => {
+@@ -367,7 +346,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+       return { ...dataItem, ...i18nItem, name: i18nItem.name };
+     }),
+   }));
+-  const allClothesGroups = [...clothes, ...moduleClothes];
++  const allClothesGroups = [...clothes];
+ 
+   // Consumables
+   const mergedAmmo = mergeAmmoById(moduleAmmo, moduleI18n.ammoTypes);
+diff --git a/i18n/ru-RU/data/equipment/armor/clothes.json b/i18n/ru-RU/data/equipment/armor/clothes.json
+index 432c567..73c1efe 100644
+--- a/i18n/ru-RU/data/equipment/armor/clothes.json
++++ b/i18n/ru-RU/data/equipment/armor/clothes.json
+@@ -1,95 +1 @@
+-{
+-  "clothes": [
+-    {
+-      "type": "Костюмы",
+-      "clothingType": "suit",
+-      "items": [
+-        { "id": "clothing_harness", "name": "Портупея" },
+-        { "id": "clothing_bos_uniform", "name": "Униформа Братства Стали" },
+-        { "id": "clothing_casual_clothes", "name": "Повседневная одежда" },
+-        { "id": "clothing_road_leathers", "name": "Дорожная кожа" },
+-        { "id": "clothing_sturdy_clothes", "name": "Прочная одежда" },
+-        { "id": "clothing_military_fatigues", "name": "Военная форма" },
+-        { "id": "clothing_vault_jumpsuit", "name": "Комбинезон Убежища" },
+-        {
+-          "id": "clothing_lab_coat",
+-          "name": "Лабораторный халат",
+-          "specialEffects": [
+-            { "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Интеллекта." }
+-          ]
+-        },
+-        { "id": "clothing_blouse", "name": "Blouse" }
+-      ]
+-    },
+-    {
+-      "type": "Обмундирование",
+-      "clothingType": "outfit",
+-      "items": [
+-        { "id": "clothing_nomad_outfit", "name": "Костюм бродяги" },
+-        { "id": "clothing_hides", "name": "Шкура" },
+-        { "id": "clothing_cage_armor", "name": "Бойцовская броня" },
+-        { "id": "clothing_engineer_armor", "name": "Броня инженера" },
+-        {
+-          "id": "clothing_heavy_coat",
+-          "name": "Плотное пальто",
+-          "specialEffects": [
+-            { "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Выносливости." }
+-          ]
+-        },
+-        {
+-          "id": "clothing_work_coveralls",
+-          "name": "Рабочий Комбинезон",
+-          "specialEffects": [
+-            { "id": "effect_carry_capacity", "description": "+5 к максимальной грузоподъемности." }
+-          ]
+-        },
+-        { "id": "clothing_fancy_clothes", "name": "Формальная одежда" },
+-        { "id": "clothing_bos_scribe_armor", "name": "Доспехи писца Братства" },
+-        { "id": "clothing_bos_fatigues", "name": "Облачение Братства Стали" },
+-        {
+-          "id": "clothing_hazmat_suit",
+-          "name": "Защитный костюм",
+-          "specialEffects": [
+-            { "description": "Полный иммунитет к радиационному урону и эффектам облучения." }
+-          ]
+-        },
+-        { "id": "clothing_spiked_armor", "name": "Броня с шипами" }
+-      ]
+-    },
+-    {
+-      "type": "Головные уборы",
+-      "clothingType": "headwear",
+-      "items": [
+-        {
+-          "id": "headwear_casual_hat",
+-          "name": "Обычная шляпа",
+-          "specialEffects": [
+-            { "description": "Игнорируйте увеличение сложности от ослепляющего или яркого света." }
+-          ]
+-        },
+-        { "id": "headwear_military_helmet", "name": "Армейский шлем" },
+-        { "id": "headwear_bos_scribe_hat", "name": "Шляпа писца" },
+-        { "id": "headwear_bos_hood", "name": "Капюшон Братства Стали" },
+-        { "id": "headwear_sack_hood", "name": "Капюшон из мешковины" },
+-        { "id": "headwear_hood", "name": "Капюшон" },
+-        { "id": "headwear_hard_hat", "name": "Каска" },
+-        { "id": "headwear_welding_mask", "name": "Щиток сварщика" },
+-        {
+-          "id": "headwear_fancy_hat",
+-          "name": "Формальная шляпа",
+-          "specialEffects": [
+-            { "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Харизмы." }
+-          ]
+-        },
+-        {
+-          "id": "headwear_gas_mask",
+-          "name": "Противогаз",
+-          "specialEffects": [
+-            { "id": "effect_poison_resistance", "description": "+3 к сопротивлению урону от яда." },
+-            { "description": "Иммунитет к воздействию газов и пыли. Все проверки Речи получают +1 к сложности." }
+-          ]
+-        }
+-      ]
+-    }
+-  ]
+-}
++{ "clothes": [] }
+diff --git a/modules/fallout/data/equipment/clothes.json b/modules/fallout/data/equipment/clothes.json
+index 94b4e35..75e77cb 100644
+--- a/modules/fallout/data/equipment/clothes.json
++++ b/modules/fallout/data/equipment/clothes.json
+@@ -1,10 +1,559 @@
+ {
+   "clothes": [
++    {
++      "type": "suits",
++      "clothingType": "suit",
++      "allowsArmor": true,
++      "items": [
++        {
++          "id": "clothing_harness",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 5,
++          "rarity": 0,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_bos_uniform",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 1,
++          "weight": 1,
++          "cost": 20,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_casual_clothes",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 1,
++          "cost": 20,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_road_leathers",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 5,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_sturdy_clothes",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 0,
++          "weight": 1.5,
++          "cost": 20,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_military_fatigues",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 0,
++          "weight": 1.5,
++          "cost": 12,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_vault_jumpsuit",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 2,
++          "weight": 0.5,
++          "cost": 20,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_lab_coat",
++          "protectedAreas": [
++            "Body",
++            "Hand"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 1,
++          "weight": 0.5,
++          "cost": 15,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        },
++        {
++          "id": "clothing_blouse",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 1,
++          "cost": 10,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "suit",
++          "allowsArmor": true
++        }
++      ]
++    },
++    {
++      "type": "outfits",
++      "clothingType": "outfit",
++      "allowsArmor": false,
++      "items": [
++        {
++          "id": "clothing_nomad_outfit",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 2,
++          "radiationDamageRating": 0,
++          "weight": 5,
++          "cost": 35,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_hides",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 2,
++          "cost": 13,
++          "rarity": 0,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_cage_armor",
++          "protectedAreas": [
++            "Head",
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 3,
++          "energyDamageRating": 4,
++          "radiationDamageRating": 0,
++          "weight": 16.5,
++          "cost": 110,
++          "rarity": 3,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_engineer_armor",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 0,
++          "weight": 1,
++          "cost": 15,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_heavy_coat",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 1,
++          "weight": 1,
++          "cost": 20,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_work_coveralls",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 2,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 1,
++          "cost": 12,
++          "rarity": 1,
++          "specialEffects": [
++            {
++              "id": "effect_carry_capacity",
++              "value": 5
++            }
++          ],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_fancy_clothes",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 1,
++          "cost": 30,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_bos_scribe_armor",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 2,
++          "radiationDamageRating": 2,
++          "weight": 2,
++          "cost": 20,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_bos_fatigues",
++          "protectedAreas": [
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 2,
++          "energyDamageRating": 2,
++          "radiationDamageRating": 2,
++          "weight": 2,
++          "cost": 20,
++          "rarity": 3,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_hazmat_suit",
++          "protectedAreas": [
++            "Head",
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 2.5,
++          "cost": 85,
++          "rarity": 3,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        },
++        {
++          "id": "clothing_spiked_armor",
++          "protectedAreas": [
++            "Head",
++            "Body",
++            "Hand",
++            "Leg"
++          ],
++          "physicalDamageRating": 2,
++          "energyDamageRating": 2,
++          "radiationDamageRating": 0,
++          "weight": 8.5,
++          "cost": 65,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "outfit",
++          "allowsArmor": false
++        }
++      ]
++    },
+     {
+       "type": "headwear",
+       "clothingType": "headwear",
+       "allowsArmor": false,
+       "items": [
++        {
++          "id": "headwear_casual_hat",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 15,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false,
++          "canRobotWear": true
++        },
++        {
++          "id": "headwear_military_helmet",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 2,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 1.5,
++          "cost": 20,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
++        {
++          "id": "headwear_bos_scribe_hat",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 2,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 8,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
++        {
++          "id": "headwear_bos_hood",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 1,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 12,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
++        {
++          "id": "headwear_sack_hood",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 2,
++          "weight": 0.5,
++          "cost": 5,
++          "rarity": 0,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
++        {
++          "id": "headwear_hood",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 1,
++          "weight": 1,
++          "cost": 5,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
++        {
++          "id": "headwear_hard_hat",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 2,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 15,
++          "rarity": 1,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false,
++          "canRobotWear": true
++        },
++        {
++          "id": "headwear_welding_mask",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 2,
++          "energyDamageRating": 2,
++          "radiationDamageRating": 0,
++          "weight": 2,
++          "cost": 20,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
++        {
++          "id": "headwear_fancy_hat",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 0,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 0,
++          "weight": 0.5,
++          "cost": 15,
++          "rarity": 2,
++          "specialEffects": [],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false,
++          "canRobotWear": true
++        },
++        {
++          "id": "headwear_gas_mask",
++          "protectedAreas": [
++            "Head"
++          ],
++          "physicalDamageRating": 1,
++          "energyDamageRating": 0,
++          "radiationDamageRating": 3,
++          "weight": 1.5,
++          "cost": 10,
++          "rarity": 2,
++          "specialEffects": [
++            {
++              "id": "effect_poison_resistance",
++              "value": 3
++            }
++          ],
++          "itemType": "clothing",
++          "clothingType": "headwear",
++          "allowsArmor": false
++        },
+         {
+           "id": "headwear_white_glove_mask",
+           "protectedAreas": [
+@@ -25,4 +574,4 @@
+       ]
+     }
+   ]
+-}
+\ No newline at end of file
++}
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json b/modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json
+index ad91eea..02abf52 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json
+@@ -1,10 +1,181 @@
+ {
+   "clothes": [
+     {
++      "type": "Suits",
++      "clothingType": "suit",
++      "items": [
++        {
++          "id": "clothing_harness",
++          "name": "Harness"
++        },
++        {
++          "id": "clothing_bos_uniform",
++          "name": "Brotherhood of Steel Uniform"
++        },
++        {
++          "id": "clothing_casual_clothes",
++          "name": "Casual Clothes"
++        },
++        {
++          "id": "clothing_road_leathers",
++          "name": "Road Leathers"
++        },
++        {
++          "id": "clothing_sturdy_clothes",
++          "name": "Sturdy Clothes"
++        },
++        {
++          "id": "clothing_military_fatigues",
++          "name": "Military Fatigues"
++        },
++        {
++          "id": "clothing_vault_jumpsuit",
++          "name": "Vault Jumpsuit"
++        },
++        {
++          "id": "clothing_lab_coat",
++          "name": "Lab Coat",
++          "specialEffects": [
++            {
++              "description": "Once per scene, you may reroll 1d20 on an Intelligence skill test."
++            }
++          ]
++        },
++        {
++          "id": "clothing_blouse",
++          "name": "Blouse"
++        }
++      ]
++    },
++    {
++      "type": "Outfits",
++      "clothingType": "outfit",
++      "items": [
++        {
++          "id": "clothing_nomad_outfit",
++          "name": "Nomad Outfit"
++        },
++        {
++          "id": "clothing_hides",
++          "name": "Hides"
++        },
++        {
++          "id": "clothing_cage_armor",
++          "name": "Cage Armor"
++        },
++        {
++          "id": "clothing_engineer_armor",
++          "name": "Engineer Armor"
++        },
++        {
++          "id": "clothing_heavy_coat",
++          "name": "Heavy Coat",
++          "specialEffects": [
++            {
++              "description": "Once per scene, you may reroll 1d20 on an Endurance skill test."
++            }
++          ]
++        },
++        {
++          "id": "clothing_work_coveralls",
++          "name": "Work Coveralls",
++          "specialEffects": [
++            {
++              "id": "effect_carry_capacity",
++              "description": "+5 to maximum carry capacity."
++            }
++          ]
++        },
++        {
++          "id": "clothing_fancy_clothes",
++          "name": "Fancy Clothes"
++        },
++        {
++          "id": "clothing_bos_scribe_armor",
++          "name": "Brotherhood Field Scribe Armor"
++        },
++        {
++          "id": "clothing_bos_fatigues",
++          "name": "Brotherhood of Steel Fatigues"
++        },
++        {
++          "id": "clothing_hazmat_suit",
++          "name": "Hazmat Suit",
++          "specialEffects": [
++            {
++              "description": "Complete immunity to radiation damage and radiation effects."
++            }
++          ]
++        },
++        {
++          "id": "clothing_spiked_armor",
++          "name": "Spiked Armor"
++        }
++      ]
++    },
++    {
++      "type": "Headwear",
+       "clothingType": "headwear",
+-      "type": "headwear",
+-      "allowsArmor": false,
+       "items": [
++        {
++          "id": "headwear_casual_hat",
++          "name": "Casual Hat",
++          "specialEffects": [
++            {
++              "description": "Ignore difficulty increase from bright or blinding light."
++            }
++          ]
++        },
++        {
++          "id": "headwear_military_helmet",
++          "name": "Military Helmet"
++        },
++        {
++          "id": "headwear_bos_scribe_hat",
++          "name": "Brotherhood Field Scribe Hat"
++        },
++        {
++          "id": "headwear_bos_hood",
++          "name": "Brotherhood of Steel Hood"
++        },
++        {
++          "id": "headwear_sack_hood",
++          "name": "Sack Hood"
++        },
++        {
++          "id": "headwear_hood",
++          "name": "Hood"
++        },
++        {
++          "id": "headwear_hard_hat",
++          "name": "Hard Hat"
++        },
++        {
++          "id": "headwear_welding_mask",
++          "name": "Welding Mask"
++        },
++        {
++          "id": "headwear_fancy_hat",
++          "name": "Fancy Hat",
++          "specialEffects": [
++            {
++              "description": "Once per scene, you may reroll 1d20 on a Charisma skill test."
++            }
++          ]
++        },
++        {
++          "id": "headwear_gas_mask",
++          "name": "Gas Mask",
++          "specialEffects": [
++            {
++              "id": "effect_poison_resistance",
++              "description": "+3 to resistance against poison damage."
++            },
++            {
++              "description": "Immune to gas and dust effects. All Speech tests suffer +1 difficulty."
++            }
++          ]
++        },
+         {
+           "id": "headwear_white_glove_mask",
+           "name": "White Glove Society Mask"
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json b/modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json
+index 0aa3c9e..88ec902 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json
+@@ -1,10 +1,181 @@
+ {
+   "clothes": [
+     {
++      "type": "Костюмы",
++      "clothingType": "suit",
++      "items": [
++        {
++          "id": "clothing_harness",
++          "name": "Портупея"
++        },
++        {
++          "id": "clothing_bos_uniform",
++          "name": "Униформа Братства Стали"
++        },
++        {
++          "id": "clothing_casual_clothes",
++          "name": "Повседневная одежда"
++        },
++        {
++          "id": "clothing_road_leathers",
++          "name": "Дорожная кожа"
++        },
++        {
++          "id": "clothing_sturdy_clothes",
++          "name": "Прочная одежда"
++        },
++        {
++          "id": "clothing_military_fatigues",
++          "name": "Военная форма"
++        },
++        {
++          "id": "clothing_vault_jumpsuit",
++          "name": "Комбинезон Убежища"
++        },
++        {
++          "id": "clothing_lab_coat",
++          "name": "Лабораторный халат",
++          "specialEffects": [
++            {
++              "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Интеллекта."
++            }
++          ]
++        },
++        {
++          "id": "clothing_blouse",
++          "name": "Blouse"
++        }
++      ]
++    },
++    {
++      "type": "Обмундирование",
++      "clothingType": "outfit",
++      "items": [
++        {
++          "id": "clothing_nomad_outfit",
++          "name": "Костюм бродяги"
++        },
++        {
++          "id": "clothing_hides",
++          "name": "Шкура"
++        },
++        {
++          "id": "clothing_cage_armor",
++          "name": "Бойцовская броня"
++        },
++        {
++          "id": "clothing_engineer_armor",
++          "name": "Броня инженера"
++        },
++        {
++          "id": "clothing_heavy_coat",
++          "name": "Плотное пальто",
++          "specialEffects": [
++            {
++              "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Выносливости."
++            }
++          ]
++        },
++        {
++          "id": "clothing_work_coveralls",
++          "name": "Рабочий Комбинезон",
++          "specialEffects": [
++            {
++              "id": "effect_carry_capacity",
++              "description": "+5 к максимальной грузоподъемности."
++            }
++          ]
++        },
++        {
++          "id": "clothing_fancy_clothes",
++          "name": "Формальная одежда"
++        },
++        {
++          "id": "clothing_bos_scribe_armor",
++          "name": "Доспехи писца Братства"
++        },
++        {
++          "id": "clothing_bos_fatigues",
++          "name": "Облачение Братства Стали"
++        },
++        {
++          "id": "clothing_hazmat_suit",
++          "name": "Защитный костюм",
++          "specialEffects": [
++            {
++              "description": "Полный иммунитет к радиационному урону и эффектам облучения."
++            }
++          ]
++        },
++        {
++          "id": "clothing_spiked_armor",
++          "name": "Броня с шипами"
++        }
++      ]
++    },
++    {
++      "type": "Головные уборы",
+       "clothingType": "headwear",
+-      "type": "headwear",
+-      "allowsArmor": false,
+       "items": [
++        {
++          "id": "headwear_casual_hat",
++          "name": "Обычная шляпа",
++          "specialEffects": [
++            {
++              "description": "Игнорируйте увеличение сложности от ослепляющего или яркого света."
++            }
++          ]
++        },
++        {
++          "id": "headwear_military_helmet",
++          "name": "Армейский шлем"
++        },
++        {
++          "id": "headwear_bos_scribe_hat",
++          "name": "Шляпа писца"
++        },
++        {
++          "id": "headwear_bos_hood",
++          "name": "Капюшон Братства Стали"
++        },
++        {
++          "id": "headwear_sack_hood",
++          "name": "Капюшон из мешковины"
++        },
++        {
++          "id": "headwear_hood",
++          "name": "Капюшон"
++        },
++        {
++          "id": "headwear_hard_hat",
++          "name": "Каска"
++        },
++        {
++          "id": "headwear_welding_mask",
++          "name": "Щиток сварщика"
++        },
++        {
++          "id": "headwear_fancy_hat",
++          "name": "Формальная шляпа",
++          "specialEffects": [
++            {
++              "description": "Один раз за сцену вы можете перебросить 1d20 при проверке Харизмы."
++            }
++          ]
++        },
++        {
++          "id": "headwear_gas_mask",
++          "name": "Противогаз",
++          "specialEffects": [
++            {
++              "id": "effect_poison_resistance",
++              "description": "+3 к сопротивлению урону от яда."
++            },
++            {
++              "description": "Иммунитет к воздействию газов и пыли. Все проверки Речи получают +1 к сложности."
++            }
++          ]
++        },
+         {
+           "id": "headwear_white_glove_mask",
+           "name": "Маска Общества «Белая перчатка»"

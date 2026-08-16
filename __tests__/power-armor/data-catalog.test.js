@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import dataPowerArmor from '../../data/equipment/powerArmor.json';
-import dataAmmo from '../../data/equipment/ammo.json';
+import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+import dataAmmo from '../../modules/fallout/data/equipment/ammo.json';
 import { PA_CORE_DRAIN_PER_HOUR, FUSION_CORE_CHARGES_ROLL } from '../../domain/powerArmor';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import ruAddItemModal from '../../i18n/ru-RU/screens/inventory/modals/addItemModal.json';

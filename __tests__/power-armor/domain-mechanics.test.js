@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import dataPowerArmor from '../../data/equipment/powerArmor.json';
+import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
 import {
   PA_CORE_DRAIN_PER_HOUR,
   PA_MS_PER_CHARGE,

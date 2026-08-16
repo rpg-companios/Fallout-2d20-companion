@@ -1,0 +1,22 @@
+{
+  "duration": {
+    "none": "нет",
+    "instant": "мгновенно",
+    "sceneUnit": "сцен"
+  },
+  "events": {
+    "effectsCleared": "Сняты эффекты: {{effects}}",
+    "effectsClearedAll": "все негативные",
+    "instantPositive": "Моментальный положительный эффект: {{name}}",
+    "instantNegative": "Моментальный отрицательный эффект: {{name}}",
+    "positiveApplied": "Положительный эффект {{name}}: +{{scenes}} сцен.",
+    "negativeApplied": "Отрицательный эффект {{name}}: +{{scenes}} сцен.",
+    "conditionsRemoved": "Снято состояние: {{conditions}}",
+    "addictionRoll": "Бросок на зависимость: {{faces}} — {{effectCount}} эффект(ов) из {{addictionLevel}} нужных.",
+    "addictionGained": "Вы стали зависимы.",
+    "addictionAvoided": "Зависимость не наступила."
+  },
+  "display": {
+    "scenesAndMinutes": "{{scenes}} сцен ({{minutes}} мин)"
+  }
+}

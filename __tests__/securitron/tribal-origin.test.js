@@ -5,12 +5,12 @@
  * 1 черта (Дикарь/Выживший/НКР) + 1 дополнительный перк.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import originsJson from '../../data/origins/origins.json';
-import traitsJson from '../../data/traits/traits.json';
-import ruOrigins from '../../i18n/ru-RU/data/system/origins.json';
-import enOrigins from '../../i18n/en-EN/data/system/origins.json';
-import ruTraits from '../../i18n/ru-RU/data/system/traits.json';
-import enTraits from '../../i18n/en-EN/data/system/traits.json';
+import originsJson from '../../modules/fallout/data/origins/origins.json';
+import traitsJson from '../../modules/fallout/data/traits/traits.json';
+import ruOrigins from '../../modules/fallout/i18n/ru-RU/data/system/origins.json';
+import enOrigins from '../../modules/fallout/i18n/en-EN/data/system/origins.json';
+import ruTraits from '../../modules/fallout/i18n/ru-RU/data/system/traits.json';
+import enTraits from '../../modules/fallout/i18n/en-EN/data/system/traits.json';
 import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
 import { getBannedTagSkills, hasTraitEffect } from '../../domain/traits';
 import { deepMerge, applyOverridesById, findUnknownOverrideIds } from '../../domain/packMerge';

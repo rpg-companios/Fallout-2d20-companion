@@ -4,10 +4,10 @@
  * from structured data to localized human-readable strings.
  */
 
-import ruQualities from '../i18n/ru-RU/data/system/qualities.json';
-import enQualities from '../i18n/en-EN/data/system/qualities.json';
-import ruEffects from '../i18n/ru-RU/data/system/damageEffects.json';
-import enEffects from '../i18n/en-EN/data/system/damageEffects.json';
+import ruQualities from '../modules/fallout/i18n/ru-RU/data/system/qualities.json';
+import enQualities from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
+import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
+import enEffects from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
 import { getCurrentLocale } from '../i18n/locale';
 
 const QUALITY_DICTS = {

@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getDiseasesCatalog } from '../../i18n/conditionsCatalog';
-import dataMagazines from '../../data/consumables/magazines.json';
-import ruMagazines from '../../i18n/ru-RU/data/consumables/magazines.json';
-import enMagazines from '../../i18n/en-EN/data/consumables/magazines.json';
-import dataDiseases from '../../data/conditions/diseases.json';
-import ruDiseases from '../../i18n/ru-RU/data/conditions/diseases.json';
-import enDiseases from '../../i18n/en-EN/data/conditions/diseases.json';
+import moduleMagazines from '../../modules/fallout/data/consumables/magazines.json';
+import ruMagazines from '../../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
+import enMagazines from '../../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
+import moduleDiseases from '../../modules/fallout/data/conditions/diseases.json';
+import ruDiseases from '../../modules/fallout/i18n/ru-RU/data/conditions/diseases.json';
+import enDiseases from '../../modules/fallout/i18n/en-EN/data/conditions/diseases.json';
 
 // Контракт импорта журналов и болезней (core rulebook: стр. 171-179 журналы,
-// стр. 193 болезни). Источник механики — data/, тексты — i18n обеих локалей.
+// стр. 193 болезни). Журналы и болезни: данные и переводы — в модуле
+// сеттинга (патчи 98, 100).
 // Журналы: 20 серий (таблица случайной публикации d20 1-20), 95 предметов:
 // 10 одиночных + 85 выпусков; у серий Live & Love и Tesla Science Magazine
 // диапазон 19-20 — «переброс результата», предмета под него нет.
@@ -47,16 +48,16 @@ const parseRange = (raw) => {
 
 describe('magazines data contract', () => {
   it('именно 95 журналов: 10 одиночных + 85 выпусков, id уникальны', () => {
-    expect(dataMagazines).toHaveLength(95);
-    expect(new Set(dataMagazines.map((m) => m.id)).size).toBe(95);
-    const singles = dataMagazines.filter((m) => m.issue === null);
-    const issues = dataMagazines.filter((m) => m.issue !== null);
+    expect(moduleMagazines).toHaveLength(95);
+    expect(new Set(moduleMagazines.map((m) => m.id)).size).toBe(95);
+    const singles = moduleMagazines.filter((m) => m.issue === null);
+    const issues = moduleMagazines.filter((m) => m.issue !== null);
     expect(singles).toHaveLength(10);
     expect(issues).toHaveLength(85);
   });
 
   it('каждая запись несёт полную механику журнала', () => {
-    for (const m of dataMagazines) {
+    for (const m of moduleMagazines) {
       expect(m.itemType).toBe('magazine');
       expect(m.weight).toBe(0.1);
       expect(m.cost).toBe(100);
@@ -72,7 +73,7 @@ describe('magazines data contract', () => {
 
   it('диапазоны выпусков внутри серии упорядочены и не пересекаются; выпуски пронумерованы от 1', () => {
     const bySeries = new Map();
-    for (const m of dataMagazines.filter((x) => x.issue !== null)) {
+    for (const m of moduleMagazines.filter((x) => x.issue !== null)) {
       if (!bySeries.has(m.seriesId)) bySeries.set(m.seriesId, []);
       bySeries.get(m.seriesId).push(m);
     }
@@ -99,10 +100,10 @@ describe('magazines data contract', () => {
 
   it('i18n ru/en полностью покрывают все id, тексты непустые', () => {
     for (const i18n of [ruMagazines, enMagazines]) {
-      expect(i18n).toHaveLength(dataMagazines.length);
+      expect(i18n).toHaveLength(moduleMagazines.length);
       const byId = new Map(i18n.map((x) => [x.id, x]));
-      expect(byId.size).toBe(dataMagazines.length);
-      for (const m of dataMagazines) {
+      expect(byId.size).toBe(moduleMagazines.length);
+      for (const m of moduleMagazines) {
         const rec = byId.get(m.id);
         expect(rec, `i18n missing ${m.id}`).toBeDefined();
         expect(rec.name.length).toBeGreaterThan(0);
@@ -114,9 +115,9 @@ describe('magazines data contract', () => {
   it('каталог объединяет механику data/ с именами обеих локалей', () => {
     for (const locale of ['ru-RU', 'en-EN']) {
       const mags = getEquipmentCatalog(locale).magazines;
-      expect(mags).toHaveLength(dataMagazines.length);
+      expect(mags).toHaveLength(moduleMagazines.length);
       for (const m of mags) {
-        const data = dataMagazines.find((d) => d.id === m.id);
+        const data = moduleMagazines.find((d) => d.id === m.id);
         expect(m.cost).toBe(data.cost);
         expect(m.seriesD20).toBe(data.seriesD20);
         expect(typeof m.name).toBe('string');
@@ -132,14 +133,14 @@ describe('magazines data contract', () => {
 
 describe('diseases data contract', () => {
   it('ровно 20 болезней, d20Roll покрывает 1-20 без дыр и повторов', () => {
-    expect(dataDiseases).toHaveLength(20);
-    expect(dataDiseases.map((d) => d.d20Roll).sort((a, b) => a - b)).toEqual(
+    expect(moduleDiseases).toHaveLength(20);
+    expect(moduleDiseases.map((d) => d.d20Roll).sort((a, b) => a - b)).toEqual(
       Array.from({ length: 20 }, (_, i) => i + 1),
     );
   });
 
   it('длительность — целое число стадий >= 1', () => {
-    for (const d of dataDiseases) {
+    for (const d of moduleDiseases) {
       expect(Number.isInteger(d.duration)).toBe(true);
       expect(d.duration).toBeGreaterThanOrEqual(1);
     }
@@ -147,9 +148,9 @@ describe('diseases data contract', () => {
 
   it('i18n ru/en покрывают все id, тексты непустые', () => {
     for (const i18n of [ruDiseases, enDiseases]) {
-      expect(i18n).toHaveLength(dataDiseases.length);
+      expect(i18n).toHaveLength(moduleDiseases.length);
       const byId = new Map(i18n.map((x) => [x.id, x]));
-      for (const d of dataDiseases) {
+      for (const d of moduleDiseases) {
         const rec = byId.get(d.id);
         expect(rec, `i18n missing ${d.id}`).toBeDefined();
         expect(rec.name.length).toBeGreaterThan(0);
@@ -173,9 +174,9 @@ describe('diseases data contract', () => {
   });
 
   it('точка сопряжения с антибиотиками: идентификатор состояния diseased документирован каталогом', () => {
-    // chem_antibiotics снимает состояние "diseased" (data/consumables/chems.json),
+    // chem_antibiotics снимает состояние "diseased" (modules/fallout/data/consumables/chems.json),
     // каталог болезней — его контент. Проверяем, что heal-вектор данных на месте.
-    expect(dataDiseases.every((d) => d.id.startsWith('disease_'))).toBe(true);
+    expect(moduleDiseases.every((d) => d.id.startsWith('disease_'))).toBe(true);
   });
 });
 

@@ -6,9 +6,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
 import { setCurrentLocale } from '../../i18n/locale';
-import moduleFood from '../../modules/fallout/data/food.json';
-import moduleDrinks from '../../modules/fallout/data/drinks.json';
-import moduleWeaponMods from '../../modules/fallout/data/weapon_mods.json';
+import moduleFood from '../../modules/fallout/data/consumables/food.json';
+import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
+import moduleWeaponMods from '../../modules/fallout/data/equipment/weapon_mods.json';
 import dataFood from '../../data/consumables/food.json';
 import dataDrinks from '../../data/consumables/drinks.json';
 import dataWeaponMods from '../../data/equipment/weapon_mods.json';

@@ -1,0 +1,3018 @@
+diff --git a/__tests__/securitron/loot-module-move.test.js b/__tests__/securitron/loot-module-move.test.js
+new file mode 100644
+index 0000000..ce13d66
+--- /dev/null
++++ b/__tests__/securitron/loot-module-move.test.js
+@@ -0,0 +1,62 @@
++/**
++ * Разделение движок/сеттинг (патч 101): таблицы лута и стабы перенесены
++ * в модуль ЦЕЛИКОМ (7 файлов, структура сохранена; имена стабов — в i18n
++ * модуля обеих локалей). data/loot и легаси-i18n — пустые движковые базы.
++ */
++import { describe, it, expect } from 'vitest';
++import moduleTrinkets from '../../modules/fallout/data/loot/trinkets.json';
++import moduleFood from '../../modules/fallout/data/loot/food.json';
++import moduleBrewery from '../../modules/fallout/data/loot/brewery.json';
++import moduleChems from '../../modules/fallout/data/loot/chems.json';
++import moduleOutcast from '../../modules/fallout/data/loot/outcast.json';
++import moduleWeaponsMelee from '../../modules/fallout/data/loot/weapons_melee.json';
++import moduleLootStubs from '../../modules/fallout/data/loot/_stubs.json';
++import moduleRuStubs from '../../modules/fallout/i18n/ru-RU/data/loot/stubs.json';
++import moduleEnStubs from '../../modules/fallout/i18n/en-EN/data/loot/stubs.json';
++import dataTrinkets from '../../data/loot/trinkets.json';
++import dataFood from '../../data/loot/food.json';
++import dataBrewery from '../../data/loot/brewery.json';
++import dataChems from '../../data/loot/chems.json';
++import dataOutcast from '../../data/loot/outcast.json';
++import dataWeaponsMelee from '../../data/loot/weapons_melee.json';
++import dataLootStubs from '../../data/loot/_stubs.json';
++import legacyRuStubs from '../../i18n/ru-RU/data/loot/stubs.json';
++import legacyEnStubs from '../../i18n/en-EN/data/loot/stubs.json';
++
++describe('Лут в модуле (сеттинг), data/ — пустой движок', () => {
++  it('таблицы лута в модуле, по файлу на таблицу (структура сохранена)', () => {
++    expect(moduleTrinkets).toHaveLength(20);
++    expect(moduleFood).toHaveLength(39);
++    expect(moduleBrewery).toHaveLength(39);
++    expect(moduleChems).toHaveLength(39);
++    expect(moduleOutcast).toHaveLength(20);
++    expect(moduleWeaponsMelee).toHaveLength(39);
++    for (const table of [moduleTrinkets, moduleFood, moduleBrewery, moduleChems, moduleOutcast, moduleWeaponsMelee]) {
++      for (const entry of table) {
++        expect(entry).toHaveProperty('roll');
++        expect(entry).toHaveProperty('id');
++      }
++    }
++  });
++
++  it('стабы: механика в модульных данных, имена — в i18n модуля обеих локалей', () => {
++    expect(moduleLootStubs).toHaveLength(37);
++    expect(moduleRuStubs).toHaveLength(37);
++    expect(moduleEnStubs).toHaveLength(37);
++    const stubIds = new Set(moduleLootStubs.map((s) => s.id));
++    expect(new Set(moduleRuStubs.map((s) => s.id))).toEqual(stubIds);
++    expect(new Set(moduleEnStubs.map((s) => s.id))).toEqual(stubIds);
++  });
++
++  it('data/loot и легаси-i18n пусты (движок без сеттинга)', () => {
++    expect(dataTrinkets).toEqual([]);
++    expect(dataFood).toEqual([]);
++    expect(dataBrewery).toEqual([]);
++    expect(dataChems).toEqual([]);
++    expect(dataOutcast).toEqual([]);
++    expect(dataWeaponsMelee).toEqual([]);
++    expect(dataLootStubs).toEqual([]);
++    expect(legacyRuStubs).toEqual([]);
++    expect(legacyEnStubs).toEqual([]);
++  });
++});
+diff --git a/components/screens/CharacterScreen/logic/RandomLootLogic.js b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+index 3c3c499..582bd56 100644
+--- a/components/screens/CharacterScreen/logic/RandomLootLogic.js
++++ b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+@@ -1,13 +1,13 @@
+ import { evaluateFormula, evaluateFormulaMulti, rollDie } from '../../../../domain/diceRollsLogic';
+-import trinkets from '../../../../data/loot/trinkets.json';
+-import food from '../../../../data/loot/food.json';
+-import brewery from '../../../../data/loot/brewery.json';
+-import chems from '../../../../data/loot/chems.json';
+-import outcast from '../../../../data/loot/outcast.json';
+-import weaponsMelee from '../../../../data/loot/weapons_melee.json';
+-import lootStubs from '../../../../data/loot/_stubs.json';
+-import ruLootStubs from '../../../../i18n/ru-RU/data/loot/stubs.json';
+-import enLootStubs from '../../../../i18n/en-EN/data/loot/stubs.json';
++import trinkets from '../../../../modules/fallout/data/loot/trinkets.json';
++import food from '../../../../modules/fallout/data/loot/food.json';
++import brewery from '../../../../modules/fallout/data/loot/brewery.json';
++import chems from '../../../../modules/fallout/data/loot/chems.json';
++import outcast from '../../../../modules/fallout/data/loot/outcast.json';
++import weaponsMelee from '../../../../modules/fallout/data/loot/weapons_melee.json';
++import lootStubs from '../../../../modules/fallout/data/loot/_stubs.json';
++import ruLootStubs from '../../../../modules/fallout/i18n/ru-RU/data/loot/stubs.json';
++import enLootStubs from '../../../../modules/fallout/i18n/en-EN/data/loot/stubs.json';
+ import { getWeaponById } from '../../../../db/Database';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getCurrentLocale } from '../../../../i18n/locale';
+diff --git a/data/loot/_stubs.json b/data/loot/_stubs.json
+index 4d4bdf3..fe51488 100644
+--- a/data/loot/_stubs.json
++++ b/data/loot/_stubs.json
+@@ -1,298 +1 @@
+-[
+- {
+-  "id": "item_treasure_map",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "rarity": 2,
+-  "stub": true,
+-  "value": 50
+- },
+- {
+-  "id": "outcast_stub_1",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_10",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_11",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_12",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_13",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_15",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_17",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_18",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_19",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_2",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_20",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_3",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_5",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_6",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "outcast_stub_7",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_1",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_10",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_11",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_12",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_13",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_14",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_15",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_16",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_17",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_18",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_19",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_2",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_20",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_3",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_4",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_5",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_6",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_7",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_8",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "trinkets_stub_9",
+-  "itemType": "misc",
+-  "weight": 0.5,
+-  "cost": 0,
+-  "rarity": 0,
+-  "stub": true
+- },
+- {
+-  "id": "weapon_chinese_sword",
+-  "itemType": "weapon",
+-  "weight": 0.5,
+-  "cost": 100,
+-  "rarity": 3,
+-  "stub": true
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/data/loot/brewery.json b/data/loot/brewery.json
+index 4a7a7b4..fe51488 100644
+--- a/data/loot/brewery.json
++++ b/data/loot/brewery.json
+@@ -1,158 +1 @@
+-[
+- {
+-  "roll": 2,
+-  "id": "drink_wine"
+- },
+- {
+-  "roll": 3,
+-  "id": "drink_wine"
+- },
+- {
+-  "roll": 4,
+-  "id": "drink_whiskey"
+- },
+- {
+-  "roll": 5,
+-  "id": "drink_whiskey"
+- },
+- {
+-  "roll": 6,
+-  "id": "drink_nuka_cherry"
+- },
+- {
+-  "roll": 7,
+-  "id": "drink_nuka_cherry"
+- },
+- {
+-  "roll": 8,
+-  "id": "drink_nuka_cherry"
+- },
+- {
+-  "roll": 9,
+-  "id": "drink_nuka_cola"
+- },
+- {
+-  "roll": 10,
+-  "id": "drink_nuka_cola"
+- },
+- {
+-  "roll": 11,
+-  "id": "drink_nuka_cola"
+- },
+- {
+-  "roll": 12,
+-  "id": "drink_bourbon"
+- },
+- {
+-  "roll": 13,
+-  "id": "drink_bourbon"
+- },
+- {
+-  "roll": 14,
+-  "id": "drink_bourbon"
+- },
+- {
+-  "roll": 15,
+-  "id": "drink_beer"
+- },
+- {
+-  "roll": 16,
+-  "id": "drink_beer"
+- },
+- {
+-  "roll": 17,
+-  "id": "drink_beer"
+- },
+- {
+-  "roll": 18,
+-  "id": "drink_beer"
+- },
+- {
+-  "roll": 19,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 20,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 21,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 22,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 23,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 24,
+-  "id": "drink_purified_water"
+- },
+- {
+-  "roll": 25,
+-  "id": "drink_purified_water"
+- },
+- {
+-  "roll": 26,
+-  "id": "drink_purified_water"
+- },
+- {
+-  "roll": 27,
+-  "id": "drink_purified_water"
+- },
+- {
+-  "roll": 28,
+-  "id": "drink_brahmin_milk"
+- },
+- {
+-  "roll": 29,
+-  "id": "drink_brahmin_milk"
+- },
+- {
+-  "roll": 30,
+-  "id": "drink_brahmin_milk"
+- },
+- {
+-  "roll": 31,
+-  "id": "drink_rum"
+- },
+- {
+-  "roll": 32,
+-  "id": "drink_rum"
+- },
+- {
+-  "roll": 33,
+-  "id": "drink_rum"
+- },
+- {
+-  "roll": 34,
+-  "id": "drink_moonshine"
+- },
+- {
+-  "roll": 35,
+-  "id": "drink_moonshine"
+- },
+- {
+-  "roll": 36,
+-  "id": "drink_moonshine"
+- },
+- {
+-  "roll": 37,
+-  "id": "drink_vodka"
+- },
+- {
+-  "roll": 38,
+-  "id": "drink_vodka"
+- },
+- {
+-  "roll": 39,
+-  "id": "drink_wine"
+- },
+- {
+-  "roll": 40,
+-  "id": "drink_wine"
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/data/loot/chems.json b/data/loot/chems.json
+index 26906bb..fe51488 100644
+--- a/data/loot/chems.json
++++ b/data/loot/chems.json
+@@ -1,158 +1 @@
+-[
+- {
+-  "roll": 2,
+-  "id": "chem_super_stimpak"
+- },
+- {
+-  "roll": 3,
+-  "id": "chem_calmex"
+- },
+- {
+-  "roll": 4,
+-  "id": "chem_day_tripper"
+- },
+- {
+-  "roll": 5,
+-  "id": "chem_addictol"
+- },
+- {
+-  "roll": 6,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 7,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 8,
+-  "id": "chem_radaway"
+- },
+- {
+-  "roll": 9,
+-  "id": "chem_radaway"
+- },
+- {
+-  "roll": 10,
+-  "id": "chem_psycho"
+- },
+- {
+-  "roll": 11,
+-  "id": "chem_psycho"
+- },
+- {
+-  "roll": 12,
+-  "id": "chem_med_x"
+- },
+- {
+-  "roll": 13,
+-  "id": "chem_med_x"
+- },
+- {
+-  "roll": 14,
+-  "id": "chem_daddy_o"
+- },
+- {
+-  "roll": 15,
+-  "id": "chem_daddy_o"
+- },
+- {
+-  "roll": 16,
+-  "id": "chem_rad_x"
+- },
+- {
+-  "roll": 17,
+-  "id": "chem_rad_x"
+- },
+- {
+-  "roll": 18,
+-  "id": "chem_healing_salve"
+- },
+- {
+-  "roll": 19,
+-  "id": "chem_healing_salve"
+- },
+- {
+-  "roll": 20,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 21,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 22,
+-  "id": "drink_dirty_water"
+- },
+- {
+-  "roll": 23,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 24,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 25,
+-  "id": "chem_radaway"
+- },
+- {
+-  "roll": 26,
+-  "id": "chem_radaway"
+- },
+- {
+-  "roll": 27,
+-  "id": "chem_buffout"
+- },
+- {
+-  "roll": 28,
+-  "id": "chem_buffout"
+- },
+- {
+-  "roll": 29,
+-  "id": "chem_jet"
+- },
+- {
+-  "roll": 30,
+-  "id": "chem_jet"
+- },
+- {
+-  "roll": 31,
+-  "id": "chem_mentats"
+- },
+- {
+-  "roll": 32,
+-  "id": "chem_mentats"
+- },
+- {
+-  "roll": 33,
+-  "id": "chem_rad_x"
+- },
+- {
+-  "roll": 34,
+-  "id": "chem_rad_x"
+- },
+- {
+-  "roll": 35,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 36,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 37,
+-  "id": "chem_antibiotics"
+- },
+- {
+-  "roll": 38,
+-  "id": "chem_overdrive"
+- },
+- {
+-  "roll": 39,
+-  "id": "chem_fury"
+- },
+- {
+-  "roll": 40,
+-  "id": "chem_x_cell"
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/data/loot/food.json b/data/loot/food.json
+index f44aa04..fe51488 100644
+--- a/data/loot/food.json
++++ b/data/loot/food.json
+@@ -1,158 +1 @@
+-[
+- {
+-  "roll": 2,
+-  "id": "food_tarberry"
+- },
+- {
+-  "roll": 3,
+-  "id": "food_perfectly_preserved_pie"
+- },
+- {
+-  "roll": 4,
+-  "id": "food_melon"
+- },
+- {
+-  "roll": 5,
+-  "id": "food_carrot"
+- },
+- {
+-  "roll": 6,
+-  "id": "food_institute_food_packet"
+- },
+- {
+-  "roll": 7,
+-  "id": "food_sugar_bombs"
+- },
+- {
+-  "roll": 8,
+-  "id": "food_mutfruit"
+- },
+- {
+-  "roll": 9,
+-  "id": "food_fancy_lads_snack_cakes"
+- },
+- {
+-  "roll": 10,
+-  "id": "food_sweet_roll"
+- },
+- {
+-  "roll": 11,
+-  "id": "food_razorgrain"
+- },
+- {
+-  "roll": 12,
+-  "id": "food_iguana_bits"
+- },
+- {
+-  "roll": 13,
+-  "id": "food_cram"
+- },
+- {
+-  "roll": 14,
+-  "id": "food_carrot"
+- },
+- {
+-  "roll": 15,
+-  "id": "food_blamco_mac_and_cheese"
+- },
+- {
+-  "roll": 16,
+-  "id": "food_sugar_bombs"
+- },
+- {
+-  "roll": 17,
+-  "id": "food_canned_meat"
+- },
+- {
+-  "roll": 18,
+-  "id": "food_pork_n_beans"
+- },
+- {
+-  "roll": 19,
+-  "id": "food_instamash"
+- },
+- {
+-  "roll": 20,
+-  "id": "food_dandy_boy_apples"
+- },
+- {
+-  "roll": 21,
+-  "id": "food_dog_food"
+- },
+- {
+-  "roll": 22,
+-  "id": "food_fancy_lads_snack_cakes"
+- },
+- {
+-  "roll": 23,
+-  "id": "food_gum_drops"
+- },
+- {
+-  "roll": 24,
+-  "id": "food_mutfruit"
+- },
+- {
+-  "roll": 25,
+-  "id": "food_potato_crisps"
+- },
+- {
+-  "roll": 26,
+-  "id": "food_salisbury_steak"
+- },
+- {
+-  "roll": 27,
+-  "id": "food_yum_yum_deviled_eggs"
+- },
+- {
+-  "roll": 28,
+-  "id": "food_brain_fungus"
+- },
+- {
+-  "roll": 29,
+-  "id": "food_corn"
+- },
+- {
+-  "roll": 30,
+-  "id": "food_gourd"
+- },
+- {
+-  "roll": 31,
+-  "id": "food_melon"
+- },
+- {
+-  "roll": 32,
+-  "id": "food_silt_bean"
+- },
+- {
+-  "roll": 33,
+-  "id": "food_tato"
+- },
+- {
+-  "roll": 34,
+-  "id": "food_instamash"
+- },
+- {
+-  "roll": 35,
+-  "id": "food_salisbury_steak"
+- },
+- {
+-  "roll": 36,
+-  "id": "food_food_paste"
+- },
+- {
+-  "roll": 37,
+-  "id": "food_noodle_cup"
+- },
+- {
+-  "roll": 38,
+-  "id": "food_corn"
+- },
+- {
+-  "roll": 39,
+-  "id": "food_blamco_mac_and_cheese"
+- },
+- {
+-  "roll": 40,
+-  "id": "food_tarberry"
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/data/loot/outcast.json b/data/loot/outcast.json
+index 0dfa724..fe51488 100644
+--- a/data/loot/outcast.json
++++ b/data/loot/outcast.json
+@@ -1,82 +1 @@
+-[
+- {
+-  "roll": 1,
+-  "id": "outcast_stub_1"
+- },
+- {
+-  "roll": 2,
+-  "id": "outcast_stub_2"
+- },
+- {
+-  "roll": 3,
+-  "id": "outcast_stub_3"
+- },
+- {
+-  "roll": 4,
+-  "id": "chem_antibiotics"
+- },
+- {
+-  "roll": 5,
+-  "id": "outcast_stub_5"
+- },
+- {
+-  "roll": 6,
+-  "id": "outcast_stub_6"
+- },
+- {
+-  "roll": 7,
+-  "id": "outcast_stub_7"
+- },
+- {
+-  "roll": 8,
+-  "id": "item_treasure_map"
+- },
+- {
+-  "roll": 9,
+-  "id": "chem_stimpak"
+- },
+- {
+-  "roll": 10,
+-  "id": "outcast_stub_10"
+- },
+- {
+-  "roll": 11,
+-  "id": "outcast_stub_11"
+- },
+- {
+-  "roll": 12,
+-  "id": "outcast_stub_12"
+- },
+- {
+-  "roll": 13,
+-  "id": "outcast_stub_13"
+- },
+- {
+-  "roll": 14,
+-  "id": "weapon_chinese_sword"
+- },
+- {
+-  "roll": 15,
+-  "id": "outcast_stub_15"
+- },
+- {
+-  "roll": 16,
+-  "id": "chem_radaway"
+- },
+- {
+-  "roll": 17,
+-  "id": "outcast_stub_17"
+- },
+- {
+-  "roll": 18,
+-  "id": "outcast_stub_18"
+- },
+- {
+-  "roll": 19,
+-  "id": "outcast_stub_19"
+- },
+- {
+-  "roll": 20,
+-  "id": "outcast_stub_20"
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/data/loot/trinkets.json b/data/loot/trinkets.json
+index 87812b5..fe51488 100644
+--- a/data/loot/trinkets.json
++++ b/data/loot/trinkets.json
+@@ -1,82 +1 @@
+-[
+- {
+-  "roll": 1,
+-  "id": "trinkets_stub_1"
+- },
+- {
+-  "roll": 2,
+-  "id": "trinkets_stub_2"
+- },
+- {
+-  "roll": 3,
+-  "id": "trinkets_stub_3"
+- },
+- {
+-  "roll": 4,
+-  "id": "trinkets_stub_4"
+- },
+- {
+-  "roll": 5,
+-  "id": "trinkets_stub_5"
+- },
+- {
+-  "roll": 6,
+-  "id": "trinkets_stub_6"
+- },
+- {
+-  "roll": 7,
+-  "id": "trinkets_stub_7"
+- },
+- {
+-  "roll": 8,
+-  "id": "trinkets_stub_8"
+- },
+- {
+-  "roll": 9,
+-  "id": "trinkets_stub_9"
+- },
+- {
+-  "roll": 10,
+-  "id": "trinkets_stub_10"
+- },
+- {
+-  "roll": 11,
+-  "id": "trinkets_stub_11"
+- },
+- {
+-  "roll": 12,
+-  "id": "trinkets_stub_12"
+- },
+- {
+-  "roll": 13,
+-  "id": "trinkets_stub_13"
+- },
+- {
+-  "roll": 14,
+-  "id": "trinkets_stub_14"
+- },
+- {
+-  "roll": 15,
+-  "id": "trinkets_stub_15"
+- },
+- {
+-  "roll": 16,
+-  "id": "trinkets_stub_16"
+- },
+- {
+-  "roll": 17,
+-  "id": "trinkets_stub_17"
+- },
+- {
+-  "roll": 18,
+-  "id": "trinkets_stub_18"
+- },
+- {
+-  "roll": 19,
+-  "id": "trinkets_stub_19"
+- },
+- {
+-  "roll": 20,
+-  "id": "trinkets_stub_20"
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/data/loot/weapons_melee.json b/data/loot/weapons_melee.json
+index bf66f20..fe51488 100644
+--- a/data/loot/weapons_melee.json
++++ b/data/loot/weapons_melee.json
+@@ -1,158 +1 @@
+-[
+- {
+-  "roll": 2,
+-  "id": "weapon_deathclaw_gauntlet"
+- },
+- {
+-  "roll": 3,
+-  "id": "weapon_shishkebab"
+- },
+- {
+-  "roll": 4,
+-  "id": "weapon_shishkebab"
+- },
+- {
+-  "roll": 5,
+-  "id": "weapon_sledgehammer"
+- },
+- {
+-  "roll": 6,
+-  "id": "weapon_sledgehammer"
+- },
+- {
+-  "roll": 7,
+-  "id": "weapon_ripper"
+- },
+- {
+-  "roll": 8,
+-  "id": "weapon_ripper"
+- },
+- {
+-  "roll": 9,
+-  "id": "weapon_boxing_glove"
+- },
+- {
+-  "roll": 10,
+-  "id": "weapon_boxing_glove"
+- },
+- {
+-  "roll": 11,
+-  "id": "weapon_baton"
+- },
+- {
+-  "roll": 12,
+-  "id": "weapon_baton"
+- },
+- {
+-  "roll": 13,
+-  "id": "weapon_machete"
+- },
+- {
+-  "roll": 14,
+-  "id": "weapon_machete"
+- },
+- {
+-  "roll": 15,
+-  "id": "weapon_walking_cane"
+- },
+- {
+-  "roll": 16,
+-  "id": "weapon_walking_cane"
+- },
+- {
+-  "roll": 17,
+-  "id": "weapon_pool_cue"
+- },
+- {
+-  "roll": 18,
+-  "id": "weapon_pool_cue"
+- },
+- {
+-  "roll": 19,
+-  "id": "weapon_switchblade"
+- },
+- {
+-  "roll": 20,
+-  "id": "weapon_switchblade"
+- },
+- {
+-  "roll": 21,
+-  "id": "weapon_board"
+- },
+- {
+-  "roll": 22,
+-  "id": "weapon_board"
+- },
+- {
+-  "roll": 23,
+-  "id": "weapon_lead_pipe"
+- },
+- {
+-  "roll": 24,
+-  "id": "weapon_lead_pipe"
+- },
+- {
+-  "roll": 25,
+-  "id": "weapon_rolling_pin"
+- },
+- {
+-  "roll": 26,
+-  "id": "weapon_rolling_pin"
+- },
+- {
+-  "roll": 27,
+-  "id": "weapon_pipe_wrench"
+- },
+- {
+-  "roll": 28,
+-  "id": "weapon_pipe_wrench"
+- },
+- {
+-  "roll": 29,
+-  "id": "weapon_knuckles"
+- },
+- {
+-  "roll": 30,
+-  "id": "weapon_knuckles"
+- },
+- {
+-  "roll": 31,
+-  "id": "weapon_tire_iron"
+- },
+- {
+-  "roll": 32,
+-  "id": "weapon_tire_iron"
+- },
+- {
+-  "roll": 33,
+-  "id": "weapon_sword"
+- },
+- {
+-  "roll": 34,
+-  "id": "weapon_sword"
+- },
+- {
+-  "roll": 35,
+-  "id": "weapon_baseball_bat_aluminum"
+- },
+- {
+-  "roll": 36,
+-  "id": "weapon_baseball_bat_aluminum"
+- },
+- {
+-  "roll": 37,
+-  "id": "weapon_power_fist"
+- },
+- {
+-  "roll": 38,
+-  "id": "weapon_power_fist"
+- },
+- {
+-  "roll": 39,
+-  "id": "weapon_super_sledge"
+- },
+- {
+-  "roll": 40,
+-  "id": "weapon_super_sledge"
+- }
+-]
+\ No newline at end of file
++[]
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 48ba5a1..0f827bd 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -45,6 +45,7 @@ modules/fallout/
+ | diseases | 20 | 0 (`[]`) | патч 98 |
+ | chems | 32 (`itemType: 'chem'`) | 0 (`[]`) | патч 99 |
+ | magazines | 95 | 0 (`[]`) | патч 100 |
++| loot | 7 файлов (233 записи) + стабы | 0 (`[]`) | патч 101 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -81,7 +82,6 @@ modules/fallout/
+ | Одежда (база) | `data/equipment/clothes.json` | 3 |
+ | Слоты модов | `data/equipment/weapon_mod_slots.json` | 38 оружий |
+ | Роботы | `data/equipment/robot/*` (8 файлов) + `robotparts.json` | 11+104 |
+-| Лут | `data/loot/*` (7 файлов) | 233 записи |
+ | Ориджины (база) | `data/origins/origins.json` | 17 |
+ | Трейты (база) | `data/traits/traits.json` | 32 |
+ | Награды навыков | `data/skillRewards.json` | словарь |
+diff --git a/i18n/en-EN/data/loot/stubs.json b/i18n/en-EN/data/loot/stubs.json
+index 2e52cf8..fe51488 100644
+--- a/i18n/en-EN/data/loot/stubs.json
++++ b/i18n/en-EN/data/loot/stubs.json
+@@ -1,150 +1 @@
+-[
+-  {
+-    "id": "item_treasure_map",
+-    "name": "Treasure Map of an Old World Survivalist Cache"
+-  },
+-  {
+-    "id": "outcast_stub_1",
+-    "name": "Elite Toolkit"
+-  },
+-  {
+-    "id": "outcast_stub_10",
+-    "name": "Combat Bracer"
+-  },
+-  {
+-    "id": "outcast_stub_11",
+-    "name": "Combat Greave"
+-  },
+-  {
+-    "id": "outcast_stub_12",
+-    "name": "Sensor Array"
+-  },
+-  {
+-    "id": "outcast_stub_13",
+-    "name": "Small Backpack"
+-  },
+-  {
+-    "id": "outcast_stub_15",
+-    "name": "Laser Musket"
+-  },
+-  {
+-    "id": "outcast_stub_17",
+-    "name": "Combat Shotgun"
+-  },
+-  {
+-    "id": "outcast_stub_18",
+-    "name": "Power Fist"
+-  },
+-  {
+-    "id": "outcast_stub_19",
+-    "name": "Sturdy Combat Helmet"
+-  },
+-  {
+-    "id": "outcast_stub_2",
+-    "name": "Flashlight"
+-  },
+-  {
+-    "id": "outcast_stub_20",
+-    "name": "Pip-Boy"
+-  },
+-  {
+-    "id": "outcast_stub_3",
+-    "name": "Copy of \"Fixing Things\" Magazine"
+-  },
+-  {
+-    "id": "outcast_stub_5",
+-    "name": "Bobby Pin"
+-  },
+-  {
+-    "id": "outcast_stub_6",
+-    "name": "Radio"
+-  },
+-  {
+-    "id": "outcast_stub_7",
+-    "name": "Combat Chest Piece"
+-  },
+-  {
+-    "id": "trinkets_stub_1",
+-    "name": "Gold Pocket Watch"
+-  },
+-  {
+-    "id": "trinkets_stub_10",
+-    "name": "Engraved Lighter"
+-  },
+-  {
+-    "id": "trinkets_stub_11",
+-    "name": "Loaded Dice"
+-  },
+-  {
+-    "id": "trinkets_stub_12",
+-    "name": "Identification Card"
+-  },
+-  {
+-    "id": "trinkets_stub_13",
+-    "name": "Cosmetics Bag"
+-  },
+-  {
+-    "id": "trinkets_stub_14",
+-    "name": "Musical Instrument"
+-  },
+-  {
+-    "id": "trinkets_stub_15",
+-    "name": "Broken Glasses"
+-  },
+-  {
+-    "id": "trinkets_stub_16",
+-    "name": "Junk Necklace"
+-  },
+-  {
+-    "id": "trinkets_stub_17",
+-    "name": "Pages of an Unfinished Story"
+-  },
+-  {
+-    "id": "trinkets_stub_18",
+-    "name": "Overdue Book"
+-  },
+-  {
+-    "id": "trinkets_stub_19",
+-    "name": "Postcard with an Address"
+-  },
+-  {
+-    "id": "trinkets_stub_2",
+-    "name": "Glitched Holotape"
+-  },
+-  {
+-    "id": "trinkets_stub_20",
+-    "name": "Pre-War Tie"
+-  },
+-  {
+-    "id": "trinkets_stub_3",
+-    "name": "Bright Bandana"
+-  },
+-  {
+-    "id": "trinkets_stub_4",
+-    "name": "Silver Locket"
+-  },
+-  {
+-    "id": "trinkets_stub_5",
+-    "name": "Medal"
+-  },
+-  {
+-    "id": "trinkets_stub_6",
+-    "name": "Potted Plant"
+-  },
+-  {
+-    "id": "trinkets_stub_7",
+-    "name": "Tickets to a Pre-War Event"
+-  },
+-  {
+-    "id": "trinkets_stub_8",
+-    "name": "Wedding Ring"
+-  },
+-  {
+-    "id": "trinkets_stub_9",
+-    "name": "Invitation to a Pre-War Party"
+-  },
+-  {
+-    "id": "weapon_chinese_sword",
+-    "name": "Sword"
+-  }
+-]
++[]
+diff --git a/i18n/ru-RU/data/loot/stubs.json b/i18n/ru-RU/data/loot/stubs.json
+index f3ef81c..fe51488 100644
+--- a/i18n/ru-RU/data/loot/stubs.json
++++ b/i18n/ru-RU/data/loot/stubs.json
+@@ -1,150 +1 @@
+-[
+-  {
+-    "id": "item_treasure_map",
+-    "name": "Карта с тайником выживальщиков старого мира"
+-  },
+-  {
+-    "id": "outcast_stub_1",
+-    "name": "Элитный набор инструментов"
+-  },
+-  {
+-    "id": "outcast_stub_10",
+-    "name": "Боевой Наруч"
+-  },
+-  {
+-    "id": "outcast_stub_11",
+-    "name": "Боевой Понож"
+-  },
+-  {
+-    "id": "outcast_stub_12",
+-    "name": "Массив сенсоров"
+-  },
+-  {
+-    "id": "outcast_stub_13",
+-    "name": "Рюкзак маленький"
+-  },
+-  {
+-    "id": "outcast_stub_15",
+-    "name": "Лазерный Мушкет"
+-  },
+-  {
+-    "id": "outcast_stub_17",
+-    "name": "Боевой дробовик"
+-  },
+-  {
+-    "id": "outcast_stub_18",
+-    "name": "Силовой кулак"
+-  },
+-  {
+-    "id": "outcast_stub_19",
+-    "name": "Прочный Боевой Шлем"
+-  },
+-  {
+-    "id": "outcast_stub_2",
+-    "name": "Фонарик"
+-  },
+-  {
+-    "id": "outcast_stub_20",
+-    "name": "Пип-Бой"
+-  },
+-  {
+-    "id": "outcast_stub_3",
+-    "name": "Копия журнала \"Чиним вещи\""
+-  },
+-  {
+-    "id": "outcast_stub_5",
+-    "name": "Заколка"
+-  },
+-  {
+-    "id": "outcast_stub_6",
+-    "name": "Радио"
+-  },
+-  {
+-    "id": "outcast_stub_7",
+-    "name": "Боевой Нагрудник"
+-  },
+-  {
+-    "id": "trinkets_stub_1",
+-    "name": "Золотые карманные часы"
+-  },
+-  {
+-    "id": "trinkets_stub_10",
+-    "name": "Зажигалка с гравировкой"
+-  },
+-  {
+-    "id": "trinkets_stub_11",
+-    "name": "Шулерские кости"
+-  },
+-  {
+-    "id": "trinkets_stub_12",
+-    "name": "Удостоверение личности"
+-  },
+-  {
+-    "id": "trinkets_stub_13",
+-    "name": "Косметичка"
+-  },
+-  {
+-    "id": "trinkets_stub_14",
+-    "name": "Музыкальный инструмент"
+-  },
+-  {
+-    "id": "trinkets_stub_15",
+-    "name": "Разбитые очки"
+-  },
+-  {
+-    "id": "trinkets_stub_16",
+-    "name": "Ожерелье из хлама"
+-  },
+-  {
+-    "id": "trinkets_stub_17",
+-    "name": "Страницы неоконченной истории"
+-  },
+-  {
+-    "id": "trinkets_stub_18",
+-    "name": "Невозвращенная книга"
+-  },
+-  {
+-    "id": "trinkets_stub_19",
+-    "name": "Открытка с адресом"
+-  },
+-  {
+-    "id": "trinkets_stub_2",
+-    "name": "Заглючивший голодиск"
+-  },
+-  {
+-    "id": "trinkets_stub_20",
+-    "name": "Довоенный галстук"
+-  },
+-  {
+-    "id": "trinkets_stub_3",
+-    "name": "Яркая бандана"
+-  },
+-  {
+-    "id": "trinkets_stub_4",
+-    "name": "Серебряный медальон"
+-  },
+-  {
+-    "id": "trinkets_stub_5",
+-    "name": "Медаль"
+-  },
+-  {
+-    "id": "trinkets_stub_6",
+-    "name": "Горшечное растение"
+-  },
+-  {
+-    "id": "trinkets_stub_7",
+-    "name": "Билеты на довоенное мероприятие"
+-  },
+-  {
+-    "id": "trinkets_stub_8",
+-    "name": "Обручальное кольцо"
+-  },
+-  {
+-    "id": "trinkets_stub_9",
+-    "name": "Приглашение на довоенную тусовку"
+-  },
+-  {
+-    "id": "weapon_chinese_sword",
+-    "name": "Меч"
+-  }
+-]
++[]
+diff --git a/modules/fallout/data/loot/_stubs.json b/modules/fallout/data/loot/_stubs.json
+new file mode 100644
+index 0000000..01cdeaf
+--- /dev/null
++++ b/modules/fallout/data/loot/_stubs.json
+@@ -0,0 +1,298 @@
++[
++  {
++    "id": "item_treasure_map",
++    "itemType": "misc",
++    "weight": 0.5,
++    "rarity": 2,
++    "stub": true,
++    "value": 50
++  },
++  {
++    "id": "outcast_stub_1",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_10",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_11",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_12",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_13",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_15",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_17",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_18",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_19",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_2",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_20",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_3",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_5",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_6",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "outcast_stub_7",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_1",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_10",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_11",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_12",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_13",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_14",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_15",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_16",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_17",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_18",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_19",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_2",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_20",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_3",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_4",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_5",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_6",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_7",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_8",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "trinkets_stub_9",
++    "itemType": "misc",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "stub": true
++  },
++  {
++    "id": "weapon_chinese_sword",
++    "itemType": "weapon",
++    "weight": 0.5,
++    "cost": 100,
++    "rarity": 3,
++    "stub": true
++  }
++]
+diff --git a/modules/fallout/data/loot/brewery.json b/modules/fallout/data/loot/brewery.json
+new file mode 100644
+index 0000000..dafde0e
+--- /dev/null
++++ b/modules/fallout/data/loot/brewery.json
+@@ -0,0 +1,158 @@
++[
++  {
++    "roll": 2,
++    "id": "drink_wine"
++  },
++  {
++    "roll": 3,
++    "id": "drink_wine"
++  },
++  {
++    "roll": 4,
++    "id": "drink_whiskey"
++  },
++  {
++    "roll": 5,
++    "id": "drink_whiskey"
++  },
++  {
++    "roll": 6,
++    "id": "drink_nuka_cherry"
++  },
++  {
++    "roll": 7,
++    "id": "drink_nuka_cherry"
++  },
++  {
++    "roll": 8,
++    "id": "drink_nuka_cherry"
++  },
++  {
++    "roll": 9,
++    "id": "drink_nuka_cola"
++  },
++  {
++    "roll": 10,
++    "id": "drink_nuka_cola"
++  },
++  {
++    "roll": 11,
++    "id": "drink_nuka_cola"
++  },
++  {
++    "roll": 12,
++    "id": "drink_bourbon"
++  },
++  {
++    "roll": 13,
++    "id": "drink_bourbon"
++  },
++  {
++    "roll": 14,
++    "id": "drink_bourbon"
++  },
++  {
++    "roll": 15,
++    "id": "drink_beer"
++  },
++  {
++    "roll": 16,
++    "id": "drink_beer"
++  },
++  {
++    "roll": 17,
++    "id": "drink_beer"
++  },
++  {
++    "roll": 18,
++    "id": "drink_beer"
++  },
++  {
++    "roll": 19,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 20,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 21,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 22,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 23,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 24,
++    "id": "drink_purified_water"
++  },
++  {
++    "roll": 25,
++    "id": "drink_purified_water"
++  },
++  {
++    "roll": 26,
++    "id": "drink_purified_water"
++  },
++  {
++    "roll": 27,
++    "id": "drink_purified_water"
++  },
++  {
++    "roll": 28,
++    "id": "drink_brahmin_milk"
++  },
++  {
++    "roll": 29,
++    "id": "drink_brahmin_milk"
++  },
++  {
++    "roll": 30,
++    "id": "drink_brahmin_milk"
++  },
++  {
++    "roll": 31,
++    "id": "drink_rum"
++  },
++  {
++    "roll": 32,
++    "id": "drink_rum"
++  },
++  {
++    "roll": 33,
++    "id": "drink_rum"
++  },
++  {
++    "roll": 34,
++    "id": "drink_moonshine"
++  },
++  {
++    "roll": 35,
++    "id": "drink_moonshine"
++  },
++  {
++    "roll": 36,
++    "id": "drink_moonshine"
++  },
++  {
++    "roll": 37,
++    "id": "drink_vodka"
++  },
++  {
++    "roll": 38,
++    "id": "drink_vodka"
++  },
++  {
++    "roll": 39,
++    "id": "drink_wine"
++  },
++  {
++    "roll": 40,
++    "id": "drink_wine"
++  }
++]
+diff --git a/modules/fallout/data/loot/chems.json b/modules/fallout/data/loot/chems.json
+new file mode 100644
+index 0000000..802c92a
+--- /dev/null
++++ b/modules/fallout/data/loot/chems.json
+@@ -0,0 +1,158 @@
++[
++  {
++    "roll": 2,
++    "id": "chem_super_stimpak"
++  },
++  {
++    "roll": 3,
++    "id": "chem_calmex"
++  },
++  {
++    "roll": 4,
++    "id": "chem_day_tripper"
++  },
++  {
++    "roll": 5,
++    "id": "chem_addictol"
++  },
++  {
++    "roll": 6,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 7,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 8,
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 9,
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 10,
++    "id": "chem_psycho"
++  },
++  {
++    "roll": 11,
++    "id": "chem_psycho"
++  },
++  {
++    "roll": 12,
++    "id": "chem_med_x"
++  },
++  {
++    "roll": 13,
++    "id": "chem_med_x"
++  },
++  {
++    "roll": 14,
++    "id": "chem_daddy_o"
++  },
++  {
++    "roll": 15,
++    "id": "chem_daddy_o"
++  },
++  {
++    "roll": 16,
++    "id": "chem_rad_x"
++  },
++  {
++    "roll": 17,
++    "id": "chem_rad_x"
++  },
++  {
++    "roll": 18,
++    "id": "chem_healing_salve"
++  },
++  {
++    "roll": 19,
++    "id": "chem_healing_salve"
++  },
++  {
++    "roll": 20,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 21,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 22,
++    "id": "drink_dirty_water"
++  },
++  {
++    "roll": 23,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 24,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 25,
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 26,
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 27,
++    "id": "chem_buffout"
++  },
++  {
++    "roll": 28,
++    "id": "chem_buffout"
++  },
++  {
++    "roll": 29,
++    "id": "chem_jet"
++  },
++  {
++    "roll": 30,
++    "id": "chem_jet"
++  },
++  {
++    "roll": 31,
++    "id": "chem_mentats"
++  },
++  {
++    "roll": 32,
++    "id": "chem_mentats"
++  },
++  {
++    "roll": 33,
++    "id": "chem_rad_x"
++  },
++  {
++    "roll": 34,
++    "id": "chem_rad_x"
++  },
++  {
++    "roll": 35,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 36,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 37,
++    "id": "chem_antibiotics"
++  },
++  {
++    "roll": 38,
++    "id": "chem_overdrive"
++  },
++  {
++    "roll": 39,
++    "id": "chem_fury"
++  },
++  {
++    "roll": 40,
++    "id": "chem_x_cell"
++  }
++]
+diff --git a/modules/fallout/data/loot/food.json b/modules/fallout/data/loot/food.json
+new file mode 100644
+index 0000000..001dab0
+--- /dev/null
++++ b/modules/fallout/data/loot/food.json
+@@ -0,0 +1,158 @@
++[
++  {
++    "roll": 2,
++    "id": "food_tarberry"
++  },
++  {
++    "roll": 3,
++    "id": "food_perfectly_preserved_pie"
++  },
++  {
++    "roll": 4,
++    "id": "food_melon"
++  },
++  {
++    "roll": 5,
++    "id": "food_carrot"
++  },
++  {
++    "roll": 6,
++    "id": "food_institute_food_packet"
++  },
++  {
++    "roll": 7,
++    "id": "food_sugar_bombs"
++  },
++  {
++    "roll": 8,
++    "id": "food_mutfruit"
++  },
++  {
++    "roll": 9,
++    "id": "food_fancy_lads_snack_cakes"
++  },
++  {
++    "roll": 10,
++    "id": "food_sweet_roll"
++  },
++  {
++    "roll": 11,
++    "id": "food_razorgrain"
++  },
++  {
++    "roll": 12,
++    "id": "food_iguana_bits"
++  },
++  {
++    "roll": 13,
++    "id": "food_cram"
++  },
++  {
++    "roll": 14,
++    "id": "food_carrot"
++  },
++  {
++    "roll": 15,
++    "id": "food_blamco_mac_and_cheese"
++  },
++  {
++    "roll": 16,
++    "id": "food_sugar_bombs"
++  },
++  {
++    "roll": 17,
++    "id": "food_canned_meat"
++  },
++  {
++    "roll": 18,
++    "id": "food_pork_n_beans"
++  },
++  {
++    "roll": 19,
++    "id": "food_instamash"
++  },
++  {
++    "roll": 20,
++    "id": "food_dandy_boy_apples"
++  },
++  {
++    "roll": 21,
++    "id": "food_dog_food"
++  },
++  {
++    "roll": 22,
++    "id": "food_fancy_lads_snack_cakes"
++  },
++  {
++    "roll": 23,
++    "id": "food_gum_drops"
++  },
++  {
++    "roll": 24,
++    "id": "food_mutfruit"
++  },
++  {
++    "roll": 25,
++    "id": "food_potato_crisps"
++  },
++  {
++    "roll": 26,
++    "id": "food_salisbury_steak"
++  },
++  {
++    "roll": 27,
++    "id": "food_yum_yum_deviled_eggs"
++  },
++  {
++    "roll": 28,
++    "id": "food_brain_fungus"
++  },
++  {
++    "roll": 29,
++    "id": "food_corn"
++  },
++  {
++    "roll": 30,
++    "id": "food_gourd"
++  },
++  {
++    "roll": 31,
++    "id": "food_melon"
++  },
++  {
++    "roll": 32,
++    "id": "food_silt_bean"
++  },
++  {
++    "roll": 33,
++    "id": "food_tato"
++  },
++  {
++    "roll": 34,
++    "id": "food_instamash"
++  },
++  {
++    "roll": 35,
++    "id": "food_salisbury_steak"
++  },
++  {
++    "roll": 36,
++    "id": "food_food_paste"
++  },
++  {
++    "roll": 37,
++    "id": "food_noodle_cup"
++  },
++  {
++    "roll": 38,
++    "id": "food_corn"
++  },
++  {
++    "roll": 39,
++    "id": "food_blamco_mac_and_cheese"
++  },
++  {
++    "roll": 40,
++    "id": "food_tarberry"
++  }
++]
+diff --git a/modules/fallout/data/loot/outcast.json b/modules/fallout/data/loot/outcast.json
+new file mode 100644
+index 0000000..3d3919b
+--- /dev/null
++++ b/modules/fallout/data/loot/outcast.json
+@@ -0,0 +1,82 @@
++[
++  {
++    "roll": 1,
++    "id": "outcast_stub_1"
++  },
++  {
++    "roll": 2,
++    "id": "outcast_stub_2"
++  },
++  {
++    "roll": 3,
++    "id": "outcast_stub_3"
++  },
++  {
++    "roll": 4,
++    "id": "chem_antibiotics"
++  },
++  {
++    "roll": 5,
++    "id": "outcast_stub_5"
++  },
++  {
++    "roll": 6,
++    "id": "outcast_stub_6"
++  },
++  {
++    "roll": 7,
++    "id": "outcast_stub_7"
++  },
++  {
++    "roll": 8,
++    "id": "item_treasure_map"
++  },
++  {
++    "roll": 9,
++    "id": "chem_stimpak"
++  },
++  {
++    "roll": 10,
++    "id": "outcast_stub_10"
++  },
++  {
++    "roll": 11,
++    "id": "outcast_stub_11"
++  },
++  {
++    "roll": 12,
++    "id": "outcast_stub_12"
++  },
++  {
++    "roll": 13,
++    "id": "outcast_stub_13"
++  },
++  {
++    "roll": 14,
++    "id": "weapon_chinese_sword"
++  },
++  {
++    "roll": 15,
++    "id": "outcast_stub_15"
++  },
++  {
++    "roll": 16,
++    "id": "chem_radaway"
++  },
++  {
++    "roll": 17,
++    "id": "outcast_stub_17"
++  },
++  {
++    "roll": 18,
++    "id": "outcast_stub_18"
++  },
++  {
++    "roll": 19,
++    "id": "outcast_stub_19"
++  },
++  {
++    "roll": 20,
++    "id": "outcast_stub_20"
++  }
++]
+diff --git a/modules/fallout/data/loot/trinkets.json b/modules/fallout/data/loot/trinkets.json
+new file mode 100644
+index 0000000..21836a2
+--- /dev/null
++++ b/modules/fallout/data/loot/trinkets.json
+@@ -0,0 +1,82 @@
++[
++  {
++    "roll": 1,
++    "id": "trinkets_stub_1"
++  },
++  {
++    "roll": 2,
++    "id": "trinkets_stub_2"
++  },
++  {
++    "roll": 3,
++    "id": "trinkets_stub_3"
++  },
++  {
++    "roll": 4,
++    "id": "trinkets_stub_4"
++  },
++  {
++    "roll": 5,
++    "id": "trinkets_stub_5"
++  },
++  {
++    "roll": 6,
++    "id": "trinkets_stub_6"
++  },
++  {
++    "roll": 7,
++    "id": "trinkets_stub_7"
++  },
++  {
++    "roll": 8,
++    "id": "trinkets_stub_8"
++  },
++  {
++    "roll": 9,
++    "id": "trinkets_stub_9"
++  },
++  {
++    "roll": 10,
++    "id": "trinkets_stub_10"
++  },
++  {
++    "roll": 11,
++    "id": "trinkets_stub_11"
++  },
++  {
++    "roll": 12,
++    "id": "trinkets_stub_12"
++  },
++  {
++    "roll": 13,
++    "id": "trinkets_stub_13"
++  },
++  {
++    "roll": 14,
++    "id": "trinkets_stub_14"
++  },
++  {
++    "roll": 15,
++    "id": "trinkets_stub_15"
++  },
++  {
++    "roll": 16,
++    "id": "trinkets_stub_16"
++  },
++  {
++    "roll": 17,
++    "id": "trinkets_stub_17"
++  },
++  {
++    "roll": 18,
++    "id": "trinkets_stub_18"
++  },
++  {
++    "roll": 19,
++    "id": "trinkets_stub_19"
++  },
++  {
++    "roll": 20,
++    "id": "trinkets_stub_20"
++  }
++]
+diff --git a/modules/fallout/data/loot/weapons_melee.json b/modules/fallout/data/loot/weapons_melee.json
+new file mode 100644
+index 0000000..44b0ff0
+--- /dev/null
++++ b/modules/fallout/data/loot/weapons_melee.json
+@@ -0,0 +1,158 @@
++[
++  {
++    "roll": 2,
++    "id": "weapon_deathclaw_gauntlet"
++  },
++  {
++    "roll": 3,
++    "id": "weapon_shishkebab"
++  },
++  {
++    "roll": 4,
++    "id": "weapon_shishkebab"
++  },
++  {
++    "roll": 5,
++    "id": "weapon_sledgehammer"
++  },
++  {
++    "roll": 6,
++    "id": "weapon_sledgehammer"
++  },
++  {
++    "roll": 7,
++    "id": "weapon_ripper"
++  },
++  {
++    "roll": 8,
++    "id": "weapon_ripper"
++  },
++  {
++    "roll": 9,
++    "id": "weapon_boxing_glove"
++  },
++  {
++    "roll": 10,
++    "id": "weapon_boxing_glove"
++  },
++  {
++    "roll": 11,
++    "id": "weapon_baton"
++  },
++  {
++    "roll": 12,
++    "id": "weapon_baton"
++  },
++  {
++    "roll": 13,
++    "id": "weapon_machete"
++  },
++  {
++    "roll": 14,
++    "id": "weapon_machete"
++  },
++  {
++    "roll": 15,
++    "id": "weapon_walking_cane"
++  },
++  {
++    "roll": 16,
++    "id": "weapon_walking_cane"
++  },
++  {
++    "roll": 17,
++    "id": "weapon_pool_cue"
++  },
++  {
++    "roll": 18,
++    "id": "weapon_pool_cue"
++  },
++  {
++    "roll": 19,
++    "id": "weapon_switchblade"
++  },
++  {
++    "roll": 20,
++    "id": "weapon_switchblade"
++  },
++  {
++    "roll": 21,
++    "id": "weapon_board"
++  },
++  {
++    "roll": 22,
++    "id": "weapon_board"
++  },
++  {
++    "roll": 23,
++    "id": "weapon_lead_pipe"
++  },
++  {
++    "roll": 24,
++    "id": "weapon_lead_pipe"
++  },
++  {
++    "roll": 25,
++    "id": "weapon_rolling_pin"
++  },
++  {
++    "roll": 26,
++    "id": "weapon_rolling_pin"
++  },
++  {
++    "roll": 27,
++    "id": "weapon_pipe_wrench"
++  },
++  {
++    "roll": 28,
++    "id": "weapon_pipe_wrench"
++  },
++  {
++    "roll": 29,
++    "id": "weapon_knuckles"
++  },
++  {
++    "roll": 30,
++    "id": "weapon_knuckles"
++  },
++  {
++    "roll": 31,
++    "id": "weapon_tire_iron"
++  },
++  {
++    "roll": 32,
++    "id": "weapon_tire_iron"
++  },
++  {
++    "roll": 33,
++    "id": "weapon_sword"
++  },
++  {
++    "roll": 34,
++    "id": "weapon_sword"
++  },
++  {
++    "roll": 35,
++    "id": "weapon_baseball_bat_aluminum"
++  },
++  {
++    "roll": 36,
++    "id": "weapon_baseball_bat_aluminum"
++  },
++  {
++    "roll": 37,
++    "id": "weapon_power_fist"
++  },
++  {
++    "roll": 38,
++    "id": "weapon_power_fist"
++  },
++  {
++    "roll": 39,
++    "id": "weapon_super_sledge"
++  },
++  {
++    "roll": 40,
++    "id": "weapon_super_sledge"
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/loot/stubs.json b/modules/fallout/i18n/en-EN/data/loot/stubs.json
+new file mode 100644
+index 0000000..2e52cf8
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/loot/stubs.json
+@@ -0,0 +1,150 @@
++[
++  {
++    "id": "item_treasure_map",
++    "name": "Treasure Map of an Old World Survivalist Cache"
++  },
++  {
++    "id": "outcast_stub_1",
++    "name": "Elite Toolkit"
++  },
++  {
++    "id": "outcast_stub_10",
++    "name": "Combat Bracer"
++  },
++  {
++    "id": "outcast_stub_11",
++    "name": "Combat Greave"
++  },
++  {
++    "id": "outcast_stub_12",
++    "name": "Sensor Array"
++  },
++  {
++    "id": "outcast_stub_13",
++    "name": "Small Backpack"
++  },
++  {
++    "id": "outcast_stub_15",
++    "name": "Laser Musket"
++  },
++  {
++    "id": "outcast_stub_17",
++    "name": "Combat Shotgun"
++  },
++  {
++    "id": "outcast_stub_18",
++    "name": "Power Fist"
++  },
++  {
++    "id": "outcast_stub_19",
++    "name": "Sturdy Combat Helmet"
++  },
++  {
++    "id": "outcast_stub_2",
++    "name": "Flashlight"
++  },
++  {
++    "id": "outcast_stub_20",
++    "name": "Pip-Boy"
++  },
++  {
++    "id": "outcast_stub_3",
++    "name": "Copy of \"Fixing Things\" Magazine"
++  },
++  {
++    "id": "outcast_stub_5",
++    "name": "Bobby Pin"
++  },
++  {
++    "id": "outcast_stub_6",
++    "name": "Radio"
++  },
++  {
++    "id": "outcast_stub_7",
++    "name": "Combat Chest Piece"
++  },
++  {
++    "id": "trinkets_stub_1",
++    "name": "Gold Pocket Watch"
++  },
++  {
++    "id": "trinkets_stub_10",
++    "name": "Engraved Lighter"
++  },
++  {
++    "id": "trinkets_stub_11",
++    "name": "Loaded Dice"
++  },
++  {
++    "id": "trinkets_stub_12",
++    "name": "Identification Card"
++  },
++  {
++    "id": "trinkets_stub_13",
++    "name": "Cosmetics Bag"
++  },
++  {
++    "id": "trinkets_stub_14",
++    "name": "Musical Instrument"
++  },
++  {
++    "id": "trinkets_stub_15",
++    "name": "Broken Glasses"
++  },
++  {
++    "id": "trinkets_stub_16",
++    "name": "Junk Necklace"
++  },
++  {
++    "id": "trinkets_stub_17",
++    "name": "Pages of an Unfinished Story"
++  },
++  {
++    "id": "trinkets_stub_18",
++    "name": "Overdue Book"
++  },
++  {
++    "id": "trinkets_stub_19",
++    "name": "Postcard with an Address"
++  },
++  {
++    "id": "trinkets_stub_2",
++    "name": "Glitched Holotape"
++  },
++  {
++    "id": "trinkets_stub_20",
++    "name": "Pre-War Tie"
++  },
++  {
++    "id": "trinkets_stub_3",
++    "name": "Bright Bandana"
++  },
++  {
++    "id": "trinkets_stub_4",
++    "name": "Silver Locket"
++  },
++  {
++    "id": "trinkets_stub_5",
++    "name": "Medal"
++  },
++  {
++    "id": "trinkets_stub_6",
++    "name": "Potted Plant"
++  },
++  {
++    "id": "trinkets_stub_7",
++    "name": "Tickets to a Pre-War Event"
++  },
++  {
++    "id": "trinkets_stub_8",
++    "name": "Wedding Ring"
++  },
++  {
++    "id": "trinkets_stub_9",
++    "name": "Invitation to a Pre-War Party"
++  },
++  {
++    "id": "weapon_chinese_sword",
++    "name": "Sword"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/loot/stubs.json b/modules/fallout/i18n/ru-RU/data/loot/stubs.json
+new file mode 100644
+index 0000000..f3ef81c
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/loot/stubs.json
+@@ -0,0 +1,150 @@
++[
++  {
++    "id": "item_treasure_map",
++    "name": "Карта с тайником выживальщиков старого мира"
++  },
++  {
++    "id": "outcast_stub_1",
++    "name": "Элитный набор инструментов"
++  },
++  {
++    "id": "outcast_stub_10",
++    "name": "Боевой Наруч"
++  },
++  {
++    "id": "outcast_stub_11",
++    "name": "Боевой Понож"
++  },
++  {
++    "id": "outcast_stub_12",
++    "name": "Массив сенсоров"
++  },
++  {
++    "id": "outcast_stub_13",
++    "name": "Рюкзак маленький"
++  },
++  {
++    "id": "outcast_stub_15",
++    "name": "Лазерный Мушкет"
++  },
++  {
++    "id": "outcast_stub_17",
++    "name": "Боевой дробовик"
++  },
++  {
++    "id": "outcast_stub_18",
++    "name": "Силовой кулак"
++  },
++  {
++    "id": "outcast_stub_19",
++    "name": "Прочный Боевой Шлем"
++  },
++  {
++    "id": "outcast_stub_2",
++    "name": "Фонарик"
++  },
++  {
++    "id": "outcast_stub_20",
++    "name": "Пип-Бой"
++  },
++  {
++    "id": "outcast_stub_3",
++    "name": "Копия журнала \"Чиним вещи\""
++  },
++  {
++    "id": "outcast_stub_5",
++    "name": "Заколка"
++  },
++  {
++    "id": "outcast_stub_6",
++    "name": "Радио"
++  },
++  {
++    "id": "outcast_stub_7",
++    "name": "Боевой Нагрудник"
++  },
++  {
++    "id": "trinkets_stub_1",
++    "name": "Золотые карманные часы"
++  },
++  {
++    "id": "trinkets_stub_10",
++    "name": "Зажигалка с гравировкой"
++  },
++  {
++    "id": "trinkets_stub_11",
++    "name": "Шулерские кости"
++  },
++  {
++    "id": "trinkets_stub_12",
++    "name": "Удостоверение личности"
++  },
++  {
++    "id": "trinkets_stub_13",
++    "name": "Косметичка"
++  },
++  {
++    "id": "trinkets_stub_14",
++    "name": "Музыкальный инструмент"
++  },
++  {
++    "id": "trinkets_stub_15",
++    "name": "Разбитые очки"
++  },
++  {
++    "id": "trinkets_stub_16",
++    "name": "Ожерелье из хлама"
++  },
++  {
++    "id": "trinkets_stub_17",
++    "name": "Страницы неоконченной истории"
++  },
++  {
++    "id": "trinkets_stub_18",
++    "name": "Невозвращенная книга"
++  },
++  {
++    "id": "trinkets_stub_19",
++    "name": "Открытка с адресом"
++  },
++  {
++    "id": "trinkets_stub_2",
++    "name": "Заглючивший голодиск"
++  },
++  {
++    "id": "trinkets_stub_20",
++    "name": "Довоенный галстук"
++  },
++  {
++    "id": "trinkets_stub_3",
++    "name": "Яркая бандана"
++  },
++  {
++    "id": "trinkets_stub_4",
++    "name": "Серебряный медальон"
++  },
++  {
++    "id": "trinkets_stub_5",
++    "name": "Медаль"
++  },
++  {
++    "id": "trinkets_stub_6",
++    "name": "Горшечное растение"
++  },
++  {
++    "id": "trinkets_stub_7",
++    "name": "Билеты на довоенное мероприятие"
++  },
++  {
++    "id": "trinkets_stub_8",
++    "name": "Обручальное кольцо"
++  },
++  {
++    "id": "trinkets_stub_9",
++    "name": "Приглашение на довоенную тусовку"
++  },
++  {
++    "id": "weapon_chinese_sword",
++    "name": "Меч"
++  }
++]

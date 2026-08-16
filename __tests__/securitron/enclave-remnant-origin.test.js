@@ -25,8 +25,8 @@ vi.mock('../../db/Database', async () => {
 });
 
 import { getOrigins, getTraits, getOriginI18n, getTraitI18n, getEquipmentCatalogForLocale } from '../../domain/registry';
-import moduleOrigins from '../../modules/fallout/data/origins.json';
-import moduleTraits from '../../modules/fallout/data/traits.json';
+import moduleOrigins from '../../modules/fallout/data/origins/origins.json';
+import moduleTraits from '../../modules/fallout/data/traits/traits.json';
 
 const ORIGIN_ID = 'enclaveRemnant';
 const TRAIT_ID = 'enclaveRemnant-hidden';

@@ -15,26 +15,26 @@ import { getCurrentLocale } from '../../../../i18n/locale';
 // ---------------------------------------------------------------------------
 // Static data imports — raw stats
 // ---------------------------------------------------------------------------
-import dataRobotArms from '../../../../data/equipment/robot/robotarms.json';
-import dataRobotHeads from '../../../../data/equipment/robot/robotheads.json';
-import dataRobotBody  from '../../../../data/equipment/robot/robotbody.json';
-import dataRobotLegs  from '../../../../data/equipment/robot/robotlegs.json';
-import dataRobotWeapons from '../../../../data/equipment/robot/weapons.json';
+import dataRobotArms from '../../../../modules/fallout/data/equipment/robot/robotarms.json';
+import dataRobotHeads from '../../../../modules/fallout/data/equipment/robot/robotheads.json';
+import dataRobotBody  from '../../../../modules/fallout/data/equipment/robot/robotbody.json';
+import dataRobotLegs  from '../../../../modules/fallout/data/equipment/robot/robotlegs.json';
+import dataRobotWeapons from '../../../../modules/fallout/data/equipment/robot/weapons.json';
 
 // ---------------------------------------------------------------------------
 // i18n imports
 // ---------------------------------------------------------------------------
-import ruRobotArms from '../../../../i18n/ru-RU/data/equipment/robot/robotarms.json';
-import ruRobotHeads from '../../../../i18n/ru-RU/data/equipment/robot/robotheads.json';
-import ruRobotBody  from '../../../../i18n/ru-RU/data/equipment/robot/robotbody.json';
-import ruRobotLegs  from '../../../../i18n/ru-RU/data/equipment/robot/robotlegs.json';
-import ruRobotWeapons from '../../../../i18n/ru-RU/data/equipment/robot/weapons.json';
+import ruRobotArms from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
+import ruRobotHeads from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
+import ruRobotBody  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+import ruRobotLegs  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
+import ruRobotWeapons from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
 
-import enRobotArms from '../../../../i18n/en-EN/data/equipment/robot/robotarms.json';
-import enRobotHeads from '../../../../i18n/en-EN/data/equipment/robot/robotheads.json';
-import enRobotBody  from '../../../../i18n/en-EN/data/equipment/robot/robotbody.json';
-import enRobotLegs  from '../../../../i18n/en-EN/data/equipment/robot/robotlegs.json';
-import enRobotWeapons from '../../../../i18n/en-EN/data/equipment/robot/weapons.json';
+import enRobotArms from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
+import enRobotHeads from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
+import enRobotBody  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+import enRobotLegs  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
+import enRobotWeapons from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 

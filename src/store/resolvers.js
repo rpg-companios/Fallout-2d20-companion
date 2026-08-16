@@ -104,6 +104,7 @@ import {
 import {
   getTimedMaxHpBonus,
   getTimedDamageResistanceBonus,
+  getTimedDefenseBonus,
 } from '../../domain/effects.js';
 
 import { effectsDictToLegacyArray } from './effectsSync.js';
@@ -112,7 +113,7 @@ import { effectsDictToLegacyArray } from './effectsSync.js';
 // К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
 // атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
 import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
-import dataPowerArmor from '../../data/equipment/powerArmor.json';
+import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
 
 const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
 
@@ -185,8 +186,16 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
   stats.initiative.base = calculateInitiative(attributesEffective);
   stats.initiative.total = calculateAttributeTotal(stats.initiative);
   
-  // Defense: AGI >= 9 ? 2 : 1
+  // Defense: AGI >= 9 ? 2 : 1 (+ бонусы timed-эффектов, напр. Стелс-бой +2)
   stats.defense.base = calculateDefense(attributesEffective);
+  const defenseBonus = getTimedDefenseBonus(effectsArray);
+  if (defenseBonus !== 0) {
+    stats.defense.modifiers.push({
+      source: 'timedEffects',
+      value: defenseBonus,
+      operation: '+',
+    });
+  }
   stats.defense.total = calculateAttributeTotal(stats.defense);
   
   // Melee Bonus: STR-based
@@ -295,6 +304,22 @@ export const applyEffectToStats = (stats, effect) => {
         updatedStats.damageResistance[type]
       );
     }
+  }
+
+  if (effect.defenseModifier) {
+    const mod = effect.defenseModifier;
+    if (!updatedStats.defense) {
+      updatedStats.defense = { base: 0, modifiers: [], total: 0 };
+    }
+    updatedStats.defense.modifiers = [
+      ...(updatedStats.defense.modifiers || []),
+      {
+        source: effect.id,
+        value: Number(mod.value) || 0,
+        operation: mod.op || '+',
+      },
+    ];
+    updatedStats.defense.total = calculateAttributeTotal(updatedStats.defense);
   }
   
   return updatedStats;

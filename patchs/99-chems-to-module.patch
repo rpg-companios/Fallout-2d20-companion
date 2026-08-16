@@ -1,0 +1,1587 @@
+diff --git a/__tests__/consumables/magazines-diseases-contract.test.js b/__tests__/consumables/magazines-diseases-contract.test.js
+index bdfad60..9852f6d 100644
+--- a/__tests__/consumables/magazines-diseases-contract.test.js
++++ b/__tests__/consumables/magazines-diseases-contract.test.js
+@@ -174,7 +174,7 @@ describe('diseases data contract', () => {
+   });
+ 
+   it('точка сопряжения с антибиотиками: идентификатор состояния diseased документирован каталогом', () => {
+-    // chem_antibiotics снимает состояние "diseased" (data/consumables/chems.json),
++    // chem_antibiotics снимает состояние "diseased" (modules/fallout/data/consumables/chems.json),
+     // каталог болезней — его контент. Проверяем, что heal-вектор данных на месте.
+     expect(moduleDiseases.every((d) => d.id.startsWith('disease_'))).toBe(true);
+   });
+diff --git a/__tests__/securitron/chems-module-move.test.js b/__tests__/securitron/chems-module-move.test.js
+new file mode 100644
+index 0000000..ab3ad96
+--- /dev/null
++++ b/__tests__/securitron/chems-module-move.test.js
+@@ -0,0 +1,42 @@
++/**
++ * Разделение движок/сеттинг (патч 99): химка перенесена в модуль ЦЕЛИКОМ
++ * (полные записи + i18n-имена обеих локалей) с КАНОНИЗАЦИЕЙ itemType
++ * ('chems' → 'chem'). data/ и легаси-i18n для химки — пустые движковые
++ * базы. Каталог отдаёт расходники без нормализующего валидатора.
++ */
++import { describe, it, expect, beforeAll } from 'vitest';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { setCurrentLocale } from '../../i18n/locale';
++import moduleChems from '../../modules/fallout/data/consumables/chems.json';
++import moduleRuChems from '../../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
++import moduleEnChems from '../../modules/fallout/i18n/en-EN/data/consumables/chems.json';
++import dataChems from '../../data/consumables/chems.json';
++import legacyRuChems from '../../i18n/ru-RU/data/consumables/chems.json';
++import legacyEnChems from '../../i18n/en-EN/data/consumables/chems.json';
++
++describe('Химка в модуле (сеттинг), data/ — пустой движок', () => {
++  beforeAll(() => setCurrentLocale('ru-RU'));
++
++  it('модуль содержит полные записи в каноническом виде (itemType: chem)', () => {
++    expect(moduleChems.length).toBe(32);
++    expect(moduleChems[0]).toHaveProperty('positiveEffect');
++    for (const chem of moduleChems) {
++      expect(chem.itemType).toBe('chem');
++    }
++    expect(moduleRuChems).toHaveLength(32);
++    expect(moduleEnChems).toHaveLength(32);
++  });
++
++  it('data/ и легаси-i18n для химки пусты (движок без сеттинга)', () => {
++    expect(dataChems).toEqual([]);
++    expect(legacyRuChems).toEqual([]);
++    expect(legacyEnChems).toEqual([]);
++  });
++
++  it('каталог отдаёт химку из модуля с именами, без нормализации', () => {
++    const catalog = getEquipmentCatalog('ru-RU');
++    expect(catalog.chems.length).toBe(32);
++    expect(catalog.chems.find((c) => c.id === 'chem_stimpak').name).toBe('Стимулятор');
++    expect(catalog.chems.every((c) => c.itemType === 'chem')).toBe(true);
++  });
++});
+diff --git a/data/consumables/chems.json b/data/consumables/chems.json
+index 9c30543..fe51488 100644
+--- a/data/consumables/chems.json
++++ b/data/consumables/chems.json
+@@ -1,399 +1 @@
+-[
+-  {
+-    "id": "chem_addictol",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 125,
+-    "rarity": 3,
+-    "positiveEffect": { "removeCondition": ["addicted"] },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_antibiotics",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 75,
+-    "rarity": 3,
+-    "positiveEffect": { "removeCondition": ["diseased"] },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_healing_salve",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 20,
+-    "rarity": 1,
+-    "positiveEffect": { "hpModifier": { "op": "+", "value": 2 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_skeeto_spit",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 40,
+-    "rarity": 2,
+-    "positiveEffect": { "maxHpModifier": { "op": "+", "value": 2 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_stimpak",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 2,
+-    "positiveEffect": { "hpModifier": { "op": "+", "value": 5 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_stimpak_diluted",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 30,
+-    "rarity": 1,
+-    "positiveEffect": { "hpModifier": { "op": "+", "value": 2 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_super_stimpak",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 90,
+-    "rarity": 4,
+-    "positiveEffect": { "hpModifier": { "op": "+", "value": 8 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_radaway",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 80,
+-    "rarity": 2,
+-    "positiveEffect": { "radiationModifier": { "op": "-", "value": 4 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_radaway_diluted",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 1,
+-    "positiveEffect": { "radiationModifier": { "op": "-", "value": 2 } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "instant",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_rad_x",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 40,
+-    "rarity": 2,
+-    "positiveEffect": { "damageResistanceModifier": { "radiation": { "op": "+", "value": 6 } } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_rad_x_diluted",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 25,
+-    "rarity": 1,
+-    "positiveEffect": { "damageResistanceModifier": { "radiation": { "op": "+", "value": 3 } } },
+-    "negativeEffect": "",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 0
+-  },
+-  {
+-    "id": "chem_buffjet",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 75,
+-    "rarity": 4,
+-    "positiveEffect": { "maxHpModifier": { "op": "+", "value": 4 }, "apModifier": { "op": "+", "value": 3 } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "brief",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_buffout",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 45,
+-    "rarity": 2,
+-    "positiveEffect": { "maxHpModifier": { "op": "+", "value": 3 } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_bufftats",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 75,
+-    "rarity": 4,
+-    "positiveEffect": { "maxHpModifier": { "op": "+", "value": 4 } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_calmex",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 100,
+-    "rarity": 4,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_daddy_o",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 2,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_day_tripper",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 40,
+-    "rarity": 3,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_fury",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 30,
+-    "rarity": 4,
+-    "positiveEffect": { "damageResistanceModifier": { "physical": { "op": "+", "value": 3 } } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_jet",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 2,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "brief",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_jet_fuel",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 60,
+-    "rarity": 3,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_med_x",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 2,
+-    "positiveEffect": { "damageResistanceModifier": { "physical": { "op": "+", "value": 3 } } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_mentats",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 2,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 3
+-  },
+-  {
+-    "id": "chem_mentats_berry",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 60,
+-    "rarity": 3,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_mentats_orange",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 60,
+-    "rarity": 3,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_mentats_grape",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 60,
+-    "rarity": 3,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_overdrive",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 55,
+-    "rarity": 3,
+-    "positiveEffect": { "damageModifier": { "op": "+", "value": 3 } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_psycho",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 50,
+-    "rarity": 2,
+-    "positiveEffect": {
+-      "damageModifier": { "op": "+", "value": 2 },
+-      "damageResistanceModifier": { "physical": { "op": "+", "value": 3 } }
+-    },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 2
+-  },
+-  {
+-    "id": "chem_psychobuff",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 70,
+-    "rarity": 4,
+-    "positiveEffect": {
+-      "damageModifier": { "op": "+", "value": 2 },
+-      "maxHpModifier": { "op": "+", "value": 4 }
+-    },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_psycho_jet",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 70,
+-    "rarity": 4,
+-    "positiveEffect": {
+-      "damageModifier": { "op": "+", "value": 2 },
+-      "damageResistanceModifier": { "physical": { "op": "+", "value": 4 } },
+-      "apModifier": { "op": "+", "value": 4 }
+-    },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "brief",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_psychotats",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 70,
+-    "rarity": 4,
+-    "positiveEffect": {
+-      "damageModifier": { "op": "+", "value": 2 },
+-      "damageResistanceModifier": { "physical": { "op": "+", "value": 2 } }
+-    },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  },
+-  {
+-    "id": "chem_ultra_jet",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 67,
+-    "rarity": 2,
+-    "positiveEffect": { "apModifier": { "op": "+", "value": 6 } },
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "brief",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 3
+-  },
+-  {
+-    "id": "chem_x_cell",
+-    "itemType": "chems",
+-    "weight": 0.5,
+-    "cost": 60,
+-    "rarity": 4,
+-    "positiveEffect": {},
+-    "negativeEffect": "addiction",
+-    "positiveEffectDuration": "lasting",
+-    "negativeEffectDuration": "",
+-    "addictionLevel": 1
+-  }
+-]
++[]
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index c23aa40..00dcbac 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -43,6 +43,7 @@ modules/fallout/
+ | uniq_qualities | 3 | 0 (`[]`) | патч 65 |
+ | equipmentKits | 41 (15 файлов) | — | патчи 74–75 |
+ | diseases | 20 | 0 (`[]`) | патч 98 |
++| chems | 32 (`itemType: 'chem'`) | 0 (`[]`) | патч 99 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -71,7 +72,6 @@ modules/fallout/
+ | Журналы | `data/consumables/magazines.json` | 95 |
+ | Броня | `data/equipment/armor.json` | 56 |
+ | Патроны | `data/equipment/ammo.json` | 42 |
+-| Химка | `data/consumables/chems.json` | 32 |
+ | Моды брони | `data/equipment/armor_mods.json` | 15 |
+ | Уник. моды брони | `data/equipment/uniq_armor_mods.json` | 22 |
+ | Эффекты брони | `data/equipment/armor_effects.json` | словарь |
+@@ -108,7 +108,7 @@ modules/fallout/
+ | Место | Механизм |
+ |---|---|
+ | `domain/registry.js` | `mergeArraysById` (module > base), `deepMerge` — база как фолбэк модуля |
+-| `i18n/equipmentCatalog.js` | `mergeById`/`mergeAmmoById` (data + i18n), `flattenArmorGroups` (нормализация формата брони), `validateConsumablesContract` (itemType `chems`→`chem`, fallbackType) |
++| `i18n/equipmentCatalog.js` | `mergeById`/`mergeAmmoById` (data + i18n), `flattenArmorGroups` (нормализация формата брони), `validateConsumablesContract` (fallbackType; остался только для журналов, уйдёт с патчем 100) |
+ | `db/catalogSource.js` | `ROBOT_WEAPON_BASE_MAP` (алиасы робо-оружия), `localizedById || ruById` для перков |
+ | `domain/packMerge.js` | `expandTrueItems` — разворачивание вариантов из базы |
+ 
+diff --git a/i18n/en-EN/data/consumables/chems.json b/i18n/en-EN/data/consumables/chems.json
+index 6c3b3df..fe51488 100644
+--- a/i18n/en-EN/data/consumables/chems.json
++++ b/i18n/en-EN/data/consumables/chems.json
+@@ -1,34 +1 @@
+-[
+-  { "id": "chem_addictol", "name": "Addictol", "positiveEffectLabel": "Removes addiction", "negativeEffectLabel": "" },
+-  { "id": "chem_antibiotics", "name": "Antibiotics", "positiveEffectLabel": "Removes disease", "negativeEffectLabel": "" },
+-  { "id": "chem_healing_salve", "name": "Healing Salve", "positiveEffectLabel": "Restores 2 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_skeeto_spit", "name": "Skeeto Spit", "positiveEffectLabel": "+2 Max HP", "negativeEffectLabel": "" },
+-  { "id": "chem_stimpak", "name": "Stimpak", "positiveEffectLabel": "Restores 5 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_stimpak_diluted", "name": "Stimpak (Diluted)", "positiveEffectLabel": "Restores 2 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_super_stimpak", "name": "Super Stimpak", "positiveEffectLabel": "Restores 8 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_radaway", "name": "RadAway", "positiveEffectLabel": "Removes 4 radiation", "negativeEffectLabel": "" },
+-  { "id": "chem_radaway_diluted", "name": "RadAway (Diluted)", "positiveEffectLabel": "Removes 2 radiation", "negativeEffectLabel": "" },
+-  { "id": "chem_rad_x", "name": "Rad-X", "positiveEffectLabel": "+6 radiation resistance", "negativeEffectLabel": "" },
+-  { "id": "chem_rad_x_diluted", "name": "Rad-X (Diluted)", "positiveEffectLabel": "+3 radiation resistance", "negativeEffectLabel": "" },
+-  { "id": "chem_buffjet", "name": "Buffjet", "positiveEffectLabel": "STR/END difficulty -1 (min 0), additional actions cost 1 AP less", "negativeEffectLabel": "Addiction: Buffjet" },
+-  { "id": "chem_buffout", "name": "Buffout", "positiveEffectLabel": "Reroll 1d20 on all STR and END tests", "negativeEffectLabel": "Addiction: Buffout" },
+-  { "id": "chem_bufftats", "name": "Bufftats", "positiveEffectLabel": "STR/PER/END difficulty -1 (min 0)", "negativeEffectLabel": "Addiction: Bufftats" },
+-  { "id": "chem_calmex", "name": "Calmex", "positiveEffectLabel": "Reroll 1d20 on PER and AGI tests, +2 {/CD} sneak attack damage", "negativeEffectLabel": "Addiction: Calmex" },
+-  { "id": "chem_daddy_o", "name": "Daddy-O", "positiveEffectLabel": "PER/INT difficulty -1 (min 0), CHA difficulty +1", "negativeEffectLabel": "Addiction: Daddy-O" },
+-  { "id": "chem_day_tripper", "name": "Day Tripper", "positiveEffectLabel": "CHA and LCK(CHA) difficulty -1 (min 0), STR difficulty +1", "negativeEffectLabel": "Addiction: Day Tripper" },
+-  { "id": "chem_fury", "name": "Fury", "positiveEffectLabel": "PER difficulty +2", "negativeEffectLabel": "Addiction: Fury" },
+-  { "id": "chem_jet", "name": "Jet", "positiveEffectLabel": "Additional actions cost 1 AP less", "negativeEffectLabel": "Addiction: Jet" },
+-  { "id": "chem_jet_fuel", "name": "Jet Fuel", "positiveEffectLabel": "Gain 1 free AP at the start of each turn", "negativeEffectLabel": "Addiction: Jet Fuel" },
+-  { "id": "chem_med_x", "name": "Med-X", "positiveEffectLabel": "+3 physical resistance", "negativeEffectLabel": "Addiction: Med-X" },
+-  { "id": "chem_mentats", "name": "Mentats", "positiveEffectLabel": "Reroll 1d20 on PER and INT tests", "negativeEffectLabel": "Addiction: Mentats" },
+-  { "id": "chem_mentats_berry", "name": "Berry Mentats", "positiveEffectLabel": "INT difficulty -2 (min 0)", "negativeEffectLabel": "Addiction: Berry Mentats" },
+-  { "id": "chem_mentats_orange", "name": "Orange Mentats", "positiveEffectLabel": "PER difficulty -2 (min 0), aim minor action rerolls 1 extra d20", "negativeEffectLabel": "Addiction: Orange Mentats" },
+-  { "id": "chem_mentats_grape", "name": "Grape Mentats", "positiveEffectLabel": "CHA difficulty -2 (min 0), reroll 1d20 on Barter tests", "negativeEffectLabel": "Addiction: Grape Mentats" },
+-  { "id": "chem_overdrive", "name": "Overdrive", "positiveEffectLabel": "Reroll up to 3 {/CD} per damage roll", "negativeEffectLabel": "Addiction: Overdrive" },
+-  { "id": "chem_psycho", "name": "Psycho", "positiveEffectLabel": "+2 damage, +3 physical resistance", "negativeEffectLabel": "Addiction: Psycho" },
+-  { "id": "chem_psychobuff", "name": "Psychobuff", "positiveEffectLabel": "STR/END difficulty -1 (min 0)", "negativeEffectLabel": "Addiction: Psychobuff" },
+-  { "id": "chem_psycho_jet", "name": "Psycho Jet", "positiveEffectLabel": "+2 damage, +4 physical resistance, +4 AP", "negativeEffectLabel": "Addiction: Psycho Jet" },
+-  { "id": "chem_psychotats", "name": "Psychotats", "positiveEffectLabel": "PER difficulty -1 (min 0)", "negativeEffectLabel": "Addiction: Psychotats" },
+-  { "id": "chem_ultra_jet", "name": "Ultra Jet", "positiveEffectLabel": "Additional actions cost 1 AP less", "negativeEffectLabel": "Addiction: Ultra Jet" },
+-  { "id": "chem_x_cell", "name": "X-Cell", "positiveEffectLabel": "First purchased d20 on all tests is free", "negativeEffectLabel": "Addiction: X-Cell" }
+-]
++[]
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index f5d743f..401e96b 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -76,6 +76,8 @@ import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/foo
+ import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+ import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+ import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
++import moduleRuChemsI18n from '../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
++import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/chems.json';
+ // Locale-independent technical data (stats, ids, game mechanics)
+ import dataWeapons from '../data/equipment/weapons.json';
+ import dataArmor from '../data/equipment/armor.json';
+@@ -86,11 +88,11 @@ import dataClothes from '../data/equipment/clothes.json';
+ import moduleClothesData from '../modules/fallout/data/equipment/clothes.json';
+ import moduleFood from '../modules/fallout/data/consumables/food.json';
+ import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
++import moduleChems from '../modules/fallout/data/consumables/chems.json';
+ import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+ import dataPowerArmor from '../data/equipment/powerArmor.json';
+ import dataAmmo from '../data/equipment/ammo.json';
+ import dataRobotParts from '../data/equipment/robotparts.json';
+-import dataChems from '../data/consumables/chems.json';
+ import dataMagazines from '../data/consumables/magazines.json';
+ import dataWeaponModSlots from '../data/equipment/weapon_mod_slots.json';
+ import dataRobotBody from '../data/equipment/robot/robotbody.json';
+@@ -123,6 +125,7 @@ const moduleRuI18n = {
+   weaponMods: moduleRuWeaponModsI18n,
+   food: moduleRuFoodI18n,
+   drinks: moduleRuDrinksI18n,
++  chems: moduleRuChemsI18n,
+ };
+ 
+ const moduleEnI18n = {
+@@ -135,6 +138,7 @@ const moduleEnI18n = {
+   weaponMods: moduleEnWeaponModsI18n,
+   food: moduleEnFoodI18n,
+   drinks: moduleEnDrinksI18n,
++  chems: moduleEnChemsI18n,
+ };
+ 
+ const ALL_KIT_DATA = {
+@@ -258,8 +262,7 @@ const validateConsumablesContract = (items, allowedTypes, fallbackType) => {
+   return items
+     .filter((item) => item && typeof item === 'object')
+     .map((item) => {
+-      const normalizedType = item.itemType === 'chems' ? 'chem' : item.itemType;
+-      const finalType = allowedTypes.includes(normalizedType) ? normalizedType : fallbackType;
++      const finalType = allowedTypes.includes(item.itemType) ? item.itemType : fallbackType;
+       return { ...item, itemType: finalType };
+     })
+     .filter((item) => typeof item.name === 'string' && allowedTypes.includes(item.itemType));
+@@ -391,7 +394,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+ 
+   // Consumables
+   const mergedAmmo = mergeAmmoById(dataAmmo, i18n.ammoTypes);
+-  const mergedChems = mergeById(dataChems, i18n.chems);
++  const mergedChems = mergeById(moduleChems, moduleI18n.chems);
+   const mergedDrinks = mergeById(moduleDrinks, moduleI18n.drinks);
+   const mergedFood = mergeById(moduleFood, moduleI18n.food);
+   const mergedMagazines = mergeById(dataMagazines, i18n.magazines);
+@@ -436,9 +439,9 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+     powerArmorRaw: dataPowerArmor,
+     clothes: { clothes: allClothesGroups },
+     ammoTypes: mergedAmmo,
+-    chems: validateConsumablesContract(mergedChems, ['chem'], 'chem'),
+-    drinks: validateConsumablesContract(mergedDrinks, ['drinks'], 'drinks'),
+-    food: validateConsumablesContract(mergedFood, ['food'], 'food'),
++    chems: mergedChems,
++    drinks: mergedDrinks,
++    food: mergedFood,
+     magazines: validateConsumablesContract(mergedMagazines, ['magazine'], 'magazine'),
+     generalGoods: mergedGeneralGoods,
+     oddities: mergedOddities,
+diff --git a/i18n/ru-RU/data/consumables/chems.json b/i18n/ru-RU/data/consumables/chems.json
+index d21aa3b..fe51488 100644
+--- a/i18n/ru-RU/data/consumables/chems.json
++++ b/i18n/ru-RU/data/consumables/chems.json
+@@ -1,34 +1 @@
+-[
+-  { "id": "chem_addictol", "name": "Аддиктол", "positiveEffectLabel": "Снимает зависимость", "negativeEffectLabel": "" },
+-  { "id": "chem_antibiotics", "name": "Антибиотики", "positiveEffectLabel": "Снимает болезнь", "negativeEffectLabel": "" },
+-  { "id": "chem_healing_salve", "name": "Лечебная мазь", "positiveEffectLabel": "Восстанавливает 2 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_skeeto_spit", "name": "Слюна кровокрыса", "positiveEffectLabel": "+2 к максимуму HP", "negativeEffectLabel": "" },
+-  { "id": "chem_stimpak", "name": "Стимулятор", "positiveEffectLabel": "Восстанавливает 5 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_stimpak_diluted", "name": "Стимулятор (разбавленный)", "positiveEffectLabel": "Восстанавливает 2 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_super_stimpak", "name": "Суперстимулятор", "positiveEffectLabel": "Восстанавливает 8 HP", "negativeEffectLabel": "" },
+-  { "id": "chem_radaway", "name": "Рад-авэй", "positiveEffectLabel": "Убирает 4 радиации", "negativeEffectLabel": "" },
+-  { "id": "chem_radaway_diluted", "name": "Рад-авэй (разбавленный)", "positiveEffectLabel": "Убирает 2 радиации", "negativeEffectLabel": "" },
+-  { "id": "chem_rad_x", "name": "Рад-икс", "positiveEffectLabel": "+6 защиты от радиации", "negativeEffectLabel": "" },
+-  { "id": "chem_rad_x_diluted", "name": "Рад-икс (разбавленный)", "positiveEffectLabel": "+3 защиты от радиации", "negativeEffectLabel": "" },
+-  { "id": "chem_buffjet", "name": "Баффвинт", "positiveEffectLabel": "Сложность проверок СИЛ/ВЫН -1 (мин. 0), дополнительные действия стоят на 1 ОД меньше", "negativeEffectLabel": "Зависимость: Баффвинт" },
+-  { "id": "chem_buffout", "name": "Баффаут", "positiveEffectLabel": "Переброс 1d20 на всех проверках СИЛ и ВЫН", "negativeEffectLabel": "Зависимость: Баффаут" },
+-  { "id": "chem_bufftats", "name": "Баффтаты", "positiveEffectLabel": "Сложность проверок СИЛ/ВСП/ВЫН -1 (мин. 0)", "negativeEffectLabel": "Зависимость: Баффтаты" },
+-  { "id": "chem_calmex", "name": "Калмекс", "positiveEffectLabel": "Переброс 1d20 на проверках ВСП и ЛОВ, +2 {/CD} к урону скрытной атаки", "negativeEffectLabel": "Зависимость: Калмекс" },
+-  { "id": "chem_daddy_o", "name": "Дэдди-О", "positiveEffectLabel": "Сложность проверок ВСП/ИНТ -1 (мин. 0), сложность ХАР +1", "negativeEffectLabel": "Зависимость: Дэдди-О" },
+-  { "id": "chem_day_tripper", "name": "Дэй Триппер", "positiveEffectLabel": "Сложность проверок ХАР и УДЧ(Харизма) -1 (мин. 0), сложность СИЛ +1", "negativeEffectLabel": "Зависимость: Дэй Триппер" },
+-  { "id": "chem_fury", "name": "Фьюри", "positiveEffectLabel": "Сложность проверок ВСП +2", "negativeEffectLabel": "Зависимость: Фьюри" },
+-  { "id": "chem_jet", "name": "Винт", "positiveEffectLabel": "Дополнительные действия стоят на 1 ОД меньше", "negativeEffectLabel": "Зависимость: Винт" },
+-  { "id": "chem_jet_fuel", "name": "Винтовое топливо", "positiveEffectLabel": "Получает 1 бесплатное ОД в начале каждого хода", "negativeEffectLabel": "Зависимость: Винтовое топливо" },
+-  { "id": "chem_med_x", "name": "Мед-икс", "positiveEffectLabel": "+3 физ. защиты", "negativeEffectLabel": "Зависимость: Мед-икс" },
+-  { "id": "chem_mentats", "name": "Ментаты", "positiveEffectLabel": "Переброс 1d20 на проверках ВСП и ИНТ", "negativeEffectLabel": "Зависимость: Ментаты" },
+-  { "id": "chem_mentats_berry", "name": "Ягодные ментаты", "positiveEffectLabel": "Сложность проверок ИНТ -2 (мин. 0)", "negativeEffectLabel": "Зависимость: Ягодные ментаты" },
+-  { "id": "chem_mentats_orange", "name": "Оранжевые ментаты", "positiveEffectLabel": "Сложность проверок ВСП -2 (мин. 0), прицеливание позволяет перебросить ещё 1d20", "negativeEffectLabel": "Зависимость: Оранжевые ментаты" },
+-  { "id": "chem_mentats_grape", "name": "Виноградные ментаты", "positiveEffectLabel": "Сложность проверок ХАР -2 (мин. 0), переброс 1d20 на проверки Бартера", "negativeEffectLabel": "Зависимость: Виноградные ментаты" },
+-  { "id": "chem_overdrive", "name": "Овердрайв", "positiveEffectLabel": "Можно перебросить до 3 {/CD} при броске урона", "negativeEffectLabel": "Зависимость: Овердрайв" },
+-  { "id": "chem_psycho", "name": "Психо", "positiveEffectLabel": "+2 урона, +3 физ. защиты", "negativeEffectLabel": "Зависимость: Психо" },
+-  { "id": "chem_psychobuff", "name": "Психобафф", "positiveEffectLabel": "Сложность проверок СИЛ/ВЫН -1 (мин. 0)", "negativeEffectLabel": "Зависимость: Психобафф" },
+-  { "id": "chem_psycho_jet", "name": "Психо-винт", "positiveEffectLabel": "+2 урона, +4 физ. защиты, +4 ОД", "negativeEffectLabel": "Зависимость: Психо-винт" },
+-  { "id": "chem_psychotats", "name": "Психотаты", "positiveEffectLabel": "Сложность проверок ВСП -1 (мин. 0)", "negativeEffectLabel": "Зависимость: Психотаты" },
+-  { "id": "chem_ultra_jet", "name": "Ультра-винт", "positiveEffectLabel": "Дополнительные действия стоят на 1 ОД меньше", "negativeEffectLabel": "Зависимость: Ультра-винт" },
+-  { "id": "chem_x_cell", "name": "Икс-клетка", "positiveEffectLabel": "Первый купленный d20 на всех проверках бесплатный", "negativeEffectLabel": "Зависимость: Икс-клетка" }
+-]
++[]
+diff --git a/modules/fallout/data/consumables/chems.json b/modules/fallout/data/consumables/chems.json
+new file mode 100644
+index 0000000..c277a7d
+--- /dev/null
++++ b/modules/fallout/data/consumables/chems.json
+@@ -0,0 +1,532 @@
++[
++  {
++    "id": "chem_addictol",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 125,
++    "rarity": 3,
++    "positiveEffect": {
++      "removeCondition": [
++        "addicted"
++      ]
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_antibiotics",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 75,
++    "rarity": 3,
++    "positiveEffect": {
++      "removeCondition": [
++        "diseased"
++      ]
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_healing_salve",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 20,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 2
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_skeeto_spit",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 40,
++    "rarity": 2,
++    "positiveEffect": {
++      "maxHpModifier": {
++        "op": "+",
++        "value": 2
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_stimpak",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 2,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 5
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_stimpak_diluted",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 30,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 2
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_super_stimpak",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 90,
++    "rarity": 4,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 8
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_radaway",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 80,
++    "rarity": 2,
++    "positiveEffect": {
++      "radiationModifier": {
++        "op": "-",
++        "value": 4
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_radaway_diluted",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 1,
++    "positiveEffect": {
++      "radiationModifier": {
++        "op": "-",
++        "value": 2
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "instant",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_rad_x",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 40,
++    "rarity": 2,
++    "positiveEffect": {
++      "damageResistanceModifier": {
++        "radiation": {
++          "op": "+",
++          "value": 6
++        }
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_rad_x_diluted",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 25,
++    "rarity": 1,
++    "positiveEffect": {
++      "damageResistanceModifier": {
++        "radiation": {
++          "op": "+",
++          "value": 3
++        }
++      }
++    },
++    "negativeEffect": "",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 0
++  },
++  {
++    "id": "chem_buffjet",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 75,
++    "rarity": 4,
++    "positiveEffect": {
++      "maxHpModifier": {
++        "op": "+",
++        "value": 4
++      },
++      "apModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "brief",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_buffout",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 45,
++    "rarity": 2,
++    "positiveEffect": {
++      "maxHpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_bufftats",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 75,
++    "rarity": 4,
++    "positiveEffect": {
++      "maxHpModifier": {
++        "op": "+",
++        "value": 4
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_calmex",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 100,
++    "rarity": 4,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_daddy_o",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 2,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_day_tripper",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 40,
++    "rarity": 3,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_fury",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 30,
++    "rarity": 4,
++    "positiveEffect": {
++      "damageResistanceModifier": {
++        "physical": {
++          "op": "+",
++          "value": 3
++        }
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_jet",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 2,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "brief",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_jet_fuel",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 60,
++    "rarity": 3,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_med_x",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 2,
++    "positiveEffect": {
++      "damageResistanceModifier": {
++        "physical": {
++          "op": "+",
++          "value": 3
++        }
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_mentats",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 2,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 3
++  },
++  {
++    "id": "chem_mentats_berry",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 60,
++    "rarity": 3,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_mentats_orange",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 60,
++    "rarity": 3,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_mentats_grape",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 60,
++    "rarity": 3,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_overdrive",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 55,
++    "rarity": 3,
++    "positiveEffect": {
++      "damageModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_psycho",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 50,
++    "rarity": 2,
++    "positiveEffect": {
++      "damageModifier": {
++        "op": "+",
++        "value": 2
++      },
++      "damageResistanceModifier": {
++        "physical": {
++          "op": "+",
++          "value": 3
++        }
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 2
++  },
++  {
++    "id": "chem_psychobuff",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 70,
++    "rarity": 4,
++    "positiveEffect": {
++      "damageModifier": {
++        "op": "+",
++        "value": 2
++      },
++      "maxHpModifier": {
++        "op": "+",
++        "value": 4
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_psycho_jet",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 70,
++    "rarity": 4,
++    "positiveEffect": {
++      "damageModifier": {
++        "op": "+",
++        "value": 2
++      },
++      "damageResistanceModifier": {
++        "physical": {
++          "op": "+",
++          "value": 4
++        }
++      },
++      "apModifier": {
++        "op": "+",
++        "value": 4
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "brief",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_psychotats",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 70,
++    "rarity": 4,
++    "positiveEffect": {
++      "damageModifier": {
++        "op": "+",
++        "value": 2
++      },
++      "damageResistanceModifier": {
++        "physical": {
++          "op": "+",
++          "value": 2
++        }
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  },
++  {
++    "id": "chem_ultra_jet",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 67,
++    "rarity": 2,
++    "positiveEffect": {
++      "apModifier": {
++        "op": "+",
++        "value": 6
++      }
++    },
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "brief",
++    "negativeEffectDuration": "",
++    "addictionLevel": 3
++  },
++  {
++    "id": "chem_x_cell",
++    "itemType": "chem",
++    "weight": 0.5,
++    "cost": 60,
++    "rarity": 4,
++    "positiveEffect": {},
++    "negativeEffect": "addiction",
++    "positiveEffectDuration": "lasting",
++    "negativeEffectDuration": "",
++    "addictionLevel": 1
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/consumables/chems.json b/modules/fallout/i18n/en-EN/data/consumables/chems.json
+new file mode 100644
+index 0000000..17f4154
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/consumables/chems.json
+@@ -0,0 +1,194 @@
++[
++  {
++    "id": "chem_addictol",
++    "name": "Addictol",
++    "positiveEffectLabel": "Removes addiction",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_antibiotics",
++    "name": "Antibiotics",
++    "positiveEffectLabel": "Removes disease",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_healing_salve",
++    "name": "Healing Salve",
++    "positiveEffectLabel": "Restores 2 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_skeeto_spit",
++    "name": "Skeeto Spit",
++    "positiveEffectLabel": "+2 Max HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_stimpak",
++    "name": "Stimpak",
++    "positiveEffectLabel": "Restores 5 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_stimpak_diluted",
++    "name": "Stimpak (Diluted)",
++    "positiveEffectLabel": "Restores 2 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_super_stimpak",
++    "name": "Super Stimpak",
++    "positiveEffectLabel": "Restores 8 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_radaway",
++    "name": "RadAway",
++    "positiveEffectLabel": "Removes 4 radiation",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_radaway_diluted",
++    "name": "RadAway (Diluted)",
++    "positiveEffectLabel": "Removes 2 radiation",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_rad_x",
++    "name": "Rad-X",
++    "positiveEffectLabel": "+6 radiation resistance",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_rad_x_diluted",
++    "name": "Rad-X (Diluted)",
++    "positiveEffectLabel": "+3 radiation resistance",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_buffjet",
++    "name": "Buffjet",
++    "positiveEffectLabel": "STR/END difficulty -1 (min 0), additional actions cost 1 AP less",
++    "negativeEffectLabel": "Addiction: Buffjet"
++  },
++  {
++    "id": "chem_buffout",
++    "name": "Buffout",
++    "positiveEffectLabel": "Reroll 1d20 on all STR and END tests",
++    "negativeEffectLabel": "Addiction: Buffout"
++  },
++  {
++    "id": "chem_bufftats",
++    "name": "Bufftats",
++    "positiveEffectLabel": "STR/PER/END difficulty -1 (min 0)",
++    "negativeEffectLabel": "Addiction: Bufftats"
++  },
++  {
++    "id": "chem_calmex",
++    "name": "Calmex",
++    "positiveEffectLabel": "Reroll 1d20 on PER and AGI tests, +2 {/CD} sneak attack damage",
++    "negativeEffectLabel": "Addiction: Calmex"
++  },
++  {
++    "id": "chem_daddy_o",
++    "name": "Daddy-O",
++    "positiveEffectLabel": "PER/INT difficulty -1 (min 0), CHA difficulty +1",
++    "negativeEffectLabel": "Addiction: Daddy-O"
++  },
++  {
++    "id": "chem_day_tripper",
++    "name": "Day Tripper",
++    "positiveEffectLabel": "CHA and LCK(CHA) difficulty -1 (min 0), STR difficulty +1",
++    "negativeEffectLabel": "Addiction: Day Tripper"
++  },
++  {
++    "id": "chem_fury",
++    "name": "Fury",
++    "positiveEffectLabel": "PER difficulty +2",
++    "negativeEffectLabel": "Addiction: Fury"
++  },
++  {
++    "id": "chem_jet",
++    "name": "Jet",
++    "positiveEffectLabel": "Additional actions cost 1 AP less",
++    "negativeEffectLabel": "Addiction: Jet"
++  },
++  {
++    "id": "chem_jet_fuel",
++    "name": "Jet Fuel",
++    "positiveEffectLabel": "Gain 1 free AP at the start of each turn",
++    "negativeEffectLabel": "Addiction: Jet Fuel"
++  },
++  {
++    "id": "chem_med_x",
++    "name": "Med-X",
++    "positiveEffectLabel": "+3 physical resistance",
++    "negativeEffectLabel": "Addiction: Med-X"
++  },
++  {
++    "id": "chem_mentats",
++    "name": "Mentats",
++    "positiveEffectLabel": "Reroll 1d20 on PER and INT tests",
++    "negativeEffectLabel": "Addiction: Mentats"
++  },
++  {
++    "id": "chem_mentats_berry",
++    "name": "Berry Mentats",
++    "positiveEffectLabel": "INT difficulty -2 (min 0)",
++    "negativeEffectLabel": "Addiction: Berry Mentats"
++  },
++  {
++    "id": "chem_mentats_orange",
++    "name": "Orange Mentats",
++    "positiveEffectLabel": "PER difficulty -2 (min 0), aim minor action rerolls 1 extra d20",
++    "negativeEffectLabel": "Addiction: Orange Mentats"
++  },
++  {
++    "id": "chem_mentats_grape",
++    "name": "Grape Mentats",
++    "positiveEffectLabel": "CHA difficulty -2 (min 0), reroll 1d20 on Barter tests",
++    "negativeEffectLabel": "Addiction: Grape Mentats"
++  },
++  {
++    "id": "chem_overdrive",
++    "name": "Overdrive",
++    "positiveEffectLabel": "Reroll up to 3 {/CD} per damage roll",
++    "negativeEffectLabel": "Addiction: Overdrive"
++  },
++  {
++    "id": "chem_psycho",
++    "name": "Psycho",
++    "positiveEffectLabel": "+2 damage, +3 physical resistance",
++    "negativeEffectLabel": "Addiction: Psycho"
++  },
++  {
++    "id": "chem_psychobuff",
++    "name": "Psychobuff",
++    "positiveEffectLabel": "STR/END difficulty -1 (min 0)",
++    "negativeEffectLabel": "Addiction: Psychobuff"
++  },
++  {
++    "id": "chem_psycho_jet",
++    "name": "Psycho Jet",
++    "positiveEffectLabel": "+2 damage, +4 physical resistance, +4 AP",
++    "negativeEffectLabel": "Addiction: Psycho Jet"
++  },
++  {
++    "id": "chem_psychotats",
++    "name": "Psychotats",
++    "positiveEffectLabel": "PER difficulty -1 (min 0)",
++    "negativeEffectLabel": "Addiction: Psychotats"
++  },
++  {
++    "id": "chem_ultra_jet",
++    "name": "Ultra Jet",
++    "positiveEffectLabel": "Additional actions cost 1 AP less",
++    "negativeEffectLabel": "Addiction: Ultra Jet"
++  },
++  {
++    "id": "chem_x_cell",
++    "name": "X-Cell",
++    "positiveEffectLabel": "First purchased d20 on all tests is free",
++    "negativeEffectLabel": "Addiction: X-Cell"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/consumables/chems.json b/modules/fallout/i18n/ru-RU/data/consumables/chems.json
+new file mode 100644
+index 0000000..ea4f028
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/consumables/chems.json
+@@ -0,0 +1,194 @@
++[
++  {
++    "id": "chem_addictol",
++    "name": "Аддиктол",
++    "positiveEffectLabel": "Снимает зависимость",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_antibiotics",
++    "name": "Антибиотики",
++    "positiveEffectLabel": "Снимает болезнь",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_healing_salve",
++    "name": "Лечебная мазь",
++    "positiveEffectLabel": "Восстанавливает 2 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_skeeto_spit",
++    "name": "Слюна кровокрыса",
++    "positiveEffectLabel": "+2 к максимуму HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_stimpak",
++    "name": "Стимулятор",
++    "positiveEffectLabel": "Восстанавливает 5 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_stimpak_diluted",
++    "name": "Стимулятор (разбавленный)",
++    "positiveEffectLabel": "Восстанавливает 2 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_super_stimpak",
++    "name": "Суперстимулятор",
++    "positiveEffectLabel": "Восстанавливает 8 HP",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_radaway",
++    "name": "Рад-авэй",
++    "positiveEffectLabel": "Убирает 4 радиации",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_radaway_diluted",
++    "name": "Рад-авэй (разбавленный)",
++    "positiveEffectLabel": "Убирает 2 радиации",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_rad_x",
++    "name": "Рад-икс",
++    "positiveEffectLabel": "+6 защиты от радиации",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_rad_x_diluted",
++    "name": "Рад-икс (разбавленный)",
++    "positiveEffectLabel": "+3 защиты от радиации",
++    "negativeEffectLabel": ""
++  },
++  {
++    "id": "chem_buffjet",
++    "name": "Баффвинт",
++    "positiveEffectLabel": "Сложность проверок СИЛ/ВЫН -1 (мин. 0), дополнительные действия стоят на 1 ОД меньше",
++    "negativeEffectLabel": "Зависимость: Баффвинт"
++  },
++  {
++    "id": "chem_buffout",
++    "name": "Баффаут",
++    "positiveEffectLabel": "Переброс 1d20 на всех проверках СИЛ и ВЫН",
++    "negativeEffectLabel": "Зависимость: Баффаут"
++  },
++  {
++    "id": "chem_bufftats",
++    "name": "Баффтаты",
++    "positiveEffectLabel": "Сложность проверок СИЛ/ВСП/ВЫН -1 (мин. 0)",
++    "negativeEffectLabel": "Зависимость: Баффтаты"
++  },
++  {
++    "id": "chem_calmex",
++    "name": "Калмекс",
++    "positiveEffectLabel": "Переброс 1d20 на проверках ВСП и ЛОВ, +2 {/CD} к урону скрытной атаки",
++    "negativeEffectLabel": "Зависимость: Калмекс"
++  },
++  {
++    "id": "chem_daddy_o",
++    "name": "Дэдди-О",
++    "positiveEffectLabel": "Сложность проверок ВСП/ИНТ -1 (мин. 0), сложность ХАР +1",
++    "negativeEffectLabel": "Зависимость: Дэдди-О"
++  },
++  {
++    "id": "chem_day_tripper",
++    "name": "Дэй Триппер",
++    "positiveEffectLabel": "Сложность проверок ХАР и УДЧ(Харизма) -1 (мин. 0), сложность СИЛ +1",
++    "negativeEffectLabel": "Зависимость: Дэй Триппер"
++  },
++  {
++    "id": "chem_fury",
++    "name": "Фьюри",
++    "positiveEffectLabel": "Сложность проверок ВСП +2",
++    "negativeEffectLabel": "Зависимость: Фьюри"
++  },
++  {
++    "id": "chem_jet",
++    "name": "Винт",
++    "positiveEffectLabel": "Дополнительные действия стоят на 1 ОД меньше",
++    "negativeEffectLabel": "Зависимость: Винт"
++  },
++  {
++    "id": "chem_jet_fuel",
++    "name": "Винтовое топливо",
++    "positiveEffectLabel": "Получает 1 бесплатное ОД в начале каждого хода",
++    "negativeEffectLabel": "Зависимость: Винтовое топливо"
++  },
++  {
++    "id": "chem_med_x",
++    "name": "Мед-икс",
++    "positiveEffectLabel": "+3 физ. защиты",
++    "negativeEffectLabel": "Зависимость: Мед-икс"
++  },
++  {
++    "id": "chem_mentats",
++    "name": "Ментаты",
++    "positiveEffectLabel": "Переброс 1d20 на проверках ВСП и ИНТ",
++    "negativeEffectLabel": "Зависимость: Ментаты"
++  },
++  {
++    "id": "chem_mentats_berry",
++    "name": "Ягодные ментаты",
++    "positiveEffectLabel": "Сложность проверок ИНТ -2 (мин. 0)",
++    "negativeEffectLabel": "Зависимость: Ягодные ментаты"
++  },
++  {
++    "id": "chem_mentats_orange",
++    "name": "Оранжевые ментаты",
++    "positiveEffectLabel": "Сложность проверок ВСП -2 (мин. 0), прицеливание позволяет перебросить ещё 1d20",
++    "negativeEffectLabel": "Зависимость: Оранжевые ментаты"
++  },
++  {
++    "id": "chem_mentats_grape",
++    "name": "Виноградные ментаты",
++    "positiveEffectLabel": "Сложность проверок ХАР -2 (мин. 0), переброс 1d20 на проверки Бартера",
++    "negativeEffectLabel": "Зависимость: Виноградные ментаты"
++  },
++  {
++    "id": "chem_overdrive",
++    "name": "Овердрайв",
++    "positiveEffectLabel": "Можно перебросить до 3 {/CD} при броске урона",
++    "negativeEffectLabel": "Зависимость: Овердрайв"
++  },
++  {
++    "id": "chem_psycho",
++    "name": "Психо",
++    "positiveEffectLabel": "+2 урона, +3 физ. защиты",
++    "negativeEffectLabel": "Зависимость: Психо"
++  },
++  {
++    "id": "chem_psychobuff",
++    "name": "Психобафф",
++    "positiveEffectLabel": "Сложность проверок СИЛ/ВЫН -1 (мин. 0)",
++    "negativeEffectLabel": "Зависимость: Психобафф"
++  },
++  {
++    "id": "chem_psycho_jet",
++    "name": "Психо-винт",
++    "positiveEffectLabel": "+2 урона, +4 физ. защиты, +4 ОД",
++    "negativeEffectLabel": "Зависимость: Психо-винт"
++  },
++  {
++    "id": "chem_psychotats",
++    "name": "Психотаты",
++    "positiveEffectLabel": "Сложность проверок ВСП -1 (мин. 0)",
++    "negativeEffectLabel": "Зависимость: Психотаты"
++  },
++  {
++    "id": "chem_ultra_jet",
++    "name": "Ультра-винт",
++    "positiveEffectLabel": "Дополнительные действия стоят на 1 ОД меньше",
++    "negativeEffectLabel": "Зависимость: Ультра-винт"
++  },
++  {
++    "id": "chem_x_cell",
++    "name": "Икс-клетка",
++    "positiveEffectLabel": "Первый купленный d20 на всех проверках бесплатный",
++    "negativeEffectLabel": "Зависимость: Икс-клетка"
++  }
++]

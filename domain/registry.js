@@ -9,62 +9,56 @@
 // Приоритет: module > base (по id для массивов, deep merge для словарей i18n).
 // Все потребители (domain/*, компоненты) читают данные ТОЛЬКО через реестр.
 
-import originsJson from '../data/origins/origins.json';
-import traitsJson from '../data/traits/traits.json';
-import bodyplansJson from '../data/bodyplans/bodyplans.json';
-import ruOriginsDict from '../i18n/ru-RU/data/system/origins.json';
-import enOriginsDict from '../i18n/en-EN/data/system/origins.json';
-import ruTraitsDict from '../i18n/ru-RU/data/system/traits.json';
-import enTraitsDict from '../i18n/en-EN/data/system/traits.json';
-
 // ── Модуль сеттинга (modules/fallout) ──────────────────────────────────────
-import moduleOrigins from '../modules/fallout/data/origins.json';
-import moduleTraits from '../modules/fallout/data/traits.json';
-import moduleWeapons from '../modules/fallout/data/weapons.json';
-import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
+import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
+
+import moduleOrigins from '../modules/fallout/data/origins/origins.json';
+import moduleTraits from '../modules/fallout/data/traits/traits.json';
+import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
 import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
-import moduleRuI18n from '../modules/fallout/i18n/ru-RU.json';
-import moduleEnI18n from '../modules/fallout/i18n/en-EN.json';
 
-import baseWeapons from '../data/equipment/weapons.json';
-import baseUniqQualities from '../data/equipment/uniq_qualities.json';
+// i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
+import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
+import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
+import moduleRuTraitsI18n from '../modules/fallout/i18n/ru-RU/data/system/traits.json';
+import moduleEnTraitsI18n from '../modules/fallout/i18n/en-EN/data/system/traits.json';
+import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+import moduleRuUniqQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/uniq_qualities.json';
+import moduleEnUniqQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/uniq_qualities.json';
+import moduleRuWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
+import moduleEnWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
+import moduleRuClothesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
+import moduleEnClothesI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
+import moduleRuGeneralGoodsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
+import moduleEnGeneralGoodsI18n from '../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
+import moduleRuWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
+import moduleEnWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
+import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/food.json';
+import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
 
-import moduleUniqQualities from '../modules/fallout/data/uniq_qualities.json';
+
+import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getCurrentLocale } from '../i18n/locale';
-import { deepMerge, expandTrueItems } from './packMerge';
-
-/**
- * Слияние массивов записей по id: записи override (модуль) перекрывают base
- * с тем же id; новые id — добавляются. Порядок base сохраняется, новые — в конец.
- */
-export function mergeArraysById(base = [], override = []) {
-  const byId = new Map();
-  base.forEach((entry) => { if (entry?.id) byId.set(entry.id, entry); });
-  (override || []).forEach((entry) => { if (entry?.id) byId.set(entry.id, entry); });
-  const seen = new Set();
-  const out = [];
-  for (const entry of [...base, ...(override || [])]) {
-    if (!entry?.id || seen.has(entry.id)) continue;
-    seen.add(entry.id);
-    out.push(byId.get(entry.id));
-  }
-  return out;
-}
+import { expandTrueItems } from './packMerge';
 
 /**
  * Все ориджины: база + модуль (модуль перекрывает по id).
  */
 export function getOrigins() {
-  return mergeArraysById(originsJson, moduleOrigins);
+  return moduleOrigins;
 }
 
 /**
  * Все трейты: база + модуль.
  */
 export function getTraits() {
-  return mergeArraysById(traitsJson, moduleTraits);
+  return moduleTraits;
 }
 
 /**
@@ -79,9 +73,7 @@ export function getBodyPlans() {
  * Формат: { [originId]: string }
  */
 export function getOriginI18n(locale) {
-  const base = locale === 'en-EN' ? enOriginsDict : ruOriginsDict;
-  const moduleDict = locale === 'en-EN' ? moduleEnI18n.origins : moduleRuI18n.origins;
-  return { ...base, ...(moduleDict || {}) };
+  return locale === 'en-EN' ? moduleEnOriginsI18n : moduleRuOriginsI18n;
 }
 
 /**
@@ -89,18 +81,16 @@ export function getOriginI18n(locale) {
  * Формат: { traits: { [originKey]: { [traitKey]: { name, description } } } }
  */
 export function getTraitI18n(locale) {
-  const base = locale === 'en-EN' ? enTraitsDict : ruTraitsDict;
-  const moduleDict = locale === 'en-EN' ? moduleEnI18n.traits : moduleRuI18n.traits;
-  return moduleDict ? deepMerge(base, { traits: moduleDict }) : base;
+  return locale === 'en-EN' ? moduleEnTraitsI18n : moduleRuTraitsI18n;
 }
 
 /**
- * Дополнительное оружие модуля (новые id; каталог подмешивает поверх базы).
- * Варианты (trueItemId) разворачиваются в полные записи — механика из
- * истинного предмета data/, id/модификаторы — из варианта.
+ * Оружие модуля (самодостаточно, патч 102): полный список сеттинга,
+ * варианты (trueItemId) разворачиваются внутри самого модуля — чтения
+ * движковой базы data/ нет.
  */
 export function getModuleWeapons() {
-  return expandTrueItems(moduleWeapons, baseWeapons);
+  return expandTrueItems(moduleWeapons, moduleWeapons);
 }
 
 /**
@@ -118,10 +108,24 @@ export function getModuleEquipmentKits() {
 }
 
 /**
- * Полный i18n-словарь модуля для локали (origins/traits/weapons/generalGoods/equipmentKits/uniqQualities).
+ * Полный i18n-словарь модуля для локали. Собирается из файлов по категориям
+ * (modules/fallout/i18n/<locale>/data/...): origins, traits, equipmentKits,
+ * uniqQualities, weapons, clothes, generalGoods, weaponMods, food, drinks.
  */
 export function getModuleI18n(locale) {
-  return locale === 'en-EN' ? moduleEnI18n : moduleRuI18n;
+  const isEn = locale === 'en-EN';
+  return {
+    origins: isEn ? moduleEnOriginsI18n : moduleRuOriginsI18n,
+    traits: isEn ? moduleEnTraitsI18n : moduleRuTraitsI18n,
+    equipmentKits: isEn ? moduleEnEquipmentKitsI18n : moduleRuEquipmentKitsI18n,
+    uniqQualities: isEn ? moduleEnUniqQualitiesI18n : moduleRuUniqQualitiesI18n,
+    weapons: isEn ? moduleEnWeaponsI18n : moduleRuWeaponsI18n,
+    clothes: isEn ? moduleEnClothesI18n : moduleRuClothesI18n,
+    generalGoods: isEn ? moduleEnGeneralGoodsI18n : moduleRuGeneralGoodsI18n,
+    weaponMods: isEn ? moduleEnWeaponModsI18n : moduleRuWeaponModsI18n,
+    food: isEn ? moduleEnFoodI18n : moduleRuFoodI18n,
+    drinks: isEn ? moduleEnDrinksI18n : moduleRuDrinksI18n,
+  };
 }
 
 /**
@@ -130,7 +134,7 @@ export function getModuleI18n(locale) {
  * Сейчас каталог пустой — определения добавляет владелец в модуль.
  */
 export function getUniqQualities() {
-  return mergeArraysById(baseUniqQualities, moduleUniqQualities);
+  return moduleUniqQualities;
 }
 
 /**
@@ -139,8 +143,8 @@ export function getUniqQualities() {
  */
 export function getUniqQualityName(id, locale = getCurrentLocale()) {
   if (!id) return '';
-  const i18n = locale === 'en-EN' ? moduleEnI18n : moduleRuI18n;
-  const entry = (i18n.uniqQualities || []).find((q) => q?.id === id);
+  const i18n = locale === 'en-EN' ? moduleEnUniqQualitiesI18n : moduleRuUniqQualitiesI18n;
+  const entry = (i18n || []).find((q) => q?.id === id);
   return entry?.name || '';
 }
 

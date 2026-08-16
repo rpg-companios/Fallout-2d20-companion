@@ -1,0 +1,134 @@
+[
+  {
+    "id": "mod_std_laminate",
+    "name": "Ламинированная"
+  },
+  {
+    "id": "mod_std_rubberized",
+    "name": "Прорезиненная"
+  },
+  {
+    "id": "mod_std_microcarbon",
+    "name": "Микроуглеродистая"
+  },
+  {
+    "id": "mod_std_soft_padding",
+    "name": "Мягкая",
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_2",
+        "description": "+2 к сопротивлению всем повреждениям против взрывного оружия."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_asbestos_lining",
+    "name": "Асбестовая подкладка",
+    "specialEffects": [
+      {
+        "id": "effect_ignore_energy_persistent",
+        "description": "Игнорируйте энергетический урон от эффекта 'Стойкий урон'."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_dense",
+    "name": "Плотная",
+    "specialEffects": [
+      {
+        "id": "effect_explosive_resistance_4",
+        "description": "+4 к сопротивлению урону против взрывного оружия."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_biocomponents_mesh",
+    "name": "Сеть биокомпонентов",
+    "specialEffects": [
+      {
+        "id": "effect_chems_duration_double",
+        "description": "Препараты действуют в два раза дольше (см. стр. 164)."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_pneumatic",
+    "name": "Пневматическая",
+    "specialEffects": [
+      {
+        "id": "effect_stun_immunity",
+        "description": "Эффект оглушения требует выпадения 2+ Эффектов при атаке, чтобы поразить вас."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_melee",
+    "name": "Рукопашная",
+    "specialEffects": [
+      {
+        "id": "effect_unarmed_melee_damage_1",
+        "description": "Рукопашные атаки наносят +1 урона."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_parrying",
+    "name": "Парирующая",
+    "specialEffects": [
+      {
+        "id": "effect_melee_damage_resistance_2",
+        "description": "+2 к сопротивлению урону от атак ближнего боя."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_balanced",
+    "name": "Сбалансированная",
+    "specialEffects": [
+      {
+        "id": "effect_aimed_ranged_damage_1",
+        "description": "Прицелившись и совершив дальнобойную атаку, вы наносите +1 урона."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_aerodynamic",
+    "name": "Аэродинамическая",
+    "specialEffects": [
+      {
+        "id": "effect_ap_bonus_damage_melee",
+        "description": "Может потратить до 4 ОД на бонусный урон для атак ближнего боя."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_lightweight_arms",
+    "name": "Облегчённая",
+    "specialEffects": [
+      {
+        "id": "effect_melee_piercing_1",
+        "description": "Атаки ближнего боя и рукопашные атаки получают эффект 'Проникающий' 1."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_soft_padding_legs",
+    "name": "Мягкая подкладка",
+    "specialEffects": [
+      {
+        "id": "effect_fall_damage_resistance",
+        "description": "+2 к сопротивлению физическому урону от падения."
+      }
+    ]
+  },
+  {
+    "id": "mod_std_soundproofed",
+    "name": "Звукоизолированная",
+    "specialEffects": [
+      {
+        "id": "effect_sneak_reroll",
+        "description": "Перебросьте 1d20 при проверке на скрытность."
+      }
+    ]
+  }
+]

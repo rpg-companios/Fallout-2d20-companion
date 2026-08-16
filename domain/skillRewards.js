@@ -2,7 +2,7 @@
 // Резолвит награды за выбранные навыки из data/skillRewards.json.
 // Механизм похож на kitResolver, но без UI — молча добавляет предметы в стор.
 
-import rewardData from '../data/skillRewards.json';
+import rewardData from '../modules/fallout/data/skillRewards.json';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';

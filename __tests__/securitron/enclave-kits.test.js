@@ -19,7 +19,7 @@ vi.mock('../../db/Database', async () => {
 
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
 import { resolveKitItems } from '../../domain/kitResolver';
-import moduleOrigins from '../../modules/fallout/data/origins.json';
+import moduleOrigins from '../../modules/fallout/data/origins/origins.json';
 
 const KIT_IDS = ['enclave_scientist', 'enclave_soldier'];
 const getOrigin = () => moduleOrigins.find((o) => o.id === 'enclaveRemnant');

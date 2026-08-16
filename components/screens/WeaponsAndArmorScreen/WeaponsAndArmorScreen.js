@@ -20,7 +20,7 @@ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { resolveItem, findCatalogEntry, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
+import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
@@ -35,7 +35,7 @@ import {
   applyFrameAttributeModifiers,
   FUSION_CORE_ID,
 } from '../../../domain/powerArmor';
-import dataPowerArmor from '../../../data/equipment/powerArmor.json';
+import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 
 // Силовая броня: каталог механики по id (рейтинги/прочность частей, модификаторы каркаса).
 const PA_CATALOG_BY_ID = Object.fromEntries(
@@ -50,7 +50,7 @@ import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
 import { debugLog } from '../../../src/debug/falloutDebug';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useAppSettingsStore, { selectWeaponDurabilityLossEnabled, selectWeaponDurabilityLossPer10Shots, selectRandomWeaponQualityEnabled, selectWeaponCardsDisplayMode, selectUnarmedAttackVisible } from '../../../src/store/appSettingsStore';
 import { isAmmoWeapon } from '../../../domain/weaponDurability';
 
 
@@ -127,8 +127,8 @@ const RadiationCounter = ({ isEnabled }) => {
 const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
   const storeItems = useCharacterStore((state) => state.items);
   const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
-  const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
-  const baseLossPer10Shots = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
+  const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+  const baseLossPer10Shots = useAppSettingsStore(selectWeaponDurabilityLossPer10Shots);
 
   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
   let ammoPerShot = 1;
@@ -218,7 +218,7 @@ const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
                       {effectText}
                     </Text>
                     <Text style={localStyles.effectTimerText}>
-                      {getEffectTimeText(effect.scenesLeft)}
+                      {effect.isPermanent ? '∞' : getEffectTimeText(effect.scenesLeft)}
                     </Text>
                   </View>
                 );
@@ -281,8 +281,8 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
     const { hasTrait, attributes, skills, trait } = useCharacter();
-    const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
-    const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+    const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
+    const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
     // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
     // ОС Mk II (драйвер применяется в инвентаре, флаг — в robot-срезе стора).
     // Хук ВЫЗЫВАЕТСЯ БЕЗУСЛОВНО (Правила хуков): до раннего return пустого слота.
@@ -425,71 +425,12 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
   };
 
 
-const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
-  const appliedModIds = Object.values(weapon?.appliedMods || {}).filter(Boolean);
-  const prefixes = appliedModIds
-    .map((modId) => (catalog?.weaponMods || []).find((mod) => mod.id === modId)?.prefix)
-    .filter(Boolean);
-
-  // Имя варианта (baseName, напр. «Опасная бритва») — важнее каталожного имени
-  // истинного предмета («Складной нож»); имя с уникальными качествами — из стора.
-  const localizedBaseName = weapon?.baseName
-    || (weapon?.uniqQualities?.length ? weapon?.name : undefined)
-    || base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
-  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : localizedBaseName;
-};
-
 const findLocalizedWeapon = (catalog, weapon) => {
-  const catalogId = weapon?.weaponId || weapon?.id;
-  if (!catalogId) return weapon;
-  const base = findCatalogEntry(catalog, catalogId, 'weapon');
-  if (!base) return weapon;
-
-  // Если на оружии применены моды, эффективные поля считаются из каталога + appliedMods.
-  // Иначе — catalog-данные имеют приоритет (для i18n).
-  const hasAppliedMods = Object.values(weapon.appliedMods || {}).some(Boolean);
-  const effectiveWeapon = resolveWeaponWithAppliedMods({
-    ...base,
-    id: weapon.id,
-    weaponId: weapon.weaponId,
-    instanceId: weapon.instanceId,
-    appliedMods: weapon.appliedMods,
-  }, catalog);
-  // Вариант (baseName) или уникальные качества — предмет имеет собственное имя
-  // («Опасная бритва», «Дерзкая …»), каталог по истинному id его не знает:
-  // имя берём из стора, не затираем каталожным.
-  const hasOwnIdentity = weapon.baseName != null || (weapon.uniqQualities || []).length > 0;
-
-  return {
-    ...weapon,
-    ...base,
-    id: catalogId,
-    weaponId: catalogId,
-    // мета-поля из weapon сохраняем всегда
-    sourceSlot: weapon.sourceSlot,
-    isBuiltin: weapon.isBuiltin,
-    isManipulator: weapon.isManipulator,
-    appliedMods: weapon.appliedMods,
-    uniqueId: weapon.uniqueId,
-    hasMods: base.hasMods ?? weapon.hasMods,
-    withoutMods: base.withoutMods ?? weapon.withoutMods,
-    // при наличии модов сохраняем все изменённые моды поля вместо catalog-данных
-    ...(hasAppliedMods ? {
-      name: getLocalizedModifiedWeaponName(catalog, weapon, base),
-      baseWeaponName: base.stockNames?.without || base.name || weapon.baseWeaponName,
-      damage: effectiveWeapon.damage,
-      fireRate: effectiveWeapon.fireRate,
-      damageType: effectiveWeapon.damageType,
-      qualities: effectiveWeapon.qualities,
-      range_name: effectiveWeapon.range_name,
-      weight: effectiveWeapon.weight,
-      cost: effectiveWeapon.cost,
-      effects: effectiveWeapon.effects,
-      ammoId: effectiveWeapon.ammoId,
-    } : {
-      name: hasOwnIdentity ? (weapon.baseName || weapon.name || base.name) : (base.name || weapon.name),
-    }),
-  };
+  // Единый конвейер (domain/enrichItem.js): база из каталога + моды
+  // (все структурированные поля) + качества; имя — по правилам владельца
+  // (моды → качества → база). Раньше имя/статы собирались здесь повторно —
+  // источник расхождений «моды не считались/имя без модов».
+  return resolveWeaponWithAppliedMods(weapon, catalog);
 };
 
 // Обогащение брони/одежды — единая точка (domain/resolveItem): каталожные данные
@@ -658,10 +599,10 @@ const WeaponsAndArmorScreen = () => {
   // ── Настройки отображения оружия (переключатели — на этом экране) ───────
   // Объявляются ДО visibleEquippedWeapons, т.к. он использует
   // unarmedAttackVisible (иначе TDZ: Cannot access before initialization).
-  const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
+  const weaponCardsDisplayMode = useAppSettingsStore(selectWeaponCardsDisplayMode);
   const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
   // Показ/скрытие виртуальной рукопашной атаки (кулаки/манипулятор).
-  const unarmedAttackVisible = useAppSettingsStore((state) => state.unarmedAttackVisible);
+  const unarmedAttackVisible = useAppSettingsStore(selectUnarmedAttackVisible);
   const setUnarmedAttackVisible = useAppSettingsStore((state) => state.setUnarmedAttackVisible);
 
   // Виртуальная рукопашная атака (кулаки/манипулятор) всегда есть в первом

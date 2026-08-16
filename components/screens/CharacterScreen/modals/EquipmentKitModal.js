@@ -11,11 +11,11 @@ import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 // Lazy-load robot catalog data
 const loadRobotCatalog = () => ({
-  heads: require('../../../../data/equipment/robot/robotheads.json'),
-  bodies: require('../../../../data/equipment/robot/robotbody.json'),
-  arms: require('../../../../data/equipment/robot/robotarms.json'),
-  legs: require('../../../../data/equipment/robot/robotlegs.json'),
-  weapons: require('../../../../data/equipment/robot/weapons.json'),
+  heads: require('../../../../modules/fallout/data/equipment/robot/robotheads.json'),
+  bodies: require('../../../../modules/fallout/data/equipment/robot/robotbody.json'),
+  arms: require('../../../../modules/fallout/data/equipment/robot/robotarms.json'),
+  legs: require('../../../../modules/fallout/data/equipment/robot/robotlegs.json'),
+  weapons: require('../../../../modules/fallout/data/equipment/robot/weapons.json'),
 });
 
 const META_CATEGORY_ORDER = ['structure', 'apparel', 'weapon', 'module', 'misc'];

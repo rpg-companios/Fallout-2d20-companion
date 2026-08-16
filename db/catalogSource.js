@@ -12,9 +12,9 @@
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getCurrentLocale } from '../i18n/locale';
-import perksData from '../data/perks/perks.json';
-import ruPerksData from '../i18n/ru-RU/data/perks/perks.json';
-import enPerksData from '../i18n/en-EN/data/perks/perks.json';
+import perksData from '../modules/fallout/data/perks/perks.json';
+import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
 
 // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
 const safeStr = (v) => (v === null || v === undefined ? null : String(v));
