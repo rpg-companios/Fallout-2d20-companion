@@ -291,3 +291,45 @@ describe('Миграция v12→v13: трейт Тени в сейве (ста�
     expect(migrated.attributesSaved).toBe(true);
   });
 });
+
+describe('Миграция v13→v14: старый комплект → NIGHTKIN', () => {
+  it('CURRENT_SCHEMA_VERSION = 14', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(14);
+  });
+
+  it('Тень со стартовым капиталом: комплект заменён на nightkin, флаг pending', () => {
+    const save = {
+      schemaVersion: 13,
+      origin: { id: 'shadow' },
+      trait: { id: 'shadow' },
+      equipment: { id: 'default_caps_only', name: 'Стартовый капитал', items: [{ itemType: 'currency', quantity: 100 }] },
+      caps: 100,
+    };
+    const migrated = migrateCharacterState(save);
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.equipment.name).toBe('Тень');
+    expect(migrated.nightkinKitPending).toBe(true);
+  });
+
+  it('Тень с уже новым комплектом: не трогаем', () => {
+    const save = {
+      schemaVersion: 13,
+      origin: { id: 'shadow' },
+      equipment: { id: 'nightkin', name: 'Тень', items: [] },
+    };
+    const migrated = migrateCharacterState(save);
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.nightkinKitPending).toBeUndefined();
+  });
+
+  it('не-Тень: комплект не тронут', () => {
+    const save = {
+      schemaVersion: 13,
+      origin: { id: 'vaultDweller' },
+      equipment: { id: 'vault_resident', name: 'Житель Убежища' },
+    };
+    const migrated = migrateCharacterState(save);
+    expect(migrated.equipment.id).toBe('vault_resident');
+    expect(migrated.nightkinKitPending).toBeUndefined();
+  });
+});

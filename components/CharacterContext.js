@@ -62,6 +62,7 @@ import {
   FUSION_CORE_ID,
 } from '../domain/powerArmor';
 import { canEquipArmor } from '../domain/equipEquip';
+import { resolveKitItems } from '../domain/kitResolver';
 import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
 import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
 import { getCurrentLocale } from '../i18n/locale';
@@ -806,6 +807,28 @@ export const CharacterProvider = ({ children }) => {
       // Task 4.4: Migrate old format data to Zustand Store
       // This normalizes attributes, skills, items, and effects into the store
       useCharacterStore.getState().loadFromLegacyData(data);
+      
+      // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
+      // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
+      // выдаём здесь, после загрузки. Крышки: старый комплект (100) уже
+      // в data.caps — оставляем как есть (комплект NIGHTKIN крышек не даёт).
+      if (data.nightkinKitPending && data.equipment?.id === 'nightkin') {
+        try {
+          const catalog = getEquipmentCatalog();
+          const kit = catalog?.equipmentKits?.nightkin;
+          if (kit && Array.isArray(kit.items)) {
+            const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
+            (resolved.items || []).forEach((item) => {
+              useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+            });
+            setEquipment({ id: 'nightkin', name: 'Тень', items: resolved.items || [] });
+            // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
+            data.nightkinKitPending = false;
+          }
+        } catch (e) {
+          console.warn('[loadCharacter] nightkin kit grant failed:', e);
+        }
+      }
       
       setIsSaved(true);
       isSavedRef.current = true;
