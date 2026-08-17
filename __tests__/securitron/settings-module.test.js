@@ -1,135 +1,239 @@
 /**
- * Настройки как часть сеттинга (патч 120).
- *
- * Модель (решения владельца):
- * - механики сеттинга описываются в modules/fallout/settings.json
- *   (данные: id, type, секции, дефолты, dependsOn);
- * - движковые UI-настройки (каталоги персонажей, вид карточек) —
- *   ENGINE_SETTINGS в domain/settingsCatalog.js;
- * - значения хранятся по модулям: { [moduleId]: { [settingId]: value } },
- *   разные сеттинги не смешиваются; язык — настройка сеттинга.
+ * Контракт владения настройками и независимых языков движка/сеттинга.
  */
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 import {
   ENGINE_SETTINGS,
-  getModuleSettings,
   getAllSettings,
+  getModuleSettings,
   getSettingById,
+  getSettingsForSurface,
+  SETTING_CONTROL_SURFACES,
 } from '../../domain/settingsCatalog';
+import {
+  getActiveModuleId,
+  getModuleManifest,
+  resolveLocaleFromManifest,
+  resolveModuleLocale,
+  shouldOfferLocaleChoiceForManifest,
+} from '../../domain/moduleLocale';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
-import { getCurrentLocale } from '../../i18n/locale';
+import {
+  getCurrentLocale,
+  getCurrentModuleLocale,
+} from '../../i18n/locale';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../..');
+const ids = (settings) => settings.map((setting) => setting.id);
 
-describe('Настройки сеттинга (modules/fallout/settings.json)', () => {
-  it('описание в модуле: 5 настроек, типы и дефолты', () => {
+const resetStore = () => {
+  useAppSettingsStore.setState({
+    values: {
+      engine: {
+        characterFoldersEnabled: false,
+        characterDeleteActionPlacement: 'menu',
+        language: 'ru-RU',
+      },
+      fallout: {
+        weaponDurabilityLossEnabled: false,
+        weaponDurabilityLossPer10Shots: 1,
+        randomWeaponQualityEnabled: false,
+        unarmedAttackVisible: true,
+        weaponCardsDisplayMode: 'cards',
+      },
+    },
+    moduleLocales: {},
+  });
+  useAppSettingsStore.getState().setValue('language', 'ru-RU');
+};
+
+describe('Владение настройками и экраны управления', () => {
+  it('движок владеет менеджером персонажей и языком интерфейса', () => {
+    expect(ids(ENGINE_SETTINGS)).toEqual([
+      'characterFoldersEnabled',
+      'characterDeleteActionPlacement',
+      'language',
+    ]);
+    expect(getSettingById('language')).toMatchObject({
+      controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
+      defaultValue: 'ru-RU',
+    });
+  });
+
+  it('Fallout владеет механиками оружия и показывает только cards/spoilers', () => {
     const settings = getModuleSettings();
-    expect(settings).toHaveLength(5);
-    expect(settings.map((s) => s.id)).toEqual([
+    expect(ids(settings)).toEqual([
       'weaponDurabilityLossEnabled',
       'weaponDurabilityLossPer10Shots',
       'randomWeaponQualityEnabled',
       'unarmedAttackVisible',
-      'language',
-    ]);
-    expect(settings.find((s) => s.id === 'language').type).toBe('select');
-    expect(settings.find((s) => s.id === 'weaponDurabilityLossPer10Shots').min).toBe(1);
-    expect(settings.find((s) => s.id === 'weaponDurabilityLossPer10Shots').dependsOn)
-      .toBe('weaponDurabilityLossEnabled');
-  });
-
-  it('движковые настройки — отдельно (каталоги, вид карточек)', () => {
-    expect(ENGINE_SETTINGS.map((s) => s.id).sort()).toEqual([
-      'characterDeleteActionPlacement',
-      'characterFoldersEnabled',
       'weaponCardsDisplayMode',
     ]);
-    expect(getAllSettings()).toHaveLength(8);
-    expect(getSettingById('characterDeleteActionPlacement')).toMatchObject({
-      type: 'select',
-      defaultValue: 'menu',
-      options: [{ value: 'menu' }, { value: 'card' }],
+    expect(getSettingById('weaponCardsDisplayMode')).toMatchObject({
+      controlSurface: SETTING_CONTROL_SURFACES.EQUIPMENT,
+      options: [{ value: 'cards' }, { value: 'spoilers' }],
     });
-    expect(getSettingById('characterFoldersEnabled')).not.toBeNull();
-    expect(getSettingById('language')).not.toBeNull();
+    expect(getAllSettings()).toHaveLength(8);
   });
 
-  it('i18n тексты настроек присутствуют в модуле обеих локалей', () => {
-    for (const loc of ['ru-RU', 'en-EN']) {
-      const dict = JSON.parse(readFileSync(
-        path.join(root, `modules/fallout/i18n/${loc}/data/system/settings.json`), 'utf-8'));
-      expect(dict.survivalMode).toBeTruthy();
-      expect(dict.durabilityTitle).toBeTruthy();
-      expect(dict.lossTitle).toBeTruthy();
-      expect(dict.qualityTitle).toBeTruthy();
-      expect(dict.unarmedTitle).toBeTruthy();
-      expect(dict.languageTitle).toBeTruthy();
-      expect(dict.language.ru).toBeTruthy();
-      expect(dict.language.en).toBeTruthy();
-    }
+  it('общее окно получает только назначенные ему движковые и Fallout-настройки', () => {
+    expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS))).toEqual([
+      'characterFoldersEnabled',
+      'characterDeleteActionPlacement',
+      'weaponDurabilityLossEnabled',
+      'weaponDurabilityLossPer10Shots',
+      'randomWeaponQualityEnabled',
+    ]);
+    expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.CHARACTERS))).toEqual(['language']);
+    expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.EQUIPMENT))).toEqual([
+      'unarmedAttackVisible',
+      'weaponCardsDisplayMode',
+    ]);
   });
 
-  it('i18n тексты движковой настройки удаления присутствуют в обеих локалях', () => {
-    for (const loc of ['ru-RU', 'en-EN']) {
-      const dict = JSON.parse(readFileSync(
-        path.join(root, `i18n/${loc}/screens/home/screen.json`), 'utf-8'));
-      expect(dict.settings.appearanceTitle).toBeTruthy();
-      expect(dict.settings.characterDeleteActionPlacementTitle).toBeTruthy();
-      expect(dict.settings.characterDeleteActionPlacementDescription).toBeTruthy();
-      expect(dict.settings.characterDeleteActionPlacement.menu).toBeTruthy();
-      expect(dict.settings.characterDeleteActionPlacement.card).toBeTruthy();
+  it('неиспользуемые тексты сохранены, а локализованные подписи режима добавлены', () => {
+    for (const locale of ['ru-RU', 'en-EN']) {
+      const moduleDict = JSON.parse(readFileSync(
+        path.join(root, `modules/fallout/i18n/${locale}/data/system/settings.json`),
+        'utf-8',
+      ));
+      expect(moduleDict.combat).toBeTruthy();
+      expect(moduleDict.unarmedTitle).toBeTruthy();
+      expect(moduleDict.unarmedDescription).toBeTruthy();
+      expect(moduleDict.interface).toBeTruthy();
+      expect(moduleDict.languageTitle).toBeTruthy();
+      expect(moduleDict.languageDescription).toBeTruthy();
+      expect(moduleDict.cardsTitle).toBeTruthy();
+      expect(moduleDict.cards.cards).toBeTruthy();
+      expect(moduleDict.cards.spoilers).toBeTruthy();
+
+      const engineDict = JSON.parse(readFileSync(
+        path.join(root, `i18n/${locale}/screens/home/screen.json`),
+        'utf-8',
+      ));
+      expect(engineDict.language.russian).toBe('Ru');
+      expect(engineDict.language.english).toBe('En');
+      expect(engineDict.language.settingTitle).toBeTruthy();
+      expect(engineDict.language.localeCode).toContain('{code}');
     }
   });
 });
 
-describe('Стор настроек: значения по модулям', () => {
-  beforeAll(() => {
-    useAppSettingsStore.setState({ values: {
-      engine: {
-        characterFoldersEnabled: true,
-        characterDeleteActionPlacement: 'card',
-        weaponCardsDisplayMode: 'tabs',
-      },
-      fallout: {
-        weaponDurabilityLossEnabled: true,
-        weaponDurabilityLossPer10Shots: 3,
-        randomWeaponQualityEnabled: true,
-        unarmedAttackVisible: false,
-        language: 'en-EN',
-      },
-    } });
+describe('Разрешение языка сеттинга', () => {
+  it('manifest Fallout явно объявляет локали и defaultLocale', () => {
+    expect(getActiveModuleId()).toBe('fallout');
+    expect(getModuleManifest()).toMatchObject({
+      id: 'fallout',
+      locales: ['ru-RU', 'en-EN'],
+      defaultLocale: 'ru-RU',
+    });
   });
 
-  it('getSettingValue возвращает значения из своего модуля', () => {
+  it('одна локаль всегда принудительна и не показывает второй переключатель', () => {
+    const manifest = { id: 'single', locales: ['xx-XX'], defaultLocale: 'xx-XX' };
+    expect(resolveLocaleFromManifest({
+      manifest,
+      engineLocale: 'ru-RU',
+      manualLocale: 'unsupported-manual-value',
+    })).toBe('xx-XX');
+    expect(shouldOfferLocaleChoiceForManifest({ manifest, engineLocale: 'ru-RU' })).toBe(false);
+  });
+
+  it('ручной выбор приоритетнее совпадающего языка движка', () => {
+    const manifest = {
+      id: 'multi',
+      locales: ['ru-RU', 'en-EN'],
+      defaultLocale: 'ru-RU',
+    };
+    expect(resolveLocaleFromManifest({
+      manifest,
+      engineLocale: 'en-EN',
+      manualLocale: 'ru-RU',
+    })).toBe('ru-RU');
+  });
+
+  it('без ручного выбора использует совпадение, иначе defaultLocale и переключатель', () => {
+    expect(resolveModuleLocale({ engineLocale: 'en-EN' })).toBe('en-EN');
+
+    const manifest = {
+      id: 'multi',
+      locales: ['aa-AA', 'bb-BB'],
+      defaultLocale: 'bb-BB',
+    };
+    expect(resolveLocaleFromManifest({ manifest, engineLocale: 'ru-RU' })).toBe('bb-BB');
+    expect(shouldOfferLocaleChoiceForManifest({ manifest, engineLocale: 'ru-RU' })).toBe(true);
+    expect(shouldOfferLocaleChoiceForManifest({ manifest, engineLocale: 'aa-AA' })).toBe(false);
+  });
+});
+
+describe('Стор и миграция настроек', () => {
+  beforeEach(resetStore);
+
+  it('хранит язык в engine, а режим карточек в Fallout', () => {
     const state = useAppSettingsStore.getState();
-    expect(state.getSettingValue('weaponDurabilityLossEnabled')).toBe(true);
-    expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(3);
-    expect(state.getSettingValue('characterFoldersEnabled')).toBe(true);
-    expect(state.getSettingValue('characterDeleteActionPlacement')).toBe('card');
-    expect(state.getSettingValue('weaponCardsDisplayMode')).toBe('tabs');
-    expect(state.getSettingValue('unarmedAttackVisible')).toBe(false);
-    expect(state.getSettingValue('language')).toBe('en-EN');
+    state.setValue('language', 'en-EN');
+    state.setValue('weaponCardsDisplayMode', 'spoilers');
+
+    expect(useAppSettingsStore.getState().values.engine.language).toBe('en-EN');
+    expect(useAppSettingsStore.getState().values.engine.weaponCardsDisplayMode).toBeUndefined();
+    expect(useAppSettingsStore.getState().values.fallout.weaponCardsDisplayMode).toBe('spoilers');
+    expect(useAppSettingsStore.getState().values.fallout.language).toBeUndefined();
+    expect(getCurrentLocale()).toBe('en-EN');
+    expect(getCurrentModuleLocale()).toBe('en-EN');
   });
 
-  it('числовые настройки клампятся диапазоном', () => {
+  it('помнит ручной язык по модулю и сохраняет его при смене языка движка', () => {
     const state = useAppSettingsStore.getState();
-    state.setValue('weaponDurabilityLossPer10Shots', 500);
-    expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(100);
-    state.setValue('weaponDurabilityLossPer10Shots', 0);
-    expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(1);
+    state.setModuleLocale('fallout', 'ru-RU');
+    state.setValue('language', 'en-EN');
+
+    expect(useAppSettingsStore.getState().moduleLocales).toEqual({ fallout: 'ru-RU' });
+    expect(getCurrentLocale()).toBe('en-EN');
+    expect(getCurrentModuleLocale()).toBe('ru-RU');
   });
 
-  it("язык — настройка сеттинга: setValue('language') меняет локаль", () => {
-    const before = getCurrentLocale();
-    useAppSettingsStore.getState().setValue('language', 'ru-RU');
-    expect(getCurrentLocale()).toBe('ru-RU');
-    // вернуть как было
-    useAppSettingsStore.getState().setValue('language', before);
-    expect(getCurrentLocale()).toBe(before);
+  it('не позволяет Fallout выбрать неактивный tabs', () => {
+    useAppSettingsStore.getState().setValue('weaponCardsDisplayMode', 'tabs');
+    expect(useAppSettingsStore.getState().getSettingValue('weaponCardsDisplayMode')).toBe('cards');
+  });
+
+  it('v1 переносит владельцев и мигрирует сохранённый tabs в cards', () => {
+    const migrate = useAppSettingsStore.persist.getOptions().migrate;
+    const migrated = migrate({
+      values: {
+        engine: {
+          characterFoldersEnabled: true,
+          characterDeleteActionPlacement: 'card',
+          weaponCardsDisplayMode: 'tabs',
+        },
+        fallout: {
+          weaponDurabilityLossEnabled: true,
+          weaponDurabilityLossPer10Shots: 3,
+          randomWeaponQualityEnabled: true,
+          unarmedAttackVisible: false,
+          language: 'en-EN',
+        },
+      },
+    }, 1);
+
+    expect(migrated.values.engine).toMatchObject({
+      characterFoldersEnabled: true,
+      characterDeleteActionPlacement: 'card',
+      language: 'en-EN',
+    });
+    expect(migrated.values.engine.weaponCardsDisplayMode).toBeUndefined();
+    expect(migrated.values.fallout).toMatchObject({
+      weaponDurabilityLossEnabled: true,
+      weaponDurabilityLossPer10Shots: 3,
+      randomWeaponQualityEnabled: true,
+      unarmedAttackVisible: false,
+      weaponCardsDisplayMode: 'cards',
+    });
+    expect(migrated.values.fallout.language).toBeUndefined();
   });
 });

@@ -6,7 +6,7 @@
 // domain/origins.js — see that module.
 
 import { getTraits, getTraitI18n } from './registry';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentModuleLocale } from '../i18n/locale';
 
 const TRAIT_DICTIONARIES = {
   'ru-RU': getTraitI18n('ru-RU'),
@@ -19,15 +19,23 @@ const TRAIT_DICTIONARIES = {
  */
 export function tTrait(key) {
   if (!key) return '';
-  const locale = getCurrentLocale();
-  const dict = TRAIT_DICTIONARIES[locale] || ruTraits;
+  const locale = getCurrentModuleLocale();
+  const dict = TRAIT_DICTIONARIES[locale];
+  if (!dict) {
+    throw new Error(`[traits] Для языка сеттинга "${locale}" нет словаря трейтов`);
+  }
   const parts = key.split('.');
   let current = dict;
   for (const part of parts) {
     current = current?.[part];
-    if (current === undefined) return key;
+    if (current === undefined) {
+      throw new Error(`[traits] Для ключа "${key}" нет перевода`);
+    }
   }
-  return typeof current === 'string' ? current : key;
+  if (typeof current !== 'string' || current.length === 0) {
+    throw new Error(`[traits] Перевод "${key}" должен быть непустой строкой`);
+  }
+  return current;
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +234,9 @@ export function resolveTraitDisplayName(storedName) {
  */
 export function getTraitI18nById(id) {
   const dataEntry = findTraitById(id);
-  if (!dataEntry) return { name: id, description: '' };
+  if (!dataEntry) {
+    throw new Error(`[traits] Трейт "${id}" отсутствует в данных активного сеттинга`);
+  }
   return {
     name: tTrait(dataEntry.displayNameKey),
     description: tTrait(dataEntry.descriptionKey),

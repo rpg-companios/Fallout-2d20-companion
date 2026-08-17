@@ -6,11 +6,12 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 
 beforeAll(() => {
   // catalogSource строит каталог по текущей локали (в CI Intl даёт en-EN).
   setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
 });
 
 vi.mock('../../db/Database', async () => {

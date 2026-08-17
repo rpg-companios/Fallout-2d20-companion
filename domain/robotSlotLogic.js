@@ -24,8 +24,11 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
 
   const limb = slotData?.limb;
 
+  if (limb != null && (typeof limb.name !== 'string' || limb.name.length === 0)) {
+    throw new Error(`[robotSlotLogic] Для детали робота "${limb.id}" нет локализованного имени`);
+  }
   const limbName = limb != null
-    ? t(`robotLimbs.${limb.id}`, limb.name ?? limb.id)
+    ? limb.name
     : t('robotSlot.noLimb');
 
   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;

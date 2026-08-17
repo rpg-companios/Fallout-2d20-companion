@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import modulePowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
 import moduleRuPowerArmor from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json';
 import moduleEnPowerArmor from '../../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
@@ -19,7 +19,10 @@ const countPieces = (pa) =>
   Object.values(pa || {}).reduce((sum, set) => sum + (set?.pieces || []).length, 0);
 
 describe('Силовая броня в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит полную механику: 6 сетов (frame + 5), 21 деталь', () => {
     expect(Object.keys(modulePowerArmor).sort()).toEqual(['frame', 'raiderPower', 't45', 't51', 't60', 'x01']);

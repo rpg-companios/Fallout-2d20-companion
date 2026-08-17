@@ -21,6 +21,7 @@ const CATEGORY_FILES = [
   'system/traits.json',
   'system/equipmentKits.json',
   'system/uniq_qualities.json',
+  'system/settings.json',
   'equipment/weapons/weapons.json',
   'equipment/armor/clothes.json',
   'equipment/general_goods.json',
@@ -43,7 +44,7 @@ describe('Модульный i18n: структура по категориям 
       const i18n = getModuleI18n(locale);
       expect(Object.keys(i18n).sort()).toEqual([
         'clothes', 'drinks', 'equipmentKits', 'food', 'generalGoods',
-        'origins', 'traits', 'uniqQualities', 'weaponMods', 'weapons',
+        'origins', 'settings', 'traits', 'uniqQualities', 'weaponMods', 'weapons',
       ]);
       for (const rel of CATEGORY_FILES) {
         const fromFile = JSON.parse(fs.readFileSync(path.join(MODULE_I18N_ROOT, locale, 'data', rel), 'utf-8'));
@@ -52,6 +53,7 @@ describe('Модульный i18n: структура по категориям 
           'system/traits.json': 'traits',
           'system/equipmentKits.json': 'equipmentKits',
           'system/uniq_qualities.json': 'uniqQualities',
+          'system/settings.json': 'settings',
           'equipment/weapons/weapons.json': 'weapons',
           'equipment/armor/clothes.json': 'clothes',
           'equipment/general_goods.json': 'generalGoods',

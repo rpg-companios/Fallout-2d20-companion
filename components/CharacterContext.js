@@ -31,7 +31,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
     return canonical ? { ...s, name: canonical } : s;
   });
 };
-import { loadOriginsData, findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
@@ -65,7 +65,7 @@ import { canEquipArmor } from '../domain/equipEquip';
 import { resolveKitItems } from '../domain/kitResolver';
 import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
 import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
 import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
@@ -80,14 +80,19 @@ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/
 const INITIAL_LEVEL = 1;
 
 const CharacterContext = createContext();
-const BARE_ORIGINS = loadOriginsData();
 
 // Resolve saved-character origin through the single source of truth:
-// domain/origins.findEnrichedOrigin(id) returns the origin enriched with image + equipmentKits.
+// domain/origins.findEnrichedOrigin(id) returns the localized origin enriched
+// with image + equipmentKits. A missing id/catalog entry is a data error.
 const resolveOrigin = (storedOrigin) => {
   if (!storedOrigin) return null;
   const id = typeof storedOrigin === 'string' ? storedOrigin : storedOrigin.id;
-  return findEnrichedOrigin(id) || BARE_ORIGINS.find((origin) => origin.id === id) || null;
+  if (!id) throw new Error('[CharacterContext] Сохранённый ориджин не содержит id');
+  const resolved = findEnrichedOrigin(id);
+  if (!resolved) {
+    throw new Error(`[CharacterContext] Ориджин "${id}" отсутствует в данных активного сеттинга`);
+  }
+  return resolved;
 };
 
 const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -137,9 +142,12 @@ const findCatalogEntryById = (node, id) => {
 const FUSION_CORE_CATALOG = findCatalogEntryById(dataAmmo, FUSION_CORE_ID);
 // Каталожные данные части PA в текущей локали (имя); механика — из canonical data.
 const paLocalizedCatalogItem = (catalogId) => {
-  const localized = (getEquipmentCatalog(getCurrentLocale())?.powerArmorList || [])
+  const localized = (getEquipmentCatalog(getCurrentModuleLocale())?.powerArmorList || [])
     .find((p) => p.id === catalogId);
-  return localized || PA_CATALOG_BY_ID[catalogId];
+  if (!localized) {
+    throw new Error(`[CharacterContext] Для силовой брони "${catalogId}" нет локализованных данных`);
+  }
+  return localized;
 };
 const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
 // ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
@@ -819,15 +827,16 @@ export const CharacterProvider = ({ children }) => {
         try {
           const catalog = getEquipmentCatalog();
           const kit = catalog?.equipmentKits?.nightkin;
-          if (kit && Array.isArray(kit.items)) {
-            const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
-            (resolved.items || []).forEach((item) => {
-              useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
-            });
-            setEquipment({ id: 'nightkin', name: 'Тень', items: resolved.items || [] });
-            // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
-            data.nightkinKitPending = false;
+          if (!kit?.name || !Array.isArray(kit.items)) {
+            throw new Error('[loadCharacter] Комплект nightkin отсутствует в локализованном каталоге');
           }
+          const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
+          (resolved.items || []).forEach((item) => {
+            useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+          });
+          setEquipment({ id: 'nightkin', name: kit.name, items: resolved.items || [] });
+          // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
+          data.nightkinKitPending = false;
         } catch (e) {
           console.warn('[loadCharacter] nightkin kit grant failed:', e);
         }

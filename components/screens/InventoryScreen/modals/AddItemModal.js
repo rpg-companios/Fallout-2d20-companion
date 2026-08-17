@@ -3,7 +3,7 @@ import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput,
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
 import { tInventory } from '../logic/inventoryI18n';
-import { useLocale } from '../../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/AddItemModal.styles';
 
 const CATEGORY_ICONS = {
@@ -37,7 +37,8 @@ const mapWeaponTypeToDbValue = {
 };
 
 const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot' }) => {
-  const locale = useLocale();
+  const engineLocale = useLocale();
+  const moduleLocale = useModuleLocale();
   const [currentPath, setCurrentPath] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [weaponsByType, setWeaponsByType] = useState({});
@@ -51,7 +52,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       try {
         // Fallback to catalog if DB is empty (not yet seeded)
         const dbCount = await getRowCount('weapons').catch(() => 0);
-        const catalog = getEquipmentCatalog(locale);
+        const catalog = getEquipmentCatalog(moduleLocale);
 
         if (!dbCount) {
           // Use catalog directly
@@ -114,10 +115,10 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [engineLocale, moduleLocale]);
 
   const staticData = useMemo(() => {
-    const equipmentCatalog = getEquipmentCatalog(locale);
+    const equipmentCatalog = getEquipmentCatalog(moduleLocale);
 
     return {
       [tInventory('modals.addItemModal.categories.armor')]: (equipmentCatalog.armor?.armor || [])
@@ -165,7 +166,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
         [tInventory('modals.addItemModal.categories.robotMisc')]: equipmentCatalog.robotItems || [],
       },
     };
-  }, [locale]);
+  }, [engineLocale, moduleLocale]);
 
   useEffect(() => {
     if (visible) {
@@ -179,7 +180,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const allData = useMemo(() => ({
     [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
     ...staticData,
-  }), [locale, weaponsByType, staticData]);
+  }), [engineLocale, weaponsByType, staticData]);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -263,7 +264,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     if (Array.isArray(data)) return { items: data };
     if (data && typeof data === 'object') return { categories: Object.keys(data) };
     return { categories: [] };
-  }, [locale, allData, currentPath, searchTerm]);
+  }, [engineLocale, allData, currentPath, searchTerm]);
 
   const renderItem = ({ item }) => {
     const isItem = typeof item === 'object' && item?.name;

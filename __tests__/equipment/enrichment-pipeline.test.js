@@ -10,13 +10,14 @@
  *   [префиксы модов] [имена качеств] [базовое имя];
  *   качества ВСЕГДА добавляются; ложа меняет имя только при stockNames.with.
  */
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
 import { enrichWeaponItem, applyWeaponMods, getItemDisplayName, applyNumberModifier } from '../../domain/enrichItem';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
+import { setCurrentModuleLocale } from '../../i18n/locale';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../..');
@@ -40,6 +41,10 @@ const catalog = {
 };
 
 const qname = (id) => ({ dashing: 'Дерзкая', elegant: 'Элегантная' }[id] || id);
+
+beforeEach(() => {
+  setCurrentModuleLocale('ru-RU');
+});
 
 describe('Конвейер: BASE + MODS + QUALITIES (оружие)', () => {
   it('вариант: механика истинного предмета, имя варианта, моды применяются', () => {

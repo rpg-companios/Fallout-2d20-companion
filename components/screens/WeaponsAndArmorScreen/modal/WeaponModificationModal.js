@@ -8,7 +8,6 @@ import {
   Alert
 } from 'react-native';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../db/Database';
-import { declinePrefix } from '../../../../domain/modsEquip';
 import { shiftRange } from '../../../../domain/range';
 import { applyQualityGain } from '../../../../domain/weaponQualityConflicts';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
@@ -82,10 +81,9 @@ function normalizeSlotKey(slot) {
 // i18n/<loc>/data/equipment/weapons/weapon_mods.json — единственном источнике
 // истины для названий и префиксов модов. Второго словаря (modPrefixes) не нужно:
 // prefix приходит из каталога в языке текущей локали и используется напрямую.
-function getModDisplayName(mod, weaponBaseName) {
+function getModDisplayName(mod) {
   if (!mod) return '';
-  const token = (mod.prefix || mod.name || '').trim();
-  return weaponBaseName ? declinePrefix(token, weaponBaseName) : token;
+  return (mod.prefix || mod.name || '').trim();
 }
 
 function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
@@ -95,7 +93,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   // строим имя только от базового имени, чтобы не дублировать префиксы при повторных открытиях
   const prefixesRu = [];
   for (const mod of selectedMods) {
-    const p = getModDisplayName(mod, baseName);
+    const p = getModDisplayName(mod);
     if (!p) continue;
     if (!prefixesRu.includes(p)) prefixesRu.push(p);
   }

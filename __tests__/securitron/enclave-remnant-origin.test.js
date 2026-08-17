@@ -8,10 +8,11 @@
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 
 beforeAll(() => {
   setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
 });
 
 vi.mock('../../db/Database', async () => {

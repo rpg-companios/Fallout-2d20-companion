@@ -19,7 +19,7 @@ import { selectActiveTimedEffects } from "../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
-import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
+import { loadEnrichedOrigins } from "../../../domain/origins";
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
 import { filterKitsForCharacter } from "../../../domain/equipmentKits";
 import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
@@ -54,7 +54,7 @@ import {
 } from "./logic/characterScreenI18n";
 
 const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
-import { useLocale } from "../../../i18n/locale";
+import { useLocale, useModuleLocale } from "../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
 import styles from "../../../styles/CharacterScreen.styles";
 import { getTimedAttributeModifiers } from "../../../domain/effects";
@@ -305,7 +305,7 @@ export default function CharacterScreen() {
   } = useCharacter();
 
   const debugLocale = useLocale();
-  const locale = debugLocale;
+  const moduleLocale = useModuleLocale();
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
   const storeEffects = useCharacterStore((state) => state.effects);
@@ -351,26 +351,35 @@ export default function CharacterScreen() {
   }, [debugLocale, origin?.id, origin?.name, trait?.id, trait?.name, equipment?.id, equipment?.name, attributesSaved, skillsSaved, selectedSkills, extraTaggedSkills, storeSkills, skills]);
 
   const localizedOrigin = useMemo(() => {
-    if (!origin?.id) return origin;
-    return loadEnrichedOrigins().find((entry) => entry.id === origin.id) || { ...origin, name: tOrigin(origin.id) };
-  }, [origin, locale]);
+    if (!origin) return null;
+    if (!origin.id) throw new Error('[CharacterScreen] Выбранный ориджин не содержит id');
+    const resolved = loadEnrichedOrigins().find((entry) => entry.id === origin.id);
+    if (!resolved) {
+      throw new Error(`[CharacterScreen] Ориджин "${origin.id}" отсутствует в данных активного сеттинга`);
+    }
+    return resolved;
+  }, [origin, moduleLocale]);
 
   // ЕДИНАЯ логика для всех комплектов: модалка показывает комплекты ориджина,
   // отфильтрованные ОДНИМ общим механизмом по данным. Комплект может нести
   // `requiresTraitIds` (напр. у «Трёх семей» комплект привязан к выбранной
   // семье) — тогда он показан только при этом трейте. Без требования —
   // показан всегда. Никаких спец-веток под конкретный ориджин.
-  const equipmentKitsForModal = useMemo(() => {
-    const all = localizedOrigin?.equipmentKits || origin?.equipmentKits || [];
-    return filterKitsForCharacter(all, trait);
-  }, [localizedOrigin, origin, trait]);
+  const equipmentKitsForModal = useMemo(
+    () => filterKitsForCharacter(localizedOrigin?.equipmentKits || [], trait),
+    [localizedOrigin, trait],
+  );
 
   const localizedTraitName = useMemo(() => {
     if (!trait) return null;
     const traitId = trait.id || trait.ids?.[0];
+    if (!traitId) throw new Error('[CharacterScreen] Выбранный трейт не содержит id');
     const traitData = loadTraitsData().find((entry) => entry.id === traitId);
-    return traitData?.displayNameKey ? tTrait(traitData.displayNameKey) : trait.name;
-  }, [trait, locale]);
+    if (!traitData?.displayNameKey) {
+      throw new Error(`[CharacterScreen] Трейт "${traitId}" отсутствует в данных активного сеттинга`);
+    }
+    return tTrait(traitData.displayNameKey);
+  }, [trait, moduleLocale]);
 
   const localizedEquipmentName = useMemo(() => {
     if (!equipment) return null;
@@ -380,9 +389,13 @@ export default function CharacterScreen() {
       // комплекта откроется по нажатию.
       return tCharacterScreen("placeholders.kitUnknown");
     }
-    const catalog = getEquipmentCatalog(locale);
-    return catalog?.equipmentKits?.[equipment.id]?.name || equipment.name;
-  }, [equipment, locale]);
+    const catalog = getEquipmentCatalog(moduleLocale);
+    const localizedName = catalog?.equipmentKits?.[equipment.id]?.name;
+    if (!localizedName) {
+      throw new Error(`[CharacterScreen] Для комплекта "${equipment.id}" нет перевода`);
+    }
+    return localizedName;
+  }, [equipment, moduleLocale]);
 
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);

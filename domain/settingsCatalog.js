@@ -1,35 +1,34 @@
 // domain/settingsCatalog.js
-// Каталог настроек: движковые + сеттинг (modules/<id>/settings.json).
+// Каталог настроек: движковые + настройки активного сеттинга.
 //
-// Модель (решения владельца, 2026-08-15):
-//   - настройки МЕХАНИК сеттинга описываются в settings.json модуля
-//     (данные, без логики): прочность оружия, случайное качество,
-//     показ рукопашной атаки, язык интерфейса;
-//   - движковые UI-настройки (каталоги персонажей, вид карточек оружия)
-//     описаны встроенным списком ENGINE_SETTINGS — у движка они есть,
-//     остальные настройки движок не знает;
-//   - значения хранятся по модулям: { [moduleId]: { [settingId]: value } }.
+// Настройка описывает не только тип и значение, но и экран управления:
+//   settings   — общее окно «Настройки»;
+//   characters — экран менеджера персонажей;
+//   equipment  — экран экипировки;
+//   inventory  — экран инвентаря.
 //
-// Формат записи settings.json (массив):
-//   {
-//     "id": "weaponDurabilityLossEnabled",
-//     "type": "boolean" | "number" | "select",
-//     "sectionKey": "survivalMode",           // ключ заголовка секции (i18n модуля)
-//     "labelKey": "settings.durabilityTitle", // i18n-ключи текстов
-//     "descriptionKey": "settings.durabilityDescription",
-//     "defaultValue": false,
-//     "min": 1, "max": 100,                   // для number
-//     "options": [ { "value": "ru-RU", "labelKey": "settings.lang.ru" } ], // для select
-//     "dependsOn": "weaponDurabilityLossEnabled"  // показывать только если включено
-//   }
+// Движок владеет общими UI-настройками. Механики и доступные варианты
+// конкретной игры описывает modules/<id>/settings.json. Например, движок умеет
+// отрисовать режим tabs, но Fallout не объявляет этот вариант и потому не даёт
+// его выбрать.
 
 import moduleSettings from '../modules/fallout/settings.json';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../i18n/locale';
+import { getActiveModuleId } from './moduleLocale';
+
+export const SETTING_CONTROL_SURFACES = Object.freeze({
+  SETTINGS: 'settings',
+  CHARACTERS: 'characters',
+  EQUIPMENT: 'equipment',
+  INVENTORY: 'inventory',
+});
 
 /** Движковые настройки (UI-фичи, общие для любых сеттингов). */
 export const ENGINE_SETTINGS = [
   {
     id: 'characterFoldersEnabled',
     type: 'boolean',
+    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
     sectionKey: 'appearance',
     labelKey: 'settings.foldersTitle',
     descriptionKey: 'settings.foldersDescription',
@@ -38,6 +37,7 @@ export const ENGINE_SETTINGS = [
   {
     id: 'characterDeleteActionPlacement',
     type: 'select',
+    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
     sectionKey: 'appearance',
     labelKey: 'settings.characterDeleteActionPlacementTitle',
     descriptionKey: 'settings.characterDeleteActionPlacementDescription',
@@ -48,57 +48,70 @@ export const ENGINE_SETTINGS = [
     ],
   },
   {
-    id: 'weaponCardsDisplayMode',
+    id: 'language',
     type: 'select',
-    sectionKey: 'appearance',
-    labelKey: 'settings.cardsTitle',
-    descriptionKey: 'settings.cardsDescription',
-    defaultValue: 'cards',
-    options: [
-      { value: 'cards', labelKey: 'settings.cards.cards' },
-      { value: 'spoilers', labelKey: 'settings.cards.spoilers' },
-      { value: 'tabs', labelKey: 'settings.cards.tabs' },
-    ],
+    controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
+    defaultValue: DEFAULT_LOCALE,
+    options: SUPPORTED_LOCALES.map((value) => ({ value })),
   },
 ];
 
 const SUPPORTED_TYPES = ['boolean', 'number', 'select'];
+const SUPPORTED_SURFACES = Object.values(SETTING_CONTROL_SURFACES);
 
 const validateSettings = (settings, moduleId) => {
   if (!Array.isArray(settings)) {
     throw new Error(`[settingsCatalog] ${moduleId}/settings.json: ожидался массив`);
   }
   const seen = new Set();
-  for (const s of settings) {
-    if (!s?.id || typeof s.id !== 'string') {
+  for (const setting of settings) {
+    if (!setting?.id || typeof setting.id !== 'string') {
       throw new Error(`[settingsCatalog] ${moduleId}: запись без id`);
     }
-    if (seen.has(s.id)) {
-      throw new Error(`[settingsCatalog] ${moduleId}: дубликат id "${s.id}"`);
+    if (seen.has(setting.id)) {
+      throw new Error(`[settingsCatalog] ${moduleId}: дубликат id "${setting.id}"`);
     }
-    seen.add(s.id);
-    if (!SUPPORTED_TYPES.includes(s.type)) {
-      throw new Error(`[settingsCatalog] ${moduleId}: "${s.id}" — неизвестный type "${s.type}"`);
+    seen.add(setting.id);
+    if (!SUPPORTED_TYPES.includes(setting.type)) {
+      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" — неизвестный type "${setting.type}"`);
     }
-    if (s.type === 'select' && !Array.isArray(s.options)) {
-      throw new Error(`[settingsCatalog] ${moduleId}: "${s.id}" (select) без options`);
+    if (!SUPPORTED_SURFACES.includes(setting.controlSurface)) {
+      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" — неизвестный controlSurface "${setting.controlSurface}"`);
     }
-    if (s.dependsOn && !settings.some((x) => x.id === s.dependsOn)) {
-      throw new Error(`[settingsCatalog] ${moduleId}: "${s.id}" dependsOn неизвестной "${s.dependsOn}"`);
+    if (setting.type === 'select' && !Array.isArray(setting.options)) {
+      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" (select) без options`);
+    }
+    if (setting.dependsOn && !settings.some((candidate) => candidate.id === setting.dependsOn)) {
+      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" dependsOn неизвестной "${setting.dependsOn}"`);
     }
   }
   return settings;
 };
 
 /** Настройки сеттинга (после валидации). */
-export const getModuleSettings = (moduleId = 'fallout') =>
-  validateSettings(moduleSettings, moduleId);
+export const getModuleSettings = (moduleId = getActiveModuleId()) => {
+  if (moduleId !== getActiveModuleId()) {
+    throw new Error(`[settingsCatalog] модуль "${moduleId}" не зарегистрирован`);
+  }
+  return validateSettings(moduleSettings, moduleId);
+};
 
-/** Все настройки: движковые + сеттинга. */
-export const getAllSettings = () => [...ENGINE_SETTINGS, ...getModuleSettings()];
+/** Все настройки: движковые + настройки активного сеттинга. */
+export const getAllSettings = () => [
+  ...ENGINE_SETTINGS,
+  ...getModuleSettings(getActiveModuleId()),
+];
+
+/** Настройки, которыми управляет конкретный экран. */
+export const getSettingsForSurface = (controlSurface) => {
+  if (!SUPPORTED_SURFACES.includes(controlSurface)) {
+    throw new Error(`[settingsCatalog] неизвестный controlSurface "${controlSurface}"`);
+  }
+  return getAllSettings().filter((setting) => setting.controlSurface === controlSurface);
+};
 
 /** Описание настройки по id. */
-export const getSettingById = (id) => getAllSettings().find((s) => s.id === id) || null;
+export const getSettingById = (id) => getAllSettings().find((setting) => setting.id === id) || null;
 
 /** Дефолтное значение настройки. */
 export const getSettingDefault = (id) => getSettingById(id)?.defaultValue ?? null;

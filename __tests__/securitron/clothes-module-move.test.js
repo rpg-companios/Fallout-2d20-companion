@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
 import moduleRuClothes from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
 import moduleEnClothes from '../../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
@@ -18,7 +18,10 @@ import legacyEnClothes from '../../i18n/en-EN/data/equipment/armor/clothes.json'
 const countItems = (groups) => groups.reduce((sum, g) => sum + (g.items || []).length, 0);
 
 describe('Одежда в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит все группы: suit, outfit, headwear (31 предмет)', () => {
     const groups = moduleClothes.clothes;

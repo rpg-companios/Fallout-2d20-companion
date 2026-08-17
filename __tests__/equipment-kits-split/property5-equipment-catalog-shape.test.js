@@ -19,8 +19,9 @@ describe('Property 5: Форма equipmentKits в getEquipmentCatalog()', () => 
     expect(kitIds.length).toBeGreaterThan(0);
 
     const { getEquipmentCatalog } = await import('../../i18n/equipmentCatalog');
-    const { setCurrentLocale } = await import('../../i18n/locale');
+    const { setCurrentLocale, setCurrentModuleLocale } = await import('../../i18n/locale');
     setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
     const catalog = getEquipmentCatalog('ru-RU');
 
     const bad = [];

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleArmor from '../../modules/fallout/data/equipment/armor.json';
 import moduleRuArmor from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/armor.json';
 import moduleEnArmor from '../../modules/fallout/i18n/en-EN/data/equipment/armor/armor.json';
@@ -20,7 +20,10 @@ const countPieces = (armor) =>
       (s, tier) => s + (tier?.pieces || []).length, 0), 0);
 
 describe('Броня в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит полную механику брони (56 деталей в 6 категориях)', () => {
     expect(countPieces(moduleArmor)).toBe(56);

@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleFood from '../../modules/fallout/data/consumables/food.json';
 import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
 import moduleWeaponMods from '../../modules/fallout/data/equipment/weapon_mods.json';
@@ -15,6 +15,7 @@ import dataWeaponMods from '../../data/equipment/weapon_mods.json';
 
 beforeAll(() => {
   setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
 });
 
 describe('Данные в модуле (сеттинг), data/ — пустой движок', () => {

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
-import { useLocale } from '../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import perksData from '../../../modules/fallout/data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
@@ -15,7 +15,8 @@ const PerksAndTraitsScreen = () => {
     trait, level, selectedPerks, setSelectedPerks, annotatePerks, 
     addPerkAttributePoints, attributesSaved 
   } = useCharacter();
-  useLocale(); // подписываемся на смену локали → ре-рендер
+  useLocale(); // интерфейс движка
+  useModuleLocale(); // контент активного сеттинга
   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
   const perkLimit = level + extraPerkSlots;

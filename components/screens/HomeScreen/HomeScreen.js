@@ -19,8 +19,18 @@ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCharacter } from '../../CharacterContext';
 import { findEnrichedOrigin } from '../../../domain/origins';
-import { setCurrentLocale, useLocale } from '../../../i18n/locale';
+import {
+  SUPPORTED_LOCALES,
+  useLocale,
+  useModuleLocale,
+} from '../../../i18n/locale';
+import {
+  getActiveModuleId,
+  getModuleLocales,
+  shouldOfferModuleLocaleChoice,
+} from '../../../domain/moduleLocale';
 import { tHomeScreen } from './logic/homeScreenI18n';
+import { getLocaleLabel } from './logic/localeLabel';
 import * as db from '../../../db';
 import {
   createCharacterExportPayload,
@@ -157,6 +167,7 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 
 export default function HomeScreen({ navigation }) {
   const locale = useLocale();
+  const moduleLocale = useModuleLocale();
   const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
   const [characters, setCharacters] = useState([]);
   const [folders, setFolders] = useState([]);
@@ -171,6 +182,9 @@ export default function HomeScreen({ navigation }) {
   const dropBounds = useRef({});
   const characterFoldersEnabled = useAppSettingsStore(selectCharacterFoldersEnabled);
   const characterDeleteActionPlacement = useAppSettingsStore(selectCharacterDeleteActionPlacement);
+  const setSettingValue = useAppSettingsStore((state) => state.setValue);
+  const setModuleLocale = useAppSettingsStore((state) => state.setModuleLocale);
+  const activeModuleId = getActiveModuleId();
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
@@ -248,10 +262,23 @@ export default function HomeScreen({ navigation }) {
       setDesktopInstallVisible(true);
     }
   };
-  const languageOptions = [
-    { code: 'ru-RU', label: tHomeScreen('language.russian'), flag: '🇷🇺' },
-    { code: 'en-EN', label: tHomeScreen('language.english'), flag: '🇬🇧' },
-  ];
+  const localizeLocaleLabel = (code) => getLocaleLabel({
+    code,
+    displayLocale: locale,
+    translate: tHomeScreen,
+  });
+  const languageOptions = SUPPORTED_LOCALES.map((code) => ({
+    code,
+    label: localizeLocaleLabel(code),
+  }));
+  const moduleLanguageOptions = getModuleLocales(activeModuleId).map((code) => ({
+    code,
+    label: localizeLocaleLabel(code),
+  }));
+  const showModuleLanguageSelector = shouldOfferModuleLocaleChoice({
+    moduleId: activeModuleId,
+    engineLocale: locale,
+  });
 
   const loadList = useCallback(async ({ duplicatedCharacterId, sourceCharacterId } = {}) => {
     setLoading(true);
@@ -649,17 +676,44 @@ export default function HomeScreen({ navigation }) {
                   isLast && styles.langSegmentRight,
                   locale === lang.code && styles.langSegmentActive,
                 ]}
-                onPress={() => setCurrentLocale(lang.code)}
+                onPress={() => setSettingValue('language', lang.code)}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
                 <Text style={[styles.langSegmentText, locale === lang.code && styles.langSegmentTextActive]}>
-                  {lang.code === 'ru-RU' ? 'ru' : 'en'}
+                  {lang.label}
                 </Text>
               </Pressable>
             );
           })}
         </View>
       </View>
+      {showModuleLanguageSelector && (
+        <View style={styles.moduleLanguageRow}>
+          <Text style={styles.moduleLanguageLabel}>{tHomeScreen('language.settingTitle')}</Text>
+          <View style={styles.languageContainer}>
+            {moduleLanguageOptions.map((lang, index) => (
+              <Pressable
+                key={lang.code}
+                style={[
+                  styles.langSegment,
+                  index === 0 && styles.langSegmentLeft,
+                  index === moduleLanguageOptions.length - 1 && styles.langSegmentRight,
+                  moduleLocale === lang.code && styles.langSegmentActive,
+                ]}
+                onPress={() => setModuleLocale(activeModuleId, lang.code)}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <Text style={[
+                  styles.langSegmentText,
+                  moduleLocale === lang.code && styles.langSegmentTextActive,
+                ]}>
+                  {lang.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
       <View style={styles.titleContainer}>
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>

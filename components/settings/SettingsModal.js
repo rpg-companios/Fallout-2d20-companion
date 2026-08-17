@@ -1,32 +1,55 @@
 import React from 'react';
 import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
-import { ENGINE_SETTINGS, getModuleSettings } from '../../domain/settingsCatalog';
+import {
+  ENGINE_SETTINGS,
+  getSettingsForSurface,
+  SETTING_CONTROL_SURFACES,
+} from '../../domain/settingsCatalog';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
 import { getModuleI18n } from '../../domain/registry';
-import { getCurrentLocale } from '../../i18n/locale';
+import {
+  getCurrentModuleLocale,
+  useLocale,
+  useModuleLocale,
+} from '../../i18n/locale';
 
-// Строки настроек: движковые — из i18n экрана Home (homeScreenI18n),
-// модульные — из i18n модуля (system/settings.json).
-const tSetting = (key) => {
-  if (!key) return '';
-  const moduleDict = getModuleI18n(getCurrentLocale());
-  let current = moduleDict?.settings;
-  if (!current) return tHomeScreen(key);
+const resolvePath = (dictionary, key) => {
+  let current = dictionary;
   for (const part of key.split('.')) {
     current = current?.[part];
-    if (current === undefined) return tHomeScreen(key);
+    if (current === undefined) return undefined;
   }
   return current;
 };
 
-const tSection = (sectionKey) => {
-  const moduleDict = getModuleI18n(getCurrentLocale());
-  const direct = moduleDict?.settings?.[sectionKey];
-  return typeof direct === 'string' ? direct : tHomeScreen(`settings.${sectionKey}Title`);
+const isEngineSetting = (setting) =>
+  ENGINE_SETTINGS.some((candidate) => candidate.id === setting.id);
+
+const requireModuleText = (key) => {
+  const value = resolvePath(getModuleI18n(getCurrentModuleLocale()), key);
+  if (typeof value !== 'string') {
+    throw new Error(`[SettingsModal] В активном сеттинге отсутствует строка "${key}"`);
+  }
+  return value;
 };
 
-const ALL_SETTINGS = [...ENGINE_SETTINGS, ...getModuleSettings()];
+// Движковые строки принадлежат движку, строки механик — только активному
+// сеттингу: между этими словарями нет перекрёстных фолбэков.
+const tSetting = (setting, key) => {
+  if (typeof key !== 'string' || key.length === 0) {
+    throw new Error(`[SettingsModal] У настройки "${setting.id}" отсутствует ключ перевода`);
+  }
+  return isEngineSetting(setting) ? tHomeScreen(key) : requireModuleText(key);
+};
+
+const tSection = (section) => (
+  section.owner === 'engine'
+    ? tHomeScreen(`settings.${section.sectionKey}Title`)
+    : requireModuleText(`settings.${section.sectionKey}`)
+);
+
+const SETTINGS_SCREEN_SETTINGS = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS);
 
 const SettingRow = ({ setting }) => {
   const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
@@ -37,7 +60,7 @@ const SettingRow = ({ setting }) => {
     const max = setting.max ?? 100;
     return (
       <View style={styles.loss}>
-        <Text style={styles.label}>{tSetting(setting.labelKey)}</Text>
+        <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
         <View style={styles.counter}>
           <TouchableOpacity disabled={Number(value) <= min} onPress={() => setValue(setting.id, Number(value) - 1)}>
             <Text style={styles.button}>−</Text>
@@ -47,7 +70,7 @@ const SettingRow = ({ setting }) => {
             <Text style={styles.button}>+</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.description}>{tSetting(setting.descriptionKey)}</Text>
+        <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
       </View>
     );
   }
@@ -56,18 +79,18 @@ const SettingRow = ({ setting }) => {
     return (
       <View style={[styles.row, styles.settingRow]}>
         <View style={styles.text}>
-          <Text style={styles.label}>{tSetting(setting.labelKey)}</Text>
-          <Text style={styles.description}>{tSetting(setting.descriptionKey)}</Text>
+          <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
+          <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
         </View>
         <View style={styles.selectButtons}>
-          {(setting.options || []).map((opt) => (
+          {setting.options.map((option) => (
             <TouchableOpacity
-              key={opt.value}
-              style={[styles.selectButton, value === opt.value && styles.selectButtonActive]}
-              onPress={() => setValue(setting.id, opt.value)}
+              key={option.value}
+              style={[styles.selectButton, value === option.value && styles.selectButtonActive]}
+              onPress={() => setValue(setting.id, option.value)}
             >
-              <Text style={[styles.selectText, value === opt.value && styles.selectTextActive]}>
-                {tSetting(opt.labelKey)}
+              <Text style={[styles.selectText, value === option.value && styles.selectTextActive]}>
+                {tSetting(setting, option.labelKey)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -76,35 +99,36 @@ const SettingRow = ({ setting }) => {
     );
   }
 
-  // boolean
   return (
     <View style={[styles.row, styles.settingRow]}>
       <View style={styles.text}>
-        <Text style={styles.label}>{tSetting(setting.labelKey)}</Text>
-        <Text style={styles.description}>{tSetting(setting.descriptionKey)}</Text>
+        <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
+        <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
       </View>
-      <Switch value={Boolean(value)} onValueChange={(v) => setValue(setting.id, v)} />
+      <Switch value={Boolean(value)} onValueChange={(nextValue) => setValue(setting.id, nextValue)} />
     </View>
   );
 };
 
 export default function SettingsModal({ visible, onClose }) {
-  // родительский (зависимый) показывается только при включённом dependsOn
-  const parentValue = useAppSettingsStore((state) =>
-    state.getSettingValue('weaponDurabilityLossEnabled'));
-  const visibleSettings = ALL_SETTINGS.filter(
-    (s) => !s.dependsOn || parentValue === true || s.id === s.dependsOn,
+  useLocale();
+  useModuleLocale();
+  useAppSettingsStore((state) => state.values); // зависимости между настройками
+  const getSettingValue = useAppSettingsStore((state) => state.getSettingValue);
+  const visibleSettings = SETTINGS_SCREEN_SETTINGS.filter(
+    (setting) => !setting.dependsOn || getSettingValue(setting.dependsOn) === true,
   );
 
-  // группировка по секциям с сохранением порядка
   const sections = [];
-  for (const s of visibleSettings) {
-    let sec = sections.find((x) => x.key === s.sectionKey);
-    if (!sec) {
-      sec = { key: s.sectionKey, settings: [] };
-      sections.push(sec);
+  for (const setting of visibleSettings) {
+    const owner = isEngineSetting(setting) ? 'engine' : 'module';
+    const key = `${owner}:${setting.sectionKey}`;
+    let section = sections.find((candidate) => candidate.key === key);
+    if (!section) {
+      section = { key, owner, sectionKey: setting.sectionKey, settings: [] };
+      sections.push(section);
     }
-    sec.settings.push(s);
+    section.settings.push(setting);
   }
 
   return (
@@ -115,8 +139,8 @@ export default function SettingsModal({ visible, onClose }) {
 
           {sections.map((section) => (
             <View key={section.key}>
-              <Text style={styles.sectionTitle}>{tSection(section.key)}</Text>
-              {section.settings.map((s) => <SettingRow key={s.id} setting={s} />)}
+              <Text style={styles.sectionTitle}>{tSection(section)}</Text>
+              {section.settings.map((setting) => <SettingRow key={setting.id} setting={setting} />)}
               <View style={styles.separator} />
             </View>
           ))}

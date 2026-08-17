@@ -25,7 +25,7 @@ import {
 import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { debugLog } from '../../../src/debug/falloutDebug';
-import { useLocale } from '../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { generateStackKey } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
@@ -205,8 +205,9 @@ const InventoryScreen = () => {
   // Снятые пакеты: каждый — тоже контейнер (ПРАВИЛО владельца), аккордеоны
   // независимы по id стор-записи: { [storeItemId]: true }.
 
-  const locale = useLocale();
-  const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
+  useLocale();
+  const moduleLocale = useModuleLocale();
+  const equipmentCatalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
 
   const getItemName = (item) => item?.name || item?.id || '';
   const getItemCatalogId = (item) => item?.id || item?.weaponId || item?.itemId || item?.armorId || item?.clothingId || item?.code || '';
@@ -1616,6 +1617,7 @@ const InventoryScreen = () => {
             {renderTableHeader()}
             <FlatList
               data={displayItems}
+              extraData={moduleLocale}
               renderItem={renderItem}
               keyExtractor={(item, index) => item.uniqueId || `${getItemName(item)}-${index}`}
               style={styles.list}

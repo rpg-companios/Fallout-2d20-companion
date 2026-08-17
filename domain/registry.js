@@ -39,13 +39,22 @@ import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/foo
 import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
 import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
 import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
+import moduleRuSettingsI18n from '../modules/fallout/i18n/ru-RU/data/system/settings.json';
+import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/settings.json';
 
 
 import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentModuleLocale } from '../i18n/locale';
 import { expandTrueItems } from './packMerge';
+
+const requireModuleLocale = (locale) => {
+  if (locale !== 'ru-RU' && locale !== 'en-EN') {
+    throw new Error(`[registry] Для языка сеттинга "${locale}" нет каталога данных`);
+  }
+  return locale;
+};
 
 /**
  * Все ориджины: база + модуль (модуль перекрывает по id).
@@ -73,7 +82,7 @@ export function getBodyPlans() {
  * Формат: { [originId]: string }
  */
 export function getOriginI18n(locale) {
-  return locale === 'en-EN' ? moduleEnOriginsI18n : moduleRuOriginsI18n;
+  return requireModuleLocale(locale) === 'en-EN' ? moduleEnOriginsI18n : moduleRuOriginsI18n;
 }
 
 /**
@@ -81,7 +90,7 @@ export function getOriginI18n(locale) {
  * Формат: { traits: { [originKey]: { [traitKey]: { name, description } } } }
  */
 export function getTraitI18n(locale) {
-  return locale === 'en-EN' ? moduleEnTraitsI18n : moduleRuTraitsI18n;
+  return requireModuleLocale(locale) === 'en-EN' ? moduleEnTraitsI18n : moduleRuTraitsI18n;
 }
 
 /**
@@ -113,7 +122,7 @@ export function getModuleEquipmentKits() {
  * uniqQualities, weapons, clothes, generalGoods, weaponMods, food, drinks.
  */
 export function getModuleI18n(locale) {
-  const isEn = locale === 'en-EN';
+  const isEn = requireModuleLocale(locale) === 'en-EN';
   return {
     origins: isEn ? moduleEnOriginsI18n : moduleRuOriginsI18n,
     traits: isEn ? moduleEnTraitsI18n : moduleRuTraitsI18n,
@@ -125,6 +134,7 @@ export function getModuleI18n(locale) {
     weaponMods: isEn ? moduleEnWeaponModsI18n : moduleRuWeaponModsI18n,
     food: isEn ? moduleEnFoodI18n : moduleRuFoodI18n,
     drinks: isEn ? moduleEnDrinksI18n : moduleRuDrinksI18n,
+    settings: isEn ? moduleEnSettingsI18n : moduleRuSettingsI18n,
   };
 }
 
@@ -141,9 +151,11 @@ export function getUniqQualities() {
  * Имя уникального качества из i18n модуля по id (для локали).
  * Пустая строка — имя не задано (качество есть, но имени нет).
  */
-export function getUniqQualityName(id, locale = getCurrentLocale()) {
+export function getUniqQualityName(id, locale = getCurrentModuleLocale()) {
   if (!id) return '';
-  const i18n = locale === 'en-EN' ? moduleEnUniqQualitiesI18n : moduleRuUniqQualitiesI18n;
+  const i18n = requireModuleLocale(locale) === 'en-EN'
+    ? moduleEnUniqQualitiesI18n
+    : moduleRuUniqQualitiesI18n;
   const entry = (i18n || []).find((q) => q?.id === id);
   return entry?.name || '';
 }

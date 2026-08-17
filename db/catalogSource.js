@@ -11,7 +11,7 @@
 // Character SAVES remain in SQLite (see Database.js / characters table).
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentModuleLocale } from '../i18n/locale';
 import perksData from '../modules/fallout/data/perks/perks.json';
 import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
 import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
@@ -127,18 +127,23 @@ const PERK_I18N = {
 };
 
 const buildPerkRows = () => {
-  const locale = getCurrentLocale();
-  const localizedById = PERK_I18N[locale] || PERK_I18N['ru-RU'];
-  const ruById = PERK_I18N['ru-RU'];
+  const locale = getCurrentModuleLocale();
+  const localizedById = PERK_I18N[locale];
+  if (!localizedById) {
+    throw new Error(`[catalogSource] Для языка сеттинга "${locale}" нет каталога перков`);
+  }
   return perksData.map((perk) => {
-    const localized = localizedById.get(perk.id) || ruById.get(perk.id) || {};
+    const localized = localizedById.get(perk.id);
+    if (!localized?.name || typeof localized.effect !== 'string') {
+      throw new Error(`[catalogSource] Для перка "${perk.id}" нет перевода`);
+    }
     return {
       id: perk.id,
-      perk_name: localized.name || perk.id,
+      perk_name: localized.name,
       rank: 1,
       max_rank: perk.maxRanks || 1,
       requirements: perk.prerequisites ? JSON.stringify(perk.prerequisites) : null,
-      description: localized.effect || '',
+      description: localized.effect,
       level_increase: perk.prerequisites?.levelIncreasePerRank ?? null,
     };
   });
@@ -213,7 +218,7 @@ let _cache = null;
 let _cacheLocale = null;
 
 const build = () => {
-  const locale = getCurrentLocale();
+  const locale = getCurrentModuleLocale();
   if (_cache && _cacheLocale === locale) return _cache;
   const catalog = getEquipmentCatalog(locale);
   _cache = {

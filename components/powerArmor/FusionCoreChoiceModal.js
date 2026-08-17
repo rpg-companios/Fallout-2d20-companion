@@ -13,17 +13,21 @@ import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
 import { useCharacter } from '../CharacterContext';
 import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
-import { useLocale } from '../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../i18n/locale';
 import { FUSION_CORE_ID } from '../../domain/powerArmor';
 
 const FusionCoreChoiceModal = () => {
-  const locale = useLocale();
+  useLocale();
+  const moduleLocale = useModuleLocale();
   const { pendingCoreChoice, resolveCoreChoice } = useCharacter();
 
   if (!pendingCoreChoice) return null;
 
-  const coreCatalogName = (getEquipmentCatalog(locale)?.ammoTypes || [])
-    .find((entry) => entry.id === FUSION_CORE_ID)?.name || FUSION_CORE_ID;
+  const coreCatalogName = (getEquipmentCatalog(moduleLocale)?.ammoTypes || [])
+    .find((entry) => entry.id === FUSION_CORE_ID)?.name;
+  if (!coreCatalogName) {
+    throw new Error(`[FusionCoreChoiceModal] Для боеприпаса "${FUSION_CORE_ID}" нет перевода`);
+  }
 
   return (
     <Modal

@@ -224,7 +224,9 @@ export const enrichWeaponItem = (weaponLike, catalog, opts = {}) => {
     .filter(Boolean);
   const qualityNameById = opts.qualityNameById || (() => '');
   const qualityNames = (weaponLike.uniqQualities || [])
-    .map(qualityNameById)
+    // Array.map передаёт также index и array. Вызываем контракт (id) явно,
+    // чтобы необязательные параметры callback не получали index вместо локали.
+    .map((qualityId) => qualityNameById(qualityId))
     .filter(Boolean);
   const displayName = getItemDisplayName({ baseName, modPrefixes, qualityNames });
 

@@ -10,78 +10,26 @@ import {
 } from 'react-native';
 import { useCharacter } from '../../../CharacterContext';
 import { applyLimbReplacement } from '../../../../domain/robotEquip';
-import { getCurrentLocale } from '../../../../i18n/locale';
-
-// ---------------------------------------------------------------------------
-// Static data imports — raw stats
-// ---------------------------------------------------------------------------
-import dataRobotArms from '../../../../modules/fallout/data/equipment/robot/robotarms.json';
-import dataRobotHeads from '../../../../modules/fallout/data/equipment/robot/robotheads.json';
-import dataRobotBody  from '../../../../modules/fallout/data/equipment/robot/robotbody.json';
-import dataRobotLegs  from '../../../../modules/fallout/data/equipment/robot/robotlegs.json';
-import dataRobotWeapons from '../../../../modules/fallout/data/equipment/robot/weapons.json';
-
-// ---------------------------------------------------------------------------
-// i18n imports
-// ---------------------------------------------------------------------------
-import ruRobotArms from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
-import ruRobotHeads from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
-import ruRobotBody  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
-import ruRobotLegs  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
-import ruRobotWeapons from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
-
-import enRobotArms from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
-import enRobotHeads from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
-import enRobotBody  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
-import enRobotLegs  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
-import enRobotWeapons from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
+import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
-
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Merge data stats with i18n names by id */
-const mergeById = (dataArr, i18nArr) => {
-  const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
-  return (dataArr || []).map((dataItem) => {
-    const i18nItem = i18nMap[dataItem.id] || {};
-    return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
-  });
-};
-
-/**
- * Returns the merged (stats + i18n name) limb catalog for the given slot type.
- * slotKey → itemType mapping:
- *   head                       → robotHead
- *   body                       → robotBody
- *   leftArm / rightArm / arm*  → robotArm
- *   leftLeg / rightLeg / thruster / chassis → robotLegs
- */
-const getLimbCatalogForSlot = (slotKey) => {
-  const locale = getCurrentLocale();
-  const isRu = locale === 'ru-RU';
-
-  if (slotKey === 'head') {
-    return mergeById(dataRobotHeads, isRu ? ruRobotHeads : enRobotHeads);
-  }
-  if (slotKey === 'body') {
-    return mergeById(dataRobotBody, isRu ? ruRobotBody : enRobotBody);
-  }
+/** Returns a localized limb catalog from the active setting catalog. */
+const getLimbCatalogForSlot = (catalog, slotKey) => {
+  if (slotKey === 'head') return catalog.robotHeads || [];
+  if (slotKey === 'body') return catalog.robotBody || [];
   if (
     slotKey === 'leftArm' ||
     slotKey === 'rightArm' ||
     slotKey.startsWith('arm')
   ) {
-    const i18nRobotArms = [
-      ...(isRu ? ruRobotArms : enRobotArms),
-      ...(isRu ? ruRobotWeapons : enRobotWeapons),
-    ].filter((item, index, arr) => item?.id && arr.findIndex((x) => x?.id === item.id) === index);
-    return mergeById(dataRobotArms || [], i18nRobotArms);
+    return catalog.robotArms || [];
   }
-  // legs / thruster / chassis
-  return mergeById(dataRobotLegs, isRu ? ruRobotLegs : enRobotLegs);
+  return catalog.robotLegs || [];
 };
 
 /**
@@ -192,30 +140,31 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
 const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
   const { equippedRobotSlots, setEquippedRobotSlots, setEquippedWeapons, equipment, setEquipment } =
     useCharacter();
+  useLocale();
+  const moduleLocale = useModuleLocale();
+  const equipmentCatalog = useMemo(
+    () => getEquipmentCatalog(moduleLocale),
+    [moduleLocale],
+  );
 
   // Build filtered limb list
   const compatibleLimbs = useMemo(() => {
     if (!slotKey) return [];
-    const catalog = getLimbCatalogForSlot(slotKey);
+    const catalog = getLimbCatalogForSlot(equipmentCatalog, slotKey);
     const itemType = getItemTypeForSlot(slotKey);
     const byType = catalog.filter((l) => l.itemType === itemType);
     return filterByBodyPlan(byType, bodyPlan);
-  }, [slotKey, bodyPlan]);
+  }, [equipmentCatalog, slotKey, bodyPlan]);
 
   const handleSelect = (newLimb) => {
     if (!equippedRobotSlots || !slotKey) return;
 
-    // Apply limb replacement — returns { slots, weapons }
-    const isRu = getCurrentLocale() === 'ru-RU';
-    const mergedWeapons = mergeById(
-      dataRobotWeapons || [],
-      isRu ? ruRobotWeapons : enRobotWeapons,
-    );
+    // Apply limb replacement using the active setting locale catalog.
     const { slots: updatedSlots, weapons: updatedWeapons } = applyLimbReplacement(
       equippedRobotSlots,
       slotKey,
       newLimb,
-      mergedWeapons,
+      equipmentCatalog.robotWeaponsOnly || [],
     );
 
     // Move old limb to inventory if it exists

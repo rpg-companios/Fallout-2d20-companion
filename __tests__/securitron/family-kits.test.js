@@ -18,11 +18,12 @@ vi.mock('../../db/Database', async () => {
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
 import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
 import { catalogGetWeaponMods } from '../../db/catalogSource';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import useCharacterStore from '../../src/store/characterStore';
 
 beforeAll(() => {
   setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
 });
 
 describe('Новые предметы модуля', () => {

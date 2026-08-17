@@ -23,13 +23,14 @@ import { getUniqQualities, getUniqQualityName } from '../../domain/registry';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
 import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
 import { migrateCharacterState } from '../../src/store/migrations';
 import useCharacterStore from '../../src/store/characterStore';
 
 beforeAll(() => {
   setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
 });
 
 const NAME_BY_ID = { dashing: 'Дерзкая', elegant: 'Элегантная', homemade: 'Кустарные' };

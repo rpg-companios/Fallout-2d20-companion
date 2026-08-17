@@ -2,12 +2,60 @@
 // Weapon and armor modification logic.
 // Pure functions — no React, no UI dependencies.
 
-import { clampRangeIndex, indexToRangeName } from './range.js';
 import { getProtectionKind, PROTECTION_KINDS, resolveArmorCategoryKey } from './protectionKind.js';
 
 // ---------------------------------------------------------------------------
-// WEAPON MODIFICATIONS
+// ARMOR MODIFICATIONS
 // ---------------------------------------------------------------------------
+
+const hasIntersection = (a = [], b = []) => a.some((value) => b.includes(value));
+
+/** Category config (allowedModCategories / allowedUniqueModCategories / tiers) or null. */
+export const getArmorCategoryConfig = (item, catalog) => {
+    const categoryKey = resolveArmorCategoryKey(item, catalog);
+    if (!categoryKey) return null;
+    return catalog.armorRaw[categoryKey];
+};
+
+/**
+ * Return the standard and unique armor mods allowed by the item's explicit
+ * armor category and protected areas. Unknown categories fail closed.
+ */
+export const getAvailableArmorMods = (item, catalog) => {
+    if (!item || getProtectionKind(item) !== PROTECTION_KINDS.ARMOR) {
+        return { standardMods: [], uniqueMods: [] };
+    }
+
+    const categoryConfig = getArmorCategoryConfig(item, catalog);
+    if (!categoryConfig) return { standardMods: [], uniqueMods: [] };
+
+    const protectedAreas = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
+    const allowedStandardCategories = new Set(categoryConfig.allowedModCategories || []);
+    const allowedUniqueCategories = new Set(categoryConfig.allowedUniqueModCategories || []);
+
+    const standardMods = (catalog?.armorMods || []).filter((mod) =>
+        allowedStandardCategories.has(mod.modCategory)
+        && hasIntersection(mod.protectedAreas || [], protectedAreas));
+    const uniqueMods = (catalog?.uniqArmorMods || []).filter((mod) =>
+        allowedUniqueCategories.has(mod.modCategory)
+        && hasIntersection(mod.protectedAreas || [], protectedAreas));
+
+    return { standardMods, uniqueMods };
+};
+
+/** Return whether a unique mod belongs to the item's explicit armor category. */
+export const isUniqueModAllowedForArmor = (mod, item, catalog) => {
+    if (!mod) return false;
+    const categoryConfig = getArmorCategoryConfig(item, catalog);
+    const allowedUniqueCategories = new Set(categoryConfig?.allowedUniqueModCategories || []);
+    return allowedUniqueCategories.has(mod.modCategory);
+};
+
+const normalizeModifierValue = (modifier) => {
+    if (!modifier) return 0;
+    const sign = modifier.op === '-' ? -1 : 1;
+    return sign * Number(modifier.value || 0);
+};
 
 // Format armor mod bonuses into human-readable strings.
 // Labels are passed in so callers can supply i18n-translated strings.
@@ -39,13 +87,6 @@ export const applyArmorModToItem = (armorItem, mod) => {
 
 // Apply standard and unique armor mods from a catalog to an armor item.
 const DEFAULT_EFFECTS = { bonusEffects: [], rules: [] };
-export const getArmorCategoryConfig = (item, catalog) => {
-    const categoryKey = resolveArmorCategoryKey(item);
-    if (!categoryKey) return null;
-    const raw = catalog?.armorRaw?.[categoryKey];
-    if (!raw) return null;
-    return raw;
-};
 export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     if (!armorItem) return { item: armorItem, effects: DEFAULT_EFFECTS };
 

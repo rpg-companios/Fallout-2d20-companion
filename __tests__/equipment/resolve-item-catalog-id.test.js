@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { resolveItem } from '../../domain/resolveItem';
 
-beforeAll(() => setCurrentLocale('ru-RU'));
+beforeAll(() => {
+  setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
+});
 
 describe('resolveItem catalog enrichment', () => {
   it('uses weaponId as the catalog id for normalized inventory weapon instances', () => {

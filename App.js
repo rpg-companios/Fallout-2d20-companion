@@ -15,7 +15,7 @@ import { CharacterProvider } from './components/CharacterContext';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import { initDatabase } from './db/Database';
 import { seedDatabase } from './db/seed';
-import { useLocale } from './i18n/locale';
+import { useLocale, useModuleLocale } from './i18n/locale';
 import { tApp } from './i18n/appI18n';
 
 import HomeScreen from './components/screens/HomeScreen/HomeScreen';
@@ -36,6 +36,7 @@ const TAB_ROUTES = {
 function App() {
   const [dbReady, setDbReady] = useState(false);
   const locale = useLocale();
+  useModuleLocale();
 
   useEffect(() => {
     async function initDb() {

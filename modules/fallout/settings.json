@@ -2,6 +2,7 @@
   {
     "id": "weaponDurabilityLossEnabled",
     "type": "boolean",
+    "controlSurface": "settings",
     "sectionKey": "survivalMode",
     "labelKey": "settings.durabilityTitle",
     "descriptionKey": "settings.durabilityDescription",
@@ -10,6 +11,7 @@
   {
     "id": "weaponDurabilityLossPer10Shots",
     "type": "number",
+    "controlSurface": "settings",
     "sectionKey": "survivalMode",
     "labelKey": "settings.lossTitle",
     "descriptionKey": "settings.lossDescription",
@@ -21,6 +23,7 @@
   {
     "id": "randomWeaponQualityEnabled",
     "type": "boolean",
+    "controlSurface": "settings",
     "sectionKey": "survivalMode",
     "labelKey": "settings.qualityTitle",
     "descriptionKey": "settings.qualityDescription",
@@ -30,21 +33,23 @@
   {
     "id": "unarmedAttackVisible",
     "type": "boolean",
+    "controlSurface": "equipment",
     "sectionKey": "combat",
     "labelKey": "settings.unarmedTitle",
     "descriptionKey": "settings.unarmedDescription",
     "defaultValue": true
   },
   {
-    "id": "language",
+    "id": "weaponCardsDisplayMode",
     "type": "select",
-    "sectionKey": "interface",
-    "labelKey": "settings.languageTitle",
-    "descriptionKey": "settings.languageDescription",
-    "defaultValue": "ru-RU",
+    "controlSurface": "equipment",
+    "sectionKey": "combat",
+    "labelKey": "settings.cardsTitle",
+    "descriptionKey": "settings.cardsDescription",
+    "defaultValue": "cards",
     "options": [
-      { "value": "ru-RU", "labelKey": "settings.language.ru" },
-      { "value": "en-EN", "labelKey": "settings.language.en" }
+      { "value": "cards", "labelKey": "settings.cards.cards" },
+      { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
     ]
   }
 ]

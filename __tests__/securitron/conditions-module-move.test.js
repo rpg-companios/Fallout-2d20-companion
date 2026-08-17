@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getDiseasesCatalog } from '../../i18n/conditionsCatalog';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleDiseases from '../../modules/fallout/data/conditions/diseases.json';
 import moduleRuDiseases from '../../modules/fallout/i18n/ru-RU/data/conditions/diseases.json';
 import moduleEnDiseases from '../../modules/fallout/i18n/en-EN/data/conditions/diseases.json';
@@ -14,7 +14,10 @@ import legacyRuDiseases from '../../i18n/ru-RU/data/conditions/diseases.json';
 import legacyEnDiseases from '../../i18n/en-EN/data/conditions/diseases.json';
 
 describe('Болезни в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит полные записи болезней и переводы обеих локалей', () => {
     expect(moduleDiseases.length).toBe(20);

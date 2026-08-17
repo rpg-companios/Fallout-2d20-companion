@@ -13,7 +13,7 @@
 
 import { getOrigins, getOriginI18n } from './registry';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentModuleLocale } from '../i18n/locale';
 
 // ---------------------------------------------------------------------------
 // Public constants
@@ -133,13 +133,16 @@ export function getBuiltinBaseWeapon(character) {
   // Имя берём из каталога i18n (как у прочего оружия), чтобы кулаки везде
   // отображались как «Кулаки»/«Fists», а не сырым id. origins.js уже имеет
   // доступ к catalog/locale (см. заголовок файла).
-  const base = (getEquipmentCatalog(getCurrentLocale())?.weapons || [])
+  const base = (getEquipmentCatalog(getCurrentModuleLocale())?.weapons || [])
     .find((w) => w.id === 'unarmed_human');
+  if (!base?.name) {
+    throw new Error('[origins] Для встроенного оружия "unarmed_human" нет перевода');
+  }
   return {
     id: 'unarmed_human',
     isBuiltin: true,
     itemType: 'weapon',
-    name: base?.name || 'unarmed_human',
+    name: base.name,
   };
 }
 
@@ -152,9 +155,16 @@ export function getBuiltinBaseWeapon(character) {
  */
 export function tOrigin(id) {
   if (!id) return '';
-  const locale = getCurrentLocale();
-  const dict = ORIGIN_DICTIONARIES[locale] || ruOrigins;
-  return dict[id] || id;
+  const locale = getCurrentModuleLocale();
+  const dict = ORIGIN_DICTIONARIES[locale];
+  if (!dict) {
+    throw new Error(`[origins] Для языка сеттинга "${locale}" нет словаря ориджинов`);
+  }
+  const translated = dict[id];
+  if (typeof translated !== 'string' || translated.length === 0) {
+    throw new Error(`[origins] Для ориджина "${id}" нет перевода`);
+  }
+  return translated;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,9 +187,13 @@ export function loadEnrichedOrigins() {
   const { equipmentKits: kitGroups } = getEquipmentCatalog();
   return getOrigins().map((origin) => {
     const kitIds = origin.equipmentKitIds || [];
-    const equipmentKits = kitIds
-      .map((kitId) => ({ id: kitId, ...(kitGroups[kitId] || {}) }))
-      .filter((kit) => Array.isArray(kit.items));
+    const equipmentKits = kitIds.map((kitId) => {
+      const kit = kitGroups[kitId];
+      if (!kit || !Array.isArray(kit.items)) {
+        throw new Error(`[origins] Для комплекта "${kitId}" ориджина "${origin.id}" нет локализованных данных`);
+      }
+      return { id: kitId, ...kit };
+    });
     return {
       id: origin.id,
       characterType: origin.characterType,

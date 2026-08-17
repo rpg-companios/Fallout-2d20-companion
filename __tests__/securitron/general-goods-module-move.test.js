@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleGeneralGoods from '../../modules/fallout/data/equipment/general_goods.json';
 import moduleRuGeneralGoods from '../../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
 import moduleEnGeneralGoods from '../../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
@@ -14,7 +14,10 @@ import legacyRuGeneralGoods from '../../i18n/ru-RU/data/equipment/general_goods.
 import legacyEnGeneralGoods from '../../i18n/en-EN/data/equipment/general_goods.json';
 
 describe('Общие товары в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит все записи (35: 31 база + 4 модуля) и переводы', () => {
     expect(moduleGeneralGoods).toHaveLength(35);

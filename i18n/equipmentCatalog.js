@@ -99,7 +99,7 @@ import moduleRobotWeapons from '../modules/fallout/data/equipment/robot/weapons.
 
 
 
-import { getCurrentLocale, normalizeLocale } from './locale';
+import { getCurrentModuleLocale } from './locale';
 import { expandTrueItems } from '../domain/packMerge';
 
 /**
@@ -242,10 +242,11 @@ const buildArmorIndex = (items) => {
   return { byId };
 };
 
-export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
-  // normalizeLocale уже гарантирует ключ из SUPPORTED_LOCALES (ru-RU|en-EN),
-  // поэтому фолбэк на ru-RU здесь невозможен — берём локализованный словарь напрямую.
-  const i18n = EQUIPMENT_BY_LOCALE[normalizeLocale(locale)];
+export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+  const i18n = EQUIPMENT_BY_LOCALE[locale];
+  if (!i18n) {
+    throw new Error(`[equipmentCatalog] Для языка сеттинга "${locale}" нет каталога`);
+  }
 
   // Weapons: механика и имена — из модуля сеттинга (патч 102).
   // Оружие в модуле самодостаточно: варианты (trueItemId) ссылаются на

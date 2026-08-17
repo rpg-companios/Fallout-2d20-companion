@@ -8,7 +8,7 @@ import ruQualities from '../modules/fallout/i18n/ru-RU/data/system/qualities.jso
 import enQualities from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
 import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
 import enEffects from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentModuleLocale } from '../i18n/locale';
 
 const QUALITY_DICTS = {
   'ru-RU': ruQualities,
@@ -52,8 +52,11 @@ const DAMAGE_TYPE_LABELS = {
  * @returns {string}
  */
 export function resolveWeaponQualities(qualities) {
-  const locale = getCurrentLocale();
-  const dict = QUALITY_DICTS[locale] || ruQualities;
+  const locale = getCurrentModuleLocale();
+  const dict = QUALITY_DICTS[locale];
+  if (!dict) {
+    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря качеств`);
+  }
   const qualityMap = Object.fromEntries(dict.map((q) => [q.id, q.name]));
 
   let arr = qualities;
@@ -87,8 +90,11 @@ export function resolveWeaponQualities(qualities) {
  Принимает массив {effectId, value?} (или JSON-строку из БД).
  */
 export function resolveWeaponEffects(effects) {
-  const locale = getCurrentLocale();
-  const dict = EFFECT_DICTS[locale] || ruEffects;
+  const locale = getCurrentModuleLocale();
+  const dict = EFFECT_DICTS[locale];
+  if (!dict) {
+    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря эффектов урона`);
+  }
   const effectMap = Object.fromEntries(dict.map((e) => [e.id, e.name]));
 
   let arr = effects;
@@ -128,8 +134,11 @@ export function resolveWeaponEffects(effects) {
 export function resolveWeaponDamageType(damageType) {
   if (!damageType) return '';
 
-  const locale = getCurrentLocale();
-  const labels = DAMAGE_TYPE_LABELS[locale] || DAMAGE_TYPE_LABELS['ru-RU'];
+  const locale = getCurrentModuleLocale();
+  const labels = DAMAGE_TYPE_LABELS[locale];
+  if (!labels) {
+    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря типов урона`);
+  }
 
   // Parse JSON string if needed
   let arr = damageType;

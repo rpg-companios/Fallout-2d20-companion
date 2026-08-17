@@ -10,10 +10,13 @@ vi.mock('../../db/Database', async () => {
   };
 });
 
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { resolveKitItems } from '../../domain/kitResolver';
 
-beforeAll(() => setCurrentLocale('ru-RU'));
+beforeAll(() => {
+  setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
+});
 
 describe('resolveKitItems — ложа превращает пистолет в винтовку', () => {
   it('лазерный пистолет со стандартной ложей называется «Лазерная винтовка»', async () => {

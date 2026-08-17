@@ -18,11 +18,17 @@ import { resolveBodyPlan } from '../../../domain/bodyplan';
 import styles from '../../../styles/CharacterScreen.styles';
 import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
-import { useLocale } from '../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
-import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus, getTimedDefenseBonus } from '../../../domain/effects';
+import {
+  getDefenseModifierEffectLabel,
+  getEffectTimeText,
+  getTimedMaxHpBonus,
+  getTimedDamageResistanceBonus,
+  getTimedDefenseBonus,
+} from '../../../domain/effects';
 import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
 import { applyUnarmedVisibility } from '../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
@@ -210,7 +216,9 @@ const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
                 </View>
               ) : null}
               {effects.map((effect) => {
-                const effectText = effect.effectName || effect.effectLabel || '—';
+                const effectText = effect.defenseModifier
+                  ? getDefenseModifierEffectLabel(effect.defenseModifier)
+                  : effect.effectName || effect.effectLabel || '—';
                 const isNegative = effect.effectKind === 'negative';
                 return (
                   <View key={effect.id} style={localStyles.effectsPanelRow}>
@@ -447,6 +455,33 @@ const chunkSlotKeys = (keys, size) => {
   return chunks;
 };
 
+const findLocalizedRobotPart = (catalogItems, item) => {
+  if (!item) return item;
+  if (!item.id) throw new Error('[WeaponsAndArmorScreen] Деталь робота без id');
+  const localized = (catalogItems || []).find((entry) => entry.id === item.id);
+  if (!localized) {
+    throw new Error(`[WeaponsAndArmorScreen] Для детали робота "${item.id}" нет перевода`);
+  }
+  return localized;
+};
+
+const localizeRobotSlotData = (catalog, slotData) => {
+  if (!slotData) return slotData;
+  const limbs = [
+    ...(catalog?.robotHeads || []),
+    ...(catalog?.robotBody || []),
+    ...(catalog?.robotArms || []),
+    ...(catalog?.robotLegs || []),
+  ];
+  return {
+    ...slotData,
+    limb: findLocalizedRobotPart(limbs, slotData.limb),
+    plating: findLocalizedRobotPart(catalog?.robotPlating, slotData.plating),
+    armor: findLocalizedRobotPart(catalog?.robotArmorLayer, slotData.armor),
+    frame: findLocalizedRobotPart(catalog?.robotFrames, slotData.frame),
+  };
+};
+
 const findRobotBodyUpgrade = (catalog, robotBodyPlan, inventoryItems = []) => {
   const parts = catalog?.robotPartsUpgrade || [];
   if (robotBodyPlan) {
@@ -531,7 +566,8 @@ const WeaponsAndArmorScreen = () => {
 
   const storeEffects = useCharacterStore((state) => state.effects);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
-  const locale = useLocale();
+  useLocale();
+  const moduleLocale = useModuleLocale();
   // §5.6: пока надет каркас, его attributeModifier подменяет базу атрибутов
   // (каркас: СИЛА = set 11 — значение из данных, не из кода).
   const attributesEffective = useMemo(
@@ -558,7 +594,7 @@ const WeaponsAndArmorScreen = () => {
     ];
     return [...new Set(combined)];
   }, [origin, trait]);
-  const equipmentCatalog = getEquipmentCatalog(locale);
+  const equipmentCatalog = getEquipmentCatalog(moduleLocale);
   const robotBodyUpgrade = findRobotBodyUpgrade(
     equipmentCatalog,
     // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
@@ -571,11 +607,11 @@ const WeaponsAndArmorScreen = () => {
   );
   useEffect(() => {
     debugLog('weapon.display.list', {
-      locale,
+      moduleLocale,
       equippedWeaponsForDisplay: equippedWeaponsForDisplay.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
       localizedEquippedWeapons: localizedEquippedWeapons.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
     });
-  }, [locale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
+  }, [moduleLocale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
 
   const weaponFingerprint = (w) => {
     if (!w) return null;
@@ -617,8 +653,8 @@ const WeaponsAndArmorScreen = () => {
   const [openSpoilers, setOpenSpoilers] = useState({});
   const toggleSpoiler = (index) => setOpenSpoilers((prev) => ({ ...prev, [index]: !prev[index] }));
 
-  // Табы: третий режим пока скрыт из UI переключателя, но код рендера и
-  // поддержка сохранённого значения 'tabs' сохраняются (ПРАВИЛО владельца).
+  // Табы: неактивная возможность движка на будущее. Fallout не объявляет этот
+  // вариант и мигрирует старое сохранённое значение 'tabs' в 'cards'.
   const [activeTab, setActiveTab] = useState(0);
   const weaponsCount = visibleEquippedWeapons.length;
   useEffect(() => {
@@ -953,7 +989,7 @@ const WeaponsAndArmorScreen = () => {
                         <RobotSlot
                           key={slotKey}
                           slotKey={slotKey}
-                          slotData={equippedRobotSlots[slotKey]}
+                          slotData={localizeRobotSlotData(equipmentCatalog, equippedRobotSlots[slotKey])}
                           bodyPlan={bodyPlan}
                           onUpgradeLimb={handleOpenLimbUpgradeModal}
                           onOpenArmorPicker={handleOpenArmorPicker}

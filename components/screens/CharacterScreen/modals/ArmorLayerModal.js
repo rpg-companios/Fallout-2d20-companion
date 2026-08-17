@@ -10,27 +10,9 @@ import {
 } from 'react-native';
 import { useCharacter } from '../../../CharacterContext';
 import { canEquipRobotArmor } from '../../../../domain/robotEquip';
-import { getCurrentLocale } from '../../../../i18n/locale';
-
-// ---------------------------------------------------------------------------
-// Static data imports — raw stats
-// ---------------------------------------------------------------------------
-import dataPlating from '../../../../modules/fallout/data/equipment/robot/armor_plating.json';
-import dataArmor   from '../../../../modules/fallout/data/equipment/robot/armor.json';
-import dataFrames  from '../../../../modules/fallout/data/equipment/robot/frames.json';
-
-// ---------------------------------------------------------------------------
-// i18n imports
-// ---------------------------------------------------------------------------
-import ruPlating from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
-import ruArmor   from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
-import ruFrames  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
-
-import enPlating from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
-import enArmor   from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
-import enFrames  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
+import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
-
 
 // ---------------------------------------------------------------------------
 // Layer colors (matches RobotSlot.js)
@@ -63,39 +45,22 @@ const SLOT_LOCATION_MAP = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Merge data stats with i18n names by id */
-const mergeById = (dataArr, i18nArr) => {
-  const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
-  return (dataArr || []).map((dataItem) => {
-    const i18nItem = i18nMap[dataItem.id] || {};
-    return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
-  });
-};
-
 /** Maps slotKey to robotLocation string */
 const getSlotLocation = (slotKey) => SLOT_LOCATION_MAP[slotKey] ?? null;
 
-/** Returns merged armor catalog for the given layer and locale */
-const getArmorCatalogForLayer = (layer, locale) => {
-  const isRu = locale === 'ru-RU';
-  if (layer === 'plating') {
-    return mergeById(dataPlating.plating, isRu ? ruPlating : enPlating);
-  }
-  if (layer === 'armor') {
-    return mergeById(dataArmor.armor, isRu ? ruArmor : enArmor);
-  }
-  if (layer === 'frame') {
-    return mergeById(dataFrames.frames, isRu ? ruFrames : enFrames);
-  }
+/** Returns localized robot armor from the active setting catalog. */
+const getArmorCatalogForLayer = (catalog, layer) => {
+  if (layer === 'plating') return catalog.robotPlating || [];
+  if (layer === 'armor') return catalog.robotArmorLayer || [];
+  if (layer === 'frame') return catalog.robotFrames || [];
   return [];
 };
 
-/** Layer-specific modal title */
-const getLayerTitle = (layer, locale) => {
-  const isRu = locale === 'ru-RU';
+/** Layer-specific modal title is engine-owned screen UI. */
+const getLayerTitle = (layer) => {
   if (layer === 'plating') return tCharacterScreen('modals.armor.upgradePlating');
-  if (layer === 'armor')   return tCharacterScreen('modals.armor.upgradeArmor');
-  if (layer === 'frame')   return tCharacterScreen('modals.armor.upgradeFrame');
+  if (layer === 'armor') return tCharacterScreen('modals.armor.upgradeArmor');
+  if (layer === 'frame') return tCharacterScreen('modals.armor.upgradeFrame');
   return tCharacterScreen('modals.armor.upgradeArmor');
 };
 
@@ -113,8 +78,7 @@ const StatRow = ({ label, value }) => {
   );
 };
 
-const ArmorCard = ({ item, isSelected, layerColor, onPress, locale }) => {
-  const isRu = locale === 'ru-RU';
+const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
   const dr = item.damageResistance ?? {};
 
   return (
@@ -163,8 +127,12 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress, locale }) => {
  */
 const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
   const { equippedRobotSlots, setEquippedRobotSlots } = useCharacter();
-  const locale = getCurrentLocale();
-  const isRu = locale === 'ru-RU';
+  useLocale();
+  const moduleLocale = useModuleLocale();
+  const equipmentCatalog = useMemo(
+    () => getEquipmentCatalog(moduleLocale),
+    [moduleLocale],
+  );
   const layerColor = LAYER_COLORS[layer] ?? '#888';
   const [selectedItem, setSelectedItem] = useState(null);
 
@@ -181,13 +149,13 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
     const location = getSlotLocation(slotKey);
     if (!location) return [];
 
-    const catalog = getArmorCatalogForLayer(layer, locale);
+    const catalog = getArmorCatalogForLayer(equipmentCatalog, layer);
     return catalog.filter((item) => {
       if (item.robotLocation !== location) return false;
       const { allowed } = canEquipRobotArmor(item, slotKey, layer, equippedRobotSlots);
       return allowed;
     });
-  }, [slotKey, layer, equippedRobotSlots, locale]);
+  }, [slotKey, layer, equippedRobotSlots, equipmentCatalog]);
 
   const handleApply = () => {
     if (!equippedRobotSlots || !slotKey) return;
@@ -201,7 +169,7 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
     onClose();
   };
 
-  const title = getLayerTitle(layer, locale);
+  const title = getLayerTitle(layer);
 
   return (
     <Modal
@@ -229,7 +197,6 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
                     isSelected={isSelected}
                     layerColor={layerColor}
                     onPress={() => setSelectedItem((prev) => (prev?.id === item.id ? null : item))}
-                    locale={locale}
                   />
                 );
               })}

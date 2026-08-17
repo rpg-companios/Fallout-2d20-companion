@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleChems from '../../modules/fallout/data/consumables/chems.json';
 import moduleRuChems from '../../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
 import moduleEnChems from '../../modules/fallout/i18n/en-EN/data/consumables/chems.json';
@@ -15,7 +15,10 @@ import legacyRuChems from '../../i18n/ru-RU/data/consumables/chems.json';
 import legacyEnChems from '../../i18n/en-EN/data/consumables/chems.json';
 
 describe('Химка в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит полные записи в каноническом виде (itemType: chem)', () => {
     expect(moduleChems.length).toBe(32);

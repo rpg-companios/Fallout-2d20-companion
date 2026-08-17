@@ -2,7 +2,7 @@
 // Болезни — не предметы инвентаря: у них нет веса/цены, есть куб d20 на определение
 // болезни и длительность в стадиях восстановления (core rulebook, стр. 193).
 // Механика наложения/трекинга проектируется отдельно; сейчас — только справочный каталог.
-import { getCurrentLocale, normalizeLocale } from './locale';
+import { getCurrentModuleLocale } from './locale';
 import { mergeById } from './equipmentCatalog';
 
 import moduleDiseases from '../modules/fallout/data/conditions/diseases.json';
@@ -20,5 +20,10 @@ const DISEASES_BY_LOCALE = {
  * (modules/fallout/data/conditions/diseases.json + i18n модуля).
  * Нет перевода для id — дефект данных (mergeById бросает ошибку).
  */
-export const getDiseasesCatalog = (locale = getCurrentLocale()) =>
-  mergeById(moduleDiseases, DISEASES_BY_LOCALE[normalizeLocale(locale)]);
+export const getDiseasesCatalog = (locale = getCurrentModuleLocale()) => {
+  const localizedDiseases = DISEASES_BY_LOCALE[locale];
+  if (!localizedDiseases) {
+    throw new Error(`[conditionsCatalog] Для языка сеттинга "${locale}" нет каталога болезней`);
+  }
+  return mergeById(moduleDiseases, localizedDiseases);
+};

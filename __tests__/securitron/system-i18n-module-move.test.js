@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleRuQualities from '../../modules/fallout/i18n/ru-RU/data/system/qualities.json';
 import moduleEnQualities from '../../modules/fallout/i18n/en-EN/data/system/qualities.json';
 import moduleRuEffects from '../../modules/fallout/i18n/ru-RU/data/system/effects.json';
@@ -15,7 +15,10 @@ import legacyRuQualities from '../../i18n/ru-RU/data/system/qualities.json';
 import legacyEnQualities from '../../i18n/en-EN/data/system/qualities.json';
 
 describe('Системные i18n в модуле (сеттинг), легаси — пуст', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит качества (30), эффекты, damageEffects и miscellaneous', () => {
     expect(moduleRuQualities).toHaveLength(30);

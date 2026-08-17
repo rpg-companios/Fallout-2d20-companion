@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleArmorMods from '../../modules/fallout/data/equipment/armor_mods.json';
 import moduleUniqArmorMods from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
 import moduleArmorEffects from '../../modules/fallout/data/equipment/armor_effects.json';
@@ -23,7 +23,10 @@ import dataUniqArmorMods from '../../data/equipment/uniq_armor_mods.json';
 import dataArmorEffects from '../../data/equipment/armor_effects.json';
 
 describe('Моды брони в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('механика модов — в модульных данных, i18n — только строки', () => {
     expect(moduleArmorMods).toHaveLength(15);

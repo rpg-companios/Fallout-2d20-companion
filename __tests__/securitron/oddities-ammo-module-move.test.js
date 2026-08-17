@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleOddities from '../../modules/fallout/data/equipment/oddities.json';
 import moduleAmmo from '../../modules/fallout/data/equipment/ammo.json';
 import moduleRuOddities from '../../modules/fallout/i18n/ru-RU/data/equipment/oddities.json';
@@ -19,7 +19,10 @@ import legacyRuAmmo from '../../i18n/ru-RU/data/equipment/ammo/ammo_types.json';
 import legacyEnAmmo from '../../i18n/en-EN/data/equipment/ammo/ammo_types.json';
 
 describe('Диковины и патроны в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит полные записи и переводы обеих локалей', () => {
     expect(moduleOddities).toHaveLength(20);

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleRobotArms from '../../modules/fallout/data/equipment/robot/robotarms.json';
 import moduleRobotBody from '../../modules/fallout/data/equipment/robot/robotbody.json';
 import moduleRobotHeads from '../../modules/fallout/data/equipment/robot/robotheads.json';
@@ -21,7 +21,10 @@ import dataRobotBody from '../../data/equipment/robot/robotbody.json';
 import dataRobotParts from '../../data/equipment/robotparts.json';
 
 describe('Роботы в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит все категории роботов (структура сохранена)', () => {
     expect(moduleRobotArms).toHaveLength(21);

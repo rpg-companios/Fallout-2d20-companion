@@ -5,7 +5,7 @@ import { resolveKitItems } from '../../../../domain/kitResolver';
 import { initRobotSlots } from '../../../../domain/robotEquip';
 import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../domain/origins';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
-import { useLocale } from '../../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/EquipmentKitModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
@@ -202,12 +202,15 @@ const formatBuiltinWeaponSuffix = (entry) => {
   if (!builtinId) return '';
   const catalog = getEquipmentCatalog();
   const weapon = (catalog?.weapons || []).find((w) => w.id === builtinId);
-  const name = weapon?.name || builtinId;
-  return ` + ${name}`;
+  if (!weapon?.name) {
+    throw new Error(`[EquipmentKitModal] Для встроенного оружия "${builtinId}" нет локализованных данных`);
+  }
+  return ` + ${weapon.name}`;
 };
 
 const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, character }) => {
-  const locale = useLocale(); // подписываемся на смену локали → ре-рендер
+  const locale = useLocale(); // интерфейс движка
+  useModuleLocale(); // содержимое комплектов активного сеттинга
   const metaCategoryLabels = useMemo(() => ({
     structure: tCharacterScreen('modals.equipmentKit.categories.structure'),
     weapon: tCharacterScreen('modals.equipmentKit.categories.weapon'),

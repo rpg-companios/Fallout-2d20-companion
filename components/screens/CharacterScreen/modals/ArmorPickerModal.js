@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -7,7 +7,8 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { getCurrentLocale } from '../../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import ArmorLayerModal from './ArmorLayerModal';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
@@ -19,8 +20,12 @@ const LAYER_COLORS = {
 };
 
 const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => {
-  const locale = getCurrentLocale();
-  const isRu = locale === 'ru-RU';
+  useLocale();
+  const moduleLocale = useModuleLocale();
+  const equipmentCatalog = useMemo(
+    () => getEquipmentCatalog(moduleLocale),
+    [moduleLocale],
+  );
   const [activeLayer, setActiveLayer] = useState(null);
 
   const handleLayerClose = () => {
@@ -31,21 +36,31 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
   const currentArmor   = slotKey ? equippedRobotSlots?.[slotKey]?.armor   : null;
   const currentFrame   = slotKey ? equippedRobotSlots?.[slotKey]?.frame   : null;
 
+  const localizedName = (item, catalogItems) => {
+    if (!item) return null;
+    if (!item.id) throw new Error('[ArmorPickerModal] Элемент брони робота не содержит id');
+    const localized = catalogItems.find((candidate) => candidate.id === item.id);
+    if (!localized?.name) {
+      throw new Error(`[ArmorPickerModal] Для элемента брони робота "${item.id}" нет перевода`);
+    }
+    return localized.name;
+  };
+
   const layers = [
     {
       key: 'plating',
       label: tCharacterScreen('labels.plating'),
-      current: currentPlating?.name || null,
+      current: localizedName(currentPlating, equipmentCatalog.robotPlating || []),
     },
     {
       key: 'armor',
       label: tCharacterScreen('labels.armor'),
-      current: currentArmor?.name || null,
+      current: localizedName(currentArmor, equipmentCatalog.robotArmorLayer || []),
     },
     {
       key: 'frame',
       label: tCharacterScreen('labels.frame'),
-      current: currentFrame?.name || null,
+      current: localizedName(currentFrame, equipmentCatalog.robotFrames || []),
     },
   ];
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { useLocale } from '../../../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { applyArmorMods, formatModBonuses, getAvailableArmorMods } from '../../../../domain/modsEquip';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
@@ -53,8 +53,9 @@ const ModRow = ({ mod, selected, onPress }) => {
 };
 
 const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', onApply }) => {
-  const locale = useLocale();
-  const catalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
+  useLocale();
+  const moduleLocale = useModuleLocale();
+  const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
   const [selectedStd, setSelectedStd] = useState(null);
   const [selectedUniq, setSelectedUniq] = useState(null);
   const [expandedCategories, setExpandedCategories] = useState({ standard: false, unique: false });

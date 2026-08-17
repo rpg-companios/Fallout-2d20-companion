@@ -6,12 +6,15 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleSlots from '../../modules/fallout/data/equipment/weapon_mod_slots.json';
 import dataSlots from '../../data/equipment/weapon_mod_slots.json';
 
 describe('weapon_mod_slots в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль содержит словарь слотов: { weaponId: { slot: [modIds] } }', () => {
     expect(moduleSlots).toBeDefined();

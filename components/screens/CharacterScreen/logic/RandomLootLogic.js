@@ -10,7 +10,12 @@ import ruLootStubs from '../../../../modules/fallout/i18n/ru-RU/data/loot/stubs.
 import enLootStubs from '../../../../modules/fallout/i18n/en-EN/data/loot/stubs.json';
 import { getWeaponById } from '../../../../db/Database';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
-import { getCurrentLocale } from '../../../../i18n/locale';
+import { getCurrentModuleLocale } from '../../../../i18n/locale';
+
+const LOOT_STUBS_BY_LOCALE = {
+  'ru-RU': ruLootStubs,
+  'en-EN': enLootStubs,
+};
 
 const lootTables = {
   trinklet: trinkets,
@@ -77,9 +82,19 @@ function buildCatalogIndex() {
 
     // Loot stubs contain locale-independent item data. Their display names are
     // resolved by id from the active locale, like the rest of the catalog.
-    const localizedStubNames = getCurrentLocale() === 'en-EN' ? enLootStubs : ruLootStubs;
+    const moduleLocale = getCurrentModuleLocale();
+    const localizedStubNames = LOOT_STUBS_BY_LOCALE[moduleLocale];
+    if (!localizedStubNames) {
+        throw new Error(`[RandomLootLogic] Для языка сеттинга "${moduleLocale}" нет названий лута`);
+    }
     const stubNamesById = new Map(localizedStubNames.map((item) => [item.id, item.name]));
-    addAll(lootStubs.map((item) => ({ ...item, name: stubNamesById.get(item.id) })));
+    addAll(lootStubs.map((item) => {
+        const localizedName = stubNamesById.get(item.id);
+        if (!localizedName) {
+            throw new Error(`[RandomLootLogic] Для лута "${item.id}" нет перевода`);
+        }
+        return { ...item, name: localizedName };
+    }));
 
     return index;
 }

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { getEquipmentCatalogForLocale, getModuleWeapons } from '../../domain/registry';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
 import moduleRuWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
 import moduleEnWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
@@ -15,7 +15,10 @@ import legacyRuWeapons from '../../i18n/ru-RU/data/equipment/weapons/weapons.jso
 import legacyEnWeapons from '../../i18n/en-EN/data/equipment/weapons/weapons.json';
 
 describe('Оружие в модуле (сеттинг), data/ — пустой движок', () => {
-  beforeAll(() => setCurrentLocale('ru-RU'));
+  beforeAll(() => {
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
+  });
 
   it('модуль самодостаточен: 118 базовых + 2 варианта, trueItemId на месте', () => {
     expect(moduleWeapons).toHaveLength(120);

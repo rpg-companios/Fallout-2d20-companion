@@ -29,13 +29,14 @@ import { expandTrueItems, applyVariantModifiers } from '../../domain/packMerge';
 import { resolveWeaponItem } from '../../domain/kitResolver';
 import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
 import { migrateCharacterState } from '../../src/store/migrations';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import useCharacterStore from '../../src/store/characterStore';
 import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
 
 beforeAll(() => {
   // catalogSource строит каталог по текущей локали (в CI Intl даёт en-EN).
   setCurrentLocale('ru-RU');
+  setCurrentModuleLocale('ru-RU');
 });
 
 const switchbladeStats = {

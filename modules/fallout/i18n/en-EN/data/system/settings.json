@@ -10,6 +10,12 @@
   "qualityDescription": "Weapons added via Loot have random durability from 1 to 100. Merchant weapons are always 100%.",
   "unarmedTitle": "Show unarmed attack",
   "unarmedDescription": "The unarmed attack (fists/manipulator) is always in the first slot; this toggle controls its display on the equipment screen.",
+  "cardsTitle": "Weapon cards view",
+  "cardsDescription": "How weapons are displayed on the equipment screen.",
+  "cards": {
+    "cards": "Cards",
+    "spoilers": "Spoilers"
+  },
   "languageTitle": "Interface language",
   "languageDescription": "Application and data language.",
   "language": {

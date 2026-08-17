@@ -1,6 +1,6 @@
 import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
 import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
-import { getCurrentLocale } from '../i18n/locale';
+import { getCurrentModuleLocale } from '../i18n/locale';
 import { rollCombatDiceEffects } from './diceRollsLogic';
 
 const SCENE_DURATION_MINUTES = 5;
@@ -14,13 +14,35 @@ const DICTIONARIES = {
 
 const tEffects = (path, vars = {}) => {
     const parts = path.split('.');
-    const locale = getCurrentLocale();
-    let current = DICTIONARIES[locale] || ruEffects;
+    const locale = getCurrentModuleLocale();
+    let current = DICTIONARIES[locale];
+    if (!current) {
+        throw new Error(`[effects] Для языка сеттинга "${locale}" нет словаря эффектов`);
+    }
     for (const part of parts) {
         current = current?.[part];
-        if (current === undefined) return path;
+        if (current === undefined) {
+            throw new Error(`[effects] Для ключа "${path}" нет перевода`);
+        }
     }
-    return String(current).replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] ?? ''));
+    if (typeof current !== 'string') {
+        throw new Error(`[effects] Перевод "${path}" должен быть строкой`);
+    }
+    return current.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] ?? ''));
+};
+
+export const getDefenseModifierEffectLabel = (modifier) => {
+    if (
+        !modifier
+        || !['+', '-'].includes(modifier.op)
+        || typeof modifier.value !== 'number'
+        || !Number.isFinite(modifier.value)
+    ) {
+        throw new Error('[effects] Некорректный модификатор защиты');
+    }
+    return tEffects('display.defenseModifier', {
+        modifier: `${modifier.op}${modifier.value}`,
+    });
 };
 
 const DURATION_LASTING_SCENES = 1;  // lasting = до конца текущей сцены (1 сцена = 5 мин)
@@ -319,18 +341,18 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
     // defenseModifier — timed-эффект на защиту (defense), напр. Стелс-бой (+2)
     if (positiveEffectIsObject && positiveEffectRaw?.defenseModifier && positiveDuration.scenes > 0) {
         const mod = positiveEffectRaw.defenseModifier;
-        const value = Number(mod?.value) || 0;
-        if (value !== 0) {
-            const effectName = `def:${mod.op}${value}`;
+        const effectLabel = getDefenseModifierEffectLabel(mod);
+        if (mod.value !== 0) {
+            const effectName = `def:${mod.op}${mod.value}`;
             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
                 effectName,
-                effectLabel: effectName,
+                effectLabel,
                 effectKind: 'positive',
                 scenes: positiveDuration.scenes,
                 sourceName: name,
                 defenseModifier: mod,
             }));
-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+            events.push(tEffects('events.positiveApplied', { name: effectLabel, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -351,24 +373,6 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 }));
                 events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
             }
-        }
-    }
-
-    // defenseModifier — timed-эффект на защиту (defense), напр. Стелс-бой (+2)
-    if (positiveEffectIsObject && positiveEffectRaw?.defenseModifier && positiveDuration.scenes > 0) {
-        const mod = positiveEffectRaw.defenseModifier;
-        const value = Number(mod?.value) || 0;
-        if (value !== 0) {
-            const effectName = `def:${mod.op}${value}`;
-            nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
-                effectName,
-                effectLabel: effectName,
-                effectKind: 'positive',
-                scenes: positiveDuration.scenes,
-                sourceName: name,
-                defenseModifier: mod,
-            }));
-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -554,6 +558,7 @@ export const SCENE_RULES = {
 
 export default {
     SCENE_RULES,
+    getDefenseModifierEffectLabel,
     applyConsumableToEffects,
     checkAddiction,
     applyRemoveConditions,
