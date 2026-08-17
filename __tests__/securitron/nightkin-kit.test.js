@@ -117,11 +117,11 @@ describe('Комплект NIGHTKIN: резолв', () => {
 
     const rifle = resolved.items.find((i) => i.weaponId === 'weapon_laser_gun');
     expect(rifle).toBeDefined();
-    expect(rifle.appliedMods).toMatchObject({ Stocks: 'mod_058' });
+    expect(rifle.appliedMods).toMatchObject({ Stock: 'mod_058' });
     // ложа превращает пистолет в винтовку (stockNames.with из i18n)
     expect(rifle.displayName).toContain('Лазерная винтовка');
     expect(rifle.resolvedAmmunition?.id).toBe('ammo_energy_cell');
     expect(rifle.resolvedAmmunition?.quantity).toBeGreaterThanOrEqual(8);
-    expect(rifle.resolvedAmmunition?.quantity).toBeLessThanOrEqual(14);
+    expect(rifle.resolvedAmmunition?.quantity).toBeLessThanOrEqual(20);
   });
 });

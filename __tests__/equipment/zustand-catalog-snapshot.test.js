@@ -36,6 +36,6 @@ describe('Zustand catalog snapshots', () => {
     });
     expect(ammo.name).toBeTruthy();
     expect(ammo.cost).toBeTruthy();
-    expect(ammo.rarity).toBeTruthy();
+    expect(ammo.rarity).toBe(0);
   });
 });

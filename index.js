@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 
 import { setupRichText } from './components/screens/WeaponsAndArmorScreen/textUtils';
+import { debugLog } from './src/debug/falloutDebug';
 // Глобально: любой <Text> рендерит токен {/CD} как картинку кубика (assets/CD.png).
 setupRichText();
 
@@ -17,7 +18,7 @@ class ErrorBoundary extends React.Component {
     return { hasError: true, error };
   }
   componentDidCatch(error, info) {
-    console.error('App crash:', error, info);
+    debugLog('app.crash', { error, info });
   }
   render() {
     if (this.state.hasError) {
@@ -50,7 +51,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       ))
       .then(() => navigator.serviceWorker.register('/service-worker.js'))
       .catch((error) => {
-        console.warn('Service worker registration failed:', error);
+        debugLog('serviceWorker.registrationFailed', { error });
       });
   });
 }

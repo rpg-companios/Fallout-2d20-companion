@@ -21,13 +21,13 @@ describe('Химка в модуле (сеттинг), data/ — пустой д
   });
 
   it('модуль содержит полные записи в каноническом виде (itemType: chem)', () => {
-    expect(moduleChems.length).toBe(32);
+    expect(moduleChems.length).toBe(33);
     expect(moduleChems[0]).toHaveProperty('positiveEffect');
     for (const chem of moduleChems) {
       expect(chem.itemType).toBe('chem');
     }
-    expect(moduleRuChems).toHaveLength(32);
-    expect(moduleEnChems).toHaveLength(32);
+    expect(moduleRuChems).toHaveLength(33);
+    expect(moduleEnChems).toHaveLength(33);
   });
 
   it('data/ и легаси-i18n для химки пусты (движок без сеттинга)', () => {
@@ -38,7 +38,7 @@ describe('Химка в модуле (сеттинг), data/ — пустой д
 
   it('каталог отдаёт химку из модуля с именами, без нормализации', () => {
     const catalog = getEquipmentCatalog('ru-RU');
-    expect(catalog.chems.length).toBe(32);
+    expect(catalog.chems.length).toBe(33);
     expect(catalog.chems.find((c) => c.id === 'chem_stimpak').name).toBe('Стимулятор');
     expect(catalog.chems.every((c) => c.itemType === 'chem')).toBe(true);
   });

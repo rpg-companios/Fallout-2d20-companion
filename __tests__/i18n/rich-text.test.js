@@ -1,4 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// textUtils использует только два host-компонента. Мокаем пакет целиком,
+// чтобы Node не пытался разбирать Flow-синтаксис нативной реализации RN.
+vi.mock('react-native', () => ({ Text: 'Text', Image: 'Image' }));
+
 import { renderTextWithIcons } from '../../components/screens/WeaponsAndArmorScreen/textUtils';
 
 // renderTextWithIcons возвращает React-элемент; проверяем структуру через его children.

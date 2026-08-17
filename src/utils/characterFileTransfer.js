@@ -14,10 +14,17 @@
  */
 
 import { Platform } from 'react-native';
+import { debugLog } from '../debug/falloutDebug';
 import {
   EXPORT_FILE_EXTENSION,
   sanitizeFileName as domainSanitizeFileName,
 } from '../../domain/characterTransfer';
+
+const traceCharacterFileTransfer = (level, ...details) => debugLog(`characterFileTransfer.${level}`, {
+  details: details.map((detail) => (detail instanceof Error
+    ? { name: detail.name, message: detail.message }
+    : detail)),
+});
 
 let DocumentPickerModule = null;
 let FileSystemModule = null;
@@ -123,19 +130,19 @@ export const saveCharacter = async (characterData, filename = 'character.json') 
       for (const method of methodsToTry) {
         try {
           const result = await method.execute();
-          console.log(`✅ Метод сохранения "${method.name}" сработал`);
+          traceCharacterFileTransfer('info', `✅ Метод сохранения "${method.name}" сработал`);
           return result;
         } catch (methodError) {
           if (methodError && methodError.name === 'AbortError') {
-            console.log(`⏹️  Пользователь отменил в методе "${method.name}"`);
+            traceCharacterFileTransfer('info', `⏹️  Пользователь отменил в методе "${method.name}"`);
             return { method: method.name, success: false, aborted: true };
           }
-          console.warn(`❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+          traceCharacterFileTransfer('warn', `❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
           // Продолжаем пробовать следующий метод
         }
       }
 
-      console.error('❌ Все методы сохранения не сработали');
+      traceCharacterFileTransfer('error', '❌ Все методы сохранения не сработали');
       return { method: 'unsupported', success: false };
     }
 
@@ -163,7 +170,7 @@ export const saveCharacter = async (characterData, filename = 'character.json') 
     if (error && error.name === 'AbortError') {
       return { method: 'cancelled', success: false, aborted: true };
     }
-    console.error('Ошибка сохранения:', error);
+    traceCharacterFileTransfer('error', 'Ошибка сохранения:', error);
     return { method: 'unsupported', success: false, error };
   }
 };
@@ -177,7 +184,7 @@ export const loadCharacter = async () => {
   try {
     return JSON.parse(rawText);
   } catch (error) {
-    console.error('Ошибка парсинга JSON:', error);
+    traceCharacterFileTransfer('error', 'Ошибка парсинга JSON:', error);
     return null;
   }
 };
@@ -187,7 +194,7 @@ export const loadCharacter = async () => {
  * Улучшенная версия с надежным fallback для Android
  */
 export const loadCharacterRawText = async () => {
-  console.log('📂 Начинаем загрузку файла персонажа...');
+  traceCharacterFileTransfer('info', '📂 Начинаем загрузку файла персонажа...');
   
   try {
     // Пробуем все методы в правильном порядке
@@ -198,14 +205,14 @@ export const loadCharacterRawText = async () => {
       methodsToTry.push({
         name: 'browser-fs-access',
         execute: async () => {
-          console.log('🔄 Пробуем browser-fs-access.fileOpen...');
+          traceCharacterFileTransfer('info', '🔄 Пробуем browser-fs-access.fileOpen...');
           const blob = await fsAccess.fileOpen({
             mimeTypes: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'],
             extensions: ['.json', EXPORT_FILE_EXTENSION, '*'].filter(Boolean),
             description: 'Файл персонажа Fallout 2d20',
             multiple: false,
           });
-          console.log('✅ browser-fs-access получил файл');
+          traceCharacterFileTransfer('info', '✅ browser-fs-access получил файл');
           return await blob.text();
         }
       });
@@ -216,7 +223,7 @@ export const loadCharacterRawText = async () => {
       methodsToTry.push({
         name: 'expo-document-picker',
         execute: async () => {
-          console.log('🔄 Пробуем expo-document-picker...');
+          traceCharacterFileTransfer('info', '🔄 Пробуем expo-document-picker...');
           const result = await DocumentPickerModule.getDocumentAsync({
             type: ['application/json', 'text/json', 'application/octet-stream', '.rpgc', '.json'],
             copyToCacheDirectory: true,
@@ -224,17 +231,17 @@ export const loadCharacterRawText = async () => {
           });
 
           if (result.canceled) {
-            console.log('⏹️  Пользователь отменил выбор');
+            traceCharacterFileTransfer('info', '⏹️  Пользователь отменил выбор');
             throw new Error('User canceled');
           }
           
           const file = result.assets[0];
           if (!file || !file.uri) {
-            console.error('❌ DocumentPicker вернул пустой файл');
+            traceCharacterFileTransfer('error', '❌ DocumentPicker вернул пустой файл');
             throw new Error('No file selected');
           }
 
-          console.log(`📁 Выбран файл: ${file.uri}`);
+          traceCharacterFileTransfer('info', `📁 Выбран файл: ${file.uri}`);
           
           if (FileSystemModule) {
             return await FileSystemModule.readAsStringAsync(file.uri, {
@@ -252,7 +259,7 @@ export const loadCharacterRawText = async () => {
     methodsToTry.push({
       name: 'legacy-input',
       execute: async () => {
-        console.log('🔄 Пробуем legacy input...');
+        traceCharacterFileTransfer('info', '🔄 Пробуем legacy input...');
         // Используем улучшенную версию legacy input
         const result = await new Promise((resolve) => {
           if (typeof document === 'undefined') {
@@ -273,7 +280,7 @@ export const loadCharacterRawText = async () => {
               return;
             }
             
-            console.log(`📁 Выбран файл через legacy input: ${file.name}`);
+            traceCharacterFileTransfer('info', `📁 Выбран файл через legacy input: ${file.name}`);
             const reader = new FileReader();
             reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
             reader.onerror = () => resolve(null);
@@ -293,7 +300,7 @@ export const loadCharacterRawText = async () => {
         });
         
         if (result) {
-          console.log('✅ Legacy input успешно загрузил файл');
+          traceCharacterFileTransfer('info', '✅ Legacy input успешно загрузил файл');
           return result;
         }
         throw new Error('Legacy input не выбрал файл');
@@ -301,39 +308,39 @@ export const loadCharacterRawText = async () => {
     });
 
     // Пробуем все методы по порядку
-    console.log(`🔍 Доступно методов загрузки: ${methodsToTry.length}`);
+    traceCharacterFileTransfer('info', `🔍 Доступно методов загрузки: ${methodsToTry.length}`);
     
     for (let i = 0; i < methodsToTry.length; i++) {
       const method = methodsToTry[i];
       try {
-        console.log(`\n--- Попытка ${i + 1}: ${method.name} ---`);
+        traceCharacterFileTransfer('info', `\n--- Попытка ${i + 1}: ${method.name} ---`);
         const result = await method.execute();
         if (result) {
-          console.log(`\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
+          traceCharacterFileTransfer('info', `\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
           return result;
         }
       } catch (methodError) {
         if (methodError && methodError.name === 'AbortError') {
-          console.log(`\n⏹️  Пользователь отменил в методе "${method.name}"`);
+          traceCharacterFileTransfer('info', `\n⏹️  Пользователь отменил в методе "${method.name}"`);
           return null;
         }
         if (methodError.message === 'User canceled') {
-          console.log(`\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
+          traceCharacterFileTransfer('info', `\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
           return null;
         }
-        console.warn(`\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+        traceCharacterFileTransfer('warn', `\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
         // Продолжаем пробовать следующий метод
       }
     }
 
-    console.error('\n❌ Все методы загрузки файлов не сработали');
+    traceCharacterFileTransfer('error', '\n❌ Все методы загрузки файлов не сработали');
     return null;
   } catch (error) {
     if (error && error.name === 'AbortError') {
-      console.log('\n⏹️  Пользователь отменил выбор файла');
+      traceCharacterFileTransfer('info', '\n⏹️  Пользователь отменил выбор файла');
       return null;
     }
-    console.error('\n❌ Критическая ошибка загрузки файла:', error);
+    traceCharacterFileTransfer('error', '\n❌ Критическая ошибка загрузки файла:', error);
     return null;
   }
 };

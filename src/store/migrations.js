@@ -7,6 +7,7 @@ import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { generateItemId } from '../../domain/itemIdentity';
 import { getUniqQualityName } from '../../domain/registry';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+import { debugLog } from '../debug/falloutDebug';
 
 
 /**
@@ -571,7 +572,7 @@ const MIGRATIONS = [
         // Если пересчёт модов не удался (например, каталог не загружен),
         // возвращаем предмет с мигрированным damageType, но без пересчёта модов.
         // Моды пересчитаются при следующем открытии модалки модов.
-        console.warn('Migration v4: failed to recalculate weapon mods', error);
+        debugLog('migration.v4.weaponModsRecalculationFailed', { message: error?.message });
         return item;
       }
     };

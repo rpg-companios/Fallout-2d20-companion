@@ -25,7 +25,7 @@ vi.mock('../../db/Database', async () => {
 
 import originsJson from '../../modules/fallout/data/origins/origins.json';
 import traitsJson from '../../modules/fallout/data/traits/traits.json';
-import bodyPlans from '../../data/bodyplans/bodyplans.json';
+import bodyPlans from '../../modules/fallout/data/bodyplans/bodyplans.json';
 import kitData from '../../modules/fallout/data/equipmentKits/index.js';
 import ruTraits from '../../modules/fallout/i18n/ru-RU/data/system/traits.json';
 import enTraits from '../../modules/fallout/i18n/en-EN/data/system/traits.json';

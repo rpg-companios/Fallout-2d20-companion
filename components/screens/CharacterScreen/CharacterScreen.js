@@ -1133,7 +1133,7 @@ export default function CharacterScreen() {
         }
       }
     } catch (e) {
-      console.warn('skillRewards:', e?.message);
+      debugLog('character.skillRewards.failed', { message: e?.message });
     }
   };
 
@@ -1219,7 +1219,7 @@ export default function CharacterScreen() {
                       // Вызов saveCharacter должен быть первым в обработчике для user activation
                       saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
                     } catch (error) {
-                      console.error('Ошибка сохранения:', error);
+                      debugLog('character.save.failed', { message: error?.message });
                       Alert.alert(
                         tCharacterScreen('title') || 'Ошибка',
                         'Не удалось сохранить персонажа. Проверьте консоль для подробностей.'

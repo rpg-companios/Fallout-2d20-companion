@@ -20,10 +20,10 @@ describe('Оружие в модуле (сеттинг), data/ — пустой 
     setCurrentModuleLocale('ru-RU');
   });
 
-  it('модуль самодостаточен: 118 базовых + 2 варианта, trueItemId на месте', () => {
-    expect(moduleWeapons).toHaveLength(120);
+  it('модуль самодостаточен: 120 базовых + 1 вариант, trueItemId на месте', () => {
+    expect(moduleWeapons).toHaveLength(121);
     const ids = new Set(moduleWeapons.map((w) => w.id));
-    expect(ids.size).toBe(120);
+    expect(ids.size).toBe(121);
     expect(ids.has('weapon_switchblade')).toBe(true); // истинный предмет варианта
     const razor = moduleWeapons.find((w) => w.id === 'weapon_straight_razor');
     expect(razor.trueItemId).toBe('weapon_switchblade');
@@ -32,10 +32,10 @@ describe('Оружие в модуле (сеттинг), data/ — пустой 
     expect(moduleWeapons.find((w) => w.id === 'weapon_10mm_smg').damage).toBeDefined();
   });
 
-  it('i18n модуля покрывает все 120 id в обеих локалях', () => {
+  it('i18n модуля покрывает все 121 id в обеих локалях', () => {
     const ids = new Set(moduleWeapons.map((w) => w.id));
-    expect(moduleRuWeapons).toHaveLength(120);
-    expect(moduleEnWeapons).toHaveLength(120);
+    expect(moduleRuWeapons).toHaveLength(121);
+    expect(moduleEnWeapons).toHaveLength(121);
     for (const i18n of [moduleRuWeapons, moduleEnWeapons]) {
       const i18nIds = new Set(i18n.map((w) => w.id));
       expect(i18nIds).toEqual(ids);
@@ -49,9 +49,9 @@ describe('Оружие в модуле (сеттинг), data/ — пустой 
     expect(legacyEnWeapons).toEqual([]);
   });
 
-  it('каталог: 120 оружий из модуля, вариант разворачивается внутри модуля', () => {
+  it('каталог: 121 обычное + 19 роботизированных оружий из модуля, вариант разворачивается внутри модуля', () => {
     const catalog = getEquipmentCatalogForLocale('ru-RU');
-    expect(catalog.weapons).toHaveLength(120);
+    expect(catalog.weapons).toHaveLength(140);
     const razor = catalog.weapons.find((w) => w.id === 'weapon_straight_razor');
     expect(razor.name).toBe('Опасная бритва');
     expect(razor.damage).toBe(2); // механика ножа из модуля
@@ -62,7 +62,7 @@ describe('Оружие в модуле (сеттинг), data/ — пустой 
 
   it('getModuleWeapons разворачивает варианты без базы data/', () => {
     const weapons = getModuleWeapons();
-    expect(weapons).toHaveLength(120);
+    expect(weapons).toHaveLength(121);
     expect(weapons.find((w) => w.id === 'weapon_straight_razor').damage).toBe(2);
   });
 });

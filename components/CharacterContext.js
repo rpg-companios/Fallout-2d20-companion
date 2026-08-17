@@ -33,7 +33,8 @@ const migrateSkillsToCanonical = (rawSkills) => {
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
-import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
+import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+import { hasRadiationImmunity } from '../domain/immunities';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 
 import { resolveBodyPlan } from '../domain/bodyplan';
@@ -838,7 +839,7 @@ export const CharacterProvider = ({ children }) => {
           // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
           data.nightkinKitPending = false;
         } catch (e) {
-          console.warn('[loadCharacter] nightkin kit grant failed:', e);
+          debugLog('character.load.nightkinKitGrantFailed', { message: e?.message });
         }
       }
       
@@ -848,7 +849,7 @@ export const CharacterProvider = ({ children }) => {
       characterIdRef.current = id;
       return true;
     } catch (e) {
-      console.error('[loadCharacter] failed:', e);
+      debugLog('character.load.failed', { message: e?.message });
       return false;
     }
   }, []);
@@ -922,8 +923,8 @@ export const CharacterProvider = ({ children }) => {
   };
 
   /**
-   * Применяет расходник: timed-эффекты + removeCondition + проверка зависимости.
-   * Возвращает { timedResult, addictionResult, conditionsRemoved }.
+   * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
+   * removeCondition и проверка зависимости.
    */
   const applyConsumableFull = (item) => {
     debugLog('consumable.apply.start', {
@@ -933,7 +934,24 @@ export const CharacterProvider = ({ children }) => {
       positiveEffectType: typeof item?.positiveEffect,
     });
 
-    // 1. Timed-эффекты через Zustand Store
+    // 1. Мгновенные показатели: сначала лечение, затем радиация.
+    const { hpHealBonus = 0 } = useCharacterStore.getState().perkBonuses || {};
+    const vitalChanges = resolveConsumableVitalChanges(item, {
+      currentHealth,
+      maxHealth: calculateMaxHealth(attributes, level),
+      radiation,
+      hpHealBonus,
+      radiationImmune: hasRadiationImmunity({ origin, trait }),
+    });
+    if (vitalChanges.healAmount > 0) {
+      setCurrentHealth(vitalChanges.healthAfter);
+    }
+    if (vitalChanges.radiationAmount !== null) {
+      // Радиация расходника напрямую меняет счётчик: DR частей тела не участвует.
+      setRadiation(vitalChanges.radiationAfter);
+    }
+
+    // 2. Timed-эффекты через Zustand Store
     const store = useCharacterStore.getState();
     const currentLegacy = effectsDictToLegacyArray(store.effects);
     const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
@@ -944,7 +962,7 @@ export const CharacterProvider = ({ children }) => {
     syncTimedEffectsToStore(normalizedResult.effects, store);
     setActiveTimedEffects(normalizedResult.effects);
 
-    // 2. removeCondition (аддиктол, антибиотики)
+    // 3. removeCondition (аддиктол, антибиотики)
     const { conditions: nextConditions, removed } = applyRemoveConditions(item, conditions);
     if (removed.length > 0) {
       setConditions(nextConditions);
@@ -961,7 +979,7 @@ export const CharacterProvider = ({ children }) => {
       }
     }
 
-    // 3. Зависимость
+    // 4. Зависимость
     // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
     const hasPartyBoyImmunity =
       item?.isAlcohol === true &&
@@ -1010,12 +1028,16 @@ export const CharacterProvider = ({ children }) => {
       timedResult,
       addictionResult,
       conditionsRemoved: removed,
+      healAmount: vitalChanges.healAmount,
+      radiationAmount: vitalChanges.radiationAmount,
     });
 
     return {
       timedResult: { ...timedResult, expired: normalizedCurrent.expired },
       addictionResult,
       conditionsRemoved: removed,
+      healAmount: vitalChanges.healAmount,
+      radiationAmount: vitalChanges.radiationAmount,
     };
   };
 

@@ -1,40 +1,37 @@
 /**
- * Миграции v9 -> v10 -> v11 (патчи 121c/121d): ориджин «Тень» — сброс атрибутов.
+ * Регрессии полной цепочки миграций персонажа-Тени.
  *
- * Контекст: лимиты SPECIAL Тени не применялись (трейт использовал формат
- * attributeBonus/attributeLimits, который движок не читал; исправлено на
- * канонический attributes). Уже созданные персонажи-Тени могли иметь
- * атрибуты ВНЕ лимитов (STR/END <6 или >12, CHA/INT >8).
- *
- * Решение владельца: ПОЛНЫЙ сброс всех атрибутов Тени к стартовым —
- * STR/END = 6 (4 + бонус 2), остальные = 4; очки возвращаются в пул.
- * Навыки и остальные данные НЕ трогаются.
- *
- * ВАЖНО: атрибуты в сейве — МАССИВ [{ name, value }]. Первая версия
- * миграции v9->v10 обрабатывала их как словарь и ломала формат
- * (attributes.find is not a function) — v10->v11 чинит повреждённые сейвы.
+ * migrateCharacterState всегда проводит сейв до CURRENT_SCHEMA_VERSION,
+ * поэтому ожидания ниже проверяют итог всей цепочки, включая более позднюю
+ * замену старого комплекта на NIGHTKIN.
  */
 import { describe, it, expect } from 'vitest';
 import { migrateCharacterState } from '../../src/store/migrations';
 import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 
-const makeShadowSave = (attrs, version = 9) => ({
+const attrArr = (name, value) => ({ name, value });
+
+const makeShadowSave = (attributes, version = 9) => ({
   schemaVersion: version,
   origin: { id: 'shadow' },
   trait: { id: 'shadow' },
-  attributes: attrs,
-  skills: { SNEAK: { id: 'SNEAK', base: 4, modifiers: [], total: 4 } },
+  attributes,
+  skills: [{ name: 'SNEAK', value: 4 }],
+  selectedSkills: ['SNEAK'],
+  extraTaggedSkills: [],
   level: 1,
 });
 
-const attrArr = (name, value) => ({ name, value });
+const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
 
-describe('Миграция v11→v12: полный сброс распределения (атрибуты + навыки)', () => {
-  it('CURRENT_SCHEMA_VERSION = 12', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(12);
+describe('Текущая версия формата сейва', () => {
+  it('равна 14', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(14);
   });
+});
 
-  it('Тень: attributesSaved/skillsSaved = false, навыки к стартовым (tagged 2, иные 0)', () => {
+describe('Полная цепочка от v11: сброс распределения Тени', () => {
+  it('сбрасывает флаги/навыки, сохраняет прочие поля и применяет более позднюю миграцию комплекта', () => {
     const save = {
       schemaVersion: 11,
       origin: { id: 'shadow' },
@@ -51,183 +48,126 @@ describe('Миграция v11→v12: полный сброс распредел
       equipment: { items: [{ id: 'weapon_x' }] },
       level: 2,
     };
+
     const migrated = migrateCharacterState(save);
 
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.attributesSaved).toBe(false);
     expect(migrated.skillsSaved).toBe(false);
-    const byName = Object.fromEntries(migrated.skills.map((s) => [s.name, s.value]));
-    expect(byName.SNEAK).toBe(2);          // отмеченный (tagged)
-    expect(byName.MELEE_WEAPONS).toBe(0);  // не отмеченный
-    expect(byName.SCIENCE).toBe(0);
-    // инвентарь, уровень, выбор отмеченных — не тронуты
-    expect(migrated.equipment.items).toEqual([{ id: 'weapon_x' }]);
-    expect(migrated.level).toBe(2);
+    expect(byName(migrated.skills)).toMatchObject({ SNEAK: 2, MELEE_WEAPONS: 0, SCIENCE: 0 });
     expect(migrated.selectedSkills).toEqual(['SNEAK']);
+    expect(migrated.level).toBe(2);
+    expect(migrated.equipment).toMatchObject({ id: 'nightkin', name: 'Тень', items: [] });
+    expect(migrated.nightkinKitPending).toBe(true);
   });
 
-  it('не-Тень: флаги и навыки не тронуты', () => {
+  it('не меняет распределение не-Тени', () => {
     const save = {
       schemaVersion: 11,
       origin: { id: 'vaultDweller' },
-      trait: { id: 'x' },
+      trait: { id: 'vault-dweller-trait' },
       attributesSaved: true,
       skillsSaved: true,
       skills: [{ name: 'SNEAK', value: 5 }],
     };
+
     const migrated = migrateCharacterState(save);
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.attributesSaved).toBe(true);
     expect(migrated.skillsSaved).toBe(true);
     expect(migrated.skills[0].value).toBe(5);
   });
 });
 
-describe('Полная цепочка v9→v12 для Тени', () => {
-  it('сейв v9 (массив) → атрибуты стартовые, флаги false, навыки стартовые, инвентарь цел', () => {
+describe('Полная цепочка от v9: стартовые атрибуты Тени', () => {
+  it('сбрасывает SPECIAL и навыки, сохраняя выбор навыков и уровень', () => {
     const save = {
-      schemaVersion: 9,
-      origin: { id: 'shadow' },
-      trait: { id: 'shadow' },
+      ...makeShadowSave([
+        attrArr('STR', 10), attrArr('END', 3), attrArr('PER', 7),
+        attrArr('AGI', 4), attrArr('INT', 9), attrArr('CHA', 10), attrArr('LCK', 5),
+      ]),
       attributesSaved: true,
       skillsSaved: true,
-      selectedSkills: ['SNEAK'],
-      extraTaggedSkills: [],
-      attributes: [
-        { name: 'STR', value: 10 }, { name: 'END', value: 3 },
-        { name: 'PER', value: 7 }, { name: 'AGI', value: 4 },
-        { name: 'INT', value: 9 }, { name: 'CHA', value: 10 }, { name: 'LCK', value: 5 },
-      ],
-      skills: [
-        { name: 'SNEAK', value: 5 }, { name: 'MELEE_WEAPONS', value: 4 },
-      ],
+      skills: [attrArr('SNEAK', 5), attrArr('MELEE_WEAPONS', 4)],
       equipment: { items: [{ id: 'weapon_x' }] },
       level: 3,
     };
-    const migrated = migrateCharacterState(save);
 
-    expect(migrated.schemaVersion).toBe(12);
-    expect(Array.isArray(migrated.attributes)).toBe(true);
-    const attrs = Object.fromEntries(migrated.attributes.map((a) => [a.name, a.value]));
-    expect(attrs.STR).toBe(6);
-    expect(attrs.END).toBe(6);
-    expect(attrs.PER).toBe(4);
-    expect(attrs.CHA).toBe(4);
+    const migrated = migrateCharacterState(save);
+    const attributes = byName(migrated.attributes);
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(attributes).toMatchObject({ STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 });
     expect(migrated.attributesSaved).toBe(false);
     expect(migrated.skillsSaved).toBe(false);
-    const skills = Object.fromEntries(migrated.skills.map((s) => [s.name, s.value]));
-    expect(skills.SNEAK).toBe(2);
-    expect(skills.MELEE_WEAPONS).toBe(0);
-    expect(migrated.equipment.items).toEqual([{ id: 'weapon_x' }]);
+    expect(byName(migrated.skills)).toMatchObject({ SNEAK: 2, MELEE_WEAPONS: 0 });
+    expect(migrated.selectedSkills).toEqual(['SNEAK']);
     expect(migrated.level).toBe(3);
-  });
-});
-
-  it('персонаж-Тень (v9, массив): все атрибуты сброшены к стартовым', () => {
-    const save = makeShadowSave([
-      attrArr('STR', 10),
-      attrArr('END', 3),
-      attrArr('PER', 7),
-      attrArr('AGI', 4),
-      attrArr('INT', 9),
-      attrArr('CHA', 10),
-      attrArr('LCK', 5),
-    ]);
-    const migrated = migrateCharacterState(save);
-
-    // результат — МАССИВ (формат сейва), значения сброшены
-    expect(Array.isArray(migrated.attributes)).toBe(true);
-    const byName = Object.fromEntries(migrated.attributes.map((a) => [a.name, a.value]));
-    expect(byName.STR).toBe(6);
-    expect(byName.END).toBe(6);
-    expect(byName.PER).toBe(4);
-    expect(byName.AGI).toBe(4);
-    expect(byName.INT).toBe(4);
-    expect(byName.CHA).toBe(4);
-    expect(byName.LCK).toBe(4);
-    expect(migrated.schemaVersion).toBe(11);
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.nightkinKitPending).toBe(true);
   });
 
-  it('навыки не трогаются', () => {
-    const save = makeShadowSave([
-      attrArr('STR', 10), attrArr('END', 10), attrArr('PER', 4),
-      attrArr('AGI', 4), attrArr('INT', 4), attrArr('CHA', 4), attrArr('LCK', 4),
-    ]);
-    const migrated = migrateCharacterState(save);
-    expect(migrated.skills.SNEAK).toEqual({ id: 'SNEAK', base: 4, modifiers: [], total: 4 });
-    expect(migrated.level).toBe(1);
-  });
-
-  it('персонаж НЕ Тень — атрибуты не тронуты', () => {
+  it('не сбрасывает атрибуты не-Тени', () => {
     const save = {
       schemaVersion: 9,
       origin: { id: 'vaultDweller' },
       trait: { id: 'vault-dweller-trait' },
-      attributes: [
-        attrArr('STR', 8), attrArr('END', 5), attrArr('PER', 4),
-        attrArr('AGI', 6), attrArr('INT', 7), attrArr('CHA', 3), attrArr('LCK', 9),
-      ],
+      attributes: [attrArr('STR', 8), attrArr('LCK', 9)],
     };
+
     const migrated = migrateCharacterState(save);
-    expect(Array.isArray(migrated.attributes)).toBe(true);
-    expect(migrated.attributes.find((a) => a.name === 'STR').value).toBe(8);
-    expect(migrated.attributes.find((a) => a.name === 'LCK').value).toBe(9);
+
+    expect(byName(migrated.attributes)).toEqual({ STR: 8, LCK: 9 });
   });
 });
 
-describe('Миграция v10→v11: починка повреждённых сейвов', () => {
-  it('attributes-объект (баг v9→v10) → восстановлен массив + сброс Тени', () => {
-    // повреждённый сейв: attributes = { '0': {name, value}, ... }
+describe('Полная цепочка от v10: починка повреждённых attributes', () => {
+  it('восстанавливает массив и повторно сбрасывает Тень', () => {
     const broken = makeShadowSave({
-      '0': attrArr('STR', 10),
-      '1': attrArr('END', 3),
-      '2': attrArr('PER', 7),
-      '3': attrArr('AGI', 4),
-      '4': attrArr('INT', 9),
-      '5': attrArr('CHA', 10),
-      '6': attrArr('LCK', 5),
+      0: attrArr('STR', 10),
+      1: attrArr('END', 3),
+      2: attrArr('PER', 7),
+      3: attrArr('AGI', 4),
+      4: attrArr('INT', 9),
+      5: attrArr('CHA', 10),
+      6: attrArr('LCK', 5),
     }, 10);
+
     const migrated = migrateCharacterState(broken);
 
     expect(Array.isArray(migrated.attributes)).toBe(true);
-    const byName = Object.fromEntries(migrated.attributes.map((a) => [a.name, a.value]));
-    expect(byName.STR).toBe(6);
-    expect(byName.END).toBe(6);
-    expect(byName.INT).toBe(4);
-    expect(byName.CHA).toBe(4);
-    expect(migrated.schemaVersion).toBe(11);
+    expect(byName(migrated.attributes)).toMatchObject({ STR: 6, END: 6, INT: 4, CHA: 4 });
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  it('повреждённый сейв НЕ Тени: массив восстановлен, значения сохранены', () => {
+  it('восстанавливает массив не-Тени без изменения значений', () => {
     const broken = {
       schemaVersion: 10,
       origin: { id: 'vaultDweller' },
-      trait: { id: 'x' },
-      attributes: { '0': attrArr('STR', 8), '1': attrArr('LCK', 9) },
+      trait: { id: 'vault-dweller-trait' },
+      attributes: { 0: attrArr('STR', 8), 1: attrArr('LCK', 9) },
     };
+
     const migrated = migrateCharacterState(broken);
+
     expect(Array.isArray(migrated.attributes)).toBe(true);
-    expect(migrated.attributes.find((a) => a.name === 'STR').value).toBe(8);
-    expect(migrated.attributes.find((a) => a.name === 'LCK').value).toBe(9);
+    expect(byName(migrated.attributes)).toEqual({ STR: 8, LCK: 9 });
   });
 
-  it('не-атрибутный объект не трогается', () => {
+  it('не принимает произвольный объект за массив атрибутов', () => {
     const save = { schemaVersion: 10, origin: { id: 'shadow' }, attributes: { foo: 'bar' } };
-    const migrated = migrateCharacterState(save);
-    expect(migrated.attributes).toEqual({ foo: 'bar' });
+    expect(migrateCharacterState(save).attributes).toEqual({ foo: 'bar' });
   });
 
-  it('Тень без атрибутов — не падает', () => {
+  it('не падает для Тени без атрибутов', () => {
     const save = { schemaVersion: 9, origin: { id: 'shadow' }, trait: { id: 'shadow' } };
-    const migrated = migrateCharacterState(save);
-    expect(migrated.attributes).toBeUndefined();
+    expect(migrateCharacterState(save).attributes).toBeUndefined();
   });
 });
 
-describe('Миграция v12→v13: трейт Тени в сейве (старый формат modifiers)', () => {
-  it('CURRENT_SCHEMA_VERSION = 13', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(13);
-  });
-
-  it('сейв как у пользователя: трейт в старом формате → починен, атрибуты 6/6/4..., флаги false', () => {
+describe('Полная цепочка от v12: канонизация сохранённого трейта Тени', () => {
+  it('переводит старые modifiers в attributes и сбрасывает распределение', () => {
     const save = {
       schemaVersion: 12,
       origin: { id: 'shadow' },
@@ -235,69 +175,63 @@ describe('Миграция v12→v13: трейт Тени в сейве (ста�
         ids: ['shadow'], id: 'shadow', name: 'Тень',
         modifiers: {
           attributeBonus: { STR: 2, END: 2 },
-          attributeLimits: { STR: { min: 6, max: 12 }, END: { min: 6, max: 12 }, CHA: { max: 8 }, INT: { max: 8 } },
+          attributeLimits: {
+            STR: { min: 6, max: 12 }, END: { min: 6, max: 12 },
+            CHA: { max: 8 }, INT: { max: 8 },
+          },
           skillMaxValue: 4,
           immunities: ['radiation', 'poison'],
           effects: ['stealth_boy_addiction'],
         },
       },
-      attributesSaved: false,
-      skillsSaved: false,
+      attributesSaved: true,
+      skillsSaved: true,
       attributes: [
-        { name: 'STR', value: 4 }, { name: 'END', value: 4 }, { name: 'PER', value: 4 },
-        { name: 'AGI', value: 4 }, { name: 'INT', value: 4 }, { name: 'CHA', value: 4 }, { name: 'LCK', value: 4 },
+        attrArr('STR', 4), attrArr('END', 4), attrArr('PER', 4), attrArr('AGI', 4),
+        attrArr('INT', 4), attrArr('CHA', 4), attrArr('LCK', 4),
       ],
-      skills: [
-        { name: 'SNEAK', value: 0 }, { name: 'ATHLETICS', value: 0 },
-      ],
-      equipment: { items: [{ id: 'unarmed_human', isBuiltin: true }] },
+      skills: [attrArr('SNEAK', 3), attrArr('ATHLETICS', 2)],
+      equipment: { id: 'default_caps_only', items: [{ itemType: 'currency', quantity: 100 }] },
       level: 1,
     };
+
     const migrated = migrateCharacterState(save);
 
-    expect(migrated.schemaVersion).toBe(13);
-    // трейт починен: канонический attributes, старый формат удалён
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.trait.modifiers.attributes.STR).toEqual({ baseBonus: 2, min: 6, max: 12 });
     expect(migrated.trait.modifiers.attributeBonus).toBeUndefined();
     expect(migrated.trait.modifiers.attributeLimits).toBeUndefined();
     expect(migrated.trait.modifiers.skillMaxValue).toBe(4);
-    // атрибуты сброшены к стартовым
-    const attrs = Object.fromEntries(migrated.attributes.map((a) => [a.name, a.value]));
-    expect(attrs.STR).toBe(6);
-    expect(attrs.END).toBe(6);
-    expect(attrs.PER).toBe(4);
+    expect(byName(migrated.attributes)).toMatchObject({ STR: 6, END: 6, PER: 4 });
     expect(migrated.attributesSaved).toBe(false);
     expect(migrated.skillsSaved).toBe(false);
-    // навыки к стартовым
-    expect(migrated.skills[0].value).toBe(0);
-    // инвентарь и уровень целы
-    expect(migrated.equipment.items).toEqual([{ id: 'unarmed_human', isBuiltin: true }]);
+    expect(byName(migrated.skills)).toEqual({ SNEAK: 0, ATHLETICS: 0 });
     expect(migrated.level).toBe(1);
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.nightkinKitPending).toBe(true);
   });
 
-  it('трейт уже канонический — сейв не трогаем (защита от повторного сброса)', () => {
+  it('не сбрасывает уже канонический трейт повторно', () => {
     const save = {
       schemaVersion: 12,
       origin: { id: 'shadow' },
       trait: { id: 'shadow', modifiers: { attributes: { STR: { baseBonus: 2, min: 6, max: 12 } }, skillMaxValue: 4 } },
       attributesSaved: true,
       skillsSaved: true,
-      attributes: [{ name: 'STR', value: 8 }],
-      skills: [{ name: 'SNEAK', value: 4 }],
+      attributes: [attrArr('STR', 8)],
+      skills: [attrArr('SNEAK', 4)],
     };
+
     const migrated = migrateCharacterState(save);
+
     expect(migrated.trait.modifiers.attributes.STR.baseBonus).toBe(2);
-    expect(migrated.attributes[0].value).toBe(8); // не сброшено
+    expect(migrated.attributes[0].value).toBe(8);
     expect(migrated.attributesSaved).toBe(true);
   });
 });
 
 describe('Миграция v13→v14: старый комплект → NIGHTKIN', () => {
-  it('CURRENT_SCHEMA_VERSION = 14', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(14);
-  });
-
-  it('Тень со стартовым капиталом: комплект заменён на nightkin, флаг pending', () => {
+  it('заменяет стартовый капитал Тени и ставит pending-флаг', () => {
     const save = {
       schemaVersion: 13,
       origin: { id: 'shadow' },
@@ -305,30 +239,35 @@ describe('Миграция v13→v14: старый комплект → NIGHTKIN
       equipment: { id: 'default_caps_only', name: 'Стартовый капитал', items: [{ itemType: 'currency', quantity: 100 }] },
       caps: 100,
     };
+
     const migrated = migrateCharacterState(save);
-    expect(migrated.equipment.id).toBe('nightkin');
-    expect(migrated.equipment.name).toBe('Тень');
+
+    expect(migrated.equipment).toMatchObject({ id: 'nightkin', name: 'Тень', items: [] });
     expect(migrated.nightkinKitPending).toBe(true);
   });
 
-  it('Тень с уже новым комплектом: не трогаем', () => {
+  it('не трогает уже новый комплект', () => {
     const save = {
       schemaVersion: 13,
       origin: { id: 'shadow' },
       equipment: { id: 'nightkin', name: 'Тень', items: [] },
     };
+
     const migrated = migrateCharacterState(save);
+
     expect(migrated.equipment.id).toBe('nightkin');
     expect(migrated.nightkinKitPending).toBeUndefined();
   });
 
-  it('не-Тень: комплект не тронут', () => {
+  it('не трогает комплект не-Тени', () => {
     const save = {
       schemaVersion: 13,
       origin: { id: 'vaultDweller' },
       equipment: { id: 'vault_resident', name: 'Житель Убежища' },
     };
+
     const migrated = migrateCharacterState(save);
+
     expect(migrated.equipment.id).toBe('vault_resident');
     expect(migrated.nightkinKitPending).toBeUndefined();
   });

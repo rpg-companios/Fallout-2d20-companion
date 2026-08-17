@@ -205,6 +205,34 @@ export const mergeById = (dataArr, i18nArr) => {
   });
 };
 
+// Локализация бронемода содержит описания specialEffects с теми же id,
+// а механические value/type находятся в data. Обычный верхнеуровневый spread
+// заменял весь массив локализованной версией и терял механику. Объединяем
+// вложенные записи строго по id: data задаёт состав и значения, i18n — текст.
+const mergeArmorModsById = (dataArr, i18nArr) => {
+  const localizedByModId = new Map((i18nArr || []).map((item) => [item.id, item]));
+  return (dataArr || []).map((dataItem) => {
+    const i18nItem = localizedByModId.get(dataItem.id);
+    if (!i18nItem?.name) {
+      throw new Error(`[equipmentCatalog] Missing armor mod i18n name for id: ${dataItem.id}`);
+    }
+    const localizedEffects = new Map(
+      (i18nItem.specialEffects || []).map((effect) => [effect.id, effect]),
+    );
+    const specialEffects = (dataItem.specialEffects || []).map((effect) => {
+      const description = localizedEffects.get(effect.id)?.description;
+      return {
+        ...effect,
+        ...(typeof description === 'string' ? { description } : {}),
+      };
+    });
+    return {
+      ...dataItem,
+      name: i18nItem.name,
+      specialEffects,
+    };
+  });
+};
 
 const mergeAmmoById = (dataArr, i18nArr) => {
   const i18nMap = new Map((i18nArr || []).map((item) => [item.id, item]));
@@ -364,8 +392,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedRobotLegs = mergeById(moduleRobotLegs || [], i18n.robotLegs || [])
     .map((l) => ({ ...l, itemType: l.itemType || 'robotLeg' }));
   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
-  const mergedArmorMods = mergeById(moduleArmorMods, moduleI18n.armorMods);
-  const mergedUniqArmorMods = mergeById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
+  const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
+  const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
 
   // Equipment kits: merge locale-independent items with i18n names
   const kitNames = { ...(i18n.equipmentKits || {}), ...(moduleI18n.equipmentKits || {}) };
@@ -377,6 +405,16 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
       }
       return [kitId, { name, ...kitData }];
     })
+  );
+
+  const armorEffects = Object.fromEntries(
+    Object.entries(moduleArmorEffects || {}).map(([effectId, effect]) => {
+      const description = moduleI18n.armorEffects?.[effectId]?.description;
+      return [effectId, {
+        ...effect,
+        ...(typeof description === 'string' ? { description } : {}),
+      }];
+    }),
   );
 
   return {
@@ -406,7 +444,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     armorMods: mergedArmorMods,
     uniqArmorMods: mergedUniqArmorMods,
     modsOverrides: moduleWeaponModSlots,
-    armorEffects: moduleArmorEffects,
+    armorEffects,
     robotWeaponsOnly: robotWeapons,
     robotArms,
     robotPlating: robotPlatingList,

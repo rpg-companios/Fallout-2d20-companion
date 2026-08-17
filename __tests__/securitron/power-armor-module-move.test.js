@@ -28,7 +28,11 @@ describe('Силовая броня в модуле (сеттинг), data/ — 
     expect(Object.keys(modulePowerArmor).sort()).toEqual(['frame', 'raiderPower', 't45', 't51', 't60', 'x01']);
     expect(countPieces(modulePowerArmor)).toBe(21);
     const piece = modulePowerArmor.t45.pieces[0];
-    expect(piece).toHaveProperty('damageResistance');
+    expect(piece).toMatchObject({
+      physicalDamageRating: 6,
+      energyDamageRating: 4,
+      radiationDamageRating: 7,
+    });
     expect(piece).toHaveProperty('weight');
   });
 

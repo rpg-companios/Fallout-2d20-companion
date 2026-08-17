@@ -53,13 +53,16 @@ describe('Конвейер: BASE + MODS + QUALITIES (оружие)', () => {
       weaponId: 'weapon_straight_razor',
       itemType: 'weapon',
       baseName: 'Опасная бритва',
-      appliedMods: { Uniques: 'mod_113' },
+      appliedMods: { Unique: 'mod_113' },
     }, catalog, { qualityNameById: qname });
     expect(item.damage).toBe(3); // нож 2 + мод +1
     expect(item.name).toBe('Зазубренное лезвие Опасная бритва');
     expect(item.displayName).toBe(item.name);
     expect(item.qualities).toEqual([{ qualityId: 'quality_concealed' }]);
-    expect(item.effects).toEqual([{ effectId: 'effect_piercing_x' }]);
+    expect(item.effects).toEqual([
+      { effectId: 'effect_piercing_x' },
+      { effectId: 'effect_persistent' },
+    ]);
   });
 
   it('качества ВСЕГДА добавляются к имени (не заменяют)', () => {
@@ -69,7 +72,7 @@ describe('Конвейер: BASE + MODS + QUALITIES (оружие)', () => {
       itemType: 'weapon',
       baseName: 'Опасная бритва',
       uniqQualities: ['dashing'],
-      appliedMods: { Uniques: 'mod_113' },
+      appliedMods: { Unique: 'mod_113' },
     }, catalog, { qualityNameById: qname });
     expect(item.name).toBe('Зазубренное лезвие Дерзкая Опасная бритва');
   });
@@ -81,7 +84,7 @@ describe('Конвейер: BASE + MODS + QUALITIES (оружие)', () => {
       itemType: 'weapon',
       baseName: 'Опасная бритва',
       uniqQualities: ['elegant'],
-      appliedMods: { Uniques: 'mod_113' },
+      appliedMods: { Unique: 'mod_113' },
     };
     const direct = enrichWeaponItem(instance, catalog, { qualityNameById: qname });
     const viaResolve = resolveWeaponWithAppliedMods(instance, catalog);

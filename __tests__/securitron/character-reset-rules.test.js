@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { isCharacterLocked } from '../../domain/characterCreation';
 import useCharacterStore from '../../src/store/characterStore';
 import { mergeEquipmentWithStore, mergeEquippedWeapons, migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 
 describe('isCharacterLocked (точка невозврата)', () => {
   it('не зафиксирован, пока ничего не распределено', () => {
@@ -125,7 +126,7 @@ describe('Миграция v4→v5: восстановление комплек�
       rewardedSkills: [],
     };
     const migrated = migrateCharacterState(state);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.equipment.id).toBeNull();
     // Предметы на месте — снаряжение не потеряно
     expect(migrated.equipment.items).toHaveLength(3);

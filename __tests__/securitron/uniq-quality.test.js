@@ -26,6 +26,7 @@ import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
 import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { getEquipmentCatalogForLocale } from '../../domain/registry';
 import { migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 import useCharacterStore from '../../src/store/characterStore';
 
 beforeAll(() => {
@@ -203,7 +204,7 @@ describe('Миграция v7 → v8 (старые сейвы Председат
       equippedWeapons: [],
     };
     const migrated = migrateCharacterState(v7);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     const clothes = migrated.equipment.items[0];
     expect(clothes.uniqQualities).toEqual(['elegant']);
     expect(clothes.name).toBe('Элегантная Формальная одежда');
@@ -234,7 +235,7 @@ describe('Миграция v7 → v8 (старые сейвы Председат
       equippedWeapons: [],
     };
     const migrated = migrateCharacterState(v7);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.equipment.items[0].uniqQualities).toBeUndefined();
     expect(migrated.equipment.items[0].id).toBe('clothing_fancy_clothes');
   });

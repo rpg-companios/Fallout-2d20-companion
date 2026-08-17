@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { isUnarmedAttack, applyUnarmedVisibility } from '../../domain/meleeSlot';
 
 const fists = { id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true };
-const robotManipulator = { id: 'robot_weapon_manipulator', weapon_type: 'Unarmed', isBuiltin: true };
+const robotManipulator = { id: 'robot_weapon_manipulator', weaponType: 'Unarmed', isBuiltin: true };
 const knife = { id: 'weapon_knife', weaponType: 'Melee', isBuiltin: false };
 const pistol = { id: 'weapon_pistol', weaponType: 'Light', isBuiltin: false };
 // не-встроенная Unarmed-защита от дурака: в каталоге таких нет, но фильтр

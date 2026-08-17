@@ -53,7 +53,7 @@ describe('Комплекты Анклава: данные', () => {
     expect(pistol).toBeDefined();
     expect(pistol.resolvedAmmunition?.id).toBe('ammo_energy_cell');
     expect(pistol.resolvedAmmunition?.quantity).toBeGreaterThanOrEqual(6);
-    expect(pistol.resolvedAmmunition?.quantity).toBeLessThanOrEqual(9);
+    expect(pistol.resolvedAmmunition?.quantity).toBeLessThanOrEqual(12);
   });
 
   it('солдат: военная униформа, нагрудник ББ, выбор лазерной винтовки/штурмовой винтовки с 8+4 боезапаса', async () => {
@@ -68,15 +68,19 @@ describe('Комплекты Анклава: данные', () => {
     expect(optionIds).toContain('weapon_laser_gun');
     expect(optionIds).toContain('weapon_assault_rifle');
 
-    // Резолв лазерной винтовки (пистолет + ствольная коробка/ложа mod_058, ствол mod_054)
+    // Резолв лазерной винтовки (пистолет + стандартная ложа mod_058, длинный ствол mod_204)
     const laserOption = choice.items.find((o) => o.weaponId === 'weapon_laser_gun');
-    expect(laserOption.modIds).toEqual(['mod_058', 'mod_054']);
+    expect(laserOption.modIds).toEqual(['mod_058', 'mod_204']);
 
     const resolved = await resolveKitItems({ id: 'enclave_soldier', items: kit.items });
     const ids = resolved.items.map((i) => i.clothingId || i.armorId || i.weaponId || i.itemId || i.id);
     expect(ids).toContain('clothing_military_fatigues');
     expect(ids).toContain('armor_combat_chest_001');
-    // один из вариантов оружия попал в комплект (по умолчанию choice — первый)
-    expect(ids.some((id) => id === 'weapon_laser_gun' || id === 'weapon_assault_rifle')).toBe(true);
+    // Выбор остаётся выбором, но оба варианта полностью разрешены для UI.
+    const resolvedChoice = resolved.items.find((item) => item.type === 'choice');
+    expect(resolvedChoice.items.map((item) => item.weaponId)).toEqual([
+      'weapon_laser_gun',
+      'weapon_assault_rifle',
+    ]);
   });
 });

@@ -43,8 +43,7 @@ describe('Ориджин «Осколок Анклава»: данные (в м�
     expect(origin.characterType).toBe('human');
     expect(origin.bodyPlan).toBe('humanoid');
     expect(origin.traitIds).toEqual([TRAIT_ID]);
-    // Снаряжение сейчас — стартовый капс (100 крышек); новый комплект будет позже.
-    expect(origin.equipmentKitIds).toEqual(['default_caps_only']);
+    expect(origin.equipmentKitIds).toEqual(['enclave_scientist', 'enclave_soldier']);
   });
 
   it('трейт «Скрытный и преследуемый» даёт выбор 1 доп. навыка из Скрытность/Выживание', () => {
@@ -72,14 +71,13 @@ describe('Ориджин «Осколок Анклава»: данные (в м�
     expect(typeof enTrait?.description).toBe('string');
   });
 
-  it('стартовый комплект существует и выдаёт 100 крышек (currency)', async () => {
-    const { resolveKitItems } = await import('../../domain/kitResolver');
+  it('оба стартовых комплекта Анклава существуют в каталоге', () => {
     const catalog = getEquipmentCatalogForLocale('ru-RU');
-    const kit = catalog.equipmentKits.default_caps_only;
-    expect(kit).toBeDefined();
-    const resolved = await resolveKitItems({ id: 'default_caps_only', items: kit.items });
-    const caps = resolved.items.find((i) => i.itemType === 'currency');
-    expect(caps).toBeDefined();
-    expect(caps.quantity).toBe(100);
+    const origin = getOrigin();
+    expect(origin.equipmentKitIds).toEqual(['enclave_scientist', 'enclave_soldier']);
+    for (const kitId of origin.equipmentKitIds) {
+      expect(catalog.equipmentKits[kitId], kitId).toBeDefined();
+      expect(catalog.equipmentKits[kitId].items.length, kitId).toBeGreaterThan(0);
+    }
   });
 });

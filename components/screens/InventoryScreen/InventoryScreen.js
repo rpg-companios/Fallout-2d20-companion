@@ -8,8 +8,6 @@ import CapsModal from './modals/CapsModal';
 import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
-import { calculateMaxHealth } from '../../../domain/characterCreation';
-import { getInstantHealAmount } from '../../../domain/effects';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import {
@@ -74,8 +72,6 @@ const InventoryScreen = () => {
     equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
     caps, setCaps,
-    attributes, level,
-    currentHealth, setCurrentHealth,
     applyConsumableFull,
     getModifiedItem,
     trait,
@@ -357,38 +353,29 @@ const InventoryScreen = () => {
         return;
       }
 
-      // Применяем расходник с полной логикой (timed-эффекты, removeCondition, addiction)
+      // Полная логика расходника меняет показатели в порядке: лечение, радиация,
+      // затем обрабатывает длительные эффекты, состояния и зависимость.
       const result = applyConsumableFull(consumableItem);
-      const { timedResult, addictionResult, conditionsRemoved } = result;
-
-      // Лечение HP
-      const healAmount = getInstantHealAmount(consumableItem);
-
-      debugLog('consumable.screen.healCalc', {
-        itemName,
+      const {
+        timedResult,
+        addictionResult,
+        conditionsRemoved,
         healAmount,
-        currentHealth,
-        maxHealth: calculateMaxHealth(attributes, level),
-      });
+        radiationAmount,
+      } = result;
 
-      // fastMetabolism: +hpHealBonus к любому мгновенному восстановлению ОЗ
-      const hpHealBonus = healAmount > 0 ? (Number(storePerkBonuses?.hpHealBonus) || 0) : 0;
-      const totalHeal = healAmount + hpHealBonus;
-
-      if (totalHeal > 0) {
-        const maxHealth = calculateMaxHealth(attributes, level);
-        const newHealth = Math.min(maxHealth, currentHealth + totalHeal);
-        debugLog('consumable.screen.healing', {
-          healAmount: totalHeal,
-          hpHealBonus,
-          currentHealth,
-          newHealth,
-        });
-        setCurrentHealth(newHealth);
-        showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount: totalHeal }));
+      if (healAmount > 0) {
+        showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount }));
       } else {
         debugLog('consumable.screen.noHeal', { itemName });
         showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedSelfMessage'), { itemName }));
+      }
+
+      if (radiationAmount !== null) {
+        showAlert(
+          tInventory('screen.alerts.radiationTitle'),
+          formatInventoryText(tInventory('screen.alerts.radiationMessage'), { radiationAmount }),
+        );
       }
 
       // Эффекты от timed-эффектов

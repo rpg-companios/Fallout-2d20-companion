@@ -29,6 +29,7 @@ import { expandTrueItems, applyVariantModifiers } from '../../domain/packMerge';
 import { resolveWeaponItem } from '../../domain/kitResolver';
 import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
 import { migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import useCharacterStore from '../../src/store/characterStore';
 import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
@@ -231,7 +232,7 @@ describe('Миграция v6 → v7 (старые сейвы с бритвой)
       equippedWeapons: [],
     };
     const migrated = migrateCharacterState(v6);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     const item = migrated.equipment.items[0];
     expect(item.weaponId).toBe('weapon_switchblade');
     expect(item.baseName).toBe('Опасная бритва');

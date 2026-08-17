@@ -15,8 +15,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.grilledBloatfly",
     "state": "cooked",
-    "preserved": false,
-    "description": "+2 Сопротивление урону от радиации"
+    "preserved": false
   },
   {
     "id": "food_blamco_mac_and_cheese",
@@ -31,11 +30,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_bloatfly_meat",
@@ -50,11 +52,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_bloodbug_meat",
@@ -69,11 +74,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_bloodbug_steak",
@@ -91,8 +99,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.bloodbugSteak",
     "state": "cooked",
-    "preserved": false,
-    "description": "Максимальные ОЗ +3 до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_brahmin_meat",
@@ -107,11 +114,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_brain_fungus",
@@ -126,11 +136,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_canned_dog_food",
@@ -145,11 +158,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_carrot",
@@ -164,11 +180,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_cooked_softshell_mirelurk",
@@ -186,8 +205,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.cookedSoftshellMirelurk",
     "state": "cooked",
-    "preserved": false,
-    "description": "Получите +1 ОД в начале следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_corn",
@@ -202,11 +220,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_cram",
@@ -221,11 +242,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_crispy_squirrel_bits",
@@ -243,8 +267,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_dandy_boy_apples",
@@ -259,11 +282,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_deathclaw_egg",
@@ -278,11 +304,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_deathclaw_meat",
@@ -297,11 +326,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_deathclaw_omelette",
@@ -319,8 +351,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.deathclawOmelette",
     "state": "cooked",
-    "preserved": false,
-    "description": "Если следующая сцена - бой, восстанавливайте 1ОЗ в начале каждого хода."
+    "preserved": false
   },
   {
     "id": "food_deathclaw_steak",
@@ -338,8 +369,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.deathclawSteak",
     "state": "cooked",
-    "preserved": false,
-    "description": "Можно перебросить 1d20 на все проверки на СИЛ до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_fancy_lads_snack_cakes",
@@ -354,11 +384,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_food_paste",
@@ -376,8 +409,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.foodPaste",
     "state": "cooked",
-    "preserved": true,
-    "description": "Можно перебросить 1d20 на все проверки на ВЫН до конца следующей сцены"
+    "preserved": true
   },
   {
     "id": "food_gourd",
@@ -392,11 +424,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_grilled_radroach",
@@ -414,8 +449,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_grilled_radstag",
@@ -433,8 +467,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.grilledRadstag",
     "state": "cooked",
-    "preserved": false,
-    "description": "Переносимый вес увеличивается на +25 до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_gum_drops",
@@ -449,11 +482,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_iguana_bits",
@@ -468,11 +504,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_iguana_on_a_stick",
@@ -490,8 +529,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_iguana_stew",
@@ -509,8 +547,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_instamash",
@@ -525,11 +562,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_institute_food_packet",
@@ -547,8 +587,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_melon",
@@ -563,11 +602,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_mirelurk_cake",
@@ -585,8 +627,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.mirelurkCake",
     "state": "cooked",
-    "preserved": false,
-    "description": "Можете дышать под водой до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_mirelurk_egg",
@@ -601,11 +642,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_mirelurk_egg_omelette",
@@ -623,8 +667,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.mirelurkEggOmelette",
     "state": "cooked",
-    "preserved": false,
-    "description": "Немедленно добавьте 2 ОД в пул группы"
+    "preserved": false
   },
   {
     "id": "food_mirelurk_meat",
@@ -639,11 +682,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_mirelurk_queen_steak",
@@ -661,8 +707,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.mirelurkQueenSteak",
     "state": "cooked",
-    "preserved": false,
-    "description": "Уменьшите сложность всех проверок на ВЫН на 1 до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_mole_rat_chops",
@@ -680,8 +725,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.moleRatChops",
     "state": "cooked",
-    "preserved": false,
-    "description": "+1 максимум ОД в групповой пул до конца текущей сцены"
+    "preserved": false
   },
   {
     "id": "food_mole_rat_meat",
@@ -696,11 +740,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_dog_meat",
@@ -715,11 +762,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_mutant_hound_ribs",
@@ -737,8 +787,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.mutantHoundRibs",
     "state": "cooked",
-    "preserved": false,
-    "description": "Лечит 2 урона от радиации"
+    "preserved": false
   },
   {
     "id": "food_mutant_hound_meat",
@@ -753,11 +802,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_mutfruit",
@@ -772,11 +824,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_dog_chops",
@@ -794,8 +849,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_noodle_bowl",
@@ -813,8 +867,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_perfectly_preserved_pie",
@@ -832,8 +885,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_pork_and_beans",
@@ -848,11 +900,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_potato_crisps",
@@ -867,11 +922,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_potted_meat",
@@ -886,11 +944,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "2rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 2
+    },
     "effectKey": "itemEffects.food.pottedMeat",
     "state": "cooked",
-    "preserved": true,
-    "description": "Бросьте 2 CD вместо 1 для определения урона от радиации при употреблении"
+    "preserved": true
   },
   {
     "id": "food_mirelurk_queen_meat",
@@ -905,11 +966,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "itemEffects.food.mirelurkQueenMeat",
     "state": "raw",
-    "preserved": false,
-    "description": "Можно перебросить 1d20 на все проверки на ВЫН до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_radroach_meat",
@@ -924,11 +988,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_radscorpion_egg",
@@ -943,11 +1010,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_radscorpion_egg_omelette",
@@ -965,8 +1035,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.radscorpionEggOmelette",
     "state": "cooked",
-    "preserved": false,
-    "description": "Излечение от всех зависимостей"
+    "preserved": false
   },
   {
     "id": "food_radscorpion_meat",
@@ -981,11 +1050,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_radscorpion_steak",
@@ -1003,8 +1075,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.radscorpionSteak",
     "state": "cooked",
-    "preserved": false,
-    "description": "+2 сопротивления энергоурону до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_radstag_meat",
@@ -1019,11 +1090,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_radstag_stew",
@@ -1041,8 +1115,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.radstagStew",
     "state": "cooked",
-    "preserved": false,
-    "description": "+3 сопротивления энергоурону до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_razorgrain",
@@ -1057,11 +1130,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_ribeye_steak",
@@ -1079,8 +1155,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_roasted_mirelurk_meat",
@@ -1098,8 +1173,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.roastedMirelurkMeat",
     "state": "cooked",
-    "preserved": false,
-    "description": "Получите +1 ОД в начале следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_salisbury_steak",
@@ -1114,11 +1188,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_silt_bean",
@@ -1133,11 +1210,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_softshell_mirelurk_meat",
@@ -1152,11 +1232,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_squirrel_bits",
@@ -1171,11 +1254,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_squirrel_on_a_stick",
@@ -1193,8 +1279,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_squirrel_stew",
@@ -1212,8 +1297,7 @@
     "radModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_stingwing_fillet",
@@ -1231,8 +1315,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.stingwingFillet",
     "state": "cooked",
-    "preserved": false,
-    "description": "Можете перебросить 1d20 на все проверки на ВОС до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_stingwing_meat",
@@ -1247,11 +1330,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_sugar_bombs",
@@ -1266,11 +1352,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "itemEffects.food.sugarBombs",
     "state": "cooked",
-    "preserved": true,
-    "description": "Получите +1 ОД в начале следующей сцены"
+    "preserved": true
   },
   {
     "id": "food_sweet_roll",
@@ -1285,11 +1374,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   },
   {
     "id": "food_tarberry",
@@ -1304,11 +1396,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_tato",
@@ -1323,11 +1418,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_vegetable_soup",
@@ -1345,8 +1443,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.vegetableSoup",
     "state": "cooked",
-    "preserved": false,
-    "description": "+2 сопротивления урону от радиации до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_yao_guai_meat",
@@ -1361,11 +1458,14 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "raw",
-    "preserved": false,
-    "description": ""
+    "preserved": false
   },
   {
     "id": "food_yao_guai_ribs",
@@ -1383,8 +1483,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.yaoGuaiRibs",
     "state": "cooked",
-    "preserved": false,
-    "description": "+2 сопротивления физическому урону до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_yao_guai_roast",
@@ -1402,8 +1501,7 @@
     "radModifier": null,
     "effectKey": "itemEffects.food.yaoGuaiRoast",
     "state": "cooked",
-    "preserved": false,
-    "description": "+2 CD к атакам ближнего боя до конца следующей сцены"
+    "preserved": false
   },
   {
     "id": "food_yum_yum_deviled_eggs",
@@ -1418,10 +1516,13 @@
       }
     },
     "irradiated": true,
-    "radModifier": "rollCD",
+    "radModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "state": "cooked",
-    "preserved": true,
-    "description": ""
+    "preserved": true
   }
 ]

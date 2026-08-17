@@ -9,6 +9,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createElement as h } from 'react';
 
+vi.mock('@expo/vector-icons', () => ({
+  MaterialCommunityIcons: 'MaterialCommunityIcons',
+}));
+
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',

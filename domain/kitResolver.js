@@ -181,10 +181,10 @@ export async function resolveWeaponItem(item) {
   // Ложа (stock) превращает пистолет в винтовку: имя берём из данных оружия
   // (stockNames.with), если оно задано. Это правило книги (Any Stock mods
   // change the weapon to a rifle), обеспеченное ДАННЫМИ — движок лишь знает,
-  // что мод из слота Stocks меняет базовое имя. У оружия без stockNames.with
+  // что мод из слота Stock меняет базовое имя. У оружия без stockNames.with
   // ложа — обычный мод со своим префиксом (решение владельца, патч 106).
   const trueItemId = weaponData.trueItemId || null;
-  const hasStock = mods.some((mod) => mod.slot === 'Stocks' && weaponData.stockNames?.with);
+  const hasStock = mods.some((mod) => mod.slot === 'Stock' && weaponData.stockNames?.with);
   const stockName = hasStock ? weaponData.stockNames.with : null;
   const baseName = stockName || weaponData.name || item.weaponId;
 

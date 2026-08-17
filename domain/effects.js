@@ -1,7 +1,7 @@
 import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
 import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
 import { getCurrentModuleLocale } from '../i18n/locale';
-import { rollCombatDiceEffects } from './diceRollsLogic';
+import { rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
 
 const SCENE_DURATION_MINUTES = 5;
 const SCENE_DURATION_MS = SCENE_DURATION_MINUTES * 60 * 1000;
@@ -473,7 +473,7 @@ export const getEffectTimeText = (scenesLeft) => {
 
 /**
  * Возвращает мгновенное количество HP для лечения из предмета.
- * Читает positiveEffect.hpModifier (chems) или hpHealed (drinks/food).
+ * Читает positiveEffect.hpModifier (food/chems) или hpHealed (drinks).
  */
 export const getInstantHealAmount = (item) => {
     if (!item) return 0;
@@ -484,6 +484,72 @@ export const getInstantHealAmount = (item) => {
     if (item.hpHealed != null) return Number(item.hpHealed) || 0;
     if (item.healAmount != null) return Number(item.healAmount) || 0;
     return 0;
+};
+
+/**
+ * Бросает модификатор радиации расходника по единой схеме движка.
+ * null означает, что броска не было (нет модификатора или есть иммунитет).
+ */
+export const rollConsumableRadiation = (item, { radiationImmune = false } = {}) => {
+    const modifier = item?.radModifier;
+    if (modifier == null || radiationImmune) return null;
+
+    if (
+        typeof modifier !== 'object'
+        || Array.isArray(modifier)
+        || !['+', '-'].includes(modifier.op)
+        || modifier.rollType !== 'rollCD'
+        || !Number.isInteger(modifier.rollValue)
+        || modifier.rollValue <= 0
+    ) {
+        throw new Error('[effects] Некорректный radModifier расходника');
+    }
+
+    const { total } = rollMultipleCombatDice(modifier.rollValue);
+    return modifier.op === '+' ? total : -total;
+};
+
+/**
+ * Рассчитывает мгновенные изменения здоровья и радиации от расходника.
+ * Лечение рассчитывается первым. Радиация меняет только счётчик radiation:
+ * сопротивление радиации частей тела здесь намеренно не применяется.
+ */
+export const resolveConsumableVitalChanges = (item, {
+    currentHealth,
+    maxHealth,
+    radiation,
+    hpHealBonus = 0,
+    radiationImmune = false,
+} = {}) => {
+    if (
+        !Number.isFinite(currentHealth)
+        || !Number.isFinite(maxHealth)
+        || !Number.isFinite(radiation)
+        || !Number.isFinite(hpHealBonus)
+    ) {
+        throw new Error('[effects] Некорректное состояние персонажа для применения расходника');
+    }
+
+    const instantHealAmount = getInstantHealAmount(item);
+    const healAmount = instantHealAmount > 0
+        ? Math.max(0, instantHealAmount + hpHealBonus)
+        : 0;
+    const healthAfter = healAmount > 0
+        ? Math.min(maxHealth, currentHealth + healAmount)
+        : currentHealth;
+
+    // Строгий порядок: сначала здоровье, затем бросок и изменение радиации.
+    const radiationAmount = rollConsumableRadiation(item, { radiationImmune });
+    const radiationAfter = radiationAmount === null
+        ? radiation
+        : Math.max(0, radiation + radiationAmount);
+
+    return {
+        healAmount,
+        healthAfter,
+        radiationAmount,
+        radiationAfter,
+    };
 };
 
 /**
@@ -571,5 +637,7 @@ export default {
     getTimedApBonus,
     getTimedDefenseBonus,
     getInstantHealAmount,
+    rollConsumableRadiation,
+    resolveConsumableVitalChanges,
     getEffectTimeText,
 };

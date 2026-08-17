@@ -15,6 +15,7 @@ import { MULTI_TRAIT_ORIGIN_IDS } from '../../domain/characterCreation';
 import { getBannedTagSkills, hasTraitEffect } from '../../domain/traits';
 import { deepMerge, applyOverridesById, findUnknownOverrideIds } from '../../domain/packMerge';
 import { migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 import usePackStore from '../../src/store/packStore';
 import { getOrigins, getTraits } from '../../domain/registry';
 
@@ -174,7 +175,7 @@ describe('Переименование savage → tribal', () => {
   it('миграция v5→v6: сейв с origin savage → tribal (объект и строка)', () => {
       const obj = migrateCharacterState({ schemaVersion: 5, origin: { id: 'savage' } });
     expect(obj.origin.id).toBe('tribal');
-    expect(obj.schemaVersion).toBe(8);
+    expect(obj.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     const str = migrateCharacterState({ schemaVersion: 5, origin: 'savage' });
     expect(str.origin).toBe('tribal');
     // tribal не трогается

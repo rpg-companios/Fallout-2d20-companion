@@ -17,13 +17,13 @@
 // Правила имени (решения владельца, 2026-08-15):
 //   [префиксы модов] [имена качеств] [базовое имя]
 //   - качества ВСЕГДА добавляются (не заменяют имя);
-//   - мод слота Stocks меняет базовое имя на stockNames.with ТОЛЬКО если
+//   - мод слота Stock меняет базовое имя на stockNames.with ТОЛЬКО если
 //     оно задано в данных (единичные случаи: пистолет → винтовка);
 //     иначе ложа — обычный мод со своим префиксом;
 //   - базовое имя: baseName варианта → stockNames.with (stock-мод) →
 //     stockNames.without → каталожное имя.
 
-import { clampRangeIndex, indexToRangeName } from './range.js';
+import { clampRangeIndex, indexToRangeName, rangeToIndex } from './range.js';
 
 const toNumber = (value) => {
   const n = Number(String(value ?? 0).replace(',', '.'));
@@ -144,11 +144,10 @@ export const applyWeaponMods = (baseWeapon, mods = []) => {
     if (mod.ammoPerShotDelta != null) ammoPerShot += toNumber(mod.ammoPerShotDelta);
   }
 
-  const rangeIndex = clampRangeIndex(
-    (result.range_index != null && result.range_index !== ''
-      ? toNumber(result.range_index)
-      : (result.range_name || result.rangeName || result.range || 'Close')) + rangeShift,
-  );
+  const baseRangeIndex = result.range_index != null && result.range_index !== ''
+    ? clampRangeIndex(toNumber(result.range_index))
+    : (rangeToIndex(result.range_name || result.rangeName || result.range) ?? 0);
+  const rangeIndex = clampRangeIndex(baseRangeIndex + rangeShift);
 
   return {
     ...result,
@@ -209,7 +208,7 @@ export const enrichWeaponItem = (weaponLike, catalog, opts = {}) => {
   const effective = mods.length ? applyWeaponMods(base, mods) : base;
 
   // Имя: правила владельца (см. шапку модуля).
-  const hasStockRename = mods.some((mod) => mod.slot === 'Stocks' && base.stockNames?.with);
+  const hasStockRename = mods.some((mod) => mod.slot === 'Stock' && base.stockNames?.with);
   const stockName = hasStockRename ? base.stockNames.with : null;
   const baseName = weaponLike.baseName
     || stockName
@@ -219,7 +218,7 @@ export const enrichWeaponItem = (weaponLike, catalog, opts = {}) => {
     || weaponLike.name
     || '';
   const modPrefixes = mods
-    .filter((mod) => !(mod.slot === 'Stocks' && hasStockRename))
+    .filter((mod) => !(mod.slot === 'Stock' && hasStockRename))
     .map((mod) => mod.prefix)
     .filter(Boolean);
   const qualityNameById = opts.qualityNameById || (() => '');

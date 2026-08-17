@@ -158,7 +158,7 @@ describe('Комплект Общества «Белая перчатка»', ()
     expect(weaponChoice).toBeDefined();
     const sawedOff = weaponChoice.items.find((o) => o.weaponId === 'weapon_double_barrel_shotgun');
     expect(sawedOff.modIds).toEqual(['mod_020']);
-    expect(sawedOff.appliedMods).toEqual({ Barrels: 'mod_020' });
+    expect(sawedOff.appliedMods).toEqual({ Barrel: 'mod_020' });
     expect(sawedOff.resolvedAmmunition.id).toBe('ammo_shotgun_shell');
     expect(sawedOff.resolvedAmmunition.quantity).toBeGreaterThanOrEqual(6);
     expect(sawedOff.resolvedAmmunition.quantity).toBeLessThanOrEqual(12);

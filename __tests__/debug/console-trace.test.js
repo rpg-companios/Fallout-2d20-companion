@@ -75,7 +75,7 @@ describe('console-trace: гейт __fallout', () => {
 
 describe('console-trace: инвариант исходников', () => {
   it('в шиппящемся коде ноль плоских console.* — только debugLog через гейт', () => {
-    const ROOTS = ['App.js', 'components', 'src', 'domain', 'i18n'];
+    const ROOTS = ['index.js', 'App.js', 'components', 'src', 'domain', 'i18n'];
     const ALLOWED = 'src/debug/falloutDebug.js'; // сам гейт пишет в console при включённом гейте
     const CONSOLE_CALL = /console\.(log|warn|info|error|debug)\s*\(/;
 

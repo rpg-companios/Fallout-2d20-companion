@@ -41,6 +41,7 @@ import {
 } from './logic/characterTransfer';
 import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
 import useAppSettingsStore, {
@@ -465,7 +466,7 @@ export default function HomeScreen({ navigation }) {
         sourceCharacterId: character.id,
       });
     } catch (error) {
-      console.error('[duplicateCharacter] failed:', error);
+      debugLog('home.duplicateCharacter.failed', { message: error?.message });
       Alert.alert(
         tHomeScreen('title'),
         tHomeScreen('characterActions.duplicateError'),
@@ -499,7 +500,7 @@ export default function HomeScreen({ navigation }) {
         );
       }
     } catch (error) {
-      console.error('Ошибка скачивания файла:', error);
+      debugLog('home.characterDownload.failed', { message: error?.message });
       Alert.alert(
         tHomeScreen('title'),
         'Не удалось скачать персонажа. Проверьте консоль для подробностей.'
@@ -574,7 +575,7 @@ export default function HomeScreen({ navigation }) {
         { cancelable: true }
       );
     } catch (error) {
-      console.error('Ошибка загрузки файла:', error);
+      debugLog('home.characterUpload.failed', { message: error?.message });
       Alert.alert(
         tHomeScreen('title'),
         'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
