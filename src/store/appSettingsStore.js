@@ -149,6 +149,9 @@ const useAppSettingsStore = create(
     (set, get) => ({
       values: initial,
       moduleLocales: {},
+      settingsHydrated: false,
+
+      finishSettingsHydration: () => set({ settingsHydrated: true }),
 
       getValue: (settingId) => {
         const setting = getSettingById(settingId);
@@ -212,7 +215,10 @@ const useAppSettingsStore = create(
       ),
       version: 2,
       onRehydrateStorage: () => (state) => {
-        if (state) syncRuntimeLocales(state.values, state.moduleLocales);
+        if (state) {
+          syncRuntimeLocales(state.values, state.moduleLocales);
+          state.finishSettingsHydration();
+        }
       },
     },
   ),
@@ -222,6 +228,8 @@ export default useAppSettingsStore;
 
 export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('characterFoldersEnabled');
 export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
+export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScreenEnabled');
+export const selectSettingsHydrated = (state) => state.settingsHydrated;
 export const selectLanguage = (state) => state.getSettingValue('language');
 export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');
 export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValue('weaponDurabilityLossEnabled');

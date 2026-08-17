@@ -57,6 +57,7 @@ describe('Владение настройками и экраны управле
     expect(ids(ENGINE_SETTINGS)).toEqual([
       'characterFoldersEnabled',
       'characterDeleteActionPlacement',
+      'bootScreenEnabled',
       'language',
     ]);
     expect(getSettingById('language')).toMatchObject({
@@ -78,13 +79,14 @@ describe('Владение настройками и экраны управле
       controlSurface: SETTING_CONTROL_SURFACES.EQUIPMENT,
       options: [{ value: 'cards' }, { value: 'spoilers' }],
     });
-    expect(getAllSettings()).toHaveLength(8);
+    expect(getAllSettings()).toHaveLength(9);
   });
 
   it('общее окно получает только назначенные ему движковые и Fallout-настройки', () => {
     expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS))).toEqual([
       'characterFoldersEnabled',
       'characterDeleteActionPlacement',
+      'bootScreenEnabled',
       'weaponDurabilityLossEnabled',
       'weaponDurabilityLossPer10Shots',
       'randomWeaponQualityEnabled',

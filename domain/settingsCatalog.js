@@ -48,6 +48,15 @@ export const ENGINE_SETTINGS = [
     ],
   },
   {
+    id: 'bootScreenEnabled',
+    type: 'boolean',
+    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
+    sectionKey: 'appearance',
+    labelKey: 'settings.bootScreenTitle',
+    descriptionKey: 'settings.bootScreenDescription',
+    defaultValue: false,
+  },
+  {
     id: 'language',
     type: 'select',
     controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,

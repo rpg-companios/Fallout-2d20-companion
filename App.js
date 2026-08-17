@@ -23,6 +23,11 @@ import CharacterScreen from './components/screens/CharacterScreen/CharacterScree
 import EquipmentScreen from './components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
 import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
 import PerksAndTraitsScreen from './components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
+import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
+import useAppSettingsStore, {
+  selectBootScreenEnabled,
+  selectSettingsHydrated,
+} from './src/store/appSettingsStore';
 
 const Tab = createMaterialTopTabNavigator();
 const TAB_ROUTES = {
@@ -35,23 +40,54 @@ const TAB_ROUTES = {
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
+  const [bootDone, setBootDone] = useState(false);
+  const [bootProgress, setBootProgress] = useState(0);
+  // Решение фиксируется один раз после гидратации: переключение настройки
+  // применяется со следующего запуска и не открывает заставку поверх приложения.
+  const [bootEnabledForLaunch, setBootEnabledForLaunch] = useState(null);
+  const bootScreenEnabled = useAppSettingsStore(selectBootScreenEnabled);
+  const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
   const locale = useLocale();
   useModuleLocale();
 
   useEffect(() => {
+    if (settingsHydrated && bootEnabledForLaunch === null) {
+      setBootEnabledForLaunch(bootScreenEnabled);
+    }
+  }, [bootEnabledForLaunch, bootScreenEnabled, settingsHydrated]);
+
+  useEffect(() => {
+    let cancelled = false;
     async function initDb() {
       try {
+        if (!cancelled) setBootProgress(0.2);
         const isFirstRun = await initDatabase();
+        if (!cancelled) setBootProgress(0.62);
         await seedDatabase(isFirstRun);
+        if (!cancelled) setBootProgress(1);
       } catch (e) {
+        if (!cancelled) setBootProgress(1);
       } finally {
-        setDbReady(true);
+        if (!cancelled) setDbReady(true);
       }
     }
     initDb();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  if (!dbReady) {
+  if (bootEnabledForLaunch === true && !bootDone) {
+    return (
+      <PositroniumBootScreen
+        ready={dbReady}
+        progress={bootProgress}
+        onFinished={() => setBootDone(true)}
+      />
+    );
+  }
+
+  if (bootEnabledForLaunch === null || !dbReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
         <ActivityIndicator size="large" color="#f0e68c" />
