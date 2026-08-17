@@ -1,0 +1,1648 @@
+diff --git a/__tests__/consumables/disease-effects-panel.test.js b/__tests__/consumables/disease-effects-panel.test.js
+new file mode 100644
+--- /dev/null
++++ b/__tests__/consumables/disease-effects-panel.test.js	2026-08-17 19:52:26.660489764 +0000
+@@ -0,0 +1,85 @@
++import React from 'react';
++import { act, create } from 'react-test-renderer';
++import { beforeAll, describe, expect, it, vi } from 'vitest';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: 'MaterialCommunityIcons',
++}));
++
++vi.mock('react-native', () => ({
++  View: 'View',
++  Text: 'Text',
++  TouchableOpacity: 'TouchableOpacity',
++  ScrollView: 'ScrollView',
++  ImageBackground: 'ImageBackground',
++  SafeAreaView: 'SafeAreaView',
++  Modal: 'Modal',
++  Platform: { OS: 'web', select: (values) => values.web ?? values.default },
++  StyleSheet: { create: (styles) => styles, flatten: (styles) => styles },
++  Alert: { alert: () => {} },
++  PanResponder: { create: () => ({ panHandlers: {} }) },
++}));
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++import { EffectsPanel } from '../../components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
++
++beforeAll(() => {
++  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++  setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
++});
++
++const textContent = (node) => node.children
++  .flat(Infinity)
++  .filter((part) => typeof part === 'string')
++  .join('');
++
++describe('disease effects panel', () => {
++  it('shows the localized disease name, description, and infinite duration', () => {
++    let tree;
++    act(() => {
++      tree = create(React.createElement(EffectsPanel, {
++        effects: [{
++          id: 'condition-disease_dysentery',
++          effectName: 'Stale saved name',
++          effectLabel: 'Stale saved description',
++          effectKind: 'negative',
++          effectType: 'disease',
++          conditionId: 'disease_dysentery',
++          isPermanent: true,
++          scenesLeft: 0,
++        }],
++      }));
++    });
++
++    act(() => {
++      tree.root.findByType('TouchableOpacity').props.onPress();
++    });
++
++    const labels = tree.root.findAllByType('Text').map(textContent);
++    expect(labels).toContain('Дизентерия');
++    expect(labels).toContain('Время на каждой ступени шкалы жажды уменьшается вдвое.');
++    expect(labels).toContain('∞');
++
++    act(() => setCurrentModuleLocale('en-EN'));
++    const englishLabels = tree.root.findAllByType('Text').map(textContent);
++    expect(englishLabels).toContain('Dysentery');
++    expect(englishLabels).toContain('Halves time at each step of the thirst track.');
++    expect(englishLabels).toContain('∞');
++
++    act(() => {
++      tree.unmount();
++      setCurrentModuleLocale('ru-RU');
++    });
++  });
++});
+diff --git a/__tests__/consumables/disease-exposure.test.js b/__tests__/consumables/disease-exposure.test.js
+new file mode 100644
+--- /dev/null
++++ b/__tests__/consumables/disease-exposure.test.js	2026-08-17 19:50:46.971032104 +0000
+@@ -0,0 +1,278 @@
++import { describe, expect, it, vi } from 'vitest';
++import diseaseExposureRule from '../../modules/fallout/data/rules/diseaseExposure.json';
++import moduleFood from '../../modules/fallout/data/consumables/food.json';
++import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
++import { getDiseasesCatalog } from '../../i18n/conditionsCatalog';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { resolveItem } from '../../domain/resolveItem';
++import { hasDamageImmunity } from '../../domain/immunities';
++import { getSceneRiskRules } from '../../domain/registry';
++import {
++  createSceneRiskState,
++  getSceneRiskEventForRule,
++  resolveSceneRiskEvent,
++} from '../../domain/sceneRiskChecks';
++import {
++  addPersistentDiseaseEffect,
++  removePersistentDiseaseEffects,
++  rollDiseaseFromCatalog,
++} from '../../domain/diseaseConditions';
++import { legacyEffectToStore, storeEffectToLegacy } from '../../src/store/effectsSync';
++import { denormalizeEffects, normalizeEffects } from '../../src/store/migrations';
++
++const roller = (values) => {
++  const queue = [...values];
++  return vi.fn(() => {
++    if (queue.length === 0) throw new Error('test roller exhausted');
++    return queue.shift();
++  });
++};
++
++const check = ({
++  state = createSceneRiskState(),
++  eventId = 'rawFood',
++  rolls = [1, 2],
++  now = 1_000,
++  attributeValue = 6,
++  skillValue = 3,
++  isTagged = true,
++} = {}) => resolveSceneRiskEvent({
++  rule: diseaseExposureRule,
++  state,
++  eventId,
++  attributeValue,
++  skillValue,
++  isTagged,
++  now,
++  rollD20: roller(rolls),
++});
++
++describe('Fallout disease-exposure data', () => {
++  it('declares the END + SURVIVAL 2d20 rule through the setting registry', () => {
++    expect(getSceneRiskRules()).toEqual([diseaseExposureRule]);
++    expect(diseaseExposureRule).toEqual({
++      id: 'diseaseExposure',
++      sceneDurationMinutes: 5,
++      maxDifficulty: 5,
++      immunity: 'disease',
++      test: { attribute: 'END', skill: 'SURVIVAL' },
++      roll: { rollType: 'rollD20', rollValue: 2 },
++      maximumFace: { difficultyModifier: 1, automaticFailureCount: 2 },
++      resultTable: 'diseases',
++    });
++  });
++
++  it('marks all 29 raw foods explicitly and does not infer risk from text or ids', () => {
++    const raw = moduleFood.filter((item) => item.state === 'raw');
++    const cooked = moduleFood.filter((item) => item.state === 'cooked');
++
++    expect(raw).toHaveLength(29);
++    expect(raw.every((item) => item.sceneRiskEvents?.some((event) => (
++      event.ruleId === diseaseExposureRule.id && event.eventId === 'rawFood'
++    )))).toBe(true);
++    expect(cooked).toHaveLength(46);
++    expect(cooked.every((item) => item.sceneRiskEvents === undefined)).toBe(true);
++  });
++
++  it('marks only dirty water among drinks', () => {
++    const marked = moduleDrinks.filter((item) => item.sceneRiskEvents !== undefined);
++    expect(marked).toEqual([
++      expect.objectContaining({
++        id: 'drink_dirty_water',
++        sceneRiskEvents: [{ ruleId: 'diseaseExposure', eventId: 'dirtyWater' }],
++      }),
++    ]);
++  });
++
++  it('carries setting metadata through catalog enrichment without inventory-instance fields', () => {
++    const catalog = getEquipmentCatalog('ru-RU');
++    const resolved = resolveItem({
++      id: 'food_bloodbug_meat',
++      itemType: 'food',
++      quantity: 1,
++    }, catalog);
++
++    expect(resolved.sceneRiskEvents).toEqual([
++      { ruleId: 'diseaseExposure', eventId: 'rawFood' },
++    ]);
++  });
++});
++
++describe('universal scene risk checks', () => {
++  it('implements the owner example: a single 20 adds difficulty for later checks in the same scene', () => {
++    const rawFood = check({ rolls: [5, 20], now: 1_000 });
++    expect(rawFood.check).toMatchObject({
++      baseDifficulty: 1,
++      difficulty: 1,
++      targetNumber: 9,
++      successes: 1,
++      maximumFaceCount: 1,
++      addedDifficulty: 1,
++      passed: true,
++    });
++    expect(rawFood.state.difficultyModifier).toBe(1);
++
++    const dirtyWater = check({
++      state: rawFood.state,
++      eventId: 'dirtyWater',
++      rolls: [2, 8],
++      now: 2_000,
++    });
++    expect(dirtyWater.check).toMatchObject({
++      baseDifficulty: 2,
++      difficulty: 3,
++      successes: 3,
++      passed: true,
++    });
++    expect(dirtyWater.state.difficultyModifier).toBe(1);
++
++    const sleepOnGround = check({
++      state: dirtyWater.state,
++      eventId: 'sleepOnGround',
++      rolls: [2, 3],
++      now: 3_000,
++    });
++    expect(sleepOnGround.check).toMatchObject({
++      baseDifficulty: 3,
++      difficulty: 4,
++      successes: 4,
++      passed: true,
++    });
++  });
++
++  it('ignores a repeated event type during the same five-minute scene', () => {
++    const first = check({ rolls: [1, 2], now: 10_000 });
++    const repeatRoll = roller([20, 20]);
++    const repeated = resolveSceneRiskEvent({
++      rule: diseaseExposureRule,
++      state: first.state,
++      eventId: 'rawFood',
++      attributeValue: 6,
++      skillValue: 3,
++      isTagged: true,
++      now: 20_000,
++      rollD20: repeatRoll,
++    });
++
++    expect(repeated.status).toBe('duplicate');
++    expect(repeated.check).toBeNull();
++    expect(repeated.state).toBe(first.state);
++    expect(repeatRoll).not.toHaveBeenCalled();
++  });
++
++  it('starts a clean scene at the five-minute boundary', () => {
++    const first = check({ rolls: [5, 20], now: 10_000 });
++    const nextScene = check({
++      state: first.state,
++      eventId: 'dirtyWater',
++      rolls: [5, 6],
++      now: 10_000 + (5 * 60 * 1000),
++    });
++
++    expect(nextScene.check).toMatchObject({ baseDifficulty: 1, difficulty: 1 });
++    expect(nextScene.state.eventIds).toEqual(['dirtyWater']);
++    expect(nextScene.state.difficultyModifier).toBe(0);
++  });
++
++  it('makes two natural 20s an automatic failure and adds +2 for later checks', () => {
++    const result = check({ rolls: [20, 20] });
++    expect(result.check).toMatchObject({
++      maximumFaceCount: 2,
++      addedDifficulty: 2,
++      automaticFailure: true,
++      passed: false,
++    });
++    expect(result.state.difficultyModifier).toBe(2);
++  });
++
++  it('caps total difficulty at five', () => {
++    const state = {
++      sceneStartedAt: 1_000,
++      eventIds: ['rawFood', 'dirtyWater', 'sleepOnGround', 'otherRisk'],
++      difficultyModifier: 2,
++    };
++    const result = check({
++      state,
++      eventId: 'fifthRisk',
++      rolls: [1, 1],
++      now: 2_000,
++    });
++    expect(result.check.baseDifficulty).toBe(5);
++    expect(result.check.difficulty).toBe(5);
++  });
++
++  it('reads only explicit sceneRiskEvents metadata', () => {
++    expect(getSceneRiskEventForRule(
++      { id: 'food_raw-looking_name', state: 'raw' },
++      diseaseExposureRule.id,
++    )).toBeNull();
++    expect(getSceneRiskEventForRule(
++      { sceneRiskEvents: [{ ruleId: 'diseaseExposure', eventId: 'rawFood' }] },
++      diseaseExposureRule.id,
++    )).toEqual({ ruleId: 'diseaseExposure', eventId: 'rawFood' });
++  });
++});
++
++describe('disease assignment and display-only effects', () => {
++  it('reads the setting-declared immunity from explicit character immunity data', () => {
++    expect(hasDamageImmunity(
++      { trait: { modifiers: { immunities: ['disease'] } } },
++      diseaseExposureRule.immunity,
++    )).toBe(true);
++    expect(hasDamageImmunity(
++      { trait: { modifiers: { immunities: ['radiation'] } } },
++      diseaseExposureRule.immunity,
++    )).toBe(false);
++  });
++
++  it('uses the localized d20 catalog and creates a permanent descriptive effect', () => {
++    const catalog = getDiseasesCatalog('ru-RU');
++    const result = rollDiseaseFromCatalog(catalog, () => 4);
++    expect(result.roll).toBe(4);
++    expect(result.disease.id).toBe('disease_dysentery');
++
++    const applied = addPersistentDiseaseEffect([], result.disease, 1234);
++    expect(applied.added).toBe(true);
++    expect(applied.effect).toMatchObject({
++      id: 'condition-disease_dysentery',
++      effectName: 'Дизентерия',
++      effectLabel: 'Время на каждой ступени шкалы жажды уменьшается вдвое.',
++      effectKind: 'negative',
++      effectType: 'disease',
++      conditionId: 'disease_dysentery',
++      isPermanent: true,
++      scenesLeft: 0,
++      createdAt: 1234,
++    });
++  });
++
++  it('does not duplicate the same disease, allows another disease, and antibiotics can clear all', () => {
++    const catalog = getDiseasesCatalog('en-EN');
++    const firstDisease = rollDiseaseFromCatalog(catalog, () => 1).disease;
++    const secondDisease = rollDiseaseFromCatalog(catalog, () => 2).disease;
++    const first = addPersistentDiseaseEffect([], firstDisease, 100);
++    const duplicate = addPersistentDiseaseEffect(first.effects, firstDisease, 200);
++    const second = addPersistentDiseaseEffect(duplicate.effects, secondDisease, 300);
++
++    expect(duplicate.added).toBe(false);
++    expect(second.effects).toHaveLength(2);
++    const cleared = removePersistentDiseaseEffects(second.effects);
++    expect(cleared.removed).toHaveLength(2);
++    expect(cleared.effects).toEqual([]);
++  });
++
++  it('preserves disease identity through both normalized effect-store bridges', () => {
++    const disease = getDiseasesCatalog('en-EN')[0];
++    const effect = addPersistentDiseaseEffect([], disease, 100).effect;
++    const expected = {
++      effectType: 'disease',
++      conditionId: disease.id,
++      effectName: disease.name,
++      effectLabel: disease.effectLabel,
++      isPermanent: true,
++    };
++
++    expect(storeEffectToLegacy(legacyEffectToStore(effect))).toMatchObject(expected);
++    expect(denormalizeEffects(normalizeEffects([effect]))[0]).toMatchObject(expected);
++  });
++});
+diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitron/shadow-migration.test.js
+--- a/__tests__/securitron/shadow-migration.test.js	2026-08-17 18:38:41.695485605 +0000
++++ b/__tests__/securitron/shadow-migration.test.js	2026-08-17 19:42:05.751410906 +0000
+@@ -25,8 +25,8 @@
+ const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
+ 
+ describe('Текущая версия формата сейва', () => {
+-  it('равна 14', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(14);
++  it('равна 15', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(15);
+   });
+ });
+ 
+diff --git a/__tests__/store/scene-risk-migration.test.js b/__tests__/store/scene-risk-migration.test.js
+new file mode 100644
+--- /dev/null
++++ b/__tests__/store/scene-risk-migration.test.js	2026-08-17 19:42:09.719468940 +0000
+@@ -0,0 +1,19 @@
++import { describe, expect, it } from 'vitest';
++import { migrateCharacterState } from '../../src/store/migrations';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++describe('v14 to v15 scene-risk state migration', () => {
++  it('adds the canonical empty state through the migration chain', () => {
++    const migrated = migrateCharacterState({
++      schemaVersion: 14,
++      characterName: 'Courier',
++    });
++
++    expect(CURRENT_SCHEMA_VERSION).toBe(15);
++    expect(migrated).toMatchObject({
++      schemaVersion: 15,
++      characterName: 'Courier',
++      sceneRiskStates: {},
++    });
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+--- a/components/CharacterContext.js	2026-08-17 18:37:26.618387885 +0000
++++ b/components/CharacterContext.js	2026-08-17 19:52:00.336104857 +0000
+@@ -34,7 +34,9 @@
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+-import { hasRadiationImmunity } from '../domain/immunities';
++import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
++import { createSceneRiskState, getSceneRiskEventForRule, resolveSceneRiskEvent } from '../domain/sceneRiskChecks';
++import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ 
+ import { resolveBodyPlan } from '../domain/bodyplan';
+@@ -70,6 +72,7 @@
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
+ import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
++import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
+ import { Alert, Platform } from 'react-native';
+ 
+ // Zustand Store integration (Task 4.1)
+@@ -296,11 +299,14 @@
+   const [defense, setDefense] = useState(1);
+   const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
+   const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
++  const [sceneRiskStates, setSceneRiskStates] = useState({});
++  const sceneRiskStatesRef = useRef(sceneRiskStates);
+ 
+   const isSavedRef = useRef(isSaved);
+   const characterIdRef = useRef(characterId);
+   useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
+   useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
++  useEffect(() => { sceneRiskStatesRef.current = sceneRiskStates; }, [sceneRiskStates]);
+ 
+   // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
+   // Производные значения (carryWeight, meleeBonus, defense, initiative …)
+@@ -675,6 +681,7 @@
+     defense,
+     conditions,
+     chemDosesLog,
++    sceneRiskStates,
+   }), [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+@@ -682,7 +689,7 @@
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+-    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog,
++    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog, sceneRiskStates,
+   ]);
+ 
+   // Realtime save for already persisted characters.
+@@ -768,6 +775,8 @@
+       setEffects(data.effects || []);
+       setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
+       setSceneCounter(data.sceneCounter ?? 0);
++      setSceneRiskStates(data.sceneRiskStates);
++      sceneRiskStatesRef.current = data.sceneRiskStates;
+       // Migrate old [null, null] format to dynamic array
+       const rawWeapons = data.equippedWeapons || [];
+       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
+@@ -922,9 +931,84 @@
+     return todayDoses;
+   };
+ 
++  const applyDiseaseExposureForConsumable = (item) => {
++    const ruleMatches = getSceneRiskRules()
++      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
++      .filter(({ event }) => event !== null);
++    if (ruleMatches.length === 0) return null;
++    if (ruleMatches.length > 1) {
++      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
++    }
++
++    const { rule, event } = ruleMatches[0];
++    if (rule.resultTable !== 'diseases') {
++      throw new Error(`[CharacterContext] Неизвестная таблица результата проверки риска: ${rule.resultTable}`);
++    }
++
++    const attribute = attributes.find((entry) => entry?.name === rule.test.attribute);
++    const skill = skills.find((entry) => entry?.name === rule.test.skill);
++    if (!attribute || !skill) {
++      throw new Error(
++        `[CharacterContext] Для проверки ${rule.id} отсутствует `
++        + `${rule.test.attribute} или ${rule.test.skill}`,
++      );
++    }
++
++    const currentStates = sceneRiskStatesRef.current;
++    if (!currentStates || typeof currentStates !== 'object' || Array.isArray(currentStates)) {
++      throw new Error('[CharacterContext] Некорректное каноническое состояние sceneRiskStates');
++    }
++    const riskResult = resolveSceneRiskEvent({
++      rule,
++      state: currentStates[rule.id] ?? createSceneRiskState(),
++      eventId: event.eventId,
++      attributeValue: getAttributeValue(attributes, rule.test.attribute),
++      skillValue: skill.value,
++      isTagged: selectedSkills.includes(skill.name) || extraTaggedSkills.includes(skill.name),
++    });
++
++    if (riskResult.status === 'duplicate') return riskResult;
++
++    const nextStates = {
++      ...currentStates,
++      [rule.id]: riskResult.state,
++    };
++    sceneRiskStatesRef.current = nextStates;
++    setSceneRiskStates(nextStates);
++
++    if (riskResult.check.passed) {
++      return { ...riskResult, diseaseRoll: null, disease: null, infectionStatus: null };
++    }
++
++    const { roll: diseaseRoll, disease } = rollDiseaseFromCatalog(
++      getConditionCatalog('disease', getCurrentModuleLocale()),
++    );
++    if (hasDamageImmunity({ origin, trait }, rule.immunity)) {
++      return { ...riskResult, diseaseRoll, disease, infectionStatus: 'immune' };
++    }
++
++    const store = useCharacterStore.getState();
++    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(store.effects)).effects;
++    const applied = addPersistentDiseaseEffect(currentEffects, disease);
++    if (applied.added) {
++      syncTimedEffectsToStore(applied.effects, store);
++      setActiveTimedEffects(applied.effects);
++    }
++    setConditions((previous) => (
++      previous.includes('diseased') ? previous : [...previous, 'diseased']
++    ));
++
++    return {
++      ...riskResult,
++      diseaseRoll,
++      disease,
++      infectionStatus: applied.added ? 'infected' : 'duplicate',
++    };
++  };
++
+   /**
+    * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
+-   * removeCondition и проверка зависимости.
++   * removeCondition, проверку зависимости и явно объявленный риск заражения.
+    */
+   const applyConsumableFull = (item) => {
+     debugLog('consumable.apply.start', {
+@@ -977,6 +1061,13 @@
+         syncTimedEffectsToStore(withoutAddiction, storeNow);
+         setActiveTimedEffects(withoutAddiction);
+       }
++      if (removed.includes('diseased')) {
++        const storeNow = useCharacterStore.getState();
++        const currentEffects = effectsDictToLegacyArray(storeNow.effects);
++        const withoutDiseases = removePersistentDiseaseEffects(currentEffects).effects;
++        syncTimedEffectsToStore(withoutDiseases, storeNow);
++        setActiveTimedEffects(withoutDiseases);
++      }
+     }
+ 
+     // 4. Зависимость
+@@ -1024,9 +1115,12 @@
+       }
+     }
+ 
++    const diseaseRiskResult = applyDiseaseExposureForConsumable(item);
++
+     debugLog('consumable.apply.result', {
+       timedResult,
+       addictionResult,
++      diseaseRiskResult,
+       conditionsRemoved: removed,
+       healAmount: vitalChanges.healAmount,
+       radiationAmount: vitalChanges.radiationAmount,
+@@ -1035,6 +1129,7 @@
+     return {
+       timedResult: { ...timedResult, expired: normalizedCurrent.expired },
+       addictionResult,
++      diseaseRiskResult,
+       conditionsRemoved: removed,
+       healAmount: vitalChanges.healAmount,
+       radiationAmount: vitalChanges.radiationAmount,
+@@ -1146,6 +1241,8 @@
+     setEffects([]);
+     setActiveTimedEffects([]);
+     setSceneCounter(0);
++    setSceneRiskStates({});
++    sceneRiskStatesRef.current = {};
+     setEquippedWeapons([]);
+     useCharacterStore.persist?.clearStorage?.();
+     useCharacterStore.getState().resetCharacterStore({
+@@ -1222,6 +1319,7 @@
+     effects, setEffects,
+     activeTimedEffects, setActiveTimedEffects,
+     sceneCounter,
++    sceneRiskStates,
+     sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
+     applyConsumableTimedEffects,
+     applyConsumableFull,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+--- a/components/screens/InventoryScreen/InventoryScreen.js	2026-08-17 18:33:31.415369653 +0000
++++ b/components/screens/InventoryScreen/InventoryScreen.js	2026-08-17 19:44:27.461482975 +0000
+@@ -359,6 +359,7 @@
+       const {
+         timedResult,
+         addictionResult,
++        diseaseRiskResult,
+         conditionsRemoved,
+         healAmount,
+         radiationAmount,
+@@ -390,6 +391,33 @@
+           formatInventoryText(tInventory('screen.alerts.conditionsRemovedMessage'), { conditions: conditionsRemoved.join(', ') }));
+       }
+ 
++      if (diseaseRiskResult?.status === 'checked') {
++        const { check, disease, diseaseRoll, infectionStatus } = diseaseRiskResult;
++        const checkText = formatInventoryText(
++          tInventory('screen.alerts.diseaseCheckMessage'),
++          {
++            difficulty: check.difficulty,
++            rolls: check.rolls.join(', '),
++            successes: check.successes,
++          },
++        );
++        let message = checkText;
++        if (!check.passed) {
++          const messageKey = infectionStatus === 'immune'
++            ? 'diseaseImmuneMessage'
++            : (infectionStatus === 'duplicate' ? 'diseaseDuplicateMessage' : 'diseaseInfectedMessage');
++          message = formatInventoryText(tInventory(`screen.alerts.${messageKey}`), {
++            check: checkText,
++            diseaseName: disease.name,
++            diseaseRoll,
++          });
++        }
++        showAlert(
++          tInventory(`screen.alerts.${check.passed ? 'diseaseCheckPassedTitle' : 'diseaseCheckFailedTitle'}`),
++          message,
++        );
++      }
++
+       // Результат броска на зависимость
+       if (addictionResult) {
+         const { effectCount, faces, addicted, addictionLevel } = addictionResult;
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js	2026-08-17 17:44:02.000000000 +0000
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js	2026-08-17 19:52:00.336104857 +0000
+@@ -20,6 +20,7 @@
+ import { renderTextWithIcons } from './textUtils';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
++import { getConditionCatalog } from '../../../domain/registry';
+ import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+ import {
+@@ -176,9 +177,13 @@
+ 
+ // extraRows: постоянные строки (силовая броня: «Ядерный блок: n/max», эффекты каркаса) —
+ // рендерятся как иммунитеты, с «∞» в колонке таймера.
+-const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
++export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+   const [isOpen, setIsOpen] = useState(false);
+   useLocale();
++  const moduleLocale = useModuleLocale();
++  const diseasesById = useMemo(() => new Map(
++    getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
++  ), [moduleLocale]);
+ 
+   const hasImmunities = immunities.length > 0;
+   const hasEffects = (effects || []).length > 0;
+@@ -216,15 +221,27 @@
+                 </View>
+               ) : null}
+               {effects.map((effect) => {
+-                const effectText = effect.defenseModifier
++                const localizedDisease = effect.effectType === 'disease'
++                  ? diseasesById.get(effect.conditionId)
++                  : null;
++                if (effect.effectType === 'disease' && !localizedDisease) {
++                  throw new Error(`[EffectsPanel] В каталоге нет болезни "${effect.conditionId}"`);
++                }
++                const effectText = localizedDisease?.name || (effect.defenseModifier
+                   ? getDefenseModifierEffectLabel(effect.defenseModifier)
+-                  : effect.effectName || effect.effectLabel || '—';
++                  : effect.effectName || effect.effectLabel || '—');
++                const effectDescription = localizedDisease?.effectLabel;
+                 const isNegative = effect.effectKind === 'negative';
+                 return (
+                   <View key={effect.id} style={localStyles.effectsPanelRow}>
+-                    <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
+-                      {effectText}
+-                    </Text>
++                    <View style={localStyles.effectDetails}>
++                      <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
++                        {effectText}
++                      </Text>
++                      {effectDescription ? (
++                        <Text style={localStyles.diseaseEffectDescription}>{effectDescription}</Text>
++                      ) : null}
++                    </View>
+                     <Text style={localStyles.effectTimerText}>
+                       {effect.isPermanent ? '∞' : getEffectTimeText(effect.scenesLeft)}
+                     </Text>
+diff --git a/domain/diseaseConditions.js b/domain/diseaseConditions.js
+new file mode 100644
+--- /dev/null
++++ b/domain/diseaseConditions.js	2026-08-17 19:38:26.032198175 +0000
+@@ -0,0 +1,90 @@
++import { rollDie } from './diceRollsLogic';
++
++const assertDiseaseCatalog = (catalog) => {
++  if (!Array.isArray(catalog) || catalog.length === 0) {
++    throw new Error('[diseaseConditions] Disease catalog must be a non-empty array');
++  }
++  const rolls = new Set();
++  const ids = new Set();
++  for (const disease of catalog) {
++    if (
++      !disease
++      || typeof disease.id !== 'string'
++      || !disease.id
++      || typeof disease.name !== 'string'
++      || !disease.name
++      || typeof disease.effectLabel !== 'string'
++      || !disease.effectLabel
++      || !Number.isInteger(disease.d20Roll)
++      || disease.d20Roll < 1
++      || disease.d20Roll > 20
++    ) {
++      throw new Error('[diseaseConditions] Invalid disease catalog entry');
++    }
++    if (rolls.has(disease.d20Roll) || ids.has(disease.id)) {
++      throw new Error('[diseaseConditions] Disease ids and d20Roll values must be unique');
++    }
++    rolls.add(disease.d20Roll);
++    ids.add(disease.id);
++  }
++};
++
++export const rollDiseaseFromCatalog = (catalog, rollD20 = () => rollDie(20)) => {
++  assertDiseaseCatalog(catalog);
++  if (typeof rollD20 !== 'function') {
++    throw new Error('[diseaseConditions] d20 roller must be a function');
++  }
++  const roll = rollD20();
++  if (!Number.isInteger(roll) || roll < 1 || roll > 20) {
++    throw new Error('[diseaseConditions] d20 roller returned a value outside 1..20');
++  }
++  const disease = catalog.find((entry) => entry.d20Roll === roll);
++  if (!disease) {
++    throw new Error(`[diseaseConditions] Disease table has no result for d20 roll ${roll}`);
++  }
++  return { roll, disease };
++};
++
++export const createPersistentDiseaseEffect = (disease, now = Date.now()) => {
++  assertDiseaseCatalog([disease]);
++  if (!Number.isFinite(now) || now < 0) {
++    throw new Error('[diseaseConditions] Invalid effect timestamp');
++  }
++  return {
++    id: `condition-${disease.id}`,
++    effectName: disease.name,
++    effectLabel: disease.effectLabel,
++    effectKind: 'negative',
++    effectType: 'disease',
++    conditionId: disease.id,
++    sourceName: disease.name,
++    createdAt: now,
++    isPermanent: true,
++    scenesLeft: 0,
++  };
++};
++
++export const addPersistentDiseaseEffect = (currentEffects, disease, now = Date.now()) => {
++  if (!Array.isArray(currentEffects)) {
++    throw new Error('[diseaseConditions] Active effects must be an array');
++  }
++  const existing = currentEffects.find((effect) => (
++    effect?.effectType === 'disease' && effect.conditionId === disease.id
++  ));
++  if (existing) {
++    return { effects: currentEffects, effect: existing, added: false };
++  }
++  const effect = createPersistentDiseaseEffect(disease, now);
++  return { effects: [...currentEffects, effect], effect, added: true };
++};
++
++export const removePersistentDiseaseEffects = (currentEffects) => {
++  if (!Array.isArray(currentEffects)) {
++    throw new Error('[diseaseConditions] Active effects must be an array');
++  }
++  const effects = currentEffects.filter((effect) => effect?.effectType !== 'disease');
++  return {
++    effects,
++    removed: currentEffects.filter((effect) => effect?.effectType === 'disease'),
++  };
++};
+diff --git a/domain/registry.js b/domain/registry.js
+--- a/domain/registry.js	2026-08-17 17:44:02.000000000 +0000
++++ b/domain/registry.js	2026-08-17 19:52:00.336104857 +0000
+@@ -16,6 +16,7 @@
+ import moduleTraits from '../modules/fallout/data/traits/traits.json';
+ import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+ import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
++import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
+ import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+ 
+ // i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
+@@ -46,6 +47,7 @@
+ import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import { getDiseasesCatalog } from '../i18n/conditionsCatalog';
+ import { getCurrentModuleLocale } from '../i18n/locale';
+ import { expandTrueItems } from './packMerge';
+ 
+@@ -166,3 +168,17 @@
+ export function getEquipmentCatalogForLocale(locale) {
+   return getEquipmentCatalog(locale);
+ }
++
++/**
++ * Canonical real-time scene risk rules declared by the active setting.
++ * Consumables opt into these rules through explicit sceneRiskEvents metadata.
++ */
++export function getSceneRiskRules() {
++  return [moduleDiseaseExposureRule];
++}
++
++/** Localized condition catalog supplied by the active setting. */
++export function getConditionCatalog(conditionType, locale = getCurrentModuleLocale()) {
++  if (conditionType === 'disease') return getDiseasesCatalog(locale);
++  throw new Error(`[registry] Неизвестный тип состояния "${conditionType}"`);
++}
+diff --git a/domain/sceneRiskChecks.js b/domain/sceneRiskChecks.js
+new file mode 100644
+--- /dev/null
++++ b/domain/sceneRiskChecks.js	2026-08-17 19:41:50.687190621 +0000
+@@ -0,0 +1,180 @@
++import { rollDie } from './diceRollsLogic';
++
++const MINUTE_MS = 60 * 1000;
++
++export const createSceneRiskState = () => ({
++  sceneStartedAt: null,
++  eventIds: [],
++  difficultyModifier: 0,
++});
++
++const assertFiniteInteger = (value, label, { min = 0 } = {}) => {
++  if (!Number.isInteger(value) || value < min) {
++    throw new Error(`[sceneRiskChecks] ${label} must be an integer >= ${min}`);
++  }
++};
++
++const assertRule = (rule) => {
++  if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
++    throw new Error('[sceneRiskChecks] Risk-check rule must be an object');
++  }
++  if (typeof rule.id !== 'string' || !rule.id) {
++    throw new Error('[sceneRiskChecks] Rule id is required');
++  }
++  assertFiniteInteger(rule.sceneDurationMinutes, 'sceneDurationMinutes', { min: 1 });
++  assertFiniteInteger(rule.maxDifficulty, 'maxDifficulty', { min: 1 });
++  if (typeof rule.test?.attribute !== 'string' || !rule.test.attribute) {
++    throw new Error('[sceneRiskChecks] test.attribute is required');
++  }
++  if (typeof rule.test?.skill !== 'string' || !rule.test.skill) {
++    throw new Error('[sceneRiskChecks] test.skill is required');
++  }
++  if (rule.roll?.rollType !== 'rollD20') {
++    throw new Error('[sceneRiskChecks] Only structured rollD20 checks are supported');
++  }
++  assertFiniteInteger(rule.roll.rollValue, 'roll.rollValue', { min: 1 });
++  assertFiniteInteger(rule.maximumFace?.difficultyModifier, 'maximumFace.difficultyModifier');
++  assertFiniteInteger(rule.maximumFace?.automaticFailureCount, 'maximumFace.automaticFailureCount', { min: 1 });
++};
++
++const assertState = (state) => {
++  if (!state || typeof state !== 'object' || Array.isArray(state)) {
++    throw new Error('[sceneRiskChecks] Scene risk state must be an object');
++  }
++  if (state.sceneStartedAt !== null && (!Number.isFinite(state.sceneStartedAt) || state.sceneStartedAt < 0)) {
++    throw new Error('[sceneRiskChecks] sceneStartedAt must be null or a non-negative timestamp');
++  }
++  if (!Array.isArray(state.eventIds) || state.eventIds.some((id) => typeof id !== 'string' || !id)) {
++    throw new Error('[sceneRiskChecks] eventIds must contain non-empty strings');
++  }
++  if (new Set(state.eventIds).size !== state.eventIds.length) {
++    throw new Error('[sceneRiskChecks] eventIds must be unique');
++  }
++  assertFiniteInteger(state.difficultyModifier, 'difficultyModifier');
++};
++
++const resetExpiredScene = (rule, state, now) => {
++  if (state.sceneStartedAt === null) return state;
++  const sceneDurationMs = rule.sceneDurationMinutes * MINUTE_MS;
++  return now >= state.sceneStartedAt + sceneDurationMs
++    ? createSceneRiskState()
++    : state;
++};
++
++const countRollSuccesses = ({ roll, targetNumber, skillValue, isTagged, maximumFace }) => {
++  if (roll === maximumFace) return 0;
++  if (roll > targetNumber) return 0;
++  if (isTagged && roll <= skillValue) return 2;
++  return 1;
++};
++
++/**
++ * Registers one explicitly declared setting event and, for a new event type in
++ * the current scene, resolves the setting-provided attribute + skill check.
++ *
++ * The engine does not inspect item ids, names, or localized text. A setting must
++ * put a canonical sceneRiskEvents entry on the source item and pass its rule here.
++ */
++export const resolveSceneRiskEvent = ({
++  rule,
++  state,
++  eventId,
++  attributeValue,
++  skillValue,
++  isTagged,
++  now = Date.now(),
++  rollD20 = () => rollDie(20),
++}) => {
++  assertRule(rule);
++  assertState(state);
++  if (typeof eventId !== 'string' || !eventId) {
++    throw new Error('[sceneRiskChecks] eventId is required');
++  }
++  if (!Number.isFinite(attributeValue) || !Number.isFinite(skillValue)) {
++    throw new Error('[sceneRiskChecks] Attribute and skill values must be finite numbers');
++  }
++  if (typeof isTagged !== 'boolean') {
++    throw new Error('[sceneRiskChecks] isTagged must be a boolean');
++  }
++  if (!Number.isFinite(now) || now < 0 || typeof rollD20 !== 'function') {
++    throw new Error('[sceneRiskChecks] Invalid clock or d20 roller');
++  }
++
++  const currentState = resetExpiredScene(rule, state, now);
++  if (currentState.eventIds.includes(eventId)) {
++    return { status: 'duplicate', state: currentState, check: null };
++  }
++
++  const eventIds = [...currentState.eventIds, eventId];
++  const sceneStartedAt = currentState.sceneStartedAt ?? now;
++  const baseDifficulty = Math.min(rule.maxDifficulty, eventIds.length);
++  const difficulty = Math.min(
++    rule.maxDifficulty,
++    baseDifficulty + currentState.difficultyModifier,
++  );
++  const targetNumber = attributeValue + skillValue;
++  const rolls = Array.from({ length: rule.roll.rollValue }, () => rollD20());
++  if (rolls.some((roll) => !Number.isInteger(roll) || roll < 1 || roll > 20)) {
++    throw new Error('[sceneRiskChecks] d20 roller returned a value outside 1..20');
++  }
++
++  const maximumFaceCount = rolls.filter((roll) => roll === 20).length;
++  const successes = rolls.reduce((sum, roll) => sum + countRollSuccesses({
++    roll,
++    targetNumber,
++    skillValue,
++    isTagged,
++    maximumFace: 20,
++  }), 0);
++  const automaticFailure = maximumFaceCount >= rule.maximumFace.automaticFailureCount;
++  const passed = !automaticFailure && successes >= difficulty;
++  const addedDifficulty = maximumFaceCount * rule.maximumFace.difficultyModifier;
++  const difficultyModifier = Math.min(
++    rule.maxDifficulty,
++    currentState.difficultyModifier + addedDifficulty,
++  );
++
++  return {
++    status: 'checked',
++    state: {
++      sceneStartedAt,
++      eventIds,
++      difficultyModifier,
++    },
++    check: {
++      ruleId: rule.id,
++      eventId,
++      attribute: rule.test.attribute,
++      skill: rule.test.skill,
++      attributeValue,
++      skillValue,
++      targetNumber,
++      isTagged,
++      baseDifficulty,
++      difficulty,
++      rolls,
++      successes,
++      maximumFaceCount,
++      addedDifficulty,
++      automaticFailure,
++      passed,
++    },
++  };
++};
++
++export const getSceneRiskEventForRule = (item, ruleId) => {
++  if (!item || item.sceneRiskEvents === undefined) return null;
++  if (!Array.isArray(item.sceneRiskEvents)) {
++    throw new Error('[sceneRiskChecks] item.sceneRiskEvents must be an array');
++  }
++  const matches = item.sceneRiskEvents.filter((entry) => entry?.ruleId === ruleId);
++  if (matches.length > 1) {
++    throw new Error(`[sceneRiskChecks] Item declares rule "${ruleId}" more than once`);
++  }
++  if (matches.length === 0) return null;
++  const event = matches[0];
++  if (typeof event.eventId !== 'string' || !event.eventId) {
++    throw new Error(`[sceneRiskChecks] Rule "${ruleId}" eventId is required`);
++  }
++  return event;
++};
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+--- a/i18n/en-EN/screens/inventory/screen.json	2026-08-17 18:33:31.415369653 +0000
++++ b/i18n/en-EN/screens/inventory/screen.json	2026-08-17 19:44:06.973183437 +0000
+@@ -63,7 +63,13 @@
+       "requiresSecuritron": "The driver is only compatible with a Securitron.",
+       "alreadyInstalled": "Mk II OS is already installed.",
+       "noDriver": "Driver item not found."
+-    }
++    },
++    "diseaseCheckPassedTitle": "Disease check passed",
++    "diseaseCheckFailedTitle": "Disease check failed",
++    "diseaseCheckMessage": "Difficulty: {difficulty}\nd20 rolls: {rolls}\nSuccesses: {successes}",
++    "diseaseInfectedMessage": "{check}\nInfected with {diseaseName} (d20: {diseaseRoll}).",
++    "diseaseDuplicateMessage": "{check}\n{diseaseName} is already active.",
++    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll})."
+   },
+   "actions": {
+     "cancel": "Cancel",
+@@ -116,4 +122,4 @@
+       "rightLeg": "right leg"
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+--- a/i18n/ru-RU/screens/inventory/screen.json	2026-08-17 18:33:31.415369653 +0000
++++ b/i18n/ru-RU/screens/inventory/screen.json	2026-08-17 19:44:06.973183437 +0000
+@@ -63,7 +63,13 @@
+       "requiresSecuritron": "Драйвер совместим только с Секьюритроном.",
+       "alreadyInstalled": "ОС Mk II уже установлена.",
+       "noDriver": "Предмет драйвера не найден."
+-    }
++    },
++    "diseaseCheckPassedTitle": "Проверка заражения пройдена",
++    "diseaseCheckFailedTitle": "Проверка заражения провалена",
++    "diseaseCheckMessage": "Сложность: {difficulty}\nБроски d20: {rolls}\nУспехи: {successes}",
++    "diseaseInfectedMessage": "{check}\nЗаражение: {diseaseName} (d20: {diseaseRoll}).",
++    "diseaseDuplicateMessage": "{check}\nБолезнь «{diseaseName}» уже активна.",
++    "diseaseImmuneMessage": "{check}\nИммунитет предотвращает заражение болезнью «{diseaseName}» (d20: {diseaseRoll})."
+   },
+   "actions": {
+     "cancel": "Отмена",
+diff --git a/modules/fallout/data/consumables/drinks.json b/modules/fallout/data/consumables/drinks.json
+--- a/modules/fallout/data/consumables/drinks.json	2026-08-17 17:44:02.000000000 +0000
++++ b/modules/fallout/data/consumables/drinks.json	2026-08-17 19:38:33.596308743 +0000
+@@ -80,7 +80,13 @@
+     "hpHealed": 2,
+     "irradiated": true,
+     "effectKey": "",
+-    "isAlcohol": false
++    "isAlcohol": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "dirtyWater"
++      }
++    ]
+   },
+   {
+     "id": "drink_dirty_wastelander",
+@@ -247,4 +253,4 @@
+     "irradiated": false,
+     "effectKey": "itemEffects.drinks.whiskey"
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/consumables/food.json
+--- a/modules/fallout/data/consumables/food.json	2026-08-17 18:33:31.415369653 +0000
++++ b/modules/fallout/data/consumables/food.json	2026-08-17 19:38:33.596308743 +0000
+@@ -59,7 +59,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_bloodbug_meat",
+@@ -81,7 +87,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_bloodbug_steak",
+@@ -121,7 +133,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_brain_fungus",
+@@ -143,7 +161,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_canned_dog_food",
+@@ -187,7 +211,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_cooked_softshell_mirelurk",
+@@ -227,7 +257,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_cram",
+@@ -311,7 +347,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_deathclaw_meat",
+@@ -333,7 +375,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_deathclaw_omelette",
+@@ -431,7 +479,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_grilled_radroach",
+@@ -609,7 +663,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_mirelurk_cake",
+@@ -649,7 +709,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_mirelurk_egg_omelette",
+@@ -689,7 +755,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_mirelurk_queen_steak",
+@@ -747,7 +819,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_dog_meat",
+@@ -769,7 +847,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_mutant_hound_ribs",
+@@ -809,7 +893,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_mutfruit",
+@@ -831,7 +921,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_dog_chops",
+@@ -973,7 +1069,13 @@
+     },
+     "effectKey": "itemEffects.food.mirelurkQueenMeat",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_radroach_meat",
+@@ -995,7 +1097,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_radscorpion_egg",
+@@ -1017,7 +1125,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_radscorpion_egg_omelette",
+@@ -1057,7 +1171,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_radscorpion_steak",
+@@ -1097,7 +1217,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_radstag_stew",
+@@ -1137,7 +1263,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_ribeye_steak",
+@@ -1217,7 +1349,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_softshell_mirelurk_meat",
+@@ -1239,7 +1377,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_squirrel_bits",
+@@ -1261,7 +1405,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_squirrel_on_a_stick",
+@@ -1337,7 +1487,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_sugar_bombs",
+@@ -1403,7 +1559,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_tato",
+@@ -1425,7 +1587,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_vegetable_soup",
+@@ -1465,7 +1633,13 @@
+     },
+     "effectKey": "",
+     "state": "raw",
+-    "preserved": false
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   },
+   {
+     "id": "food_yao_guai_ribs",
+diff --git a/modules/fallout/data/rules/diseaseExposure.json b/modules/fallout/data/rules/diseaseExposure.json
+new file mode 100644
+--- /dev/null
++++ b/modules/fallout/data/rules/diseaseExposure.json	2026-08-17 19:37:52.803712272 +0000
+@@ -0,0 +1,19 @@
++{
++  "id": "diseaseExposure",
++  "sceneDurationMinutes": 5,
++  "maxDifficulty": 5,
++  "immunity": "disease",
++  "test": {
++    "attribute": "END",
++    "skill": "SURVIVAL"
++  },
++  "roll": {
++    "rollType": "rollD20",
++    "rollValue": 2
++  },
++  "maximumFace": {
++    "difficultyModifier": 1,
++    "automaticFailureCount": 2
++  },
++  "resultTable": "diseases"
++}
+diff --git a/src/store/effectsSync.js b/src/store/effectsSync.js
+--- a/src/store/effectsSync.js	2026-08-17 17:44:02.000000000 +0000
++++ b/src/store/effectsSync.js	2026-08-17 19:39:25.605069220 +0000
+@@ -19,6 +19,8 @@
+   durationMs: effect.durationMs,
+   scenesLeft: effect.scenesLeft || 0,
+   sourceName: effect.sourceName,
++  effectType: effect.effectType,
++  conditionId: effect.conditionId,
+ });
+ 
+ export const storeEffectToLegacy = (effect) => ({
+@@ -35,6 +37,8 @@
+   durationMs: effect.durationMs,
+   scenesLeft: effect.scenesLeft || 0,
+   sourceName: effect.sourceName,
++  effectType: effect.effectType,
++  conditionId: effect.conditionId,
+ });
+ 
+ export const legacyEffectsArrayToStore = (effectsArray = []) => {
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+--- a/src/store/migrations.js	2026-08-17 18:37:26.618387885 +0000
++++ b/src/store/migrations.js	2026-08-17 19:48:23.640936370 +0000
+@@ -200,6 +200,9 @@
+       parameters: [],
+       maxHpModifier: effect.maxHpModifier,
+       damageResistanceModifier: effect.damageResistanceModifier,
++      isPermanent: effect.isPermanent,
++      effectType: effect.effectType,
++      conditionId: effect.conditionId,
+       createdAt: effect.createdAt,
+       expiresAt: effect.expiresAt,
+       durationMs: effect.durationMs,
+@@ -304,6 +307,9 @@
+       effectKind: effect.effectKind ?? effect.type,
+       maxHpModifier: effect.maxHpModifier,
+       damageResistanceModifier: effect.damageResistanceModifier,
++      isPermanent: effect.isPermanent,
++      effectType: effect.effectType,
++      conditionId: effect.conditionId,
+       createdAt: effect.createdAt,
+       expiresAt: effect.expiresAt,
+       durationMs: effect.durationMs,
+@@ -986,6 +992,14 @@
+     return next;
+   },
+ 
++  // v14 -> v15: каноническое состояние универсальных рисков текущей
++  // реальной сцены. Конкретные rule id добавляются по первому событию;
++  // миграция не подменяется load-time fallback в CharacterContext.
++  (state) => ({
++    ...state,
++    sceneRiskStates: {},
++  }),
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+--- a/src/store/saveSchema.js	2026-08-17 17:44:02.000000000 +0000
++++ b/src/store/saveSchema.js	2026-08-17 19:42:05.751410906 +0000
+@@ -34,7 +34,8 @@
+ //       атрибуты/флаги/навыки к стартовым (инвентарь/уровень не трогаем).
+ // v14 — «Тень»: старый комплект (default_caps_only) заменяется на NIGHTKIN;
+ //       флаг nightkinKitPending — предметы выдаются после загрузки.
+-export const CURRENT_SCHEMA_VERSION = 14;
++// v15 — состояние универсальных проверок риска в текущей реальной сцене.
++export const CURRENT_SCHEMA_VERSION = 15;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+--- a/styles/WeaponsAndArmorScreen.styles.js	2026-08-17 17:44:02.000000000 +0000
++++ b/styles/WeaponsAndArmorScreen.styles.js	2026-08-17 19:39:50.049426673 +0000
+@@ -42,7 +42,9 @@
+   },
+   effectsListContainer: { width: '100%', marginTop: 4 },
+   effectLineContainer: { marginBottom: 2, alignItems: 'center' },
++  effectDetails: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
+   effectText: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
++  diseaseEffectDescription: { fontSize: 11, color: '#4B5563', textAlign: 'center', marginTop: 2 },
+   positiveEffectText: { color: '#00A651' },
+   negativeEffectText: { color: '#D62828' },
+   effectTimerText: { fontSize: 10, color: '#6B7280' },
