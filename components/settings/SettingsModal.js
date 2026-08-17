@@ -76,20 +76,25 @@ const SettingRow = ({ setting }) => {
   }
 
   if (setting.type === 'select') {
+    const hasColumnOptions = setting.optionsLayout === 'column';
     return (
       <View style={[styles.row, styles.settingRow]}>
-        <View style={styles.text}>
+        <View style={[styles.text, hasColumnOptions && styles.columnOptionsText]}>
           <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
           <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
         </View>
-        <View style={styles.selectButtons}>
+        <View style={[styles.selectButtons, hasColumnOptions && styles.selectButtonsColumn]}>
           {setting.options.map((option) => (
             <TouchableOpacity
               key={option.value}
               style={[styles.selectButton, value === option.value && styles.selectButtonActive]}
               onPress={() => setValue(setting.id, option.value)}
             >
-              <Text style={[styles.selectText, value === option.value && styles.selectTextActive]}>
+              <Text style={[
+                styles.selectText,
+                hasColumnOptions && styles.selectTextColumn,
+                value === option.value && styles.selectTextActive,
+              ]}>
                 {tSetting(setting, option.labelKey)}
               </Text>
             </TouchableOpacity>
@@ -162,6 +167,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   settingRow: { marginTop: 16 },
   text: { flex: 1 },
+  columnOptionsText: { flex: 3 },
   label: { fontSize: 16, fontWeight: '700' },
   description: { fontSize: 13, color: '#555', lineHeight: 18, marginTop: 6 },
   separator: { height: 1, backgroundColor: '#ddd', marginVertical: 18 },
@@ -171,8 +177,10 @@ const styles = StyleSheet.create({
   value: { fontSize: 22, minWidth: 45, textAlign: 'center' },
   close: { alignSelf: 'flex-end', marginTop: 18, padding: 10 },
   selectButtons: { flexDirection: 'row', gap: 6 },
+  selectButtonsColumn: { flex: 2, flexDirection: 'column' },
   selectButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#ccc' },
   selectButtonActive: { backgroundColor: '#f0e68c', borderColor: '#c9b458' },
   selectText: { fontSize: 13 },
+  selectTextColumn: { textAlign: 'center' },
   selectTextActive: { fontWeight: '700' },
 });

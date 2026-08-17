@@ -42,6 +42,7 @@ export const ENGINE_SETTINGS = [
     labelKey: 'settings.characterDeleteActionPlacementTitle',
     descriptionKey: 'settings.characterDeleteActionPlacementDescription',
     defaultValue: 'menu',
+    optionsLayout: 'column',
     options: [
       { value: 'menu', labelKey: 'settings.characterDeleteActionPlacement.menu' },
       { value: 'card', labelKey: 'settings.characterDeleteActionPlacement.card' },
