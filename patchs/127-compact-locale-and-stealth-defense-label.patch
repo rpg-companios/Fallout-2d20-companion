@@ -1,0 +1,263 @@
+diff --git a/__tests__/consumables/stealth-boy-defense-effect.test.js b/__tests__/consumables/stealth-boy-defense-effect.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..f2404c68672cb4047ee976b342154aefb72db703
+--- /dev/null
++++ b/__tests__/consumables/stealth-boy-defense-effect.test.js
+@@ -0,0 +1,44 @@
++import { beforeEach, describe, expect, it } from 'vitest';
++import {
++  applyConsumableToEffects,
++  getDefenseModifierEffectLabel,
++  getTimedDefenseBonus,
++} from '../../domain/effects';
++import { setCurrentModuleLocale } from '../../i18n/locale';
++
++const stealthBoy = {
++  id: 'chem_stealth_boy',
++  name: 'Стелс-бой',
++  positiveEffect: {
++    defenseModifier: { op: '+', value: 2 },
++  },
++  positiveEffectDuration: 'lasting',
++};
++
++describe('Stealth Boy defense effect', () => {
++  beforeEach(() => {
++    setCurrentModuleLocale('ru-RU');
++  });
++
++  it('adds the defense modifier once and exposes a localized label', () => {
++    const result = applyConsumableToEffects(stealthBoy, []);
++
++    expect(result.effects).toHaveLength(1);
++    expect(result.effects[0]).toMatchObject({
++      effectName: 'def:+2',
++      effectLabel: 'Защита: +2',
++      scenesLeft: 1,
++      defenseModifier: { op: '+', value: 2 },
++    });
++    expect(result.events).toHaveLength(1);
++    expect(result.events[0]).toContain('Защита: +2');
++    expect(getTimedDefenseBonus(result.effects)).toBe(2);
++  });
++
++  it('formats both new and persisted defense effects for the active module locale', () => {
++    expect(getDefenseModifierEffectLabel({ op: '+', value: 2 })).toBe('Защита: +2');
++
++    setCurrentModuleLocale('en-EN');
++    expect(getDefenseModifierEffectLabel({ op: '+', value: 2 })).toBe('Defence: +2');
++  });
++});
+diff --git a/__tests__/i18n/locale-label.test.js b/__tests__/i18n/locale-label.test.js
+index 3999c4b3339c0dc639814f16c15e968e8f760aef..9cc176cf225bf792f909326136eb0f31d38e9b5a 100644
+--- a/__tests__/i18n/locale-label.test.js
++++ b/__tests__/i18n/locale-label.test.js
+@@ -2,12 +2,25 @@ import { describe, expect, it } from 'vitest';
+ import { getLocaleLabel } from '../../components/screens/HomeScreen/logic/localeLabel';
+ 
+ const translate = (key) => ({
+-  'language.russian': 'Русский',
+-  'language.english': 'English',
++  'language.russian': 'Ru',
++  'language.english': 'En',
+   'language.localeCode': 'Код языка: {code}',
+ }[key]);
+ 
+ describe('character-manager locale labels', () => {
++  it('uses compact labels for the built-in engine and module locales', () => {
++    expect(getLocaleLabel({
++      code: 'ru-RU',
++      displayLocale: 'ru-RU',
++      translate,
++    })).toBe('Ru');
++    expect(getLocaleLabel({
++      code: 'en-EN',
++      displayLocale: 'ru-RU',
++      translate,
++    })).toBe('En');
++  });
++
+   it('uses the localized generic code label when Intl.DisplayNames is unavailable', () => {
+     expect(getLocaleLabel({
+       code: 'fr-FR',
+diff --git a/__tests__/securitron/settings-module.test.js b/__tests__/securitron/settings-module.test.js
+index 0bec18be5901d6df3bddbd747f485f8272e375eb..ebcc8768214c9de2a674caf88b2408d4ffb80de1 100644
+--- a/__tests__/securitron/settings-module.test.js
++++ b/__tests__/securitron/settings-module.test.js
+@@ -116,6 +116,8 @@ describe('Владение настройками и экраны управле
+         path.join(root, `i18n/${locale}/screens/home/screen.json`),
+         'utf-8',
+       ));
++      expect(engineDict.language.russian).toBe('Ru');
++      expect(engineDict.language.english).toBe('En');
+       expect(engineDict.language.settingTitle).toBeTruthy();
+       expect(engineDict.language.localeCode).toContain('{code}');
+     }
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index abc992cfbc8e7b2ca9b4a0c0d1700e2ba4fd195b..c9a72a8c519429d23f6557a0c44ffdd9eb96d491 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -22,7 +22,13 @@ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+-import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus, getTimedDefenseBonus } from '../../../domain/effects';
++import {
++  getDefenseModifierEffectLabel,
++  getEffectTimeText,
++  getTimedMaxHpBonus,
++  getTimedDamageResistanceBonus,
++  getTimedDefenseBonus,
++} from '../../../domain/effects';
+ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../domain/weaponDisplay';
+ import { applyUnarmedVisibility } from '../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
+@@ -210,7 +216,9 @@ const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+                 </View>
+               ) : null}
+               {effects.map((effect) => {
+-                const effectText = effect.effectName || effect.effectLabel || '—';
++                const effectText = effect.defenseModifier
++                  ? getDefenseModifierEffectLabel(effect.defenseModifier)
++                  : effect.effectName || effect.effectLabel || '—';
+                 const isNegative = effect.effectKind === 'negative';
+                 return (
+                   <View key={effect.id} style={localStyles.effectsPanelRow}>
+diff --git a/domain/effects.js b/domain/effects.js
+index 148d191e1dd58a603e24898636aeeff9fe7efa83..edf5b7b532d027565ea29fdb868eed428db866ec 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -31,6 +31,20 @@ const tEffects = (path, vars = {}) => {
+     return current.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] ?? ''));
+ };
+ 
++export const getDefenseModifierEffectLabel = (modifier) => {
++    if (
++        !modifier
++        || !['+', '-'].includes(modifier.op)
++        || typeof modifier.value !== 'number'
++        || !Number.isFinite(modifier.value)
++    ) {
++        throw new Error('[effects] Некорректный модификатор защиты');
++    }
++    return tEffects('display.defenseModifier', {
++        modifier: `${modifier.op}${modifier.value}`,
++    });
++};
++
+ const DURATION_LASTING_SCENES = 1;  // lasting = до конца текущей сцены (1 сцена = 5 мин)
+ const DURATION_BRIEF_SCENES = 3;    // brief = краткое действие (3 сцены = 15 мин)
+ 
+@@ -327,18 +341,18 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+     // defenseModifier — timed-эффект на защиту (defense), напр. Стелс-бой (+2)
+     if (positiveEffectIsObject && positiveEffectRaw?.defenseModifier && positiveDuration.scenes > 0) {
+         const mod = positiveEffectRaw.defenseModifier;
+-        const value = Number(mod?.value) || 0;
+-        if (value !== 0) {
+-            const effectName = `def:${mod.op}${value}`;
++        const effectLabel = getDefenseModifierEffectLabel(mod);
++        if (mod.value !== 0) {
++            const effectName = `def:${mod.op}${mod.value}`;
+             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                 effectName,
+-                effectLabel: effectName,
++                effectLabel,
+                 effectKind: 'positive',
+                 scenes: positiveDuration.scenes,
+                 sourceName: name,
+                 defenseModifier: mod,
+             }));
+-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
++            events.push(tEffects('events.positiveApplied', { name: effectLabel, scenes: positiveDuration.scenes }));
+         }
+     }
+ 
+@@ -362,24 +376,6 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+         }
+     }
+ 
+-    // defenseModifier — timed-эффект на защиту (defense), напр. Стелс-бой (+2)
+-    if (positiveEffectIsObject && positiveEffectRaw?.defenseModifier && positiveDuration.scenes > 0) {
+-        const mod = positiveEffectRaw.defenseModifier;
+-        const value = Number(mod?.value) || 0;
+-        if (value !== 0) {
+-            const effectName = `def:${mod.op}${value}`;
+-            nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+-                effectName,
+-                effectLabel: effectName,
+-                effectKind: 'positive',
+-                scenes: positiveDuration.scenes,
+-                sourceName: name,
+-                defenseModifier: mod,
+-            }));
+-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+-        }
+-    }
+-
+     // Строковый/label positiveEffect — timed-эффект для отображения
+     const positiveName = toStringSafe(item?.positiveEffectLabel || (!positiveEffectIsObject ? positiveEffectRaw : ''));
+     const positiveLabel = toStringSafe(item?.positiveEffectLabel);
+@@ -562,6 +558,7 @@ export const SCENE_RULES = {
+ 
+ export default {
+     SCENE_RULES,
++    getDefenseModifierEffectLabel,
+     applyConsumableToEffects,
+     checkAddiction,
+     applyRemoveConditions,
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 8753eeb91efff21ae7b29ebdec73e6a45f34613f..6d2307ca9476e346b0b577a4181ceae0530c3062 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -37,8 +37,8 @@
+   },
+   "deleteConfirm": "Do you really want to delete this character?",
+   "language": {
+-    "russian": "Русский",
+-    "english": "English",
++    "russian": "Ru",
++    "english": "En",
+     "settingTitle": "Setting language",
+     "localeCode": "Language {code}"
+   },
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index c3196e6b6699f1bef2b54eaad695ca0a5fabefed..9f9b0553014ee4eb1dae0cb920f95f0c40b74a65 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -37,8 +37,8 @@
+   },
+   "deleteConfirm": "Вы действительно хотите удалить этого персонажа?",
+   "language": {
+-    "russian": "Русский",
+-    "english": "English",
++    "russian": "Ru",
++    "english": "En",
+     "settingTitle": "Язык сеттинга",
+     "localeCode": "Язык {code}"
+   },
+diff --git a/modules/fallout/i18n/en-EN/data/system/effects.json b/modules/fallout/i18n/en-EN/data/system/effects.json
+index 0c47b6efd2a7cca7410d24273b70231fcf411aed..3a52181891afa429943350d08849b0a816bf70ee 100644
+--- a/modules/fallout/i18n/en-EN/data/system/effects.json
++++ b/modules/fallout/i18n/en-EN/data/system/effects.json
+@@ -17,6 +17,7 @@
+     "addictionAvoided": "Addiction avoided."
+   },
+   "display": {
+-    "scenesAndMinutes": "{{scenes}} scenes ({{minutes}} min)"
++    "scenesAndMinutes": "{{scenes}} scenes ({{minutes}} min)",
++    "defenseModifier": "Defence: {{modifier}}"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/data/system/effects.json b/modules/fallout/i18n/ru-RU/data/system/effects.json
+index b310420725f3f0af80b24946f204e8b424cc44c3..1e8ef41df3f6a0de533ccfb9031d13edf24556b4 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/effects.json
++++ b/modules/fallout/i18n/ru-RU/data/system/effects.json
+@@ -17,6 +17,7 @@
+     "addictionAvoided": "Зависимость не наступила."
+   },
+   "display": {
+-    "scenesAndMinutes": "{{scenes}} сцен ({{minutes}} мин)"
++    "scenesAndMinutes": "{{scenes}} сцен ({{minutes}} мин)",
++    "defenseModifier": "Защита: {{modifier}}"
+   }
+ }
