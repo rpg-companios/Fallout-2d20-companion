@@ -13,6 +13,7 @@ import {
   Linking,
   TextInput,
   PanResponder,
+  Dimensions,
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,7 +33,10 @@ import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudS
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
-import useAppSettingsStore, { selectCharacterFoldersEnabled } from '../../../src/store/appSettingsStore';
+import useAppSettingsStore, {
+  selectCharacterDeleteActionPlacement,
+  selectCharacterFoldersEnabled,
+} from '../../../src/store/appSettingsStore';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -49,8 +53,41 @@ const ActionCell = ({ icon, label, onPress, disabled = false }) => (
   </TouchableOpacity>
 );
 
-const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd }) => {
+const CHARACTER_ACTION_MENU_WIDTH = 220;
+
+const CharacterCell = ({
+  character,
+  deleteActionPlacement,
+  onPress,
+  onDelete,
+  onDownload,
+  onDuplicate,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+}) => {
   const originImage = getOriginImage(character.originName);
+  const actionButtonRef = useRef(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState(null);
+
+  const openActionMenu = (event) => {
+    event?.stopPropagation?.();
+    actionButtonRef.current?.measureInWindow((x, y, width, height) => {
+      const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
+      const menuHeight = deleteActionPlacement === 'menu' ? 144 : 100;
+      const left = Math.max(8, Math.min(x + width - CHARACTER_ACTION_MENU_WIDTH, windowWidth - CHARACTER_ACTION_MENU_WIDTH - 8));
+      const top = y + height + menuHeight + 8 <= windowHeight
+        ? y + height + 4
+        : Math.max(8, y - menuHeight - 4);
+      setActionMenuPosition({ top, left });
+    });
+  };
+
+  const runAction = (action) => {
+    setActionMenuPosition(null);
+    action();
+  };
+
   // PanResponder keeps ownership of the pointer after it leaves the small handle,
   // which Touchable's touch callbacks do not guarantee on web and native.
   const callbacks = useRef({});
@@ -63,14 +100,55 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, 
     onPanResponderRelease: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
     onPanResponderTerminate: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
   })).current;
+
   return (
     <TouchableOpacity style={styles.characterCell} onPress={onPress} activeOpacity={0.8}>
       <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
       <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
-      <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><Text style={styles.deleteIcon}>🗑</Text></TouchableOpacity>
-      <TouchableOpacity style={styles.downloadButton} onPress={(event) => { event?.stopPropagation?.(); onDownload(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><MaterialCommunityIcons name="download" size={16} color="#8a8a8a" /></TouchableOpacity>
+      {deleteActionPlacement === 'card' && (
+        <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }} accessibilityLabel={tHomeScreen('characterActions.delete')}>
+          <Text style={styles.deleteIcon}>🗑</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity
+        ref={actionButtonRef}
+        style={styles.characterActionButton}
+        onPress={openActionMenu}
+        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+        accessibilityLabel={tHomeScreen('characterActions.openMenu')}
+      >
+        <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
+      </TouchableOpacity>
       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
       {character.level ? <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text> : null}
+
+      <Modal
+        visible={Boolean(actionMenuPosition)}
+        transparent
+        animationType="none"
+        onRequestClose={() => setActionMenuPosition(null)}
+      >
+        <Pressable style={styles.characterActionBackdrop} onPress={() => setActionMenuPosition(null)}>
+          {actionMenuPosition && (
+            <View style={[styles.characterActionMenu, actionMenuPosition]}>
+              <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDownload)}>
+                <MaterialCommunityIcons name="download" size={19} color="#111827" />
+                <Text style={styles.characterActionText}>{tHomeScreen('characterActions.download')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDuplicate)}>
+                <MaterialCommunityIcons name="content-copy" size={19} color="#111827" />
+                <Text style={styles.characterActionText}>{tHomeScreen('characterActions.duplicate')}</Text>
+              </TouchableOpacity>
+              {deleteActionPlacement === 'menu' && (
+                <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDelete)}>
+                  <MaterialCommunityIcons name="delete-outline" size={19} color="#b91c1c" />
+                  <Text style={[styles.characterActionText, styles.characterActionDeleteText]}>{tHomeScreen('characterActions.delete')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </Pressable>
+      </Modal>
     </TouchableOpacity>
   );
 };
@@ -92,6 +170,7 @@ export default function HomeScreen({ navigation }) {
   const rootDropRef = useRef(null);
   const dropBounds = useRef({});
   const characterFoldersEnabled = useAppSettingsStore(selectCharacterFoldersEnabled);
+  const characterDeleteActionPlacement = useAppSettingsStore(selectCharacterDeleteActionPlacement);
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
@@ -174,7 +253,7 @@ export default function HomeScreen({ navigation }) {
     { code: 'en-EN', label: tHomeScreen('language.english'), flag: '🇬🇧' },
   ];
 
-  const loadList = useCallback(async () => {
+  const loadList = useCallback(async ({ duplicatedCharacterId, sourceCharacterId } = {}) => {
     setLoading(true);
     try {
       const savedFolders = await db.getCharacterFolders();
@@ -182,6 +261,15 @@ export default function HomeScreen({ navigation }) {
       const counts = Object.fromEntries(savedFolders.map((folder, index) => [folder.id, folderLists[index].length]));
       const visible = activeFolder ? folderLists[savedFolders.findIndex((folder) => folder.id === activeFolder.id)] || [] : await db.getRootCharactersList();
       visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      if (duplicatedCharacterId && sourceCharacterId) {
+        const duplicateIndex = visible.findIndex((item) => item.id === duplicatedCharacterId);
+        const sourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
+        if (duplicateIndex >= 0 && sourceIndex >= 0) {
+          const [duplicate] = visible.splice(duplicateIndex, 1);
+          const currentSourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
+          visible.splice(currentSourceIndex + 1, 0, duplicate);
+        }
+      }
       setCharacters(visible);
       setFolders(savedFolders);
       setFolderCounts(counts);
@@ -339,6 +427,24 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
+  const handleDuplicate = async (character) => {
+    try {
+      const duplicate = await db.duplicateCharacter(
+        character.id,
+        tHomeScreen('characterActions.copySuffix'),
+      );
+      await loadList({
+        duplicatedCharacterId: duplicate.id,
+        sourceCharacterId: character.id,
+      });
+    } catch (error) {
+      console.error('[duplicateCharacter] failed:', error);
+      Alert.alert(
+        tHomeScreen('title'),
+        tHomeScreen('characterActions.duplicateError'),
+      );
+    }
+  };
 
   const handleDownload = async (character) => {
     if (false) { // cross-platform
@@ -606,9 +712,11 @@ export default function HomeScreen({ navigation }) {
                   <CharacterCell
                     key={item.id}
                     character={item}
+                    deleteActionPlacement={characterDeleteActionPlacement}
                     onPress={() => handleOpen(item.id)}
                     onDelete={() => handleDelete(item)}
                     onDownload={() => handleDownload(item)}
+                    onDuplicate={() => handleDuplicate(item)}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}

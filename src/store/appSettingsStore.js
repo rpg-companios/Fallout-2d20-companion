@@ -75,6 +75,7 @@ const useAppSettingsStore = create(
       getSettingValue: (settingId) => get().getValue(settingId),
 
       setCharacterFoldersEnabled: (v) => get().setValue('characterFoldersEnabled', v),
+      setCharacterDeleteActionPlacement: (v) => get().setValue('characterDeleteActionPlacement', v),
       setWeaponCardsDisplayMode: (v) => get().setValue('weaponCardsDisplayMode', v),
       setWeaponDurabilityLossEnabled: (v) => get().setValue('weaponDurabilityLossEnabled', v),
       setWeaponDurabilityLossPer10Shots: (v) => get().setValue('weaponDurabilityLossPer10Shots', v),
@@ -129,6 +130,7 @@ export default useAppSettingsStore;
 
 // Подписываемые селекторы (используются в компонентах вместо геттеров).
 export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('characterFoldersEnabled');
+export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
 export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');
 export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValue('weaponDurabilityLossEnabled');
 export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingValue('weaponDurabilityLossPer10Shots');

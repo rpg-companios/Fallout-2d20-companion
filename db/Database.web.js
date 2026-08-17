@@ -1,5 +1,9 @@
 import { getAll, getFirst, runQuery, initDatabase, runBatch, tableExists } from './adapters/WebAdapter';
 import {
+  buildCharacterDuplicate,
+  createDuplicateCharacterId,
+} from '../domain/characterDuplication';
+import {
   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
   catalogGetAmmoTypes, catalogGetAmmoById,
@@ -78,6 +82,11 @@ export async function getItemByName(name) {
 
 // ─── Персонажи (СОХРАНЁНКИ — остаются в SQLite/Web-adapter) ─────────────────────
 
+const makeDuplicateCharacterId = (timestamp) => createDuplicateCharacterId(
+  timestamp,
+  Math.random().toString(36).slice(2, 11),
+);
+
 export async function saveCharacter(id, name, level, originName, data) {
   const now = Date.now();
   const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
@@ -98,9 +107,14 @@ export async function saveCharacter(id, name, level, originName, data) {
 export async function loadCharacterById(id) {
   const row = await getFirst('SELECT * FROM characters WHERE id = ?', [id]);
   if (!row) return null;
+  const renameRequest = await getFirst(
+    'SELECT character_id FROM character_rename_requests WHERE character_id = ?',
+    [id],
+  );
   return {
     ...row,
     data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
+    renamePending: Boolean(renameRequest),
   };
 }
 
@@ -118,8 +132,77 @@ export async function getCharactersList() {
   }));
 }
 
+/**
+ * Atomically duplicates a character, its folder placement, and its rename marker.
+ * The domain helper owns copy semantics; persistence only stores its result.
+ */
+export async function duplicateCharacter(id, copySuffix) {
+  const source = await getFirst('SELECT * FROM characters WHERE id = ?', [id]);
+  if (!source) throw new Error(`Character not found: ${id}`);
+
+  const existingNames = (await getAll('SELECT name FROM characters')).map(row => row.name);
+  const sourceMembership = await getFirst(
+    'SELECT folder_id FROM character_folder_memberships WHERE character_id = ?',
+    [id],
+  );
+  const timestamp = Date.now();
+  const duplicate = buildCharacterDuplicate({
+    source: {
+      id: source.id,
+      name: source.name,
+      level: source.level,
+      originName: source.origin_name,
+      data: typeof source.data === 'string' ? JSON.parse(source.data) : source.data,
+    },
+    existingNames,
+    copyLabel: copySuffix,
+    duplicateId: makeDuplicateCharacterId(timestamp),
+    timestamp,
+  });
+
+  const statements = [
+    {
+      sql: `INSERT INTO characters
+              (id, name, level, origin_name, data, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      params: [
+        duplicate.id,
+        duplicate.name,
+        duplicate.level,
+        duplicate.originName,
+        JSON.stringify(duplicate.data),
+        duplicate.createdAt,
+        duplicate.updatedAt,
+      ],
+    },
+    {
+      sql: 'INSERT INTO character_rename_requests (character_id) VALUES (?)',
+      params: [duplicate.id],
+    },
+  ];
+
+  if (sourceMembership) {
+    statements.push({
+      sql: `INSERT INTO character_folder_memberships (character_id, folder_id)
+            VALUES (?, ?)`,
+      params: [duplicate.id, sourceMembership.folder_id],
+    });
+  }
+
+  await runBatch(statements);
+  return duplicate;
+}
+
+export async function clearCharacterRenameRequest(id) {
+  await runQuery('DELETE FROM character_rename_requests WHERE character_id = ?', [id]);
+}
+
 export async function deleteCharacter(id) {
-  await runBatch([{ sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [id] }]);
+  await runBatch([
+    { sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [id] },
+    { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [id] },
+    { sql: 'DELETE FROM characters WHERE id = ?', params: [id] },
+  ]);
 }
 
 export async function getPerkEffects(_perkName, _rank = 1) {
@@ -172,6 +255,6 @@ export async function getCharactersInFolder(folderId) {
 }
 export async function deleteCharacterFolderAndCharacters(folderId) {
   const members = await getAll('SELECT character_id FROM character_folder_memberships WHERE folder_id = ?', [folderId]);
-  await runBatch([...members.flatMap(({ character_id }) => [{ sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [character_id] }]), { sql: 'DELETE FROM character_folder_memberships WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM character_folders WHERE id = ?', params: [folderId] }]);
+  await runBatch([...members.flatMap(({ character_id }) => [{ sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [character_id] }]), { sql: 'DELETE FROM character_folder_memberships WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM character_folders WHERE id = ?', params: [folderId] }]);
   return members.map((row) => row.character_id);
 }

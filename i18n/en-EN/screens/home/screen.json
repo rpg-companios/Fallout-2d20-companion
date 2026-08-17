@@ -27,6 +27,14 @@
       "failed": "Failed to save file."
     }
   },
+  "characterActions": {
+    "openMenu": "Character actions",
+    "download": "Download character",
+    "duplicate": "Duplicate character",
+    "delete": "Delete character",
+    "copySuffix": "copy",
+    "duplicateError": "Failed to duplicate character."
+  },
   "deleteConfirm": "Do you really want to delete this character?",
   "language": {
     "russian": "Русский",
@@ -66,6 +74,13 @@
   },
   "settings": {
     "title": "Settings",
+    "appearanceTitle": "Appearance",
+    "characterDeleteActionPlacementTitle": "Delete character",
+    "characterDeleteActionPlacementDescription": "Where to show the delete character action.",
+    "characterDeleteActionPlacement": {
+      "menu": "In action menu",
+      "card": "On character card"
+    },
     "survivalModeTitle": "Survival Mode Settings",
     "durabilityTitle": "Weapon wear on firing",
     "durabilityDescription": "Enable weapon wear mechanic when firing.",

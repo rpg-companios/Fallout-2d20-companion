@@ -9,6 +9,7 @@ vi.mock('@react-native-async-storage/async-storage', () => {
     default: {
       getItem: async (k) => (mem.has(k) ? mem.get(k) : null),
       setItem: async (k, v) => { mem.set(k, v); },
+      multiSet: async (pairs) => { pairs.forEach(([k, v]) => mem.set(k, v)); },
       removeItem: async (k) => { mem.delete(k); },
       clear: async () => { mem.clear(); },
       getAllKeys: async () => Array.from(mem.keys()),

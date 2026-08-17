@@ -27,6 +27,14 @@
       "failed": "Не удалось сохранить файл."
     }
   },
+  "characterActions": {
+    "openMenu": "Действия персонажа",
+    "download": "Скачать персонажа",
+    "duplicate": "Дублировать персонажа",
+    "delete": "Удалить персонажа",
+    "copySuffix": "копия",
+    "duplicateError": "Не удалось дублировать персонажа."
+  },
   "deleteConfirm": "Вы действительно хотите удалить этого персонажа?",
   "language": {
     "russian": "Русский",
@@ -66,6 +74,13 @@
   },
   "settings": {
     "title": "Настройки",
+    "appearanceTitle": "Внешний вид",
+    "characterDeleteActionPlacementTitle": "Удаление персонажа",
+    "characterDeleteActionPlacementDescription": "Где показывать действие удаления персонажа.",
+    "characterDeleteActionPlacement": {
+      "menu": "В меню действий",
+      "card": "На карточке"
+    },
     "survivalModeTitle": "Настройки режима «Выживание»",
     "durabilityTitle": "Износ оружия при выстреле",
     "durabilityDescription": "Включить механику износа оружия при выстрелах.",

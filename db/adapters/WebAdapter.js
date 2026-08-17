@@ -196,18 +196,19 @@ export async function runBatch(statements) {
       await runQuery(sql, params);
     }
   }
+  const writes = [];
   for (const [table, data] of Object.entries(grouped)) {
     const existing = await readTable(table);
     const pkField = data.cols[0];
-    const isReplace = statements.find(s => /INSERT\s+OR\s+REPLACE/i.test(s.sql));
     const map = new Map(existing.map(r => [r[pkField], r]));
     for (const params of data.rows) {
       const obj = {};
       data.cols.forEach((col, i) => { obj[col] = params[i] ?? null; });
       map.set(obj[pkField], obj);
     }
-    await writeTable(table, Array.from(map.values()));
+    writes.push([PREFIX + table, JSON.stringify(Array.from(map.values()))]);
   }
+  if (writes.length > 0) await AsyncStorage.multiSet(writes);
 }
 
 export async function tableExists(tableName) {

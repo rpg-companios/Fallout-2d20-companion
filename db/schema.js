@@ -5,7 +5,7 @@
 //
 // schema_meta оставлена для версионирования/миграций на будущее.
 
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const CREATE_TABLES = [
   `CREATE TABLE IF NOT EXISTS schema_meta (
@@ -34,5 +34,9 @@ export const CREATE_TABLES = [
   `CREATE TABLE IF NOT EXISTS character_folder_memberships (
     character_id TEXT PRIMARY KEY,
     folder_id TEXT NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS character_rename_requests (
+    character_id TEXT PRIMARY KEY
   )`,
 ];

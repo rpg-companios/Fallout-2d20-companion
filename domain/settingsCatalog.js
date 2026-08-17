@@ -36,6 +36,18 @@ export const ENGINE_SETTINGS = [
     defaultValue: false,
   },
   {
+    id: 'characterDeleteActionPlacement',
+    type: 'select',
+    sectionKey: 'appearance',
+    labelKey: 'settings.characterDeleteActionPlacementTitle',
+    descriptionKey: 'settings.characterDeleteActionPlacementDescription',
+    defaultValue: 'menu',
+    options: [
+      { value: 'menu', labelKey: 'settings.characterDeleteActionPlacement.menu' },
+      { value: 'card', labelKey: 'settings.characterDeleteActionPlacement.card' },
+    ],
+  },
+  {
     id: 'weaponCardsDisplayMode',
     type: 'select',
     sectionKey: 'appearance',

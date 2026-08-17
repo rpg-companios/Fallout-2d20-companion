@@ -725,6 +725,7 @@ export const CharacterProvider = ({ children }) => {
         snapshot.origin?.id || snapshot.origin?.name || null,
         serialized
       );
+      await db.clearCharacterRenameRequest(id);
       await syncCharacterToCloudIfEnabled(id);
 
       setIsSaved(true);
@@ -741,9 +742,11 @@ export const CharacterProvider = ({ children }) => {
       const row = await db.loadCharacterById(id);
       if (!row) return false;
       const data = deserializeState(row.data);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      isSavedRef.current = false;
 
       setCharacterId(id);
-      setCharacterName(data.characterName || '');
+      setCharacterName(row.name);
       setLevel(data.level ?? INITIAL_LEVEL);
       setAttributes(data.attributes || createInitialAttributes());
       setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
@@ -830,8 +833,9 @@ export const CharacterProvider = ({ children }) => {
         }
       }
       
-      setIsSaved(true);
-      isSavedRef.current = true;
+      const saved = !row.renamePending;
+      setIsSaved(saved);
+      isSavedRef.current = saved;
       characterIdRef.current = id;
       return true;
     } catch (e) {
