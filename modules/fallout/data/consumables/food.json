@@ -1,267 +1,22 @@
 [
   {
-    "id": "food_fancy_lads_snack_cakes",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 18,
-    "rarity": 0,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_silt_bean",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 5,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_noodle_cup",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 20,
-    "rarity": 2,
-    "hpHealed": 6,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_sugar_bombs",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 11,
-    "rarity": 0,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "itemEffects.food.sugarBombs",
-    "isMeat": false
-  },
-  {
-    "id": "food_squirrel_bits",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 4,
-    "rarity": 1,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_crispy_squirrel_bits",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 2,
-    "hpHealed": 6,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_gum_drops",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 5,
-    "rarity": 0,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_squirrel_on_a_stick",
+    "id": "food_grilled_bloatfly",
     "itemType": "food",
     "weight": 0.5,
     "cost": 15,
-    "rarity": 2,
-    "hpHealed": 7,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_iguana_on_a_stick",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 33,
-    "rarity": 2,
-    "hpHealed": 6,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_carrot",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 3,
     "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_radroach_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 3,
-    "rarity": 0,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_potato_crisps",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 7,
-    "rarity": 0,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_yao_guai_ribs",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 90,
-    "rarity": 4,
-    "hpHealed": 13,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
     "irradiated": false,
-    "effectKey": "itemEffects.food.yaoGuaiRibs",
-    "isMeat": true
-  },
-  {
-    "id": "food_dog_ribs",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 12,
-    "rarity": 1,
-    "hpHealed": 6,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_mutant_hound_ribs",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 12,
-    "rarity": 3,
-    "hpHealed": 8,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.mutantHoundRibs",
-    "isMeat": true
-  },
-  {
-    "id": "food_gourd",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_cram",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 25,
-    "rarity": 1,
-    "hpHealed": 5,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_corn",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_brain_fungus",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_ribeye_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 40,
-    "rarity": 2,
-    "hpHealed": 10,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_deathclaw_filet",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 35,
-    "rarity": 3,
-    "hpHealed": 11,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.deathclawFilet",
-    "isMeat": true
-  },
-  {
-    "id": "food_mutfruit",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 8,
-    "rarity": 0,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_tarberry",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 5,
-    "rarity": 3,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_canned_bean",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
+    "radModifier": null,
+    "effectKey": "itemEffects.food.grilledBloatfly",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+2 Сопротивление урону от радиации"
   },
   {
     "id": "food_blamco_mac_and_cheese",
@@ -269,472 +24,18 @@
     "weight": 0.5,
     "cost": 10,
     "rarity": 1,
-    "hpHealed": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
     "irradiated": true,
+    "radModifier": "rollCD",
     "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_brahmin_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 28,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_melon",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_grilled_bloatfly",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 15,
-    "rarity": 1,
-    "hpHealed": 6,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.grilledBloatfly",
-    "isMeat": true
-  },
-  {
-    "id": "food_deathclaw_egg",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 69,
-    "rarity": 3,
-    "hpHealed": 7,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_mirelurk_egg",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 0,
-    "rarity": 2,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_radscorpion_egg",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 48,
-    "rarity": 3,
-    "hpHealed": 6,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_yum_yum_deviled_eggs",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 20,
-    "rarity": 0,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_deathclaw_omelette",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 80,
-    "rarity": 4,
-    "hpHealed": 11,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.deathclawOmelette",
-    "isMeat": false
-  },
-  {
-    "id": "food_mirelurk_egg_omelette",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 30,
-    "rarity": 3,
-    "hpHealed": 7,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.mirelurkEggOmelette",
-    "isMeat": false
-  },
-  {
-    "id": "food_radscorpion_egg_omelette",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 65,
-    "rarity": 4,
-    "hpHealed": 9,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.radscorpionEggOmelette",
-    "isMeat": false
-  },
-  {
-    "id": "food_institute_food_packet",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 10,
-    "rarity": 2,
-    "hpHealed": 5,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_sweet_roll",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 9,
-    "rarity": 1,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_food_paste",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 0,
-    "rarity": 2,
-    "hpHealed": 7,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.foodPaste",
-    "isMeat": false
-  },
-  {
-    "id": "food_mirelurk_paste",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 35,
-    "rarity": 3,
-    "hpHealed": 12,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.mirelurkPaste",
-    "isMeat": false
-  },
-  {
-    "id": "food_dog_food",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 6,
-    "rarity": 0,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_potato",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 7,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_dandy_boy_apples",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 7,
-    "rarity": 0,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_pork_n_beans",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 10,
-    "rarity": 0,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_instamash",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 20,
-    "rarity": 0,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_grilled_radroach",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 7,
-    "rarity": 1,
-    "hpHealed": 5,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_grilled_radstag",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 60,
-    "rarity": 2,
-    "hpHealed": 11,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.grilledRadstag",
-    "isMeat": true
-  },
-  {
-    "id": "food_squirrel_stew",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 24,
-    "rarity": 2,
-    "hpHealed": 10,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_radstag_stew",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 60,
-    "rarity": 3,
-    "hpHealed": 12,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.radstag_Stew",
-    "isMeat": true
-  },
-  {
-    "id": "food_iguana_stew",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 8,
-    "rarity": 1,
-    "hpHealed": 4,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_yao_guai_roast",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 110,
-    "rarity": 4,
-    "hpHealed": 14,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.yaoGuaiRoast",
-    "isMeat": true
-  },
-  {
-    "id": "food_vegetable_soup",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 13,
-    "rarity": 2,
-    "hpHealed": 7,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.vegetableSoup",
-    "isMeat": false
-  },
-  {
-    "id": "food_iguana_soup",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 21,
-    "rarity": 3,
-    "hpHealed": 10,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_deathclaw_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 130,
-    "rarity": 4,
-    "hpHealed": 14,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.deathclawSteak",
-    "isMeat": true
-  },
-  {
-    "id": "food_radscorpion_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 65,
-    "rarity": 3,
-    "hpHealed": 12,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.radscorpionSteak",
-    "isMeat": true
-  },
-  {
-    "id": "food_mole_rat_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 8,
-    "rarity": 1,
-    "hpHealed": 7,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.moleRatSteak",
-    "isMeat": true
-  },
-  {
-    "id": "food_mirelurk_queen_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 130,
-    "rarity": 5,
-    "hpHealed": 14,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.mirelurkQueenSteak",
-    "isMeat": true
-  },
-  {
-    "id": "food_stingwing_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 18,
-    "rarity": 2,
-    "hpHealed": 10,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.stingwingSteak",
-    "isMeat": true
-  },
-  {
-    "id": "food_salisbury_steak",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 20,
-    "rarity": 0,
-    "hpHealed": 5,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_perfectly_preserved_pie",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 20,
-    "rarity": 3,
-    "hpHealed": 5,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": false
-  },
-  {
-    "id": "food_stray_dog_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 28,
-    "rarity": 1,
-    "hpHealed": 3,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_deathclaw_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 30,
-    "rarity": 1,
-    "hpHealed": 8,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_deathclaw_steak_cooked",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 110,
-    "rarity": 3,
-    "hpHealed": 9,
-    "irradiated": false,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_mirelurk_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 18,
-    "rarity": 1,
-    "hpHealed": 6,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_softshell_mirelurk_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 22,
-    "rarity": 2,
-    "hpHealed": 6,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_grilled_mirelurk_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 40,
-    "rarity": 3,
-    "hpHealed": 9,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.grilledMirelurkMeat",
-    "isMeat": true
-  },
-  {
-    "id": "food_roasted_mirelurk_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 40,
-    "rarity": 2,
-    "hpHealed": 8,
-    "irradiated": false,
-    "effectKey": "itemEffects.food.roastedMirelurkMeat",
-    "isMeat": true
-  },
-  {
-    "id": "food_mutant_hound_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 8,
-    "rarity": 2,
-    "hpHealed": 5,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
   },
   {
     "id": "food_bloatfly_meat",
@@ -742,32 +43,645 @@
     "weight": 0.5,
     "cost": 8,
     "rarity": 0,
-    "hpHealed": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 2
+      }
+    },
     "irradiated": true,
+    "radModifier": "rollCD",
     "effectKey": "",
-    "isMeat": true
+    "state": "raw",
+    "preserved": false,
+    "description": ""
   },
   {
-    "id": "food_radstag_meat",
+    "id": "food_bloodbug_meat",
     "itemType": "food",
     "weight": 0.5,
-    "cost": 50,
+    "cost": 8,
     "rarity": 1,
-    "hpHealed": 8,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
     "irradiated": true,
+    "radModifier": "rollCD",
     "effectKey": "",
-    "isMeat": true
+    "state": "raw",
+    "preserved": false,
+    "description": ""
   },
   {
-    "id": "food_radscorpion_meat",
+    "id": "food_bloodbug_steak",
     "itemType": "food",
     "weight": 0.5,
-    "cost": 55,
+    "cost": 18,
     "rarity": 2,
-    "hpHealed": 9,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.bloodbugSteak",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Максимальные ОЗ +3 до конца следующей сцены"
+  },
+  {
+    "id": "food_brahmin_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 28,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
     "irradiated": true,
+    "radModifier": "rollCD",
     "effectKey": "",
-    "isMeat": true
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_brain_fungus",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_canned_dog_food",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_carrot",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 3,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_cooked_softshell_mirelurk",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 40,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.cookedSoftshellMirelurk",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Получите +1 ОД в начале следующей сцены"
+  },
+  {
+    "id": "food_corn",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_cram",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 25,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_crispy_squirrel_bits",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_dandy_boy_apples",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_deathclaw_egg",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 69,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_deathclaw_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 110,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_deathclaw_omelette",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 80,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 11
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.deathclawOmelette",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Если следующая сцена - бой, восстанавливайте 1ОЗ в начале каждого хода."
+  },
+  {
+    "id": "food_deathclaw_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 130,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 14
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.deathclawSteak",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Можно перебросить 1d20 на все проверки на СИЛ до конца следующей сцены"
+  },
+  {
+    "id": "food_fancy_lads_snack_cakes",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 18,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_food_paste",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 0,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.foodPaste",
+    "state": "cooked",
+    "preserved": true,
+    "description": "Можно перебросить 1d20 на все проверки на ВЫН до конца следующей сцены"
+  },
+  {
+    "id": "food_gourd",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_grilled_radroach",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_grilled_radstag",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 60,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 11
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.grilledRadstag",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Переносимый вес увеличивается на +25 до конца следующей сцены"
+  },
+  {
+    "id": "food_gum_drops",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_iguana_bits",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_iguana_on_a_stick",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 33,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_iguana_stew",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 21,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_instamash",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_institute_food_packet",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_melon",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_mirelurk_cake",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 35,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 12
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.mirelurkCake",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Можете дышать под водой до конца следующей сцены"
+  },
+  {
+    "id": "food_mirelurk_egg",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 0,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_mirelurk_egg_omelette",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 30,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.mirelurkEggOmelette",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Немедленно добавьте 2 ОД в пул группы"
+  },
+  {
+    "id": "food_mirelurk_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 18,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_mirelurk_queen_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 130,
+    "rarity": 5,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 14
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.mirelurkQueenSteak",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Уменьшите сложность всех проверок на ВЫН на 1 до конца следующей сцены"
+  },
+  {
+    "id": "food_mole_rat_chops",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.moleRatChops",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+1 максимум ОД в групповой пул до конца текущей сцены"
   },
   {
     "id": "food_mole_rat_meat",
@@ -775,54 +689,18 @@
     "weight": 0.5,
     "cost": 5,
     "rarity": 0,
-    "hpHealed": 5,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
     "irradiated": true,
+    "radModifier": "rollCD",
     "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_queen_mirelurk_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 22,
-    "rarity": 4,
-    "hpHealed": 10,
-    "irradiated": true,
-    "effectKey": "itemEffects.food.queenMirelurkMeat",
-    "isMeat": true
-  },
-  {
-    "id": "food_stingwing_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 8,
-    "rarity": 1,
-    "hpHealed": 7,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_yao_guai_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 85,
-    "rarity": 3,
-    "hpHealed": 9,
-    "irradiated": true,
-    "effectKey": "",
-    "isMeat": true
-  },
-  {
-    "id": "food_canned_meat",
-    "itemType": "food",
-    "weight": 0.5,
-    "cost": 25,
-    "rarity": 0,
-    "hpHealed": 6,
-    "irradiated": true,
-    "effectKey": "itemEffects.food.cannedMeat",
-    "isMeat": false
+    "state": "raw",
+    "preserved": false,
+    "description": ""
   },
   {
     "id": "food_dog_meat",
@@ -830,18 +708,720 @@
     "weight": 0.5,
     "cost": 8,
     "rarity": 0,
-    "hpHealed": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
     "irradiated": true,
+    "radModifier": "rollCD",
     "effectKey": "",
-    "isMeat": true
+    "state": "raw",
+    "preserved": false,
+    "description": ""
   },
   {
-    "id": "food_mutafruit",
-    "name": "Мутафрукт",
+    "id": "food_mutant_hound_ribs",
     "itemType": "food",
     "weight": 0.5,
-    "cost": 0,
+    "cost": 12,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.mutantHoundRibs",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Лечит 2 урона от радиации"
+  },
+  {
+    "id": "food_mutant_hound_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_mutfruit",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
     "rarity": 0,
-    "isMeat": false
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_dog_chops",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 12,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_noodle_bowl",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_perfectly_preserved_pie",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_pork_and_beans",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_potato_crisps",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_potted_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 25,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radModifier": "2rollCD",
+    "effectKey": "itemEffects.food.pottedMeat",
+    "state": "cooked",
+    "preserved": true,
+    "description": "Бросьте 2 CD вместо 1 для определения урона от радиации при употреблении"
+  },
+  {
+    "id": "food_mirelurk_queen_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 22,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "itemEffects.food.mirelurkQueenMeat",
+    "state": "raw",
+    "preserved": false,
+    "description": "Можно перебросить 1d20 на все проверки на ВЫН до конца следующей сцены"
+  },
+  {
+    "id": "food_radroach_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 3,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_radscorpion_egg",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 48,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_radscorpion_egg_omelette",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 65,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.radscorpionEggOmelette",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Излечение от всех зависимостей"
+  },
+  {
+    "id": "food_radscorpion_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 55,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_radscorpion_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 65,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 12
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.radscorpionSteak",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+2 сопротивления энергоурону до конца следующей сцены"
+  },
+  {
+    "id": "food_radstag_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 50,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_radstag_stew",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 60,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 12
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.radstagStew",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+3 сопротивления энергоурону до конца следующей сцены"
+  },
+  {
+    "id": "food_razorgrain",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_ribeye_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 40,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_roasted_mirelurk_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 40,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.roastedMirelurkMeat",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Получите +1 ОД в начале следующей сцены"
+  },
+  {
+    "id": "food_salisbury_steak",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_silt_bean",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_softshell_mirelurk_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 22,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_squirrel_bits",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 4,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_squirrel_on_a_stick",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 15,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_squirrel_stew",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 24,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_stingwing_fillet",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 35,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 11
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.stingwingFillet",
+    "state": "cooked",
+    "preserved": false,
+    "description": "Можете перебросить 1d20 на все проверки на ВОС до конца следующей сцены"
+  },
+  {
+    "id": "food_stingwing_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 30,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_sugar_bombs",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 11,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "itemEffects.food.sugarBombs",
+    "state": "cooked",
+    "preserved": true,
+    "description": "Получите +1 ОД в начале следующей сцены"
+  },
+  {
+    "id": "food_sweet_roll",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 9,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
+  },
+  {
+    "id": "food_tarberry",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_tato",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_vegetable_soup",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 13,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.vegetableSoup",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+2 сопротивления урону от радиации до конца следующей сцены"
+  },
+  {
+    "id": "food_yao_guai_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 85,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "description": ""
+  },
+  {
+    "id": "food_yao_guai_ribs",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 90,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 13
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.yaoGuaiRibs",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+2 сопротивления физическому урону до конца следующей сцены"
+  },
+  {
+    "id": "food_yao_guai_roast",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 110,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 14
+      }
+    },
+    "irradiated": false,
+    "radModifier": null,
+    "effectKey": "itemEffects.food.yaoGuaiRoast",
+    "state": "cooked",
+    "preserved": false,
+    "description": "+2 CD к атакам ближнего боя до конца следующей сцены"
+  },
+  {
+    "id": "food_yum_yum_deviled_eggs",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radModifier": "rollCD",
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true,
+    "description": ""
   }
 ]
