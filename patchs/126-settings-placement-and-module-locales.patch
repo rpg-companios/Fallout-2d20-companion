@@ -1,0 +1,3525 @@
+diff --git a/App.js b/App.js
+index 284fe441be9a0674208e3ce626bdf99cd53d5bf4..41b4c510cc4fbdf216b90daf3ceeb4eecdb1c465 100644
+--- a/App.js
++++ b/App.js
+@@ -15,7 +15,7 @@ import { CharacterProvider } from './components/CharacterContext';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import { initDatabase } from './db/Database';
+ import { seedDatabase } from './db/seed';
+-import { useLocale } from './i18n/locale';
++import { useLocale, useModuleLocale } from './i18n/locale';
+ import { tApp } from './i18n/appI18n';
+ 
+ import HomeScreen from './components/screens/HomeScreen/HomeScreen';
+@@ -36,6 +36,7 @@ const TAB_ROUTES = {
+ function App() {
+   const [dbReady, setDbReady] = useState(false);
+   const locale = useLocale();
++  useModuleLocale();
+ 
+   useEffect(() => {
+     async function initDb() {
+diff --git a/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js b/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js
+index 01eb688ca47911be7dea7e90368599c27b2a6fe3..d9af5040e82cd4e5eb82bca4a6efabb083262653 100644
+--- a/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js
++++ b/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js
+@@ -19,8 +19,9 @@ describe('Property 5: Форма equipmentKits в getEquipmentCatalog()', () =>
+     expect(kitIds.length).toBeGreaterThan(0);
+ 
+     const { getEquipmentCatalog } = await import('../../i18n/equipmentCatalog');
+-    const { setCurrentLocale } = await import('../../i18n/locale');
++    const { setCurrentLocale, setCurrentModuleLocale } = await import('../../i18n/locale');
+     setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
+     const catalog = getEquipmentCatalog('ru-RU');
+ 
+     const bad = [];
+diff --git a/__tests__/equipment/enrich-item-quality-arity.test.js b/__tests__/equipment/enrich-item-quality-arity.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..62ba00db99abe9bbf15f4273134961e1855a9807
+--- /dev/null
++++ b/__tests__/equipment/enrich-item-quality-arity.test.js
+@@ -0,0 +1,21 @@
++import { describe, expect, it, vi } from 'vitest';
++import { enrichWeaponItem } from '../../domain/enrichItem';
++
++describe('weapon quality-name callback contract', () => {
++  it('passes only the quality id to unary quality-name resolvers', () => {
++    const qualityNameById = vi.fn((id) => `name:${id}`);
++    const catalog = {
++      weapons: [{ id: 'weapon_test', name: 'Test weapon' }],
++      weaponMods: [],
++    };
++
++    const item = enrichWeaponItem({
++      weaponId: 'weapon_test',
++      uniqQualities: ['first', 'second'],
++    }, catalog, { qualityNameById });
++
++    expect(qualityNameById).toHaveBeenNthCalledWith(1, 'first');
++    expect(qualityNameById).toHaveBeenNthCalledWith(2, 'second');
++    expect(item.name).toBe('name:first name:second Test weapon');
++  });
++});
+diff --git a/__tests__/equipment/enrichment-pipeline.test.js b/__tests__/equipment/enrichment-pipeline.test.js
+index 8d1bb41ff21e5a45c103dbb4f09bc5edbff83a24..ac0586d00987fb56c66bbdcdea9beea42ee22856 100644
+--- a/__tests__/equipment/enrichment-pipeline.test.js
++++ b/__tests__/equipment/enrichment-pipeline.test.js
+@@ -10,13 +10,14 @@
+  *   [префиксы модов] [имена качеств] [базовое имя];
+  *   качества ВСЕГДА добавляются; ложа меняет имя только при stockNames.with.
+  */
+-import { describe, it, expect } from 'vitest';
++import { beforeEach, describe, it, expect } from 'vitest';
+ import { readFileSync } from 'fs';
+ import { fileURLToPath } from 'url';
+ import path from 'path';
+ 
+ import { enrichWeaponItem, applyWeaponMods, getItemDisplayName, applyNumberModifier } from '../../domain/enrichItem';
+ import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
++import { setCurrentModuleLocale } from '../../i18n/locale';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const root = path.resolve(__dirname, '../..');
+@@ -41,6 +42,10 @@ const catalog = {
+ 
+ const qname = (id) => ({ dashing: 'Дерзкая', elegant: 'Элегантная' }[id] || id);
+ 
++beforeEach(() => {
++  setCurrentModuleLocale('ru-RU');
++});
++
+ describe('Конвейер: BASE + MODS + QUALITIES (оружие)', () => {
+   it('вариант: механика истинного предмета, имя варианта, моды применяются', () => {
+     const item = enrichWeaponItem({
+diff --git a/__tests__/equipment/kit-stock-name.test.js b/__tests__/equipment/kit-stock-name.test.js
+index fafee679b3d26639ba707674d3c9df613ca62006..5359f585e2f33036db6ac33c2a8547b182a16976 100644
+--- a/__tests__/equipment/kit-stock-name.test.js
++++ b/__tests__/equipment/kit-stock-name.test.js
+@@ -10,10 +10,13 @@ vi.mock('../../db/Database', async () => {
+   };
+ });
+ 
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import { resolveKitItems } from '../../domain/kitResolver';
+ 
+-beforeAll(() => setCurrentLocale('ru-RU'));
++beforeAll(() => {
++  setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
++});
+ 
+ describe('resolveKitItems — ложа превращает пистолет в винтовку', () => {
+   it('лазерный пистолет со стандартной ложей называется «Лазерная винтовка»', async () => {
+diff --git a/__tests__/equipment/resolve-item-catalog-id.test.js b/__tests__/equipment/resolve-item-catalog-id.test.js
+index 4bca57481bb6fd578e1f39f055c183bed3f75ac0..aa2259e6b1696df34c17a21f2c6fab2becff5150 100644
+--- a/__tests__/equipment/resolve-item-catalog-id.test.js
++++ b/__tests__/equipment/resolve-item-catalog-id.test.js
+@@ -1,10 +1,13 @@
+ import { describe, it, expect, beforeAll } from 'vitest';
+ 
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { resolveItem } from '../../domain/resolveItem';
+ 
+-beforeAll(() => setCurrentLocale('ru-RU'));
++beforeAll(() => {
++  setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
++});
+ 
+ describe('resolveItem catalog enrichment', () => {
+   it('uses weaponId as the catalog id for normalized inventory weapon instances', () => {
+diff --git a/__tests__/i18n/locale-label.test.js b/__tests__/i18n/locale-label.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..3999c4b3339c0dc639814f16c15e968e8f760aef
+--- /dev/null
++++ b/__tests__/i18n/locale-label.test.js
+@@ -0,0 +1,34 @@
++import { describe, expect, it } from 'vitest';
++import { getLocaleLabel } from '../../components/screens/HomeScreen/logic/localeLabel';
++
++const translate = (key) => ({
++  'language.russian': 'Русский',
++  'language.english': 'English',
++  'language.localeCode': 'Код языка: {code}',
++}[key]);
++
++describe('character-manager locale labels', () => {
++  it('uses the localized generic code label when Intl.DisplayNames is unavailable', () => {
++    expect(getLocaleLabel({
++      code: 'fr-FR',
++      displayLocale: 'ru-RU',
++      translate,
++      DisplayNames: null,
++    })).toBe('Код языка: fr-FR');
++  });
++
++  it('uses the same fallback when Intl.DisplayNames returns no language name', () => {
++    class EmptyDisplayNames {
++      of() {
++        return undefined;
++      }
++    }
++
++    expect(getLocaleLabel({
++      code: 'fr-FR',
++      displayLocale: 'ru-RU',
++      translate,
++      DisplayNames: EmptyDisplayNames,
++    })).toBe('Код языка: fr-FR');
++  });
++});
+diff --git a/__tests__/securitron/armor-mods-module-move.test.js b/__tests__/securitron/armor-mods-module-move.test.js
+index 45c8af06223d113778bca30b7be8344a0af1f132..13e791375e62a5f5cc71ca97e5db878e74d1d88c 100644
+--- a/__tests__/securitron/armor-mods-module-move.test.js
++++ b/__tests__/securitron/armor-mods-module-move.test.js
+@@ -8,7 +8,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleArmorMods from '../../modules/fallout/data/equipment/armor_mods.json';
+ import moduleUniqArmorMods from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
+ import moduleArmorEffects from '../../modules/fallout/data/equipment/armor_effects.json';
+@@ -23,7 +23,10 @@ import dataUniqArmorMods from '../../data/equipment/uniq_armor_mods.json';
+ import dataArmorEffects from '../../data/equipment/armor_effects.json';
+ 
+ describe('Моды брони в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('механика модов — в модульных данных, i18n — только строки', () => {
+     expect(moduleArmorMods).toHaveLength(15);
+diff --git a/__tests__/securitron/armor-module-move.test.js b/__tests__/securitron/armor-module-move.test.js
+index 3e329c29828e66c709da86671e6b9220f4fcd9d7..70389227fdf01ab79a421b9d55001a70954ebeae 100644
+--- a/__tests__/securitron/armor-module-move.test.js
++++ b/__tests__/securitron/armor-module-move.test.js
+@@ -6,7 +6,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleArmor from '../../modules/fallout/data/equipment/armor.json';
+ import moduleRuArmor from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/armor.json';
+ import moduleEnArmor from '../../modules/fallout/i18n/en-EN/data/equipment/armor/armor.json';
+@@ -20,7 +20,10 @@ const countPieces = (armor) =>
+       (s, tier) => s + (tier?.pieces || []).length, 0), 0);
+ 
+ describe('Броня в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит полную механику брони (56 деталей в 6 категориях)', () => {
+     expect(countPieces(moduleArmor)).toBe(56);
+diff --git a/__tests__/securitron/chems-module-move.test.js b/__tests__/securitron/chems-module-move.test.js
+index ab3ad968c33e5ff9a71433acaf2e3f3c97ef26d9..8efb31d02864b2802e9a326578d63253b1859914 100644
+--- a/__tests__/securitron/chems-module-move.test.js
++++ b/__tests__/securitron/chems-module-move.test.js
+@@ -6,7 +6,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleChems from '../../modules/fallout/data/consumables/chems.json';
+ import moduleRuChems from '../../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
+ import moduleEnChems from '../../modules/fallout/i18n/en-EN/data/consumables/chems.json';
+@@ -15,7 +15,10 @@ import legacyRuChems from '../../i18n/ru-RU/data/consumables/chems.json';
+ import legacyEnChems from '../../i18n/en-EN/data/consumables/chems.json';
+ 
+ describe('Химка в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит полные записи в каноническом виде (itemType: chem)', () => {
+     expect(moduleChems.length).toBe(32);
+diff --git a/__tests__/securitron/clothes-module-move.test.js b/__tests__/securitron/clothes-module-move.test.js
+index 59f0435f377d978c2d7d2e650e41165a631e913b..1251eed096bfbf1f0f1c2b6b98c738978b0cc4f2 100644
+--- a/__tests__/securitron/clothes-module-move.test.js
++++ b/__tests__/securitron/clothes-module-move.test.js
+@@ -7,7 +7,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleClothes from '../../modules/fallout/data/equipment/clothes.json';
+ import moduleRuClothes from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
+ import moduleEnClothes from '../../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
+@@ -18,7 +18,10 @@ import legacyEnClothes from '../../i18n/en-EN/data/equipment/armor/clothes.json'
+ const countItems = (groups) => groups.reduce((sum, g) => sum + (g.items || []).length, 0);
+ 
+ describe('Одежда в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит все группы: suit, outfit, headwear (31 предмет)', () => {
+     const groups = moduleClothes.clothes;
+diff --git a/__tests__/securitron/conditions-module-move.test.js b/__tests__/securitron/conditions-module-move.test.js
+index d50629e7274af55ee975954385a05e623c77c060..90ba2d8375887b86b07fea4774850b81649edb25 100644
+--- a/__tests__/securitron/conditions-module-move.test.js
++++ b/__tests__/securitron/conditions-module-move.test.js
+@@ -5,7 +5,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getDiseasesCatalog } from '../../i18n/conditionsCatalog';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleDiseases from '../../modules/fallout/data/conditions/diseases.json';
+ import moduleRuDiseases from '../../modules/fallout/i18n/ru-RU/data/conditions/diseases.json';
+ import moduleEnDiseases from '../../modules/fallout/i18n/en-EN/data/conditions/diseases.json';
+@@ -14,7 +14,10 @@ import legacyRuDiseases from '../../i18n/ru-RU/data/conditions/diseases.json';
+ import legacyEnDiseases from '../../i18n/en-EN/data/conditions/diseases.json';
+ 
+ describe('Болезни в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит полные записи болезней и переводы обеих локалей', () => {
+     expect(moduleDiseases.length).toBe(20);
+diff --git a/__tests__/securitron/enclave-kits.test.js b/__tests__/securitron/enclave-kits.test.js
+index be5d0982e3210286b2b8540e0ee8aa535bcd08db..4b6f7696f88d048639e8845270024b8fbd760f63 100644
+--- a/__tests__/securitron/enclave-kits.test.js
++++ b/__tests__/securitron/enclave-kits.test.js
+@@ -3,9 +3,12 @@
+  */
+ import { describe, it, expect, vi, beforeAll } from 'vitest';
+ 
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ 
+-beforeAll(() => setCurrentLocale('ru-RU'));
++beforeAll(() => {
++  setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
++});
+ 
+ vi.mock('../../db/Database', async () => {
+   const catalog = await import('../../db/catalogSource');
+diff --git a/__tests__/securitron/enclave-remnant-origin.test.js b/__tests__/securitron/enclave-remnant-origin.test.js
+index 401f6278df6d70b7e600eab105560675002c22f9..21ecaf4f179d9ed30dddcd3f8979c54738c64981 100644
+--- a/__tests__/securitron/enclave-remnant-origin.test.js
++++ b/__tests__/securitron/enclave-remnant-origin.test.js
+@@ -8,10 +8,11 @@
+  */
+ import { describe, it, expect, vi, beforeAll } from 'vitest';
+ 
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ 
+ beforeAll(() => {
+   setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
+ });
+ 
+ vi.mock('../../db/Database', async () => {
+diff --git a/__tests__/securitron/family-kits.test.js b/__tests__/securitron/family-kits.test.js
+index f46332a7832dc7552a5a8866587adc1c906780f3..d9c70a51df1b8bee3c93b6ac86334c235ea0ac16 100644
+--- a/__tests__/securitron/family-kits.test.js
++++ b/__tests__/securitron/family-kits.test.js
+@@ -18,11 +18,12 @@ vi.mock('../../db/Database', async () => {
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+ import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
+ import { catalogGetWeaponMods } from '../../db/catalogSource';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import useCharacterStore from '../../src/store/characterStore';
+ 
+ beforeAll(() => {
+   setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
+ });
+ 
+ describe('Новые предметы модуля', () => {
+diff --git a/__tests__/securitron/general-goods-module-move.test.js b/__tests__/securitron/general-goods-module-move.test.js
+index 8e8e6239d278ed35ba2a5f42857c4d395fab7d81..572c1146ff3ce2efd0adb5581aa083826ff6edb9 100644
+--- a/__tests__/securitron/general-goods-module-move.test.js
++++ b/__tests__/securitron/general-goods-module-move.test.js
+@@ -5,7 +5,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleGeneralGoods from '../../modules/fallout/data/equipment/general_goods.json';
+ import moduleRuGeneralGoods from '../../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
+ import moduleEnGeneralGoods from '../../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
+@@ -14,7 +14,10 @@ import legacyRuGeneralGoods from '../../i18n/ru-RU/data/equipment/general_goods.
+ import legacyEnGeneralGoods from '../../i18n/en-EN/data/equipment/general_goods.json';
+ 
+ describe('Общие товары в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит все записи (35: 31 база + 4 модуля) и переводы', () => {
+     expect(moduleGeneralGoods).toHaveLength(35);
+diff --git a/__tests__/securitron/item-variant.test.js b/__tests__/securitron/item-variant.test.js
+index fb0be9d701bc3d46faddbbf73ef99b8d8d546183..0f86104c6677caee66933684692ce54db260bfd0 100644
+--- a/__tests__/securitron/item-variant.test.js
++++ b/__tests__/securitron/item-variant.test.js
+@@ -29,13 +29,14 @@ import { expandTrueItems, applyVariantModifiers } from '../../domain/packMerge';
+ import { resolveWeaponItem } from '../../domain/kitResolver';
+ import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
+ import { migrateCharacterState } from '../../src/store/migrations';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import useCharacterStore from '../../src/store/characterStore';
+ import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
+ 
+ beforeAll(() => {
+   // catalogSource строит каталог по текущей локали (в CI Intl даёт en-EN).
+   setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
+ });
+ 
+ const switchbladeStats = {
+diff --git a/__tests__/securitron/magazines-module-move.test.js b/__tests__/securitron/magazines-module-move.test.js
+index 2125e3fb3d1da7d21433bbedcbf60676df779780..8a13c84ee3d8ace8311421bf615b8e8dda9bdc4d 100644
+--- a/__tests__/securitron/magazines-module-move.test.js
++++ b/__tests__/securitron/magazines-module-move.test.js
+@@ -6,7 +6,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleMagazines from '../../modules/fallout/data/consumables/magazines.json';
+ import moduleRuMagazines from '../../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
+ import moduleEnMagazines from '../../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
+@@ -15,7 +15,10 @@ import legacyRuMagazines from '../../i18n/ru-RU/data/consumables/magazines.json'
+ import legacyEnMagazines from '../../i18n/en-EN/data/consumables/magazines.json';
+ 
+ describe('Журналы в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит полные записи журналов (95) и переводы обеих локалей', () => {
+     expect(moduleMagazines).toHaveLength(95);
+diff --git a/__tests__/securitron/module-data-move.test.js b/__tests__/securitron/module-data-move.test.js
+index 8de1b0c962774eadcbc5b2cbaf11f43317b38fd3..02a99aede0d3f0e973132c062c9903932b4084dd 100644
+--- a/__tests__/securitron/module-data-move.test.js
++++ b/__tests__/securitron/module-data-move.test.js
+@@ -5,7 +5,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleFood from '../../modules/fallout/data/consumables/food.json';
+ import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
+ import moduleWeaponMods from '../../modules/fallout/data/equipment/weapon_mods.json';
+@@ -15,6 +15,7 @@ import dataWeaponMods from '../../data/equipment/weapon_mods.json';
+ 
+ beforeAll(() => {
+   setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
+ });
+ 
+ describe('Данные в модуле (сеттинг), data/ — пустой движок', () => {
+diff --git a/__tests__/securitron/module-i18n-structure.test.js b/__tests__/securitron/module-i18n-structure.test.js
+index 5be4dbb71be7b1581aa9ea39886424f711b56f33..fb0bd61b5269c9ae1bcc1163c6a820080d3f5a35 100644
+--- a/__tests__/securitron/module-i18n-structure.test.js
++++ b/__tests__/securitron/module-i18n-structure.test.js
+@@ -21,6 +21,7 @@ const CATEGORY_FILES = [
+   'system/traits.json',
+   'system/equipmentKits.json',
+   'system/uniq_qualities.json',
++  'system/settings.json',
+   'equipment/weapons/weapons.json',
+   'equipment/armor/clothes.json',
+   'equipment/general_goods.json',
+@@ -43,7 +44,7 @@ describe('Модульный i18n: структура по категориям
+       const i18n = getModuleI18n(locale);
+       expect(Object.keys(i18n).sort()).toEqual([
+         'clothes', 'drinks', 'equipmentKits', 'food', 'generalGoods',
+-        'origins', 'traits', 'uniqQualities', 'weaponMods', 'weapons',
++        'origins', 'settings', 'traits', 'uniqQualities', 'weaponMods', 'weapons',
+       ]);
+       for (const rel of CATEGORY_FILES) {
+         const fromFile = JSON.parse(fs.readFileSync(path.join(MODULE_I18N_ROOT, locale, 'data', rel), 'utf-8'));
+@@ -52,6 +53,7 @@ describe('Модульный i18n: структура по категориям
+           'system/traits.json': 'traits',
+           'system/equipmentKits.json': 'equipmentKits',
+           'system/uniq_qualities.json': 'uniqQualities',
++          'system/settings.json': 'settings',
+           'equipment/weapons/weapons.json': 'weapons',
+           'equipment/armor/clothes.json': 'clothes',
+           'equipment/general_goods.json': 'generalGoods',
+diff --git a/__tests__/securitron/nightkin-kit.test.js b/__tests__/securitron/nightkin-kit.test.js
+index 7249162cc0d07f85ec75cc529ee4e7067cd090a8..d08f9247be1ac6cbb51707957448fe68b7b9b949 100644
+--- a/__tests__/securitron/nightkin-kit.test.js
++++ b/__tests__/securitron/nightkin-kit.test.js
+@@ -11,9 +11,12 @@
+  */
+ import { describe, it, expect, vi, beforeAll } from 'vitest';
+ 
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ 
+-beforeAll(() => setCurrentLocale('ru-RU'));
++beforeAll(() => {
++  setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
++});
+ 
+ vi.mock('../../db/Database', async () => {
+   const catalog = await import('../../db/catalogSource');
+diff --git a/__tests__/securitron/oddities-ammo-module-move.test.js b/__tests__/securitron/oddities-ammo-module-move.test.js
+index 201fc215b4629ca7ad1c8ce875e5f77cb7330a79..9baea70f0839df68445f8f93606f688443d52333 100644
+--- a/__tests__/securitron/oddities-ammo-module-move.test.js
++++ b/__tests__/securitron/oddities-ammo-module-move.test.js
+@@ -4,7 +4,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleOddities from '../../modules/fallout/data/equipment/oddities.json';
+ import moduleAmmo from '../../modules/fallout/data/equipment/ammo.json';
+ import moduleRuOddities from '../../modules/fallout/i18n/ru-RU/data/equipment/oddities.json';
+@@ -19,7 +19,10 @@ import legacyRuAmmo from '../../i18n/ru-RU/data/equipment/ammo/ammo_types.json';
+ import legacyEnAmmo from '../../i18n/en-EN/data/equipment/ammo/ammo_types.json';
+ 
+ describe('Диковины и патроны в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит полные записи и переводы обеих локалей', () => {
+     expect(moduleOddities).toHaveLength(20);
+diff --git a/__tests__/securitron/power-armor-module-move.test.js b/__tests__/securitron/power-armor-module-move.test.js
+index c78bddf690534a00bb2b38d7cc5087901d7eb1c8..49828b24da2b34b817cba3da857dc0e8a8685ce4 100644
+--- a/__tests__/securitron/power-armor-module-move.test.js
++++ b/__tests__/securitron/power-armor-module-move.test.js
+@@ -7,7 +7,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import modulePowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+ import moduleRuPowerArmor from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json';
+ import moduleEnPowerArmor from '../../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
+@@ -19,7 +19,10 @@ const countPieces = (pa) =>
+   Object.values(pa || {}).reduce((sum, set) => sum + (set?.pieces || []).length, 0);
+ 
+ describe('Силовая броня в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит полную механику: 6 сетов (frame + 5), 21 деталь', () => {
+     expect(Object.keys(modulePowerArmor).sort()).toEqual(['frame', 'raiderPower', 't45', 't51', 't60', 'x01']);
+diff --git a/__tests__/securitron/robot-module-move.test.js b/__tests__/securitron/robot-module-move.test.js
+index fa465cd9641e12951fa49bec9654306247407ed3..a852ab594afd2738fbce3cd18a5845884a044d03 100644
+--- a/__tests__/securitron/robot-module-move.test.js
++++ b/__tests__/securitron/robot-module-move.test.js
+@@ -6,7 +6,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleRobotArms from '../../modules/fallout/data/equipment/robot/robotarms.json';
+ import moduleRobotBody from '../../modules/fallout/data/equipment/robot/robotbody.json';
+ import moduleRobotHeads from '../../modules/fallout/data/equipment/robot/robotheads.json';
+@@ -21,7 +21,10 @@ import dataRobotBody from '../../data/equipment/robot/robotbody.json';
+ import dataRobotParts from '../../data/equipment/robotparts.json';
+ 
+ describe('Роботы в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит все категории роботов (структура сохранена)', () => {
+     expect(moduleRobotArms).toHaveLength(21);
+diff --git a/__tests__/securitron/settings-module.test.js b/__tests__/securitron/settings-module.test.js
+index 5e46dbf0d1e6150371d980c9afd0229a43a86e97..0bec18be5901d6df3bddbd747f485f8272e375eb 100644
+--- a/__tests__/securitron/settings-module.test.js
++++ b/__tests__/securitron/settings-module.test.js
+@@ -1,135 +1,237 @@
+ /**
+- * Настройки как часть сеттинга (патч 120).
+- *
+- * Модель (решения владельца):
+- * - механики сеттинга описываются в modules/fallout/settings.json
+- *   (данные: id, type, секции, дефолты, dependsOn);
+- * - движковые UI-настройки (каталоги персонажей, вид карточек) —
+- *   ENGINE_SETTINGS в domain/settingsCatalog.js;
+- * - значения хранятся по модулям: { [moduleId]: { [settingId]: value } },
+- *   разные сеттинги не смешиваются; язык — настройка сеттинга.
++ * Контракт владения настройками и независимых языков движка/сеттинга.
+  */
+-import { describe, it, expect, beforeAll } from 'vitest';
++import { beforeEach, describe, expect, it } from 'vitest';
+ import { readFileSync } from 'fs';
+ import path from 'path';
+ import { fileURLToPath } from 'url';
+ 
+ import {
+   ENGINE_SETTINGS,
+-  getModuleSettings,
+   getAllSettings,
++  getModuleSettings,
+   getSettingById,
++  getSettingsForSurface,
++  SETTING_CONTROL_SURFACES,
+ } from '../../domain/settingsCatalog';
++import {
++  getActiveModuleId,
++  getModuleManifest,
++  resolveLocaleFromManifest,
++  resolveModuleLocale,
++  shouldOfferLocaleChoiceForManifest,
++} from '../../domain/moduleLocale';
+ import useAppSettingsStore from '../../src/store/appSettingsStore';
+-import { getCurrentLocale } from '../../i18n/locale';
++import {
++  getCurrentLocale,
++  getCurrentModuleLocale,
++} from '../../i18n/locale';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const root = path.resolve(__dirname, '../..');
++const ids = (settings) => settings.map((setting) => setting.id);
++
++const resetStore = () => {
++  useAppSettingsStore.setState({
++    values: {
++      engine: {
++        characterFoldersEnabled: false,
++        characterDeleteActionPlacement: 'menu',
++        language: 'ru-RU',
++      },
++      fallout: {
++        weaponDurabilityLossEnabled: false,
++        weaponDurabilityLossPer10Shots: 1,
++        randomWeaponQualityEnabled: false,
++        unarmedAttackVisible: true,
++        weaponCardsDisplayMode: 'cards',
++      },
++    },
++    moduleLocales: {},
++  });
++  useAppSettingsStore.getState().setValue('language', 'ru-RU');
++};
+ 
+-describe('Настройки сеттинга (modules/fallout/settings.json)', () => {
+-  it('описание в модуле: 5 настроек, типы и дефолты', () => {
++describe('Владение настройками и экраны управления', () => {
++  it('движок владеет менеджером персонажей и языком интерфейса', () => {
++    expect(ids(ENGINE_SETTINGS)).toEqual([
++      'characterFoldersEnabled',
++      'characterDeleteActionPlacement',
++      'language',
++    ]);
++    expect(getSettingById('language')).toMatchObject({
++      controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
++      defaultValue: 'ru-RU',
++    });
++  });
++
++  it('Fallout владеет механиками оружия и показывает только cards/spoilers', () => {
+     const settings = getModuleSettings();
+-    expect(settings).toHaveLength(5);
+-    expect(settings.map((s) => s.id)).toEqual([
++    expect(ids(settings)).toEqual([
+       'weaponDurabilityLossEnabled',
+       'weaponDurabilityLossPer10Shots',
+       'randomWeaponQualityEnabled',
+       'unarmedAttackVisible',
+-      'language',
++      'weaponCardsDisplayMode',
+     ]);
+-    expect(settings.find((s) => s.id === 'language').type).toBe('select');
+-    expect(settings.find((s) => s.id === 'weaponDurabilityLossPer10Shots').min).toBe(1);
+-    expect(settings.find((s) => s.id === 'weaponDurabilityLossPer10Shots').dependsOn)
+-      .toBe('weaponDurabilityLossEnabled');
++    expect(getSettingById('weaponCardsDisplayMode')).toMatchObject({
++      controlSurface: SETTING_CONTROL_SURFACES.EQUIPMENT,
++      options: [{ value: 'cards' }, { value: 'spoilers' }],
++    });
++    expect(getAllSettings()).toHaveLength(8);
+   });
+ 
+-  it('движковые настройки — отдельно (каталоги, вид карточек)', () => {
+-    expect(ENGINE_SETTINGS.map((s) => s.id).sort()).toEqual([
+-      'characterDeleteActionPlacement',
++  it('общее окно получает только назначенные ему движковые и Fallout-настройки', () => {
++    expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS))).toEqual([
+       'characterFoldersEnabled',
++      'characterDeleteActionPlacement',
++      'weaponDurabilityLossEnabled',
++      'weaponDurabilityLossPer10Shots',
++      'randomWeaponQualityEnabled',
++    ]);
++    expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.CHARACTERS))).toEqual(['language']);
++    expect(ids(getSettingsForSurface(SETTING_CONTROL_SURFACES.EQUIPMENT))).toEqual([
++      'unarmedAttackVisible',
+       'weaponCardsDisplayMode',
+     ]);
+-    expect(getAllSettings()).toHaveLength(8);
+-    expect(getSettingById('characterDeleteActionPlacement')).toMatchObject({
+-      type: 'select',
+-      defaultValue: 'menu',
+-      options: [{ value: 'menu' }, { value: 'card' }],
+-    });
+-    expect(getSettingById('characterFoldersEnabled')).not.toBeNull();
+-    expect(getSettingById('language')).not.toBeNull();
+   });
+ 
+-  it('i18n тексты настроек присутствуют в модуле обеих локалей', () => {
+-    for (const loc of ['ru-RU', 'en-EN']) {
+-      const dict = JSON.parse(readFileSync(
+-        path.join(root, `modules/fallout/i18n/${loc}/data/system/settings.json`), 'utf-8'));
+-      expect(dict.survivalMode).toBeTruthy();
+-      expect(dict.durabilityTitle).toBeTruthy();
+-      expect(dict.lossTitle).toBeTruthy();
+-      expect(dict.qualityTitle).toBeTruthy();
+-      expect(dict.unarmedTitle).toBeTruthy();
+-      expect(dict.languageTitle).toBeTruthy();
+-      expect(dict.language.ru).toBeTruthy();
+-      expect(dict.language.en).toBeTruthy();
+-    }
+-  });
++  it('неиспользуемые тексты сохранены, а локализованные подписи режима добавлены', () => {
++    for (const locale of ['ru-RU', 'en-EN']) {
++      const moduleDict = JSON.parse(readFileSync(
++        path.join(root, `modules/fallout/i18n/${locale}/data/system/settings.json`),
++        'utf-8',
++      ));
++      expect(moduleDict.combat).toBeTruthy();
++      expect(moduleDict.unarmedTitle).toBeTruthy();
++      expect(moduleDict.unarmedDescription).toBeTruthy();
++      expect(moduleDict.interface).toBeTruthy();
++      expect(moduleDict.languageTitle).toBeTruthy();
++      expect(moduleDict.languageDescription).toBeTruthy();
++      expect(moduleDict.cardsTitle).toBeTruthy();
++      expect(moduleDict.cards.cards).toBeTruthy();
++      expect(moduleDict.cards.spoilers).toBeTruthy();
+ 
+-  it('i18n тексты движковой настройки удаления присутствуют в обеих локалях', () => {
+-    for (const loc of ['ru-RU', 'en-EN']) {
+-      const dict = JSON.parse(readFileSync(
+-        path.join(root, `i18n/${loc}/screens/home/screen.json`), 'utf-8'));
+-      expect(dict.settings.appearanceTitle).toBeTruthy();
+-      expect(dict.settings.characterDeleteActionPlacementTitle).toBeTruthy();
+-      expect(dict.settings.characterDeleteActionPlacementDescription).toBeTruthy();
+-      expect(dict.settings.characterDeleteActionPlacement.menu).toBeTruthy();
+-      expect(dict.settings.characterDeleteActionPlacement.card).toBeTruthy();
++      const engineDict = JSON.parse(readFileSync(
++        path.join(root, `i18n/${locale}/screens/home/screen.json`),
++        'utf-8',
++      ));
++      expect(engineDict.language.settingTitle).toBeTruthy();
++      expect(engineDict.language.localeCode).toContain('{code}');
+     }
+   });
+ });
+ 
+-describe('Стор настроек: значения по модулям', () => {
+-  beforeAll(() => {
+-    useAppSettingsStore.setState({ values: {
+-      engine: {
+-        characterFoldersEnabled: true,
+-        characterDeleteActionPlacement: 'card',
+-        weaponCardsDisplayMode: 'tabs',
+-      },
+-      fallout: {
+-        weaponDurabilityLossEnabled: true,
+-        weaponDurabilityLossPer10Shots: 3,
+-        randomWeaponQualityEnabled: true,
+-        unarmedAttackVisible: false,
+-        language: 'en-EN',
+-      },
+-    } });
++describe('Разрешение языка сеттинга', () => {
++  it('manifest Fallout явно объявляет локали и defaultLocale', () => {
++    expect(getActiveModuleId()).toBe('fallout');
++    expect(getModuleManifest()).toMatchObject({
++      id: 'fallout',
++      locales: ['ru-RU', 'en-EN'],
++      defaultLocale: 'ru-RU',
++    });
++  });
++
++  it('одна локаль всегда принудительна и не показывает второй переключатель', () => {
++    const manifest = { id: 'single', locales: ['xx-XX'], defaultLocale: 'xx-XX' };
++    expect(resolveLocaleFromManifest({
++      manifest,
++      engineLocale: 'ru-RU',
++      manualLocale: 'unsupported-manual-value',
++    })).toBe('xx-XX');
++    expect(shouldOfferLocaleChoiceForManifest({ manifest, engineLocale: 'ru-RU' })).toBe(false);
++  });
++
++  it('ручной выбор приоритетнее совпадающего языка движка', () => {
++    const manifest = {
++      id: 'multi',
++      locales: ['ru-RU', 'en-EN'],
++      defaultLocale: 'ru-RU',
++    };
++    expect(resolveLocaleFromManifest({
++      manifest,
++      engineLocale: 'en-EN',
++      manualLocale: 'ru-RU',
++    })).toBe('ru-RU');
+   });
+ 
+-  it('getSettingValue возвращает значения из своего модуля', () => {
++  it('без ручного выбора использует совпадение, иначе defaultLocale и переключатель', () => {
++    expect(resolveModuleLocale({ engineLocale: 'en-EN' })).toBe('en-EN');
++
++    const manifest = {
++      id: 'multi',
++      locales: ['aa-AA', 'bb-BB'],
++      defaultLocale: 'bb-BB',
++    };
++    expect(resolveLocaleFromManifest({ manifest, engineLocale: 'ru-RU' })).toBe('bb-BB');
++    expect(shouldOfferLocaleChoiceForManifest({ manifest, engineLocale: 'ru-RU' })).toBe(true);
++    expect(shouldOfferLocaleChoiceForManifest({ manifest, engineLocale: 'aa-AA' })).toBe(false);
++  });
++});
++
++describe('Стор и миграция настроек', () => {
++  beforeEach(resetStore);
++
++  it('хранит язык в engine, а режим карточек в Fallout', () => {
+     const state = useAppSettingsStore.getState();
+-    expect(state.getSettingValue('weaponDurabilityLossEnabled')).toBe(true);
+-    expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(3);
+-    expect(state.getSettingValue('characterFoldersEnabled')).toBe(true);
+-    expect(state.getSettingValue('characterDeleteActionPlacement')).toBe('card');
+-    expect(state.getSettingValue('weaponCardsDisplayMode')).toBe('tabs');
+-    expect(state.getSettingValue('unarmedAttackVisible')).toBe(false);
+-    expect(state.getSettingValue('language')).toBe('en-EN');
++    state.setValue('language', 'en-EN');
++    state.setValue('weaponCardsDisplayMode', 'spoilers');
++
++    expect(useAppSettingsStore.getState().values.engine.language).toBe('en-EN');
++    expect(useAppSettingsStore.getState().values.engine.weaponCardsDisplayMode).toBeUndefined();
++    expect(useAppSettingsStore.getState().values.fallout.weaponCardsDisplayMode).toBe('spoilers');
++    expect(useAppSettingsStore.getState().values.fallout.language).toBeUndefined();
++    expect(getCurrentLocale()).toBe('en-EN');
++    expect(getCurrentModuleLocale()).toBe('en-EN');
+   });
+ 
+-  it('числовые настройки клампятся диапазоном', () => {
++  it('помнит ручной язык по модулю и сохраняет его при смене языка движка', () => {
+     const state = useAppSettingsStore.getState();
+-    state.setValue('weaponDurabilityLossPer10Shots', 500);
+-    expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(100);
+-    state.setValue('weaponDurabilityLossPer10Shots', 0);
+-    expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(1);
++    state.setModuleLocale('fallout', 'ru-RU');
++    state.setValue('language', 'en-EN');
++
++    expect(useAppSettingsStore.getState().moduleLocales).toEqual({ fallout: 'ru-RU' });
++    expect(getCurrentLocale()).toBe('en-EN');
++    expect(getCurrentModuleLocale()).toBe('ru-RU');
+   });
+ 
+-  it("язык — настройка сеттинга: setValue('language') меняет локаль", () => {
+-    const before = getCurrentLocale();
+-    useAppSettingsStore.getState().setValue('language', 'ru-RU');
+-    expect(getCurrentLocale()).toBe('ru-RU');
+-    // вернуть как было
+-    useAppSettingsStore.getState().setValue('language', before);
+-    expect(getCurrentLocale()).toBe(before);
++  it('не позволяет Fallout выбрать неактивный tabs', () => {
++    useAppSettingsStore.getState().setValue('weaponCardsDisplayMode', 'tabs');
++    expect(useAppSettingsStore.getState().getSettingValue('weaponCardsDisplayMode')).toBe('cards');
++  });
++
++  it('v1 переносит владельцев и мигрирует сохранённый tabs в cards', () => {
++    const migrate = useAppSettingsStore.persist.getOptions().migrate;
++    const migrated = migrate({
++      values: {
++        engine: {
++          characterFoldersEnabled: true,
++          characterDeleteActionPlacement: 'card',
++          weaponCardsDisplayMode: 'tabs',
++        },
++        fallout: {
++          weaponDurabilityLossEnabled: true,
++          weaponDurabilityLossPer10Shots: 3,
++          randomWeaponQualityEnabled: true,
++          unarmedAttackVisible: false,
++          language: 'en-EN',
++        },
++      },
++    }, 1);
++
++    expect(migrated.values.engine).toMatchObject({
++      characterFoldersEnabled: true,
++      characterDeleteActionPlacement: 'card',
++      language: 'en-EN',
++    });
++    expect(migrated.values.engine.weaponCardsDisplayMode).toBeUndefined();
++    expect(migrated.values.fallout).toMatchObject({
++      weaponDurabilityLossEnabled: true,
++      weaponDurabilityLossPer10Shots: 3,
++      randomWeaponQualityEnabled: true,
++      unarmedAttackVisible: false,
++      weaponCardsDisplayMode: 'cards',
++    });
++    expect(migrated.values.fallout.language).toBeUndefined();
+   });
+ });
+diff --git a/__tests__/securitron/system-i18n-module-move.test.js b/__tests__/securitron/system-i18n-module-move.test.js
+index 8d308ae57f4fc6514f797529830a479f566bda63..5863f40ff4e2c6436b4f36f3814daa0500db6f88 100644
+--- a/__tests__/securitron/system-i18n-module-move.test.js
++++ b/__tests__/securitron/system-i18n-module-move.test.js
+@@ -5,7 +5,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleRuQualities from '../../modules/fallout/i18n/ru-RU/data/system/qualities.json';
+ import moduleEnQualities from '../../modules/fallout/i18n/en-EN/data/system/qualities.json';
+ import moduleRuEffects from '../../modules/fallout/i18n/ru-RU/data/system/effects.json';
+@@ -15,7 +15,10 @@ import legacyRuQualities from '../../i18n/ru-RU/data/system/qualities.json';
+ import legacyEnQualities from '../../i18n/en-EN/data/system/qualities.json';
+ 
+ describe('Системные i18n в модуле (сеттинг), легаси — пуст', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит качества (30), эффекты, damageEffects и miscellaneous', () => {
+     expect(moduleRuQualities).toHaveLength(30);
+diff --git a/__tests__/securitron/treefamilies-origin.test.js b/__tests__/securitron/treefamilies-origin.test.js
+index 819811b6f6f16947bb735aeeaa44d1e6841815db..7d27cf3fbc3c8c881352d37fd80f44b0ebab9bf7 100644
+--- a/__tests__/securitron/treefamilies-origin.test.js
++++ b/__tests__/securitron/treefamilies-origin.test.js
+@@ -6,11 +6,12 @@
+  */
+ import { describe, it, expect, vi, beforeAll } from 'vitest';
+ 
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ 
+ beforeAll(() => {
+   // catalogSource строит каталог по текущей локали (в CI Intl даёт en-EN).
+   setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
+ });
+ 
+ vi.mock('../../db/Database', async () => {
+diff --git a/__tests__/securitron/uniq-quality.test.js b/__tests__/securitron/uniq-quality.test.js
+index c3abbe5f5f44cb836259cd5a1f0aceaf55499e6a..80ed14c5d6dd9e2f793f862d2f757c5fd8a83693 100644
+--- a/__tests__/securitron/uniq-quality.test.js
++++ b/__tests__/securitron/uniq-quality.test.js
+@@ -23,13 +23,14 @@ import { getUniqQualities, getUniqQualityName } from '../../domain/registry';
+ import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+ import { generateStackKey, generateItemId } from '../../domain/itemIdentity';
+ import { resolveKitItems, resolveWeaponItem } from '../../domain/kitResolver';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+ import { migrateCharacterState } from '../../src/store/migrations';
+ import useCharacterStore from '../../src/store/characterStore';
+ 
+ beforeAll(() => {
+   setCurrentLocale('ru-RU');
++  setCurrentModuleLocale('ru-RU');
+ });
+ 
+ const NAME_BY_ID = { dashing: 'Дерзкая', elegant: 'Элегантная', homemade: 'Кустарные' };
+diff --git a/__tests__/securitron/weapon-mod-slots-module-move.test.js b/__tests__/securitron/weapon-mod-slots-module-move.test.js
+index 949d426c079f728f25f5deded56b6ca8a8a0ae03..907f20947a6fd73302c320dbe1d21d64c2682d45 100644
+--- a/__tests__/securitron/weapon-mod-slots-module-move.test.js
++++ b/__tests__/securitron/weapon-mod-slots-module-move.test.js
+@@ -6,12 +6,15 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleSlots from '../../modules/fallout/data/equipment/weapon_mod_slots.json';
+ import dataSlots from '../../data/equipment/weapon_mod_slots.json';
+ 
+ describe('weapon_mod_slots в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль содержит словарь слотов: { weaponId: { slot: [modIds] } }', () => {
+     expect(moduleSlots).toBeDefined();
+diff --git a/__tests__/securitron/weapons-module-move.test.js b/__tests__/securitron/weapons-module-move.test.js
+index 20823f6e73efa4cce7b74545752c7f8a9c3d0e84..7f7fb3bd4184e32210e21a652b71009968e3ff2e 100644
+--- a/__tests__/securitron/weapons-module-move.test.js
++++ b/__tests__/securitron/weapons-module-move.test.js
+@@ -6,7 +6,7 @@
+  */
+ import { describe, it, expect, beforeAll } from 'vitest';
+ import { getEquipmentCatalogForLocale, getModuleWeapons } from '../../domain/registry';
+-import { setCurrentLocale } from '../../i18n/locale';
++import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
+ import moduleWeapons from '../../modules/fallout/data/equipment/weapons.json';
+ import moduleRuWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
+ import moduleEnWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
+@@ -15,7 +15,10 @@ import legacyRuWeapons from '../../i18n/ru-RU/data/equipment/weapons/weapons.jso
+ import legacyEnWeapons from '../../i18n/en-EN/data/equipment/weapons/weapons.json';
+ 
+ describe('Оружие в модуле (сеттинг), data/ — пустой движок', () => {
+-  beforeAll(() => setCurrentLocale('ru-RU'));
++  beforeAll(() => {
++    setCurrentLocale('ru-RU');
++    setCurrentModuleLocale('ru-RU');
++  });
+ 
+   it('модуль самодостаточен: 118 базовых + 2 варианта, trueItemId на месте', () => {
+     expect(moduleWeapons).toHaveLength(120);
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index becd8c000f52e4814614b90ac17e45afaea2214f..95fbdacb74e87734f8c27f7142b48004b39327e8 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -31,7 +31,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
+     return canonical ? { ...s, name: canonical } : s;
+   });
+ };
+-import { loadOriginsData, findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
++import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+ import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+@@ -65,7 +65,7 @@ import { canEquipArmor } from '../domain/equipEquip';
+ import { resolveKitItems } from '../domain/kitResolver';
+ import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+ import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
+ import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
+@@ -80,14 +80,19 @@ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/
+ const INITIAL_LEVEL = 1;
+ 
+ const CharacterContext = createContext();
+-const BARE_ORIGINS = loadOriginsData();
+ 
+ // Resolve saved-character origin through the single source of truth:
+-// domain/origins.findEnrichedOrigin(id) returns the origin enriched with image + equipmentKits.
++// domain/origins.findEnrichedOrigin(id) returns the localized origin enriched
++// with image + equipmentKits. A missing id/catalog entry is a data error.
+ const resolveOrigin = (storedOrigin) => {
+   if (!storedOrigin) return null;
+   const id = typeof storedOrigin === 'string' ? storedOrigin : storedOrigin.id;
+-  return findEnrichedOrigin(id) || BARE_ORIGINS.find((origin) => origin.id === id) || null;
++  if (!id) throw new Error('[CharacterContext] Сохранённый ориджин не содержит id');
++  const resolved = findEnrichedOrigin(id);
++  if (!resolved) {
++    throw new Error(`[CharacterContext] Ориджин "${id}" отсутствует в данных активного сеттинга`);
++  }
++  return resolved;
+ };
+ 
+ const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+@@ -137,9 +142,12 @@ const findCatalogEntryById = (node, id) => {
+ const FUSION_CORE_CATALOG = findCatalogEntryById(dataAmmo, FUSION_CORE_ID);
+ // Каталожные данные части PA в текущей локали (имя); механика — из canonical data.
+ const paLocalizedCatalogItem = (catalogId) => {
+-  const localized = (getEquipmentCatalog(getCurrentLocale())?.powerArmorList || [])
++  const localized = (getEquipmentCatalog(getCurrentModuleLocale())?.powerArmorList || [])
+     .find((p) => p.id === catalogId);
+-  return localized || PA_CATALOG_BY_ID[catalogId];
++  if (!localized) {
++    throw new Error(`[CharacterContext] Для силовой брони "${catalogId}" нет локализованных данных`);
++  }
++  return localized;
+ };
+ const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
+ // ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
+@@ -819,15 +827,16 @@ export const CharacterProvider = ({ children }) => {
+         try {
+           const catalog = getEquipmentCatalog();
+           const kit = catalog?.equipmentKits?.nightkin;
+-          if (kit && Array.isArray(kit.items)) {
+-            const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
+-            (resolved.items || []).forEach((item) => {
+-              useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+-            });
+-            setEquipment({ id: 'nightkin', name: 'Тень', items: resolved.items || [] });
+-            // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
+-            data.nightkinKitPending = false;
++          if (!kit?.name || !Array.isArray(kit.items)) {
++            throw new Error('[loadCharacter] Комплект nightkin отсутствует в локализованном каталоге');
+           }
++          const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
++          (resolved.items || []).forEach((item) => {
++            useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
++          });
++          setEquipment({ id: 'nightkin', name: kit.name, items: resolved.items || [] });
++          // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
++          data.nightkinKitPending = false;
+         } catch (e) {
+           console.warn('[loadCharacter] nightkin kit grant failed:', e);
+         }
+diff --git a/components/powerArmor/FusionCoreChoiceModal.js b/components/powerArmor/FusionCoreChoiceModal.js
+index 2a5d5bfd762f329763aa2b02fa74ff8feeff704b..0357bc8dad1daaf23517b50072f95848c51595b6 100644
+--- a/components/powerArmor/FusionCoreChoiceModal.js
++++ b/components/powerArmor/FusionCoreChoiceModal.js
+@@ -13,17 +13,21 @@ import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
+ import { useCharacter } from '../CharacterContext';
+ import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+-import { useLocale } from '../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../i18n/locale';
+ import { FUSION_CORE_ID } from '../../domain/powerArmor';
+ 
+ const FusionCoreChoiceModal = () => {
+-  const locale = useLocale();
++  useLocale();
++  const moduleLocale = useModuleLocale();
+   const { pendingCoreChoice, resolveCoreChoice } = useCharacter();
+ 
+   if (!pendingCoreChoice) return null;
+ 
+-  const coreCatalogName = (getEquipmentCatalog(locale)?.ammoTypes || [])
+-    .find((entry) => entry.id === FUSION_CORE_ID)?.name || FUSION_CORE_ID;
++  const coreCatalogName = (getEquipmentCatalog(moduleLocale)?.ammoTypes || [])
++    .find((entry) => entry.id === FUSION_CORE_ID)?.name;
++  if (!coreCatalogName) {
++    throw new Error(`[FusionCoreChoiceModal] Для боеприпаса "${FUSION_CORE_ID}" нет перевода`);
++  }
+ 
+   return (
+     <Modal
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index d74c129184ce558f0494782bdc71691c6cfbc68a..2571e1e21b0b85f69ab1adda5a952d0143fded7e 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -19,7 +19,7 @@ import { selectActiveTimedEffects } from "../../../src/store/selectors";
+ import { useShallow } from 'zustand/react/shallow';
+ import OriginModal from "./modals/OriginModal";
+ import EquipmentKitModal from "./modals/EquipmentKitModal";
+-import { loadEnrichedOrigins, tOrigin } from "../../../domain/origins";
++import { loadEnrichedOrigins } from "../../../domain/origins";
+ import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../domain/traits";
+ import { filterKitsForCharacter } from "../../../domain/equipmentKits";
+ import { rollCombatDiceEffects } from "../../../domain/diceRollsLogic";
+@@ -54,7 +54,7 @@ import {
+ } from "./logic/characterScreenI18n";
+ 
+ const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+-import { useLocale } from "../../../i18n/locale";
++import { useLocale, useModuleLocale } from "../../../i18n/locale";
+ import { AttributesSection } from "./AttributesSection";
+ import styles from "../../../styles/CharacterScreen.styles";
+ import { getTimedAttributeModifiers } from "../../../domain/effects";
+@@ -305,7 +305,7 @@ export default function CharacterScreen() {
+   } = useCharacter();
+ 
+   const debugLocale = useLocale();
+-  const locale = debugLocale;
++  const moduleLocale = useModuleLocale();
+   const storeAttributes = useCharacterStore((state) => state.attributes);
+   const storeSkills = useCharacterStore((state) => state.skills);
+   const storeEffects = useCharacterStore((state) => state.effects);
+@@ -351,26 +351,35 @@ export default function CharacterScreen() {
+   }, [debugLocale, origin?.id, origin?.name, trait?.id, trait?.name, equipment?.id, equipment?.name, attributesSaved, skillsSaved, selectedSkills, extraTaggedSkills, storeSkills, skills]);
+ 
+   const localizedOrigin = useMemo(() => {
+-    if (!origin?.id) return origin;
+-    return loadEnrichedOrigins().find((entry) => entry.id === origin.id) || { ...origin, name: tOrigin(origin.id) };
+-  }, [origin, locale]);
++    if (!origin) return null;
++    if (!origin.id) throw new Error('[CharacterScreen] Выбранный ориджин не содержит id');
++    const resolved = loadEnrichedOrigins().find((entry) => entry.id === origin.id);
++    if (!resolved) {
++      throw new Error(`[CharacterScreen] Ориджин "${origin.id}" отсутствует в данных активного сеттинга`);
++    }
++    return resolved;
++  }, [origin, moduleLocale]);
+ 
+   // ЕДИНАЯ логика для всех комплектов: модалка показывает комплекты ориджина,
+   // отфильтрованные ОДНИМ общим механизмом по данным. Комплект может нести
+   // `requiresTraitIds` (напр. у «Трёх семей» комплект привязан к выбранной
+   // семье) — тогда он показан только при этом трейте. Без требования —
+   // показан всегда. Никаких спец-веток под конкретный ориджин.
+-  const equipmentKitsForModal = useMemo(() => {
+-    const all = localizedOrigin?.equipmentKits || origin?.equipmentKits || [];
+-    return filterKitsForCharacter(all, trait);
+-  }, [localizedOrigin, origin, trait]);
++  const equipmentKitsForModal = useMemo(
++    () => filterKitsForCharacter(localizedOrigin?.equipmentKits || [], trait),
++    [localizedOrigin, trait],
++  );
+ 
+   const localizedTraitName = useMemo(() => {
+     if (!trait) return null;
+     const traitId = trait.id || trait.ids?.[0];
++    if (!traitId) throw new Error('[CharacterScreen] Выбранный трейт не содержит id');
+     const traitData = loadTraitsData().find((entry) => entry.id === traitId);
+-    return traitData?.displayNameKey ? tTrait(traitData.displayNameKey) : trait.name;
+-  }, [trait, locale]);
++    if (!traitData?.displayNameKey) {
++      throw new Error(`[CharacterScreen] Трейт "${traitId}" отсутствует в данных активного сеттинга`);
++    }
++    return tTrait(traitData.displayNameKey);
++  }, [trait, moduleLocale]);
+ 
+   const localizedEquipmentName = useMemo(() => {
+     if (!equipment) return null;
+@@ -380,9 +389,13 @@ export default function CharacterScreen() {
+       // комплекта откроется по нажатию.
+       return tCharacterScreen("placeholders.kitUnknown");
+     }
+-    const catalog = getEquipmentCatalog(locale);
+-    return catalog?.equipmentKits?.[equipment.id]?.name || equipment.name;
+-  }, [equipment, locale]);
++    const catalog = getEquipmentCatalog(moduleLocale);
++    const localizedName = catalog?.equipmentKits?.[equipment.id]?.name;
++    if (!localizedName) {
++      throw new Error(`[CharacterScreen] Для комплекта "${equipment.id}" нет перевода`);
++    }
++    return localizedName;
++  }, [equipment, moduleLocale]);
+ 
+   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
+   const [selectedOrigin, setSelectedOrigin] = useState(null);
+diff --git a/components/screens/CharacterScreen/logic/RandomLootLogic.js b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+index 582bd5687c9553b9100d051d51b498db00859c2e..1c1ec81f9848d26075b4d79a74165207d379e3f2 100644
+--- a/components/screens/CharacterScreen/logic/RandomLootLogic.js
++++ b/components/screens/CharacterScreen/logic/RandomLootLogic.js
+@@ -10,7 +10,12 @@ import ruLootStubs from '../../../../modules/fallout/i18n/ru-RU/data/loot/stubs.
+ import enLootStubs from '../../../../modules/fallout/i18n/en-EN/data/loot/stubs.json';
+ import { getWeaponById } from '../../../../db/Database';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+-import { getCurrentLocale } from '../../../../i18n/locale';
++import { getCurrentModuleLocale } from '../../../../i18n/locale';
++
++const LOOT_STUBS_BY_LOCALE = {
++  'ru-RU': ruLootStubs,
++  'en-EN': enLootStubs,
++};
+ 
+ const lootTables = {
+   trinklet: trinkets,
+@@ -77,9 +82,19 @@ function buildCatalogIndex() {
+ 
+     // Loot stubs contain locale-independent item data. Their display names are
+     // resolved by id from the active locale, like the rest of the catalog.
+-    const localizedStubNames = getCurrentLocale() === 'en-EN' ? enLootStubs : ruLootStubs;
++    const moduleLocale = getCurrentModuleLocale();
++    const localizedStubNames = LOOT_STUBS_BY_LOCALE[moduleLocale];
++    if (!localizedStubNames) {
++        throw new Error(`[RandomLootLogic] Для языка сеттинга "${moduleLocale}" нет названий лута`);
++    }
+     const stubNamesById = new Map(localizedStubNames.map((item) => [item.id, item.name]));
+-    addAll(lootStubs.map((item) => ({ ...item, name: stubNamesById.get(item.id) })));
++    addAll(lootStubs.map((item) => {
++        const localizedName = stubNamesById.get(item.id);
++        if (!localizedName) {
++            throw new Error(`[RandomLootLogic] Для лута "${item.id}" нет перевода`);
++        }
++        return { ...item, name: localizedName };
++    }));
+ 
+     return index;
+ }
+diff --git a/components/screens/CharacterScreen/modals/ArmorLayerModal.js b/components/screens/CharacterScreen/modals/ArmorLayerModal.js
+index 714abe867f24dd88105bab0e0fc9965e9cf80d7e..e5ea6904b155393a9b8c742af00bdebbe8c6cfd2 100644
+--- a/components/screens/CharacterScreen/modals/ArmorLayerModal.js
++++ b/components/screens/CharacterScreen/modals/ArmorLayerModal.js
+@@ -10,28 +10,10 @@ import {
+ } from 'react-native';
+ import { useCharacter } from '../../../CharacterContext';
+ import { canEquipRobotArmor } from '../../../../domain/robotEquip';
+-import { getCurrentLocale } from '../../../../i18n/locale';
+-
+-// ---------------------------------------------------------------------------
+-// Static data imports — raw stats
+-// ---------------------------------------------------------------------------
+-import dataPlating from '../../../../modules/fallout/data/equipment/robot/armor_plating.json';
+-import dataArmor   from '../../../../modules/fallout/data/equipment/robot/armor.json';
+-import dataFrames  from '../../../../modules/fallout/data/equipment/robot/frames.json';
+-
+-// ---------------------------------------------------------------------------
+-// i18n imports
+-// ---------------------------------------------------------------------------
+-import ruPlating from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
+-import ruArmor   from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
+-import ruFrames  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
+-
+-import enPlating from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
+-import enArmor   from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
+-import enFrames  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
++import { useLocale, useModuleLocale } from '../../../../i18n/locale';
++import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+ 
+-
+ // ---------------------------------------------------------------------------
+ // Layer colors (matches RobotSlot.js)
+ // ---------------------------------------------------------------------------
+@@ -63,39 +45,22 @@ const SLOT_LOCATION_MAP = {
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-/** Merge data stats with i18n names by id */
+-const mergeById = (dataArr, i18nArr) => {
+-  const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
+-  return (dataArr || []).map((dataItem) => {
+-    const i18nItem = i18nMap[dataItem.id] || {};
+-    return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
+-  });
+-};
+-
+ /** Maps slotKey to robotLocation string */
+ const getSlotLocation = (slotKey) => SLOT_LOCATION_MAP[slotKey] ?? null;
+ 
+-/** Returns merged armor catalog for the given layer and locale */
+-const getArmorCatalogForLayer = (layer, locale) => {
+-  const isRu = locale === 'ru-RU';
+-  if (layer === 'plating') {
+-    return mergeById(dataPlating.plating, isRu ? ruPlating : enPlating);
+-  }
+-  if (layer === 'armor') {
+-    return mergeById(dataArmor.armor, isRu ? ruArmor : enArmor);
+-  }
+-  if (layer === 'frame') {
+-    return mergeById(dataFrames.frames, isRu ? ruFrames : enFrames);
+-  }
++/** Returns localized robot armor from the active setting catalog. */
++const getArmorCatalogForLayer = (catalog, layer) => {
++  if (layer === 'plating') return catalog.robotPlating || [];
++  if (layer === 'armor') return catalog.robotArmorLayer || [];
++  if (layer === 'frame') return catalog.robotFrames || [];
+   return [];
+ };
+ 
+-/** Layer-specific modal title */
+-const getLayerTitle = (layer, locale) => {
+-  const isRu = locale === 'ru-RU';
++/** Layer-specific modal title is engine-owned screen UI. */
++const getLayerTitle = (layer) => {
+   if (layer === 'plating') return tCharacterScreen('modals.armor.upgradePlating');
+-  if (layer === 'armor')   return tCharacterScreen('modals.armor.upgradeArmor');
+-  if (layer === 'frame')   return tCharacterScreen('modals.armor.upgradeFrame');
++  if (layer === 'armor') return tCharacterScreen('modals.armor.upgradeArmor');
++  if (layer === 'frame') return tCharacterScreen('modals.armor.upgradeFrame');
+   return tCharacterScreen('modals.armor.upgradeArmor');
+ };
+ 
+@@ -113,8 +78,7 @@ const StatRow = ({ label, value }) => {
+   );
+ };
+ 
+-const ArmorCard = ({ item, isSelected, layerColor, onPress, locale }) => {
+-  const isRu = locale === 'ru-RU';
++const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
+   const dr = item.damageResistance ?? {};
+ 
+   return (
+@@ -163,8 +127,12 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress, locale }) => {
+  */
+ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+   const { equippedRobotSlots, setEquippedRobotSlots } = useCharacter();
+-  const locale = getCurrentLocale();
+-  const isRu = locale === 'ru-RU';
++  useLocale();
++  const moduleLocale = useModuleLocale();
++  const equipmentCatalog = useMemo(
++    () => getEquipmentCatalog(moduleLocale),
++    [moduleLocale],
++  );
+   const layerColor = LAYER_COLORS[layer] ?? '#888';
+   const [selectedItem, setSelectedItem] = useState(null);
+ 
+@@ -181,13 +149,13 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+     const location = getSlotLocation(slotKey);
+     if (!location) return [];
+ 
+-    const catalog = getArmorCatalogForLayer(layer, locale);
++    const catalog = getArmorCatalogForLayer(equipmentCatalog, layer);
+     return catalog.filter((item) => {
+       if (item.robotLocation !== location) return false;
+       const { allowed } = canEquipRobotArmor(item, slotKey, layer, equippedRobotSlots);
+       return allowed;
+     });
+-  }, [slotKey, layer, equippedRobotSlots, locale]);
++  }, [slotKey, layer, equippedRobotSlots, equipmentCatalog]);
+ 
+   const handleApply = () => {
+     if (!equippedRobotSlots || !slotKey) return;
+@@ -201,7 +169,7 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+     onClose();
+   };
+ 
+-  const title = getLayerTitle(layer, locale);
++  const title = getLayerTitle(layer);
+ 
+   return (
+     <Modal
+@@ -229,7 +197,6 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+                     isSelected={isSelected}
+                     layerColor={layerColor}
+                     onPress={() => setSelectedItem((prev) => (prev?.id === item.id ? null : item))}
+-                    locale={locale}
+                   />
+                 );
+               })}
+diff --git a/components/screens/CharacterScreen/modals/ArmorPickerModal.js b/components/screens/CharacterScreen/modals/ArmorPickerModal.js
+index 1d7e6e2951ca5baa079716a9f92c177c561878ad..610b5c288dfce8e41feae89cab983fde73a22f63 100644
+--- a/components/screens/CharacterScreen/modals/ArmorPickerModal.js
++++ b/components/screens/CharacterScreen/modals/ArmorPickerModal.js
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useMemo, useState } from 'react';
+ import {
+   Modal,
+   View,
+@@ -7,7 +7,8 @@ import {
+   StyleSheet,
+   Pressable,
+ } from 'react-native';
+-import { getCurrentLocale } from '../../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../../i18n/locale';
++import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import ArmorLayerModal from './ArmorLayerModal';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+ 
+@@ -19,8 +20,12 @@ const LAYER_COLORS = {
+ };
+ 
+ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => {
+-  const locale = getCurrentLocale();
+-  const isRu = locale === 'ru-RU';
++  useLocale();
++  const moduleLocale = useModuleLocale();
++  const equipmentCatalog = useMemo(
++    () => getEquipmentCatalog(moduleLocale),
++    [moduleLocale],
++  );
+   const [activeLayer, setActiveLayer] = useState(null);
+ 
+   const handleLayerClose = () => {
+@@ -31,21 +36,31 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) =>
+   const currentArmor   = slotKey ? equippedRobotSlots?.[slotKey]?.armor   : null;
+   const currentFrame   = slotKey ? equippedRobotSlots?.[slotKey]?.frame   : null;
+ 
++  const localizedName = (item, catalogItems) => {
++    if (!item) return null;
++    if (!item.id) throw new Error('[ArmorPickerModal] Элемент брони робота не содержит id');
++    const localized = catalogItems.find((candidate) => candidate.id === item.id);
++    if (!localized?.name) {
++      throw new Error(`[ArmorPickerModal] Для элемента брони робота "${item.id}" нет перевода`);
++    }
++    return localized.name;
++  };
++
+   const layers = [
+     {
+       key: 'plating',
+       label: tCharacterScreen('labels.plating'),
+-      current: currentPlating?.name || null,
++      current: localizedName(currentPlating, equipmentCatalog.robotPlating || []),
+     },
+     {
+       key: 'armor',
+       label: tCharacterScreen('labels.armor'),
+-      current: currentArmor?.name || null,
++      current: localizedName(currentArmor, equipmentCatalog.robotArmorLayer || []),
+     },
+     {
+       key: 'frame',
+       label: tCharacterScreen('labels.frame'),
+-      current: currentFrame?.name || null,
++      current: localizedName(currentFrame, equipmentCatalog.robotFrames || []),
+     },
+   ];
+ 
+diff --git a/components/screens/CharacterScreen/modals/EquipmentKitModal.js b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 05d9764b7337fe909584a70ca285b9c55710c950..b6916a40b9af6a4f0bc7bdc13fef96826c38dc18 100644
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -5,7 +5,7 @@ import { resolveKitItems } from '../../../../domain/kitResolver';
+ import { initRobotSlots } from '../../../../domain/robotEquip';
+ import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../domain/origins';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+-import { useLocale } from '../../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/EquipmentKitModal.styles';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+ 
+@@ -202,12 +202,15 @@ const formatBuiltinWeaponSuffix = (entry) => {
+   if (!builtinId) return '';
+   const catalog = getEquipmentCatalog();
+   const weapon = (catalog?.weapons || []).find((w) => w.id === builtinId);
+-  const name = weapon?.name || builtinId;
+-  return ` + ${name}`;
++  if (!weapon?.name) {
++    throw new Error(`[EquipmentKitModal] Для встроенного оружия "${builtinId}" нет локализованных данных`);
++  }
++  return ` + ${weapon.name}`;
+ };
+ 
+ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, character }) => {
+-  const locale = useLocale(); // подписываемся на смену локали → ре-рендер
++  const locale = useLocale(); // интерфейс движка
++  useModuleLocale(); // содержимое комплектов активного сеттинга
+   const metaCategoryLabels = useMemo(() => ({
+     structure: tCharacterScreen('modals.equipmentKit.categories.structure'),
+     weapon: tCharacterScreen('modals.equipmentKit.categories.weapon'),
+diff --git a/components/screens/CharacterScreen/modals/LimbUpgradeModal.js b/components/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index 2795cf5d26bfbe6aa397f5ff81f8a347a6109fe3..1b3b95f725faf12794811d5c4efc9bfcfaa1743c 100644
+--- a/components/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/components/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -10,78 +10,26 @@ import {
+ } from 'react-native';
+ import { useCharacter } from '../../../CharacterContext';
+ import { applyLimbReplacement } from '../../../../domain/robotEquip';
+-import { getCurrentLocale } from '../../../../i18n/locale';
+-
+-// ---------------------------------------------------------------------------
+-// Static data imports — raw stats
+-// ---------------------------------------------------------------------------
+-import dataRobotArms from '../../../../modules/fallout/data/equipment/robot/robotarms.json';
+-import dataRobotHeads from '../../../../modules/fallout/data/equipment/robot/robotheads.json';
+-import dataRobotBody  from '../../../../modules/fallout/data/equipment/robot/robotbody.json';
+-import dataRobotLegs  from '../../../../modules/fallout/data/equipment/robot/robotlegs.json';
+-import dataRobotWeapons from '../../../../modules/fallout/data/equipment/robot/weapons.json';
+-
+-// ---------------------------------------------------------------------------
+-// i18n imports
+-// ---------------------------------------------------------------------------
+-import ruRobotArms from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
+-import ruRobotHeads from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
+-import ruRobotBody  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+-import ruRobotLegs  from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
+-import ruRobotWeapons from '../../../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
+-
+-import enRobotArms from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
+-import enRobotHeads from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
+-import enRobotBody  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+-import enRobotLegs  from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
+-import enRobotWeapons from '../../../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
++import { useLocale, useModuleLocale } from '../../../../i18n/locale';
++import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+ 
+-
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-/** Merge data stats with i18n names by id */
+-const mergeById = (dataArr, i18nArr) => {
+-  const i18nMap = Object.fromEntries((i18nArr || []).map((item) => [item.id, item]));
+-  return (dataArr || []).map((dataItem) => {
+-    const i18nItem = i18nMap[dataItem.id] || {};
+-    return { ...dataItem, ...i18nItem, name: i18nItem.name || dataItem.id };
+-  });
+-};
+-
+-/**
+- * Returns the merged (stats + i18n name) limb catalog for the given slot type.
+- * slotKey → itemType mapping:
+- *   head                       → robotHead
+- *   body                       → robotBody
+- *   leftArm / rightArm / arm*  → robotArm
+- *   leftLeg / rightLeg / thruster / chassis → robotLegs
+- */
+-const getLimbCatalogForSlot = (slotKey) => {
+-  const locale = getCurrentLocale();
+-  const isRu = locale === 'ru-RU';
+-
+-  if (slotKey === 'head') {
+-    return mergeById(dataRobotHeads, isRu ? ruRobotHeads : enRobotHeads);
+-  }
+-  if (slotKey === 'body') {
+-    return mergeById(dataRobotBody, isRu ? ruRobotBody : enRobotBody);
+-  }
++/** Returns a localized limb catalog from the active setting catalog. */
++const getLimbCatalogForSlot = (catalog, slotKey) => {
++  if (slotKey === 'head') return catalog.robotHeads || [];
++  if (slotKey === 'body') return catalog.robotBody || [];
+   if (
+     slotKey === 'leftArm' ||
+     slotKey === 'rightArm' ||
+     slotKey.startsWith('arm')
+   ) {
+-    const i18nRobotArms = [
+-      ...(isRu ? ruRobotArms : enRobotArms),
+-      ...(isRu ? ruRobotWeapons : enRobotWeapons),
+-    ].filter((item, index, arr) => item?.id && arr.findIndex((x) => x?.id === item.id) === index);
+-    return mergeById(dataRobotArms || [], i18nRobotArms);
++    return catalog.robotArms || [];
+   }
+-  // legs / thruster / chassis
+-  return mergeById(dataRobotLegs, isRu ? ruRobotLegs : enRobotLegs);
++  return catalog.robotLegs || [];
+ };
+ 
+ /**
+@@ -192,30 +140,31 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
+ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
+   const { equippedRobotSlots, setEquippedRobotSlots, setEquippedWeapons, equipment, setEquipment } =
+     useCharacter();
++  useLocale();
++  const moduleLocale = useModuleLocale();
++  const equipmentCatalog = useMemo(
++    () => getEquipmentCatalog(moduleLocale),
++    [moduleLocale],
++  );
+ 
+   // Build filtered limb list
+   const compatibleLimbs = useMemo(() => {
+     if (!slotKey) return [];
+-    const catalog = getLimbCatalogForSlot(slotKey);
++    const catalog = getLimbCatalogForSlot(equipmentCatalog, slotKey);
+     const itemType = getItemTypeForSlot(slotKey);
+     const byType = catalog.filter((l) => l.itemType === itemType);
+     return filterByBodyPlan(byType, bodyPlan);
+-  }, [slotKey, bodyPlan]);
++  }, [equipmentCatalog, slotKey, bodyPlan]);
+ 
+   const handleSelect = (newLimb) => {
+     if (!equippedRobotSlots || !slotKey) return;
+ 
+-    // Apply limb replacement — returns { slots, weapons }
+-    const isRu = getCurrentLocale() === 'ru-RU';
+-    const mergedWeapons = mergeById(
+-      dataRobotWeapons || [],
+-      isRu ? ruRobotWeapons : enRobotWeapons,
+-    );
++    // Apply limb replacement using the active setting locale catalog.
+     const { slots: updatedSlots, weapons: updatedWeapons } = applyLimbReplacement(
+       equippedRobotSlots,
+       slotKey,
+       newLimb,
+-      mergedWeapons,
++      equipmentCatalog.robotWeaponsOnly || [],
+     );
+ 
+     // Move old limb to inventory if it exists
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 1661f7fdff752d6252e295245209107f6fea238a..ddc472460587cf4b91e9ed2fa477b277eda9dc63 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -19,8 +19,18 @@ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+ import { useCharacter } from '../../CharacterContext';
+ import { findEnrichedOrigin } from '../../../domain/origins';
+-import { setCurrentLocale, useLocale } from '../../../i18n/locale';
++import {
++  SUPPORTED_LOCALES,
++  useLocale,
++  useModuleLocale,
++} from '../../../i18n/locale';
++import {
++  getActiveModuleId,
++  getModuleLocales,
++  shouldOfferModuleLocaleChoice,
++} from '../../../domain/moduleLocale';
+ import { tHomeScreen } from './logic/homeScreenI18n';
++import { getLocaleLabel } from './logic/localeLabel';
+ import * as db from '../../../db';
+ import {
+   createCharacterExportPayload,
+@@ -157,6 +167,7 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
+ 
+ export default function HomeScreen({ navigation }) {
+   const locale = useLocale();
++  const moduleLocale = useModuleLocale();
+   const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
+   const [characters, setCharacters] = useState([]);
+   const [folders, setFolders] = useState([]);
+@@ -171,6 +182,9 @@ export default function HomeScreen({ navigation }) {
+   const dropBounds = useRef({});
+   const characterFoldersEnabled = useAppSettingsStore(selectCharacterFoldersEnabled);
+   const characterDeleteActionPlacement = useAppSettingsStore(selectCharacterDeleteActionPlacement);
++  const setSettingValue = useAppSettingsStore((state) => state.setValue);
++  const setModuleLocale = useAppSettingsStore((state) => state.setModuleLocale);
++  const activeModuleId = getActiveModuleId();
+   const [loading, setLoading] = useState(true);
+   const [menuVisible, setMenuVisible] = useState(false);
+   const [aboutVisible, setAboutVisible] = useState(false);
+@@ -248,10 +262,23 @@ export default function HomeScreen({ navigation }) {
+       setDesktopInstallVisible(true);
+     }
+   };
+-  const languageOptions = [
+-    { code: 'ru-RU', label: tHomeScreen('language.russian'), flag: '🇷🇺' },
+-    { code: 'en-EN', label: tHomeScreen('language.english'), flag: '🇬🇧' },
+-  ];
++  const localizeLocaleLabel = (code) => getLocaleLabel({
++    code,
++    displayLocale: locale,
++    translate: tHomeScreen,
++  });
++  const languageOptions = SUPPORTED_LOCALES.map((code) => ({
++    code,
++    label: localizeLocaleLabel(code),
++  }));
++  const moduleLanguageOptions = getModuleLocales(activeModuleId).map((code) => ({
++    code,
++    label: localizeLocaleLabel(code),
++  }));
++  const showModuleLanguageSelector = shouldOfferModuleLocaleChoice({
++    moduleId: activeModuleId,
++    engineLocale: locale,
++  });
+ 
+   const loadList = useCallback(async ({ duplicatedCharacterId, sourceCharacterId } = {}) => {
+     setLoading(true);
+@@ -649,17 +676,44 @@ export default function HomeScreen({ navigation }) {
+                   isLast && styles.langSegmentRight,
+                   locale === lang.code && styles.langSegmentActive,
+                 ]}
+-                onPress={() => setCurrentLocale(lang.code)}
++                onPress={() => setSettingValue('language', lang.code)}
+                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+               >
+                 <Text style={[styles.langSegmentText, locale === lang.code && styles.langSegmentTextActive]}>
+-                  {lang.code === 'ru-RU' ? 'ru' : 'en'}
++                  {lang.label}
+                 </Text>
+               </Pressable>
+             );
+           })}
+         </View>
+       </View>
++      {showModuleLanguageSelector && (
++        <View style={styles.moduleLanguageRow}>
++          <Text style={styles.moduleLanguageLabel}>{tHomeScreen('language.settingTitle')}</Text>
++          <View style={styles.languageContainer}>
++            {moduleLanguageOptions.map((lang, index) => (
++              <Pressable
++                key={lang.code}
++                style={[
++                  styles.langSegment,
++                  index === 0 && styles.langSegmentLeft,
++                  index === moduleLanguageOptions.length - 1 && styles.langSegmentRight,
++                  moduleLocale === lang.code && styles.langSegmentActive,
++                ]}
++                onPress={() => setModuleLocale(activeModuleId, lang.code)}
++                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
++              >
++                <Text style={[
++                  styles.langSegmentText,
++                  moduleLocale === lang.code && styles.langSegmentTextActive,
++                ]}>
++                  {lang.label}
++                </Text>
++              </Pressable>
++            ))}
++          </View>
++        </View>
++      )}
+       <View style={styles.titleContainer}>
+         <Text style={styles.title}>{tHomeScreen("title")}</Text>
+         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
+diff --git a/components/screens/HomeScreen/logic/localeLabel.js b/components/screens/HomeScreen/logic/localeLabel.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..862ae4ffeadd0aa16b2d9b387533ea8ea6029909
+--- /dev/null
++++ b/components/screens/HomeScreen/logic/localeLabel.js
+@@ -0,0 +1,23 @@
++export const getLocaleLabel = ({
++  code,
++  displayLocale,
++  translate,
++  DisplayNames = globalThis.Intl?.DisplayNames,
++}) => {
++  if (code === 'ru-RU') return translate('language.russian');
++  if (code === 'en-EN') return translate('language.english');
++
++  try {
++    if (typeof DisplayNames === 'function') {
++      const languageName = new DisplayNames(
++        [displayLocale.split('-')[0]],
++        { type: 'language' },
++      ).of(code.split('-')[0]);
++      if (languageName) return `${languageName} (${code})`;
++    }
++  } catch {
++    // Intl.DisplayNames is optional in some React Native runtimes.
++  }
++
++  return translate('language.localeCode').replace('{code}', code);
++};
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index ca48791b215a588fa505bbd27117f5e8927035ad..ba04e9a8937abf4f55dcd48a7265626ed04a0759 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -25,7 +25,7 @@ import {
+ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+-import { useLocale } from '../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { generateStackKey } from '../../../domain/itemIdentity';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+@@ -205,8 +205,9 @@ const InventoryScreen = () => {
+   // Снятые пакеты: каждый — тоже контейнер (ПРАВИЛО владельца), аккордеоны
+   // независимы по id стор-записи: { [storeItemId]: true }.
+ 
+-  const locale = useLocale();
+-  const equipmentCatalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
++  useLocale();
++  const moduleLocale = useModuleLocale();
++  const equipmentCatalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
+ 
+   const getItemName = (item) => item?.name || item?.id || '';
+   const getItemCatalogId = (item) => item?.id || item?.weaponId || item?.itemId || item?.armorId || item?.clothingId || item?.code || '';
+@@ -1616,6 +1617,7 @@ const InventoryScreen = () => {
+             {renderTableHeader()}
+             <FlatList
+               data={displayItems}
++              extraData={moduleLocale}
+               renderItem={renderItem}
+               keyExtractor={(item, index) => item.uniqueId || `${getItemName(item)}-${index}`}
+               style={styles.list}
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 0517091741d5546e4e8dae3195b8c9d51b21041e..a925456ab69f48827a0842084e4eda93ce9a666e 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -3,7 +3,7 @@ import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput,
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
+ import { tInventory } from '../logic/inventoryI18n';
+-import { useLocale } from '../../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/AddItemModal.styles';
+ 
+ const CATEGORY_ICONS = {
+@@ -37,7 +37,8 @@ const mapWeaponTypeToDbValue = {
+ };
+ 
+ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot' }) => {
+-  const locale = useLocale();
++  const engineLocale = useLocale();
++  const moduleLocale = useModuleLocale();
+   const [currentPath, setCurrentPath] = useState([]);
+   const [searchTerm, setSearchTerm] = useState('');
+   const [weaponsByType, setWeaponsByType] = useState({});
+@@ -51,7 +52,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+       try {
+         // Fallback to catalog if DB is empty (not yet seeded)
+         const dbCount = await getRowCount('weapons').catch(() => 0);
+-        const catalog = getEquipmentCatalog(locale);
++        const catalog = getEquipmentCatalog(moduleLocale);
+ 
+         if (!dbCount) {
+           // Use catalog directly
+@@ -114,10 +115,10 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     return () => {
+       cancelled = true;
+     };
+-  }, [locale]);
++  }, [engineLocale, moduleLocale]);
+ 
+   const staticData = useMemo(() => {
+-    const equipmentCatalog = getEquipmentCatalog(locale);
++    const equipmentCatalog = getEquipmentCatalog(moduleLocale);
+ 
+     return {
+       [tInventory('modals.addItemModal.categories.armor')]: (equipmentCatalog.armor?.armor || [])
+@@ -165,7 +166,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+         [tInventory('modals.addItemModal.categories.robotMisc')]: equipmentCatalog.robotItems || [],
+       },
+     };
+-  }, [locale]);
++  }, [engineLocale, moduleLocale]);
+ 
+   useEffect(() => {
+     if (visible) {
+@@ -179,7 +180,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   const allData = useMemo(() => ({
+     [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
+     ...staticData,
+-  }), [locale, weaponsByType, staticData]);
++  }), [engineLocale, weaponsByType, staticData]);
+ 
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+@@ -263,7 +264,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     if (Array.isArray(data)) return { items: data };
+     if (data && typeof data === 'object') return { categories: Object.keys(data) };
+     return { categories: [] };
+-  }, [locale, allData, currentPath, searchTerm]);
++  }, [engineLocale, allData, currentPath, searchTerm]);
+ 
+   const renderItem = ({ item }) => {
+     const isItem = typeof item === 'object' && item?.name;
+diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index ba9ec62137ef575f3637099c75867d1bb703a471..cc30b42980b665bd38c0819cb37f5b08e82aaab8 100644
+--- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
+ import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+ import { useCharacter } from '../../CharacterContext';
+ import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
+-import { useLocale } from '../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import perksData from '../../../modules/fallout/data/perks/perks.json';
+ import PerkSelectModal from './PerkSelectModal';
+ import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
+@@ -15,7 +15,8 @@ const PerksAndTraitsScreen = () => {
+     trait, level, selectedPerks, setSelectedPerks, annotatePerks, 
+     addPerkAttributePoints, attributesSaved 
+   } = useCharacter();
+-  useLocale(); // подписываемся на смену локали → ре-рендер
++  useLocale(); // интерфейс движка
++  useModuleLocale(); // контент активного сеттинга
+   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
+   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
+   const perkLimit = level + extraPerkSlots;
+diff --git a/components/screens/PerksAndTraitsScreen/perksDisplay.js b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+index 04ca55fa08623bbf643f576979599c37091758a0..a2eaddeee40f21050e4334d852dbc5fe14865b50 100644
+--- a/components/screens/PerksAndTraitsScreen/perksDisplay.js
++++ b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+@@ -1,6 +1,6 @@
+ import ruPerksData from '../../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+ import enPerksData from '../../../modules/fallout/i18n/en-EN/data/perks/perks.json';
+-import { getCurrentLocale } from '../../../i18n/locale';
++import { getCurrentModuleLocale } from '../../../i18n/locale';
+ 
+ const DICTIONARIES = {
+   'ru-RU': ruPerksData,
+@@ -8,19 +8,30 @@ const DICTIONARIES = {
+ };
+ 
+ const byId = (entries = []) => new Map(entries.map((entry) => [entry.id, entry]));
+-const RU_BY_ID = byId(ruPerksData);
+-const EN_BY_ID = byId(enPerksData);
++const PERKS_BY_LOCALE = Object.fromEntries(
++  Object.entries(DICTIONARIES).map(([locale, entries]) => [locale, byId(entries)]),
++);
+ 
+-const getLocaleMap = () => byId(DICTIONARIES[getCurrentLocale()] || ruPerksData);
++const getLocaleMap = () => {
++  const locale = getCurrentModuleLocale();
++  const localizedPerks = PERKS_BY_LOCALE[locale];
++  if (!localizedPerks) {
++    throw new Error(`[perksDisplay] Для языка сеттинга "${locale}" нет каталога перков`);
++  }
++  return localizedPerks;
++};
+ 
+ export const getPerkDisplay = (perk) => {
+   if (!perk) return { name: '', description: '' };
+-  const id = perk.id;
+-  const localized = id ? getLocaleMap().get(id) || RU_BY_ID.get(id) || EN_BY_ID.get(id) : null;
++  if (!perk.id) throw new Error('[perksDisplay] Перк без id');
++  const localized = getLocaleMap().get(perk.id);
++  if (!localized) {
++    throw new Error(`[perksDisplay] Для перка "${perk.id}" нет перевода`);
++  }
+ 
+   return {
+-    name: localized?.name || perk.perk_name || perk.name || id || '',
+-    description: localized?.effect || perk.description || '',
++    name: localized.name,
++    description: localized.effect,
+   };
+ };
+ 
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 2d5d1e90f3fa32f2a37ff9d9fb5862b88d8938ff..abc992cfbc8e7b2ca9b4a0c0d1700e2ba4fd195b 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -18,7 +18,7 @@ import { resolveBodyPlan } from '../../../domain/bodyplan';
+ import styles from '../../../styles/CharacterScreen.styles';
+ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
+ import { renderTextWithIcons } from './textUtils';
+-import { useLocale } from '../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+@@ -447,6 +447,33 @@ const chunkSlotKeys = (keys, size) => {
+   return chunks;
+ };
+ 
++const findLocalizedRobotPart = (catalogItems, item) => {
++  if (!item) return item;
++  if (!item.id) throw new Error('[WeaponsAndArmorScreen] Деталь робота без id');
++  const localized = (catalogItems || []).find((entry) => entry.id === item.id);
++  if (!localized) {
++    throw new Error(`[WeaponsAndArmorScreen] Для детали робота "${item.id}" нет перевода`);
++  }
++  return localized;
++};
++
++const localizeRobotSlotData = (catalog, slotData) => {
++  if (!slotData) return slotData;
++  const limbs = [
++    ...(catalog?.robotHeads || []),
++    ...(catalog?.robotBody || []),
++    ...(catalog?.robotArms || []),
++    ...(catalog?.robotLegs || []),
++  ];
++  return {
++    ...slotData,
++    limb: findLocalizedRobotPart(limbs, slotData.limb),
++    plating: findLocalizedRobotPart(catalog?.robotPlating, slotData.plating),
++    armor: findLocalizedRobotPart(catalog?.robotArmorLayer, slotData.armor),
++    frame: findLocalizedRobotPart(catalog?.robotFrames, slotData.frame),
++  };
++};
++
+ const findRobotBodyUpgrade = (catalog, robotBodyPlan, inventoryItems = []) => {
+   const parts = catalog?.robotPartsUpgrade || [];
+   if (robotBodyPlan) {
+@@ -531,7 +558,8 @@ const WeaponsAndArmorScreen = () => {
+ 
+   const storeEffects = useCharacterStore((state) => state.effects);
+   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
+-  const locale = useLocale();
++  useLocale();
++  const moduleLocale = useModuleLocale();
+   // §5.6: пока надет каркас, его attributeModifier подменяет базу атрибутов
+   // (каркас: СИЛА = set 11 — значение из данных, не из кода).
+   const attributesEffective = useMemo(
+@@ -558,7 +586,7 @@ const WeaponsAndArmorScreen = () => {
+     ];
+     return [...new Set(combined)];
+   }, [origin, trait]);
+-  const equipmentCatalog = getEquipmentCatalog(locale);
++  const equipmentCatalog = getEquipmentCatalog(moduleLocale);
+   const robotBodyUpgrade = findRobotBodyUpgrade(
+     equipmentCatalog,
+     // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
+@@ -571,11 +599,11 @@ const WeaponsAndArmorScreen = () => {
+   );
+   useEffect(() => {
+     debugLog('weapon.display.list', {
+-      locale,
++      moduleLocale,
+       equippedWeaponsForDisplay: equippedWeaponsForDisplay.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+       localizedEquippedWeapons: localizedEquippedWeapons.map((w) => ({ id: w.id, weaponId: w.weaponId, name: w.name, damage: w.damage, fireRate: w.fireRate, baseWeaponName: w.baseWeaponName, appliedMods: w.appliedMods })),
+     });
+-  }, [locale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
++  }, [moduleLocale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
+ 
+   const weaponFingerprint = (w) => {
+     if (!w) return null;
+@@ -617,8 +645,8 @@ const WeaponsAndArmorScreen = () => {
+   const [openSpoilers, setOpenSpoilers] = useState({});
+   const toggleSpoiler = (index) => setOpenSpoilers((prev) => ({ ...prev, [index]: !prev[index] }));
+ 
+-  // Табы: третий режим пока скрыт из UI переключателя, но код рендера и
+-  // поддержка сохранённого значения 'tabs' сохраняются (ПРАВИЛО владельца).
++  // Табы: неактивная возможность движка на будущее. Fallout не объявляет этот
++  // вариант и мигрирует старое сохранённое значение 'tabs' в 'cards'.
+   const [activeTab, setActiveTab] = useState(0);
+   const weaponsCount = visibleEquippedWeapons.length;
+   useEffect(() => {
+@@ -953,7 +981,7 @@ const WeaponsAndArmorScreen = () => {
+                         <RobotSlot
+                           key={slotKey}
+                           slotKey={slotKey}
+-                          slotData={equippedRobotSlots[slotKey]}
++                          slotData={localizeRobotSlotData(equipmentCatalog, equippedRobotSlots[slotKey])}
+                           bodyPlan={bodyPlan}
+                           onUpgradeLimb={handleOpenLimbUpgradeModal}
+                           onOpenArmorPicker={handleOpenArmorPicker}
+diff --git a/components/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js b/components/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js
+index 1505e3fc137da7a1cb37e0933a9b3cbdc7d21df3..11065f7e3529f2e3aa062146b52c3c2454c9fbb6 100644
+--- a/components/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js
++++ b/components/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js
+@@ -1,6 +1,6 @@
+ import React, { useMemo, useState, useEffect } from 'react';
+ import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+-import { useLocale } from '../../../../i18n/locale';
++import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { applyArmorMods, formatModBonuses, getAvailableArmorMods } from '../../../../domain/modsEquip';
+ import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
+@@ -53,8 +53,9 @@ const ModRow = ({ mod, selected, onPress }) => {
+ };
+ 
+ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', onApply }) => {
+-  const locale = useLocale();
+-  const catalog = useMemo(() => getEquipmentCatalog(locale), [locale]);
++  useLocale();
++  const moduleLocale = useModuleLocale();
++  const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
+   const [selectedStd, setSelectedStd] = useState(null);
+   const [selectedUniq, setSelectedUniq] = useState(null);
+   const [expandedCategories, setExpandedCategories] = useState({ standard: false, unique: false });
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+index dfc4a75d39359e54d95c22b0faf03dad8c29befb..e88055f8a5455da904d729e8bdb5d66ddba85332 100644
+--- a/components/settings/SettingsModal.js
++++ b/components/settings/SettingsModal.js
+@@ -1,32 +1,55 @@
+ import React from 'react';
+ import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
+ import useAppSettingsStore from '../../src/store/appSettingsStore';
+-import { ENGINE_SETTINGS, getModuleSettings } from '../../domain/settingsCatalog';
++import {
++  ENGINE_SETTINGS,
++  getSettingsForSurface,
++  SETTING_CONTROL_SURFACES,
++} from '../../domain/settingsCatalog';
+ import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
+ import { getModuleI18n } from '../../domain/registry';
+-import { getCurrentLocale } from '../../i18n/locale';
+-
+-// Строки настроек: движковые — из i18n экрана Home (homeScreenI18n),
+-// модульные — из i18n модуля (system/settings.json).
+-const tSetting = (key) => {
+-  if (!key) return '';
+-  const moduleDict = getModuleI18n(getCurrentLocale());
+-  let current = moduleDict?.settings;
+-  if (!current) return tHomeScreen(key);
++import {
++  getCurrentModuleLocale,
++  useLocale,
++  useModuleLocale,
++} from '../../i18n/locale';
++
++const resolvePath = (dictionary, key) => {
++  let current = dictionary;
+   for (const part of key.split('.')) {
+     current = current?.[part];
+-    if (current === undefined) return tHomeScreen(key);
++    if (current === undefined) return undefined;
+   }
+   return current;
+ };
+ 
+-const tSection = (sectionKey) => {
+-  const moduleDict = getModuleI18n(getCurrentLocale());
+-  const direct = moduleDict?.settings?.[sectionKey];
+-  return typeof direct === 'string' ? direct : tHomeScreen(`settings.${sectionKey}Title`);
++const isEngineSetting = (setting) =>
++  ENGINE_SETTINGS.some((candidate) => candidate.id === setting.id);
++
++const requireModuleText = (key) => {
++  const value = resolvePath(getModuleI18n(getCurrentModuleLocale()), key);
++  if (typeof value !== 'string') {
++    throw new Error(`[SettingsModal] В активном сеттинге отсутствует строка "${key}"`);
++  }
++  return value;
+ };
+ 
+-const ALL_SETTINGS = [...ENGINE_SETTINGS, ...getModuleSettings()];
++// Движковые строки принадлежат движку, строки механик — только активному
++// сеттингу: между этими словарями нет перекрёстных фолбэков.
++const tSetting = (setting, key) => {
++  if (typeof key !== 'string' || key.length === 0) {
++    throw new Error(`[SettingsModal] У настройки "${setting.id}" отсутствует ключ перевода`);
++  }
++  return isEngineSetting(setting) ? tHomeScreen(key) : requireModuleText(key);
++};
++
++const tSection = (section) => (
++  section.owner === 'engine'
++    ? tHomeScreen(`settings.${section.sectionKey}Title`)
++    : requireModuleText(`settings.${section.sectionKey}`)
++);
++
++const SETTINGS_SCREEN_SETTINGS = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS);
+ 
+ const SettingRow = ({ setting }) => {
+   const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
+@@ -37,7 +60,7 @@ const SettingRow = ({ setting }) => {
+     const max = setting.max ?? 100;
+     return (
+       <View style={styles.loss}>
+-        <Text style={styles.label}>{tSetting(setting.labelKey)}</Text>
++        <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
+         <View style={styles.counter}>
+           <TouchableOpacity disabled={Number(value) <= min} onPress={() => setValue(setting.id, Number(value) - 1)}>
+             <Text style={styles.button}>−</Text>
+@@ -47,7 +70,7 @@ const SettingRow = ({ setting }) => {
+             <Text style={styles.button}>+</Text>
+           </TouchableOpacity>
+         </View>
+-        <Text style={styles.description}>{tSetting(setting.descriptionKey)}</Text>
++        <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
+       </View>
+     );
+   }
+@@ -56,18 +79,18 @@ const SettingRow = ({ setting }) => {
+     return (
+       <View style={[styles.row, styles.settingRow]}>
+         <View style={styles.text}>
+-          <Text style={styles.label}>{tSetting(setting.labelKey)}</Text>
+-          <Text style={styles.description}>{tSetting(setting.descriptionKey)}</Text>
++          <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
++          <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
+         </View>
+         <View style={styles.selectButtons}>
+-          {(setting.options || []).map((opt) => (
++          {setting.options.map((option) => (
+             <TouchableOpacity
+-              key={opt.value}
+-              style={[styles.selectButton, value === opt.value && styles.selectButtonActive]}
+-              onPress={() => setValue(setting.id, opt.value)}
++              key={option.value}
++              style={[styles.selectButton, value === option.value && styles.selectButtonActive]}
++              onPress={() => setValue(setting.id, option.value)}
+             >
+-              <Text style={[styles.selectText, value === opt.value && styles.selectTextActive]}>
+-                {tSetting(opt.labelKey)}
++              <Text style={[styles.selectText, value === option.value && styles.selectTextActive]}>
++                {tSetting(setting, option.labelKey)}
+               </Text>
+             </TouchableOpacity>
+           ))}
+@@ -76,35 +99,36 @@ const SettingRow = ({ setting }) => {
+     );
+   }
+ 
+-  // boolean
+   return (
+     <View style={[styles.row, styles.settingRow]}>
+       <View style={styles.text}>
+-        <Text style={styles.label}>{tSetting(setting.labelKey)}</Text>
+-        <Text style={styles.description}>{tSetting(setting.descriptionKey)}</Text>
++        <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
++        <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
+       </View>
+-      <Switch value={Boolean(value)} onValueChange={(v) => setValue(setting.id, v)} />
++      <Switch value={Boolean(value)} onValueChange={(nextValue) => setValue(setting.id, nextValue)} />
+     </View>
+   );
+ };
+ 
+ export default function SettingsModal({ visible, onClose }) {
+-  // родительский (зависимый) показывается только при включённом dependsOn
+-  const parentValue = useAppSettingsStore((state) =>
+-    state.getSettingValue('weaponDurabilityLossEnabled'));
+-  const visibleSettings = ALL_SETTINGS.filter(
+-    (s) => !s.dependsOn || parentValue === true || s.id === s.dependsOn,
++  useLocale();
++  useModuleLocale();
++  useAppSettingsStore((state) => state.values); // зависимости между настройками
++  const getSettingValue = useAppSettingsStore((state) => state.getSettingValue);
++  const visibleSettings = SETTINGS_SCREEN_SETTINGS.filter(
++    (setting) => !setting.dependsOn || getSettingValue(setting.dependsOn) === true,
+   );
+ 
+-  // группировка по секциям с сохранением порядка
+   const sections = [];
+-  for (const s of visibleSettings) {
+-    let sec = sections.find((x) => x.key === s.sectionKey);
+-    if (!sec) {
+-      sec = { key: s.sectionKey, settings: [] };
+-      sections.push(sec);
++  for (const setting of visibleSettings) {
++    const owner = isEngineSetting(setting) ? 'engine' : 'module';
++    const key = `${owner}:${setting.sectionKey}`;
++    let section = sections.find((candidate) => candidate.key === key);
++    if (!section) {
++      section = { key, owner, sectionKey: setting.sectionKey, settings: [] };
++      sections.push(section);
+     }
+-    sec.settings.push(s);
++    section.settings.push(setting);
+   }
+ 
+   return (
+@@ -115,8 +139,8 @@ export default function SettingsModal({ visible, onClose }) {
+ 
+           {sections.map((section) => (
+             <View key={section.key}>
+-              <Text style={styles.sectionTitle}>{tSection(section.key)}</Text>
+-              {section.settings.map((s) => <SettingRow key={s.id} setting={s} />)}
++              <Text style={styles.sectionTitle}>{tSection(section)}</Text>
++              {section.settings.map((setting) => <SettingRow key={setting.id} setting={setting} />)}
+               <View style={styles.separator} />
+             </View>
+           ))}
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index 0ba709740bf76d9841cfdbd86ff0208476c4dbe8..493a05f50fdbd8cd02843643f3d9d28a4e75c453 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -11,7 +11,7 @@
+ // Character SAVES remain in SQLite (see Database.js / characters table).
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentModuleLocale } from '../i18n/locale';
+ import perksData from '../modules/fallout/data/perks/perks.json';
+ import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+ import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
+@@ -127,18 +127,23 @@ const PERK_I18N = {
+ };
+ 
+ const buildPerkRows = () => {
+-  const locale = getCurrentLocale();
+-  const localizedById = PERK_I18N[locale] || PERK_I18N['ru-RU'];
+-  const ruById = PERK_I18N['ru-RU'];
++  const locale = getCurrentModuleLocale();
++  const localizedById = PERK_I18N[locale];
++  if (!localizedById) {
++    throw new Error(`[catalogSource] Для языка сеттинга "${locale}" нет каталога перков`);
++  }
+   return perksData.map((perk) => {
+-    const localized = localizedById.get(perk.id) || ruById.get(perk.id) || {};
++    const localized = localizedById.get(perk.id);
++    if (!localized?.name || typeof localized.effect !== 'string') {
++      throw new Error(`[catalogSource] Для перка "${perk.id}" нет перевода`);
++    }
+     return {
+       id: perk.id,
+-      perk_name: localized.name || perk.id,
++      perk_name: localized.name,
+       rank: 1,
+       max_rank: perk.maxRanks || 1,
+       requirements: perk.prerequisites ? JSON.stringify(perk.prerequisites) : null,
+-      description: localized.effect || '',
++      description: localized.effect,
+       level_increase: perk.prerequisites?.levelIncreasePerRank ?? null,
+     };
+   });
+@@ -213,7 +218,7 @@ let _cache = null;
+ let _cacheLocale = null;
+ 
+ const build = () => {
+-  const locale = getCurrentLocale();
++  const locale = getCurrentModuleLocale();
+   if (_cache && _cacheLocale === locale) return _cache;
+   const catalog = getEquipmentCatalog(locale);
+   _cache = {
+diff --git a/domain/effects.js b/domain/effects.js
+index aa26cbd3a90a5556529b27ad2db458b2e5f3b653..148d191e1dd58a603e24898636aeeff9fe7efa83 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -1,6 +1,6 @@
+ import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
+ import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentModuleLocale } from '../i18n/locale';
+ import { rollCombatDiceEffects } from './diceRollsLogic';
+ 
+ const SCENE_DURATION_MINUTES = 5;
+@@ -14,13 +14,21 @@ const DICTIONARIES = {
+ 
+ const tEffects = (path, vars = {}) => {
+     const parts = path.split('.');
+-    const locale = getCurrentLocale();
+-    let current = DICTIONARIES[locale] || ruEffects;
++    const locale = getCurrentModuleLocale();
++    let current = DICTIONARIES[locale];
++    if (!current) {
++        throw new Error(`[effects] Для языка сеттинга "${locale}" нет словаря эффектов`);
++    }
+     for (const part of parts) {
+         current = current?.[part];
+-        if (current === undefined) return path;
++        if (current === undefined) {
++            throw new Error(`[effects] Для ключа "${path}" нет перевода`);
++        }
++    }
++    if (typeof current !== 'string') {
++        throw new Error(`[effects] Перевод "${path}" должен быть строкой`);
+     }
+-    return String(current).replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] ?? ''));
++    return current.replace(/\{\{(\w+)\}\}/g, (_, key) => (vars[key] ?? ''));
+ };
+ 
+ const DURATION_LASTING_SCENES = 1;  // lasting = до конца текущей сцены (1 сцена = 5 мин)
+diff --git a/domain/enrichItem.js b/domain/enrichItem.js
+index 1176dae0b2ca17641e75ac38d7ebcdc2593795d3..918f12370d1af3e98fe09d1afff6529bee3d9804 100644
+--- a/domain/enrichItem.js
++++ b/domain/enrichItem.js
+@@ -224,7 +224,9 @@ export const enrichWeaponItem = (weaponLike, catalog, opts = {}) => {
+     .filter(Boolean);
+   const qualityNameById = opts.qualityNameById || (() => '');
+   const qualityNames = (weaponLike.uniqQualities || [])
+-    .map(qualityNameById)
++    // Array.map передаёт также index и array. Вызываем контракт (id) явно,
++    // чтобы необязательные параметры callback не получали index вместо локали.
++    .map((qualityId) => qualityNameById(qualityId))
+     .filter(Boolean);
+   const displayName = getItemDisplayName({ baseName, modPrefixes, qualityNames });
+ 
+diff --git a/domain/moduleLocale.js b/domain/moduleLocale.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..acf33f02d07fd14163bce0c36fb7059dc15df904
+--- /dev/null
++++ b/domain/moduleLocale.js
+@@ -0,0 +1,96 @@
++import falloutManifest from '../modules/fallout/manifest.json';
++
++const MODULE_MANIFESTS = Object.freeze({
++  fallout: falloutManifest,
++});
++
++const ACTIVE_MODULE_ID = falloutManifest.id;
++
++/** Идентификатор сеттинга, подключённого реестром данных. */
++export const getActiveModuleId = () => ACTIVE_MODULE_ID;
++
++/** Идентификаторы всех зарегистрированных сеттингов. */
++export const getRegisteredModuleIds = () => Object.keys(MODULE_MANIFESTS);
++
++const validateManifest = (manifest, moduleId) => {
++  if (!manifest || manifest.id !== moduleId) {
++    throw new Error(`[moduleLocale] Некорректный manifest модуля "${moduleId}"`);
++  }
++  if (!Array.isArray(manifest.locales) || manifest.locales.length === 0) {
++    throw new Error(`[moduleLocale] ${moduleId}: locales должен содержать хотя бы один язык`);
++  }
++  if (new Set(manifest.locales).size !== manifest.locales.length) {
++    throw new Error(`[moduleLocale] ${moduleId}: locales содержит дубликаты`);
++  }
++  if (!manifest.locales.every((locale) => typeof locale === 'string' && locale.length > 0)) {
++    throw new Error(`[moduleLocale] ${moduleId}: каждый locale должен быть непустой строкой`);
++  }
++  if (!manifest.defaultLocale || !manifest.locales.includes(manifest.defaultLocale)) {
++    throw new Error(`[moduleLocale] ${moduleId}: defaultLocale должен присутствовать в locales`);
++  }
++  return manifest;
++};
++
++export const getModuleManifest = (moduleId = ACTIVE_MODULE_ID) => {
++  const manifest = MODULE_MANIFESTS[moduleId];
++  if (!manifest) {
++    throw new Error(`[moduleLocale] Модуль "${moduleId}" не зарегистрирован`);
++  }
++  return validateManifest(manifest, moduleId);
++};
++
++export const getModuleLocales = (moduleId = ACTIVE_MODULE_ID) =>
++  [...getModuleManifest(moduleId).locales];
++
++/**
++ * Язык сеттинга:
++ * 1. единственный язык сеттинга;
++ * 2. ручной выбор пользователя для этого сеттинга (если он был сделан);
++ * 3. язык движка при точном совпадении;
++ * 4. обязательный defaultLocale из manifest.
++ */
++export const resolveLocaleFromManifest = ({
++  manifest,
++  moduleId = manifest?.id,
++  engineLocale,
++  manualLocale = null,
++}) => {
++  const validManifest = validateManifest(manifest, moduleId);
++  if (validManifest.locales.length === 1) return validManifest.locales[0];
++  if (manualLocale !== null && manualLocale !== undefined) {
++    if (!validManifest.locales.includes(manualLocale)) {
++      throw new Error(`[moduleLocale] ${moduleId}: ручной язык "${manualLocale}" отсутствует в locales`);
++    }
++    return manualLocale;
++  }
++  if (validManifest.locales.includes(engineLocale)) return engineLocale;
++  return validManifest.defaultLocale;
++};
++
++export const resolveModuleLocale = ({
++  moduleId = ACTIVE_MODULE_ID,
++  engineLocale,
++  manualLocale = null,
++}) => resolveLocaleFromManifest({
++  manifest: getModuleManifest(moduleId),
++  moduleId,
++  engineLocale,
++  manualLocale,
++});
++
++/** Второй переключатель нужен только при нескольких языках без совпадения с движком. */
++export const shouldOfferLocaleChoiceForManifest = ({
++  manifest,
++  moduleId = manifest?.id,
++  engineLocale,
++}) => {
++  const { locales } = validateManifest(manifest, moduleId);
++  return locales.length > 1 && !locales.includes(engineLocale);
++};
++
++export const shouldOfferModuleLocaleChoice = ({ moduleId = ACTIVE_MODULE_ID, engineLocale }) =>
++  shouldOfferLocaleChoiceForManifest({
++    manifest: getModuleManifest(moduleId),
++    moduleId,
++    engineLocale,
++  });
+diff --git a/domain/origins.js b/domain/origins.js
+index 6fac859bbacbe18ffe94edb0d7cb75e8bc872cfc..2802a7e5325b467b7ec0678cb16bddb65fd30123 100644
+--- a/domain/origins.js
++++ b/domain/origins.js
+@@ -13,7 +13,7 @@
+ 
+ import { getOrigins, getOriginI18n } from './registry';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentModuleLocale } from '../i18n/locale';
+ 
+ // ---------------------------------------------------------------------------
+ // Public constants
+@@ -133,13 +133,16 @@ export function getBuiltinBaseWeapon(character) {
+   // Имя берём из каталога i18n (как у прочего оружия), чтобы кулаки везде
+   // отображались как «Кулаки»/«Fists», а не сырым id. origins.js уже имеет
+   // доступ к catalog/locale (см. заголовок файла).
+-  const base = (getEquipmentCatalog(getCurrentLocale())?.weapons || [])
++  const base = (getEquipmentCatalog(getCurrentModuleLocale())?.weapons || [])
+     .find((w) => w.id === 'unarmed_human');
++  if (!base?.name) {
++    throw new Error('[origins] Для встроенного оружия "unarmed_human" нет перевода');
++  }
+   return {
+     id: 'unarmed_human',
+     isBuiltin: true,
+     itemType: 'weapon',
+-    name: base?.name || 'unarmed_human',
++    name: base.name,
+   };
+ }
+ 
+@@ -152,9 +155,16 @@ export function getBuiltinBaseWeapon(character) {
+  */
+ export function tOrigin(id) {
+   if (!id) return '';
+-  const locale = getCurrentLocale();
+-  const dict = ORIGIN_DICTIONARIES[locale] || ruOrigins;
+-  return dict[id] || id;
++  const locale = getCurrentModuleLocale();
++  const dict = ORIGIN_DICTIONARIES[locale];
++  if (!dict) {
++    throw new Error(`[origins] Для языка сеттинга "${locale}" нет словаря ориджинов`);
++  }
++  const translated = dict[id];
++  if (typeof translated !== 'string' || translated.length === 0) {
++    throw new Error(`[origins] Для ориджина "${id}" нет перевода`);
++  }
++  return translated;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -177,9 +187,13 @@ export function loadEnrichedOrigins() {
+   const { equipmentKits: kitGroups } = getEquipmentCatalog();
+   return getOrigins().map((origin) => {
+     const kitIds = origin.equipmentKitIds || [];
+-    const equipmentKits = kitIds
+-      .map((kitId) => ({ id: kitId, ...(kitGroups[kitId] || {}) }))
+-      .filter((kit) => Array.isArray(kit.items));
++    const equipmentKits = kitIds.map((kitId) => {
++      const kit = kitGroups[kitId];
++      if (!kit || !Array.isArray(kit.items)) {
++        throw new Error(`[origins] Для комплекта "${kitId}" ориджина "${origin.id}" нет локализованных данных`);
++      }
++      return { id: kitId, ...kit };
++    });
+     return {
+       id: origin.id,
+       characterType: origin.characterType,
+diff --git a/domain/registry.js b/domain/registry.js
+index 17b07fca4124797bab646ab5554d02799ce1d136..6c16fe101c81d409e443b15c9fa2fb8c9f327975 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -39,14 +39,23 @@ import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/foo
+ import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+ import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+ import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
++import moduleRuSettingsI18n from '../modules/fallout/i18n/ru-RU/data/system/settings.json';
++import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/settings.json';
+ 
+ 
+ import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentModuleLocale } from '../i18n/locale';
+ import { expandTrueItems } from './packMerge';
+ 
++const requireModuleLocale = (locale) => {
++  if (locale !== 'ru-RU' && locale !== 'en-EN') {
++    throw new Error(`[registry] Для языка сеттинга "${locale}" нет каталога данных`);
++  }
++  return locale;
++};
++
+ /**
+  * Все ориджины: база + модуль (модуль перекрывает по id).
+  */
+@@ -73,7 +82,7 @@ export function getBodyPlans() {
+  * Формат: { [originId]: string }
+  */
+ export function getOriginI18n(locale) {
+-  return locale === 'en-EN' ? moduleEnOriginsI18n : moduleRuOriginsI18n;
++  return requireModuleLocale(locale) === 'en-EN' ? moduleEnOriginsI18n : moduleRuOriginsI18n;
+ }
+ 
+ /**
+@@ -81,7 +90,7 @@ export function getOriginI18n(locale) {
+  * Формат: { traits: { [originKey]: { [traitKey]: { name, description } } } }
+  */
+ export function getTraitI18n(locale) {
+-  return locale === 'en-EN' ? moduleEnTraitsI18n : moduleRuTraitsI18n;
++  return requireModuleLocale(locale) === 'en-EN' ? moduleEnTraitsI18n : moduleRuTraitsI18n;
+ }
+ 
+ /**
+@@ -113,7 +122,7 @@ export function getModuleEquipmentKits() {
+  * uniqQualities, weapons, clothes, generalGoods, weaponMods, food, drinks.
+  */
+ export function getModuleI18n(locale) {
+-  const isEn = locale === 'en-EN';
++  const isEn = requireModuleLocale(locale) === 'en-EN';
+   return {
+     origins: isEn ? moduleEnOriginsI18n : moduleRuOriginsI18n,
+     traits: isEn ? moduleEnTraitsI18n : moduleRuTraitsI18n,
+@@ -125,6 +134,7 @@ export function getModuleI18n(locale) {
+     weaponMods: isEn ? moduleEnWeaponModsI18n : moduleRuWeaponModsI18n,
+     food: isEn ? moduleEnFoodI18n : moduleRuFoodI18n,
+     drinks: isEn ? moduleEnDrinksI18n : moduleRuDrinksI18n,
++    settings: isEn ? moduleEnSettingsI18n : moduleRuSettingsI18n,
+   };
+ }
+ 
+@@ -141,9 +151,11 @@ export function getUniqQualities() {
+  * Имя уникального качества из i18n модуля по id (для локали).
+  * Пустая строка — имя не задано (качество есть, но имени нет).
+  */
+-export function getUniqQualityName(id, locale = getCurrentLocale()) {
++export function getUniqQualityName(id, locale = getCurrentModuleLocale()) {
+   if (!id) return '';
+-  const i18n = locale === 'en-EN' ? moduleEnUniqQualitiesI18n : moduleRuUniqQualitiesI18n;
++  const i18n = requireModuleLocale(locale) === 'en-EN'
++    ? moduleEnUniqQualitiesI18n
++    : moduleRuUniqQualitiesI18n;
+   const entry = (i18n || []).find((q) => q?.id === id);
+   return entry?.name || '';
+ }
+diff --git a/domain/robotSlotLogic.js b/domain/robotSlotLogic.js
+index ed130a532320666cb9a818696ab1e02b6ff71819..a9dd983933dcbd78c0f160f3fac06bca2d01b338 100644
+--- a/domain/robotSlotLogic.js
++++ b/domain/robotSlotLogic.js
+@@ -24,8 +24,11 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
+ 
+   const limb = slotData?.limb;
+ 
++  if (limb != null && (typeof limb.name !== 'string' || limb.name.length === 0)) {
++    throw new Error(`[robotSlotLogic] Для детали робота "${limb.id}" нет локализованного имени`);
++  }
+   const limbName = limb != null
+-    ? t(`robotLimbs.${limb.id}`, limb.name ?? limb.id)
++    ? limb.name
+     : t('robotSlot.noLimb');
+ 
+   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
+diff --git a/domain/settingsCatalog.js b/domain/settingsCatalog.js
+index 4df45476edad7d9cab3ddcf835153716df61dc52..95ac889e6801fcf8df2fc8c3c85e4aca87a2384b 100644
+--- a/domain/settingsCatalog.js
++++ b/domain/settingsCatalog.js
+@@ -1,35 +1,34 @@
+ // domain/settingsCatalog.js
+-// Каталог настроек: движковые + сеттинг (modules/<id>/settings.json).
++// Каталог настроек: движковые + настройки активного сеттинга.
+ //
+-// Модель (решения владельца, 2026-08-15):
+-//   - настройки МЕХАНИК сеттинга описываются в settings.json модуля
+-//     (данные, без логики): прочность оружия, случайное качество,
+-//     показ рукопашной атаки, язык интерфейса;
+-//   - движковые UI-настройки (каталоги персонажей, вид карточек оружия)
+-//     описаны встроенным списком ENGINE_SETTINGS — у движка они есть,
+-//     остальные настройки движок не знает;
+-//   - значения хранятся по модулям: { [moduleId]: { [settingId]: value } }.
++// Настройка описывает не только тип и значение, но и экран управления:
++//   settings   — общее окно «Настройки»;
++//   characters — экран менеджера персонажей;
++//   equipment  — экран экипировки;
++//   inventory  — экран инвентаря.
+ //
+-// Формат записи settings.json (массив):
+-//   {
+-//     "id": "weaponDurabilityLossEnabled",
+-//     "type": "boolean" | "number" | "select",
+-//     "sectionKey": "survivalMode",           // ключ заголовка секции (i18n модуля)
+-//     "labelKey": "settings.durabilityTitle", // i18n-ключи текстов
+-//     "descriptionKey": "settings.durabilityDescription",
+-//     "defaultValue": false,
+-//     "min": 1, "max": 100,                   // для number
+-//     "options": [ { "value": "ru-RU", "labelKey": "settings.lang.ru" } ], // для select
+-//     "dependsOn": "weaponDurabilityLossEnabled"  // показывать только если включено
+-//   }
++// Движок владеет общими UI-настройками. Механики и доступные варианты
++// конкретной игры описывает modules/<id>/settings.json. Например, движок умеет
++// отрисовать режим tabs, но Fallout не объявляет этот вариант и потому не даёт
++// его выбрать.
+ 
+ import moduleSettings from '../modules/fallout/settings.json';
++import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../i18n/locale';
++import { getActiveModuleId } from './moduleLocale';
++
++export const SETTING_CONTROL_SURFACES = Object.freeze({
++  SETTINGS: 'settings',
++  CHARACTERS: 'characters',
++  EQUIPMENT: 'equipment',
++  INVENTORY: 'inventory',
++});
+ 
+ /** Движковые настройки (UI-фичи, общие для любых сеттингов). */
+ export const ENGINE_SETTINGS = [
+   {
+     id: 'characterFoldersEnabled',
+     type: 'boolean',
++    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
+     sectionKey: 'appearance',
+     labelKey: 'settings.foldersTitle',
+     descriptionKey: 'settings.foldersDescription',
+@@ -38,6 +37,7 @@ export const ENGINE_SETTINGS = [
+   {
+     id: 'characterDeleteActionPlacement',
+     type: 'select',
++    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
+     sectionKey: 'appearance',
+     labelKey: 'settings.characterDeleteActionPlacementTitle',
+     descriptionKey: 'settings.characterDeleteActionPlacementDescription',
+@@ -48,57 +48,70 @@ export const ENGINE_SETTINGS = [
+     ],
+   },
+   {
+-    id: 'weaponCardsDisplayMode',
++    id: 'language',
+     type: 'select',
+-    sectionKey: 'appearance',
+-    labelKey: 'settings.cardsTitle',
+-    descriptionKey: 'settings.cardsDescription',
+-    defaultValue: 'cards',
+-    options: [
+-      { value: 'cards', labelKey: 'settings.cards.cards' },
+-      { value: 'spoilers', labelKey: 'settings.cards.spoilers' },
+-      { value: 'tabs', labelKey: 'settings.cards.tabs' },
+-    ],
++    controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
++    defaultValue: DEFAULT_LOCALE,
++    options: SUPPORTED_LOCALES.map((value) => ({ value })),
+   },
+ ];
+ 
+ const SUPPORTED_TYPES = ['boolean', 'number', 'select'];
++const SUPPORTED_SURFACES = Object.values(SETTING_CONTROL_SURFACES);
+ 
+ const validateSettings = (settings, moduleId) => {
+   if (!Array.isArray(settings)) {
+     throw new Error(`[settingsCatalog] ${moduleId}/settings.json: ожидался массив`);
+   }
+   const seen = new Set();
+-  for (const s of settings) {
+-    if (!s?.id || typeof s.id !== 'string') {
++  for (const setting of settings) {
++    if (!setting?.id || typeof setting.id !== 'string') {
+       throw new Error(`[settingsCatalog] ${moduleId}: запись без id`);
+     }
+-    if (seen.has(s.id)) {
+-      throw new Error(`[settingsCatalog] ${moduleId}: дубликат id "${s.id}"`);
++    if (seen.has(setting.id)) {
++      throw new Error(`[settingsCatalog] ${moduleId}: дубликат id "${setting.id}"`);
++    }
++    seen.add(setting.id);
++    if (!SUPPORTED_TYPES.includes(setting.type)) {
++      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" — неизвестный type "${setting.type}"`);
+     }
+-    seen.add(s.id);
+-    if (!SUPPORTED_TYPES.includes(s.type)) {
+-      throw new Error(`[settingsCatalog] ${moduleId}: "${s.id}" — неизвестный type "${s.type}"`);
++    if (!SUPPORTED_SURFACES.includes(setting.controlSurface)) {
++      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" — неизвестный controlSurface "${setting.controlSurface}"`);
+     }
+-    if (s.type === 'select' && !Array.isArray(s.options)) {
+-      throw new Error(`[settingsCatalog] ${moduleId}: "${s.id}" (select) без options`);
++    if (setting.type === 'select' && !Array.isArray(setting.options)) {
++      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" (select) без options`);
+     }
+-    if (s.dependsOn && !settings.some((x) => x.id === s.dependsOn)) {
+-      throw new Error(`[settingsCatalog] ${moduleId}: "${s.id}" dependsOn неизвестной "${s.dependsOn}"`);
++    if (setting.dependsOn && !settings.some((candidate) => candidate.id === setting.dependsOn)) {
++      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" dependsOn неизвестной "${setting.dependsOn}"`);
+     }
+   }
+   return settings;
+ };
+ 
+ /** Настройки сеттинга (после валидации). */
+-export const getModuleSettings = (moduleId = 'fallout') =>
+-  validateSettings(moduleSettings, moduleId);
++export const getModuleSettings = (moduleId = getActiveModuleId()) => {
++  if (moduleId !== getActiveModuleId()) {
++    throw new Error(`[settingsCatalog] модуль "${moduleId}" не зарегистрирован`);
++  }
++  return validateSettings(moduleSettings, moduleId);
++};
++
++/** Все настройки: движковые + настройки активного сеттинга. */
++export const getAllSettings = () => [
++  ...ENGINE_SETTINGS,
++  ...getModuleSettings(getActiveModuleId()),
++];
+ 
+-/** Все настройки: движковые + сеттинга. */
+-export const getAllSettings = () => [...ENGINE_SETTINGS, ...getModuleSettings()];
++/** Настройки, которыми управляет конкретный экран. */
++export const getSettingsForSurface = (controlSurface) => {
++  if (!SUPPORTED_SURFACES.includes(controlSurface)) {
++    throw new Error(`[settingsCatalog] неизвестный controlSurface "${controlSurface}"`);
++  }
++  return getAllSettings().filter((setting) => setting.controlSurface === controlSurface);
++};
+ 
+ /** Описание настройки по id. */
+-export const getSettingById = (id) => getAllSettings().find((s) => s.id === id) || null;
++export const getSettingById = (id) => getAllSettings().find((setting) => setting.id === id) || null;
+ 
+ /** Дефолтное значение настройки. */
+ export const getSettingDefault = (id) => getSettingById(id)?.defaultValue ?? null;
+diff --git a/domain/traits.js b/domain/traits.js
+index 92f62f3d3455d0d1ccb309ebbae835d3e46f0c4d..8ceb90b63744779339abcd2bcad5240d843c8fd1 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -6,7 +6,7 @@
+ // domain/origins.js — see that module.
+ 
+ import { getTraits, getTraitI18n } from './registry';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentModuleLocale } from '../i18n/locale';
+ 
+ const TRAIT_DICTIONARIES = {
+   'ru-RU': getTraitI18n('ru-RU'),
+@@ -19,15 +19,23 @@ const TRAIT_DICTIONARIES = {
+  */
+ export function tTrait(key) {
+   if (!key) return '';
+-  const locale = getCurrentLocale();
+-  const dict = TRAIT_DICTIONARIES[locale] || ruTraits;
++  const locale = getCurrentModuleLocale();
++  const dict = TRAIT_DICTIONARIES[locale];
++  if (!dict) {
++    throw new Error(`[traits] Для языка сеттинга "${locale}" нет словаря трейтов`);
++  }
+   const parts = key.split('.');
+   let current = dict;
+   for (const part of parts) {
+     current = current?.[part];
+-    if (current === undefined) return key;
++    if (current === undefined) {
++      throw new Error(`[traits] Для ключа "${key}" нет перевода`);
++    }
+   }
+-  return typeof current === 'string' ? current : key;
++  if (typeof current !== 'string' || current.length === 0) {
++    throw new Error(`[traits] Перевод "${key}" должен быть непустой строкой`);
++  }
++  return current;
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -226,7 +234,9 @@ export function resolveTraitDisplayName(storedName) {
+  */
+ export function getTraitI18nById(id) {
+   const dataEntry = findTraitById(id);
+-  if (!dataEntry) return { name: id, description: '' };
++  if (!dataEntry) {
++    throw new Error(`[traits] Трейт "${id}" отсутствует в данных активного сеттинга`);
++  }
+   return {
+     name: tTrait(dataEntry.displayNameKey),
+     description: tTrait(dataEntry.descriptionKey),
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index 72faf979d2c399f7733403be70974a24afaa33e8..d3470a5605de94eb8e2d00a43e3a930ad584e2af 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -8,7 +8,7 @@ import ruQualities from '../modules/fallout/i18n/ru-RU/data/system/qualities.jso
+ import enQualities from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
+ import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
+ import enEffects from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
+-import { getCurrentLocale } from '../i18n/locale';
++import { getCurrentModuleLocale } from '../i18n/locale';
+ 
+ const QUALITY_DICTS = {
+   'ru-RU': ruQualities,
+@@ -52,8 +52,11 @@ const DAMAGE_TYPE_LABELS = {
+  * @returns {string}
+  */
+ export function resolveWeaponQualities(qualities) {
+-  const locale = getCurrentLocale();
+-  const dict = QUALITY_DICTS[locale] || ruQualities;
++  const locale = getCurrentModuleLocale();
++  const dict = QUALITY_DICTS[locale];
++  if (!dict) {
++    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря качеств`);
++  }
+   const qualityMap = Object.fromEntries(dict.map((q) => [q.id, q.name]));
+ 
+   let arr = qualities;
+@@ -87,8 +90,11 @@ export function resolveWeaponQualities(qualities) {
+  Принимает массив {effectId, value?} (или JSON-строку из БД).
+  */
+ export function resolveWeaponEffects(effects) {
+-  const locale = getCurrentLocale();
+-  const dict = EFFECT_DICTS[locale] || ruEffects;
++  const locale = getCurrentModuleLocale();
++  const dict = EFFECT_DICTS[locale];
++  if (!dict) {
++    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря эффектов урона`);
++  }
+   const effectMap = Object.fromEntries(dict.map((e) => [e.id, e.name]));
+ 
+   let arr = effects;
+@@ -128,8 +134,11 @@ export function resolveWeaponEffects(effects) {
+ export function resolveWeaponDamageType(damageType) {
+   if (!damageType) return '';
+ 
+-  const locale = getCurrentLocale();
+-  const labels = DAMAGE_TYPE_LABELS[locale] || DAMAGE_TYPE_LABELS['ru-RU'];
++  const locale = getCurrentModuleLocale();
++  const labels = DAMAGE_TYPE_LABELS[locale];
++  if (!labels) {
++    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря типов урона`);
++  }
+ 
+   // Parse JSON string if needed
+   let arr = damageType;
+diff --git a/i18n/conditionsCatalog.js b/i18n/conditionsCatalog.js
+index 88db9bff54a9de5495eee950958677ba4170b493..b4aa063615067beeef7e12656090469984fce550 100644
+--- a/i18n/conditionsCatalog.js
++++ b/i18n/conditionsCatalog.js
+@@ -2,7 +2,7 @@
+ // Болезни — не предметы инвентаря: у них нет веса/цены, есть куб d20 на определение
+ // болезни и длительность в стадиях восстановления (core rulebook, стр. 193).
+ // Механика наложения/трекинга проектируется отдельно; сейчас — только справочный каталог.
+-import { getCurrentLocale, normalizeLocale } from './locale';
++import { getCurrentModuleLocale } from './locale';
+ import { mergeById } from './equipmentCatalog';
+ 
+ import moduleDiseases from '../modules/fallout/data/conditions/diseases.json';
+@@ -20,5 +20,10 @@ const DISEASES_BY_LOCALE = {
+  * (modules/fallout/data/conditions/diseases.json + i18n модуля).
+  * Нет перевода для id — дефект данных (mergeById бросает ошибку).
+  */
+-export const getDiseasesCatalog = (locale = getCurrentLocale()) =>
+-  mergeById(moduleDiseases, DISEASES_BY_LOCALE[normalizeLocale(locale)]);
++export const getDiseasesCatalog = (locale = getCurrentModuleLocale()) => {
++  const localizedDiseases = DISEASES_BY_LOCALE[locale];
++  if (!localizedDiseases) {
++    throw new Error(`[conditionsCatalog] Для языка сеттинга "${locale}" нет каталога болезней`);
++  }
++  return mergeById(moduleDiseases, localizedDiseases);
++};
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index eca305b3a7760ec2a709043cd189a74ca1efee65..8753eeb91efff21ae7b29ebdec73e6a45f34613f 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -38,7 +38,9 @@
+   "deleteConfirm": "Do you really want to delete this character?",
+   "language": {
+     "russian": "Русский",
+-    "english": "English"
++    "english": "English",
++    "settingTitle": "Setting language",
++    "localeCode": "Language {code}"
+   },
+   "labels": {
+     "level": "Lvl."
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 2f4b7bb2258e9256d1237b22a00dfb66813e933b..e165ba31a27f9d1f87d3d547a22091f01d8ae419 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -99,7 +99,7 @@ import moduleRobotWeapons from '../modules/fallout/data/equipment/robot/weapons.
+ 
+ 
+ 
+-import { getCurrentLocale, normalizeLocale } from './locale';
++import { getCurrentModuleLocale } from './locale';
+ import { expandTrueItems } from '../domain/packMerge';
+ 
+ /**
+@@ -242,10 +242,11 @@ const buildArmorIndex = (items) => {
+   return { byId };
+ };
+ 
+-export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+-  // normalizeLocale уже гарантирует ключ из SUPPORTED_LOCALES (ru-RU|en-EN),
+-  // поэтому фолбэк на ru-RU здесь невозможен — берём локализованный словарь напрямую.
+-  const i18n = EQUIPMENT_BY_LOCALE[normalizeLocale(locale)];
++export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
++  const i18n = EQUIPMENT_BY_LOCALE[locale];
++  if (!i18n) {
++    throw new Error(`[equipmentCatalog] Для языка сеттинга "${locale}" нет каталога`);
++  }
+ 
+   // Weapons: механика и имена — из модуля сеттинга (патч 102).
+   // Оружие в модуле самодостаточно: варианты (trueItemId) ссылаются на
+diff --git a/i18n/locale.js b/i18n/locale.js
+index 27def6f90b63686a0c45b01117b718ed2f4e6e2b..6d5ef1fde65264babad7f0c01b9b646381e7bec1 100644
+--- a/i18n/locale.js
++++ b/i18n/locale.js
+@@ -1,5 +1,6 @@
+ import { useEffect, useState } from 'react';
+ import { debugLog, FALLOUT_DEBUG_MARKER } from '../src/debug/falloutDebug';
++import { getModuleLocales, resolveModuleLocale } from '../domain/moduleLocale';
+ 
+ const SUPPORTED_LOCALES = ['ru-RU', 'en-EN'];
+ const DEFAULT_LOCALE = 'ru-RU';
+@@ -7,7 +8,7 @@ const DEFAULT_LOCALE = 'ru-RU';
+ const normalizeLocale = (input) => {
+   if (!input || typeof input !== 'string') return DEFAULT_LOCALE;
+   const normalized = input.replace('_', '-');
+-  const exact = SUPPORTED_LOCALES.find(locale => locale.toLowerCase() === normalized.toLowerCase());
++  const exact = SUPPORTED_LOCALES.find((locale) => locale.toLowerCase() === normalized.toLowerCase());
+   if (exact) return exact;
+ 
+   const langCode = normalized.slice(0, 2).toLowerCase();
+@@ -26,9 +27,11 @@ const detectLocale = () => {
+ };
+ 
+ let currentLocale = detectLocale();
+-const listeners = new Set();
++let currentModuleLocale = resolveModuleLocale({ engineLocale: currentLocale });
++const engineListeners = new Set();
++const moduleListeners = new Set();
+ 
+-const emitLocaleChange = () => {
++const emit = (listeners) => {
+   listeners.forEach((listener) => {
+     try {
+       listener();
+@@ -39,26 +42,68 @@ const emitLocaleChange = () => {
+ };
+ 
+ export const subscribeToLocale = (listener) => {
+-  listeners.add(listener);
+-  return () => listeners.delete(listener);
++  engineListeners.add(listener);
++  return () => engineListeners.delete(listener);
+ };
+ 
++export const subscribeToModuleLocale = (listener) => {
++  moduleListeners.add(listener);
++  return () => moduleListeners.delete(listener);
++};
++
++/** Текущий язык интерфейса движка. */
+ export const getCurrentLocale = () => currentLocale;
++
+ export const setCurrentLocale = (nextLocale) => {
+   const previousLocale = currentLocale;
+   currentLocale = normalizeLocale(nextLocale);
+-  debugLog('locale.setCurrentLocale', { marker: FALLOUT_DEBUG_MARKER, previousLocale, nextLocale, normalizedLocale: currentLocale });
+-  emitLocaleChange();
++  debugLog('locale.setCurrentLocale', {
++    marker: FALLOUT_DEBUG_MARKER,
++    previousLocale,
++    nextLocale,
++    normalizedLocale: currentLocale,
++  });
++  if (previousLocale !== currentLocale) emit(engineListeners);
+   return currentLocale;
+ };
+ 
++/** Текущий язык контента активного сеттинга. */
++export const getCurrentModuleLocale = () => currentModuleLocale;
++
++export const setCurrentModuleLocale = (nextLocale) => {
++  if (typeof nextLocale !== 'string' || nextLocale.length === 0) {
++    throw new Error('[locale] Язык сеттинга должен быть непустой строкой');
++  }
++  if (!getModuleLocales().includes(nextLocale)) {
++    throw new Error(`[locale] Язык "${nextLocale}" не поддерживается активным сеттингом`);
++  }
++  const previousLocale = currentModuleLocale;
++  currentModuleLocale = nextLocale;
++  debugLog('locale.setCurrentModuleLocale', {
++    marker: FALLOUT_DEBUG_MARKER,
++    previousLocale,
++    nextLocale,
++  });
++  if (previousLocale !== currentModuleLocale) emit(moduleListeners);
++  return currentModuleLocale;
++};
++
+ export const useLocale = () => {
+   const [locale, setLocale] = useState(getCurrentLocale());
+ 
+   useEffect(() => {
+-    const unsubscribe = subscribeToLocale(() => {
+-      setLocale(getCurrentLocale());
+-    });
++    const unsubscribe = subscribeToLocale(() => setLocale(getCurrentLocale()));
++    return unsubscribe;
++  }, []);
++
++  return locale;
++};
++
++export const useModuleLocale = () => {
++  const [locale, setLocale] = useState(getCurrentModuleLocale());
++
++  useEffect(() => {
++    const unsubscribe = subscribeToModuleLocale(() => setLocale(getCurrentModuleLocale()));
+     return unsubscribe;
+   }, []);
+ 
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 1ba48cc8a7c782c50e9d38b9fe9a05d56070ccdd..c3196e6b6699f1bef2b54eaad695ca0a5fabefed 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -38,7 +38,9 @@
+   "deleteConfirm": "Вы действительно хотите удалить этого персонажа?",
+   "language": {
+     "russian": "Русский",
+-    "english": "English"
++    "english": "English",
++    "settingTitle": "Язык сеттинга",
++    "localeCode": "Язык {code}"
+   },
+   "labels": {
+     "level": "Ур."
+diff --git a/modules/fallout/i18n/en-EN/data/system/settings.json b/modules/fallout/i18n/en-EN/data/system/settings.json
+index 83092867aa461913f52a794c5020dc3f58f619a7..39956af1f4a2fe20cf022b9a7377cc2e986550bc 100644
+--- a/modules/fallout/i18n/en-EN/data/system/settings.json
++++ b/modules/fallout/i18n/en-EN/data/system/settings.json
+@@ -10,6 +10,12 @@
+   "qualityDescription": "Weapons added via Loot have random durability from 1 to 100. Merchant weapons are always 100%.",
+   "unarmedTitle": "Show unarmed attack",
+   "unarmedDescription": "The unarmed attack (fists/manipulator) is always in the first slot; this toggle controls its display on the equipment screen.",
++  "cardsTitle": "Weapon cards view",
++  "cardsDescription": "How weapons are displayed on the equipment screen.",
++  "cards": {
++    "cards": "Cards",
++    "spoilers": "Spoilers"
++  },
+   "languageTitle": "Interface language",
+   "languageDescription": "Application and data language.",
+   "language": {
+diff --git a/modules/fallout/i18n/ru-RU/data/system/settings.json b/modules/fallout/i18n/ru-RU/data/system/settings.json
+index 1534893f98de4025e36be5027d525eec380395cb..dd22acd72252339f8bd75acb866c71a0ba4f193e 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/settings.json
++++ b/modules/fallout/i18n/ru-RU/data/system/settings.json
+@@ -10,6 +10,12 @@
+   "qualityDescription": "Оружие, добавленное через «Лут», имеет случайную прочность от 1 до 100. Оружие торговцев всегда 100%.",
+   "unarmedTitle": "Показывать рукопашную атаку",
+   "unarmedDescription": "Рукопашная атака (кулаки/манипулятор) всегда в первом слоте; этот переключатель управляет её показом на экране снаряжения.",
++  "cardsTitle": "Вид карточек оружия",
++  "cardsDescription": "Способ отображения оружия на экране снаряжения.",
++  "cards": {
++    "cards": "Карточки",
++    "spoilers": "Спойлеры"
++  },
+   "languageTitle": "Язык интерфейса",
+   "languageDescription": "Язык приложения и данных.",
+   "language": {
+diff --git a/modules/fallout/manifest.json b/modules/fallout/manifest.json
+index e93fca09014bef05e415abd38ec0ca1ae3063cc1..4ff96932d2680657985a236d6460faf66b2d873f 100644
+--- a/modules/fallout/manifest.json
++++ b/modules/fallout/manifest.json
+@@ -3,5 +3,6 @@
+   "name": "Fallout 2d20",
+   "version": 1,
+   "requiresCore": ">=1.0",
++  "defaultLocale": "ru-RU",
+   "locales": ["ru-RU", "en-EN"]
+ }
+diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
+index 58b7f874b615728bd1f1f00373a4ecb4bc1abb72..66043d86f23f8246a899fa055fa771b3609b4c43 100644
+--- a/modules/fallout/settings.json
++++ b/modules/fallout/settings.json
+@@ -2,6 +2,7 @@
+   {
+     "id": "weaponDurabilityLossEnabled",
+     "type": "boolean",
++    "controlSurface": "settings",
+     "sectionKey": "survivalMode",
+     "labelKey": "settings.durabilityTitle",
+     "descriptionKey": "settings.durabilityDescription",
+@@ -10,6 +11,7 @@
+   {
+     "id": "weaponDurabilityLossPer10Shots",
+     "type": "number",
++    "controlSurface": "settings",
+     "sectionKey": "survivalMode",
+     "labelKey": "settings.lossTitle",
+     "descriptionKey": "settings.lossDescription",
+@@ -21,6 +23,7 @@
+   {
+     "id": "randomWeaponQualityEnabled",
+     "type": "boolean",
++    "controlSurface": "settings",
+     "sectionKey": "survivalMode",
+     "labelKey": "settings.qualityTitle",
+     "descriptionKey": "settings.qualityDescription",
+@@ -30,21 +33,23 @@
+   {
+     "id": "unarmedAttackVisible",
+     "type": "boolean",
++    "controlSurface": "equipment",
+     "sectionKey": "combat",
+     "labelKey": "settings.unarmedTitle",
+     "descriptionKey": "settings.unarmedDescription",
+     "defaultValue": true
+   },
+   {
+-    "id": "language",
++    "id": "weaponCardsDisplayMode",
+     "type": "select",
+-    "sectionKey": "interface",
+-    "labelKey": "settings.languageTitle",
+-    "descriptionKey": "settings.languageDescription",
+-    "defaultValue": "ru-RU",
++    "controlSurface": "equipment",
++    "sectionKey": "combat",
++    "labelKey": "settings.cardsTitle",
++    "descriptionKey": "settings.cardsDescription",
++    "defaultValue": "cards",
+     "options": [
+-      { "value": "ru-RU", "labelKey": "settings.language.ru" },
+-      { "value": "en-EN", "labelKey": "settings.language.en" }
++      { "value": "cards", "labelKey": "settings.cards.cards" },
++      { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
+     ]
+   }
+ ]
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 6dc4e1af1b0d10d2bb11392911d6f8a6d90702d5..ecd87ee88332f537327afbca0c1374b693732ee2 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -7,16 +7,25 @@ import {
+   getSettingDefault,
+   getSettingById,
+ } from '../../domain/settingsCatalog';
+-import { getCurrentLocale, setCurrentLocale } from '../../i18n/locale';
+-
+-// Стор настроек: значения сгруппированы ПО МОДУЛЯМ —
+-// { [moduleId]: { [settingId]: value } } + движковые настройки в ключе 'engine'.
+-// Переключение сеттинга не смешивает значения разных модулей.
+-//
+-// Движковые настройки (каталоги персонажей, вид карточек оружия) — в 'engine';
+-// настройки механик сеттинга — в 'fallout' (и будущих модулях).
++import {
++  getActiveModuleId,
++  getModuleLocales,
++  getRegisteredModuleIds,
++  resolveModuleLocale,
++} from '../../domain/moduleLocale';
++import {
++  getCurrentLocale,
++  setCurrentLocale,
++  setCurrentModuleLocale,
++  SUPPORTED_LOCALES,
++} from '../../i18n/locale';
++
++// Значения движка и каждого сеттинга хранятся раздельно:
++// { engine: { ... }, [moduleId]: { ... } }.
++// Ручной выбор языка контента также раздельный по сеттингам и не смешивается
++// с языком интерфейса движка.
+ const ENGINE_KEY = 'engine';
+-const MODULE_ID = 'fallout';
++const MODULE_ID = getActiveModuleId();
+ 
+ const clamp = (value, min, max) => Math.min(max, Math.max(min, Math.floor(Number(value) || min)));
+ 
+@@ -25,39 +34,134 @@ const applySettingValue = (setting, value) => {
+     return clamp(value, setting.min ?? 0, setting.max ?? 100);
+   }
+   if (setting?.type === 'boolean') return Boolean(value);
++  if (setting?.type === 'select') {
++    return setting.options.some((option) => option.value === value)
++      ? value
++      : setting.defaultValue;
++  }
+   return value;
+ };
+ 
++const isEngineSetting = (settingId) =>
++  ENGINE_SETTINGS.some((setting) => setting.id === settingId);
++
+ const buildDefaults = () => {
+   const defaults = { [ENGINE_KEY]: {}, [MODULE_ID]: {} };
+-  ENGINE_SETTINGS.forEach((s) => { defaults[ENGINE_KEY][s.id] = s.defaultValue; });
+-  getModuleSettings(MODULE_ID).forEach((s) => { defaults[MODULE_ID][s.id] = s.defaultValue; });
++  ENGINE_SETTINGS.forEach((setting) => {
++    defaults[ENGINE_KEY][setting.id] = setting.defaultValue;
++  });
++  getModuleSettings(MODULE_ID).forEach((setting) => {
++    defaults[MODULE_ID][setting.id] = setting.defaultValue;
++  });
+   return defaults;
+ };
+ 
+-// Инициализация языка из настроек (если задан) — до первого рендера.
++const syncRuntimeLocales = (values, moduleLocales = {}) => {
++  const engineLocale = setCurrentLocale(values?.[ENGINE_KEY]?.language);
++  const moduleLocale = resolveModuleLocale({
++    moduleId: MODULE_ID,
++    engineLocale,
++    manualLocale: moduleLocales[MODULE_ID] ?? null,
++  });
++  setCurrentModuleLocale(moduleLocale);
++};
++
+ const initial = buildDefaults();
+-const persistedLanguage = null; // значение подтянется hydrate-ом (см. migrate/onRehydrate)
++// До гидратации сохраняем определённый движком язык устройства, а не
++// перетираем его статическим дефолтом каталога.
++initial[ENGINE_KEY].language = getCurrentLocale();
++syncRuntimeLocales(initial);
++
++const migrateNestedState = (persistedState) => {
++  const defaults = buildDefaults();
++  const previousValues = persistedState.values || {};
++  const previousEngine = previousValues[ENGINE_KEY] || {};
++  const previousModule = previousValues[MODULE_ID] || {};
++  const engine = { ...defaults[ENGINE_KEY], ...previousEngine };
++  const fallout = { ...defaults[MODULE_ID], ...previousModule };
++
++  const previousLanguage = previousEngine.language ?? previousModule.language;
++  engine.language = SUPPORTED_LOCALES.includes(previousLanguage)
++    ? previousLanguage
++    : defaults[ENGINE_KEY].language;
++
++  const previousDisplayMode = previousModule.weaponCardsDisplayMode
++    ?? previousEngine.weaponCardsDisplayMode;
++  fallout.weaponCardsDisplayMode = ['cards', 'spoilers'].includes(previousDisplayMode)
++    ? previousDisplayMode
++    : 'cards';
++
++  // Эти настройки сменили владельца: язык относится к движку, а доступные
++  // способы показа оружия объявляет Fallout.
++  delete engine.weaponCardsDisplayMode;
++  delete fallout.language;
++
++  const moduleLocales = {};
++  for (const moduleId of getRegisteredModuleIds()) {
++    const previousManualLocale = persistedState.moduleLocales?.[moduleId];
++    if (getModuleLocales(moduleId).includes(previousManualLocale)) {
++      moduleLocales[moduleId] = previousManualLocale;
++    }
++  }
++
++  return {
++    ...persistedState,
++    values: { [ENGINE_KEY]: engine, [MODULE_ID]: fallout },
++    moduleLocales,
++  };
++};
++
++const migrateFlatState = (persistedState) => {
++  const defaults = buildDefaults();
++  const fallout = { ...defaults[MODULE_ID] };
++  const engine = { ...defaults[ENGINE_KEY] };
++  const old = persistedState || {};
++  const qualityEnabled = old.randomWeaponQualityEnabled
++    ?? old.randomWeaponDurabilityEnabled
++    ?? false;
++
++  if (old.randomWeaponDurabilityEnabled !== undefined) {
++    fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
++    fallout.weaponDurabilityLossEnabled = false;
++  } else {
++    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? false;
++    fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
++  }
++
++  fallout.weaponDurabilityLossPer10Shots = old.weaponDurabilityLossPer10Shots ?? 1;
++  fallout.unarmedAttackVisible = old.unarmedAttackVisible ?? true;
++  fallout.weaponCardsDisplayMode = ['cards', 'spoilers'].includes(old.weaponCardsDisplayMode)
++    ? old.weaponCardsDisplayMode
++    : 'cards';
++  engine.characterFoldersEnabled = old.characterFoldersEnabled ?? false;
++  engine.characterDeleteActionPlacement = ['menu', 'card'].includes(old.characterDeleteActionPlacement)
++    ? old.characterDeleteActionPlacement
++    : 'menu';
++  engine.language = SUPPORTED_LOCALES.includes(old.language)
++    ? old.language
++    : defaults[ENGINE_KEY].language;
++
++  return { values: { [ENGINE_KEY]: engine, [MODULE_ID]: fallout }, moduleLocales: {} };
++};
+ 
+ const useAppSettingsStore = create(
+   persist(
+     (set, get) => ({
+       values: initial,
++      moduleLocales: {},
+ 
+       getValue: (settingId) => {
+         const setting = getSettingById(settingId);
+-        const scope = setting && ENGINE_SETTINGS.some((s) => s.id === settingId)
+-          ? ENGINE_KEY
+-          : MODULE_ID;
++        if (!setting) throw new Error(`[appSettingsStore] Неизвестная настройка "${settingId}"`);
++        const scope = isEngineSetting(settingId) ? ENGINE_KEY : MODULE_ID;
+         const current = get().values[scope]?.[settingId];
+         return current !== undefined ? current : getSettingDefault(settingId);
+       },
+ 
+       setValue: (settingId, value) => {
+         const setting = getSettingById(settingId);
+-        const scope = setting && ENGINE_SETTINGS.some((s) => s.id === settingId)
+-          ? ENGINE_KEY
+-          : MODULE_ID;
++        if (!setting) throw new Error(`[appSettingsStore] Неизвестная настройка "${settingId}"`);
++        const scope = isEngineSetting(settingId) ? ENGINE_KEY : MODULE_ID;
+         const normalized = applySettingValue(setting, value);
+         set((state) => ({
+           values: {
+@@ -65,62 +169,50 @@ const useAppSettingsStore = create(
+             [scope]: { ...(state.values[scope] || {}), [settingId]: normalized },
+           },
+         }));
+-        // Язык интерфейса — настройка сеттинга; применяется сразу.
+-        if (settingId === 'language' && typeof normalized === 'string') {
+-          setCurrentLocale(normalized);
++        if (settingId === 'language') {
++          syncRuntimeLocales(get().values, get().moduleLocales);
+         }
+       },
+ 
+-      // Удобные функции-селекторы (подписываемые): значения с дефолтами.
+       getSettingValue: (settingId) => get().getValue(settingId),
+ 
+-      setCharacterFoldersEnabled: (v) => get().setValue('characterFoldersEnabled', v),
+-      setCharacterDeleteActionPlacement: (v) => get().setValue('characterDeleteActionPlacement', v),
+-      setWeaponCardsDisplayMode: (v) => get().setValue('weaponCardsDisplayMode', v),
+-      setWeaponDurabilityLossEnabled: (v) => get().setValue('weaponDurabilityLossEnabled', v),
+-      setWeaponDurabilityLossPer10Shots: (v) => get().setValue('weaponDurabilityLossPer10Shots', v),
+-      setRandomWeaponQualityEnabled: (v) => get().setValue('randomWeaponQualityEnabled', v),
+-      setUnarmedAttackVisible: (v) => get().setValue('unarmedAttackVisible', v),
++      getModuleLocale: (moduleId = MODULE_ID) => resolveModuleLocale({
++        moduleId,
++        engineLocale: get().getValue('language'),
++        manualLocale: get().moduleLocales[moduleId] ?? null,
++      }),
++
++      setModuleLocale: (moduleId, locale) => {
++        if (!getModuleLocales(moduleId).includes(locale)) {
++          throw new Error(`[appSettingsStore] Язык "${locale}" отсутствует в модуле "${moduleId}"`);
++        }
++        set((state) => ({
++          moduleLocales: { ...state.moduleLocales, [moduleId]: locale },
++        }));
++        syncRuntimeLocales(get().values, get().moduleLocales);
++      },
++
++      setCharacterFoldersEnabled: (value) => get().setValue('characterFoldersEnabled', value),
++      setCharacterDeleteActionPlacement: (value) => get().setValue('characterDeleteActionPlacement', value),
++      setLanguage: (value) => get().setValue('language', value),
++      setWeaponCardsDisplayMode: (value) => get().setValue('weaponCardsDisplayMode', value),
++      setWeaponDurabilityLossEnabled: (value) => get().setValue('weaponDurabilityLossEnabled', value),
++      setWeaponDurabilityLossPer10Shots: (value) => get().setValue('weaponDurabilityLossPer10Shots', value),
++      setRandomWeaponQualityEnabled: (value) => get().setValue('randomWeaponQualityEnabled', value),
++      setUnarmedAttackVisible: (value) => get().setValue('unarmedAttackVisible', value),
+     }),
+     {
+       name: 'settings',
+       storage: createJSONStorage(() => AsyncStorage),
+-      partialize: (state) => ({ values: state.values }),
+-      migrate: (persistedState) => {
+-        // Миграция со старого хранилища ('fallout2d20:settings', плоские ключи)
+-        // на новое: { [moduleId]: { [settingId]: value } }.
+-        const defaults = buildDefaults();
+-        if (persistedState?.values && typeof persistedState.values === 'object') {
+-          return persistedState; // уже новый формат
+-        }
+-        // старый формат: плоские ключи на верхнем уровне
+-        const fallout = { ...defaults[MODULE_ID] };
+-        const engine = { ...defaults[ENGINE_KEY] };
+-        const old = persistedState || {};
+-        // переименование v0->v1 старого формата
+-        const qualityEnabled = old.randomWeaponQualityEnabled ??
+-          old.randomWeaponDurabilityEnabled ?? false;
+-        if (old.randomWeaponDurabilityEnabled !== undefined) {
+-          fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
+-          fallout.weaponDurabilityLossEnabled = false;
+-        } else {
+-          fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? false;
+-          fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
+-        }
+-        fallout.weaponDurabilityLossPer10Shots = old.weaponDurabilityLossPer10Shots ?? 1;
+-        fallout.unarmedAttackVisible = old.unarmedAttackVisible ?? true;
+-        engine.characterFoldersEnabled = old.characterFoldersEnabled ?? false;
+-        engine.weaponCardsDisplayMode = ['cards', 'spoilers', 'tabs'].includes(old.weaponCardsDisplayMode)
+-          ? old.weaponCardsDisplayMode
+-          : 'cards';
+-        return { values: { [ENGINE_KEY]: engine, [MODULE_ID]: fallout } };
+-      },
+-      version: 1,
++      partialize: (state) => ({ values: state.values, moduleLocales: state.moduleLocales }),
++      migrate: (persistedState) => (
++        persistedState?.values && typeof persistedState.values === 'object'
++          ? migrateNestedState(persistedState)
++          : migrateFlatState(persistedState)
++      ),
++      version: 2,
+       onRehydrateStorage: () => (state) => {
+-        // после восстановления применяем язык из настроек
+-        if (state?.values?.[MODULE_ID]?.language) {
+-          setCurrentLocale(state.values[MODULE_ID].language);
+-        }
++        if (state) syncRuntimeLocales(state.values, state.moduleLocales);
+       },
+     },
+   ),
+@@ -128,9 +220,9 @@ const useAppSettingsStore = create(
+ 
+ export default useAppSettingsStore;
+ 
+-// Подписываемые селекторы (используются в компонентах вместо геттеров).
+ export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('characterFoldersEnabled');
+ export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
++export const selectLanguage = (state) => state.getSettingValue('language');
+ export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');
+ export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValue('weaponDurabilityLossEnabled');
+ export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingValue('weaponDurabilityLossPer10Shots');
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 4fe78221f1c3e6516798af8753b77d43a6259ebb..dde2f0fdcf138fbd33ef66998e5ba1a825279126 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -28,6 +28,19 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     justifyContent: 'space-between',
+   },
++  moduleLanguageRow: {
++    paddingHorizontal: 16,
++    paddingVertical: 8,
++    backgroundColor: 'rgba(0,0,0,0.75)',
++    borderBottomWidth: 1,
++    borderBottomColor: '#d4af37',
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'flex-end',
++    gap: 10,
++    flexWrap: 'wrap',
++  },
++  moduleLanguageLabel: { color: '#f0e68c', fontSize: 13, fontWeight: '600' },
+   menuCell: { width: 44, marginRight: 8 },
+   menuButton: {
+     width: 38,
