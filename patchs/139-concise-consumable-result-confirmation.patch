@@ -1,0 +1,189 @@
+diff --git a/__tests__/consumables/consumable-result-report.test.js b/__tests__/consumables/consumable-result-report.test.js
+index f6f9c3e4b328a1f712722d7bfef92d28a052d100..b3948b976f71e032721fd74a3d4f26f74eb0dada 100644
+--- a/__tests__/consumables/consumable-result-report.test.js
++++ b/__tests__/consumables/consumable-result-report.test.js
+@@ -79,15 +79,16 @@ describe('consolidated consumable result report', () => {
+       ...vitalResult,
+     });
+ 
+-    expect(report.positive).toEqual([
+-      'Применено на вас: Антирадин.',
+-      'Уровень радиации снижен на 4.',
+-    ]);
++    expect(report.positive).toEqual(['Уровень радиации снижен на 4.']);
++    expect(report.message).not.toContain('Применено');
+     expect(report.message).not.toContain('Моментальный положительный эффект');
+     expect(report.message).not.toContain('Убирает 4 радиации');
+   });
+ 
+-  it('reports only application when Antiradin changes zero radiation', () => {
++  it.each([
++    ['нулевой радиации', { radiation: 0 }],
++    ['иммунитете к радиации', { radiation: 7, radiationImmune: true }],
++  ])('reports only a short application confirmation at %s', (_case, radiationState) => {
+     const antiradin = {
+       name: 'Антирадин',
+       positiveEffect: {},
+@@ -98,7 +99,7 @@ describe('consolidated consumable result report', () => {
+     const vitalResult = resolveConsumableVitalChanges(antiradin, {
+       currentHealth: 8,
+       maxHealth: 10,
+-      radiation: 0,
++      ...radiationState,
+     });
+     const report = buildConsumableResultReport({
+       itemName: antiradin.name,
+@@ -106,7 +107,8 @@ describe('consolidated consumable result report', () => {
+       ...vitalResult,
+     });
+ 
+-    expect(report.positive).toEqual(['Применено на вас: Антирадин.']);
++    expect(report.positive).toEqual(['Применено: Антирадин.']);
++    expect(report.message).not.toContain('на вас');
+   });
+ 
+   it('combines positive and negative outcomes without roll details', () => {
+@@ -137,7 +139,6 @@ describe('consolidated consumable result report', () => {
+ 
+     expect(report.title).toBe('Результат применения');
+     expect(report.positive).toEqual([
+-      'Применено на вас: Сырая еда.',
+       'Восстановлено 3 единиц здоровья.',
+       'Положительный эффект.',
+     ]);
+@@ -164,10 +165,7 @@ describe('consolidated consumable result report', () => {
+       conditionRemovalsRequested: removal.requested,
+     });
+ 
+-    expect(report.positive).toEqual([
+-      'Применено на вас: Антибиотики.',
+-      'Все болезни вылечены.',
+-    ]);
++    expect(report.positive).toEqual(['Все болезни вылечены.']);
+     expect(report.negative).toEqual([]);
+     expect(report.message).not.toContain('Отрицательный результат');
+   });
+@@ -199,7 +197,10 @@ describe('consolidated consumable result report', () => {
+       },
+     });
+ 
++    expect(report.positive).toEqual([]);
+     expect(report.negative).toEqual([expected]);
++    expect(report.message).not.toContain('Применено');
++    expect(report.message).not.toContain('Положительный результат');
+   });
+ 
+   it('puts avoided risks and radiation reduction in the positive section', () => {
+@@ -211,7 +212,6 @@ describe('consolidated consumable result report', () => {
+     });
+ 
+     expect(report.positive).toEqual([
+-      'Применено на вас: Препарат.',
+       'Уровень радиации снижен на 4.',
+       'Проверка заражения пройдена.',
+       'Зависимость не наступила.',
+@@ -219,11 +219,13 @@ describe('consolidated consumable result report', () => {
+     expect(report.negative).toEqual([]);
+   });
+ 
+-  it('creates a single positive report when used on another character', () => {
+-    const report = buildConsumableResultReport({ itemName: 'Стимулятор', target: 'other' });
++  it('uses a short application confirmation when there are no factual results', () => {
++    const report = buildConsumableResultReport({ itemName: 'Стимулятор' });
+ 
+-    expect(report.positive).toEqual(['Применено на другого персонажа: Стимулятор.']);
++    expect(report.positive).toEqual(['Применено: Стимулятор.']);
+     expect(report.negative).toEqual([]);
++    expect(report.message).not.toContain('на вас');
++    expect(report.message).not.toContain('на другого персонажа');
+   });
+ 
+   it('uses the engine locale for report structure', () => {
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 33eb6011fe3923a2657dd54e3c9a2577e62c0868..45112136854733d71039ad0f1875905f51e0a95c 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -359,7 +359,7 @@ const InventoryScreen = () => {
+     };
+ 
+     const applyToOther = () => {
+-      const report = buildConsumableResultReport({ itemName, target: 'other' });
++      const report = buildConsumableResultReport({ itemName });
+       showAlert(report.title, report.message);
+       handleRemoveItem(consumableItem, 1);
+     };
+diff --git a/components/screens/InventoryScreen/logic/consumableResultReport.js b/components/screens/InventoryScreen/logic/consumableResultReport.js
+index 79a691ba8b48e7c3050a3d8c437d1cfd9a5cef21..7ee1bd214e33b40db9debc9b1ae0b4808b38389c 100644
+--- a/components/screens/InventoryScreen/logic/consumableResultReport.js
++++ b/components/screens/InventoryScreen/logic/consumableResultReport.js
+@@ -35,7 +35,6 @@ const diseaseFailureMessage = (diseaseRiskResult) => {
+  */
+ export const buildConsumableResultReport = ({
+   itemName,
+-  target = 'self',
+   timedResult,
+   addictionResult,
+   diseaseRiskResult,
+@@ -44,13 +43,7 @@ export const buildConsumableResultReport = ({
+   healAmount = 0,
+   radiationAmount = null,
+ }) => {
+-  if (target !== 'self' && target !== 'other') {
+-    throw new Error(`[consumableResultReport] Неизвестная цель расходника: ${target}`);
+-  }
+-  const appliedMessageKey = target === 'self' ? 'appliedSelfMessage' : 'appliedOtherMessage';
+-  const positive = [
+-    formatInventoryText(tInventory(`screen.alerts.${appliedMessageKey}`), { itemName }),
+-  ];
++  const positive = [];
+   const negative = [];
+ 
+   if (healAmount > 0) {
+@@ -96,9 +89,16 @@ export const buildConsumableResultReport = ({
+     }
+   }
+ 
+-  const sections = [
+-    `${tInventory('screen.alerts.positiveResultSection')}\n${bulletList(positive)}`,
+-  ];
++  // Выбор цели уже подтверждает применение. Повторяем это только когда
++  // расходник не дал ни одного отдельного фактического результата.
++  if (positive.length === 0 && negative.length === 0) {
++    positive.push(formatInventoryText(tInventory('screen.alerts.appliedMessage'), { itemName }));
++  }
++
++  const sections = [];
++  if (positive.length > 0) {
++    sections.push(`${tInventory('screen.alerts.positiveResultSection')}\n${bulletList(positive)}`);
++  }
+   if (negative.length > 0) {
+     sections.push(`${tInventory('screen.alerts.negativeResultSection')}\n${bulletList(negative)}`);
+   }
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index acebb9d064b1922f0616eee602196848d72e2997..a956ba93b3512930190ff92e06a31fe28a911e66 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -31,8 +31,7 @@
+     "healMessage": "Restored {healAmount} health.",
+     "radiationTitle": "Radiation",
+     "radiationMessage": "Radiation level change: {radiationAmount}.",
+-    "appliedSelfMessage": "Used on you: {itemName}.",
+-    "appliedOtherMessage": "Used on another character: {itemName}.",
++    "appliedMessage": "Used: {itemName}.",
+     "robotCannotSelfUseTitle": "Robot restriction",
+     "robotCannotSelfUseMessage": "Robots cannot use food, drinks or chems on themselves.",
+     "robotOnlyWeaponTitle": "Equipment restriction",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 3825b2abbfb6fe093cc14ff47764b6c247ee394b..e066bc46aa248280be00f75d38b78193877779af 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -31,8 +31,7 @@
+     "healMessage": "Восстановлено {healAmount} единиц здоровья.",
+     "radiationTitle": "Радиация",
+     "radiationMessage": "Изменение уровня радиации: {radiationAmount}.",
+-    "appliedSelfMessage": "Применено на вас: {itemName}.",
+-    "appliedOtherMessage": "Применено на другого персонажа: {itemName}.",
++    "appliedMessage": "Применено: {itemName}.",
+     "robotCannotSelfUseTitle": "Ограничение робота",
+     "robotCannotSelfUseMessage": "Роботы не могут применять еду, напитки и препараты на себя.",
+     "robotOnlyWeaponTitle": "Ограничение экипировки",
