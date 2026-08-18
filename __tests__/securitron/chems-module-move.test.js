@@ -42,4 +42,17 @@ describe('Химка в модуле (сеттинг), data/ — пустой д
     expect(catalog.chems.find((c) => c.id === 'chem_stimpak').name).toBe('Стимулятор');
     expect(catalog.chems.every((c) => c.itemType === 'chem')).toBe(true);
   });
+
+  it('хранит Антирадин с единым верхнеуровневым radiationModifier', () => {
+    const radaway = moduleChems.find((chem) => chem.id === 'chem_radaway');
+    const diluted = moduleChems.find((chem) => chem.id === 'chem_radaway_diluted');
+
+    expect(radaway.radiationModifier).toEqual({ op: '-', value: 4 });
+    expect(diluted.radiationModifier).toEqual({ op: '-', value: 2 });
+    expect(Object.hasOwn(radaway.positiveEffect, 'radiationModifier')).toBe(false);
+    expect(Object.hasOwn(diluted.positiveEffect, 'radiationModifier')).toBe(false);
+    expect(moduleRuChems.find((chem) => chem.id === 'chem_radaway').name).toBe('Антирадин');
+    expect(moduleRuChems.find((chem) => chem.id === 'chem_radaway_diluted').name)
+      .toBe('Антирадин (разбавленный)');
+  });
 });

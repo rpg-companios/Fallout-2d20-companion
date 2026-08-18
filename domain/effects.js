@@ -201,14 +201,41 @@ export const getTimedAttributeModifiers = (activeEffects = []) => (
 );
 
 /**
+ * Добавляет дозу в скользящее временное окно и возвращает общий размер пула.
+ * Содержимое записей задаёт сеттинг; движок учитывает только их takenAt.
+ */
+export const recordDoseWithinWindow = (doseLog, dose, { now, windowMs }) => {
+    if (!Array.isArray(doseLog)) {
+        throw new Error('[effects] doseLog должен быть массивом');
+    }
+    if (doseLog.some((entry) => !entry || !Number.isFinite(entry.takenAt))) {
+        throw new Error('[effects] Каждая запись doseLog должна содержать числовой takenAt');
+    }
+    if (!dose || !Number.isFinite(dose.takenAt)) {
+        throw new Error('[effects] dose должен содержать числовой takenAt');
+    }
+    if (!Number.isFinite(now) || !Number.isFinite(windowMs) || windowMs <= 0) {
+        throw new Error('[effects] Некорректное временное окно доз');
+    }
+
+    const activeDoses = doseLog.filter(({ takenAt }) => now - takenAt < windowMs);
+    const nextDoseLog = [...activeDoses, dose];
+
+    return {
+        doseLog: nextDoseLog,
+        doseCount: nextDoseLog.length,
+    };
+};
+
+/**
  * Проверяет возникновение зависимости при приёме препарата.
  *
- * Механика: бросаем N Combat Dice (N = дозы за 24 ч),
+ * Механика: бросаем N Combat Dice (N = все дозы препаратов за 24 ч),
  * считаем грани 5 и 6 как "эффекты".
  * Если effectCount >= addictionLevel → зависимость.
  *
  * @param {object} item          — предмет с полем addictionLevel
- * @param {number} dosesToday    — сколько доз этого препарата принято за 24 ч (включая текущую)
+ * @param {number} dosesToday    — сколько всего доз препаратов принято за 24 ч (включая текущую)
  * @param {object} [options]     — { anyEffect?: boolean } (Тень и Стелс-бой:
  *                                 зависимость при ЛЮБОМ эффекте на кубике)
  * @returns {{ addicted: boolean, effectCount: number, faces: number[], addictionLevel: number }}
@@ -236,28 +263,33 @@ export const checkAddiction = (item, dosesToday, options = {}) => {
  *
  * @param {object}   item       — предмет с полем positiveEffect.removeCondition
  * @param {string[]} conditions — текущие условия персонажа
- * @returns {{ conditions: string[], removed: string[] }}
+ * @returns {{ conditions: string[], removed: string[], requested: string[] }}
  */
 export const applyRemoveConditions = (item, conditions = []) => {
     const positiveEffect = item?.positiveEffect;
     if (!positiveEffect || typeof positiveEffect !== 'object') {
-        return { conditions, removed: [] };
+        return { conditions, removed: [], requested: [] };
     }
-    const toRemove = Array.isArray(positiveEffect.removeCondition)
+    const requested = Array.isArray(positiveEffect.removeCondition)
         ? positiveEffect.removeCondition.map(toStringSafe).filter(Boolean)
         : [];
-    if (toRemove.length === 0) {
-        return { conditions, removed: [] };
+    if (requested.length === 0) {
+        return { conditions, removed: [], requested };
     }
-    const removed = conditions.filter((c) => toRemove.includes(c));
-    const next = conditions.filter((c) => !toRemove.includes(c));
-    return { conditions: next, removed };
+    const removed = conditions.filter((condition) => requested.includes(condition));
+    const next = conditions.filter((condition) => !requested.includes(condition));
+    return { conditions: next, removed, requested };
 };
 
 export const applyConsumableToEffects = (item, currentEffects = []) => {
     const name = toStringSafe(item?.name || item?.Name);
     let nextEffects = [...currentEffects];
     const events = [];
+    const notificationEvents = [];
+    const addNotificationEvent = (kind, message) => {
+        events.push(message);
+        notificationEvents.push({ kind, message });
+    };
 
     const removeNegativeEffects = normalizeRemovalEffects(
         item?.removeNegativeEffects ?? item?.removesNegativeEffects
@@ -276,7 +308,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
             const clearedLabel = removeNegativeEffects.includes('all')
                 ? tEffects('events.effectsClearedAll')
                 : removeNegativeEffects.join(', ');
-            events.push(tEffects('events.effectsCleared', { effects: clearedLabel }));
+            addNotificationEvent('positive', tEffects('events.effectsCleared', { effects: clearedLabel }));
         }
     }
 
@@ -298,7 +330,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 sourceName: name,
                 maxHpModifier: mod,
             }));
-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -316,7 +348,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 sourceName: name,
                 damageModifier: mod,
             }));
-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -334,7 +366,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 sourceName: name,
                 apModifier: mod,
             }));
-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -352,7 +384,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 sourceName: name,
                 defenseModifier: mod,
             }));
-            events.push(tEffects('events.positiveApplied', { name: effectLabel, scenes: positiveDuration.scenes }));
+            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectLabel, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -371,18 +403,30 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                     sourceName: name,
                     damageResistanceModifier: { type, op: mod.op, value },
                 }));
-                events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+                addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
             }
         }
     }
 
-    // Строковый/label positiveEffect — timed-эффект для отображения
+    // Строковый/label positiveEffect — timed-эффект для отображения.
+    // Мгновенная подпись является только описанием предмета и не дублируется,
+    // когда итог уже строится из структурированных лечения, радиации или
+    // снятия состояний. При нулевом фактическом результате остаётся только
+    // сообщение о применении предмета.
     const positiveName = toStringSafe(item?.positiveEffectLabel || (!positiveEffectIsObject ? positiveEffectRaw : ''));
     const positiveLabel = toStringSafe(item?.positiveEffectLabel);
+    const hasStructuredInstantPositiveResult = Boolean(
+        positiveEffectRaw?.hpModifier
+        || item?.hpHealed != null
+        || item?.healAmount != null
+        || item?.radiationModifier != null
+        || (Array.isArray(positiveEffectRaw?.removeCondition)
+            && positiveEffectRaw.removeCondition.length > 0)
+    );
 
     if (positiveName && positiveDuration.type !== 'none') {
-        if (positiveDuration.type === 'instant') {
-            events.push(tEffects('events.instantPositive', { name: positiveName }));
+        if (positiveDuration.type === 'instant' && !hasStructuredInstantPositiveResult) {
+            addNotificationEvent('positive', tEffects('events.instantPositive', { name: positiveName }));
         } else if (positiveDuration.scenes > 0) {
             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
                 effectName: positiveName,
@@ -391,7 +435,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 scenes: positiveDuration.scenes,
                 sourceName: name,
             }));
-            events.push(tEffects('events.positiveApplied', { name: positiveName, scenes: positiveDuration.scenes }));
+            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: positiveName, scenes: positiveDuration.scenes }));
         }
     }
 
@@ -401,7 +445,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
 
     if (negativeName && negativeDuration.type !== 'none') {
         if (negativeDuration.type === 'instant') {
-            events.push(tEffects('events.instantNegative', { name: negativeName }));
+            addNotificationEvent('negative', tEffects('events.instantNegative', { name: negativeName }));
         } else if (negativeDuration.scenes > 0) {
             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
                 effectName: negativeName,
@@ -410,13 +454,14 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
                 scenes: negativeDuration.scenes,
                 sourceName: name,
             }));
-            events.push(tEffects('events.negativeApplied', { name: negativeName, scenes: negativeDuration.scenes }));
+            addNotificationEvent('negative', tEffects('events.negativeApplied', { name: negativeName, scenes: negativeDuration.scenes }));
         }
     }
 
     return {
         effects: nextEffects,
         events,
+        notificationEvents,
     };
 };
 
@@ -487,22 +532,44 @@ export const getInstantHealAmount = (item) => {
 };
 
 /**
- * Бросает модификатор радиации расходника по единой схеме движка.
- * null означает, что броска не было (нет модификатора или есть иммунитет).
+ * Рассчитывает изменение радиации расходника по единой схеме движка.
+ * radiationModifier поддерживает два явных варианта данных:
+ * - фиксированный: { op, value };
+ * - бросковый: { op, rollType: 'rollCD', rollValue }.
+ * null означает, что изменения не было (нет модификатора или есть иммунитет).
  */
-export const rollConsumableRadiation = (item, { radiationImmune = false } = {}) => {
-    const modifier = item?.radModifier;
+export const resolveConsumableRadiationAmount = (item, { radiationImmune = false } = {}) => {
+    const modifier = item?.radiationModifier;
     if (modifier == null || radiationImmune) return null;
 
     if (
         typeof modifier !== 'object'
         || Array.isArray(modifier)
         || !['+', '-'].includes(modifier.op)
-        || modifier.rollType !== 'rollCD'
+    ) {
+        throw new Error('[effects] Некорректный radiationModifier расходника');
+    }
+
+    const hasFixedValue = Object.hasOwn(modifier, 'value');
+    const hasRollFields = Object.hasOwn(modifier, 'rollType')
+        || Object.hasOwn(modifier, 'rollValue');
+    if (hasFixedValue === hasRollFields) {
+        throw new Error('[effects] Некорректный radiationModifier расходника');
+    }
+
+    if (hasFixedValue) {
+        if (!Number.isFinite(modifier.value) || modifier.value <= 0) {
+            throw new Error('[effects] Некорректный radiationModifier расходника');
+        }
+        return modifier.op === '+' ? modifier.value : -modifier.value;
+    }
+
+    if (
+        modifier.rollType !== 'rollCD'
         || !Number.isInteger(modifier.rollValue)
         || modifier.rollValue <= 0
     ) {
-        throw new Error('[effects] Некорректный radModifier расходника');
+        throw new Error('[effects] Некорректный radiationModifier расходника');
     }
 
     const { total } = rollMultipleCombatDice(modifier.rollValue);
@@ -538,11 +605,16 @@ export const resolveConsumableVitalChanges = (item, {
         ? Math.min(maxHealth, currentHealth + healAmount)
         : currentHealth;
 
-    // Строгий порядок: сначала здоровье, затем бросок и изменение радиации.
-    const radiationAmount = rollConsumableRadiation(item, { radiationImmune });
-    const radiationAfter = radiationAmount === null
+    // Строгий порядок: сначала здоровье, затем расчёт и изменение радиации.
+    const requestedRadiationAmount = resolveConsumableRadiationAmount(item, { radiationImmune });
+    const radiationAfter = requestedRadiationAmount === null
         ? radiation
-        : Math.max(0, radiation + radiationAmount);
+        : Math.max(0, radiation + requestedRadiationAmount);
+    // Отчёт показывает фактическое изменение: при radiation = 2 и модификаторе
+    // -4 счётчик станет 0, а снято будет 2 очка радиации.
+    const radiationAmount = requestedRadiationAmount === null
+        ? null
+        : radiationAfter - radiation;
 
     return {
         healAmount,
@@ -626,6 +698,7 @@ export default {
     SCENE_RULES,
     getDefenseModifierEffectLabel,
     applyConsumableToEffects,
+    recordDoseWithinWindow,
     checkAddiction,
     applyRemoveConditions,
     advanceEffectsByScene,
@@ -637,7 +710,7 @@ export default {
     getTimedApBonus,
     getTimedDefenseBonus,
     getInstantHealAmount,
-    rollConsumableRadiation,
+    resolveConsumableRadiationAmount,
     resolveConsumableVitalChanges,
     getEffectTimeText,
 };

@@ -31,8 +31,7 @@
     "healMessage": "Restored {healAmount} health.",
     "radiationTitle": "Radiation",
     "radiationMessage": "Radiation level change: {radiationAmount}.",
-    "appliedSelfMessage": "{itemName} was used on you.",
-    "appliedOtherMessage": "{itemName} was used on another character.",
+    "appliedMessage": "Used: {itemName}.",
     "robotCannotSelfUseTitle": "Robot restriction",
     "robotCannotSelfUseMessage": "Robots cannot use food, drinks or chems on themselves.",
     "robotOnlyWeaponTitle": "Equipment restriction",
@@ -69,7 +68,26 @@
     "diseaseCheckMessage": "Difficulty: {difficulty}\nd20 rolls: {rolls}\nSuccesses: {successes}",
     "diseaseInfectedMessage": "{check}\nInfected with {diseaseName} (d20: {diseaseRoll}).",
     "diseaseDuplicateMessage": "{check}\n{diseaseName} is already active.",
-    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll})."
+    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll}).",
+    "consumableResultTitle": "Use result",
+    "positiveResultSection": "Positive result",
+    "negativeResultSection": "Negative result",
+    "radiationIncreaseMessage": "Radiation level increased by {radiationAmount}.",
+    "radiationDecreaseMessage": "Radiation level decreased by {radiationAmount}.",
+    "diseaseCheckPassedSummary": "Disease check passed.",
+    "diseaseInfectedSummary": "Disease check failed. Infected with {diseaseName}.",
+    "diseaseDuplicateSummary": "Disease check failed. {diseaseName} is already active.",
+    "diseaseImmuneSummary": "Disease check failed. Immunity prevented infection with {diseaseName}.",
+    "conditionRemoval": {
+      "addicted": {
+        "removed": "Addiction cured.",
+        "notPresent": "No active addiction."
+      },
+      "diseased": {
+        "removed": "All diseases cured.",
+        "notPresent": "No active diseases."
+      }
+    }
   },
   "actions": {
     "cancel": "Cancel",

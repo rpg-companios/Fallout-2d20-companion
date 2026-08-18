@@ -22,6 +22,7 @@ import {
 } from '../../../domain/powerArmor';
 import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+import { buildConsumableResultReport } from './logic/consumableResultReport';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -174,17 +175,13 @@ const InventoryScreen = () => {
     return [...fromStore, ...extras];
   }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
 
-  const showAlert = (title, message = '') => {
+  const showAlert = (title, message = '', buttons) => {
     const text = message ? `${title}\n\n${message}` : title;
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
       window.alert(text);
       return;
     }
-    if (message) {
-      Alert.alert(title, message);
-    } else {
-      Alert.alert(title);
-    }
+    Alert.alert(title, message, buttons);
   };
   
   const [isCapsModalVisible, setIsCapsModalVisible] = useState(false);
@@ -356,88 +353,14 @@ const InventoryScreen = () => {
       // Полная логика расходника меняет показатели в порядке: лечение, радиация,
       // затем обрабатывает длительные эффекты, состояния и зависимость.
       const result = applyConsumableFull(consumableItem);
-      const {
-        timedResult,
-        addictionResult,
-        diseaseRiskResult,
-        conditionsRemoved,
-        healAmount,
-        radiationAmount,
-      } = result;
-
-      if (healAmount > 0) {
-        showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount }));
-      } else {
-        debugLog('consumable.screen.noHeal', { itemName });
-        showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedSelfMessage'), { itemName }));
-      }
-
-      if (radiationAmount !== null) {
-        showAlert(
-          tInventory('screen.alerts.radiationTitle'),
-          formatInventoryText(tInventory('screen.alerts.radiationMessage'), { radiationAmount }),
-        );
-      }
-
-      // Эффекты от timed-эффектов
-      if (timedResult.events.length > 0) {
-        showAlert(tInventory('screen.alerts.effectsTitle'), timedResult.events.join('\n'));
-      }
-
-      // Удаление условий (аддиктол, антибиотики)
-      if (conditionsRemoved.length > 0) {
-        showAlert(
-          tInventory('screen.alerts.conditionsRemovedTitle'),
-          formatInventoryText(tInventory('screen.alerts.conditionsRemovedMessage'), { conditions: conditionsRemoved.join(', ') }));
-      }
-
-      if (diseaseRiskResult?.status === 'checked') {
-        const { check, disease, diseaseRoll, infectionStatus } = diseaseRiskResult;
-        const checkText = formatInventoryText(
-          tInventory('screen.alerts.diseaseCheckMessage'),
-          {
-            difficulty: check.difficulty,
-            rolls: check.rolls.join(', '),
-            successes: check.successes,
-          },
-        );
-        let message = checkText;
-        if (!check.passed) {
-          const messageKey = infectionStatus === 'immune'
-            ? 'diseaseImmuneMessage'
-            : (infectionStatus === 'duplicate' ? 'diseaseDuplicateMessage' : 'diseaseInfectedMessage');
-          message = formatInventoryText(tInventory(`screen.alerts.${messageKey}`), {
-            check: checkText,
-            diseaseName: disease.name,
-            diseaseRoll,
-          });
-        }
-        showAlert(
-          tInventory(`screen.alerts.${check.passed ? 'diseaseCheckPassedTitle' : 'diseaseCheckFailedTitle'}`),
-          message,
-        );
-      }
-
-      // Результат броска на зависимость
-      if (addictionResult) {
-        const { effectCount, faces, addicted, addictionLevel } = addictionResult;
-        const facesText = faces.join(', ');
-        showAlert(
-          tInventory('screen.alerts.addictionRollTitle'),
-          formatInventoryText(tInventory('screen.alerts.addictionRollMessage'), { faces: facesText, effectCount, addictionLevel })
-        );
-        if (addicted) {
-          showAlert(tInventory('screen.alerts.addictionGainedTitle'), tInventory('screen.alerts.addictionGainedMessage'));
-        } else {
-          showAlert(tInventory('screen.alerts.addictionAvoidedTitle'), tInventory('screen.alerts.addictionAvoidedMessage'));
-        }
-      }
-
+      const report = buildConsumableResultReport({ itemName, ...result });
+      showAlert(report.title, report.message);
       handleRemoveItem(consumableItem, 1);
     };
 
     const applyToOther = () => {
-      showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedOtherMessage'), { itemName }));
+      const report = buildConsumableResultReport({ itemName });
+      showAlert(report.title, report.message);
       handleRemoveItem(consumableItem, 1);
     };
 

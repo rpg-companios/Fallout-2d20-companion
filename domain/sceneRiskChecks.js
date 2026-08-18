@@ -5,7 +5,7 @@ const MINUTE_MS = 60 * 1000;
 export const createSceneRiskState = () => ({
   sceneStartedAt: null,
   eventIds: [],
-  difficultyModifier: 0,
+  pendingDifficultyModifier: 0,
 });
 
 const assertFiniteInteger = (value, label, { min = 0 } = {}) => {
@@ -23,6 +23,13 @@ const assertRule = (rule) => {
   }
   assertFiniteInteger(rule.sceneDurationMinutes, 'sceneDurationMinutes', { min: 1 });
   assertFiniteInteger(rule.maxDifficulty, 'maxDifficulty', { min: 1 });
+  if (
+    !Array.isArray(rule.eventTypes)
+    || rule.eventTypes.some((eventId) => typeof eventId !== 'string' || !eventId)
+    || new Set(rule.eventTypes).size !== rule.eventTypes.length
+  ) {
+    throw new Error('[sceneRiskChecks] eventTypes must contain unique non-empty strings');
+  }
   if (typeof rule.test?.attribute !== 'string' || !rule.test.attribute) {
     throw new Error('[sceneRiskChecks] test.attribute is required');
   }
@@ -34,8 +41,8 @@ const assertRule = (rule) => {
   }
   assertFiniteInteger(rule.roll.rollValue, 'roll.rollValue', { min: 1 });
   assertFiniteInteger(
-    rule.complication?.subsequentDifficultyModifier,
-    'complication.subsequentDifficultyModifier',
+    rule.complication?.nextEventDifficultyModifier,
+    'complication.nextEventDifficultyModifier',
   );
 };
 
@@ -52,7 +59,19 @@ const assertState = (state) => {
   if (new Set(state.eventIds).size !== state.eventIds.length) {
     throw new Error('[sceneRiskChecks] eventIds must be unique');
   }
-  assertFiniteInteger(state.difficultyModifier, 'difficultyModifier');
+  assertFiniteInteger(state.pendingDifficultyModifier, 'pendingDifficultyModifier');
+};
+
+const assertStateRegistry = (states) => {
+  if (!states || typeof states !== 'object' || Array.isArray(states)) {
+    throw new Error('[sceneRiskChecks] Scene risk states must be an object');
+  }
+  Object.entries(states).forEach(([ruleId, state]) => {
+    if (!ruleId) {
+      throw new Error('[sceneRiskChecks] Scene risk state rule id is required');
+    }
+    assertState(state);
+  });
 };
 
 const resetExpiredScene = (rule, state, now) => {
@@ -85,6 +104,9 @@ export const resolveSceneRiskEvent = ({
   if (typeof eventId !== 'string' || !eventId) {
     throw new Error('[sceneRiskChecks] eventId is required');
   }
+  if (!rule.eventTypes.includes(eventId)) {
+    throw new Error(`[sceneRiskChecks] Rule "${rule.id}" does not declare event type "${eventId}"`);
+  }
   if (!Number.isFinite(now) || now < 0) {
     throw new Error('[sceneRiskChecks] Invalid clock');
   }
@@ -97,9 +119,10 @@ export const resolveSceneRiskEvent = ({
   const eventIds = [...currentState.eventIds, eventId];
   const sceneStartedAt = currentState.sceneStartedAt ?? now;
   const baseDifficulty = Math.min(rule.maxDifficulty, eventIds.length);
+  const appliedDifficultyModifier = currentState.pendingDifficultyModifier;
   const difficulty = Math.min(
     rule.maxDifficulty,
-    baseDifficulty + currentState.difficultyModifier,
+    baseDifficulty + appliedDifficultyModifier,
   );
   const d20Check = resolveD20Check({
     attributeValue,
@@ -110,19 +133,16 @@ export const resolveSceneRiskEvent = ({
     rollD20,
   });
   const addedDifficulty = (
-    d20Check.complicationCount * rule.complication.subsequentDifficultyModifier
+    d20Check.complicationCount * rule.complication.nextEventDifficultyModifier
   );
-  const difficultyModifier = Math.min(
-    rule.maxDifficulty,
-    currentState.difficultyModifier + addedDifficulty,
-  );
+  const pendingDifficultyModifier = Math.min(rule.maxDifficulty, addedDifficulty);
 
   return {
     status: 'checked',
     state: {
       sceneStartedAt,
       eventIds,
-      difficultyModifier,
+      pendingDifficultyModifier,
     },
     check: {
       ruleId: rule.id,
@@ -130,8 +150,42 @@ export const resolveSceneRiskEvent = ({
       attribute: rule.test.attribute,
       skill: rule.test.skill,
       baseDifficulty,
+      appliedDifficultyModifier,
       ...d20Check,
       addedDifficulty,
+    },
+  };
+};
+
+/**
+ * Owns the canonical scene state for every risk rule of one character.
+ * Event categories never keep local counters, and resolving an event updates
+ * this registry synchronously before control returns to UI code.
+ */
+export const createSceneRiskTracker = (initialStates) => {
+  assertStateRegistry(initialStates);
+  let states = initialStates;
+
+  return {
+    getStates: () => states,
+    replaceStates: (nextStates) => {
+      assertStateRegistry(nextStates);
+      states = nextStates;
+      return states;
+    },
+    resolveEvent: (params) => {
+      const { rule } = params;
+      const result = resolveSceneRiskEvent({
+        ...params,
+        state: states[rule.id] ?? createSceneRiskState(),
+      });
+      if (result.status === 'checked') {
+        states = {
+          ...states,
+          [rule.id]: result.state,
+        };
+      }
+      return { result, states };
     },
   };
 };

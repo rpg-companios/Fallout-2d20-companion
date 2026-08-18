@@ -1000,6 +1000,37 @@ const MIGRATIONS = [
     sceneRiskStates: {},
   }),
 
+  // v15 -> v16: осложнения больше не накапливаются до конца сцены. Поле
+  // хранит только модификатор для одной следующей новой категории события.
+  (state) => {
+    if (
+      !state.sceneRiskStates
+      || typeof state.sceneRiskStates !== 'object'
+      || Array.isArray(state.sceneRiskStates)
+    ) {
+      throw new Error('[migrations] v15 sceneRiskStates must be an object');
+    }
+    const sceneRiskStates = Object.fromEntries(
+      Object.entries(state.sceneRiskStates).map(([ruleId, sceneState]) => {
+        if (
+          !sceneState
+          || typeof sceneState !== 'object'
+          || Array.isArray(sceneState)
+          || !Number.isInteger(sceneState.difficultyModifier)
+          || sceneState.difficultyModifier < 0
+        ) {
+          throw new Error(`[migrations] Invalid v15 scene-risk state for rule "${ruleId}"`);
+        }
+        const { difficultyModifier, ...unchanged } = sceneState;
+        return [ruleId, {
+          ...unchanged,
+          pendingDifficultyModifier: difficultyModifier,
+        }];
+      }),
+    );
+    return { ...state, sceneRiskStates };
+  },
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.

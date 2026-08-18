@@ -33,9 +33,9 @@ const migrateSkillsToCanonical = (rawSkills) => {
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
-import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
-import { createSceneRiskState, getSceneRiskEventForRule, resolveSceneRiskEvent } from '../domain/sceneRiskChecks';
+import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
 import { isSkillTagged } from '../domain/d20Checks';
 import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
@@ -83,6 +83,7 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/save
 import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
 const INITIAL_LEVEL = 1;
+const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 const CharacterContext = createContext();
 
@@ -301,13 +302,15 @@ export const CharacterProvider = ({ children }) => {
   const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
   const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
   const [sceneRiskStates, setSceneRiskStates] = useState({});
-  const sceneRiskStatesRef = useRef(sceneRiskStates);
+  const sceneRiskTrackerRef = useRef(null);
+  if (sceneRiskTrackerRef.current === null) {
+    sceneRiskTrackerRef.current = createSceneRiskTracker(sceneRiskStates);
+  }
 
   const isSavedRef = useRef(isSaved);
   const characterIdRef = useRef(characterId);
   useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
   useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
-  useEffect(() => { sceneRiskStatesRef.current = sceneRiskStates; }, [sceneRiskStates]);
 
   // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
   // Производные значения (carryWeight, meleeBonus, defense, initiative …)
@@ -776,8 +779,8 @@ export const CharacterProvider = ({ children }) => {
       setEffects(data.effects || []);
       setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
       setSceneCounter(data.sceneCounter ?? 0);
+      sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
       setSceneRiskStates(data.sceneRiskStates);
-      sceneRiskStatesRef.current = data.sceneRiskStates;
       // Migrate old [null, null] format to dynamic array
       const rawWeapons = data.equippedWeapons || [];
       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
@@ -823,7 +826,7 @@ export const CharacterProvider = ({ children }) => {
       setDefense(data.defense ?? 1);
       setConditions(data.conditions || []);
       setChemDosesLog(
-        (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < 24 * 60 * 60 * 1000)
+        (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS)
       );
       
       // Task 4.4: Migrate old format data to Zustand Store
@@ -915,21 +918,17 @@ export const CharacterProvider = ({ children }) => {
   };
 
   /**
-   * Записывает дозу препарата и возвращает количество доз за последние 24 ч.
+   * Записывает дозу препарата и возвращает общий размер пула доз за последние 24 ч.
    */
   const recordChemDose = (chemId) => {
     const now = Date.now();
-    const cutoff = now - 24 * 60 * 60 * 1000;
-    let updatedLog;
-    setChemDosesLog((prev) => {
-      updatedLog = [...prev.filter((d) => d.takenAt > cutoff), { chemId, takenAt: now }];
-      return updatedLog;
-    });
-    // Синхронный подсчёт: фильтруем текущий лог + новая доза
-    const todayDoses = chemDosesLog
-      .filter((d) => d.takenAt > cutoff && d.chemId === chemId)
-      .length + 1;
-    return todayDoses;
+    const result = recordDoseWithinWindow(
+      chemDosesLog,
+      { chemId, takenAt: now },
+      { now, windowMs: CHEM_DOSE_WINDOW_MS },
+    );
+    setChemDosesLog(result.doseLog);
+    return result.doseCount;
   };
 
   const applyDiseaseExposureForConsumable = (item) => {
@@ -955,13 +954,8 @@ export const CharacterProvider = ({ children }) => {
       );
     }
 
-    const currentStates = sceneRiskStatesRef.current;
-    if (!currentStates || typeof currentStates !== 'object' || Array.isArray(currentStates)) {
-      throw new Error('[CharacterContext] Некорректное каноническое состояние sceneRiskStates');
-    }
-    const riskResult = resolveSceneRiskEvent({
+    const { result: riskResult, states: nextStates } = sceneRiskTrackerRef.current.resolveEvent({
       rule,
-      state: currentStates[rule.id] ?? createSceneRiskState(),
       eventId: event.eventId,
       attributeValue: getAttributeValue(attributes, rule.test.attribute),
       skillValue: skill.value,
@@ -974,11 +968,6 @@ export const CharacterProvider = ({ children }) => {
 
     if (riskResult.status === 'duplicate') return riskResult;
 
-    const nextStates = {
-      ...currentStates,
-      [rule.id]: riskResult.state,
-    };
-    sceneRiskStatesRef.current = nextStates;
     setSceneRiskStates(nextStates);
 
     if (riskResult.check.passed) {
@@ -1052,7 +1041,11 @@ export const CharacterProvider = ({ children }) => {
     setActiveTimedEffects(normalizedResult.effects);
 
     // 3. removeCondition (аддиктол, антибиотики)
-    const { conditions: nextConditions, removed } = applyRemoveConditions(item, conditions);
+    const {
+      conditions: nextConditions,
+      removed,
+      requested: conditionRemovalsRequested,
+    } = applyRemoveConditions(item, conditions);
     if (removed.length > 0) {
       setConditions(nextConditions);
       // Снятие зависимости (аддиктол): удаляем перманентный эффект
@@ -1075,7 +1068,12 @@ export const CharacterProvider = ({ children }) => {
       }
     }
 
-    // 4. Зависимость
+    // 4. Зависимость. Каждая химическая доза входит в общий пул за 24 часа,
+    // даже если у текущего препарата нет свойства зависимости.
+    const dosesToday = item?.itemType === 'chem'
+      ? recordChemDose(item.id)
+      : 0;
+
     // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
     const hasPartyBoyImmunity =
       item?.isAlcohol === true &&
@@ -1093,7 +1091,6 @@ export const CharacterProvider = ({ children }) => {
       !hasPartyBoyImmunity &&
       (!isStealthBoy || isShadowCharacter)
     ) {
-      const dosesToday = recordChemDose(item.id || item.name);
       // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
       // (бросок CD, грани 5/6 = эффект).
       const anyEffect = isShadowCharacter && isStealthBoy;
@@ -1127,6 +1124,7 @@ export const CharacterProvider = ({ children }) => {
       addictionResult,
       diseaseRiskResult,
       conditionsRemoved: removed,
+      conditionRemovalsRequested,
       healAmount: vitalChanges.healAmount,
       radiationAmount: vitalChanges.radiationAmount,
     });
@@ -1136,6 +1134,7 @@ export const CharacterProvider = ({ children }) => {
       addictionResult,
       diseaseRiskResult,
       conditionsRemoved: removed,
+      conditionRemovalsRequested,
       healAmount: vitalChanges.healAmount,
       radiationAmount: vitalChanges.radiationAmount,
     };
@@ -1246,8 +1245,9 @@ export const CharacterProvider = ({ children }) => {
     setEffects([]);
     setActiveTimedEffects([]);
     setSceneCounter(0);
-    setSceneRiskStates({});
-    sceneRiskStatesRef.current = {};
+    const emptySceneRiskStates = {};
+    sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
+    setSceneRiskStates(emptySceneRiskStates);
     setEquippedWeapons([]);
     useCharacterStore.persist?.clearStorage?.();
     useCharacterStore.getState().resetCharacterStore({

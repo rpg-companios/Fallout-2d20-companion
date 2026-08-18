@@ -122,11 +122,10 @@
     "weight": 0.5,
     "cost": 80,
     "rarity": 2,
-    "positiveEffect": {
-      "radiationModifier": {
-        "op": "-",
-        "value": 4
-      }
+    "positiveEffect": {},
+    "radiationModifier": {
+      "op": "-",
+      "value": 4
     },
     "negativeEffect": "",
     "positiveEffectDuration": "instant",
@@ -139,11 +138,10 @@
     "weight": 0.5,
     "cost": 50,
     "rarity": 1,
-    "positiveEffect": {
-      "radiationModifier": {
-        "op": "-",
-        "value": 2
-      }
+    "positiveEffect": {},
+    "radiationModifier": {
+      "op": "-",
+      "value": 2
     },
     "negativeEffect": "",
     "positiveEffectDuration": "instant",

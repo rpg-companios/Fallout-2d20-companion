@@ -2,6 +2,11 @@
   "id": "diseaseExposure",
   "sceneDurationMinutes": 5,
   "maxDifficulty": 5,
+  "eventTypes": [
+    "rawFood",
+    "dirtyWater",
+    "sleepOnGround"
+  ],
   "immunity": "disease",
   "test": {
     "attribute": "END",
@@ -12,7 +17,7 @@
     "rollValue": 2
   },
   "complication": {
-    "subsequentDifficultyModifier": 1
+    "nextEventDifficultyModifier": 1
   },
   "resultTable": "diseases"
 }

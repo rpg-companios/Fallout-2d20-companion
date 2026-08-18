@@ -9,6 +9,7 @@ import { hasDamageImmunity } from '../../domain/immunities';
 import { getSceneRiskRules } from '../../domain/registry';
 import {
   createSceneRiskState,
+  createSceneRiskTracker,
   getSceneRiskEventForRule,
   resolveSceneRiskEvent,
 } from '../../domain/sceneRiskChecks';
@@ -54,10 +55,11 @@ describe('Fallout disease-exposure data', () => {
       id: 'diseaseExposure',
       sceneDurationMinutes: 5,
       maxDifficulty: 5,
+      eventTypes: ['rawFood', 'dirtyWater', 'sleepOnGround'],
       immunity: 'disease',
       test: { attribute: 'END', skill: 'SURVIVAL' },
       roll: { rollType: 'rollD20', rollValue: 2 },
-      complication: { subsequentDifficultyModifier: 1 },
+      complication: { nextEventDifficultyModifier: 1 },
       resultTable: 'diseases',
     });
   });
@@ -99,21 +101,83 @@ describe('Fallout disease-exposure data', () => {
 });
 
 describe('universal scene risk checks', () => {
-  it('implements the owner example: a single 20 adds difficulty for later checks in the same scene', () => {
+  it('uses one character-level tracker for raw food, dirty water, and repeated events', () => {
+    const tracker = createSceneRiskTracker({});
+    const rawFood = moduleFood.find((item) => item.state === 'raw');
+    const dirtyWater = moduleDrinks.find((item) => item.id === 'drink_dirty_water');
+    const resolveItemEvent = (item, rolls, now) => {
+      const event = getSceneRiskEventForRule(item, diseaseExposureRule.id);
+      return tracker.resolveEvent({
+        rule: diseaseExposureRule,
+        eventId: event.eventId,
+        attributeValue: 6,
+        skillValue: 3,
+        isTagged: true,
+        now,
+        rollD20: roller(rolls),
+      }).result;
+    };
+
+    const first = resolveItemEvent(rawFood, [4, 5], 1_000);
+    expect(first.check).toMatchObject({ eventId: 'rawFood', baseDifficulty: 1, difficulty: 1 });
+
+    const second = resolveItemEvent(dirtyWater, [4, 5], 2_000);
+    expect(second.check).toMatchObject({ eventId: 'dirtyWater', baseDifficulty: 2, difficulty: 2 });
+
+    const repeatedRoll = roller([20, 20]);
+    const repeatedEvent = getSceneRiskEventForRule(rawFood, diseaseExposureRule.id);
+    const repeated = tracker.resolveEvent({
+      rule: diseaseExposureRule,
+      eventId: repeatedEvent.eventId,
+      attributeValue: 6,
+      skillValue: 3,
+      isTagged: true,
+      now: 3_000,
+      rollD20: repeatedRoll,
+    }).result;
+    expect(repeated).toMatchObject({ status: 'duplicate', check: null });
+    expect(repeatedRoll).not.toHaveBeenCalled();
+    expect(tracker.getStates()[diseaseExposureRule.id].eventIds).toEqual(['rawFood', 'dirtyWater']);
+  });
+
+  it('is order-independent for the first two event categories', () => {
+    const dirtyWater = check({ eventId: 'dirtyWater', rolls: [4, 5], now: 1_000 });
+    const rawFood = check({
+      state: dirtyWater.state,
+      eventId: 'rawFood',
+      rolls: [4, 5],
+      now: 2_000,
+    });
+
+    expect(dirtyWater.check).toMatchObject({ baseDifficulty: 1, difficulty: 1 });
+    expect(rawFood.check).toMatchObject({ baseDifficulty: 2, difficulty: 2 });
+  });
+
+  it('applies each natural 20 only to the next new event-category check', () => {
     const rawFood = check({ rolls: [5, 20], now: 1_000 });
     expect(rawFood.check).toMatchObject({
       baseDifficulty: 1,
       difficulty: 1,
+      appliedDifficultyModifier: 0,
       targetNumber: 9,
       successes: 1,
       complicationCount: 1,
       addedDifficulty: 1,
       passed: true,
     });
-    expect(rawFood.state.difficultyModifier).toBe(1);
+    expect(rawFood.state.pendingDifficultyModifier).toBe(1);
+
+    const repeated = check({
+      state: rawFood.state,
+      eventId: 'rawFood',
+      rolls: [20, 20],
+      now: 1_500,
+    });
+    expect(repeated.status).toBe('duplicate');
+    expect(repeated.state.pendingDifficultyModifier).toBe(1);
 
     const dirtyWater = check({
-      state: rawFood.state,
+      state: repeated.state,
       eventId: 'dirtyWater',
       rolls: [2, 8],
       now: 2_000,
@@ -121,10 +185,12 @@ describe('universal scene risk checks', () => {
     expect(dirtyWater.check).toMatchObject({
       baseDifficulty: 2,
       difficulty: 3,
+      appliedDifficultyModifier: 1,
       successes: 3,
+      complicationCount: 0,
       passed: true,
     });
-    expect(dirtyWater.state.difficultyModifier).toBe(1);
+    expect(dirtyWater.state.pendingDifficultyModifier).toBe(0);
 
     const sleepOnGround = check({
       state: dirtyWater.state,
@@ -134,13 +200,14 @@ describe('universal scene risk checks', () => {
     });
     expect(sleepOnGround.check).toMatchObject({
       baseDifficulty: 3,
-      difficulty: 4,
+      difficulty: 3,
+      appliedDifficultyModifier: 0,
       successes: 4,
       passed: true,
     });
   });
 
-  it('applies the same subsequent-check complication to dirty water', () => {
+  it('applies the same next-event complication to dirty water', () => {
     const dirtyWater = check({
       eventId: 'dirtyWater',
       rolls: [5, 20],
@@ -153,7 +220,7 @@ describe('universal scene risk checks', () => {
       passed: true,
       outcome: 'successWithComplication',
     });
-    expect(dirtyWater.state.difficultyModifier).toBe(1);
+    expect(dirtyWater.state.pendingDifficultyModifier).toBe(1);
   });
 
   it('ignores a repeated event type during the same five-minute scene', () => {
@@ -185,12 +252,16 @@ describe('universal scene risk checks', () => {
       now: 10_000 + (5 * 60 * 1000),
     });
 
-    expect(nextScene.check).toMatchObject({ baseDifficulty: 1, difficulty: 1 });
+    expect(nextScene.check).toMatchObject({
+      baseDifficulty: 1,
+      difficulty: 1,
+      appliedDifficultyModifier: 0,
+    });
     expect(nextScene.state.eventIds).toEqual(['dirtyWater']);
-    expect(nextScene.state.difficultyModifier).toBe(0);
+    expect(nextScene.state.pendingDifficultyModifier).toBe(0);
   });
 
-  it('makes two natural 20s an automatic failure and adds +2 for later checks', () => {
+  it('makes two natural 20s an automatic failure and adds +2 only to the next check', () => {
     const result = check({ rolls: [20, 20] });
     expect(result.check).toMatchObject({
       complicationCount: 2,
@@ -198,23 +269,38 @@ describe('universal scene risk checks', () => {
       automaticFailure: true,
       passed: false,
     });
-    expect(result.state.difficultyModifier).toBe(2);
+    expect(result.state.pendingDifficultyModifier).toBe(2);
+
+    const next = check({
+      state: result.state,
+      eventId: 'dirtyWater',
+      rolls: [2, 3],
+      now: 2_000,
+    });
+    expect(next.check).toMatchObject({ baseDifficulty: 2, difficulty: 4 });
+    expect(next.state.pendingDifficultyModifier).toBe(0);
   });
 
   it('caps total difficulty at five', () => {
     const state = {
       sceneStartedAt: 1_000,
-      eventIds: ['rawFood', 'dirtyWater', 'sleepOnGround', 'otherRisk'],
-      difficultyModifier: 2,
+      eventIds: ['rawFood', 'dirtyWater'],
+      pendingDifficultyModifier: 4,
     };
     const result = check({
       state,
-      eventId: 'fifthRisk',
+      eventId: 'sleepOnGround',
       rolls: [1, 1],
       now: 2_000,
     });
-    expect(result.check.baseDifficulty).toBe(5);
+    expect(result.check.baseDifficulty).toBe(3);
     expect(result.check.difficulty).toBe(5);
+  });
+
+  it('accepts only event types explicitly declared by the setting rule', () => {
+    expect(() => check({ eventId: 'unknownRisk' })).toThrow(
+      'does not declare event type "unknownRisk"',
+    );
   });
 
   it('reads only explicit sceneRiskEvents metadata', () => {

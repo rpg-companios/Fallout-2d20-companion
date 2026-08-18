@@ -25,8 +25,8 @@ const makeShadowSave = (attributes, version = 9) => ({
 const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
 
 describe('Текущая версия формата сейва', () => {
-  it('равна 15', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(15);
+  it('равна 16', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
   });
 });
 

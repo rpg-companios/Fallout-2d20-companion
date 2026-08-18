@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import moduleFood from '../../modules/fallout/data/consumables/food.json';
+import moduleChems from '../../modules/fallout/data/consumables/chems.json';
 import ruFood from '../../modules/fallout/i18n/ru-RU/data/consumables/food.json';
 import enFood from '../../modules/fallout/i18n/en-EN/data/consumables/food.json';
 import {
   getInstantHealAmount,
   resolveConsumableVitalChanges,
-  rollConsumableRadiation,
+  resolveConsumableRadiationAmount,
 } from '../../domain/effects';
 import { hasRadiationImmunity } from '../../domain/immunities';
 
@@ -56,13 +57,14 @@ describe('каталог еды Fallout', () => {
 
     expect(irradiated).toHaveLength(44);
     expect(safe).toHaveLength(31);
-    expect(safe.every((item) => item.radModifier === null)).toBe(true);
+    expect(moduleFood.every((item) => !Object.hasOwn(item, 'radModifier'))).toBe(true);
+    expect(safe.every((item) => item.radiationModifier === null)).toBe(true);
     expect(irradiated.every((item) => (
-      item.radModifier?.op === '+'
-      && item.radModifier?.rollType === 'rollCD'
-      && [1, 2].includes(item.radModifier?.rollValue)
+      item.radiationModifier?.op === '+'
+      && item.radiationModifier?.rollType === 'rollCD'
+      && [1, 2].includes(item.radiationModifier?.rollValue)
     ))).toBe(true);
-    expect(byId(moduleFood, 'food_potted_meat').radModifier).toEqual({
+    expect(byId(moduleFood, 'food_potted_meat').radiationModifier).toEqual({
       op: '+',
       rollType: 'rollCD',
       rollValue: 2,
@@ -70,7 +72,7 @@ describe('каталог еды Fallout', () => {
   });
 });
 
-describe('применение еды движком', () => {
+describe('применение расходников движком', () => {
   it('читает лечение каждой еды из positiveEffect.hpModifier', () => {
     for (const item of moduleFood) {
       expect(getInstantHealAmount(item)).toBe(item.positiveEffect.hpModifier.value);
@@ -86,8 +88,8 @@ describe('применение еды движком', () => {
       .mockReturnValueOnce(0.7)
       .mockReturnValueOnce(0.9);
 
-    expect(rollConsumableRadiation({
-      radModifier: { op: '+', rollType: 'rollCD', rollValue: 6 },
+    expect(resolveConsumableRadiationAmount({
+      radiationModifier: { op: '+', rollType: 'rollCD', rollValue: 6 },
     })).toBe(5);
   });
 
@@ -130,8 +132,52 @@ describe('применение еды движком', () => {
     expect(random).not.toHaveBeenCalled();
   });
 
-  it('отвергает устаревшие строковые radModifier вместо их нормализации', () => {
-    expect(() => rollConsumableRadiation({ radModifier: 'rollCD' }))
-      .toThrow('[effects] Некорректный radModifier расходника');
+  it('Антирадин снимает 4 очка радиации', () => {
+    const result = resolveConsumableVitalChanges(byId(moduleChems, 'chem_radaway'), {
+      currentHealth: 8,
+      maxHealth: 10,
+      radiation: 7,
+    });
+
+    expect(result).toEqual({
+      healAmount: 0,
+      healthAfter: 8,
+      radiationAmount: -4,
+      radiationAfter: 3,
+    });
+  });
+
+  it('при нехватке радиации сообщает фактически снятое количество', () => {
+    const result = resolveConsumableVitalChanges(byId(moduleChems, 'chem_radaway'), {
+      currentHealth: 8,
+      maxHealth: 10,
+      radiation: 2,
+    });
+
+    expect(result.radiationAmount).toBe(-2);
+    expect(result.radiationAfter).toBe(0);
+  });
+
+  it('при врождённом иммунитете Антирадин не меняет радиацию', () => {
+    const result = resolveConsumableVitalChanges(byId(moduleChems, 'chem_radaway'), {
+      currentHealth: 8,
+      maxHealth: 10,
+      radiation: 7,
+      radiationImmune: true,
+    });
+
+    expect(result.radiationAmount).toBeNull();
+    expect(result.radiationAfter).toBe(7);
+  });
+
+  it('отвергает устаревшие строковые radiationModifier вместо их нормализации', () => {
+    expect(() => resolveConsumableRadiationAmount({ radiationModifier: 'rollCD' }))
+      .toThrow('[effects] Некорректный radiationModifier расходника');
+  });
+
+  it('отвергает смешение фиксированного значения и броска', () => {
+    expect(() => resolveConsumableRadiationAmount({
+      radiationModifier: { op: '-', value: 4, rollType: 'rollCD', rollValue: 1 },
+    })).toThrow('[effects] Некорректный radiationModifier расходника');
   });
 });

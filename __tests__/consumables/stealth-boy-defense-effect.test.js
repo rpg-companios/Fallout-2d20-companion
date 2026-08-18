@@ -32,6 +32,9 @@ describe('Stealth Boy defense effect', () => {
     });
     expect(result.events).toHaveLength(1);
     expect(result.events[0]).toContain('Защита: +2');
+    expect(result.notificationEvents).toEqual([
+      { kind: 'positive', message: result.events[0] },
+    ]);
     expect(getTimedDefenseBonus(result.effects)).toBe(2);
   });
 
