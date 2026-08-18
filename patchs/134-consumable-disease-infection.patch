@@ -225,10 +225,10 @@ index 0000000000000000000000000000000000000000..5c2f8badb8b01e89fa8d54c269052228
 +});
 diff --git a/__tests__/consumables/disease-exposure.test.js b/__tests__/consumables/disease-exposure.test.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34a9a11a94
+index 0000000000000000000000000000000000000000..f8ed2f6f370c9ecd4bb18338a91577677f195e28
 --- /dev/null
 +++ b/__tests__/consumables/disease-exposure.test.js
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,380 @@
 +import { describe, expect, it, vi } from 'vitest';
 +import diseaseExposureRule from '../../modules/fallout/data/rules/diseaseExposure.json';
 +import moduleFood from '../../modules/fallout/data/consumables/food.json';
@@ -240,6 +240,7 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +import { getSceneRiskRules } from '../../domain/registry';
 +import {
 +  createSceneRiskState,
++  createSceneRiskTracker,
 +  getSceneRiskEventForRule,
 +  resolveSceneRiskEvent,
 +} from '../../domain/sceneRiskChecks';
@@ -285,10 +286,11 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +      id: 'diseaseExposure',
 +      sceneDurationMinutes: 5,
 +      maxDifficulty: 5,
++      eventTypes: ['rawFood', 'dirtyWater', 'sleepOnGround'],
 +      immunity: 'disease',
 +      test: { attribute: 'END', skill: 'SURVIVAL' },
 +      roll: { rollType: 'rollD20', rollValue: 2 },
-+      complication: { subsequentDifficultyModifier: 1 },
++      complication: { nextEventDifficultyModifier: 1 },
 +      resultTable: 'diseases',
 +    });
 +  });
@@ -330,21 +332,83 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +});
 +
 +describe('universal scene risk checks', () => {
-+  it('implements the owner example: a single 20 adds difficulty for later checks in the same scene', () => {
++  it('uses one character-level tracker for raw food, dirty water, and repeated events', () => {
++    const tracker = createSceneRiskTracker({});
++    const rawFood = moduleFood.find((item) => item.state === 'raw');
++    const dirtyWater = moduleDrinks.find((item) => item.id === 'drink_dirty_water');
++    const resolveItemEvent = (item, rolls, now) => {
++      const event = getSceneRiskEventForRule(item, diseaseExposureRule.id);
++      return tracker.resolveEvent({
++        rule: diseaseExposureRule,
++        eventId: event.eventId,
++        attributeValue: 6,
++        skillValue: 3,
++        isTagged: true,
++        now,
++        rollD20: roller(rolls),
++      }).result;
++    };
++
++    const first = resolveItemEvent(rawFood, [4, 5], 1_000);
++    expect(first.check).toMatchObject({ eventId: 'rawFood', baseDifficulty: 1, difficulty: 1 });
++
++    const second = resolveItemEvent(dirtyWater, [4, 5], 2_000);
++    expect(second.check).toMatchObject({ eventId: 'dirtyWater', baseDifficulty: 2, difficulty: 2 });
++
++    const repeatedRoll = roller([20, 20]);
++    const repeatedEvent = getSceneRiskEventForRule(rawFood, diseaseExposureRule.id);
++    const repeated = tracker.resolveEvent({
++      rule: diseaseExposureRule,
++      eventId: repeatedEvent.eventId,
++      attributeValue: 6,
++      skillValue: 3,
++      isTagged: true,
++      now: 3_000,
++      rollD20: repeatedRoll,
++    }).result;
++    expect(repeated).toMatchObject({ status: 'duplicate', check: null });
++    expect(repeatedRoll).not.toHaveBeenCalled();
++    expect(tracker.getStates()[diseaseExposureRule.id].eventIds).toEqual(['rawFood', 'dirtyWater']);
++  });
++
++  it('is order-independent for the first two event categories', () => {
++    const dirtyWater = check({ eventId: 'dirtyWater', rolls: [4, 5], now: 1_000 });
++    const rawFood = check({
++      state: dirtyWater.state,
++      eventId: 'rawFood',
++      rolls: [4, 5],
++      now: 2_000,
++    });
++
++    expect(dirtyWater.check).toMatchObject({ baseDifficulty: 1, difficulty: 1 });
++    expect(rawFood.check).toMatchObject({ baseDifficulty: 2, difficulty: 2 });
++  });
++
++  it('applies each natural 20 only to the next new event-category check', () => {
 +    const rawFood = check({ rolls: [5, 20], now: 1_000 });
 +    expect(rawFood.check).toMatchObject({
 +      baseDifficulty: 1,
 +      difficulty: 1,
++      appliedDifficultyModifier: 0,
 +      targetNumber: 9,
 +      successes: 1,
 +      complicationCount: 1,
 +      addedDifficulty: 1,
 +      passed: true,
 +    });
-+    expect(rawFood.state.difficultyModifier).toBe(1);
++    expect(rawFood.state.pendingDifficultyModifier).toBe(1);
++
++    const repeated = check({
++      state: rawFood.state,
++      eventId: 'rawFood',
++      rolls: [20, 20],
++      now: 1_500,
++    });
++    expect(repeated.status).toBe('duplicate');
++    expect(repeated.state.pendingDifficultyModifier).toBe(1);
 +
 +    const dirtyWater = check({
-+      state: rawFood.state,
++      state: repeated.state,
 +      eventId: 'dirtyWater',
 +      rolls: [2, 8],
 +      now: 2_000,
@@ -352,10 +416,12 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +    expect(dirtyWater.check).toMatchObject({
 +      baseDifficulty: 2,
 +      difficulty: 3,
++      appliedDifficultyModifier: 1,
 +      successes: 3,
++      complicationCount: 0,
 +      passed: true,
 +    });
-+    expect(dirtyWater.state.difficultyModifier).toBe(1);
++    expect(dirtyWater.state.pendingDifficultyModifier).toBe(0);
 +
 +    const sleepOnGround = check({
 +      state: dirtyWater.state,
@@ -365,13 +431,14 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +    });
 +    expect(sleepOnGround.check).toMatchObject({
 +      baseDifficulty: 3,
-+      difficulty: 4,
++      difficulty: 3,
++      appliedDifficultyModifier: 0,
 +      successes: 4,
 +      passed: true,
 +    });
 +  });
 +
-+  it('applies the same subsequent-check complication to dirty water', () => {
++  it('applies the same next-event complication to dirty water', () => {
 +    const dirtyWater = check({
 +      eventId: 'dirtyWater',
 +      rolls: [5, 20],
@@ -384,7 +451,7 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +      passed: true,
 +      outcome: 'successWithComplication',
 +    });
-+    expect(dirtyWater.state.difficultyModifier).toBe(1);
++    expect(dirtyWater.state.pendingDifficultyModifier).toBe(1);
 +  });
 +
 +  it('ignores a repeated event type during the same five-minute scene', () => {
@@ -416,12 +483,16 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +      now: 10_000 + (5 * 60 * 1000),
 +    });
 +
-+    expect(nextScene.check).toMatchObject({ baseDifficulty: 1, difficulty: 1 });
++    expect(nextScene.check).toMatchObject({
++      baseDifficulty: 1,
++      difficulty: 1,
++      appliedDifficultyModifier: 0,
++    });
 +    expect(nextScene.state.eventIds).toEqual(['dirtyWater']);
-+    expect(nextScene.state.difficultyModifier).toBe(0);
++    expect(nextScene.state.pendingDifficultyModifier).toBe(0);
 +  });
 +
-+  it('makes two natural 20s an automatic failure and adds +2 for later checks', () => {
++  it('makes two natural 20s an automatic failure and adds +2 only to the next check', () => {
 +    const result = check({ rolls: [20, 20] });
 +    expect(result.check).toMatchObject({
 +      complicationCount: 2,
@@ -429,23 +500,38 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +      automaticFailure: true,
 +      passed: false,
 +    });
-+    expect(result.state.difficultyModifier).toBe(2);
++    expect(result.state.pendingDifficultyModifier).toBe(2);
++
++    const next = check({
++      state: result.state,
++      eventId: 'dirtyWater',
++      rolls: [2, 3],
++      now: 2_000,
++    });
++    expect(next.check).toMatchObject({ baseDifficulty: 2, difficulty: 4 });
++    expect(next.state.pendingDifficultyModifier).toBe(0);
 +  });
 +
 +  it('caps total difficulty at five', () => {
 +    const state = {
 +      sceneStartedAt: 1_000,
-+      eventIds: ['rawFood', 'dirtyWater', 'sleepOnGround', 'otherRisk'],
-+      difficultyModifier: 2,
++      eventIds: ['rawFood', 'dirtyWater'],
++      pendingDifficultyModifier: 4,
 +    };
 +    const result = check({
 +      state,
-+      eventId: 'fifthRisk',
++      eventId: 'sleepOnGround',
 +      rolls: [1, 1],
 +      now: 2_000,
 +    });
-+    expect(result.check.baseDifficulty).toBe(5);
++    expect(result.check.baseDifficulty).toBe(3);
 +    expect(result.check.difficulty).toBe(5);
++  });
++
++  it('accepts only event types explicitly declared by the setting rule', () => {
++    expect(() => check({ eventId: 'unknownRisk' })).toThrow(
++      'does not declare event type "unknownRisk"',
++    );
 +  });
 +
 +  it('reads only explicit sceneRiskEvents metadata', () => {
@@ -524,7 +610,7 @@ index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34
 +  });
 +});
 diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitron/shadow-migration.test.js
-index 6cec8c91e6d5ae47414e77975cc09e7ea17138b5..174db12580865d3cba4c529522c234a987202430 100644
+index 6cec8c91e6d5ae47414e77975cc09e7ea17138b5..57355f124279845cd7a528bedb47ff493637843a 100644
 --- a/__tests__/securitron/shadow-migration.test.js
 +++ b/__tests__/securitron/shadow-migration.test.js
 @@ -25,8 +25,8 @@ const makeShadowSave = (attributes, version = 9) => ({
@@ -533,38 +619,74 @@ index 6cec8c91e6d5ae47414e77975cc09e7ea17138b5..174db12580865d3cba4c529522c234a9
  describe('Текущая версия формата сейва', () => {
 -  it('равна 14', () => {
 -    expect(CURRENT_SCHEMA_VERSION).toBe(14);
-+  it('равна 15', () => {
-+    expect(CURRENT_SCHEMA_VERSION).toBe(15);
++  it('равна 16', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(16);
    });
  });
  
 diff --git a/__tests__/store/scene-risk-migration.test.js b/__tests__/store/scene-risk-migration.test.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..4c72c6de53fdc2f3d842d2d014cd891f210c7248
+index 0000000000000000000000000000000000000000..7abe37cf4bdb1d3d2723dacdc3b803fd87cd6bd8
 --- /dev/null
 +++ b/__tests__/store/scene-risk-migration.test.js
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,55 @@
 +import { describe, expect, it } from 'vitest';
 +import { migrateCharacterState } from '../../src/store/migrations';
 +import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 +
-+describe('v14 to v15 scene-risk state migration', () => {
-+  it('adds the canonical empty state through the migration chain', () => {
++describe('scene-risk state migrations', () => {
++  it('adds the canonical empty state through the v14 to v16 migration chain', () => {
 +    const migrated = migrateCharacterState({
 +      schemaVersion: 14,
 +      characterName: 'Courier',
 +    });
 +
-+    expect(CURRENT_SCHEMA_VERSION).toBe(15);
++    expect(CURRENT_SCHEMA_VERSION).toBe(16);
 +    expect(migrated).toMatchObject({
-+      schemaVersion: 15,
++      schemaVersion: 16,
 +      characterName: 'Courier',
 +      sceneRiskStates: {},
 +    });
 +  });
++
++  it('converts the v15 accumulated modifier into a one-check pending modifier', () => {
++    const migrated = migrateCharacterState({
++      schemaVersion: 15,
++      sceneRiskStates: {
++        diseaseExposure: {
++          sceneStartedAt: 1_000,
++          eventIds: ['rawFood'],
++          difficultyModifier: 1,
++        },
++      },
++    });
++
++    expect(migrated).toEqual({
++      schemaVersion: 16,
++      sceneRiskStates: {
++        diseaseExposure: {
++          sceneStartedAt: 1_000,
++          eventIds: ['rawFood'],
++          pendingDifficultyModifier: 1,
++        },
++      },
++    });
++  });
++
++  it('rejects a malformed v15 scene state instead of inventing defaults', () => {
++    expect(() => migrateCharacterState({
++      schemaVersion: 15,
++      sceneRiskStates: {
++        diseaseExposure: {
++          sceneStartedAt: 1_000,
++          eventIds: ['rawFood'],
++        },
++      },
++    })).toThrow('Invalid v15 scene-risk state');
++  });
 +});
 diff --git a/components/CharacterContext.js b/components/CharacterContext.js
-index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a75952d96c38 100644
+index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..045d914ed541210b1173c7caa1d5e220f3b5bf10 100644
 --- a/components/CharacterContext.js
 +++ b/components/CharacterContext.js
 @@ -34,7 +34,10 @@ const migrateSkillsToCanonical = (rawSkills) => {
@@ -573,7 +695,7 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
  import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 -import { hasRadiationImmunity } from '../domain/immunities';
 +import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
-+import { createSceneRiskState, getSceneRiskEventForRule, resolveSceneRiskEvent } from '../domain/sceneRiskChecks';
++import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
 +import { isSkillTagged } from '../domain/d20Checks';
 +import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
  import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
@@ -587,22 +709,19 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
  import { Alert, Platform } from 'react-native';
  
  // Zustand Store integration (Task 4.1)
-@@ -296,11 +300,14 @@ export const CharacterProvider = ({ children }) => {
+@@ -296,6 +300,11 @@ export const CharacterProvider = ({ children }) => {
    const [defense, setDefense] = useState(1);
    const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
    const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
 +  const [sceneRiskStates, setSceneRiskStates] = useState({});
-+  const sceneRiskStatesRef = useRef(sceneRiskStates);
++  const sceneRiskTrackerRef = useRef(null);
++  if (sceneRiskTrackerRef.current === null) {
++    sceneRiskTrackerRef.current = createSceneRiskTracker(sceneRiskStates);
++  }
  
    const isSavedRef = useRef(isSaved);
    const characterIdRef = useRef(characterId);
-   useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
-   useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
-+  useEffect(() => { sceneRiskStatesRef.current = sceneRiskStates; }, [sceneRiskStates]);
- 
-   // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
-   // Производные значения (carryWeight, meleeBonus, defense, initiative …)
-@@ -675,6 +682,7 @@ export const CharacterProvider = ({ children }) => {
+@@ -675,6 +684,7 @@ export const CharacterProvider = ({ children }) => {
      defense,
      conditions,
      chemDosesLog,
@@ -610,7 +729,7 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
    }), [
      characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
      forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
-@@ -682,7 +690,7 @@ export const CharacterProvider = ({ children }) => {
+@@ -682,7 +692,7 @@ export const CharacterProvider = ({ children }) => {
      equippedArmor, equippedPowerArmor, powerArmorRuntime,
      caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
      luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
@@ -619,16 +738,16 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
    ]);
  
    // Realtime save for already persisted characters.
-@@ -768,6 +776,8 @@ export const CharacterProvider = ({ children }) => {
+@@ -768,6 +778,8 @@ export const CharacterProvider = ({ children }) => {
        setEffects(data.effects || []);
        setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
        setSceneCounter(data.sceneCounter ?? 0);
++      sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
 +      setSceneRiskStates(data.sceneRiskStates);
-+      sceneRiskStatesRef.current = data.sceneRiskStates;
        // Migrate old [null, null] format to dynamic array
        const rawWeapons = data.equippedWeapons || [];
        let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
-@@ -922,9 +932,88 @@ export const CharacterProvider = ({ children }) => {
+@@ -922,9 +934,78 @@ export const CharacterProvider = ({ children }) => {
      return todayDoses;
    };
  
@@ -655,13 +774,8 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
 +      );
 +    }
 +
-+    const currentStates = sceneRiskStatesRef.current;
-+    if (!currentStates || typeof currentStates !== 'object' || Array.isArray(currentStates)) {
-+      throw new Error('[CharacterContext] Некорректное каноническое состояние sceneRiskStates');
-+    }
-+    const riskResult = resolveSceneRiskEvent({
++    const { result: riskResult, states: nextStates } = sceneRiskTrackerRef.current.resolveEvent({
 +      rule,
-+      state: currentStates[rule.id] ?? createSceneRiskState(),
 +      eventId: event.eventId,
 +      attributeValue: getAttributeValue(attributes, rule.test.attribute),
 +      skillValue: skill.value,
@@ -674,11 +788,6 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
 +
 +    if (riskResult.status === 'duplicate') return riskResult;
 +
-+    const nextStates = {
-+      ...currentStates,
-+      [rule.id]: riskResult.state,
-+    };
-+    sceneRiskStatesRef.current = nextStates;
 +    setSceneRiskStates(nextStates);
 +
 +    if (riskResult.check.passed) {
@@ -718,7 +827,7 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
     */
    const applyConsumableFull = (item) => {
      debugLog('consumable.apply.start', {
-@@ -977,6 +1066,13 @@ export const CharacterProvider = ({ children }) => {
+@@ -977,6 +1058,13 @@ export const CharacterProvider = ({ children }) => {
          syncTimedEffectsToStore(withoutAddiction, storeNow);
          setActiveTimedEffects(withoutAddiction);
        }
@@ -732,7 +841,7 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
      }
  
      // 4. Зависимость
-@@ -1024,9 +1120,12 @@ export const CharacterProvider = ({ children }) => {
+@@ -1024,9 +1112,12 @@ export const CharacterProvider = ({ children }) => {
        }
      }
  
@@ -745,7 +854,7 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
        conditionsRemoved: removed,
        healAmount: vitalChanges.healAmount,
        radiationAmount: vitalChanges.radiationAmount,
-@@ -1035,6 +1134,7 @@ export const CharacterProvider = ({ children }) => {
+@@ -1035,6 +1126,7 @@ export const CharacterProvider = ({ children }) => {
      return {
        timedResult: { ...timedResult, expired: normalizedCurrent.expired },
        addictionResult,
@@ -753,16 +862,17 @@ index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a759
        conditionsRemoved: removed,
        healAmount: vitalChanges.healAmount,
        radiationAmount: vitalChanges.radiationAmount,
-@@ -1146,6 +1246,8 @@ export const CharacterProvider = ({ children }) => {
+@@ -1146,6 +1238,9 @@ export const CharacterProvider = ({ children }) => {
      setEffects([]);
      setActiveTimedEffects([]);
      setSceneCounter(0);
-+    setSceneRiskStates({});
-+    sceneRiskStatesRef.current = {};
++    const emptySceneRiskStates = {};
++    sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
++    setSceneRiskStates(emptySceneRiskStates);
      setEquippedWeapons([]);
      useCharacterStore.persist?.clearStorage?.();
      useCharacterStore.getState().resetCharacterStore({
-@@ -1222,6 +1324,7 @@ export const CharacterProvider = ({ children }) => {
+@@ -1222,6 +1317,7 @@ export const CharacterProvider = ({ children }) => {
      effects, setEffects,
      activeTimedEffects, setActiveTimedEffects,
      sceneCounter,
@@ -1168,10 +1278,10 @@ index 6c16fe101c81d409e443b15c9fa2fb8c9f327975..96428460b62c3dc5ad6f1d505e94d5e4
 +}
 diff --git a/domain/sceneRiskChecks.js b/domain/sceneRiskChecks.js
 new file mode 100644
-index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955598bbc10
+index 0000000000000000000000000000000000000000..566a29dcedb694a7b8d1e1d8afccd0fd124e885b
 --- /dev/null
 +++ b/domain/sceneRiskChecks.js
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,208 @@
 +import { resolveD20Check } from './d20Checks';
 +
 +const MINUTE_MS = 60 * 1000;
@@ -1179,7 +1289,7 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +export const createSceneRiskState = () => ({
 +  sceneStartedAt: null,
 +  eventIds: [],
-+  difficultyModifier: 0,
++  pendingDifficultyModifier: 0,
 +});
 +
 +const assertFiniteInteger = (value, label, { min = 0 } = {}) => {
@@ -1197,6 +1307,13 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +  }
 +  assertFiniteInteger(rule.sceneDurationMinutes, 'sceneDurationMinutes', { min: 1 });
 +  assertFiniteInteger(rule.maxDifficulty, 'maxDifficulty', { min: 1 });
++  if (
++    !Array.isArray(rule.eventTypes)
++    || rule.eventTypes.some((eventId) => typeof eventId !== 'string' || !eventId)
++    || new Set(rule.eventTypes).size !== rule.eventTypes.length
++  ) {
++    throw new Error('[sceneRiskChecks] eventTypes must contain unique non-empty strings');
++  }
 +  if (typeof rule.test?.attribute !== 'string' || !rule.test.attribute) {
 +    throw new Error('[sceneRiskChecks] test.attribute is required');
 +  }
@@ -1208,8 +1325,8 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +  }
 +  assertFiniteInteger(rule.roll.rollValue, 'roll.rollValue', { min: 1 });
 +  assertFiniteInteger(
-+    rule.complication?.subsequentDifficultyModifier,
-+    'complication.subsequentDifficultyModifier',
++    rule.complication?.nextEventDifficultyModifier,
++    'complication.nextEventDifficultyModifier',
 +  );
 +};
 +
@@ -1226,7 +1343,19 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +  if (new Set(state.eventIds).size !== state.eventIds.length) {
 +    throw new Error('[sceneRiskChecks] eventIds must be unique');
 +  }
-+  assertFiniteInteger(state.difficultyModifier, 'difficultyModifier');
++  assertFiniteInteger(state.pendingDifficultyModifier, 'pendingDifficultyModifier');
++};
++
++const assertStateRegistry = (states) => {
++  if (!states || typeof states !== 'object' || Array.isArray(states)) {
++    throw new Error('[sceneRiskChecks] Scene risk states must be an object');
++  }
++  Object.entries(states).forEach(([ruleId, state]) => {
++    if (!ruleId) {
++      throw new Error('[sceneRiskChecks] Scene risk state rule id is required');
++    }
++    assertState(state);
++  });
 +};
 +
 +const resetExpiredScene = (rule, state, now) => {
@@ -1259,6 +1388,9 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +  if (typeof eventId !== 'string' || !eventId) {
 +    throw new Error('[sceneRiskChecks] eventId is required');
 +  }
++  if (!rule.eventTypes.includes(eventId)) {
++    throw new Error(`[sceneRiskChecks] Rule "${rule.id}" does not declare event type "${eventId}"`);
++  }
 +  if (!Number.isFinite(now) || now < 0) {
 +    throw new Error('[sceneRiskChecks] Invalid clock');
 +  }
@@ -1271,9 +1403,10 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +  const eventIds = [...currentState.eventIds, eventId];
 +  const sceneStartedAt = currentState.sceneStartedAt ?? now;
 +  const baseDifficulty = Math.min(rule.maxDifficulty, eventIds.length);
++  const appliedDifficultyModifier = currentState.pendingDifficultyModifier;
 +  const difficulty = Math.min(
 +    rule.maxDifficulty,
-+    baseDifficulty + currentState.difficultyModifier,
++    baseDifficulty + appliedDifficultyModifier,
 +  );
 +  const d20Check = resolveD20Check({
 +    attributeValue,
@@ -1284,19 +1417,16 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +    rollD20,
 +  });
 +  const addedDifficulty = (
-+    d20Check.complicationCount * rule.complication.subsequentDifficultyModifier
++    d20Check.complicationCount * rule.complication.nextEventDifficultyModifier
 +  );
-+  const difficultyModifier = Math.min(
-+    rule.maxDifficulty,
-+    currentState.difficultyModifier + addedDifficulty,
-+  );
++  const pendingDifficultyModifier = Math.min(rule.maxDifficulty, addedDifficulty);
 +
 +  return {
 +    status: 'checked',
 +    state: {
 +      sceneStartedAt,
 +      eventIds,
-+      difficultyModifier,
++      pendingDifficultyModifier,
 +    },
 +    check: {
 +      ruleId: rule.id,
@@ -1304,8 +1434,42 @@ index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955
 +      attribute: rule.test.attribute,
 +      skill: rule.test.skill,
 +      baseDifficulty,
++      appliedDifficultyModifier,
 +      ...d20Check,
 +      addedDifficulty,
++    },
++  };
++};
++
++/**
++ * Owns the canonical scene state for every risk rule of one character.
++ * Event categories never keep local counters, and resolving an event updates
++ * this registry synchronously before control returns to UI code.
++ */
++export const createSceneRiskTracker = (initialStates) => {
++  assertStateRegistry(initialStates);
++  let states = initialStates;
++
++  return {
++    getStates: () => states,
++    replaceStates: (nextStates) => {
++      assertStateRegistry(nextStates);
++      states = nextStates;
++      return states;
++    },
++    resolveEvent: (params) => {
++      const { rule } = params;
++      const result = resolveSceneRiskEvent({
++        ...params,
++        state: states[rule.id] ?? createSceneRiskState(),
++      });
++      if (result.status === 'checked') {
++        states = {
++          ...states,
++          [rule.id]: result.state,
++        };
++      }
++      return { result, states };
 +    },
 +  };
 +};
@@ -1838,14 +2002,19 @@ index b997c5f58a03787b078c2013a65546744af26631..7267aec84b9a1d4226eb562e895afd3f
      "id": "food_yao_guai_ribs",
 diff --git a/modules/fallout/data/rules/diseaseExposure.json b/modules/fallout/data/rules/diseaseExposure.json
 new file mode 100644
-index 0000000000000000000000000000000000000000..a3e8eedf0a636b119b6faa3c869cd740820ef3ba
+index 0000000000000000000000000000000000000000..7748b1ff9975c84bfde6d760b2cb7562121d7777
 --- /dev/null
 +++ b/modules/fallout/data/rules/diseaseExposure.json
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,23 @@
 +{
 +  "id": "diseaseExposure",
 +  "sceneDurationMinutes": 5,
 +  "maxDifficulty": 5,
++  "eventTypes": [
++    "rawFood",
++    "dirtyWater",
++    "sleepOnGround"
++  ],
 +  "immunity": "disease",
 +  "test": {
 +    "attribute": "END",
@@ -1856,7 +2025,7 @@ index 0000000000000000000000000000000000000000..a3e8eedf0a636b119b6faa3c869cd740
 +    "rollValue": 2
 +  },
 +  "complication": {
-+    "subsequentDifficultyModifier": 1
++    "nextEventDifficultyModifier": 1
 +  },
 +  "resultTable": "diseases"
 +}
@@ -1883,7 +2052,7 @@ index 86b4795702ee12aa3b1f5bc0bc013976809eae7a..abfb6fd03a4e6c2bf5f8006966cb32bc
  
  export const legacyEffectsArrayToStore = (effectsArray = []) => {
 diff --git a/src/store/migrations.js b/src/store/migrations.js
-index 5737ba2c86d7f7fb5c478a216b495222a6481532..6f5a96af70858a9b1c7694372d08c8fe54a44426 100644
+index 5737ba2c86d7f7fb5c478a216b495222a6481532..46ec0d161327f7f9ab2b70264e23b2b208f7b370 100644
 --- a/src/store/migrations.js
 +++ b/src/store/migrations.js
 @@ -200,6 +200,9 @@ export const normalizeEffects = (activeTimedEffects = []) => {
@@ -1906,7 +2075,7 @@ index 5737ba2c86d7f7fb5c478a216b495222a6481532..6f5a96af70858a9b1c7694372d08c8fe
        createdAt: effect.createdAt,
        expiresAt: effect.expiresAt,
        durationMs: effect.durationMs,
-@@ -986,6 +992,14 @@ const MIGRATIONS = [
+@@ -986,6 +992,45 @@ const MIGRATIONS = [
      return next;
    },
  
@@ -1918,20 +2087,52 @@ index 5737ba2c86d7f7fb5c478a216b495222a6481532..6f5a96af70858a9b1c7694372d08c8fe
 +    sceneRiskStates: {},
 +  }),
 +
++  // v15 -> v16: осложнения больше не накапливаются до конца сцены. Поле
++  // хранит только модификатор для одной следующей новой категории события.
++  (state) => {
++    if (
++      !state.sceneRiskStates
++      || typeof state.sceneRiskStates !== 'object'
++      || Array.isArray(state.sceneRiskStates)
++    ) {
++      throw new Error('[migrations] v15 sceneRiskStates must be an object');
++    }
++    const sceneRiskStates = Object.fromEntries(
++      Object.entries(state.sceneRiskStates).map(([ruleId, sceneState]) => {
++        if (
++          !sceneState
++          || typeof sceneState !== 'object'
++          || Array.isArray(sceneState)
++          || !Number.isInteger(sceneState.difficultyModifier)
++          || sceneState.difficultyModifier < 0
++        ) {
++          throw new Error(`[migrations] Invalid v15 scene-risk state for rule "${ruleId}"`);
++        }
++        const { difficultyModifier, ...unchanged } = sceneState;
++        return [ruleId, {
++          ...unchanged,
++          pendingDifficultyModifier: difficultyModifier,
++        }];
++      }),
++    );
++    return { ...state, sceneRiskStates };
++  },
++
  ];
  /**
   * Мерж комплекта снаряжения при сохранении снапшота.
 diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
-index e617fb621ec2ef67758dd407c4b746539ac0ae56..5145b6a79959ac1db1471ede34d6649a31282c62 100644
+index e617fb621ec2ef67758dd407c4b746539ac0ae56..a871fda6b77ba66a3ad8cd635cc5ce23343a0cd6 100644
 --- a/src/store/saveSchema.js
 +++ b/src/store/saveSchema.js
-@@ -34,7 +34,8 @@
+@@ -34,7 +34,9 @@
  //       атрибуты/флаги/навыки к стартовым (инвентарь/уровень не трогаем).
  // v14 — «Тень»: старый комплект (default_caps_only) заменяется на NIGHTKIN;
  //       флаг nightkinKitPending — предметы выдаются после загрузки.
 -export const CURRENT_SCHEMA_VERSION = 14;
 +// v15 — состояние универсальных проверок риска в текущей реальной сцене.
-+export const CURRENT_SCHEMA_VERSION = 15;
++// v16 — одноразовый модификатор сложности для следующей новой категории риска.
++export const CURRENT_SCHEMA_VERSION = 16;
  
  // Версия, которая ставится при отсутствии schemaVersion в сохранении
  // (старые сохранения без поля — считаем v0, текущим форматом).
