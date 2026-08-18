@@ -1,0 +1,18 @@
+{
+  "id": "diseaseExposure",
+  "sceneDurationMinutes": 5,
+  "maxDifficulty": 5,
+  "immunity": "disease",
+  "test": {
+    "attribute": "END",
+    "skill": "SURVIVAL"
+  },
+  "roll": {
+    "rollType": "rollD20",
+    "rollValue": 2
+  },
+  "complication": {
+    "subsequentDifficultyModifier": 1
+  },
+  "resultTable": "diseases"
+}

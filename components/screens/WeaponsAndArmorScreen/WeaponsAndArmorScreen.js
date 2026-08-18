@@ -20,6 +20,7 @@ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { getConditionCatalog } from '../../../domain/registry';
 import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import {
@@ -176,9 +177,13 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => 
 
 // extraRows: постоянные строки (силовая броня: «Ядерный блок: n/max», эффекты каркаса) —
 // рендерятся как иммунитеты, с «∞» в колонке таймера.
-const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
+  const moduleLocale = useModuleLocale();
+  const diseasesById = useMemo(() => new Map(
+    getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
+  ), [moduleLocale]);
 
   const hasImmunities = immunities.length > 0;
   const hasEffects = (effects || []).length > 0;
@@ -216,15 +221,27 @@ const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
                 </View>
               ) : null}
               {effects.map((effect) => {
-                const effectText = effect.defenseModifier
+                const localizedDisease = effect.effectType === 'disease'
+                  ? diseasesById.get(effect.conditionId)
+                  : null;
+                if (effect.effectType === 'disease' && !localizedDisease) {
+                  throw new Error(`[EffectsPanel] В каталоге нет болезни "${effect.conditionId}"`);
+                }
+                const effectText = localizedDisease?.name || (effect.defenseModifier
                   ? getDefenseModifierEffectLabel(effect.defenseModifier)
-                  : effect.effectName || effect.effectLabel || '—';
+                  : effect.effectName || effect.effectLabel || '—');
+                const effectDescription = localizedDisease?.effectLabel;
                 const isNegative = effect.effectKind === 'negative';
                 return (
                   <View key={effect.id} style={localStyles.effectsPanelRow}>
-                    <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
-                      {effectText}
-                    </Text>
+                    <View style={localStyles.effectDetails}>
+                      <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
+                        {effectText}
+                      </Text>
+                      {effectDescription ? (
+                        <Text style={localStyles.diseaseEffectDescription}>{effectDescription}</Text>
+                      ) : null}
+                    </View>
                     <Text style={localStyles.effectTimerText}>
                       {effect.isPermanent ? '∞' : getEffectTimeText(effect.scenesLeft)}
                     </Text>

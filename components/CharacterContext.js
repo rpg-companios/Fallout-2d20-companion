@@ -34,7 +34,10 @@ const migrateSkillsToCanonical = (rawSkills) => {
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
-import { hasRadiationImmunity } from '../domain/immunities';
+import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+import { createSceneRiskState, getSceneRiskEventForRule, resolveSceneRiskEvent } from '../domain/sceneRiskChecks';
+import { isSkillTagged } from '../domain/d20Checks';
+import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 
 import { resolveBodyPlan } from '../domain/bodyplan';
@@ -70,6 +73,7 @@ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
 import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
+import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
 import { Alert, Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
@@ -296,11 +300,14 @@ export const CharacterProvider = ({ children }) => {
   const [defense, setDefense] = useState(1);
   const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
   const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
+  const [sceneRiskStates, setSceneRiskStates] = useState({});
+  const sceneRiskStatesRef = useRef(sceneRiskStates);
 
   const isSavedRef = useRef(isSaved);
   const characterIdRef = useRef(characterId);
   useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
   useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
+  useEffect(() => { sceneRiskStatesRef.current = sceneRiskStates; }, [sceneRiskStates]);
 
   // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
   // Производные значения (carryWeight, meleeBonus, defense, initiative …)
@@ -675,6 +682,7 @@ export const CharacterProvider = ({ children }) => {
     defense,
     conditions,
     chemDosesLog,
+    sceneRiskStates,
   }), [
     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
@@ -682,7 +690,7 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
-    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog,
+    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog, sceneRiskStates,
   ]);
 
   // Realtime save for already persisted characters.
@@ -768,6 +776,8 @@ export const CharacterProvider = ({ children }) => {
       setEffects(data.effects || []);
       setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
       setSceneCounter(data.sceneCounter ?? 0);
+      setSceneRiskStates(data.sceneRiskStates);
+      sceneRiskStatesRef.current = data.sceneRiskStates;
       // Migrate old [null, null] format to dynamic array
       const rawWeapons = data.equippedWeapons || [];
       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
@@ -922,9 +932,88 @@ export const CharacterProvider = ({ children }) => {
     return todayDoses;
   };
 
+  const applyDiseaseExposureForConsumable = (item) => {
+    const ruleMatches = getSceneRiskRules()
+      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
+      .filter(({ event }) => event !== null);
+    if (ruleMatches.length === 0) return null;
+    if (ruleMatches.length > 1) {
+      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
+    }
+
+    const { rule, event } = ruleMatches[0];
+    if (rule.resultTable !== 'diseases') {
+      throw new Error(`[CharacterContext] Неизвестная таблица результата проверки риска: ${rule.resultTable}`);
+    }
+
+    const attribute = attributes.find((entry) => entry?.name === rule.test.attribute);
+    const skill = skills.find((entry) => entry?.name === rule.test.skill);
+    if (!attribute || !skill) {
+      throw new Error(
+        `[CharacterContext] Для проверки ${rule.id} отсутствует `
+        + `${rule.test.attribute} или ${rule.test.skill}`,
+      );
+    }
+
+    const currentStates = sceneRiskStatesRef.current;
+    if (!currentStates || typeof currentStates !== 'object' || Array.isArray(currentStates)) {
+      throw new Error('[CharacterContext] Некорректное каноническое состояние sceneRiskStates');
+    }
+    const riskResult = resolveSceneRiskEvent({
+      rule,
+      state: currentStates[rule.id] ?? createSceneRiskState(),
+      eventId: event.eventId,
+      attributeValue: getAttributeValue(attributes, rule.test.attribute),
+      skillValue: skill.value,
+      isTagged: isSkillTagged({
+        skillId: skill.name,
+        primaryTaggedSkillIds: selectedSkills,
+        extraTaggedSkillIds: extraTaggedSkills,
+      }),
+    });
+
+    if (riskResult.status === 'duplicate') return riskResult;
+
+    const nextStates = {
+      ...currentStates,
+      [rule.id]: riskResult.state,
+    };
+    sceneRiskStatesRef.current = nextStates;
+    setSceneRiskStates(nextStates);
+
+    if (riskResult.check.passed) {
+      return { ...riskResult, diseaseRoll: null, disease: null, infectionStatus: null };
+    }
+
+    const { roll: diseaseRoll, disease } = rollDiseaseFromCatalog(
+      getConditionCatalog('disease', getCurrentModuleLocale()),
+    );
+    if (hasDamageImmunity({ origin, trait }, rule.immunity)) {
+      return { ...riskResult, diseaseRoll, disease, infectionStatus: 'immune' };
+    }
+
+    const store = useCharacterStore.getState();
+    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(store.effects)).effects;
+    const applied = addPersistentDiseaseEffect(currentEffects, disease);
+    if (applied.added) {
+      syncTimedEffectsToStore(applied.effects, store);
+      setActiveTimedEffects(applied.effects);
+    }
+    setConditions((previous) => (
+      previous.includes('diseased') ? previous : [...previous, 'diseased']
+    ));
+
+    return {
+      ...riskResult,
+      diseaseRoll,
+      disease,
+      infectionStatus: applied.added ? 'infected' : 'duplicate',
+    };
+  };
+
   /**
    * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
-   * removeCondition и проверка зависимости.
+   * removeCondition, проверку зависимости и явно объявленный риск заражения.
    */
   const applyConsumableFull = (item) => {
     debugLog('consumable.apply.start', {
@@ -977,6 +1066,13 @@ export const CharacterProvider = ({ children }) => {
         syncTimedEffectsToStore(withoutAddiction, storeNow);
         setActiveTimedEffects(withoutAddiction);
       }
+      if (removed.includes('diseased')) {
+        const storeNow = useCharacterStore.getState();
+        const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+        const withoutDiseases = removePersistentDiseaseEffects(currentEffects).effects;
+        syncTimedEffectsToStore(withoutDiseases, storeNow);
+        setActiveTimedEffects(withoutDiseases);
+      }
     }
 
     // 4. Зависимость
@@ -1024,9 +1120,12 @@ export const CharacterProvider = ({ children }) => {
       }
     }
 
+    const diseaseRiskResult = applyDiseaseExposureForConsumable(item);
+
     debugLog('consumable.apply.result', {
       timedResult,
       addictionResult,
+      diseaseRiskResult,
       conditionsRemoved: removed,
       healAmount: vitalChanges.healAmount,
       radiationAmount: vitalChanges.radiationAmount,
@@ -1035,6 +1134,7 @@ export const CharacterProvider = ({ children }) => {
     return {
       timedResult: { ...timedResult, expired: normalizedCurrent.expired },
       addictionResult,
+      diseaseRiskResult,
       conditionsRemoved: removed,
       healAmount: vitalChanges.healAmount,
       radiationAmount: vitalChanges.radiationAmount,
@@ -1146,6 +1246,8 @@ export const CharacterProvider = ({ children }) => {
     setEffects([]);
     setActiveTimedEffects([]);
     setSceneCounter(0);
+    setSceneRiskStates({});
+    sceneRiskStatesRef.current = {};
     setEquippedWeapons([]);
     useCharacterStore.persist?.clearStorage?.();
     useCharacterStore.getState().resetCharacterStore({
@@ -1222,6 +1324,7 @@ export const CharacterProvider = ({ children }) => {
     effects, setEffects,
     activeTimedEffects, setActiveTimedEffects,
     sceneCounter,
+    sceneRiskStates,
     sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
     applyConsumableTimedEffects,
     applyConsumableFull,

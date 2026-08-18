@@ -63,7 +63,13 @@
       "requiresSecuritron": "Драйвер совместим только с Секьюритроном.",
       "alreadyInstalled": "ОС Mk II уже установлена.",
       "noDriver": "Предмет драйвера не найден."
-    }
+    },
+    "diseaseCheckPassedTitle": "Проверка заражения пройдена",
+    "diseaseCheckFailedTitle": "Проверка заражения провалена",
+    "diseaseCheckMessage": "Сложность: {difficulty}\nБроски d20: {rolls}\nУспехи: {successes}",
+    "diseaseInfectedMessage": "{check}\nЗаражение: {diseaseName} (d20: {diseaseRoll}).",
+    "diseaseDuplicateMessage": "{check}\nБолезнь «{diseaseName}» уже активна.",
+    "diseaseImmuneMessage": "{check}\nИммунитет предотвращает заражение болезнью «{diseaseName}» (d20: {diseaseRoll})."
   },
   "actions": {
     "cancel": "Отмена",

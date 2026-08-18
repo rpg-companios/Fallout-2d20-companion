@@ -63,7 +63,13 @@
       "requiresSecuritron": "The driver is only compatible with a Securitron.",
       "alreadyInstalled": "Mk II OS is already installed.",
       "noDriver": "Driver item not found."
-    }
+    },
+    "diseaseCheckPassedTitle": "Disease check passed",
+    "diseaseCheckFailedTitle": "Disease check failed",
+    "diseaseCheckMessage": "Difficulty: {difficulty}\nd20 rolls: {rolls}\nSuccesses: {successes}",
+    "diseaseInfectedMessage": "{check}\nInfected with {diseaseName} (d20: {diseaseRoll}).",
+    "diseaseDuplicateMessage": "{check}\n{diseaseName} is already active.",
+    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll})."
   },
   "actions": {
     "cancel": "Cancel",

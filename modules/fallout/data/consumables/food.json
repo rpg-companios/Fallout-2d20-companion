@@ -59,7 +59,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_bloodbug_meat",
@@ -81,7 +87,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_bloodbug_steak",
@@ -121,7 +133,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_brain_fungus",
@@ -143,7 +161,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_canned_dog_food",
@@ -187,7 +211,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_cooked_softshell_mirelurk",
@@ -227,7 +257,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_cram",
@@ -311,7 +347,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_deathclaw_meat",
@@ -333,7 +375,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_deathclaw_omelette",
@@ -431,7 +479,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_grilled_radroach",
@@ -609,7 +663,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_mirelurk_cake",
@@ -649,7 +709,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_mirelurk_egg_omelette",
@@ -689,7 +755,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_mirelurk_queen_steak",
@@ -747,7 +819,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_dog_meat",
@@ -769,7 +847,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_mutant_hound_ribs",
@@ -809,7 +893,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_mutfruit",
@@ -831,7 +921,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_dog_chops",
@@ -973,7 +1069,13 @@
     },
     "effectKey": "itemEffects.food.mirelurkQueenMeat",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_radroach_meat",
@@ -995,7 +1097,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_radscorpion_egg",
@@ -1017,7 +1125,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_radscorpion_egg_omelette",
@@ -1057,7 +1171,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_radscorpion_steak",
@@ -1097,7 +1217,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_radstag_stew",
@@ -1137,7 +1263,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_ribeye_steak",
@@ -1217,7 +1349,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_softshell_mirelurk_meat",
@@ -1239,7 +1377,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_squirrel_bits",
@@ -1261,7 +1405,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_squirrel_on_a_stick",
@@ -1337,7 +1487,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_sugar_bombs",
@@ -1403,7 +1559,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_tato",
@@ -1425,7 +1587,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_vegetable_soup",
@@ -1465,7 +1633,13 @@
     },
     "effectKey": "",
     "state": "raw",
-    "preserved": false
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   },
   {
     "id": "food_yao_guai_ribs",

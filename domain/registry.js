@@ -16,6 +16,7 @@ import moduleOrigins from '../modules/fallout/data/origins/origins.json';
 import moduleTraits from '../modules/fallout/data/traits/traits.json';
 import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
 import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
 import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
 
 // i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
@@ -46,6 +47,7 @@ import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/sett
 import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+import { getDiseasesCatalog } from '../i18n/conditionsCatalog';
 import { getCurrentModuleLocale } from '../i18n/locale';
 import { expandTrueItems } from './packMerge';
 
@@ -165,4 +167,18 @@ export function getUniqQualityName(id, locale = getCurrentModuleLocale()) {
  */
 export function getEquipmentCatalogForLocale(locale) {
   return getEquipmentCatalog(locale);
+}
+
+/**
+ * Canonical real-time scene risk rules declared by the active setting.
+ * Consumables opt into these rules through explicit sceneRiskEvents metadata.
+ */
+export function getSceneRiskRules() {
+  return [moduleDiseaseExposureRule];
+}
+
+/** Localized condition catalog supplied by the active setting. */
+export function getConditionCatalog(conditionType, locale = getCurrentModuleLocale()) {
+  if (conditionType === 'disease') return getDiseasesCatalog(locale);
+  throw new Error(`[registry] Неизвестный тип состояния "${conditionType}"`);
 }

@@ -200,6 +200,9 @@ export const normalizeEffects = (activeTimedEffects = []) => {
       parameters: [],
       maxHpModifier: effect.maxHpModifier,
       damageResistanceModifier: effect.damageResistanceModifier,
+      isPermanent: effect.isPermanent,
+      effectType: effect.effectType,
+      conditionId: effect.conditionId,
       createdAt: effect.createdAt,
       expiresAt: effect.expiresAt,
       durationMs: effect.durationMs,
@@ -304,6 +307,9 @@ export const denormalizeEffects = (effectsDict = {}) => {
       effectKind: effect.effectKind ?? effect.type,
       maxHpModifier: effect.maxHpModifier,
       damageResistanceModifier: effect.damageResistanceModifier,
+      isPermanent: effect.isPermanent,
+      effectType: effect.effectType,
+      conditionId: effect.conditionId,
       createdAt: effect.createdAt,
       expiresAt: effect.expiresAt,
       durationMs: effect.durationMs,
@@ -985,6 +991,14 @@ const MIGRATIONS = [
     next.nightkinKitPending = true;
     return next;
   },
+
+  // v14 -> v15: каноническое состояние универсальных рисков текущей
+  // реальной сцены. Конкретные rule id добавляются по первому событию;
+  // миграция не подменяется load-time fallback в CharacterContext.
+  (state) => ({
+    ...state,
+    sceneRiskStates: {},
+  }),
 
 ];
 /**

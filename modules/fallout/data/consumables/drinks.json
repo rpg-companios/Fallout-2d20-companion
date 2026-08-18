@@ -80,7 +80,13 @@
     "hpHealed": 2,
     "irradiated": true,
     "effectKey": "",
-    "isAlcohol": false
+    "isAlcohol": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "dirtyWater"
+      }
+    ]
   },
   {
     "id": "drink_dirty_wastelander",

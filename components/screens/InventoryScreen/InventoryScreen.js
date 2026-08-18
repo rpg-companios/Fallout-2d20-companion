@@ -359,6 +359,7 @@ const InventoryScreen = () => {
       const {
         timedResult,
         addictionResult,
+        diseaseRiskResult,
         conditionsRemoved,
         healAmount,
         radiationAmount,
@@ -388,6 +389,33 @@ const InventoryScreen = () => {
         showAlert(
           tInventory('screen.alerts.conditionsRemovedTitle'),
           formatInventoryText(tInventory('screen.alerts.conditionsRemovedMessage'), { conditions: conditionsRemoved.join(', ') }));
+      }
+
+      if (diseaseRiskResult?.status === 'checked') {
+        const { check, disease, diseaseRoll, infectionStatus } = diseaseRiskResult;
+        const checkText = formatInventoryText(
+          tInventory('screen.alerts.diseaseCheckMessage'),
+          {
+            difficulty: check.difficulty,
+            rolls: check.rolls.join(', '),
+            successes: check.successes,
+          },
+        );
+        let message = checkText;
+        if (!check.passed) {
+          const messageKey = infectionStatus === 'immune'
+            ? 'diseaseImmuneMessage'
+            : (infectionStatus === 'duplicate' ? 'diseaseDuplicateMessage' : 'diseaseInfectedMessage');
+          message = formatInventoryText(tInventory(`screen.alerts.${messageKey}`), {
+            check: checkText,
+            diseaseName: disease.name,
+            diseaseRoll,
+          });
+        }
+        showAlert(
+          tInventory(`screen.alerts.${check.passed ? 'diseaseCheckPassedTitle' : 'diseaseCheckFailedTitle'}`),
+          message,
+        );
       }
 
       // Результат броска на зависимость

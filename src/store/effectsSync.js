@@ -19,6 +19,8 @@ export const legacyEffectToStore = (effect) => ({
   durationMs: effect.durationMs,
   scenesLeft: effect.scenesLeft || 0,
   sourceName: effect.sourceName,
+  effectType: effect.effectType,
+  conditionId: effect.conditionId,
 });
 
 export const storeEffectToLegacy = (effect) => ({
@@ -35,6 +37,8 @@ export const storeEffectToLegacy = (effect) => ({
   durationMs: effect.durationMs,
   scenesLeft: effect.scenesLeft || 0,
   sourceName: effect.sourceName,
+  effectType: effect.effectType,
+  conditionId: effect.conditionId,
 });
 
 export const legacyEffectsArrayToStore = (effectsArray = []) => {
