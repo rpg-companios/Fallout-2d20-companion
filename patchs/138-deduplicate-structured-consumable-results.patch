@@ -1,0 +1,136 @@
+diff --git a/__tests__/consumables/consumable-result-report.test.js b/__tests__/consumables/consumable-result-report.test.js
+index 7e93c702e058e521b9a5d3cc857bb06c8a9d2af4..f6f9c3e4b328a1f712722d7bfef92d28a052d100 100644
+--- a/__tests__/consumables/consumable-result-report.test.js
++++ b/__tests__/consumables/consumable-result-report.test.js
+@@ -1,6 +1,10 @@
+ import { readFileSync } from 'node:fs';
+ import { beforeEach, describe, expect, it } from 'vitest';
+-import { applyConsumableToEffects, applyRemoveConditions } from '../../domain/effects';
++import {
++  applyConsumableToEffects,
++  applyRemoveConditions,
++  resolveConsumableVitalChanges,
++} from '../../domain/effects';
+ import { setCurrentLocale } from '../../i18n/locale';
+ import { buildConsumableResultReport } from '../../components/screens/InventoryScreen/logic/consumableResultReport';
+ 
+@@ -23,6 +27,88 @@ describe('consolidated consumable result report', () => {
+     expect(result.notificationEvents.map((event) => event.message)).toEqual(result.events);
+   });
+ 
++  it.each([
++    ['лечение', { positiveEffect: { hpModifier: { op: '+', value: 5 } } }],
++    ['радиация', { positiveEffect: {}, radiationModifier: { op: '-', value: 4 } }],
++    ['снятие состояния', { positiveEffect: { removeCondition: ['diseased'] } }],
++  ])('does not duplicate a structured %s result with an instant label', (_name, mechanics) => {
++    const result = applyConsumableToEffects({
++      name: 'Препарат',
++      positiveEffectLabel: 'Описание структурированного результата',
++      positiveEffectDuration: 'instant',
++      ...mechanics,
++    });
++
++    expect(result.notificationEvents).toEqual([]);
++    expect(result.events).toEqual([]);
++  });
++
++  it('keeps unrelated instant negative events when suppressing a positive duplicate', () => {
++    const result = applyConsumableToEffects({
++      name: 'Препарат',
++      positiveEffect: { hpModifier: { op: '+', value: 5 } },
++      positiveEffectLabel: 'Восстанавливает 5 HP',
++      positiveEffectDuration: 'instant',
++      negativeEffect: 'Тошнота',
++      negativeEffectDuration: 'instant',
++    });
++
++    expect(result.notificationEvents).toEqual([
++      { kind: 'negative', message: result.events[0] },
++    ]);
++    expect(result.events[0]).toContain('Тошнота');
++  });
++
++  it('reports Antiradin reduction once and uses the actual counter change', () => {
++    const antiradin = {
++      name: 'Антирадин',
++      positiveEffect: {},
++      positiveEffectLabel: 'Убирает 4 радиации',
++      positiveEffectDuration: 'instant',
++      radiationModifier: { op: '-', value: 4 },
++    };
++    const vitalResult = resolveConsumableVitalChanges(antiradin, {
++      currentHealth: 8,
++      maxHealth: 10,
++      radiation: 4,
++    });
++    const timedResult = applyConsumableToEffects(antiradin);
++    const report = buildConsumableResultReport({
++      itemName: antiradin.name,
++      timedResult,
++      ...vitalResult,
++    });
++
++    expect(report.positive).toEqual([
++      'Применено на вас: Антирадин.',
++      'Уровень радиации снижен на 4.',
++    ]);
++    expect(report.message).not.toContain('Моментальный положительный эффект');
++    expect(report.message).not.toContain('Убирает 4 радиации');
++  });
++
++  it('reports only application when Antiradin changes zero radiation', () => {
++    const antiradin = {
++      name: 'Антирадин',
++      positiveEffect: {},
++      positiveEffectLabel: 'Убирает 4 радиации',
++      positiveEffectDuration: 'instant',
++      radiationModifier: { op: '-', value: 4 },
++    };
++    const vitalResult = resolveConsumableVitalChanges(antiradin, {
++      currentHealth: 8,
++      maxHealth: 10,
++      radiation: 0,
++    });
++    const report = buildConsumableResultReport({
++      itemName: antiradin.name,
++      timedResult: applyConsumableToEffects(antiradin),
++      ...vitalResult,
++    });
++
++    expect(report.positive).toEqual(['Применено на вас: Антирадин.']);
++  });
++
+   it('combines positive and negative outcomes without roll details', () => {
+     const report = buildConsumableResultReport({
+       itemName: 'Сырая еда',
+diff --git a/domain/effects.js b/domain/effects.js
+index bf10db2ec0461a8b9acc6ce0914c1217d988c34b..6687595fefa364be0ec02c1fa5e16b66c31b20d0 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -381,12 +381,24 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+         }
+     }
+ 
+-    // Строковый/label positiveEffect — timed-эффект для отображения
++    // Строковый/label positiveEffect — timed-эффект для отображения.
++    // Мгновенная подпись является только описанием предмета и не дублируется,
++    // когда итог уже строится из структурированных лечения, радиации или
++    // снятия состояний. При нулевом фактическом результате остаётся только
++    // сообщение о применении предмета.
+     const positiveName = toStringSafe(item?.positiveEffectLabel || (!positiveEffectIsObject ? positiveEffectRaw : ''));
+     const positiveLabel = toStringSafe(item?.positiveEffectLabel);
++    const hasStructuredInstantPositiveResult = Boolean(
++        positiveEffectRaw?.hpModifier
++        || item?.hpHealed != null
++        || item?.healAmount != null
++        || item?.radiationModifier != null
++        || (Array.isArray(positiveEffectRaw?.removeCondition)
++            && positiveEffectRaw.removeCondition.length > 0)
++    );
+ 
+     if (positiveName && positiveDuration.type !== 'none') {
+-        if (positiveDuration.type === 'instant') {
++        if (positiveDuration.type === 'instant' && !hasStructuredInstantPositiveResult) {
+             addNotificationEvent('positive', tEffects('events.instantPositive', { name: positiveName }));
+         } else if (positiveDuration.scenes > 0) {
+             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
