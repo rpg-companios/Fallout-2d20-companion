@@ -1,0 +1,233 @@
+diff --git a/__tests__/consumables/addiction-dose-pool.test.js b/__tests__/consumables/addiction-dose-pool.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..95ec5ff620af33261d402092fc836c3c3a87ca6e
+--- /dev/null
++++ b/__tests__/consumables/addiction-dose-pool.test.js
+@@ -0,0 +1,88 @@
++import { readFileSync } from 'node:fs';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { checkAddiction, recordDoseWithinWindow } from '../../domain/effects';
++
++const DAY_MS = 24 * 60 * 60 * 1000;
++
++const mockCombatDieFaces = (faces) => {
++  const randomValues = faces.map((face) => (face - 0.5) / 6);
++  vi.spyOn(Math, 'random').mockImplementation(() => {
++    if (randomValues.length === 0) throw new Error('test combat-die queue exhausted');
++    return randomValues.shift();
++  });
++};
++
++describe('shared 24-hour addiction dose pool', () => {
++  afterEach(() => {
++    vi.restoreAllMocks();
++  });
++
++  it('counts active doses from different chems and discards expired doses', () => {
++    const now = 30 * DAY_MS;
++    const result = recordDoseWithinWindow(
++      [
++        { chemId: 'chem_rad_x', takenAt: now - DAY_MS },
++        { chemId: 'chem_stimpak', takenAt: now - 23 * 60 * 60 * 1000 },
++        { chemId: 'chem_mentats', takenAt: now - 2 * 60 * 60 * 1000 },
++        { chemId: 'chem_jet', takenAt: now - 60 * 60 * 1000 },
++      ],
++      { chemId: 'chem_buffout', takenAt: now },
++      { now, windowMs: DAY_MS },
++    );
++
++    expect(result.doseLog.map(({ chemId }) => chemId)).toEqual([
++      'chem_stimpak',
++      'chem_mentats',
++      'chem_jet',
++      'chem_buffout',
++    ]);
++    expect(result.doseCount).toBe(4);
++  });
++
++  it('rejects malformed dose records instead of normalizing a heterogeneous log', () => {
++    expect(() => recordDoseWithinWindow(
++      [{ chemId: 'chem_mentats' }],
++      { chemId: 'chem_jet', takenAt: DAY_MS },
++      { now: DAY_MS, windowMs: DAY_MS },
++    )).toThrow('takenAt');
++  });
++
++  it('records every canonical chem before deciding whether the current chem is addictive', () => {
++    const source = readFileSync('components/CharacterContext.js', 'utf8');
++    const doseRecordingIndex = source.indexOf("const dosesToday = item?.itemType === 'chem'");
++    const addictionCheckIndex = source.indexOf('item?.addictionLevel > 0', doseRecordingIndex);
++
++    expect(doseRecordingIndex).toBeGreaterThan(-1);
++    expect(source.slice(doseRecordingIndex, addictionCheckIndex)).toContain('recordChemDose(item.id)');
++    expect(addictionCheckIndex).toBeGreaterThan(doseRecordingIndex);
++  });
++
++  it('rolls one combat die per total dose and gains Addiction 1 from any effect', () => {
++    mockCombatDieFaces([1, 5, 2]);
++
++    const result = checkAddiction(
++      { addictionLevel: 1, negativeEffect: 'addiction' },
++      3,
++    );
++
++    expect(result).toEqual({
++      addicted: true,
++      effectCount: 1,
++      faces: [1, 5, 2],
++      addictionLevel: 1,
++    });
++  });
++
++  it('keeps addictionLevel as the required number of effects', () => {
++    mockCombatDieFaces([5, 2, 6]);
++
++    const result = checkAddiction(
++      { addictionLevel: 2, negativeEffect: 'addiction' },
++      3,
++    );
++
++    expect(result.addicted).toBe(true);
++    expect(result.effectCount).toBe(2);
++    expect(result.faces).toEqual([5, 2, 6]);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 4989d3a8f9a94adfa99ae25c39483f033f07953b..5e878dc97db735b49d842f71f1a5e2a2aeb32851 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -33,7 +33,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
+ };
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+-import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
++import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
+ import { isSkillTagged } from '../domain/d20Checks';
+@@ -83,6 +83,7 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/save
+ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
+ 
+ const INITIAL_LEVEL = 1;
++const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
+ 
+ const CharacterContext = createContext();
+ 
+@@ -825,7 +826,7 @@ export const CharacterProvider = ({ children }) => {
+       setDefense(data.defense ?? 1);
+       setConditions(data.conditions || []);
+       setChemDosesLog(
+-        (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < 24 * 60 * 60 * 1000)
++        (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS)
+       );
+       
+       // Task 4.4: Migrate old format data to Zustand Store
+@@ -917,21 +918,17 @@ export const CharacterProvider = ({ children }) => {
+   };
+ 
+   /**
+-   * Записывает дозу препарата и возвращает количество доз за последние 24 ч.
++   * Записывает дозу препарата и возвращает общий размер пула доз за последние 24 ч.
+    */
+   const recordChemDose = (chemId) => {
+     const now = Date.now();
+-    const cutoff = now - 24 * 60 * 60 * 1000;
+-    let updatedLog;
+-    setChemDosesLog((prev) => {
+-      updatedLog = [...prev.filter((d) => d.takenAt > cutoff), { chemId, takenAt: now }];
+-      return updatedLog;
+-    });
+-    // Синхронный подсчёт: фильтруем текущий лог + новая доза
+-    const todayDoses = chemDosesLog
+-      .filter((d) => d.takenAt > cutoff && d.chemId === chemId)
+-      .length + 1;
+-    return todayDoses;
++    const result = recordDoseWithinWindow(
++      chemDosesLog,
++      { chemId, takenAt: now },
++      { now, windowMs: CHEM_DOSE_WINDOW_MS },
++    );
++    setChemDosesLog(result.doseLog);
++    return result.doseCount;
+   };
+ 
+   const applyDiseaseExposureForConsumable = (item) => {
+@@ -1071,7 +1068,12 @@ export const CharacterProvider = ({ children }) => {
+       }
+     }
+ 
+-    // 4. Зависимость
++    // 4. Зависимость. Каждая химическая доза входит в общий пул за 24 часа,
++    // даже если у текущего препарата нет свойства зависимости.
++    const dosesToday = item?.itemType === 'chem'
++      ? recordChemDose(item.id)
++      : 0;
++
+     // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
+     const hasPartyBoyImmunity =
+       item?.isAlcohol === true &&
+@@ -1089,7 +1091,6 @@ export const CharacterProvider = ({ children }) => {
+       !hasPartyBoyImmunity &&
+       (!isStealthBoy || isShadowCharacter)
+     ) {
+-      const dosesToday = recordChemDose(item.id || item.name);
+       // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
+       // (бросок CD, грани 5/6 = эффект).
+       const anyEffect = isShadowCharacter && isStealthBoy;
+diff --git a/domain/effects.js b/domain/effects.js
+index 6687595fefa364be0ec02c1fa5e16b66c31b20d0..eb758985d9c168dbf9e7f4124fa89cef335ece0c 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -200,15 +200,42 @@ export const getTimedAttributeModifiers = (activeEffects = []) => (
+     }, {})
+ );
+ 
++/**
++ * Добавляет дозу в скользящее временное окно и возвращает общий размер пула.
++ * Содержимое записей задаёт сеттинг; движок учитывает только их takenAt.
++ */
++export const recordDoseWithinWindow = (doseLog, dose, { now, windowMs }) => {
++    if (!Array.isArray(doseLog)) {
++        throw new Error('[effects] doseLog должен быть массивом');
++    }
++    if (doseLog.some((entry) => !entry || !Number.isFinite(entry.takenAt))) {
++        throw new Error('[effects] Каждая запись doseLog должна содержать числовой takenAt');
++    }
++    if (!dose || !Number.isFinite(dose.takenAt)) {
++        throw new Error('[effects] dose должен содержать числовой takenAt');
++    }
++    if (!Number.isFinite(now) || !Number.isFinite(windowMs) || windowMs <= 0) {
++        throw new Error('[effects] Некорректное временное окно доз');
++    }
++
++    const activeDoses = doseLog.filter(({ takenAt }) => now - takenAt < windowMs);
++    const nextDoseLog = [...activeDoses, dose];
++
++    return {
++        doseLog: nextDoseLog,
++        doseCount: nextDoseLog.length,
++    };
++};
++
+ /**
+  * Проверяет возникновение зависимости при приёме препарата.
+  *
+- * Механика: бросаем N Combat Dice (N = дозы за 24 ч),
++ * Механика: бросаем N Combat Dice (N = все дозы препаратов за 24 ч),
+  * считаем грани 5 и 6 как "эффекты".
+  * Если effectCount >= addictionLevel → зависимость.
+  *
+  * @param {object} item          — предмет с полем addictionLevel
+- * @param {number} dosesToday    — сколько доз этого препарата принято за 24 ч (включая текущую)
++ * @param {number} dosesToday    — сколько всего доз препаратов принято за 24 ч (включая текущую)
+  * @param {object} [options]     — { anyEffect?: boolean } (Тень и Стелс-бой:
+  *                                 зависимость при ЛЮБОМ эффекте на кубике)
+  * @returns {{ addicted: boolean, effectCount: number, faces: number[], addictionLevel: number }}
+@@ -671,6 +698,7 @@ export default {
+     SCENE_RULES,
+     getDefenseModifierEffectLabel,
+     applyConsumableToEffects,
++    recordDoseWithinWindow,
+     checkAddiction,
+     applyRemoveConditions,
+     advanceEffectsByScene,
