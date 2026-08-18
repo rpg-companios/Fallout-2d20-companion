@@ -1,7 +1,142 @@
+diff --git a/__tests__/checks/d20-checks.test.js b/__tests__/checks/d20-checks.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..c60554ba7b122ab1e3200b01c9ccd4311e7723fd
+--- /dev/null
++++ b/__tests__/checks/d20-checks.test.js
+@@ -0,0 +1,128 @@
++import { describe, expect, it, vi } from 'vitest';
++import { isSkillTagged, resolveD20Check } from '../../domain/d20Checks';
++
++const roller = (values) => {
++  const queue = [...values];
++  return vi.fn(() => {
++    if (queue.length === 0) throw new Error('test roller exhausted');
++    return queue.shift();
++  });
++};
++
++const check = ({
++  attributeValue = 6,
++  skillValue = 3,
++  isTagged = false,
++  difficulty = 1,
++  rolls = [5, 6],
++} = {}) => resolveD20Check({
++  attributeValue,
++  skillValue,
++  isTagged,
++  difficulty,
++  diceCount: rolls.length,
++  rollD20: roller(rolls),
++});
++
++describe('engine d20 checks', () => {
++  it('recognizes both primary and extra tagged skills without inferring a tag from rank', () => {
++    const primaryTaggedSkillIds = ['SURVIVAL'];
++    const extraTaggedSkillIds = ['SCIENCE'];
++    expect(isSkillTagged({
++      skillId: 'SURVIVAL',
++      primaryTaggedSkillIds,
++      extraTaggedSkillIds,
++    })).toBe(true);
++    expect(isSkillTagged({
++      skillId: 'SCIENCE',
++      primaryTaggedSkillIds,
++      extraTaggedSkillIds,
++    })).toBe(true);
++    expect(isSkillTagged({
++      skillId: 'REPAIR',
++      primaryTaggedSkillIds,
++      extraTaggedSkillIds,
++    })).toBe(false);
++  });
++
++  it('uses attribute + skill as the target number and compares successes with difficulty', () => {
++    expect(check({ rolls: [8, 9], difficulty: 2 })).toMatchObject({
++      targetNumber: 9,
++      successes: 2,
++      complicationCount: 0,
++      passed: true,
++      outcome: 'success',
++    });
++    expect(check({ rolls: [9, 10], difficulty: 2 })).toMatchObject({
++      successes: 1,
++      passed: false,
++      outcome: 'failure',
++    });
++  });
++
++  it('always gives exactly two successes for a natural 1', () => {
++    expect(check({
++      attributeValue: 0,
++      skillValue: 0,
++      isTagged: false,
++      difficulty: 2,
++      rolls: [1],
++    })).toMatchObject({
++      targetNumber: 0,
++      successes: 2,
++      passed: true,
++    });
++    expect(check({ isTagged: true, rolls: [1], difficulty: 2 }).successes).toBe(2);
++  });
++
++  it('gives two successes at or below the skill rank only when the skill is tagged', () => {
++    const tagged = check({ isTagged: true, rolls: [3, 4], difficulty: 3 });
++    expect(tagged.dieResults.map((result) => result.successes)).toEqual([2, 1]);
++    expect(tagged.passed).toBe(true);
++
++    const untagged = check({ isTagged: false, rolls: [3, 4], difficulty: 3 });
++    expect(untagged.dieResults.map((result) => result.successes)).toEqual([1, 1]);
++    expect(untagged.passed).toBe(false);
++  });
++
++  it('resolves one success plus a natural 20 as success with a complication', () => {
++    expect(check({ rolls: [9, 20], difficulty: 1 })).toMatchObject({
++      successes: 1,
++      complicationCount: 1,
++      automaticFailure: false,
++      passed: true,
++      outcome: 'successWithComplication',
++    });
++  });
++
++  it('fails when a natural 20 is rolled and the pool produces no successes', () => {
++    expect(check({ rolls: [10, 20], difficulty: 0 })).toMatchObject({
++      successes: 0,
++      complicationCount: 1,
++      noSuccessFailure: true,
++      passed: false,
++      outcome: 'failure',
++    });
++  });
++
++  it('fails automatically when two natural 20s are rolled', () => {
++    expect(check({ rolls: [1, 20, 20], difficulty: 1 })).toMatchObject({
++      successes: 2,
++      complicationCount: 2,
++      automaticFailure: true,
++      passed: false,
++      outcome: 'failure',
++    });
++  });
++
++  it('rejects invalid canonical check input instead of normalizing it', () => {
++    expect(() => check({ attributeValue: 6.5 })).toThrow('attributeValue');
++    expect(() => check({ rolls: [0] })).toThrow('outside 1..20');
++    expect(() => resolveD20Check({
++      attributeValue: 6,
++      skillValue: 3,
++      isTagged: 'yes',
++      difficulty: 1,
++    })).toThrow('isTagged');
++  });
++});
 diff --git a/__tests__/consumables/disease-effects-panel.test.js b/__tests__/consumables/disease-effects-panel.test.js
 new file mode 100644
+index 0000000000000000000000000000000000000000..5c2f8badb8b01e89fa8d54c26905222812e2f418
 --- /dev/null
-+++ b/__tests__/consumables/disease-effects-panel.test.js	2026-08-17 19:52:26.660489764 +0000
++++ b/__tests__/consumables/disease-effects-panel.test.js
 @@ -0,0 +1,85 @@
 +import React from 'react';
 +import { act, create } from 'react-test-renderer';
@@ -90,9 +225,10 @@ new file mode 100644
 +});
 diff --git a/__tests__/consumables/disease-exposure.test.js b/__tests__/consumables/disease-exposure.test.js
 new file mode 100644
+index 0000000000000000000000000000000000000000..268f630680fb81377caced0fc9783c34a9a11a94
 --- /dev/null
-+++ b/__tests__/consumables/disease-exposure.test.js	2026-08-17 19:50:46.971032104 +0000
-@@ -0,0 +1,278 @@
++++ b/__tests__/consumables/disease-exposure.test.js
+@@ -0,0 +1,294 @@
 +import { describe, expect, it, vi } from 'vitest';
 +import diseaseExposureRule from '../../modules/fallout/data/rules/diseaseExposure.json';
 +import moduleFood from '../../modules/fallout/data/consumables/food.json';
@@ -152,7 +288,7 @@ new file mode 100644
 +      immunity: 'disease',
 +      test: { attribute: 'END', skill: 'SURVIVAL' },
 +      roll: { rollType: 'rollD20', rollValue: 2 },
-+      maximumFace: { difficultyModifier: 1, automaticFailureCount: 2 },
++      complication: { subsequentDifficultyModifier: 1 },
 +      resultTable: 'diseases',
 +    });
 +  });
@@ -201,7 +337,7 @@ new file mode 100644
 +      difficulty: 1,
 +      targetNumber: 9,
 +      successes: 1,
-+      maximumFaceCount: 1,
++      complicationCount: 1,
 +      addedDifficulty: 1,
 +      passed: true,
 +    });
@@ -233,6 +369,22 @@ new file mode 100644
 +      successes: 4,
 +      passed: true,
 +    });
++  });
++
++  it('applies the same subsequent-check complication to dirty water', () => {
++    const dirtyWater = check({
++      eventId: 'dirtyWater',
++      rolls: [5, 20],
++    });
++    expect(dirtyWater.check).toMatchObject({
++      eventId: 'dirtyWater',
++      difficulty: 1,
++      complicationCount: 1,
++      addedDifficulty: 1,
++      passed: true,
++      outcome: 'successWithComplication',
++    });
++    expect(dirtyWater.state.difficultyModifier).toBe(1);
 +  });
 +
 +  it('ignores a repeated event type during the same five-minute scene', () => {
@@ -272,7 +424,7 @@ new file mode 100644
 +  it('makes two natural 20s an automatic failure and adds +2 for later checks', () => {
 +    const result = check({ rolls: [20, 20] });
 +    expect(result.check).toMatchObject({
-+      maximumFaceCount: 2,
++      complicationCount: 2,
 +      addedDifficulty: 2,
 +      automaticFailure: true,
 +      passed: false,
@@ -372,9 +524,10 @@ new file mode 100644
 +  });
 +});
 diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitron/shadow-migration.test.js
---- a/__tests__/securitron/shadow-migration.test.js	2026-08-17 18:38:41.695485605 +0000
-+++ b/__tests__/securitron/shadow-migration.test.js	2026-08-17 19:42:05.751410906 +0000
-@@ -25,8 +25,8 @@
+index 6cec8c91e6d5ae47414e77975cc09e7ea17138b5..174db12580865d3cba4c529522c234a987202430 100644
+--- a/__tests__/securitron/shadow-migration.test.js
++++ b/__tests__/securitron/shadow-migration.test.js
+@@ -25,8 +25,8 @@ const makeShadowSave = (attributes, version = 9) => ({
  const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
  
  describe('Текущая версия формата сейва', () => {
@@ -387,8 +540,9 @@ diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitro
  
 diff --git a/__tests__/store/scene-risk-migration.test.js b/__tests__/store/scene-risk-migration.test.js
 new file mode 100644
+index 0000000000000000000000000000000000000000..4c72c6de53fdc2f3d842d2d014cd891f210c7248
 --- /dev/null
-+++ b/__tests__/store/scene-risk-migration.test.js	2026-08-17 19:42:09.719468940 +0000
++++ b/__tests__/store/scene-risk-migration.test.js
 @@ -0,0 +1,19 @@
 +import { describe, expect, it } from 'vitest';
 +import { migrateCharacterState } from '../../src/store/migrations';
@@ -410,20 +564,22 @@ new file mode 100644
 +  });
 +});
 diff --git a/components/CharacterContext.js b/components/CharacterContext.js
---- a/components/CharacterContext.js	2026-08-17 18:37:26.618387885 +0000
-+++ b/components/CharacterContext.js	2026-08-17 19:52:00.336104857 +0000
-@@ -34,7 +34,9 @@
+index 9db1b9e87b6ee6d5efcad2b06519c42452c848b0..7ca0eeaf3d2daca1010f8d2254f3a75952d96c38 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -34,7 +34,10 @@ const migrateSkillsToCanonical = (rawSkills) => {
  import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
  import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
  import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 -import { hasRadiationImmunity } from '../domain/immunities';
 +import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 +import { createSceneRiskState, getSceneRiskEventForRule, resolveSceneRiskEvent } from '../domain/sceneRiskChecks';
++import { isSkillTagged } from '../domain/d20Checks';
 +import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
  import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
  
  import { resolveBodyPlan } from '../domain/bodyplan';
-@@ -70,6 +72,7 @@
+@@ -70,6 +73,7 @@ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
  import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
  import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
  import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
@@ -431,7 +587,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
  import { Alert, Platform } from 'react-native';
  
  // Zustand Store integration (Task 4.1)
-@@ -296,11 +299,14 @@
+@@ -296,11 +300,14 @@ export const CharacterProvider = ({ children }) => {
    const [defense, setDefense] = useState(1);
    const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
    const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
@@ -446,7 +602,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
  
    // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
    // Производные значения (carryWeight, meleeBonus, defense, initiative …)
-@@ -675,6 +681,7 @@
+@@ -675,6 +682,7 @@ export const CharacterProvider = ({ children }) => {
      defense,
      conditions,
      chemDosesLog,
@@ -454,7 +610,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
    }), [
      characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
      forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
-@@ -682,7 +689,7 @@
+@@ -682,7 +690,7 @@ export const CharacterProvider = ({ children }) => {
      equippedArmor, equippedPowerArmor, powerArmorRuntime,
      caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
      luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
@@ -463,7 +619,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
    ]);
  
    // Realtime save for already persisted characters.
-@@ -768,6 +775,8 @@
+@@ -768,6 +776,8 @@ export const CharacterProvider = ({ children }) => {
        setEffects(data.effects || []);
        setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
        setSceneCounter(data.sceneCounter ?? 0);
@@ -472,7 +628,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
        // Migrate old [null, null] format to dynamic array
        const rawWeapons = data.equippedWeapons || [];
        let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
-@@ -922,9 +931,84 @@
+@@ -922,9 +932,88 @@ export const CharacterProvider = ({ children }) => {
      return todayDoses;
    };
  
@@ -509,7 +665,11 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
 +      eventId: event.eventId,
 +      attributeValue: getAttributeValue(attributes, rule.test.attribute),
 +      skillValue: skill.value,
-+      isTagged: selectedSkills.includes(skill.name) || extraTaggedSkills.includes(skill.name),
++      isTagged: isSkillTagged({
++        skillId: skill.name,
++        primaryTaggedSkillIds: selectedSkills,
++        extraTaggedSkillIds: extraTaggedSkills,
++      }),
 +    });
 +
 +    if (riskResult.status === 'duplicate') return riskResult;
@@ -558,7 +718,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
     */
    const applyConsumableFull = (item) => {
      debugLog('consumable.apply.start', {
-@@ -977,6 +1061,13 @@
+@@ -977,6 +1066,13 @@ export const CharacterProvider = ({ children }) => {
          syncTimedEffectsToStore(withoutAddiction, storeNow);
          setActiveTimedEffects(withoutAddiction);
        }
@@ -572,7 +732,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
      }
  
      // 4. Зависимость
-@@ -1024,9 +1115,12 @@
+@@ -1024,9 +1120,12 @@ export const CharacterProvider = ({ children }) => {
        }
      }
  
@@ -585,7 +745,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
        conditionsRemoved: removed,
        healAmount: vitalChanges.healAmount,
        radiationAmount: vitalChanges.radiationAmount,
-@@ -1035,6 +1129,7 @@
+@@ -1035,6 +1134,7 @@ export const CharacterProvider = ({ children }) => {
      return {
        timedResult: { ...timedResult, expired: normalizedCurrent.expired },
        addictionResult,
@@ -593,7 +753,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
        conditionsRemoved: removed,
        healAmount: vitalChanges.healAmount,
        radiationAmount: vitalChanges.radiationAmount,
-@@ -1146,6 +1241,8 @@
+@@ -1146,6 +1246,8 @@ export const CharacterProvider = ({ children }) => {
      setEffects([]);
      setActiveTimedEffects([]);
      setSceneCounter(0);
@@ -602,7 +762,7 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
      setEquippedWeapons([]);
      useCharacterStore.persist?.clearStorage?.();
      useCharacterStore.getState().resetCharacterStore({
-@@ -1222,6 +1319,7 @@
+@@ -1222,6 +1324,7 @@ export const CharacterProvider = ({ children }) => {
      effects, setEffects,
      activeTimedEffects, setActiveTimedEffects,
      sceneCounter,
@@ -611,9 +771,10 @@ diff --git a/components/CharacterContext.js b/components/CharacterContext.js
      applyConsumableTimedEffects,
      applyConsumableFull,
 diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
---- a/components/screens/InventoryScreen/InventoryScreen.js	2026-08-17 18:33:31.415369653 +0000
-+++ b/components/screens/InventoryScreen/InventoryScreen.js	2026-08-17 19:44:27.461482975 +0000
-@@ -359,6 +359,7 @@
+index b87bc62052b742f13247fd9435a3df6cf25440e1..97e563d4b08f1340f7652f26110882ae4b415fa1 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -359,6 +359,7 @@ const InventoryScreen = () => {
        const {
          timedResult,
          addictionResult,
@@ -621,7 +782,7 @@ diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/
          conditionsRemoved,
          healAmount,
          radiationAmount,
-@@ -390,6 +391,33 @@
+@@ -390,6 +391,33 @@ const InventoryScreen = () => {
            formatInventoryText(tInventory('screen.alerts.conditionsRemovedMessage'), { conditions: conditionsRemoved.join(', ') }));
        }
  
@@ -656,9 +817,10 @@ diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/
        if (addictionResult) {
          const { effectCount, faces, addicted, addictionLevel } = addictionResult;
 diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
---- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js	2026-08-17 17:44:02.000000000 +0000
-+++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js	2026-08-17 19:52:00.336104857 +0000
-@@ -20,6 +20,7 @@
+index c9a72a8c519429d23f6557a0c44ffdd9eb96d491..6631a24f08b7f1610d5d7ac75d6f0ffb72602c62 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -20,6 +20,7 @@ import localStyles from '../../../styles/WeaponsAndArmorScreen.styles';
  import { renderTextWithIcons } from './textUtils';
  import { useLocale, useModuleLocale } from '../../../i18n/locale';
  import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -666,7 +828,7 @@ diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b
  import { resolveItem, resolveWeaponWithAppliedMods } from '../../../domain/resolveItem';
  import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
  import {
-@@ -176,9 +177,13 @@
+@@ -176,9 +177,13 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) =>
  
  // extraRows: постоянные строки (силовая броня: «Ядерный блок: n/max», эффекты каркаса) —
  // рендерятся как иммунитеты, с «∞» в колонке таймера.
@@ -681,7 +843,7 @@ diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b
  
    const hasImmunities = immunities.length > 0;
    const hasEffects = (effects || []).length > 0;
-@@ -216,15 +221,27 @@
+@@ -216,15 +221,27 @@ const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
                  </View>
                ) : null}
                {effects.map((effect) => {
@@ -714,10 +876,155 @@ diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b
                      <Text style={localStyles.effectTimerText}>
                        {effect.isPermanent ? '∞' : getEffectTimeText(effect.scenesLeft)}
                      </Text>
+diff --git a/domain/d20Checks.js b/domain/d20Checks.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..45d6660257ced0cc1e905c970594fa1cf7b6ccec
+--- /dev/null
++++ b/domain/d20Checks.js
+@@ -0,0 +1,138 @@
++import { rollDie } from './diceRollsLogic';
++
++const NATURAL_ONE = 1;
++const COMPLICATION_FACE = 20;
++const AUTOMATIC_FAILURE_COMPLICATIONS = 2;
++
++const assertNonNegativeInteger = (value, label) => {
++  if (!Number.isInteger(value) || value < 0) {
++    throw new Error(`[d20Checks] ${label} must be a non-negative integer`);
++  }
++};
++
++const assertSkillIdArray = (value, label) => {
++  if (!Array.isArray(value) || value.some((id) => typeof id !== 'string' || !id)) {
++    throw new Error(`[d20Checks] ${label} must contain non-empty skill ids`);
++  }
++};
++
++export const isSkillTagged = ({
++  skillId,
++  primaryTaggedSkillIds,
++  extraTaggedSkillIds,
++}) => {
++  if (typeof skillId !== 'string' || !skillId) {
++    throw new Error('[d20Checks] skillId is required');
++  }
++  assertSkillIdArray(primaryTaggedSkillIds, 'primaryTaggedSkillIds');
++  assertSkillIdArray(extraTaggedSkillIds, 'extraTaggedSkillIds');
++  return primaryTaggedSkillIds.includes(skillId) || extraTaggedSkillIds.includes(skillId);
++};
++
++const scoreD20 = ({ roll, targetNumber, skillValue, isTagged }) => {
++  if (roll === COMPLICATION_FACE) {
++    return {
++      roll,
++      successes: 0,
++      isSuccess: false,
++      isCriticalSuccess: false,
++      isComplication: true,
++    };
++  }
++
++  if (roll === NATURAL_ONE) {
++    return {
++      roll,
++      successes: 2,
++      isSuccess: true,
++      isCriticalSuccess: true,
++      isComplication: false,
++    };
++  }
++
++  if (roll > targetNumber) {
++    return {
++      roll,
++      successes: 0,
++      isSuccess: false,
++      isCriticalSuccess: false,
++      isComplication: false,
++    };
++  }
++
++  const isCriticalSuccess = isTagged && roll <= skillValue;
++  return {
++    roll,
++    successes: isCriticalSuccess ? 2 : 1,
++    isSuccess: true,
++    isCriticalSuccess,
++    isComplication: false,
++  };
++};
++
++/**
++ * Resolves an engine-owned attribute + skill d20 check.
++ *
++ * Settings provide the selected attribute, skill, difficulty, and dice-pool
++ * size. Callers provide whether that skill is actually tagged for the current
++ * character; skill rank alone never implies that it is tagged.
++ */
++export const resolveD20Check = ({
++  attributeValue,
++  skillValue,
++  isTagged,
++  difficulty,
++  diceCount = 2,
++  rollD20 = () => rollDie(20),
++}) => {
++  assertNonNegativeInteger(attributeValue, 'attributeValue');
++  assertNonNegativeInteger(skillValue, 'skillValue');
++  assertNonNegativeInteger(difficulty, 'difficulty');
++  if (typeof isTagged !== 'boolean') {
++    throw new Error('[d20Checks] isTagged must be a boolean');
++  }
++  if (!Number.isInteger(diceCount) || diceCount < 1) {
++    throw new Error('[d20Checks] diceCount must be an integer >= 1');
++  }
++  if (typeof rollD20 !== 'function') {
++    throw new Error('[d20Checks] rollD20 must be a function');
++  }
++
++  const targetNumber = attributeValue + skillValue;
++  const rolls = Array.from({ length: diceCount }, () => rollD20());
++  if (rolls.some((roll) => !Number.isInteger(roll) || roll < 1 || roll > 20)) {
++    throw new Error('[d20Checks] d20 roller returned a value outside 1..20');
++  }
++
++  const dieResults = rolls.map((roll) => scoreD20({
++    roll,
++    targetNumber,
++    skillValue,
++    isTagged,
++  }));
++  const successes = dieResults.reduce((total, result) => total + result.successes, 0);
++  const complicationCount = dieResults.filter((result) => result.isComplication).length;
++  const automaticFailure = complicationCount >= AUTOMATIC_FAILURE_COMPLICATIONS;
++  const noSuccessFailure = complicationCount > 0 && successes === 0;
++  const passed = !automaticFailure && !noSuccessFailure && successes >= difficulty;
++  const outcome = passed
++    ? (complicationCount > 0 ? 'successWithComplication' : 'success')
++    : 'failure';
++
++  return {
++    attributeValue,
++    skillValue,
++    targetNumber,
++    isTagged,
++    difficulty,
++    diceCount,
++    rolls,
++    dieResults,
++    successes,
++    complicationCount,
++    automaticFailure,
++    noSuccessFailure,
++    passed,
++    outcome,
++  };
++};
 diff --git a/domain/diseaseConditions.js b/domain/diseaseConditions.js
 new file mode 100644
+index 0000000000000000000000000000000000000000..79b24e666a66478aa2825a54194de799b5cb2237
 --- /dev/null
-+++ b/domain/diseaseConditions.js	2026-08-17 19:38:26.032198175 +0000
++++ b/domain/diseaseConditions.js
 @@ -0,0 +1,90 @@
 +import { rollDie } from './diceRollsLogic';
 +
@@ -809,10 +1116,23 @@ new file mode 100644
 +    removed: currentEffects.filter((effect) => effect?.effectType === 'disease'),
 +  };
 +};
+diff --git a/domain/perks/tag.js b/domain/perks/tag.js
+index eb6e8e5487e98b51a8ab723fa502b46925db7130..74d0cc995dc4b23310ae71478830a724b65a32ff 100644
+--- a/domain/perks/tag.js
++++ b/domain/perks/tag.js
+@@ -1,6 +1,6 @@
+ // domain/perks/tag.js
+ // Отметка! — даёт 1 дополнительный отмеченный навык (максимум 6 меток суммарно).
+-// Бонус к критам при d20 ≤ значению навыка — не реализован (движка проверок нет).
++// Движковый резолвер d20 учитывает эту отметку: d20 ≤ рангу навыка даёт 2 успеха.
+ 
+ export const tagPerk = {
+   id: 'tag',
 diff --git a/domain/registry.js b/domain/registry.js
---- a/domain/registry.js	2026-08-17 17:44:02.000000000 +0000
-+++ b/domain/registry.js	2026-08-17 19:52:00.336104857 +0000
-@@ -16,6 +16,7 @@
+index 6c16fe101c81d409e443b15c9fa2fb8c9f327975..96428460b62c3dc5ad6f1d505e94d5e43cc174a8 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -16,6 +16,7 @@ import moduleOrigins from '../modules/fallout/data/origins/origins.json';
  import moduleTraits from '../modules/fallout/data/traits/traits.json';
  import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
  import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
@@ -820,7 +1140,7 @@ diff --git a/domain/registry.js b/domain/registry.js
  import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
  
  // i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
-@@ -46,6 +47,7 @@
+@@ -46,6 +47,7 @@ import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/sett
  import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
  
  import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
@@ -828,7 +1148,7 @@ diff --git a/domain/registry.js b/domain/registry.js
  import { getCurrentModuleLocale } from '../i18n/locale';
  import { expandTrueItems } from './packMerge';
  
-@@ -166,3 +168,17 @@
+@@ -166,3 +168,17 @@ export function getUniqQualityName(id, locale = getCurrentModuleLocale()) {
  export function getEquipmentCatalogForLocale(locale) {
    return getEquipmentCatalog(locale);
  }
@@ -848,10 +1168,11 @@ diff --git a/domain/registry.js b/domain/registry.js
 +}
 diff --git a/domain/sceneRiskChecks.js b/domain/sceneRiskChecks.js
 new file mode 100644
+index 0000000000000000000000000000000000000000..9ec9ff0eb99377da572fec6f66399955598bbc10
 --- /dev/null
-+++ b/domain/sceneRiskChecks.js	2026-08-17 19:41:50.687190621 +0000
-@@ -0,0 +1,180 @@
-+import { rollDie } from './diceRollsLogic';
++++ b/domain/sceneRiskChecks.js
+@@ -0,0 +1,154 @@
++import { resolveD20Check } from './d20Checks';
 +
 +const MINUTE_MS = 60 * 1000;
 +
@@ -886,8 +1207,10 @@ new file mode 100644
 +    throw new Error('[sceneRiskChecks] Only structured rollD20 checks are supported');
 +  }
 +  assertFiniteInteger(rule.roll.rollValue, 'roll.rollValue', { min: 1 });
-+  assertFiniteInteger(rule.maximumFace?.difficultyModifier, 'maximumFace.difficultyModifier');
-+  assertFiniteInteger(rule.maximumFace?.automaticFailureCount, 'maximumFace.automaticFailureCount', { min: 1 });
++  assertFiniteInteger(
++    rule.complication?.subsequentDifficultyModifier,
++    'complication.subsequentDifficultyModifier',
++  );
 +};
 +
 +const assertState = (state) => {
@@ -914,13 +1237,6 @@ new file mode 100644
 +    : state;
 +};
 +
-+const countRollSuccesses = ({ roll, targetNumber, skillValue, isTagged, maximumFace }) => {
-+  if (roll === maximumFace) return 0;
-+  if (roll > targetNumber) return 0;
-+  if (isTagged && roll <= skillValue) return 2;
-+  return 1;
-+};
-+
 +/**
 + * Registers one explicitly declared setting event and, for a new event type in
 + * the current scene, resolves the setting-provided attribute + skill check.
@@ -936,21 +1252,15 @@ new file mode 100644
 +  skillValue,
 +  isTagged,
 +  now = Date.now(),
-+  rollD20 = () => rollDie(20),
++  rollD20,
 +}) => {
 +  assertRule(rule);
 +  assertState(state);
 +  if (typeof eventId !== 'string' || !eventId) {
 +    throw new Error('[sceneRiskChecks] eventId is required');
 +  }
-+  if (!Number.isFinite(attributeValue) || !Number.isFinite(skillValue)) {
-+    throw new Error('[sceneRiskChecks] Attribute and skill values must be finite numbers');
-+  }
-+  if (typeof isTagged !== 'boolean') {
-+    throw new Error('[sceneRiskChecks] isTagged must be a boolean');
-+  }
-+  if (!Number.isFinite(now) || now < 0 || typeof rollD20 !== 'function') {
-+    throw new Error('[sceneRiskChecks] Invalid clock or d20 roller');
++  if (!Number.isFinite(now) || now < 0) {
++    throw new Error('[sceneRiskChecks] Invalid clock');
 +  }
 +
 +  const currentState = resetExpiredScene(rule, state, now);
@@ -965,23 +1275,17 @@ new file mode 100644
 +    rule.maxDifficulty,
 +    baseDifficulty + currentState.difficultyModifier,
 +  );
-+  const targetNumber = attributeValue + skillValue;
-+  const rolls = Array.from({ length: rule.roll.rollValue }, () => rollD20());
-+  if (rolls.some((roll) => !Number.isInteger(roll) || roll < 1 || roll > 20)) {
-+    throw new Error('[sceneRiskChecks] d20 roller returned a value outside 1..20');
-+  }
-+
-+  const maximumFaceCount = rolls.filter((roll) => roll === 20).length;
-+  const successes = rolls.reduce((sum, roll) => sum + countRollSuccesses({
-+    roll,
-+    targetNumber,
++  const d20Check = resolveD20Check({
++    attributeValue,
 +    skillValue,
 +    isTagged,
-+    maximumFace: 20,
-+  }), 0);
-+  const automaticFailure = maximumFaceCount >= rule.maximumFace.automaticFailureCount;
-+  const passed = !automaticFailure && successes >= difficulty;
-+  const addedDifficulty = maximumFaceCount * rule.maximumFace.difficultyModifier;
++    difficulty,
++    diceCount: rule.roll.rollValue,
++    rollD20,
++  });
++  const addedDifficulty = (
++    d20Check.complicationCount * rule.complication.subsequentDifficultyModifier
++  );
 +  const difficultyModifier = Math.min(
 +    rule.maxDifficulty,
 +    currentState.difficultyModifier + addedDifficulty,
@@ -999,18 +1303,9 @@ new file mode 100644
 +      eventId,
 +      attribute: rule.test.attribute,
 +      skill: rule.test.skill,
-+      attributeValue,
-+      skillValue,
-+      targetNumber,
-+      isTagged,
 +      baseDifficulty,
-+      difficulty,
-+      rolls,
-+      successes,
-+      maximumFaceCount,
++      ...d20Check,
 +      addedDifficulty,
-+      automaticFailure,
-+      passed,
 +    },
 +  };
 +};
@@ -1032,8 +1327,9 @@ new file mode 100644
 +  return event;
 +};
 diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
---- a/i18n/en-EN/screens/inventory/screen.json	2026-08-17 18:33:31.415369653 +0000
-+++ b/i18n/en-EN/screens/inventory/screen.json	2026-08-17 19:44:06.973183437 +0000
+index fe4e14eca8fe5629bdafc09ed1f78f6b53c10c31..f58db2edbc70e96fd7afa5e0e33d141938dc6153 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
 @@ -63,7 +63,13 @@
        "requiresSecuritron": "The driver is only compatible with a Securitron.",
        "alreadyInstalled": "Mk II OS is already installed.",
@@ -1057,8 +1353,9 @@ diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inven
 \ No newline at end of file
 +}
 diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
---- a/i18n/ru-RU/screens/inventory/screen.json	2026-08-17 18:33:31.415369653 +0000
-+++ b/i18n/ru-RU/screens/inventory/screen.json	2026-08-17 19:44:06.973183437 +0000
+index ef125afa00fd9b69d0a4fe70d226012addeaa327..de98a7d8d2f8b4c1a34c247229890d44e02a5e6b 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
 @@ -63,7 +63,13 @@
        "requiresSecuritron": "Драйвер совместим только с Секьюритроном.",
        "alreadyInstalled": "ОС Mk II уже установлена.",
@@ -1075,8 +1372,9 @@ diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inven
    "actions": {
      "cancel": "Отмена",
 diff --git a/modules/fallout/data/consumables/drinks.json b/modules/fallout/data/consumables/drinks.json
---- a/modules/fallout/data/consumables/drinks.json	2026-08-17 17:44:02.000000000 +0000
-+++ b/modules/fallout/data/consumables/drinks.json	2026-08-17 19:38:33.596308743 +0000
+index cb57a2ce7d846bff68d2f0bc35bf96b0bba7f6b6..90be68e7b08203bb10f8386c00421f7478d4206c 100644
+--- a/modules/fallout/data/consumables/drinks.json
++++ b/modules/fallout/data/consumables/drinks.json
 @@ -80,7 +80,13 @@
      "hpHealed": 2,
      "irradiated": true,
@@ -1100,8 +1398,9 @@ diff --git a/modules/fallout/data/consumables/drinks.json b/modules/fallout/data
 \ No newline at end of file
 +]
 diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/consumables/food.json
---- a/modules/fallout/data/consumables/food.json	2026-08-17 18:33:31.415369653 +0000
-+++ b/modules/fallout/data/consumables/food.json	2026-08-17 19:38:33.596308743 +0000
+index b997c5f58a03787b078c2013a65546744af26631..7267aec84b9a1d4226eb562e895afd3fb337569e 100644
+--- a/modules/fallout/data/consumables/food.json
++++ b/modules/fallout/data/consumables/food.json
 @@ -59,7 +59,13 @@
      },
      "effectKey": "",
@@ -1539,9 +1838,10 @@ diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/c
      "id": "food_yao_guai_ribs",
 diff --git a/modules/fallout/data/rules/diseaseExposure.json b/modules/fallout/data/rules/diseaseExposure.json
 new file mode 100644
+index 0000000000000000000000000000000000000000..a3e8eedf0a636b119b6faa3c869cd740820ef3ba
 --- /dev/null
-+++ b/modules/fallout/data/rules/diseaseExposure.json	2026-08-17 19:37:52.803712272 +0000
-@@ -0,0 +1,19 @@
++++ b/modules/fallout/data/rules/diseaseExposure.json
+@@ -0,0 +1,18 @@
 +{
 +  "id": "diseaseExposure",
 +  "sceneDurationMinutes": 5,
@@ -1555,16 +1855,16 @@ new file mode 100644
 +    "rollType": "rollD20",
 +    "rollValue": 2
 +  },
-+  "maximumFace": {
-+    "difficultyModifier": 1,
-+    "automaticFailureCount": 2
++  "complication": {
++    "subsequentDifficultyModifier": 1
 +  },
 +  "resultTable": "diseases"
 +}
 diff --git a/src/store/effectsSync.js b/src/store/effectsSync.js
---- a/src/store/effectsSync.js	2026-08-17 17:44:02.000000000 +0000
-+++ b/src/store/effectsSync.js	2026-08-17 19:39:25.605069220 +0000
-@@ -19,6 +19,8 @@
+index 86b4795702ee12aa3b1f5bc0bc013976809eae7a..abfb6fd03a4e6c2bf5f8006966cb32bc1120b433 100644
+--- a/src/store/effectsSync.js
++++ b/src/store/effectsSync.js
+@@ -19,6 +19,8 @@ export const legacyEffectToStore = (effect) => ({
    durationMs: effect.durationMs,
    scenesLeft: effect.scenesLeft || 0,
    sourceName: effect.sourceName,
@@ -1573,7 +1873,7 @@ diff --git a/src/store/effectsSync.js b/src/store/effectsSync.js
  });
  
  export const storeEffectToLegacy = (effect) => ({
-@@ -35,6 +37,8 @@
+@@ -35,6 +37,8 @@ export const storeEffectToLegacy = (effect) => ({
    durationMs: effect.durationMs,
    scenesLeft: effect.scenesLeft || 0,
    sourceName: effect.sourceName,
@@ -1583,9 +1883,10 @@ diff --git a/src/store/effectsSync.js b/src/store/effectsSync.js
  
  export const legacyEffectsArrayToStore = (effectsArray = []) => {
 diff --git a/src/store/migrations.js b/src/store/migrations.js
---- a/src/store/migrations.js	2026-08-17 18:37:26.618387885 +0000
-+++ b/src/store/migrations.js	2026-08-17 19:48:23.640936370 +0000
-@@ -200,6 +200,9 @@
+index 5737ba2c86d7f7fb5c478a216b495222a6481532..6f5a96af70858a9b1c7694372d08c8fe54a44426 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -200,6 +200,9 @@ export const normalizeEffects = (activeTimedEffects = []) => {
        parameters: [],
        maxHpModifier: effect.maxHpModifier,
        damageResistanceModifier: effect.damageResistanceModifier,
@@ -1595,7 +1896,7 @@ diff --git a/src/store/migrations.js b/src/store/migrations.js
        createdAt: effect.createdAt,
        expiresAt: effect.expiresAt,
        durationMs: effect.durationMs,
-@@ -304,6 +307,9 @@
+@@ -304,6 +307,9 @@ export const denormalizeEffects = (effectsDict = {}) => {
        effectKind: effect.effectKind ?? effect.type,
        maxHpModifier: effect.maxHpModifier,
        damageResistanceModifier: effect.damageResistanceModifier,
@@ -1605,7 +1906,7 @@ diff --git a/src/store/migrations.js b/src/store/migrations.js
        createdAt: effect.createdAt,
        expiresAt: effect.expiresAt,
        durationMs: effect.durationMs,
-@@ -986,6 +992,14 @@
+@@ -986,6 +992,14 @@ const MIGRATIONS = [
      return next;
    },
  
@@ -1621,8 +1922,9 @@ diff --git a/src/store/migrations.js b/src/store/migrations.js
  /**
   * Мерж комплекта снаряжения при сохранении снапшота.
 diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
---- a/src/store/saveSchema.js	2026-08-17 17:44:02.000000000 +0000
-+++ b/src/store/saveSchema.js	2026-08-17 19:42:05.751410906 +0000
+index e617fb621ec2ef67758dd407c4b746539ac0ae56..5145b6a79959ac1db1471ede34d6649a31282c62 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
 @@ -34,7 +34,8 @@
  //       атрибуты/флаги/навыки к стартовым (инвентарь/уровень не трогаем).
  // v14 — «Тень»: старый комплект (default_caps_only) заменяется на NIGHTKIN;
@@ -1634,9 +1936,10 @@ diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
  // Версия, которая ставится при отсутствии schemaVersion в сохранении
  // (старые сохранения без поля — считаем v0, текущим форматом).
 diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
---- a/styles/WeaponsAndArmorScreen.styles.js	2026-08-17 17:44:02.000000000 +0000
-+++ b/styles/WeaponsAndArmorScreen.styles.js	2026-08-17 19:39:50.049426673 +0000
-@@ -42,7 +42,9 @@
+index 5f24d9270cb5414c459bba6676c8cba47ee7f4ed..3ea640768d6f04d8968440af1090169250ec7290 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -42,7 +42,9 @@ const styles = StyleSheet.create({
    },
    effectsListContainer: { width: '100%', marginTop: 4 },
    effectLineContainer: { marginBottom: 2, alignItems: 'center' },
