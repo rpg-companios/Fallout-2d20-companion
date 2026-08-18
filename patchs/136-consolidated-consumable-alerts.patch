@@ -1,0 +1,695 @@
+diff --git a/__tests__/consumables/consumable-result-report.test.js b/__tests__/consumables/consumable-result-report.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e93c702e058e521b9a5d3cc857bb06c8a9d2af4
+--- /dev/null
++++ b/__tests__/consumables/consumable-result-report.test.js
+@@ -0,0 +1,170 @@
++import { readFileSync } from 'node:fs';
++import { beforeEach, describe, expect, it } from 'vitest';
++import { applyConsumableToEffects, applyRemoveConditions } from '../../domain/effects';
++import { setCurrentLocale } from '../../i18n/locale';
++import { buildConsumableResultReport } from '../../components/screens/InventoryScreen/logic/consumableResultReport';
++
++describe('consolidated consumable result report', () => {
++  beforeEach(() => {
++    setCurrentLocale('ru-RU');
++  });
++
++  it('exposes timed-effect messages with an explicit outcome kind', () => {
++    const result = applyConsumableToEffects({
++      name: 'Препарат',
++      positiveEffectLabel: 'Бонус',
++      positiveEffectDuration: 'instant',
++      negativeEffect: 'Тошнота',
++      negativeEffectDuration: 'instant',
++    });
++
++    expect(result.notificationEvents).toHaveLength(2);
++    expect(result.notificationEvents.map((event) => event.kind)).toEqual(['positive', 'negative']);
++    expect(result.notificationEvents.map((event) => event.message)).toEqual(result.events);
++  });
++
++  it('combines positive and negative outcomes without roll details', () => {
++    const report = buildConsumableResultReport({
++      itemName: 'Сырая еда',
++      healAmount: 3,
++      radiationAmount: 2,
++      timedResult: {
++        notificationEvents: [
++          { kind: 'positive', message: 'Положительный эффект.' },
++          { kind: 'negative', message: 'Отрицательный эффект.' },
++        ],
++      },
++      diseaseRiskResult: {
++        status: 'checked',
++        check: { passed: false, difficulty: 3, rolls: [7, 20], successes: 1 },
++        disease: { name: 'Лихорадка' },
++        diseaseRoll: 12,
++        infectionStatus: 'infected',
++      },
++      addictionResult: {
++        addicted: true,
++        faces: [5, 6],
++        effectCount: 2,
++        addictionLevel: 2,
++      },
++    });
++
++    expect(report.title).toBe('Результат применения');
++    expect(report.positive).toEqual([
++      'Применено на вас: Сырая еда.',
++      'Восстановлено 3 единиц здоровья.',
++      'Положительный эффект.',
++    ]);
++    expect(report.negative).toEqual([
++      'Уровень радиации повышен на 2.',
++      'Отрицательный эффект.',
++      'Проверка заражения провалена. Заражение: Лихорадка.',
++      'Вы стали зависимы от этого препарата.',
++    ]);
++    expect(report.message).toContain('Положительный результат');
++    expect(report.message).toContain('Отрицательный результат');
++    expect(report.message).not.toContain('Сложность');
++    expect(report.message).not.toContain('7, 20');
++    expect(report.message).not.toContain('d20');
++  });
++
++  it('reports antibiotics generically in the same positive section', () => {
++    const removal = applyRemoveConditions({
++      positiveEffect: { removeCondition: ['diseased'] },
++    }, ['diseased']);
++    const report = buildConsumableResultReport({
++      itemName: 'Антибиотики',
++      conditionsRemoved: removal.removed,
++      conditionRemovalsRequested: removal.requested,
++    });
++
++    expect(report.positive).toEqual([
++      'Применено на вас: Антибиотики.',
++      'Все болезни вылечены.',
++    ]);
++    expect(report.negative).toEqual([]);
++    expect(report.message).not.toContain('Отрицательный результат');
++  });
++
++  it('truthfully reports when antibiotics had no active disease to remove', () => {
++    const removal = applyRemoveConditions({
++      positiveEffect: { removeCondition: ['diseased'] },
++    }, []);
++    const report = buildConsumableResultReport({
++      itemName: 'Антибиотики',
++      conditionsRemoved: removal.removed,
++      conditionRemovalsRequested: removal.requested,
++    });
++
++    expect(report.positive).toContain('Активных болезней нет.');
++  });
++
++  it.each([
++    ['duplicate', 'Проверка заражения провалена. Болезнь «Лихорадка» уже активна.'],
++    ['immune', 'Проверка заражения провалена. Иммунитет предотвратил заражение болезнью «Лихорадка».'],
++  ])('keeps a failed %s disease check in the negative section', (infectionStatus, expected) => {
++    const report = buildConsumableResultReport({
++      itemName: 'Грязная вода',
++      diseaseRiskResult: {
++        status: 'checked',
++        check: { passed: false },
++        disease: { name: 'Лихорадка' },
++        infectionStatus,
++      },
++    });
++
++    expect(report.negative).toEqual([expected]);
++  });
++
++  it('puts avoided risks and radiation reduction in the positive section', () => {
++    const report = buildConsumableResultReport({
++      itemName: 'Препарат',
++      radiationAmount: -4,
++      diseaseRiskResult: { status: 'checked', check: { passed: true } },
++      addictionResult: { addicted: false },
++    });
++
++    expect(report.positive).toEqual([
++      'Применено на вас: Препарат.',
++      'Уровень радиации снижен на 4.',
++      'Проверка заражения пройдена.',
++      'Зависимость не наступила.',
++    ]);
++    expect(report.negative).toEqual([]);
++  });
++
++  it('creates a single positive report when used on another character', () => {
++    const report = buildConsumableResultReport({ itemName: 'Стимулятор', target: 'other' });
++
++    expect(report.positive).toEqual(['Применено на другого персонажа: Стимулятор.']);
++    expect(report.negative).toEqual([]);
++  });
++
++  it('uses the engine locale for report structure', () => {
++    setCurrentLocale('en-EN');
++    const report = buildConsumableResultReport({
++      itemName: 'Antibiotics',
++      conditionRemovalsRequested: ['diseased'],
++      conditionsRemoved: ['diseased'],
++    });
++
++    expect(report.title).toBe('Use result');
++    expect(report.message).toContain('Positive result');
++    expect(report.message).toContain('All diseases cured.');
++  });
++
++  it('keeps the successful self-use path to one final alert after target selection', () => {
++    const source = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
++    const selfPath = source.slice(
++      source.indexOf('const applyToSelf = () => {'),
++      source.indexOf('const applyToOther = () => {'),
++    );
++
++    // One alert is the early robot restriction; the normal path emits only the
++    // consolidated report. The target selector is outside this callback.
++    expect(selfPath.match(/showAlert\(/g)).toHaveLength(2);
++    expect(selfPath).toContain('buildConsumableResultReport');
++    expect(selfPath).not.toContain('diseaseCheckMessage');
++    expect(selfPath).not.toContain('addictionRollMessage');
++  });
++});
+diff --git a/__tests__/consumables/stealth-boy-defense-effect.test.js b/__tests__/consumables/stealth-boy-defense-effect.test.js
+index f2404c68672cb4047ee976b342154aefb72db703..d4797d1faa7d1f748466ee9623bda0412c54b291 100644
+--- a/__tests__/consumables/stealth-boy-defense-effect.test.js
++++ b/__tests__/consumables/stealth-boy-defense-effect.test.js
+@@ -32,6 +32,9 @@ describe('Stealth Boy defense effect', () => {
+     });
+     expect(result.events).toHaveLength(1);
+     expect(result.events[0]).toContain('Защита: +2');
++    expect(result.notificationEvents).toEqual([
++      { kind: 'positive', message: result.events[0] },
++    ]);
+     expect(getTimedDefenseBonus(result.effects)).toBe(2);
+   });
+ 
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 045d914ed541210b1173c7caa1d5e220f3b5bf10..4989d3a8f9a94adfa99ae25c39483f033f07953b 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1044,7 +1044,11 @@ export const CharacterProvider = ({ children }) => {
+     setActiveTimedEffects(normalizedResult.effects);
+ 
+     // 3. removeCondition (аддиктол, антибиотики)
+-    const { conditions: nextConditions, removed } = applyRemoveConditions(item, conditions);
++    const {
++      conditions: nextConditions,
++      removed,
++      requested: conditionRemovalsRequested,
++    } = applyRemoveConditions(item, conditions);
+     if (removed.length > 0) {
+       setConditions(nextConditions);
+       // Снятие зависимости (аддиктол): удаляем перманентный эффект
+@@ -1119,6 +1123,7 @@ export const CharacterProvider = ({ children }) => {
+       addictionResult,
+       diseaseRiskResult,
+       conditionsRemoved: removed,
++      conditionRemovalsRequested,
+       healAmount: vitalChanges.healAmount,
+       radiationAmount: vitalChanges.radiationAmount,
+     });
+@@ -1128,6 +1133,7 @@ export const CharacterProvider = ({ children }) => {
+       addictionResult,
+       diseaseRiskResult,
+       conditionsRemoved: removed,
++      conditionRemovalsRequested,
+       healAmount: vitalChanges.healAmount,
+       radiationAmount: vitalChanges.radiationAmount,
+     };
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 97e563d4b08f1340f7652f26110882ae4b415fa1..33eb6011fe3923a2657dd54e3c9a2577e62c0868 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -22,6 +22,7 @@ import {
+ } from '../../../domain/powerArmor';
+ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
++import { buildConsumableResultReport } from './logic/consumableResultReport';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+@@ -174,17 +175,13 @@ const InventoryScreen = () => {
+     return [...fromStore, ...extras];
+   }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
+ 
+-  const showAlert = (title, message = '') => {
++  const showAlert = (title, message = '', buttons) => {
+     const text = message ? `${title}\n\n${message}` : title;
+     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+       window.alert(text);
+       return;
+     }
+-    if (message) {
+-      Alert.alert(title, message);
+-    } else {
+-      Alert.alert(title);
+-    }
++    Alert.alert(title, message, buttons);
+   };
+   
+   const [isCapsModalVisible, setIsCapsModalVisible] = useState(false);
+@@ -356,88 +353,14 @@ const InventoryScreen = () => {
+       // Полная логика расходника меняет показатели в порядке: лечение, радиация,
+       // затем обрабатывает длительные эффекты, состояния и зависимость.
+       const result = applyConsumableFull(consumableItem);
+-      const {
+-        timedResult,
+-        addictionResult,
+-        diseaseRiskResult,
+-        conditionsRemoved,
+-        healAmount,
+-        radiationAmount,
+-      } = result;
+-
+-      if (healAmount > 0) {
+-        showAlert(tInventory('screen.alerts.successTitle'), formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount }));
+-      } else {
+-        debugLog('consumable.screen.noHeal', { itemName });
+-        showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedSelfMessage'), { itemName }));
+-      }
+-
+-      if (radiationAmount !== null) {
+-        showAlert(
+-          tInventory('screen.alerts.radiationTitle'),
+-          formatInventoryText(tInventory('screen.alerts.radiationMessage'), { radiationAmount }),
+-        );
+-      }
+-
+-      // Эффекты от timed-эффектов
+-      if (timedResult.events.length > 0) {
+-        showAlert(tInventory('screen.alerts.effectsTitle'), timedResult.events.join('\n'));
+-      }
+-
+-      // Удаление условий (аддиктол, антибиотики)
+-      if (conditionsRemoved.length > 0) {
+-        showAlert(
+-          tInventory('screen.alerts.conditionsRemovedTitle'),
+-          formatInventoryText(tInventory('screen.alerts.conditionsRemovedMessage'), { conditions: conditionsRemoved.join(', ') }));
+-      }
+-
+-      if (diseaseRiskResult?.status === 'checked') {
+-        const { check, disease, diseaseRoll, infectionStatus } = diseaseRiskResult;
+-        const checkText = formatInventoryText(
+-          tInventory('screen.alerts.diseaseCheckMessage'),
+-          {
+-            difficulty: check.difficulty,
+-            rolls: check.rolls.join(', '),
+-            successes: check.successes,
+-          },
+-        );
+-        let message = checkText;
+-        if (!check.passed) {
+-          const messageKey = infectionStatus === 'immune'
+-            ? 'diseaseImmuneMessage'
+-            : (infectionStatus === 'duplicate' ? 'diseaseDuplicateMessage' : 'diseaseInfectedMessage');
+-          message = formatInventoryText(tInventory(`screen.alerts.${messageKey}`), {
+-            check: checkText,
+-            diseaseName: disease.name,
+-            diseaseRoll,
+-          });
+-        }
+-        showAlert(
+-          tInventory(`screen.alerts.${check.passed ? 'diseaseCheckPassedTitle' : 'diseaseCheckFailedTitle'}`),
+-          message,
+-        );
+-      }
+-
+-      // Результат броска на зависимость
+-      if (addictionResult) {
+-        const { effectCount, faces, addicted, addictionLevel } = addictionResult;
+-        const facesText = faces.join(', ');
+-        showAlert(
+-          tInventory('screen.alerts.addictionRollTitle'),
+-          formatInventoryText(tInventory('screen.alerts.addictionRollMessage'), { faces: facesText, effectCount, addictionLevel })
+-        );
+-        if (addicted) {
+-          showAlert(tInventory('screen.alerts.addictionGainedTitle'), tInventory('screen.alerts.addictionGainedMessage'));
+-        } else {
+-          showAlert(tInventory('screen.alerts.addictionAvoidedTitle'), tInventory('screen.alerts.addictionAvoidedMessage'));
+-        }
+-      }
+-
++      const report = buildConsumableResultReport({ itemName, ...result });
++      showAlert(report.title, report.message);
+       handleRemoveItem(consumableItem, 1);
+     };
+ 
+     const applyToOther = () => {
+-      showAlert(tInventory('screen.alerts.appliedTitle'), formatInventoryText(tInventory('screen.alerts.appliedOtherMessage'), { itemName }));
++      const report = buildConsumableResultReport({ itemName, target: 'other' });
++      showAlert(report.title, report.message);
+       handleRemoveItem(consumableItem, 1);
+     };
+ 
+diff --git a/components/screens/InventoryScreen/logic/consumableResultReport.js b/components/screens/InventoryScreen/logic/consumableResultReport.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..79a691ba8b48e7c3050a3d8c437d1cfd9a5cef21
+--- /dev/null
++++ b/components/screens/InventoryScreen/logic/consumableResultReport.js
+@@ -0,0 +1,112 @@
++import { formatInventoryText, tInventory } from './inventoryI18n';
++
++const bulletList = (messages) => messages.map((message) => `• ${message}`).join('\n');
++
++const conditionRemovalMessage = (conditionId, removed) => {
++  const key = `screen.alerts.conditionRemoval.${conditionId}.${removed ? 'removed' : 'notPresent'}`;
++  const message = tInventory(key);
++  if (message === key) {
++    throw new Error(`[consumableResultReport] Нет текста результата для состояния "${conditionId}"`);
++  }
++  return message;
++};
++
++const diseaseFailureMessage = (diseaseRiskResult) => {
++  const { disease, infectionStatus } = diseaseRiskResult;
++  if (!disease?.name) {
++    throw new Error('[consumableResultReport] Проваленная проверка заражения не содержит болезнь');
++  }
++
++  const keyByStatus = {
++    infected: 'diseaseInfectedSummary',
++    duplicate: 'diseaseDuplicateSummary',
++    immune: 'diseaseImmuneSummary',
++  };
++  const key = keyByStatus[infectionStatus];
++  if (!key) {
++    throw new Error(`[consumableResultReport] Неизвестный итог заражения: ${infectionStatus}`);
++  }
++  return formatInventoryText(tInventory(`screen.alerts.${key}`), { diseaseName: disease.name });
++};
++
++/**
++ * Собирает один итог применения расходника. Механические результаты остаются
++ * структурированными: UI не распознаёт локализованный текст и не парсит броски.
++ */
++export const buildConsumableResultReport = ({
++  itemName,
++  target = 'self',
++  timedResult,
++  addictionResult,
++  diseaseRiskResult,
++  conditionsRemoved = [],
++  conditionRemovalsRequested = [],
++  healAmount = 0,
++  radiationAmount = null,
++}) => {
++  if (target !== 'self' && target !== 'other') {
++    throw new Error(`[consumableResultReport] Неизвестная цель расходника: ${target}`);
++  }
++  const appliedMessageKey = target === 'self' ? 'appliedSelfMessage' : 'appliedOtherMessage';
++  const positive = [
++    formatInventoryText(tInventory(`screen.alerts.${appliedMessageKey}`), { itemName }),
++  ];
++  const negative = [];
++
++  if (healAmount > 0) {
++    positive.push(formatInventoryText(tInventory('screen.alerts.healMessage'), { healAmount }));
++  }
++
++  if (radiationAmount > 0) {
++    negative.push(formatInventoryText(tInventory('screen.alerts.radiationIncreaseMessage'), {
++      radiationAmount,
++    }));
++  } else if (radiationAmount < 0) {
++    positive.push(formatInventoryText(tInventory('screen.alerts.radiationDecreaseMessage'), {
++      radiationAmount: Math.abs(radiationAmount),
++    }));
++  }
++
++  for (const event of timedResult?.notificationEvents || []) {
++    if (event?.kind === 'positive') positive.push(event.message);
++    else if (event?.kind === 'negative') negative.push(event.message);
++    else throw new Error(`[consumableResultReport] Неизвестный тип события: ${event?.kind}`);
++  }
++
++  const removedSet = new Set(conditionsRemoved);
++  for (const conditionId of new Set(conditionRemovalsRequested)) {
++    positive.push(conditionRemovalMessage(conditionId, removedSet.has(conditionId)));
++  }
++
++  if (diseaseRiskResult?.status === 'checked') {
++    if (diseaseRiskResult.check?.passed) {
++      positive.push(tInventory('screen.alerts.diseaseCheckPassedSummary'));
++    } else {
++      // По решению владельца провал остаётся отрицательным итогом даже тогда,
++      // когда иммунитет или уже активная болезнь не добавили нового состояния.
++      negative.push(diseaseFailureMessage(diseaseRiskResult));
++    }
++  }
++
++  if (addictionResult) {
++    if (addictionResult.addicted) {
++      negative.push(tInventory('screen.alerts.addictionGainedMessage'));
++    } else {
++      positive.push(tInventory('screen.alerts.addictionAvoidedMessage'));
++    }
++  }
++
++  const sections = [
++    `${tInventory('screen.alerts.positiveResultSection')}\n${bulletList(positive)}`,
++  ];
++  if (negative.length > 0) {
++    sections.push(`${tInventory('screen.alerts.negativeResultSection')}\n${bulletList(negative)}`);
++  }
++
++  return {
++    title: tInventory('screen.alerts.consumableResultTitle'),
++    message: sections.join('\n\n'),
++    positive,
++    negative,
++  };
++};
+diff --git a/domain/effects.js b/domain/effects.js
+index b387757cc46df67a10df10775f2833fefb0b8b7f..7231af8eca75fb8c47a387699f7d57773a20fc5a 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -236,28 +236,33 @@ export const checkAddiction = (item, dosesToday, options = {}) => {
+  *
+  * @param {object}   item       — предмет с полем positiveEffect.removeCondition
+  * @param {string[]} conditions — текущие условия персонажа
+- * @returns {{ conditions: string[], removed: string[] }}
++ * @returns {{ conditions: string[], removed: string[], requested: string[] }}
+  */
+ export const applyRemoveConditions = (item, conditions = []) => {
+     const positiveEffect = item?.positiveEffect;
+     if (!positiveEffect || typeof positiveEffect !== 'object') {
+-        return { conditions, removed: [] };
++        return { conditions, removed: [], requested: [] };
+     }
+-    const toRemove = Array.isArray(positiveEffect.removeCondition)
++    const requested = Array.isArray(positiveEffect.removeCondition)
+         ? positiveEffect.removeCondition.map(toStringSafe).filter(Boolean)
+         : [];
+-    if (toRemove.length === 0) {
+-        return { conditions, removed: [] };
++    if (requested.length === 0) {
++        return { conditions, removed: [], requested };
+     }
+-    const removed = conditions.filter((c) => toRemove.includes(c));
+-    const next = conditions.filter((c) => !toRemove.includes(c));
+-    return { conditions: next, removed };
++    const removed = conditions.filter((condition) => requested.includes(condition));
++    const next = conditions.filter((condition) => !requested.includes(condition));
++    return { conditions: next, removed, requested };
+ };
+ 
+ export const applyConsumableToEffects = (item, currentEffects = []) => {
+     const name = toStringSafe(item?.name || item?.Name);
+     let nextEffects = [...currentEffects];
+     const events = [];
++    const notificationEvents = [];
++    const addNotificationEvent = (kind, message) => {
++        events.push(message);
++        notificationEvents.push({ kind, message });
++    };
+ 
+     const removeNegativeEffects = normalizeRemovalEffects(
+         item?.removeNegativeEffects ?? item?.removesNegativeEffects
+@@ -276,7 +281,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+             const clearedLabel = removeNegativeEffects.includes('all')
+                 ? tEffects('events.effectsClearedAll')
+                 : removeNegativeEffects.join(', ');
+-            events.push(tEffects('events.effectsCleared', { effects: clearedLabel }));
++            addNotificationEvent('positive', tEffects('events.effectsCleared', { effects: clearedLabel }));
+         }
+     }
+ 
+@@ -298,7 +303,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                 sourceName: name,
+                 maxHpModifier: mod,
+             }));
+-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
++            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+         }
+     }
+ 
+@@ -316,7 +321,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                 sourceName: name,
+                 damageModifier: mod,
+             }));
+-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
++            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+         }
+     }
+ 
+@@ -334,7 +339,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                 sourceName: name,
+                 apModifier: mod,
+             }));
+-            events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
++            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+         }
+     }
+ 
+@@ -352,7 +357,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                 sourceName: name,
+                 defenseModifier: mod,
+             }));
+-            events.push(tEffects('events.positiveApplied', { name: effectLabel, scenes: positiveDuration.scenes }));
++            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectLabel, scenes: positiveDuration.scenes }));
+         }
+     }
+ 
+@@ -371,7 +376,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                     sourceName: name,
+                     damageResistanceModifier: { type, op: mod.op, value },
+                 }));
+-                events.push(tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
++                addNotificationEvent('positive', tEffects('events.positiveApplied', { name: effectName, scenes: positiveDuration.scenes }));
+             }
+         }
+     }
+@@ -382,7 +387,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+ 
+     if (positiveName && positiveDuration.type !== 'none') {
+         if (positiveDuration.type === 'instant') {
+-            events.push(tEffects('events.instantPositive', { name: positiveName }));
++            addNotificationEvent('positive', tEffects('events.instantPositive', { name: positiveName }));
+         } else if (positiveDuration.scenes > 0) {
+             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                 effectName: positiveName,
+@@ -391,7 +396,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                 scenes: positiveDuration.scenes,
+                 sourceName: name,
+             }));
+-            events.push(tEffects('events.positiveApplied', { name: positiveName, scenes: positiveDuration.scenes }));
++            addNotificationEvent('positive', tEffects('events.positiveApplied', { name: positiveName, scenes: positiveDuration.scenes }));
+         }
+     }
+ 
+@@ -401,7 +406,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+ 
+     if (negativeName && negativeDuration.type !== 'none') {
+         if (negativeDuration.type === 'instant') {
+-            events.push(tEffects('events.instantNegative', { name: negativeName }));
++            addNotificationEvent('negative', tEffects('events.instantNegative', { name: negativeName }));
+         } else if (negativeDuration.scenes > 0) {
+             nextEffects = applyOrStackEffect(nextEffects, buildTimedEffect({
+                 effectName: negativeName,
+@@ -410,13 +415,14 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
+                 scenes: negativeDuration.scenes,
+                 sourceName: name,
+             }));
+-            events.push(tEffects('events.negativeApplied', { name: negativeName, scenes: negativeDuration.scenes }));
++            addNotificationEvent('negative', tEffects('events.negativeApplied', { name: negativeName, scenes: negativeDuration.scenes }));
+         }
+     }
+ 
+     return {
+         effects: nextEffects,
+         events,
++        notificationEvents,
+     };
+ };
+ 
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index f58db2edbc70e96fd7afa5e0e33d141938dc6153..acebb9d064b1922f0616eee602196848d72e2997 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -31,8 +31,8 @@
+     "healMessage": "Restored {healAmount} health.",
+     "radiationTitle": "Radiation",
+     "radiationMessage": "Radiation level change: {radiationAmount}.",
+-    "appliedSelfMessage": "{itemName} was used on you.",
+-    "appliedOtherMessage": "{itemName} was used on another character.",
++    "appliedSelfMessage": "Used on you: {itemName}.",
++    "appliedOtherMessage": "Used on another character: {itemName}.",
+     "robotCannotSelfUseTitle": "Robot restriction",
+     "robotCannotSelfUseMessage": "Robots cannot use food, drinks or chems on themselves.",
+     "robotOnlyWeaponTitle": "Equipment restriction",
+@@ -69,7 +69,26 @@
+     "diseaseCheckMessage": "Difficulty: {difficulty}\nd20 rolls: {rolls}\nSuccesses: {successes}",
+     "diseaseInfectedMessage": "{check}\nInfected with {diseaseName} (d20: {diseaseRoll}).",
+     "diseaseDuplicateMessage": "{check}\n{diseaseName} is already active.",
+-    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll})."
++    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll}).",
++    "consumableResultTitle": "Use result",
++    "positiveResultSection": "Positive result",
++    "negativeResultSection": "Negative result",
++    "radiationIncreaseMessage": "Radiation level increased by {radiationAmount}.",
++    "radiationDecreaseMessage": "Radiation level decreased by {radiationAmount}.",
++    "diseaseCheckPassedSummary": "Disease check passed.",
++    "diseaseInfectedSummary": "Disease check failed. Infected with {diseaseName}.",
++    "diseaseDuplicateSummary": "Disease check failed. {diseaseName} is already active.",
++    "diseaseImmuneSummary": "Disease check failed. Immunity prevented infection with {diseaseName}.",
++    "conditionRemoval": {
++      "addicted": {
++        "removed": "Addiction cured.",
++        "notPresent": "No active addiction."
++      },
++      "diseased": {
++        "removed": "All diseases cured.",
++        "notPresent": "No active diseases."
++      }
++    }
+   },
+   "actions": {
+     "cancel": "Cancel",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index de98a7d8d2f8b4c1a34c247229890d44e02a5e6b..3825b2abbfb6fe093cc14ff47764b6c247ee394b 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -31,8 +31,8 @@
+     "healMessage": "Восстановлено {healAmount} единиц здоровья.",
+     "radiationTitle": "Радиация",
+     "radiationMessage": "Изменение уровня радиации: {radiationAmount}.",
+-    "appliedSelfMessage": "{itemName} применен на вас.",
+-    "appliedOtherMessage": "{itemName} применен на другого персонажа.",
++    "appliedSelfMessage": "Применено на вас: {itemName}.",
++    "appliedOtherMessage": "Применено на другого персонажа: {itemName}.",
+     "robotCannotSelfUseTitle": "Ограничение робота",
+     "robotCannotSelfUseMessage": "Роботы не могут применять еду, напитки и препараты на себя.",
+     "robotOnlyWeaponTitle": "Ограничение экипировки",
+@@ -69,7 +69,26 @@
+     "diseaseCheckMessage": "Сложность: {difficulty}\nБроски d20: {rolls}\nУспехи: {successes}",
+     "diseaseInfectedMessage": "{check}\nЗаражение: {diseaseName} (d20: {diseaseRoll}).",
+     "diseaseDuplicateMessage": "{check}\nБолезнь «{diseaseName}» уже активна.",
+-    "diseaseImmuneMessage": "{check}\nИммунитет предотвращает заражение болезнью «{diseaseName}» (d20: {diseaseRoll})."
++    "diseaseImmuneMessage": "{check}\nИммунитет предотвращает заражение болезнью «{diseaseName}» (d20: {diseaseRoll}).",
++    "consumableResultTitle": "Результат применения",
++    "positiveResultSection": "Положительный результат",
++    "negativeResultSection": "Отрицательный результат",
++    "radiationIncreaseMessage": "Уровень радиации повышен на {radiationAmount}.",
++    "radiationDecreaseMessage": "Уровень радиации снижен на {radiationAmount}.",
++    "diseaseCheckPassedSummary": "Проверка заражения пройдена.",
++    "diseaseInfectedSummary": "Проверка заражения провалена. Заражение: {diseaseName}.",
++    "diseaseDuplicateSummary": "Проверка заражения провалена. Болезнь «{diseaseName}» уже активна.",
++    "diseaseImmuneSummary": "Проверка заражения провалена. Иммунитет предотвратил заражение болезнью «{diseaseName}».",
++    "conditionRemoval": {
++      "addicted": {
++        "removed": "Зависимость вылечена.",
++        "notPresent": "Активной зависимости нет."
++      },
++      "diseased": {
++        "removed": "Все болезни вылечены.",
++        "notPresent": "Активных болезней нет."
++      }
++    }
+   },
+   "actions": {
+     "cancel": "Отмена",
