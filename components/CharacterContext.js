@@ -32,7 +32,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
   });
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
-import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskState, getSceneRiskEventForRule, resolveSceneRiskEvent } from '../domain/sceneRiskChecks';
@@ -75,7 +75,7 @@ import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
 import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
 import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
 import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
-import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
+import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
 import { Alert, Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
@@ -826,6 +826,19 @@ export const CharacterProvider = ({ children }) => {
       setSelectedPerks(data.selectedPerks || []);
       if (data.pendingPerkDuplicateNotice) {
         paAlert(tPerkAlert('duplicatePerksFixedTitle'), tPerkAlert('duplicatePerksFixedMessage'));
+      }
+      const perkInspection = inspectSelectedPerkRecords(data.selectedPerks || [], getPerks());
+      const brokenPerkLabels = [
+        ...perkInspection.missingId,
+        ...perkInspection.unknownId,
+      ].map((entry) => entry.label);
+      if (brokenPerkLabels.length > 0) {
+        paAlert(
+          tPerkAlert('perkMissingIdTitle'),
+          brokenPerkLabels
+            .map((label) => tPerkAlert('perkMissingIdMessage').replace('{perk}', label))
+            .join('\n'),
+        );
       }
       setCarryWeight(data.carryWeight ?? 150);
       setMeleeBonus(data.meleeBonus ?? 0);

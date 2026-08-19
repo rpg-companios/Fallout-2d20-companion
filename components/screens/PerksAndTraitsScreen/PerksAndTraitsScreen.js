@@ -9,7 +9,7 @@ import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
 import styles from '../../../styles/PerksAndTraitsScreen.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
-import { getPerkDisplay, withPerkDisplay } from './perksDisplay';
+import { getPerkDisplay, getPerkSheetDisplay } from './perksDisplay';
 
 const PerksAndTraitsScreen = () => {
   const { 
@@ -86,11 +86,10 @@ const PerksAndTraitsScreen = () => {
       return;
     }
 
-    const selectedPerk = withPerkDisplay(perk);
     const previousPerk = isReplacing ? selectedPerks[replacingIndex] : null;
 
     // Специальная обработка перка по стабильному id, без привязки к русскому названию.
-    if (selectedPerk.id === 'intenseTraining' && previousPerk?.id !== 'intenseTraining') {
+    if (perk.id === 'intenseTraining' && previousPerk?.id !== 'intenseTraining') {
       const canTakeIntensiveTraining = level >= 2 || attributesSaved;
       
       if (!canTakeIntensiveTraining) {
@@ -99,12 +98,12 @@ const PerksAndTraitsScreen = () => {
       }
 
       const successMessage = tPerksAndTraits('perkSelected.intensiveTrainingSuccess')
-        .replace('{perkName}', selectedPerk.perk_name)
+        .replace('{perkName}', getPerkDisplay(perk).name)
         .replace('{bonus}', 1);
       showAlert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
     }
 
-    const result = applyPerkSelection(selectedPerks, selectedPerk, {
+    const result = applyPerkSelection(selectedPerks, perk, {
       replaceIndex: isReplacing ? replacingIndex : undefined,
     });
     if (!result.ok) {
@@ -112,7 +111,7 @@ const PerksAndTraitsScreen = () => {
       return;
     }
 
-    applyIntenseTrainingDelta(previousPerk, selectedPerk);
+    applyIntenseTrainingDelta(previousPerk, perk);
     setSelectedPerks(result.selectedPerks);
     closePerkModal();
   };
@@ -171,7 +170,7 @@ const PerksAndTraitsScreen = () => {
 
           {/* Выбранные перки (по уровням) */}
           {rankedPerks.map((perk, idx) => {
-            const display = getPerkDisplay(perk);
+            const display = getPerkSheetDisplay(perk);
             return (
               <TouchableOpacity
                 key={`perk-${idx}-${perk.id || 'unknown'}`}

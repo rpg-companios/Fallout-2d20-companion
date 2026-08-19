@@ -83,8 +83,7 @@ export function withAssignedPerkRanks(selectedPerks = []) {
         const id = toSelectedPerkId(selected);
         if (!id) return selected;
         counts[id] = (counts[id] || 0) + 1;
-        if (typeof selected === 'string') return { id: selected, rank: counts[id] };
-        return { ...selected, rank: counts[id] };
+        return { id, rank: counts[id] };
     });
 }
 
@@ -94,9 +93,10 @@ export function applyPerkSelection(selectedPerks = [], perk, { replaceIndex } = 
         return { ok: false, reason: 'max-rank', selectedPerks };
     }
 
+    const pick = { id: perk.id };
     const next = replaceIndex != null
-        ? (selectedPerks || []).map((entry, index) => (index === replaceIndex ? perk : entry))
-        : [...(selectedPerks || []), perk];
+        ? (selectedPerks || []).map((entry, index) => (index === replaceIndex ? pick : entry))
+        : [...(selectedPerks || []), pick];
 
     return { ok: true, reason: null, selectedPerks: withAssignedPerkRanks(next) };
 }
@@ -111,15 +111,15 @@ export function removeSelectedPerkAt(selectedPerks = [], index) {
 const resolveCatalogMaxRanks = (selected, catalogById) => {
     const id = toSelectedPerkId(selected);
     const catalogPerk = id ? catalogById.get(id) : null;
-    const rawMax = catalogPerk?.maxRanks ?? (isObject(selected) ? selected.maxRanks : undefined);
+    const rawMax = catalogPerk?.maxRanks;
     if (typeof rawMax !== 'number' || !Number.isFinite(rawMax) || rawMax < 1) return null;
     return rawMax;
 };
 
 /**
- * Keep at most maxRanks picks of each perk. Extra picks are dropped so the
- * freed slots can be spent on other perks. If maxRanks is missing from both
- * the catalog and the saved perk, the entry is left untouched.
+ * Keep at most catalog maxRanks picks of each perk. Extra picks are dropped
+ * so the freed slots can be spent on other perks. maxRanks is read only from
+ * the setting catalog — never from the saved perk record.
  */
 export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []) {
     const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
@@ -147,6 +147,34 @@ export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []
         selectedPerks: withAssignedPerkRanks(kept),
         removed,
     };
+}
+
+export function identifySelectedPerk(selected, index) {
+    if (typeof selected === 'string' && selected) return selected;
+    return toSelectedPerkId(selected)
+        || selected?.perk_name
+        || selected?.name
+        || selected?.nameKey
+        || `#${index + 1}`;
+}
+
+export function inspectSelectedPerkRecords(selectedPerks = [], perkCatalog = []) {
+    const catalogIds = new Set((perkCatalog || []).map((perk) => perk?.id).filter(Boolean));
+    const missingId = [];
+    const unknownId = [];
+
+    (selectedPerks || []).forEach((selected, index) => {
+        const id = toSelectedPerkId(selected);
+        if (!id) {
+            missingId.push({ selected, label: identifySelectedPerk(selected, index) });
+            return;
+        }
+        if (!catalogIds.has(id)) {
+            unknownId.push({ selected, label: identifySelectedPerk(selected, index) });
+        }
+    });
+
+    return { missingId, unknownId };
 }
 
 /**

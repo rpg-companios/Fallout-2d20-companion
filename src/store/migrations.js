@@ -6,7 +6,7 @@ import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityCon
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { generateItemId } from '../../domain/itemIdentity';
 import { getPerks, getUniqQualityName } from '../../domain/registry';
-import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
+import { trimSelectedPerksToMaxRanks, withAssignedPerkRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { debugLog } from '../debug/falloutDebug';
 
@@ -1014,6 +1014,14 @@ const MIGRATIONS = [
       selectedPerks,
       pendingPerkDuplicateNotice: true,
     };
+  },
+
+  // v16 -> v17: сейв перка — только id и ранг. Имя, описание и maxRanks
+  // читаются из каталога сеттинга при загрузке. Запись без id не сжимаем:
+  // её нужно показать в алерте.
+  (state) => {
+    if (!Array.isArray(state.selectedPerks)) return state;
+    return { ...state, selectedPerks: withAssignedPerkRanks(state.selectedPerks) };
   },
 
 ];

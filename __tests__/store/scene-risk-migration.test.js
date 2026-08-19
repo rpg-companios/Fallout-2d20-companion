@@ -9,9 +9,9 @@ describe('v14 to v15 scene-risk state migration', () => {
       characterName: 'Courier',
     });
 
-    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+    expect(CURRENT_SCHEMA_VERSION).toBe(17);
     expect(migrated).toMatchObject({
-      schemaVersion: 16,
+      schemaVersion: 17,
       characterName: 'Courier',
       sceneRiskStates: {},
     });

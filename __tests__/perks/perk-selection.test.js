@@ -10,6 +10,7 @@ import {
   getRequiredLevelForRank,
   meetsPerkRequirements,
   removeSelectedPerkAt,
+  inspectSelectedPerkRecords,
   trimSelectedPerksToMaxRanks,
   withAssignedPerkRanks,
 } from '../../domain/perks';
@@ -33,7 +34,7 @@ describe('perk selection ranks', () => {
 
     const first = applyPerkSelection([], junktownVendor);
     expect(first.ok).toBe(true);
-    expect(first.selectedPerks).toEqual([expect.objectContaining({ id: 'junktownVendor', rank: 1 })]);
+    expect(first.selectedPerks).toEqual([{ id: 'junktownVendor', rank: 1 }]);
 
     const second = applyPerkSelection(first.selectedPerks, junktownVendor);
     expect(second.ok).toBe(false);
@@ -146,12 +147,35 @@ describe('trim extra perk ranks', () => {
     expect(selectedPerks.map((perk) => perk.rank)).toEqual([1, 1]);
   });
 
-  it('does not invent a max rank when the catalog and save have no maxRanks', () => {
+  it('does not invent a max rank when the catalog has no such perk', () => {
     const orphan = { id: 'unknownCustomPerk' };
     const { selectedPerks, removed } = trimSelectedPerksToMaxRanks([orphan, orphan], []);
 
     expect(removed).toHaveLength(0);
     expect(selectedPerks).toHaveLength(2);
+  });
+
+  it('reads maxRanks only from the catalog, never from the save', () => {
+    const inflated = { id: 'junktownVendor', maxRanks: 99 };
+    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(
+      [inflated, inflated],
+      perksData,
+    );
+
+    expect(removed).toHaveLength(1);
+    expect(selectedPerks).toEqual([{ id: 'junktownVendor', rank: 1 }]);
+  });
+});
+
+describe('inspect selected perk records', () => {
+  it('flags a saved perk without id and an id missing from the catalog', () => {
+    const inspection = inspectSelectedPerkRecords(
+      [{ perk_name: 'Broken Vendor' }, { id: 'notInCatalog' }, { id: 'junktownVendor', rank: 1 }],
+      perksData,
+    );
+
+    expect(inspection.missingId.map((entry) => entry.label)).toEqual(['Broken Vendor']);
+    expect(inspection.unknownId.map((entry) => entry.label)).toEqual(['notInCatalog']);
   });
 });
 

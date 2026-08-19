@@ -14,7 +14,9 @@
     "errorTitle": "Ошибка",
     "perkSelectedTitle": "Перк выбран",
     "duplicatePerksFixedTitle": "Найдено задвоение перков",
-    "duplicatePerksFixedMessage": "Ошибочные ранги сняты. Освободившиеся слоты можно потратить на другие перки."
+    "duplicatePerksFixedMessage": "Ошибочные ранги сняты. Освободившиеся слоты можно потратить на другие перки.",
+    "perkMissingIdTitle": "Ошибка данных перка",
+    "perkMissingIdMessage": "У перка {perk} отсутствует ID. Свяжитесь с разработчиком."
   },
   "warnings": {
     "perkLimitReached": "На текущем уровне больше перков взять нельзя",
