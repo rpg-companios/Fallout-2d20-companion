@@ -911,7 +911,7 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const addPerkAttributePoints = (points) => {
-    setAvailablePerkAttributePoints(prev => prev + points);
+    setAvailablePerkAttributePoints(prev => Math.max(0, prev + points));
   };
 
   /**
@@ -1378,9 +1378,9 @@ export const CharacterProvider = ({ children }) => {
     availablePerkAttributePoints,
     addPerkAttributePoints,
     commitAttributeChanges,
-    meetsPerkRequirements: (perk) => meetsPerkRequirements(perk, attributes, level),
-    getPerkUnmetReasons: (perk) => getPerkUnmetReasons(perk, attributes, level),
-    annotatePerks: (perks) => annotatePerks(perks, attributes, level),
+    meetsPerkRequirements: (perk, options) => meetsPerkRequirements(perk, attributes, level, selectedPerks, options),
+    getPerkUnmetReasons: (perk, options) => getPerkUnmetReasons(perk, attributes, level, selectedPerks, options),
+    annotatePerks: (perks, options) => annotatePerks(perks, attributes, level, selectedPerks, options),
   };
 
   return (

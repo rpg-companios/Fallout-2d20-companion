@@ -5,7 +5,9 @@
     "description": "Описание"
   },
   "buttons": {
-    "addPerk": "+ Добавить перк"
+    "addPerk": "+ Добавить перк",
+    "changePerk": "Изменить",
+    "removePerk": "Убрать"
   },
   "alerts": {
     "warningTitle": "Предупреждение",
@@ -13,7 +15,8 @@
     "perkSelectedTitle": "Перк выбран"
   },
   "warnings": {
-    "perkLimitReached": "На текущем уровне больше перков взять нельзя"
+    "perkLimitReached": "На текущем уровне больше перков взять нельзя",
+    "perkAlreadyAtMaxRank": "Этот перк уже взят на максимальном ранге"
   },
   "errors": {
     "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
@@ -23,13 +26,17 @@
   },
   "modal": {
     "title": "Выберите перк",
+    "replaceTitle": "Заменить перк",
     "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
     "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
+    "alreadyAtMaxRank": "Уже взят на максимальном ранге ({current}/{max})",
+    "excludedByPerk": "Нельзя взять вместе с уже выбранным перком",
     "buttons": {
       "choose": "Выбрать",
       "cancelChoice": "Отменить выбор",
       "confirm": "Подтвердить",
-      "cancel": "Отмена"
+      "cancel": "Отмена",
+      "remove": "Убрать перк"
     }
   }
 }

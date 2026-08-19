@@ -5,7 +5,9 @@
     "description": "Description"
   },
   "buttons": {
-    "addPerk": "+ Add perk"
+    "addPerk": "+ Add perk",
+    "changePerk": "Change",
+    "removePerk": "Remove"
   },
   "alerts": {
     "warningTitle": "Warning",
@@ -13,7 +15,8 @@
     "perkSelectedTitle": "Perk selected"
   },
   "warnings": {
-    "perkLimitReached": "No more perks can be taken at the current level"
+    "perkLimitReached": "No more perks can be taken at the current level",
+    "perkAlreadyAtMaxRank": "This perk is already at its maximum rank"
   },
   "errors": {
     "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
@@ -23,13 +26,17 @@
   },
   "modal": {
     "title": "Select a perk",
+    "replaceTitle": "Change perk",
     "requiresLevel": "Requires level: {required} (current: {current})",
     "requiresAttribute": "Requires {code}: {required} (current: {current})",
+    "alreadyAtMaxRank": "Already taken at maximum rank ({current}/{max})",
+    "excludedByPerk": "Cannot be taken together with an already selected perk",
     "buttons": {
       "choose": "Select",
       "cancelChoice": "Cancel selection",
       "confirm": "Confirm",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "remove": "Remove perk"
     }
   }
 }

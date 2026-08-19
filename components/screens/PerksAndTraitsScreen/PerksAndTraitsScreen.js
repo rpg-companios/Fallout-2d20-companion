@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
+import { applyPerkSelection, removeSelectedPerkAt, withAssignedPerkRanks } from '../../../domain/perks';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import perksData from '../../../modules/fallout/data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
@@ -18,72 +19,110 @@ const PerksAndTraitsScreen = () => {
   useLocale(); // интерфейс движка
   useModuleLocale(); // контент активного сеттинга
   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
+  const [replacingIndex, setReplacingIndex] = useState(null);
   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
   const perkLimit = level + extraPerkSlots;
+  const rankedPerks = useMemo(() => withAssignedPerkRanks(selectedPerks), [selectedPerks]);
 
   // Создаем массив из 20 строк
   const emptyRows = Array(20).fill(null);
 
-  const annotatedPerks = useMemo(() => annotatePerks(perksData), [annotatePerks]);
+  const annotatedPerks = useMemo(
+    () => annotatePerks(perksData, { replaceIndex: replacingIndex }),
+    [annotatePerks, selectedPerks, replacingIndex],
+  );
+
+  const showAlert = (title, message) => {
+    if (Platform.OS === 'web') {
+      window.alert(message ? `${title}\n\n${message}` : message || title);
+      return;
+    }
+    if (message) {
+      Alert.alert(title, message);
+      return;
+    }
+    Alert.alert(title);
+  };
+
+  const closePerkModal = () => {
+    setPerkModalVisible(false);
+    setReplacingIndex(null);
+  };
 
   const handleAddPerkPress = () => {
     if (selectedPerks.length >= perkLimit) {
-      const message = tPerksAndTraits('warnings.perkLimitReached');
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert(tPerksAndTraits('alerts.warningTitle'), message);
-      }
+      showAlert(tPerksAndTraits('alerts.warningTitle'), tPerksAndTraits('warnings.perkLimitReached'));
       return;
     }
+    setReplacingIndex(null);
     setPerkModalVisible(true);
+  };
+
+  const handleReassignPerk = (index) => {
+    setReplacingIndex(index);
+    setPerkModalVisible(true);
+  };
+
+  const applyIntenseTrainingDelta = (previousPerk, nextPerk) => {
+    const wasIntenseTraining = previousPerk?.id === 'intenseTraining';
+    const isIntenseTraining = nextPerk?.id === 'intenseTraining';
+    if (isIntenseTraining && !wasIntenseTraining) {
+      addPerkAttributePoints(1);
+      return;
+    }
+    if (wasIntenseTraining && !isIntenseTraining) {
+      addPerkAttributePoints(-1);
+    }
   };
 
   const handleChoosePerk = (perk) => {
     if (!perk) return;
+
+    const isReplacing = replacingIndex != null;
     
     // Блокируем выбор, если уже взяли максимум на уровне (доп. защита)
-    if (selectedPerks.length >= perkLimit) {
-      const message = tPerksAndTraits('warnings.perkLimitReached');
-      if (Platform.OS === 'web') {
-        window.alert(message);
-      } else {
-        Alert.alert(tPerksAndTraits('alerts.warningTitle'), message);
-      }
+    if (!isReplacing && selectedPerks.length >= perkLimit) {
+      showAlert(tPerksAndTraits('alerts.warningTitle'), tPerksAndTraits('warnings.perkLimitReached'));
       return;
     }
 
     const selectedPerk = withPerkDisplay(perk);
+    const previousPerk = isReplacing ? selectedPerks[replacingIndex] : null;
 
     // Специальная обработка перка по стабильному id, без привязки к русскому названию.
-    if (selectedPerk.id === 'intenseTraining') {
+    if (selectedPerk.id === 'intenseTraining' && previousPerk?.id !== 'intenseTraining') {
       const canTakeIntensiveTraining = level >= 2 || attributesSaved;
       
       if (!canTakeIntensiveTraining) {
-        const message = tPerksAndTraits('errors.intensiveTrainingRequirements');
-        if (Platform.OS === 'web') {
-          window.alert(message);
-        } else {
-          Alert.alert(tPerksAndTraits('alerts.errorTitle'), message);
-        }
+        showAlert(tPerksAndTraits('alerts.errorTitle'), tPerksAndTraits('errors.intensiveTrainingRequirements'));
         return;
       }
 
-      const attributeBonus = 1;
-      addPerkAttributePoints(attributeBonus);
-      
       const successMessage = tPerksAndTraits('perkSelected.intensiveTrainingSuccess')
         .replace('{perkName}', selectedPerk.perk_name)
-        .replace('{bonus}', attributeBonus);
-      if (Platform.OS === 'web') {
-        window.alert(successMessage);
-      } else {
-        Alert.alert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
-      }
+        .replace('{bonus}', 1);
+      showAlert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
     }
 
-    setSelectedPerks(prev => [...prev, selectedPerk]);
-    setPerkModalVisible(false);
+    const result = applyPerkSelection(selectedPerks, selectedPerk, {
+      replaceIndex: isReplacing ? replacingIndex : undefined,
+    });
+    if (!result.ok) {
+      showAlert(tPerksAndTraits('alerts.warningTitle'), tPerksAndTraits('warnings.perkAlreadyAtMaxRank'));
+      return;
+    }
+
+    applyIntenseTrainingDelta(previousPerk, selectedPerk);
+    setSelectedPerks(result.selectedPerks);
+    closePerkModal();
+  };
+
+  const handleRemovePerk = () => {
+    if (replacingIndex == null) return;
+    const previousPerk = selectedPerks[replacingIndex];
+    applyIntenseTrainingDelta(previousPerk, null);
+    setSelectedPerks(removeSelectedPerkAt(selectedPerks, replacingIndex));
+    closePerkModal();
   };
 
   return (
@@ -131,14 +170,21 @@ const PerksAndTraitsScreen = () => {
           })()}
 
           {/* Выбранные перки (по уровням) */}
-          {selectedPerks.map((perk, idx) => {
+          {rankedPerks.map((perk, idx) => {
             const display = getPerkDisplay(perk);
             return (
-              <View key={`perk-${perk.id || idx}`} style={styles.row}>
-                <Text style={[styles.cell, styles.nameColumn]}>{display.name}</Text>
+              <TouchableOpacity
+                key={`perk-${idx}-${perk.id || 'unknown'}`}
+                style={[styles.row, styles.selectedPerkRow]}
+                onPress={() => handleReassignPerk(idx)}
+              >
+                <View style={[styles.cell, styles.nameColumn]}>
+                  <Text style={styles.perkNameText}>{display.name}</Text>
+                  <Text style={styles.reassignHint}>{tPerksAndTraits('buttons.changePerk')}</Text>
+                </View>
                 <Text style={[styles.cell, styles.rankColumn]}>{perk.rank ?? ''}</Text>
                 {renderTextWithIcons(display.description, [styles.cell, styles.descriptionColumn])}
-              </View>
+              </TouchableOpacity>
             );
           })}
 
@@ -160,12 +206,14 @@ const PerksAndTraitsScreen = () => {
 
       <PerkSelectModal
         visible={isPerkModalVisible}
-        onClose={() => setPerkModalVisible(false)}
+        onClose={closePerkModal}
         annotatedPerks={annotatedPerks}
         onChoosePerk={handleChoosePerk}
+        onRemovePerk={replacingIndex != null ? handleRemovePerk : undefined}
+        title={replacingIndex != null ? tPerksAndTraits('modal.replaceTitle') : tPerksAndTraits('modal.title')}
       />
     </View>
   );
 };
 
-export default PerksAndTraitsScreen; 
+export default PerksAndTraitsScreen;
