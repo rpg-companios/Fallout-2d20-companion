@@ -5,7 +5,8 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
 import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { generateItemId } from '../../domain/itemIdentity';
-import { getUniqQualityName } from '../../domain/registry';
+import { getPerks, getUniqQualityName } from '../../domain/registry';
+import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { debugLog } from '../debug/falloutDebug';
 
@@ -999,6 +1000,21 @@ const MIGRATIONS = [
     ...state,
     sceneRiskStates: {},
   }),
+
+  // v15 -> v16: лишние ранги перка сверх maxRanks снимаются, слот
+  // освобождается. Алерт показывается при загрузке, если что-то сняли.
+  (state) => {
+    if (!Array.isArray(state.selectedPerks)) return state;
+    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(state.selectedPerks, getPerks());
+    if (removed.length === 0) {
+      return { ...state, selectedPerks };
+    }
+    return {
+      ...state,
+      selectedPerks,
+      pendingPerkDuplicateNotice: true,
+    };
+  },
 
 ];
 /**

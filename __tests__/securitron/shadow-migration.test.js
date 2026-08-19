@@ -26,7 +26,7 @@ const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.nam
 
 describe('Текущая версия формата сейва', () => {
   it('равна 15', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(15);
+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
   });
 });
 

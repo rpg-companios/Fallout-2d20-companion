@@ -10,6 +10,7 @@ import {
   getRequiredLevelForRank,
   meetsPerkRequirements,
   removeSelectedPerkAt,
+  trimSelectedPerksToMaxRanks,
   withAssignedPerkRanks,
 } from '../../domain/perks';
 
@@ -128,6 +129,29 @@ describe('perk availability annotation', () => {
     expect(meetsPerkRequirements(cautiousNature, attributes, 1, selected)).toBe(false);
     const annotated = annotatePerks([cautiousNature], attributes, 1, selected);
     expect(annotated[0].unmet.excluded.perkIds).toEqual(['daringNature']);
+  });
+});
+
+describe('trim extra perk ranks', () => {
+  it('removes picks beyond maxRanks and keeps the first valid ranks', () => {
+    const junktownVendor = perkById('junktownVendor');
+    const snakeater = perkById('snakeater');
+    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(
+      [junktownVendor, junktownVendor, snakeater],
+      perksData,
+    );
+
+    expect(removed).toHaveLength(1);
+    expect(selectedPerks.map((perk) => perk.id)).toEqual(['junktownVendor', 'snakeater']);
+    expect(selectedPerks.map((perk) => perk.rank)).toEqual([1, 1]);
+  });
+
+  it('does not invent a max rank when the catalog and save have no maxRanks', () => {
+    const orphan = { id: 'unknownCustomPerk' };
+    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks([orphan, orphan], []);
+
+    expect(removed).toHaveLength(0);
+    expect(selectedPerks).toHaveLength(2);
   });
 });
 

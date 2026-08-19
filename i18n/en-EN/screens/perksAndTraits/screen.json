@@ -12,7 +12,9 @@
   "alerts": {
     "warningTitle": "Warning",
     "errorTitle": "Error",
-    "perkSelectedTitle": "Perk selected"
+    "perkSelectedTitle": "Perk selected",
+    "duplicatePerksFixedTitle": "Duplicate perks found",
+    "duplicatePerksFixedMessage": "The extra ranks were removed. You can spend the freed slots on other perks."
   },
   "warnings": {
     "perkLimitReached": "No more perks can be taken at the current level",

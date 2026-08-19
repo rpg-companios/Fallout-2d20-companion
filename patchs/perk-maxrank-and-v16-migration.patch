@@ -1,0 +1,977 @@
+diff --git a/__tests__/perks/perk-selection.test.js b/__tests__/perks/perk-selection.test.js
+new file mode 100644
+index 0000000..ecdf3ff
+--- /dev/null
++++ b/__tests__/perks/perk-selection.test.js
+@@ -0,0 +1,171 @@
++import { describe, expect, it } from 'vitest';
++import perksData from '../../modules/fallout/data/perks/perks.json';
++import {
++  annotatePerks,
++  applyPerkSelection,
++  calculatePerkEffects,
++  canSelectPerk,
++  collapseSelectedPerks,
++  getPerkSelectionCount,
++  getRequiredLevelForRank,
++  meetsPerkRequirements,
++  removeSelectedPerkAt,
++  trimSelectedPerksToMaxRanks,
++  withAssignedPerkRanks,
++} from '../../domain/perks';
++
++const perkById = (id) => perksData.find((perk) => perk.id === id);
++
++const attributes = [
++  { name: 'STR', value: 8 },
++  { name: 'PER', value: 8 },
++  { name: 'END', value: 8 },
++  { name: 'CHA', value: 8 },
++  { name: 'INT', value: 8 },
++  { name: 'AGI', value: 8 },
++  { name: 'LCK', value: 8 },
++];
++
++describe('perk selection ranks', () => {
++  it('does not allow taking a rank 1 perk twice', () => {
++    const junktownVendor = perkById('junktownVendor');
++    expect(junktownVendor.maxRanks).toBe(1);
++
++    const first = applyPerkSelection([], junktownVendor);
++    expect(first.ok).toBe(true);
++    expect(first.selectedPerks).toEqual([expect.objectContaining({ id: 'junktownVendor', rank: 1 })]);
++
++    const second = applyPerkSelection(first.selectedPerks, junktownVendor);
++    expect(second.ok).toBe(false);
++    expect(second.reason).toBe('max-rank');
++    expect(second.selectedPerks).toHaveLength(1);
++    expect(canSelectPerk(junktownVendor, first.selectedPerks)).toBe(false);
++  });
++
++  it('allows a multi-rank perk up to maxRanks and then blocks it', () => {
++    const strongBack = perkById('strongBack');
++    expect(strongBack.maxRanks).toBe(3);
++
++    const rank1 = applyPerkSelection([], strongBack);
++    const rank2 = applyPerkSelection(rank1.selectedPerks, strongBack);
++    const rank3 = applyPerkSelection(rank2.selectedPerks, strongBack);
++    const rank4 = applyPerkSelection(rank3.selectedPerks, strongBack);
++
++    expect(rank1.ok && rank2.ok && rank3.ok).toBe(true);
++    expect(rank3.selectedPerks.map((perk) => perk.rank)).toEqual([1, 2, 3]);
++    expect(rank4.ok).toBe(false);
++    expect(getPerkSelectionCount(rank3.selectedPerks, 'strongBack')).toBe(3);
++  });
++
++  it('lets a confirmed duplicate perk be replaced or removed without scrapping the sheet', () => {
++    const junktownVendor = perkById('junktownVendor');
++    const snakeater = perkById('snakeater');
++    const stuck = withAssignedPerkRanks([junktownVendor, junktownVendor]);
++
++    expect(stuck).toHaveLength(2);
++    expect(canSelectPerk(junktownVendor, stuck)).toBe(false);
++
++    const replaced = applyPerkSelection(stuck, snakeater, { replaceIndex: 1 });
++    expect(replaced.ok).toBe(true);
++    expect(replaced.selectedPerks.map((perk) => perk.id)).toEqual(['junktownVendor', 'snakeater']);
++    expect(getPerkSelectionCount(replaced.selectedPerks, 'junktownVendor')).toBe(1);
++
++    const removed = removeSelectedPerkAt(stuck, 1);
++    expect(removed).toHaveLength(1);
++    expect(removed[0]).toMatchObject({ id: 'junktownVendor', rank: 1 });
++    expect(canSelectPerk(junktownVendor, removed)).toBe(false);
++    expect(canSelectPerk(snakeater, removed)).toBe(true);
++  });
++
++  it('reassigns sequential ranks after a middle pick is removed', () => {
++    const strongBack = perkById('strongBack');
++    const junktownVendor = perkById('junktownVendor');
++    const selected = withAssignedPerkRanks([strongBack, junktownVendor, strongBack]);
++
++    const removed = removeSelectedPerkAt(selected, 0);
++    expect(removed.map((perk) => ({ id: perk.id, rank: perk.rank }))).toEqual([
++      { id: 'junktownVendor', rank: 1 },
++      { id: 'strongBack', rank: 1 },
++    ]);
++  });
++});
++
++describe('perk availability annotation', () => {
++  it('marks a maxed rank-1 perk unavailable and still annotates the rest', () => {
++    const junktownVendor = perkById('junktownVendor');
++    const selected = [{ id: 'junktownVendor', rank: 1 }];
++    const annotated = annotatePerks([junktownVendor, perkById('snakeater')], attributes, 1, selected);
++    const vendor = annotated.find((entry) => entry.perk.id === 'junktownVendor');
++    const snakeater = annotated.find((entry) => entry.perk.id === 'snakeater');
++
++    expect(vendor.available).toBe(false);
++    expect(vendor.unmet.maxRank).toEqual({ current: 1, max: 1 });
++    expect(snakeater.available).toBe(true);
++  });
++
++  it('ignores the slot being replaced when checking max rank', () => {
++    const junktownVendor = perkById('junktownVendor');
++    const selected = [{ id: 'junktownVendor', rank: 1 }];
++
++    expect(meetsPerkRequirements(junktownVendor, attributes, 1, selected)).toBe(false);
++    expect(meetsPerkRequirements(junktownVendor, attributes, 1, selected, { replaceIndex: 0 })).toBe(true);
++  });
++
++  it('requires the next rank level for a multi-rank perk', () => {
++    const strongBack = perkById('strongBack');
++    expect(getRequiredLevelForRank(strongBack, 1)).toBe(1);
++    expect(getRequiredLevelForRank(strongBack, 2)).toBe(3);
++
++    const selected = [{ id: 'strongBack', rank: 1 }];
++    expect(meetsPerkRequirements(strongBack, attributes, 1, selected)).toBe(false);
++    expect(meetsPerkRequirements(strongBack, attributes, 3, selected)).toBe(true);
++  });
++
++  it('blocks mutually exclusive perks', () => {
++    const daringNature = perkById('daringNature');
++    const cautiousNature = perkById('cautiousNature');
++    const selected = [{ id: 'daringNature', rank: 1 }];
++
++    expect(meetsPerkRequirements(cautiousNature, attributes, 1, selected)).toBe(false);
++    const annotated = annotatePerks([cautiousNature], attributes, 1, selected);
++    expect(annotated[0].unmet.excluded.perkIds).toEqual(['daringNature']);
++  });
++});
++
++describe('trim extra perk ranks', () => {
++  it('removes picks beyond maxRanks and keeps the first valid ranks', () => {
++    const junktownVendor = perkById('junktownVendor');
++    const snakeater = perkById('snakeater');
++    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(
++      [junktownVendor, junktownVendor, snakeater],
++      perksData,
++    );
++
++    expect(removed).toHaveLength(1);
++    expect(selectedPerks.map((perk) => perk.id)).toEqual(['junktownVendor', 'snakeater']);
++    expect(selectedPerks.map((perk) => perk.rank)).toEqual([1, 1]);
++  });
++
++  it('does not invent a max rank when the catalog and save have no maxRanks', () => {
++    const orphan = { id: 'unknownCustomPerk' };
++    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks([orphan, orphan], []);
++
++    expect(removed).toHaveLength(0);
++    expect(selectedPerks).toHaveLength(2);
++  });
++});
++
++describe('perk effect aggregation', () => {
++  it('counts one rank-scaled bonus even when the same perk was picked twice', () => {
++    const strongBack = perkById('strongBack');
++    const selected = [
++      { id: 'strongBack', rank: 1, effect: 'strongBack' },
++      { id: 'strongBack', rank: 2, effect: 'strongBack' },
++    ];
++
++    expect(collapseSelectedPerks(selected)).toEqual([
++      expect.objectContaining({ id: 'strongBack', rank: 2 }),
++    ]);
++    expect(calculatePerkEffects([strongBack], selected).bonuses.carryWeightBonus).toBe(50);
++  });
++});
+diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitron/shadow-migration.test.js
+index 174db12..e73e2cf 100644
+--- a/__tests__/securitron/shadow-migration.test.js
++++ b/__tests__/securitron/shadow-migration.test.js
+@@ -26,7 +26,7 @@ const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.nam
+ 
+ describe('Текущая версия формата сейва', () => {
+   it('равна 15', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(15);
++    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+   });
+ });
+ 
+diff --git a/__tests__/store/perk-duplicate-migration.test.js b/__tests__/store/perk-duplicate-migration.test.js
+new file mode 100644
+index 0000000..53d6197
+--- /dev/null
++++ b/__tests__/store/perk-duplicate-migration.test.js
+@@ -0,0 +1,31 @@
++import { describe, expect, it } from 'vitest';
++import { migrateCharacterState } from '../../src/store/migrations';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++describe('v15 to v16 duplicate perk ranks', () => {
++  it('trims extra rank-1 picks, frees the slot and asks to show a notice', () => {
++    const migrated = migrateCharacterState({
++      schemaVersion: 15,
++      selectedPerks: [
++        { id: 'junktownVendor', maxRanks: 1 },
++        { id: 'junktownVendor', maxRanks: 1 },
++        { id: 'snakeater', maxRanks: 1 },
++      ],
++    });
++
++    expect(CURRENT_SCHEMA_VERSION).toBe(16);
++    expect(migrated.schemaVersion).toBe(16);
++    expect(migrated.selectedPerks.map((perk) => perk.id)).toEqual(['junktownVendor', 'snakeater']);
++    expect(migrated.pendingPerkDuplicateNotice).toBe(true);
++  });
++
++  it('does not raise a notice when there is nothing to trim', () => {
++    const migrated = migrateCharacterState({
++      schemaVersion: 15,
++      selectedPerks: [{ id: 'junktownVendor', maxRanks: 1 }],
++    });
++
++    expect(migrated.selectedPerks).toHaveLength(1);
++    expect(migrated.pendingPerkDuplicateNotice).toBeUndefined();
++  });
++});
+diff --git a/__tests__/store/scene-risk-migration.test.js b/__tests__/store/scene-risk-migration.test.js
+index 4c72c6d..d28c624 100644
+--- a/__tests__/store/scene-risk-migration.test.js
++++ b/__tests__/store/scene-risk-migration.test.js
+@@ -9,9 +9,9 @@ describe('v14 to v15 scene-risk state migration', () => {
+       characterName: 'Courier',
+     });
+ 
+-    expect(CURRENT_SCHEMA_VERSION).toBe(15);
++    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+     expect(migrated).toMatchObject({
+-      schemaVersion: 15,
++      schemaVersion: 16,
+       characterName: 'Courier',
+       sceneRiskStates: {},
+     });
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 7ca0eea..067d60d 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -73,6 +73,8 @@ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
+ import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
++import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
++import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
+ import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
+ import { Alert, Platform } from 'react-native';
+ 
+@@ -158,6 +160,11 @@ const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventor
+ // ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
+ // (контроль — инвариант-тест __tests__/i18n/no-fallbacks.test.js).
+ const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()][key];
++const PERK_ALERTS_DICT = {
++  'ru-RU': ruPerksAndTraitsScreen.alerts,
++  'en-EN': enPerksAndTraitsScreen.alerts,
++};
++const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
+ // Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
+ // что использует обычная броня при выборе слота.
+ const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
+@@ -817,6 +824,9 @@ export const CharacterProvider = ({ children }) => {
+       setAttributesSaved(data.attributesSaved ?? false);
+       setSkillsSaved(data.skillsSaved ?? false);
+       setSelectedPerks(data.selectedPerks || []);
++      if (data.pendingPerkDuplicateNotice) {
++        paAlert(tPerkAlert('duplicatePerksFixedTitle'), tPerkAlert('duplicatePerksFixedMessage'));
++      }
+       setCarryWeight(data.carryWeight ?? 150);
+       setMeleeBonus(data.meleeBonus ?? 0);
+       setInitiative(data.initiative ?? 0);
+@@ -911,7 +921,7 @@ export const CharacterProvider = ({ children }) => {
+   };
+ 
+   const addPerkAttributePoints = (points) => {
+-    setAvailablePerkAttributePoints(prev => prev + points);
++    setAvailablePerkAttributePoints(prev => Math.max(0, prev + points));
+   };
+ 
+   /**
+@@ -1378,9 +1388,9 @@ export const CharacterProvider = ({ children }) => {
+     availablePerkAttributePoints,
+     addPerkAttributePoints,
+     commitAttributeChanges,
+-    meetsPerkRequirements: (perk) => meetsPerkRequirements(perk, attributes, level),
+-    getPerkUnmetReasons: (perk) => getPerkUnmetReasons(perk, attributes, level),
+-    annotatePerks: (perks) => annotatePerks(perks, attributes, level),
++    meetsPerkRequirements: (perk, options) => meetsPerkRequirements(perk, attributes, level, selectedPerks, options),
++    getPerkUnmetReasons: (perk, options) => getPerkUnmetReasons(perk, attributes, level, selectedPerks, options),
++    annotatePerks: (perks, options) => annotatePerks(perks, attributes, level, selectedPerks, options),
+   };
+ 
+   return (
+diff --git a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+index 3961a17..55dfa15 100644
+--- a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
++++ b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+@@ -6,7 +6,7 @@ import { getPerkDisplay } from './perksDisplay';
+ 
+ const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
+ 
+-const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => {
++const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRemovePerk, title }) => {
+   const [expandedIndex, setExpandedIndex] = useState(null);
+   const [selectedPerk, setSelectedPerk] = useState(null);
+ 
+@@ -26,7 +26,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) =>
+     >
+       <View style={styles.modalOverlay}>
+         <View style={styles.modalContainer}>
+-          <Text style={styles.modalTitle}>{tPerksAndTraits('modal.title')}</Text>
++          <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
+ 
+           <ScrollView style={{ maxHeight: 420 }}>
+             {(annotatedPerks || []).map((entry, index) => {
+@@ -66,6 +66,18 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) =>
+                                 .replace('{current}', unmet.level.current)}
+                             </Text>
+                           )}
++                          {unmet.maxRank && (
++                            <Text style={styles.unmetText}>
++                              {tPerksAndTraits('modal.alreadyAtMaxRank')
++                                .replace('{current}', unmet.maxRank.current)
++                                .replace('{max}', unmet.maxRank.max)}
++                            </Text>
++                          )}
++                          {unmet.excluded && (
++                            <Text style={styles.unmetText}>
++                              {tPerksAndTraits('modal.excludedByPerk')}
++                            </Text>
++                          )}
+                           {unmet.attributes && Object.entries(unmet.attributes).map(([code, info]) => (
+                             <Text key={`${perk.id || index}-${code}`} style={styles.unmetText}>
+                               {tPerksAndTraits('modal.requiresAttribute')
+@@ -105,6 +117,17 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) =>
+           </ScrollView>
+ 
+           <View style={styles.modalButtons}>
++            {onRemovePerk && (
++              <TouchableOpacity
++                style={[styles.modalButton, styles.removeButton]}
++                onPress={() => {
++                  onRemovePerk();
++                  onClose();
++                }}
++              >
++                <Text style={styles.modalButtonText}>{tPerksAndTraits('modal.buttons.remove')}</Text>
++              </TouchableOpacity>
++            )}
+             <TouchableOpacity 
+               style={[styles.modalButton, styles.confirmButton]} 
+               onPress={() => {
+diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index cc30b42..d32818e 100644
+--- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
+ import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+ import { useCharacter } from '../../CharacterContext';
+ import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
++import { applyPerkSelection, removeSelectedPerkAt, withAssignedPerkRanks } from '../../../domain/perks';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import perksData from '../../../modules/fallout/data/perks/perks.json';
+ import PerkSelectModal from './PerkSelectModal';
+@@ -18,72 +19,110 @@ const PerksAndTraitsScreen = () => {
+   useLocale(); // интерфейс движка
+   useModuleLocale(); // контент активного сеттинга
+   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
++  const [replacingIndex, setReplacingIndex] = useState(null);
+   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
+   const perkLimit = level + extraPerkSlots;
++  const rankedPerks = useMemo(() => withAssignedPerkRanks(selectedPerks), [selectedPerks]);
+ 
+   // Создаем массив из 20 строк
+   const emptyRows = Array(20).fill(null);
+ 
+-  const annotatedPerks = useMemo(() => annotatePerks(perksData), [annotatePerks]);
++  const annotatedPerks = useMemo(
++    () => annotatePerks(perksData, { replaceIndex: replacingIndex }),
++    [annotatePerks, selectedPerks, replacingIndex],
++  );
++
++  const showAlert = (title, message) => {
++    if (Platform.OS === 'web') {
++      window.alert(message ? `${title}\n\n${message}` : message || title);
++      return;
++    }
++    if (message) {
++      Alert.alert(title, message);
++      return;
++    }
++    Alert.alert(title);
++  };
++
++  const closePerkModal = () => {
++    setPerkModalVisible(false);
++    setReplacingIndex(null);
++  };
+ 
+   const handleAddPerkPress = () => {
+     if (selectedPerks.length >= perkLimit) {
+-      const message = tPerksAndTraits('warnings.perkLimitReached');
+-      if (Platform.OS === 'web') {
+-        window.alert(message);
+-      } else {
+-        Alert.alert(tPerksAndTraits('alerts.warningTitle'), message);
+-      }
++      showAlert(tPerksAndTraits('alerts.warningTitle'), tPerksAndTraits('warnings.perkLimitReached'));
+       return;
+     }
++    setReplacingIndex(null);
++    setPerkModalVisible(true);
++  };
++
++  const handleReassignPerk = (index) => {
++    setReplacingIndex(index);
+     setPerkModalVisible(true);
+   };
+ 
++  const applyIntenseTrainingDelta = (previousPerk, nextPerk) => {
++    const wasIntenseTraining = previousPerk?.id === 'intenseTraining';
++    const isIntenseTraining = nextPerk?.id === 'intenseTraining';
++    if (isIntenseTraining && !wasIntenseTraining) {
++      addPerkAttributePoints(1);
++      return;
++    }
++    if (wasIntenseTraining && !isIntenseTraining) {
++      addPerkAttributePoints(-1);
++    }
++  };
++
+   const handleChoosePerk = (perk) => {
+     if (!perk) return;
++
++    const isReplacing = replacingIndex != null;
+     
+     // Блокируем выбор, если уже взяли максимум на уровне (доп. защита)
+-    if (selectedPerks.length >= perkLimit) {
+-      const message = tPerksAndTraits('warnings.perkLimitReached');
+-      if (Platform.OS === 'web') {
+-        window.alert(message);
+-      } else {
+-        Alert.alert(tPerksAndTraits('alerts.warningTitle'), message);
+-      }
++    if (!isReplacing && selectedPerks.length >= perkLimit) {
++      showAlert(tPerksAndTraits('alerts.warningTitle'), tPerksAndTraits('warnings.perkLimitReached'));
+       return;
+     }
+ 
+     const selectedPerk = withPerkDisplay(perk);
++    const previousPerk = isReplacing ? selectedPerks[replacingIndex] : null;
+ 
+     // Специальная обработка перка по стабильному id, без привязки к русскому названию.
+-    if (selectedPerk.id === 'intenseTraining') {
++    if (selectedPerk.id === 'intenseTraining' && previousPerk?.id !== 'intenseTraining') {
+       const canTakeIntensiveTraining = level >= 2 || attributesSaved;
+       
+       if (!canTakeIntensiveTraining) {
+-        const message = tPerksAndTraits('errors.intensiveTrainingRequirements');
+-        if (Platform.OS === 'web') {
+-          window.alert(message);
+-        } else {
+-          Alert.alert(tPerksAndTraits('alerts.errorTitle'), message);
+-        }
++        showAlert(tPerksAndTraits('alerts.errorTitle'), tPerksAndTraits('errors.intensiveTrainingRequirements'));
+         return;
+       }
+ 
+-      const attributeBonus = 1;
+-      addPerkAttributePoints(attributeBonus);
+-      
+       const successMessage = tPerksAndTraits('perkSelected.intensiveTrainingSuccess')
+         .replace('{perkName}', selectedPerk.perk_name)
+-        .replace('{bonus}', attributeBonus);
+-      if (Platform.OS === 'web') {
+-        window.alert(successMessage);
+-      } else {
+-        Alert.alert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
+-      }
++        .replace('{bonus}', 1);
++      showAlert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
+     }
+ 
+-    setSelectedPerks(prev => [...prev, selectedPerk]);
+-    setPerkModalVisible(false);
++    const result = applyPerkSelection(selectedPerks, selectedPerk, {
++      replaceIndex: isReplacing ? replacingIndex : undefined,
++    });
++    if (!result.ok) {
++      showAlert(tPerksAndTraits('alerts.warningTitle'), tPerksAndTraits('warnings.perkAlreadyAtMaxRank'));
++      return;
++    }
++
++    applyIntenseTrainingDelta(previousPerk, selectedPerk);
++    setSelectedPerks(result.selectedPerks);
++    closePerkModal();
++  };
++
++  const handleRemovePerk = () => {
++    if (replacingIndex == null) return;
++    const previousPerk = selectedPerks[replacingIndex];
++    applyIntenseTrainingDelta(previousPerk, null);
++    setSelectedPerks(removeSelectedPerkAt(selectedPerks, replacingIndex));
++    closePerkModal();
+   };
+ 
+   return (
+@@ -131,14 +170,21 @@ const PerksAndTraitsScreen = () => {
+           })()}
+ 
+           {/* Выбранные перки (по уровням) */}
+-          {selectedPerks.map((perk, idx) => {
++          {rankedPerks.map((perk, idx) => {
+             const display = getPerkDisplay(perk);
+             return (
+-              <View key={`perk-${perk.id || idx}`} style={styles.row}>
+-                <Text style={[styles.cell, styles.nameColumn]}>{display.name}</Text>
++              <TouchableOpacity
++                key={`perk-${idx}-${perk.id || 'unknown'}`}
++                style={[styles.row, styles.selectedPerkRow]}
++                onPress={() => handleReassignPerk(idx)}
++              >
++                <View style={[styles.cell, styles.nameColumn]}>
++                  <Text style={styles.perkNameText}>{display.name}</Text>
++                  <Text style={styles.reassignHint}>{tPerksAndTraits('buttons.changePerk')}</Text>
++                </View>
+                 <Text style={[styles.cell, styles.rankColumn]}>{perk.rank ?? ''}</Text>
+                 {renderTextWithIcons(display.description, [styles.cell, styles.descriptionColumn])}
+-              </View>
++              </TouchableOpacity>
+             );
+           })}
+ 
+@@ -160,12 +206,14 @@ const PerksAndTraitsScreen = () => {
+ 
+       <PerkSelectModal
+         visible={isPerkModalVisible}
+-        onClose={() => setPerkModalVisible(false)}
++        onClose={closePerkModal}
+         annotatedPerks={annotatedPerks}
+         onChoosePerk={handleChoosePerk}
++        onRemovePerk={replacingIndex != null ? handleRemovePerk : undefined}
++        title={replacingIndex != null ? tPerksAndTraits('modal.replaceTitle') : tPerksAndTraits('modal.title')}
+       />
+     </View>
+   );
+ };
+ 
+-export default PerksAndTraitsScreen; 
++export default PerksAndTraitsScreen;
+diff --git a/domain/perks.js b/domain/perks.js
+index 8c978ee..02d14ba 100644
+--- a/domain/perks.js
++++ b/domain/perks.js
+@@ -49,43 +49,174 @@ const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites ||
+ const getLevelRequirement = (req) => req.char_lvl ?? req.level;
+ const getAttributeRequirements = (req) => req.attributes || req.special || {};
+ 
+-/**
+- * Returns true if the character meets a specific perk's requirements.
+- * Considers level and SPECIAL minimums. SPECIAL keys from perks.json are used directly.
+- */
+-export function meetsPerkRequirements(perk, attributes, level) {
+-    if (!perk) return false;
++export function getPerkMaxRanks(perk) {
++    const maxRanks = Number(perk?.maxRanks ?? perk?.maxRank ?? 1);
++    return Number.isFinite(maxRanks) && maxRanks > 0 ? maxRanks : 1;
++}
++
++export function getPerkSelectionCount(selectedPerks = [], perkId, { ignoreIndex } = {}) {
++    if (!perkId) return 0;
++    let count = 0;
++    (selectedPerks || []).forEach((selected, index) => {
++        if (ignoreIndex != null && index === ignoreIndex) return;
++        if (toSelectedPerkId(selected) === perkId) count += 1;
++    });
++    return count;
++}
++
++export function getRequiredLevelForRank(perk, rank) {
+     const req = getPrerequisites(perk);
++    const baseLevel = getLevelRequirement(req);
++    const increase = Number(req.levelIncreasePerRank) || 0;
++    const base = typeof baseLevel === 'number' ? baseLevel : 1;
++    return base + (Math.max(1, Number(rank) || 1) - 1) * increase;
++}
+ 
+-    const requiredLevel = getLevelRequirement(req);
+-    if (typeof requiredLevel === 'number' && level < requiredLevel) {
+-        return false;
++export function canSelectPerk(perk, selectedPerks = [], { replaceIndex } = {}) {
++    if (!perk?.id) return false;
++    return getPerkSelectionCount(selectedPerks, perk.id, { ignoreIndex: replaceIndex }) < getPerkMaxRanks(perk);
++}
++
++export function withAssignedPerkRanks(selectedPerks = []) {
++    const counts = {};
++    return (selectedPerks || []).map((selected) => {
++        const id = toSelectedPerkId(selected);
++        if (!id) return selected;
++        counts[id] = (counts[id] || 0) + 1;
++        if (typeof selected === 'string') return { id: selected, rank: counts[id] };
++        return { ...selected, rank: counts[id] };
++    });
++}
++
++export function applyPerkSelection(selectedPerks = [], perk, { replaceIndex } = {}) {
++    if (!perk?.id) return { ok: false, reason: 'missing-perk', selectedPerks };
++    if (!canSelectPerk(perk, selectedPerks, { replaceIndex })) {
++        return { ok: false, reason: 'max-rank', selectedPerks };
+     }
+ 
+-    const attrReq = getAttributeRequirements(req);
+-    if (attrReq && Object.keys(attrReq).length > 0) {
+-        const valueByName = buildAttributeValueMap(attributes);
+-        for (const [code, minVal] of Object.entries(attrReq)) {
+-            const currentVal = valueByName[code] ?? 0;
+-            if (currentVal < minVal) return false;
++    const next = replaceIndex != null
++        ? (selectedPerks || []).map((entry, index) => (index === replaceIndex ? perk : entry))
++        : [...(selectedPerks || []), perk];
++
++    return { ok: true, reason: null, selectedPerks: withAssignedPerkRanks(next) };
++}
++
++export function removeSelectedPerkAt(selectedPerks = [], index) {
++    if (index == null || index < 0 || index >= (selectedPerks || []).length) {
++        return selectedPerks || [];
++    }
++    return withAssignedPerkRanks((selectedPerks || []).filter((_, entryIndex) => entryIndex !== index));
++}
++
++const resolveCatalogMaxRanks = (selected, catalogById) => {
++    const id = toSelectedPerkId(selected);
++    const catalogPerk = id ? catalogById.get(id) : null;
++    const rawMax = catalogPerk?.maxRanks ?? (isObject(selected) ? selected.maxRanks : undefined);
++    if (typeof rawMax !== 'number' || !Number.isFinite(rawMax) || rawMax < 1) return null;
++    return rawMax;
++};
++
++/**
++ * Keep at most maxRanks picks of each perk. Extra picks are dropped so the
++ * freed slots can be spent on other perks. If maxRanks is missing from both
++ * the catalog and the saved perk, the entry is left untouched.
++ */
++export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []) {
++    const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
++    const keptCounts = {};
++    const kept = [];
++    const removed = [];
++
++    for (const selected of selectedPerks || []) {
++        const id = toSelectedPerkId(selected);
++        const maxRanks = resolveCatalogMaxRanks(selected, catalogById);
++        if (!id || maxRanks == null) {
++            kept.push(selected);
++            continue;
++        }
++        keptCounts[id] = keptCounts[id] || 0;
++        if (keptCounts[id] >= maxRanks) {
++            removed.push(selected);
++            continue;
+         }
++        keptCounts[id] += 1;
++        kept.push(selected);
+     }
+ 
+-    // Other requirements (e.g., "notForRobots") are ignored for now per scope.
+-    return true;
++    return {
++        selectedPerks: withAssignedPerkRanks(kept),
++        removed,
++    };
++}
++
++/**
++ * Collapse duplicate picks of the same perk into one entry whose rank is the
++ * number of picks (or the stored rank when there is only one entry).
++ * Needed so rank-scaled effects are not applied once per pick.
++ */
++export function collapseSelectedPerks(selectedPerks = []) {
++    const groups = new Map();
++    for (const selected of selectedPerks || []) {
++        const id = toSelectedPerkId(selected);
++        if (!id) continue;
++        if (!groups.has(id)) groups.set(id, []);
++        groups.get(id).push(selected);
++    }
++
++    return [...groups.values()].map((entries) => {
++        const first = entries[0];
++        const rank = entries.length > 1
++            ? entries.length
++            : Math.max(toSelectedPerkRank(first), entries.length);
++        if (typeof first === 'string') return { id: first, rank };
++        return { ...first, rank };
++    });
++}
++
++/**
++ * Returns true if the character meets a specific perk's requirements.
++ * Considers level, SPECIAL minimums, already-taken ranks, and exclusive perks.
++ */
++export function meetsPerkRequirements(perk, attributes, level, selectedPerks = [], options = {}) {
++    if (!perk) return false;
++    const unmet = getPerkUnmetReasons(perk, attributes, level, selectedPerks, options);
++    return !unmet.level
++        && Object.keys(unmet.attributes || {}).length === 0
++        && !unmet.maxRank
++        && !unmet.excluded;
+ }
+ 
+ /**
+  * Returns a structured status for why a perk is not available.
+  */
+-export function getPerkUnmetReasons(perk, attributes, level) {
++export function getPerkUnmetReasons(perk, attributes, level, selectedPerks = [], options = {}) {
+     const reasons = { level: false, attributes: {} };
+     if (!perk) return reasons;
+     const req = getPrerequisites(perk);
++    const ignoreIndex = options.replaceIndex;
++    const currentRanks = getPerkSelectionCount(selectedPerks, perk.id, { ignoreIndex });
++    const maxRanks = getPerkMaxRanks(perk);
++
++    if (currentRanks >= maxRanks) {
++        reasons.maxRank = { current: currentRanks, max: maxRanks };
++    } else {
++        const requiredLevel = getRequiredLevelForRank(perk, currentRanks + 1);
++        if (typeof requiredLevel === 'number' && level < requiredLevel) {
++            reasons.level = { required: requiredLevel, current: level };
++        }
++    }
+ 
+-    const requiredLevel = getLevelRequirement(req);
+-    if (typeof requiredLevel === 'number' && level < requiredLevel) {
+-        reasons.level = { required: requiredLevel, current: level };
++    const excluded = req.excludedPerks || [];
++    if (excluded.length > 0) {
++        const blockedBy = [];
++        (selectedPerks || []).forEach((selected, index) => {
++            if (ignoreIndex != null && index === ignoreIndex) return;
++            const id = toSelectedPerkId(selected);
++            if (id && excluded.includes(id)) blockedBy.push(id);
++        });
++        if (blockedBy.length > 0) {
++            reasons.excluded = { perkIds: blockedBy };
++        }
+     }
+ 
+     const attrReq = getAttributeRequirements(req);
+@@ -103,10 +234,10 @@ export function getPerkUnmetReasons(perk, attributes, level) {
+ /**
+  * Helper to annotate a list of perks with availability status.
+  */
+-export function annotatePerks(perks, attributes, level) {
++export function annotatePerks(perks, attributes, level, selectedPerks = [], options = {}) {
+     return (perks || []).map((perk) => {
+-        const available = meetsPerkRequirements(perk, attributes, level);
+-        const unmet = available ? null : getPerkUnmetReasons(perk, attributes, level);
++        const available = meetsPerkRequirements(perk, attributes, level, selectedPerks, options);
++        const unmet = available ? null : getPerkUnmetReasons(perk, attributes, level, selectedPerks, options);
+         return { perk, available, unmet };
+     });
+ }
+@@ -145,7 +276,7 @@ export function calculatePerkEffects(perks = [], selectedPerks = [], state = {})
+     let bonuses = {};
+     const applied = [];
+ 
+-    for (const selected of selectedPerks || []) {
++    for (const selected of collapseSelectedPerks(selectedPerks)) {
+         const id = toSelectedPerkId(selected);
+         if (!id) continue;
+         const perk = byId.get(id) || (isObject(selected) ? selected : null);
+diff --git a/domain/registry.js b/domain/registry.js
+index 9642846..48d77ca 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -14,6 +14,7 @@ import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
+ 
+ import moduleOrigins from '../modules/fallout/data/origins/origins.json';
+ import moduleTraits from '../modules/fallout/data/traits/traits.json';
++import modulePerks from '../modules/fallout/data/perks/perks.json';
+ import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+ import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+ import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
+@@ -72,6 +73,14 @@ export function getTraits() {
+   return moduleTraits;
+ }
+ 
++/**
++ * Перки активного сеттинга. Каталог живёт в модуле; движок читает его
++ * только через реестр.
++ */
++export function getPerks() {
++  return modulePerks;
++}
++
+ /**
+  * Планы тела (движковые данные; сеттинг может добавить свои).
+  */
+diff --git a/i18n/en-EN/screens/perksAndTraits/screen.json b/i18n/en-EN/screens/perksAndTraits/screen.json
+index a7c076c..8733418 100644
+--- a/i18n/en-EN/screens/perksAndTraits/screen.json
++++ b/i18n/en-EN/screens/perksAndTraits/screen.json
+@@ -5,15 +5,20 @@
+     "description": "Description"
+   },
+   "buttons": {
+-    "addPerk": "+ Add perk"
++    "addPerk": "+ Add perk",
++    "changePerk": "Change",
++    "removePerk": "Remove"
+   },
+   "alerts": {
+     "warningTitle": "Warning",
+     "errorTitle": "Error",
+-    "perkSelectedTitle": "Perk selected"
++    "perkSelectedTitle": "Perk selected",
++    "duplicatePerksFixedTitle": "Duplicate perks found",
++    "duplicatePerksFixedMessage": "The extra ranks were removed. You can spend the freed slots on other perks."
+   },
+   "warnings": {
+-    "perkLimitReached": "No more perks can be taken at the current level"
++    "perkLimitReached": "No more perks can be taken at the current level",
++    "perkAlreadyAtMaxRank": "This perk is already at its maximum rank"
+   },
+   "errors": {
+     "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
+@@ -23,13 +28,17 @@
+   },
+   "modal": {
+     "title": "Select a perk",
++    "replaceTitle": "Change perk",
+     "requiresLevel": "Requires level: {required} (current: {current})",
+     "requiresAttribute": "Requires {code}: {required} (current: {current})",
++    "alreadyAtMaxRank": "Already taken at maximum rank ({current}/{max})",
++    "excludedByPerk": "Cannot be taken together with an already selected perk",
+     "buttons": {
+       "choose": "Select",
+       "cancelChoice": "Cancel selection",
+       "confirm": "Confirm",
+-      "cancel": "Cancel"
++      "cancel": "Cancel",
++      "remove": "Remove perk"
+     }
+   }
+ }
+diff --git a/i18n/ru-RU/screens/perksAndTraits/screen.json b/i18n/ru-RU/screens/perksAndTraits/screen.json
+index 875e520..5ebd53b 100644
+--- a/i18n/ru-RU/screens/perksAndTraits/screen.json
++++ b/i18n/ru-RU/screens/perksAndTraits/screen.json
+@@ -5,15 +5,20 @@
+     "description": "Описание"
+   },
+   "buttons": {
+-    "addPerk": "+ Добавить перк"
++    "addPerk": "+ Добавить перк",
++    "changePerk": "Изменить",
++    "removePerk": "Убрать"
+   },
+   "alerts": {
+     "warningTitle": "Предупреждение",
+     "errorTitle": "Ошибка",
+-    "perkSelectedTitle": "Перк выбран"
++    "perkSelectedTitle": "Перк выбран",
++    "duplicatePerksFixedTitle": "Найдено задвоение перков",
++    "duplicatePerksFixedMessage": "Ошибочные ранги сняты. Освободившиеся слоты можно потратить на другие перки."
+   },
+   "warnings": {
+-    "perkLimitReached": "На текущем уровне больше перков взять нельзя"
++    "perkLimitReached": "На текущем уровне больше перков взять нельзя",
++    "perkAlreadyAtMaxRank": "Этот перк уже взят на максимальном ранге"
+   },
+   "errors": {
+     "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
+@@ -23,13 +28,17 @@
+   },
+   "modal": {
+     "title": "Выберите перк",
++    "replaceTitle": "Заменить перк",
+     "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
+     "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
++    "alreadyAtMaxRank": "Уже взят на максимальном ранге ({current}/{max})",
++    "excludedByPerk": "Нельзя взять вместе с уже выбранным перком",
+     "buttons": {
+       "choose": "Выбрать",
+       "cancelChoice": "Отменить выбор",
+       "confirm": "Подтвердить",
+-      "cancel": "Отмена"
++      "cancel": "Отмена",
++      "remove": "Убрать перк"
+     }
+   }
+ }
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 6f5a96a..7b07ebf 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -5,7 +5,8 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+ import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { generateItemId } from '../../domain/itemIdentity';
+-import { getUniqQualityName } from '../../domain/registry';
++import { getPerks, getUniqQualityName } from '../../domain/registry';
++import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
+ import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+ import { debugLog } from '../debug/falloutDebug';
+ 
+@@ -1000,6 +1001,21 @@ const MIGRATIONS = [
+     sceneRiskStates: {},
+   }),
+ 
++  // v15 -> v16: лишние ранги перка сверх maxRanks снимаются, слот
++  // освобождается. Алерт показывается при загрузке, если что-то сняли.
++  (state) => {
++    if (!Array.isArray(state.selectedPerks)) return state;
++    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(state.selectedPerks, getPerks());
++    if (removed.length === 0) {
++      return { ...state, selectedPerks };
++    }
++    return {
++      ...state,
++      selectedPerks,
++      pendingPerkDuplicateNotice: true,
++    };
++  },
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 5145b6a..cb5a121 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -35,7 +35,8 @@
+ // v14 — «Тень»: старый комплект (default_caps_only) заменяется на NIGHTKIN;
+ //       флаг nightkinKitPending — предметы выдаются после загрузки.
+ // v15 — состояние универсальных проверок риска в текущей реальной сцене.
+-export const CURRENT_SCHEMA_VERSION = 15;
++// v16 — снять лишние ранги перков сверх maxRanks и освободить слоты.
++export const CURRENT_SCHEMA_VERSION = 16;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+diff --git a/styles/PerkSelectModal.styles.js b/styles/PerkSelectModal.styles.js
+index 5cd2fb9..5f7a2ee 100644
+--- a/styles/PerkSelectModal.styles.js
++++ b/styles/PerkSelectModal.styles.js
+@@ -68,6 +68,7 @@ const styles = StyleSheet.create({
+     borderColor: '#15803d',
+     marginRight: 8,
+   },
++  removeButton: { backgroundColor: '#64748b', borderColor: '#475569' },
+   cancelButton: { backgroundColor: '#ef4444', borderColor: '#b91c1c' },
+   modalButtonText: { color: '#fff', fontWeight: 'bold' },
+ });
+diff --git a/styles/PerksAndTraitsScreen.styles.js b/styles/PerksAndTraitsScreen.styles.js
+index 28dc965..91dc66e 100644
+--- a/styles/PerksAndTraitsScreen.styles.js
++++ b/styles/PerksAndTraitsScreen.styles.js
+@@ -28,6 +28,9 @@ const styles = StyleSheet.create({
+   nameColumn: { width: 160, flexShrink: 0, flexGrow: 0 },
+   rankColumn: { width: 60, flexShrink: 0, flexGrow: 0, textAlign: 'center' },
+   descriptionColumn: { flex: 1, borderRightWidth: 0, minWidth: 0 },
++  selectedPerkRow: { backgroundColor: '#f8fafc' },
++  perkNameText: { color: '#000' },
++  reassignHint: { color: '#0369a1', fontSize: 12, marginTop: 2 },
+   placeholder: { padding: 10, color: '#888', textAlign: 'center' },
+   addPerkButton: {
+     position: 'absolute',

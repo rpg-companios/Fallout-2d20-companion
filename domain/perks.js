@@ -108,6 +108,47 @@ export function removeSelectedPerkAt(selectedPerks = [], index) {
     return withAssignedPerkRanks((selectedPerks || []).filter((_, entryIndex) => entryIndex !== index));
 }
 
+const resolveCatalogMaxRanks = (selected, catalogById) => {
+    const id = toSelectedPerkId(selected);
+    const catalogPerk = id ? catalogById.get(id) : null;
+    const rawMax = catalogPerk?.maxRanks ?? (isObject(selected) ? selected.maxRanks : undefined);
+    if (typeof rawMax !== 'number' || !Number.isFinite(rawMax) || rawMax < 1) return null;
+    return rawMax;
+};
+
+/**
+ * Keep at most maxRanks picks of each perk. Extra picks are dropped so the
+ * freed slots can be spent on other perks. If maxRanks is missing from both
+ * the catalog and the saved perk, the entry is left untouched.
+ */
+export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []) {
+    const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
+    const keptCounts = {};
+    const kept = [];
+    const removed = [];
+
+    for (const selected of selectedPerks || []) {
+        const id = toSelectedPerkId(selected);
+        const maxRanks = resolveCatalogMaxRanks(selected, catalogById);
+        if (!id || maxRanks == null) {
+            kept.push(selected);
+            continue;
+        }
+        keptCounts[id] = keptCounts[id] || 0;
+        if (keptCounts[id] >= maxRanks) {
+            removed.push(selected);
+            continue;
+        }
+        keptCounts[id] += 1;
+        kept.push(selected);
+    }
+
+    return {
+        selectedPerks: withAssignedPerkRanks(kept),
+        removed,
+    };
+}
+
 /**
  * Collapse duplicate picks of the same perk into one entry whose rank is the
  * number of picks (or the stored rank when there is only one entry).

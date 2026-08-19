@@ -12,7 +12,9 @@
   "alerts": {
     "warningTitle": "Предупреждение",
     "errorTitle": "Ошибка",
-    "perkSelectedTitle": "Перк выбран"
+    "perkSelectedTitle": "Перк выбран",
+    "duplicatePerksFixedTitle": "Найдено задвоение перков",
+    "duplicatePerksFixedMessage": "Ошибочные ранги сняты. Освободившиеся слоты можно потратить на другие перки."
   },
   "warnings": {
     "perkLimitReached": "На текущем уровне больше перков взять нельзя",
