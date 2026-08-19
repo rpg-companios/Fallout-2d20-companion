@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+REMOTE="origin"
+
+ROOT_DIR="$(
+  CDPATH=''
+  cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
+  pwd
+)"
+
+if [[ $# -ne 1 ]]; then
+  echo "Использование: ./apply-patch.sh <номер патча>"
+  echo "Пример:       ./apply-patch.sh 134"
+  exit 2
+fi
+
+PATCH_ID="$1"
+
+# Поддерживает номера вроде 134 и 121b.
+if [[ ! "$PATCH_ID" =~ ^[0-9]+[[:alnum:]]*$ ]]; then
+  echo "Ошибка: некорректный номер патча: $PATCH_ID"
+  exit 2
+fi
+
+if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Ошибка: $ROOT_DIR не является Git-репозиторием."
+  exit 1
+fi
+
+ARENA_BRANCH="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
+if [[ -z "$ARENA_BRANCH" || "$ARENA_BRANCH" == "HEAD" ]]; then
+  echo "Ошибка: не удалось определить текущую ветку."
+  exit 1
+fi
+
+echo "Текущая ветка:"
+echo "  $ARENA_BRANCH"
+echo "Загрузка патчей из:"
+echo "  $REMOTE/$ARENA_BRANCH"
+
+# Загружает ветку, но не переключает текущую ветку
+# и не выполняет merge/rebase.
+git -C "$ROOT_DIR" fetch \
+  --no-tags \
+  "$REMOTE" \
+  "refs/heads/$ARENA_BRANCH"
+
+FETCHED_COMMIT="$(
+  git -C "$ROOT_DIR" rev-parse FETCH_HEAD
+)"
+
+echo "Загружен коммит: $FETCHED_COMMIT"
+echo "Поиск патча №$PATCH_ID..."
+
+mapfile -t PATCH_PATHS < <(
+  git -C "$ROOT_DIR" ls-tree \
+    -r \
+    --name-only \
+    "$FETCHED_COMMIT" \
+    -- patchs \
+    | grep -E "^patchs/${PATCH_ID}[-.].*\\.patch$" \
+    || true
+)
+
+if [[ ${#PATCH_PATHS[@]} -eq 0 ]]; then
+  echo "Ошибка: патч №$PATCH_ID не найден в $REMOTE/$ARENA_BRANCH:patchs/"
+  exit 1
+fi
+
+if [[ ${#PATCH_PATHS[@]} -gt 1 ]]; then
+  echo "Ошибка: найдено несколько патчей №$PATCH_ID:"
+  printf '  %s\n' "${PATCH_PATHS[@]}"
+  exit 1
+fi
+
+PATCH_PATH="${PATCH_PATHS[0]}"
+echo "Найден: $PATCH_PATH"
+echo "Применение..."
+
+git -C "$ROOT_DIR" show "$FETCHED_COMMIT:$PATCH_PATH" \
+  | git -C "$ROOT_DIR" apply --verbose -
+
+echo "Патч $PATCH_ID применён."
