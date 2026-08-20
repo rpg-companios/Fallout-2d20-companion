@@ -38,4 +38,14 @@ describe('perk rank texts', () => {
       'На 2-м ранге вы находите +6 {/CD} дополнительных патрона.',
     );
   });
+
+  it('splits English texts that already contain Rank N', () => {
+    setCurrentModuleLocale('en-EN');
+    expect(getPerkDisplay({ id: 'scrounger' }, { rank: 2 }).description).toBe(
+      'Rank 2: +6 {/CD}.',
+    );
+    expect(getPerkSheetDisplay({ id: 'scrounger', rank: 2 }).description).toBe(
+      'Rank 1: find +3 {/CD} extra ammo.\n\nRank 2: +6 {/CD}.',
+    );
+  });
 });
