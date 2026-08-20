@@ -2,7 +2,10 @@
   "labels": {
     "name": "Name",
     "rank": "Rank",
-    "description": "Description"
+    "rankValue": "Rank {rank}",
+    "description": "Description",
+    "traitsSection": "Traits",
+    "perksSection": "Perks"
   },
   "buttons": {
     "addPerk": "+ Add perk",

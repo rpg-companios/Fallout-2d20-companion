@@ -9,9 +9,9 @@ describe('scene-risk state migrations', () => {
       characterName: 'Courier',
     });
 
-    expect(CURRENT_SCHEMA_VERSION).toBe(17);
+    expect(CURRENT_SCHEMA_VERSION).toBe(18);
     expect(migrated).toMatchObject({
-      schemaVersion: 17,
+      schemaVersion: 18,
       characterName: 'Courier',
       sceneRiskStates: {},
     });
@@ -30,7 +30,7 @@ describe('scene-risk state migrations', () => {
     });
 
     expect(migrated).toEqual({
-      schemaVersion: 17,
+      schemaVersion: 18,
       sceneRiskStates: {
         diseaseExposure: {
           sceneStartedAt: 1_000,

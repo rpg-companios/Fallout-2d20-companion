@@ -37,7 +37,8 @@
 // v15 — состояние универсальных проверок риска в текущей реальной сцене.
 // v16 — одноразовый модификатор сложности для следующей новой категории риска.
 // v17 — снять лишние ранги перков сверх catalog maxRanks; сейв перка — {id, rank}.
-export const CURRENT_SCHEMA_VERSION = 17;
+// v18 — id перков: triggerRush→scrounger, slacker→dodger, bullRush→painTrain.
+export const CURRENT_SCHEMA_VERSION = 18;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

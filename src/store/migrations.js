@@ -10,6 +10,12 @@ import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { debugLog } from '../debug/falloutDebug';
 
+const PERK_ID_REMAP_V18 = {
+  triggerRush: 'scrounger',
+  slacker: 'dodger',
+  bullRush: 'painTrain',
+};
+
 
 /**
  * Преобразует атрибуты из старого формата [{name, value}] в словарь
@@ -1038,6 +1044,28 @@ const MIGRATIONS = [
   (state) => {
     if (!Array.isArray(state.selectedPerks)) return state;
     const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(state.selectedPerks, getPerks());
+    if (removed.length === 0) {
+      return { ...state, selectedPerks };
+    }
+    return {
+      ...state,
+      selectedPerks,
+      pendingPerkDuplicateNotice: true,
+    };
+  },
+
+  // v17 -> v18: канонические id перков. triggerRush был смесью Халявщика и
+  // Ган-фу; в RU это Халявщик → scrounger. slacker → dodger, bullRush → painTrain.
+  (state) => {
+    if (!Array.isArray(state.selectedPerks)) return state;
+    const remapped = state.selectedPerks.map((selected) => {
+      if (!selected || typeof selected !== 'object') return selected;
+      const id = selected.id || selected.perkId;
+      const nextId = PERK_ID_REMAP_V18[id];
+      if (!nextId) return selected;
+      return { ...selected, id: nextId };
+    });
+    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(remapped, getPerks());
     if (removed.length === 0) {
       return { ...state, selectedPerks };
     }

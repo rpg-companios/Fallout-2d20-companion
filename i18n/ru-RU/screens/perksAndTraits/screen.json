@@ -2,7 +2,10 @@
   "labels": {
     "name": "Название",
     "rank": "Ранг",
-    "description": "Описание"
+    "rankValue": "Ранг {rank}",
+    "description": "Описание",
+    "traitsSection": "Черты",
+    "perksSection": "Перки"
   },
   "buttons": {
     "addPerk": "+ Добавить перк",
