@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import styles from '../../../styles/PerkSelectModal.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
-import { getPerkDisplay } from './perksDisplay';
+import { getPerkModalDisplay } from './perksDisplay';
 
 const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
 
@@ -29,11 +29,16 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
           <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
 
           <ScrollView style={{ maxHeight: 420 }}>
-            {(annotatedPerks || []).map((entry, index) => {
-              const { perk, available, unmet, nextRank } = entry;
+            {(annotatedPerks || []).filter((entry) => !entry.unmet?.maxRank).map((entry, index) => {
+              const { perk, available, unmet, taken = 0, maxRanks = 1 } = entry;
               const isExpanded = expandedIndex === index;
-              const display = getPerkDisplay(perk, nextRank == null ? {} : { rank: nextRank });
+              const display = getPerkModalDisplay(perk, { taken });
               const isSelected = isSamePerkRank(selectedPerk, perk);
+              const title = maxRanks > 1
+                ? `${display.name}. ${tPerksAndTraits('labels.ranksProgress')
+                  .replace('{current}', taken)
+                  .replace('{max}', maxRanks)}`
+                : display.name;
               
               // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
               const shouldShowExpanded = isExpanded && !isSelected;
@@ -51,7 +56,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
                     style={[styles.perkHeader, isSelected && styles.selectedPerk]}
                   >
                     <Text style={[styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName]}>
-                      {display.name}
+                      {title}
                     </Text>
                   </TouchableOpacity>
                   {shouldShowExpanded && (

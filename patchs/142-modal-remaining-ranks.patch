@@ -1,0 +1,188 @@
+diff --git a/__tests__/perks/perk-display.test.js b/__tests__/perks/perk-display.test.js
+index 102911c..f808125 100644
+--- a/__tests__/perks/perk-display.test.js
++++ b/__tests__/perks/perk-display.test.js
+@@ -1,18 +1,18 @@
+ import { beforeEach, describe, expect, it } from 'vitest';
+ import { setCurrentModuleLocale } from '../../i18n/locale';
+-import { getPerkDisplay, getPerkSheetDisplay } from '../../components/screens/PerksAndTraitsScreen/perksDisplay';
++import { getPerkModalDisplay, getPerkSheetDisplay } from '../../components/screens/PerksAndTraitsScreen/perksDisplay';
+ 
+ describe('perk rank texts', () => {
+   beforeEach(() => {
+     setCurrentModuleLocale('ru-RU');
+   });
+ 
+-  it('shows only the next rank in the perk list', () => {
++  it('shows remaining ranks in the perk list', () => {
+     const perk = { id: 'leadBelly' };
+-    expect(getPerkDisplay(perk, { rank: 1 }).description).toBe(
+-      'На 1-м ранге вы можете перебросить 1 {/CD} чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков.',
++    expect(getPerkModalDisplay(perk, { taken: 0 }).description).toBe(
++      'На 1-м ранге вы можете перебросить 1 {/CD} чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков.\n\nНа 2-м ранге у вас появляется иммунитет к радиационному урону от употребления облученной пищи или напитков.',
+     );
+-    expect(getPerkDisplay(perk, { rank: 2 }).description).toBe(
++    expect(getPerkModalDisplay(perk, { taken: 1 }).description).toBe(
+       'На 2-м ранге у вас появляется иммунитет к радиационному урону от употребления облученной пищи или напитков.',
+     );
+   });
+@@ -25,7 +25,7 @@ describe('perk rank texts', () => {
+   });
+ 
+   it('keeps a single effect for perks without rankEffects', () => {
+-    const listed = getPerkDisplay({ id: 'strongBack' }, { rank: 2 });
++    const listed = getPerkModalDisplay({ id: 'strongBack' }, { taken: 1 });
+     const sheet = getPerkSheetDisplay({ id: 'strongBack', rank: 2 });
+     expect(listed.description).toBe(
+       'Ваш максимальный переносимый вес увеличивается на +25 фунтов за ранг.',
+@@ -33,16 +33,16 @@ describe('perk rank texts', () => {
+     expect(sheet.description).toBe(listed.description);
+   });
+ 
+-  it('shows scrounger rank 2 only in the perk list', () => {
+-    expect(getPerkDisplay({ id: 'scrounger' }, { rank: 2 }).description).toBe(
+-      'На 2-м ранге вы находите +6 {/CD} дополнительных патрона.',
++  it('shows scrounger remaining ranks in the perk list', () => {
++    expect(getPerkModalDisplay({ id: 'scrounger' }, { taken: 1 }).description).toBe(
++      'На 2-м ранге вы находите +6 {/CD} дополнительных патрона.\n\nНа 3-м ранге вы получаете +10 {/CD} дополнительных патронов.',
+     );
+   });
+ 
+   it('splits English texts that already contain Rank N', () => {
+     setCurrentModuleLocale('en-EN');
+-    expect(getPerkDisplay({ id: 'scrounger' }, { rank: 2 }).description).toBe(
+-      'Rank 2: +6 {/CD}.',
++    expect(getPerkModalDisplay({ id: 'scrounger' }, { taken: 1 }).description).toBe(
++      'Rank 2: +6 {/CD}.\n\nRank 3: +10 {/CD}.',
+     );
+     expect(getPerkSheetDisplay({ id: 'scrounger', rank: 2 }).description).toBe(
+       'Rank 1: find +3 {/CD} extra ammo.\n\nRank 2: +6 {/CD}.',
+diff --git a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+index 9a74d6e..f5b80d9 100644
+--- a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
++++ b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
+ import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+ import styles from '../../../styles/PerkSelectModal.styles';
+ import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
+-import { getPerkDisplay } from './perksDisplay';
++import { getPerkModalDisplay } from './perksDisplay';
+ 
+ const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
+ 
+@@ -29,11 +29,16 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
+           <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
+ 
+           <ScrollView style={{ maxHeight: 420 }}>
+-            {(annotatedPerks || []).map((entry, index) => {
+-              const { perk, available, unmet, nextRank } = entry;
++            {(annotatedPerks || []).filter((entry) => !entry.unmet?.maxRank).map((entry, index) => {
++              const { perk, available, unmet, taken = 0, maxRanks = 1 } = entry;
+               const isExpanded = expandedIndex === index;
+-              const display = getPerkDisplay(perk, nextRank == null ? {} : { rank: nextRank });
++              const display = getPerkModalDisplay(perk, { taken });
+               const isSelected = isSamePerkRank(selectedPerk, perk);
++              const title = maxRanks > 1
++                ? `${display.name}. ${tPerksAndTraits('labels.ranksProgress')
++                  .replace('{current}', taken)
++                  .replace('{max}', maxRanks)}`
++                : display.name;
+               
+               // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
+               const shouldShowExpanded = isExpanded && !isSelected;
+@@ -51,7 +56,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
+                     style={[styles.perkHeader, isSelected && styles.selectedPerk]}
+                   >
+                     <Text style={[styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName]}>
+-                      {display.name}
++                      {title}
+                     </Text>
+                   </TouchableOpacity>
+                   {shouldShowExpanded && (
+diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index 2db6d83..6e8589a 100644
+--- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -86,7 +86,8 @@ const PerksAndTraitsScreen = () => {
+       const maxRanks = getPerkMaxRanks(entry.perk);
+       return {
+         ...entry,
+-        nextRank: Math.min(taken + 1, maxRanks),
++        taken,
++        maxRanks,
+       };
+     }),
+     [annotatePerks, selectedPerks, replacingIndex],
+diff --git a/components/screens/PerksAndTraitsScreen/perksDisplay.js b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+index af51d76..c763b4f 100644
+--- a/components/screens/PerksAndTraitsScreen/perksDisplay.js
++++ b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+@@ -57,6 +57,23 @@ const requireTakenRankTexts = (localized, rank) => {
+   return taken.join('\n\n');
+ };
+ 
++const requireRemainingRankTexts = (localized, taken) => {
++  const rankEffects = getRankEffects(localized);
++  if (!rankEffects) return localized.effect;
++  const start = Number(taken);
++  if (!Number.isFinite(start) || start < 0) {
++    throw new Error(`[perksDisplay] Для перка "${localized.id}" нужно число взятых рангов`);
++  }
++  if (start >= rankEffects.length) {
++    throw new Error(`[perksDisplay] У перка "${localized.id}" нет оставшихся рангов`);
++  }
++  const remaining = [];
++  for (let rank = start + 1; rank <= rankEffects.length; rank += 1) {
++    remaining.push(requireRankText(localized, rank));
++  }
++  return remaining.join('\n\n');
++};
++
+ export const getPerkDisplay = (perk, { rank } = {}) => {
+   if (!perk) return { name: '', description: '' };
+   if (!perk.id) throw new Error('[perksDisplay] Перк без id');
+@@ -71,6 +88,20 @@ export const getPerkDisplay = (perk, { rank } = {}) => {
+   };
+ };
+ 
++export const getPerkModalDisplay = (perk, { taken = 0 } = {}) => {
++  if (!perk) return { name: '', description: '' };
++  if (!perk.id) throw new Error('[perksDisplay] Перк без id');
++  const localized = getLocaleMap().get(perk.id);
++  if (!localized) {
++    throw new Error(`[perksDisplay] Для перка "${perk.id}" нет перевода`);
++  }
++
++  return {
++    name: localized.name,
++    description: requireRemainingRankTexts(localized, taken),
++  };
++};
++
+ export const getPerkSheetDisplay = (perk) => {
+   const id = perk?.id || perk?.perkId;
+   if (id) {
+diff --git a/i18n/en-EN/screens/perksAndTraits/screen.json b/i18n/en-EN/screens/perksAndTraits/screen.json
+index c5b766b..8f50ff3 100644
+--- a/i18n/en-EN/screens/perksAndTraits/screen.json
++++ b/i18n/en-EN/screens/perksAndTraits/screen.json
+@@ -3,6 +3,7 @@
+     "name": "Name",
+     "rank": "Rank",
+     "rankValue": "Rank {rank}",
++    "ranksProgress": "Ranks {current} of {max}",
+     "description": "Description",
+     "traitsSection": "Traits",
+     "perksSection": "Perks"
+diff --git a/i18n/ru-RU/screens/perksAndTraits/screen.json b/i18n/ru-RU/screens/perksAndTraits/screen.json
+index 279a6b7..48c2c64 100644
+--- a/i18n/ru-RU/screens/perksAndTraits/screen.json
++++ b/i18n/ru-RU/screens/perksAndTraits/screen.json
+@@ -3,6 +3,7 @@
+     "name": "Название",
+     "rank": "Ранг",
+     "rankValue": "Ранг {rank}",
++    "ranksProgress": "Ранги {current} из {max}",
+     "description": "Описание",
+     "traitsSection": "Черты",
+     "perksSection": "Перки"

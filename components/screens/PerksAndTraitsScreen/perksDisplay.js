@@ -57,6 +57,23 @@ const requireTakenRankTexts = (localized, rank) => {
   return taken.join('\n\n');
 };
 
+const requireRemainingRankTexts = (localized, taken) => {
+  const rankEffects = getRankEffects(localized);
+  if (!rankEffects) return localized.effect;
+  const start = Number(taken);
+  if (!Number.isFinite(start) || start < 0) {
+    throw new Error(`[perksDisplay] Для перка "${localized.id}" нужно число взятых рангов`);
+  }
+  if (start >= rankEffects.length) {
+    throw new Error(`[perksDisplay] У перка "${localized.id}" нет оставшихся рангов`);
+  }
+  const remaining = [];
+  for (let rank = start + 1; rank <= rankEffects.length; rank += 1) {
+    remaining.push(requireRankText(localized, rank));
+  }
+  return remaining.join('\n\n');
+};
+
 export const getPerkDisplay = (perk, { rank } = {}) => {
   if (!perk) return { name: '', description: '' };
   if (!perk.id) throw new Error('[perksDisplay] Перк без id');
@@ -68,6 +85,20 @@ export const getPerkDisplay = (perk, { rank } = {}) => {
   return {
     name: localized.name,
     description: rank == null ? localized.effect : requireRankText(localized, rank),
+  };
+};
+
+export const getPerkModalDisplay = (perk, { taken = 0 } = {}) => {
+  if (!perk) return { name: '', description: '' };
+  if (!perk.id) throw new Error('[perksDisplay] Перк без id');
+  const localized = getLocaleMap().get(perk.id);
+  if (!localized) {
+    throw new Error(`[perksDisplay] Для перка "${perk.id}" нет перевода`);
+  }
+
+  return {
+    name: localized.name,
+    description: requireRemainingRankTexts(localized, taken),
   };
 };
 

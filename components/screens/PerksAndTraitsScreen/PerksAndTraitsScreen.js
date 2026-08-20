@@ -86,7 +86,8 @@ const PerksAndTraitsScreen = () => {
       const maxRanks = getPerkMaxRanks(entry.perk);
       return {
         ...entry,
-        nextRank: Math.min(taken + 1, maxRanks),
+        taken,
+        maxRanks,
       };
     }),
     [annotatePerks, selectedPerks, replacingIndex],
