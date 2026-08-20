@@ -34,11 +34,12 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
               const isExpanded = expandedIndex === index;
               const display = getPerkModalDisplay(perk, { taken });
               const isSelected = isSamePerkRank(selectedPerk, perk);
-              const title = maxRanks > 1
-                ? `${display.name}. ${tPerksAndTraits('labels.ranksProgress')
+              const rankLabel = maxRanks > 1
+                ? tPerksAndTraits('labels.ranksProgress')
                   .replace('{current}', taken)
-                  .replace('{max}', maxRanks)}`
-                : display.name;
+                  .replace('{max}', maxRanks)
+                : '';
+              const nameStyle = [styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName];
               
               // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
               const shouldShowExpanded = isExpanded && !isSelected;
@@ -55,9 +56,16 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
                     }}
                     style={[styles.perkHeader, isSelected && styles.selectedPerk]}
                   >
-                    <Text style={[styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName]}>
-                      {title}
-                    </Text>
+                    <View style={styles.perkNameCell}>
+                      <Text style={nameStyle} numberOfLines={1}>{display.name}</Text>
+                    </View>
+                    {rankLabel ? (
+                      <View style={styles.perkRankCell}>
+                        <Text style={[styles.perkRank, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName]}>
+                          {rankLabel}
+                        </Text>
+                      </View>
+                    ) : null}
                   </TouchableOpacity>
                   {shouldShowExpanded && (
                     <View style={styles.perkBody}>
