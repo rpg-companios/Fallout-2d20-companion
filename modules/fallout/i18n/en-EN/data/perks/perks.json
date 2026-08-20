@@ -2,12 +2,20 @@
   {
     "id": "animalFriend",
     "name": "Animal Friend",
-    "effect": "Rank 1: Mammal, Lizard or Insect creatures roll 1 CD before attacking you. No Effect = they don't attack. Rank 2: CHR+Survival test difficulty 2 to befriend an animal."
+    "effect": "Rank 1: Mammal, Lizard or Insect creatures roll 1 CD before attacking you. No Effect = they don't attack. Rank 2: CHR+Survival test difficulty 2 to befriend an animal.",
+    "rankEffects": [
+      "Rank 1: Mammal, Lizard or Insect creatures roll 1 CD before attacking you. No Effect = they don't attack.",
+      "Rank 2: CHR+Survival test difficulty 2 to befriend an animal."
+    ]
   },
   {
     "id": "aquaboy",
     "name": "Aquaboy/Aquagirl",
-    "effect": "Rank 1: Immune to radiation damage in irradiated water, hold breath 2x longer. Rank 2: +2 difficulty to spot you underwater."
+    "effect": "Rank 1: Immune to radiation damage in irradiated water, hold breath 2x longer. Rank 2: +2 difficulty to spot you underwater.",
+    "rankEffects": [
+      "Rank 1: Immune to radiation damage in irradiated water, hold breath 2x longer.",
+      "Rank 2: +2 difficulty to spot you underwater."
+    ]
   },
   {
     "id": "radResistant",
@@ -27,7 +35,12 @@
   {
     "id": "gunFu",
     "name": "Gun Fu",
-    "effect": "On a successful ranged attack, spend 1 AP and 1 ammo to hit a second target at Close range from the first for the same damage. Rank 2: 2 AP and 2 ammo, two extra targets. Rank 3: 3 AP and 3 ammo, three extra targets."
+    "effect": "On a successful ranged attack, spend 1 AP and 1 ammo to hit a second target at Close range from the first for the same damage. Rank 2: 2 AP and 2 ammo, two extra targets. Rank 3: 3 AP and 3 ammo, three extra targets.",
+    "rankEffects": [
+      "On a successful ranged attack, spend 1 AP and 1 ammo to hit a second target at Close range from the first for the same damage.",
+      "Rank 2: 2 AP and 2 ammo, two extra targets.",
+      "Rank 3: 3 AP and 3 ammo, three extra targets."
+    ]
   },
   {
     "id": "silverTongue",
@@ -37,12 +50,20 @@
   {
     "id": "blitz",
     "name": "Blitz",
-    "effect": "Rank 1: When you move into reach and make a melee attack, reroll 1d20. Rank 2: +1 CD damage."
+    "effect": "Rank 1: When you move into reach and make a melee attack, reroll 1d20. Rank 2: +1 CD damage.",
+    "rankEffects": [
+      "Rank 1: When you move into reach and make a melee attack, reroll 1d20.",
+      "Rank 2: +1 CD damage."
+    ]
   },
   {
     "id": "leadBelly",
     "name": "Lead Belly",
-    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink."
+    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink.",
+    "rankEffects": [
+      "Rank 1: Reroll radiation CD from irradiated food/drink.",
+      "Rank 2: Immune to radiation from food/drink."
+    ]
   },
   {
     "id": "juryRigging",
@@ -117,7 +138,12 @@
   {
     "id": "fortuneFinder",
     "name": "Fortune Finder",
-    "effect": "When you find caps: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD."
+    "effect": "When you find caps: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD.",
+    "rankEffects": [
+      "When you find caps: Rank 1: +3 CD",
+      "Rank 2: +6 CD",
+      "Rank 3: +10 CD"
+    ]
   },
   {
     "id": "solarPowered",
@@ -142,7 +168,12 @@
   {
     "id": "roboticsExpert",
     "name": "Robotics Expert",
-    "effect": "Rank 1: Modify robots with rank 1 mods. Rank 2: Rank 2 mods, -1 difficulty robot repair. Rank 3: Rank 3 mods, reprogramming possible."
+    "effect": "Rank 1: Modify robots with rank 1 mods. Rank 2: Rank 2 mods, -1 difficulty robot repair. Rank 3: Rank 3 mods, reprogramming possible.",
+    "rankEffects": [
+      "Rank 1: Modify robots with rank 1 mods.",
+      "Rank 2: Rank 2 mods, -1 difficulty robot repair.",
+      "Rank 3: Rank 3 mods, reprogramming possible."
+    ]
   },
   {
     "id": "gunNut",
@@ -162,7 +193,12 @@
   {
     "id": "scrounger",
     "name": "Scrounger",
-    "effect": "Rank 1: find +3 {/CD} extra ammo. Rank 2: +6 {/CD}. Rank 3: +10 {/CD}."
+    "effect": "Rank 1: find +3 {/CD} extra ammo. Rank 2: +6 {/CD}. Rank 3: +10 {/CD}.",
+    "rankEffects": [
+      "Rank 1: find +3 {/CD} extra ammo.",
+      "Rank 2: +6 {/CD}.",
+      "Rank 3: +10 {/CD}."
+    ]
   },
   {
     "id": "pharmaFarmer",
@@ -197,7 +233,11 @@
   {
     "id": "rifleman",
     "name": "Rifleman",
-    "effect": "With a two-handed weapon with fire rate ≤2 (except heavy weapons), +1 CD per rank. Rank 2: +Piercing 1."
+    "effect": "With a two-handed weapon with fire rate ≤2 (except heavy weapons), +1 CD per rank. Rank 2: +Piercing 1.",
+    "rankEffects": [
+      "With a two-handed weapon with fire rate ≤2 (except heavy weapons), +1 CD per rank.",
+      "Rank 2: +Piercing 1."
+    ]
   },
   {
     "id": "meltdown",
@@ -242,7 +282,11 @@
   {
     "id": "painTrain",
     "name": "Pain Train",
-    "effect": "If you wear power armor or are a super mutant, you may use Charge as a major action. Rank 2: add +1 {/CD} and the Stun effect."
+    "effect": "If you wear power armor or are a super mutant, you may use Charge as a major action. Rank 2: add +1 {/CD} and the Stun effect.",
+    "rankEffects": [
+      "If you wear power armor or are a super mutant, you may use Charge as a major action.",
+      "Rank 2: add +1 {/CD} and the Stun effect."
+    ]
   },
   {
     "id": "quickHands",
@@ -302,7 +346,12 @@
   {
     "id": "pickpocket",
     "name": "Pickpocket",
-    "effect": "Rank 1: Ignore first AGI+Sneak complication when stealing. Rank 2: Reroll 1d20 for pickpocketing. Rank 3: -1 difficulty."
+    "effect": "Rank 1: Ignore first AGI+Sneak complication when stealing. Rank 2: Reroll 1d20 for pickpocketing. Rank 3: -1 difficulty.",
+    "rankEffects": [
+      "Rank 1: Ignore first AGI+Sneak complication when stealing.",
+      "Rank 2: Reroll 1d20 for pickpocketing.",
+      "Rank 3: -1 difficulty."
+    ]
   },
   {
     "id": "lightStep",
@@ -327,7 +376,11 @@
   {
     "id": "ironFist",
     "name": "Iron Fist",
-    "effect": "Rank 1: +1 CD to unarmed attacks. Rank 2: +Vicious effect."
+    "effect": "Rank 1: +1 CD to unarmed attacks. Rank 2: +Vicious effect.",
+    "rankEffects": [
+      "Rank 1: +1 CD to unarmed attacks.",
+      "Rank 2: +Vicious effect."
+    ]
   },
   {
     "id": "adrenalineRush",
@@ -337,7 +390,11 @@
   {
     "id": "intimidation",
     "name": "Terrifying Presence",
-    "effect": "Rank 1: Reroll 1d20 to threaten/frighten. Rank 2: Major action to threaten, STR+Speech test difficulty 2."
+    "effect": "Rank 1: Reroll 1d20 to threaten/frighten. Rank 2: Major action to threaten, STR+Speech test difficulty 2.",
+    "rankEffects": [
+      "Rank 1: Reroll 1d20 to threaten/frighten.",
+      "Rank 2: Major action to threaten, STR+Speech test difficulty 2."
+    ]
   },
   {
     "id": "pyromaniac",
@@ -357,7 +414,11 @@
   {
     "id": "scrapper",
     "name": "Scrapper",
-    "effect": "Rank 1: when scrapping, also get uncommon and common materials. Rank 2: also get rare materials."
+    "effect": "Rank 1: when scrapping, also get uncommon and common materials. Rank 2: also get rare materials.",
+    "rankEffects": [
+      "Rank 1: when scrapping, also get uncommon and common materials.",
+      "Rank 2: also get rare materials."
+    ]
   },
   {
     "id": "refractor",
@@ -372,7 +433,11 @@
   {
     "id": "chemResistant",
     "name": "Chem Resistant",
-    "effect": "Rank 1: Roll 1 fewer CD to determine addiction. Rank 2: Immune to drug addiction."
+    "effect": "Rank 1: Roll 1 fewer CD to determine addiction. Rank 2: Immune to drug addiction.",
+    "rankEffects": [
+      "Rank 1: Roll 1 fewer CD to determine addiction.",
+      "Rank 2: Immune to drug addiction."
+    ]
   },
   {
     "id": "ricochet",
@@ -432,7 +497,11 @@
   {
     "id": "dodger",
     "name": "Dodger",
-    "effect": "Rank 1: On Defend action, -1 difficulty to test. Rank 2: Improving defense costs only 1 AP."
+    "effect": "Rank 1: On Defend action, -1 difficulty to test. Rank 2: Improving defense costs only 1 AP.",
+    "rankEffects": [
+      "Rank 1: On Defend action, -1 difficulty to test.",
+      "Rank 2: Improving defense costs only 1 AP."
+    ]
   },
   {
     "id": "slayer",
