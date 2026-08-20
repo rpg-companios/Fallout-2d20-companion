@@ -72,11 +72,13 @@
   {
     "id": "gunFu",
     "nameKey": "perks.gunFu.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
-        "AGI": 7
-      }
+        "AGI": 10
+      },
+      "level": 1,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.gunFu.effect",
     "effect": "gunFu"
@@ -411,7 +413,7 @@
     "maxRanks": 3,
     "prerequisites": {
       "special": {
-        "CHA": 6
+        "LCK": 6
       },
       "level": 1,
       "levelIncreasePerRank": 5
@@ -536,13 +538,11 @@
   {
     "id": "medic",
     "nameKey": "perks.medic.name",
-    "maxRanks": 3,
+    "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "INT": 7
-      },
-      "level": 1,
-      "levelIncreasePerRank": 5
+        "INT": 8
+      }
     },
     "effectKey": "perks.medic.effect",
     "effect": "medic"
@@ -606,8 +606,8 @@
     "effect": "sizeMatters"
   },
   {
-    "id": "bullRush",
-    "nameKey": "perks.bullRush.name",
+    "id": "painTrain",
+    "nameKey": "perks.painTrain.name",
     "maxRanks": 2,
     "prerequisites": {
       "special": {
@@ -617,8 +617,8 @@
       "level": 1,
       "levelIncreasePerRank": 5
     },
-    "effectKey": "perks.bullRush.effect",
-    "effect": "bullRush"
+    "effectKey": "perks.painTrain.effect",
+    "effect": "painTrain"
   },
   {
     "id": "quickHands",
@@ -1099,8 +1099,8 @@
     "effect": "concentratedFire"
   },
   {
-    "id": "slacker",
-    "nameKey": "perks.slacker.name",
+    "id": "dodger",
+    "nameKey": "perks.dodger.name",
     "maxRanks": 2,
     "prerequisites": {
       "special": {
@@ -1109,22 +1109,8 @@
       "level": 4,
       "levelIncreasePerRank": 6
     },
-    "effectKey": "perks.slacker.effect",
-    "effect": "slacker"
-  },
-  {
-    "id": "triggerRush",
-    "nameKey": "perks.triggerRush.name",
-    "maxRanks": 3,
-    "prerequisites": {
-      "special": {
-        "AGI": 10
-      },
-      "level": 1,
-      "levelIncreasePerRank": 5
-    },
-    "effectKey": "perks.triggerRush.effect",
-    "effect": "triggerRush"
+    "effectKey": "perks.dodger.effect",
+    "effect": "dodger"
   },
   {
     "id": "slayer",
@@ -1197,5 +1183,1103 @@
     },
     "effectKey": "perks.lifeGiver.effect",
     "effect": "lifeGiver"
+  },
+  {
+    "id": "allNightLong",
+    "nameKey": "perks.allNightLong.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 6
+      },
+      "level": 16,
+      "notForRobots": true
+    },
+    "effectKey": "perks.allNightLong.effect",
+    "effect": "allNightLong"
+  },
+  {
+    "id": "ammosmith",
+    "nameKey": "perks.ammosmith.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 7
+      },
+      "level": 2
+    },
+    "effectKey": "perks.ammosmith.effect",
+    "effect": "ammosmith"
+  },
+  {
+    "id": "archer",
+    "nameKey": "perks.archer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 6
+      },
+      "level": 1
+    },
+    "effectKey": "perks.archer.effect",
+    "effect": "archer"
+  },
+  {
+    "id": "blocker",
+    "nameKey": "perks.blocker.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 6
+      }
+    },
+    "effectKey": "perks.blocker.effect",
+    "effect": "blocker"
+  },
+  {
+    "id": "bloodsucker",
+    "nameKey": "perks.bloodsucker.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 6
+      },
+      "level": 11
+    },
+    "effectKey": "perks.bloodsucker.effect",
+    "effect": "bloodsucker"
+  },
+  {
+    "id": "bodyguards",
+    "nameKey": "perks.bodyguards.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 8
+      },
+      "level": 5
+    },
+    "effectKey": "perks.bodyguards.effect",
+    "effect": "bodyguards"
+  },
+  {
+    "id": "bornSurvivor",
+    "nameKey": "perks.bornSurvivor.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 8
+      },
+      "level": 3
+    },
+    "effectKey": "perks.bornSurvivor.effect",
+    "effect": "bornSurvivor"
+  },
+  {
+    "id": "bowBeforeMe",
+    "nameKey": "perks.bowBeforeMe.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 8
+      },
+      "level": 4
+    },
+    "effectKey": "perks.bowBeforeMe.effect",
+    "effect": "bowBeforeMe"
+  },
+  {
+    "id": "bulletShield",
+    "nameKey": "perks.bulletShield.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 8
+      },
+      "level": 8
+    },
+    "effectKey": "perks.bulletShield.effect",
+    "effect": "bulletShield"
+  },
+  {
+    "id": "butchersBounty",
+    "nameKey": "perks.butchersBounty.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 8
+      },
+      "level": 3
+    },
+    "effectKey": "perks.butchersBounty.effect",
+    "effect": "butchersBounty"
+  },
+  {
+    "id": "cannibal",
+    "nameKey": "perks.cannibal.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 8
+      },
+      "level": 10,
+      "notForRobots": true
+    },
+    "effectKey": "perks.cannibal.effect",
+    "effect": "cannibal"
+  },
+  {
+    "id": "centerMass",
+    "nameKey": "perks.centerMass.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 7
+      }
+    },
+    "effectKey": "perks.centerMass.effect",
+    "effect": "centerMass"
+  },
+  {
+    "id": "colaNut",
+    "nameKey": "perks.colaNut.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 6
+      },
+      "level": 14,
+      "notForRobots": true
+    },
+    "effectKey": "perks.colaNut.effect",
+    "effect": "colaNut"
+  },
+  {
+    "id": "communityOrganizer",
+    "nameKey": "perks.communityOrganizer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 5,
+        "END": 5
+      }
+    },
+    "effectKey": "perks.communityOrganizer.effect",
+    "effect": "communityOrganizer"
+  },
+  {
+    "id": "contractor",
+    "nameKey": "perks.contractor.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 5,
+        "INT": 5
+      },
+      "level": 2
+    },
+    "effectKey": "perks.contractor.effect",
+    "effect": "contractor"
+  },
+  {
+    "id": "covertOperator",
+    "nameKey": "perks.covertOperator.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 8
+      }
+    },
+    "effectKey": "perks.covertOperator.effect",
+    "effect": "covertOperator"
+  },
+  {
+    "id": "crackShot",
+    "nameKey": "perks.crackShot.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 7
+      },
+      "level": 7
+    },
+    "effectKey": "perks.crackShot.effect",
+    "effect": "crackShot"
+  },
+  {
+    "id": "deadManSprinting",
+    "nameKey": "perks.deadManSprinting.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 7
+      },
+      "level": 8
+    },
+    "effectKey": "perks.deadManSprinting.effect",
+    "effect": "deadManSprinting"
+  },
+  {
+    "id": "dromedary",
+    "nameKey": "perks.dromedary.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 3,
+      "notForRobots": true
+    },
+    "effectKey": "perks.dromedary.effect",
+    "effect": "dromedary"
+  },
+  {
+    "id": "dryNurse",
+    "nameKey": "perks.dryNurse.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 8
+      },
+      "level": 13
+    },
+    "effectKey": "perks.dryNurse.effect",
+    "effect": "dryNurse"
+  },
+  {
+    "id": "emt",
+    "nameKey": "perks.emt.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 1
+      }
+    },
+    "effectKey": "perks.emt.effect",
+    "effect": "emt"
+  },
+  {
+    "id": "enforcer",
+    "nameKey": "perks.enforcer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 9
+      },
+      "level": 12
+    },
+    "effectKey": "perks.enforcer.effect",
+    "effect": "enforcer"
+  },
+  {
+    "id": "escapeArtist",
+    "nameKey": "perks.escapeArtist.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 8
+      },
+      "level": 15
+    },
+    "effectKey": "perks.escapeArtist.effect",
+    "effect": "escapeArtist"
+  },
+  {
+    "id": "evasive",
+    "nameKey": "perks.evasive.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 7
+      },
+      "level": 7
+    },
+    "effectKey": "perks.evasive.effect",
+    "effect": "evasive"
+  },
+  {
+    "id": "fieldSurgeon",
+    "nameKey": "perks.fieldSurgeon.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 8,
+        "INT": 8
+      },
+      "level": 15
+    },
+    "effectKey": "perks.fieldSurgeon.effect",
+    "effect": "fieldSurgeon"
+  },
+  {
+    "id": "fireInTheHole",
+    "nameKey": "perks.fireInTheHole.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 8
+      },
+      "level": 8
+    },
+    "effectKey": "perks.fireInTheHole.effect",
+    "effect": "fireInTheHole"
+  },
+  {
+    "id": "fireproof",
+    "nameKey": "perks.fireproof.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 6
+      },
+      "level": 7
+    },
+    "effectKey": "perks.fireproof.effect",
+    "effect": "fireproof"
+  },
+  {
+    "id": "ghoulish",
+    "nameKey": "perks.ghoulish.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 9
+      },
+      "level": 7,
+      "notForRobots": true
+    },
+    "effectKey": "perks.ghoulish.effect",
+    "effect": "ghoulish"
+  },
+  {
+    "id": "gladiator",
+    "nameKey": "perks.gladiator.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 6
+      },
+      "level": 2
+    },
+    "effectKey": "perks.gladiator.effect",
+    "effect": "gladiator"
+  },
+  {
+    "id": "glowSight",
+    "nameKey": "perks.glowSight.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 8
+      },
+      "level": 3
+    },
+    "effectKey": "perks.glowSight.effect",
+    "effect": "glowSight"
+  },
+  {
+    "id": "goatLegs",
+    "nameKey": "perks.goatLegs.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 7
+      },
+      "level": 7
+    },
+    "effectKey": "perks.goatLegs.effect",
+    "effect": "goatLegs"
+  },
+  {
+    "id": "greenThumb",
+    "nameKey": "perks.greenThumb.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 4
+      },
+      "level": 4
+    },
+    "effectKey": "perks.greenThumb.effect",
+    "effect": "greenThumb"
+  },
+  {
+    "id": "gunRunner",
+    "nameKey": "perks.gunRunner.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 6
+      },
+      "level": 4
+    },
+    "effectKey": "perks.gunRunner.effect",
+    "effect": "gunRunner"
+  },
+  {
+    "id": "happyCamper",
+    "nameKey": "perks.happyCamper.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7,
+        "END": 6
+      },
+      "level": 3
+    },
+    "effectKey": "perks.happyCamper.effect",
+    "effect": "happyCamper"
+  },
+  {
+    "id": "happyGoLucky",
+    "nameKey": "perks.happyGoLucky.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 9
+      },
+      "level": 17
+    },
+    "effectKey": "perks.happyGoLucky.effect",
+    "effect": "happyGoLucky"
+  },
+  {
+    "id": "healingHands",
+    "nameKey": "perks.healingHands.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 8,
+        "INT": 7
+      },
+      "level": 18
+    },
+    "effectKey": "perks.healingHands.effect",
+    "effect": "healingHands"
+  },
+  {
+    "id": "hiredHelp",
+    "nameKey": "perks.hiredHelp.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7
+      }
+    },
+    "effectKey": "perks.hiredHelp.effect",
+    "effect": "hiredHelp"
+  },
+  {
+    "id": "homeDefense",
+    "nameKey": "perks.homeDefense.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 6
+      },
+      "level": 5
+    },
+    "effectKey": "perks.homeDefense.effect",
+    "effect": "homeDefense"
+  },
+  {
+    "id": "homebody",
+    "nameKey": "perks.homebody.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 6
+      },
+      "level": 5
+    },
+    "effectKey": "perks.homebody.effect",
+    "effect": "homebody"
+  },
+  {
+    "id": "incisor",
+    "nameKey": "perks.incisor.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 6
+      },
+      "level": 2
+    },
+    "effectKey": "perks.incisor.effect",
+    "effect": "incisor"
+  },
+  {
+    "id": "ironclad",
+    "nameKey": "perks.ironclad.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 5
+    },
+    "effectKey": "perks.ironclad.effect",
+    "effect": "ironclad"
+  },
+  {
+    "id": "junkShield",
+    "nameKey": "perks.junkShield.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 7
+      },
+      "level": 1
+    },
+    "effectKey": "perks.junkShield.effect",
+    "effect": "junkShield"
+  },
+  {
+    "id": "licensedPlumber",
+    "nameKey": "perks.licensedPlumber.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 6
+      },
+      "level": 5
+    },
+    "effectKey": "perks.licensedPlumber.effect",
+    "effect": "licensedPlumber"
+  },
+  {
+    "id": "localLeader",
+    "nameKey": "perks.localLeader.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 6
+      },
+      "level": 2
+    },
+    "effectKey": "perks.localLeader.effect",
+    "effect": "localLeader"
+  },
+  {
+    "id": "lockAndLoad",
+    "nameKey": "perks.lockAndLoad.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 7
+      },
+      "level": 2
+    },
+    "effectKey": "perks.lockAndLoad.effect",
+    "effect": "lockAndLoad"
+  },
+  {
+    "id": "martialArtist",
+    "nameKey": "perks.martialArtist.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 6
+      },
+      "level": 8
+    },
+    "effectKey": "perks.martialArtist.effect",
+    "effect": "martialArtist"
+  },
+  {
+    "id": "mechanicalMenace",
+    "nameKey": "perks.mechanicalMenace.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 6,
+        "INT": 5
+      }
+    },
+    "effectKey": "perks.mechanicalMenace.effect",
+    "effect": "mechanicalMenace"
+  },
+  {
+    "id": "modernRenegade",
+    "nameKey": "perks.modernRenegade.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 7
+      },
+      "level": 8
+    },
+    "effectKey": "perks.modernRenegade.effect",
+    "effect": "modernRenegade"
+  },
+  {
+    "id": "mysteriousSavior",
+    "nameKey": "perks.mysteriousSavior.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 7
+      }
+    },
+    "effectKey": "perks.mysteriousSavior.effect",
+    "effect": "mysteriousSavior"
+  },
+  {
+    "id": "naturalResistance",
+    "nameKey": "perks.naturalResistance.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 10
+    },
+    "effectKey": "perks.naturalResistance.effect",
+    "effect": "naturalResistance"
+  },
+  {
+    "id": "nightEyes",
+    "nameKey": "perks.nightEyes.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 8
+      },
+      "level": 7
+    },
+    "effectKey": "perks.nightEyes.effect",
+    "effect": "nightEyes"
+  },
+  {
+    "id": "nocturnalFortitude",
+    "nameKey": "perks.nocturnalFortitude.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 6
+      },
+      "level": 12,
+      "notForRobots": true
+    },
+    "effectKey": "perks.nocturnalFortitude.effect",
+    "effect": "nocturnalFortitude"
+  },
+  {
+    "id": "overlyGenerous",
+    "nameKey": "perks.overlyGenerous.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7
+      },
+      "level": 12
+    },
+    "effectKey": "perks.overlyGenerous.effect",
+    "effect": "overlyGenerous"
+  },
+  {
+    "id": "packRat",
+    "nameKey": "perks.packRat.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 6
+      },
+      "level": 4
+    },
+    "effectKey": "perks.packRat.effect",
+    "effect": "packRat"
+  },
+  {
+    "id": "pannapictagraphist",
+    "nameKey": "perks.pannapictagraphist.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 5
+      }
+    },
+    "effectKey": "perks.pannapictagraphist.effect",
+    "effect": "pannapictagraphist"
+  },
+  {
+    "id": "pharmacist",
+    "nameKey": "perks.pharmacist.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 8
+      },
+      "level": 2
+    },
+    "effectKey": "perks.pharmacist.effect",
+    "effect": "pharmacist"
+  },
+  {
+    "id": "photosynthetic",
+    "nameKey": "perks.photosynthetic.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 5
+    },
+    "effectKey": "perks.photosynthetic.effect",
+    "effect": "photosynthetic"
+  },
+  {
+    "id": "powerPatcher",
+    "nameKey": "perks.powerPatcher.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 6
+      },
+      "level": 5
+    },
+    "effectKey": "perks.powerPatcher.effect",
+    "effect": "powerPatcher"
+  },
+  {
+    "id": "powerUser",
+    "nameKey": "perks.powerUser.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 9
+      },
+      "level": 10
+    },
+    "effectKey": "perks.powerUser.effect",
+    "effect": "powerUser"
+  },
+  {
+    "id": "psychopath",
+    "nameKey": "perks.psychopath.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 8
+      },
+      "level": 11
+    },
+    "effectKey": "perks.psychopath.effect",
+    "effect": "psychopath"
+  },
+  {
+    "id": "quackSurgeon",
+    "nameKey": "perks.quackSurgeon.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7
+      },
+      "level": 12
+    },
+    "effectKey": "perks.quackSurgeon.effect",
+    "effect": "quackSurgeon"
+  },
+  {
+    "id": "radicool",
+    "nameKey": "perks.radicool.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 6
+      },
+      "level": 12
+    },
+    "effectKey": "perks.radicool.effect",
+    "effect": "radicool"
+  },
+  {
+    "id": "rejuvenated",
+    "nameKey": "perks.rejuvenated.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 12,
+      "notForRobots": true
+    },
+    "effectKey": "perks.rejuvenated.effect",
+    "effect": "rejuvenated"
+  },
+  {
+    "id": "responder",
+    "nameKey": "perks.responder.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 8,
+        "INT": 7
+      },
+      "level": 9
+    },
+    "effectKey": "perks.responder.effect",
+    "effect": "responder"
+  },
+  {
+    "id": "retribution",
+    "nameKey": "perks.retribution.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 8,
+        "LCK": 8
+      },
+      "level": 2
+    },
+    "effectKey": "perks.retribution.effect",
+    "effect": "retribution"
+  },
+  {
+    "id": "revenant",
+    "nameKey": "perks.revenant.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 8
+      },
+      "level": 12
+    },
+    "effectKey": "perks.revenant.effect",
+    "effect": "revenant"
+  },
+  {
+    "id": "robotWrangler",
+    "nameKey": "perks.robotWrangler.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 5
+      }
+    },
+    "effectKey": "perks.robotWrangler.effect",
+    "effect": "robotWrangler"
+  },
+  {
+    "id": "scattershot",
+    "nameKey": "perks.scattershot.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 7
+      },
+      "level": 10
+    },
+    "effectKey": "perks.scattershot.effect",
+    "effect": "scattershot"
+  },
+  {
+    "id": "secretAgent",
+    "nameKey": "perks.secretAgent.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "AGI": 9
+      },
+      "level": 7
+    },
+    "effectKey": "perks.secretAgent.effect",
+    "effect": "secretAgent"
+  },
+  {
+    "id": "serendipity",
+    "nameKey": "perks.serendipity.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 7
+      },
+      "level": 5
+    },
+    "effectKey": "perks.serendipity.effect",
+    "effect": "serendipity"
+  },
+  {
+    "id": "slowMetabolizer",
+    "nameKey": "perks.slowMetabolizer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 5,
+      "notForRobots": true
+    },
+    "effectKey": "perks.slowMetabolizer.effect",
+    "effect": "slowMetabolizer"
+  },
+  {
+    "id": "spiritualHealer",
+    "nameKey": "perks.spiritualHealer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7
+      },
+      "level": 6
+    },
+    "effectKey": "perks.spiritualHealer.effect",
+    "effect": "spiritualHealer"
+  },
+  {
+    "id": "squadManeuvers",
+    "nameKey": "perks.squadManeuvers.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7
+      }
+    },
+    "effectKey": "perks.squadManeuvers.effect",
+    "effect": "squadManeuvers"
+  },
+  {
+    "id": "stabilized",
+    "nameKey": "perks.stabilized.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "INT": 7
+      },
+      "level": 16
+    },
+    "effectKey": "perks.stabilized.effect",
+    "effect": "stabilized"
+  },
+  {
+    "id": "stormChaser",
+    "nameKey": "perks.stormChaser.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 6
+      },
+      "level": 15
+    },
+    "effectKey": "perks.stormChaser.effect",
+    "effect": "stormChaser"
+  },
+  {
+    "id": "sturdyFrame",
+    "nameKey": "perks.sturdyFrame.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "STR": 8
+      },
+      "level": 5
+    },
+    "effectKey": "perks.sturdyFrame.effect",
+    "effect": "sturdyFrame"
+  },
+  {
+    "id": "superDuper",
+    "nameKey": "perks.superDuper.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "LCK": 6
+      },
+      "level": 3
+    },
+    "effectKey": "perks.superDuper.effect",
+    "effect": "superDuper"
+  },
+  {
+    "id": "suppressor",
+    "nameKey": "perks.suppressor.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 6
+      },
+      "level": 10
+    },
+    "effectKey": "perks.suppressor.effect",
+    "effect": "suppressor"
+  },
+  {
+    "id": "takingOneForTheTeam",
+    "nameKey": "perks.takingOneForTheTeam.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7,
+        "CHA": 6
+      },
+      "level": 1
+    },
+    "effectKey": "perks.takingOneForTheTeam.effect",
+    "effect": "takingOneForTheTeam"
+  },
+  {
+    "id": "tenderizer",
+    "nameKey": "perks.tenderizer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "CHA": 7
+      },
+      "level": 8
+    },
+    "effectKey": "perks.tenderizer.effect",
+    "effect": "tenderizer"
+  },
+  {
+    "id": "thirstQuencher",
+    "nameKey": "perks.thirstQuencher.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 6
+    },
+    "effectKey": "perks.thirstQuencher.effect",
+    "effect": "thirstQuencher"
+  },
+  {
+    "id": "tinkerer",
+    "nameKey": "perks.tinkerer.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 5,
+        "INT": 5
+      }
+    },
+    "effectKey": "perks.tinkerer.effect",
+    "effect": "tinkerer"
+  },
+  {
+    "id": "trueFriends",
+    "nameKey": "perks.trueFriends.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 6,
+        "CHA": 6
+      }
+    },
+    "effectKey": "perks.trueFriends.effect",
+    "effect": "trueFriends"
+  },
+  {
+    "id": "vaccinated",
+    "nameKey": "perks.vaccinated.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "END": 7
+      },
+      "level": 16
+    },
+    "effectKey": "perks.vaccinated.effect",
+    "effect": "vaccinated"
   }
 ]

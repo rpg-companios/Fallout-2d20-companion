@@ -1,0 +1,2367 @@
+diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitron/shadow-migration.test.js
+index 483356f..0d07056 100644
+--- a/__tests__/securitron/shadow-migration.test.js
++++ b/__tests__/securitron/shadow-migration.test.js
+@@ -25,8 +25,8 @@ const makeShadowSave = (attributes, version = 9) => ({
+ const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
+ 
+ describe('Текущая версия формата сейва', () => {
+-  it('равна 17', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(17);
++  it('равна 18', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(18);
+   });
+ });
+ 
+diff --git a/__tests__/store/perk-duplicate-migration.test.js b/__tests__/store/perk-duplicate-migration.test.js
+index a0e2bdc..2853376 100644
+--- a/__tests__/store/perk-duplicate-migration.test.js
++++ b/__tests__/store/perk-duplicate-migration.test.js
+@@ -13,8 +13,8 @@ describe('v16 to v17 duplicate perk ranks', () => {
+       ],
+     });
+ 
+-    expect(CURRENT_SCHEMA_VERSION).toBe(17);
+-    expect(migrated.schemaVersion).toBe(17);
++    expect(CURRENT_SCHEMA_VERSION).toBe(18);
++    expect(migrated.schemaVersion).toBe(18);
+     expect(migrated.selectedPerks).toEqual([
+       { id: 'junktownVendor', rank: 1 },
+       { id: 'snakeater', rank: 1 },
+@@ -38,7 +38,33 @@ describe('v16 to v17 duplicate perk ranks', () => {
+       selectedPerks: [{ perk_name: 'Broken Vendor' }],
+     });
+ 
+-    expect(migrated.schemaVersion).toBe(17);
++    expect(migrated.schemaVersion).toBe(18);
+     expect(migrated.selectedPerks).toEqual([{ perk_name: 'Broken Vendor' }]);
+   });
+ });
++
++describe('v17 to v18 perk id remap', () => {
++  it('remaps triggerRush to scrounger and drops extras over maxRanks', () => {
++    const migrated = migrateCharacterState({
++      schemaVersion: 17,
++      selectedPerks: [
++        { id: 'triggerRush', rank: 1 },
++        { id: 'scrounger', rank: 1 },
++        { id: 'scrounger', rank: 2 },
++        { id: 'scrounger', rank: 3 },
++        { id: 'slacker', rank: 1 },
++        { id: 'bullRush', rank: 1 },
++      ],
++    });
++
++    expect(migrated.schemaVersion).toBe(18);
++    expect(migrated.selectedPerks).toEqual([
++      { id: 'scrounger', rank: 1 },
++      { id: 'scrounger', rank: 2 },
++      { id: 'scrounger', rank: 3 },
++      { id: 'dodger', rank: 1 },
++      { id: 'painTrain', rank: 1 },
++    ]);
++    expect(migrated.pendingPerkDuplicateNotice).toBe(true);
++  });
++});
+diff --git a/__tests__/store/scene-risk-migration.test.js b/__tests__/store/scene-risk-migration.test.js
+index acd761c..102cc9f 100644
+--- a/__tests__/store/scene-risk-migration.test.js
++++ b/__tests__/store/scene-risk-migration.test.js
+@@ -9,9 +9,9 @@ describe('scene-risk state migrations', () => {
+       characterName: 'Courier',
+     });
+ 
+-    expect(CURRENT_SCHEMA_VERSION).toBe(17);
++    expect(CURRENT_SCHEMA_VERSION).toBe(18);
+     expect(migrated).toMatchObject({
+-      schemaVersion: 17,
++      schemaVersion: 18,
+       characterName: 'Courier',
+       sceneRiskStates: {},
+     });
+@@ -30,7 +30,7 @@ describe('scene-risk state migrations', () => {
+     });
+ 
+     expect(migrated).toEqual({
+-      schemaVersion: 17,
++      schemaVersion: 18,
+       sceneRiskStates: {
+         diseaseExposure: {
+           sceneStartedAt: 1_000,
+diff --git a/modules/fallout/data/perks/perks.json b/modules/fallout/data/perks/perks.json
+index 9d77a6a..f2f0f23 100644
+--- a/modules/fallout/data/perks/perks.json
++++ b/modules/fallout/data/perks/perks.json
+@@ -72,11 +72,13 @@
+   {
+     "id": "gunFu",
+     "nameKey": "perks.gunFu.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+-        "AGI": 7
+-      }
++        "AGI": 10
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.gunFu.effect",
+     "effect": "gunFu"
+@@ -411,7 +413,7 @@
+     "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+-        "CHA": 6
++        "LCK": 6
+       },
+       "level": 1,
+       "levelIncreasePerRank": 5
+@@ -536,13 +538,11 @@
+   {
+     "id": "medic",
+     "nameKey": "perks.medic.name",
+-    "maxRanks": 3,
++    "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "INT": 7
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
++        "INT": 8
++      }
+     },
+     "effectKey": "perks.medic.effect",
+     "effect": "medic"
+@@ -606,8 +606,8 @@
+     "effect": "sizeMatters"
+   },
+   {
+-    "id": "bullRush",
+-    "nameKey": "perks.bullRush.name",
++    "id": "painTrain",
++    "nameKey": "perks.painTrain.name",
+     "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+@@ -617,8 +617,8 @@
+       "level": 1,
+       "levelIncreasePerRank": 5
+     },
+-    "effectKey": "perks.bullRush.effect",
+-    "effect": "bullRush"
++    "effectKey": "perks.painTrain.effect",
++    "effect": "painTrain"
+   },
+   {
+     "id": "quickHands",
+@@ -1099,8 +1099,8 @@
+     "effect": "concentratedFire"
+   },
+   {
+-    "id": "slacker",
+-    "nameKey": "perks.slacker.name",
++    "id": "dodger",
++    "nameKey": "perks.dodger.name",
+     "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+@@ -1109,22 +1109,8 @@
+       "level": 4,
+       "levelIncreasePerRank": 6
+     },
+-    "effectKey": "perks.slacker.effect",
+-    "effect": "slacker"
+-  },
+-  {
+-    "id": "triggerRush",
+-    "nameKey": "perks.triggerRush.name",
+-    "maxRanks": 3,
+-    "prerequisites": {
+-      "special": {
+-        "AGI": 10
+-      },
+-      "level": 1,
+-      "levelIncreasePerRank": 5
+-    },
+-    "effectKey": "perks.triggerRush.effect",
+-    "effect": "triggerRush"
++    "effectKey": "perks.dodger.effect",
++    "effect": "dodger"
+   },
+   {
+     "id": "slayer",
+@@ -1197,5 +1183,1103 @@
+     },
+     "effectKey": "perks.lifeGiver.effect",
+     "effect": "lifeGiver"
++  },
++  {
++    "id": "allNightLong",
++    "nameKey": "perks.allNightLong.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 16,
++      "notForRobots": true
++    },
++    "effectKey": "perks.allNightLong.effect",
++    "effect": "allNightLong"
++  },
++  {
++    "id": "ammosmith",
++    "nameKey": "perks.ammosmith.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 7
++      },
++      "level": 2
++    },
++    "effectKey": "perks.ammosmith.effect",
++    "effect": "ammosmith"
++  },
++  {
++    "id": "archer",
++    "nameKey": "perks.archer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 6
++      },
++      "level": 1
++    },
++    "effectKey": "perks.archer.effect",
++    "effect": "archer"
++  },
++  {
++    "id": "blocker",
++    "nameKey": "perks.blocker.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      }
++    },
++    "effectKey": "perks.blocker.effect",
++    "effect": "blocker"
++  },
++  {
++    "id": "bloodsucker",
++    "nameKey": "perks.bloodsucker.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      },
++      "level": 11
++    },
++    "effectKey": "perks.bloodsucker.effect",
++    "effect": "bloodsucker"
++  },
++  {
++    "id": "bodyguards",
++    "nameKey": "perks.bodyguards.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8
++      },
++      "level": 5
++    },
++    "effectKey": "perks.bodyguards.effect",
++    "effect": "bodyguards"
++  },
++  {
++    "id": "bornSurvivor",
++    "nameKey": "perks.bornSurvivor.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 8
++      },
++      "level": 3
++    },
++    "effectKey": "perks.bornSurvivor.effect",
++    "effect": "bornSurvivor"
++  },
++  {
++    "id": "bowBeforeMe",
++    "nameKey": "perks.bowBeforeMe.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      },
++      "level": 4
++    },
++    "effectKey": "perks.bowBeforeMe.effect",
++    "effect": "bowBeforeMe"
++  },
++  {
++    "id": "bulletShield",
++    "nameKey": "perks.bulletShield.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8
++      },
++      "level": 8
++    },
++    "effectKey": "perks.bulletShield.effect",
++    "effect": "bulletShield"
++  },
++  {
++    "id": "butchersBounty",
++    "nameKey": "perks.butchersBounty.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      },
++      "level": 3
++    },
++    "effectKey": "perks.butchersBounty.effect",
++    "effect": "butchersBounty"
++  },
++  {
++    "id": "cannibal",
++    "nameKey": "perks.cannibal.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 8
++      },
++      "level": 10,
++      "notForRobots": true
++    },
++    "effectKey": "perks.cannibal.effect",
++    "effect": "cannibal"
++  },
++  {
++    "id": "centerMass",
++    "nameKey": "perks.centerMass.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      }
++    },
++    "effectKey": "perks.centerMass.effect",
++    "effect": "centerMass"
++  },
++  {
++    "id": "colaNut",
++    "nameKey": "perks.colaNut.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 14,
++      "notForRobots": true
++    },
++    "effectKey": "perks.colaNut.effect",
++    "effect": "colaNut"
++  },
++  {
++    "id": "communityOrganizer",
++    "nameKey": "perks.communityOrganizer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 5,
++        "END": 5
++      }
++    },
++    "effectKey": "perks.communityOrganizer.effect",
++    "effect": "communityOrganizer"
++  },
++  {
++    "id": "contractor",
++    "nameKey": "perks.contractor.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 5,
++        "INT": 5
++      },
++      "level": 2
++    },
++    "effectKey": "perks.contractor.effect",
++    "effect": "contractor"
++  },
++  {
++    "id": "covertOperator",
++    "nameKey": "perks.covertOperator.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 8
++      }
++    },
++    "effectKey": "perks.covertOperator.effect",
++    "effect": "covertOperator"
++  },
++  {
++    "id": "crackShot",
++    "nameKey": "perks.crackShot.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 7
++      },
++      "level": 7
++    },
++    "effectKey": "perks.crackShot.effect",
++    "effect": "crackShot"
++  },
++  {
++    "id": "deadManSprinting",
++    "nameKey": "perks.deadManSprinting.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      },
++      "level": 8
++    },
++    "effectKey": "perks.deadManSprinting.effect",
++    "effect": "deadManSprinting"
++  },
++  {
++    "id": "dromedary",
++    "nameKey": "perks.dromedary.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 3,
++      "notForRobots": true
++    },
++    "effectKey": "perks.dromedary.effect",
++    "effect": "dromedary"
++  },
++  {
++    "id": "dryNurse",
++    "nameKey": "perks.dryNurse.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 8
++      },
++      "level": 13
++    },
++    "effectKey": "perks.dryNurse.effect",
++    "effect": "dryNurse"
++  },
++  {
++    "id": "emt",
++    "nameKey": "perks.emt.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 1
++      }
++    },
++    "effectKey": "perks.emt.effect",
++    "effect": "emt"
++  },
++  {
++    "id": "enforcer",
++    "nameKey": "perks.enforcer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 9
++      },
++      "level": 12
++    },
++    "effectKey": "perks.enforcer.effect",
++    "effect": "enforcer"
++  },
++  {
++    "id": "escapeArtist",
++    "nameKey": "perks.escapeArtist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 8
++      },
++      "level": 15
++    },
++    "effectKey": "perks.escapeArtist.effect",
++    "effect": "escapeArtist"
++  },
++  {
++    "id": "evasive",
++    "nameKey": "perks.evasive.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      },
++      "level": 7
++    },
++    "effectKey": "perks.evasive.effect",
++    "effect": "evasive"
++  },
++  {
++    "id": "fieldSurgeon",
++    "nameKey": "perks.fieldSurgeon.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8,
++        "INT": 8
++      },
++      "level": 15
++    },
++    "effectKey": "perks.fieldSurgeon.effect",
++    "effect": "fieldSurgeon"
++  },
++  {
++    "id": "fireInTheHole",
++    "nameKey": "perks.fireInTheHole.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      },
++      "level": 8
++    },
++    "effectKey": "perks.fireInTheHole.effect",
++    "effect": "fireInTheHole"
++  },
++  {
++    "id": "fireproof",
++    "nameKey": "perks.fireproof.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 7
++    },
++    "effectKey": "perks.fireproof.effect",
++    "effect": "fireproof"
++  },
++  {
++    "id": "ghoulish",
++    "nameKey": "perks.ghoulish.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 9
++      },
++      "level": 7,
++      "notForRobots": true
++    },
++    "effectKey": "perks.ghoulish.effect",
++    "effect": "ghoulish"
++  },
++  {
++    "id": "gladiator",
++    "nameKey": "perks.gladiator.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      },
++      "level": 2
++    },
++    "effectKey": "perks.gladiator.effect",
++    "effect": "gladiator"
++  },
++  {
++    "id": "glowSight",
++    "nameKey": "perks.glowSight.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      },
++      "level": 3
++    },
++    "effectKey": "perks.glowSight.effect",
++    "effect": "glowSight"
++  },
++  {
++    "id": "goatLegs",
++    "nameKey": "perks.goatLegs.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      },
++      "level": 7
++    },
++    "effectKey": "perks.goatLegs.effect",
++    "effect": "goatLegs"
++  },
++  {
++    "id": "greenThumb",
++    "nameKey": "perks.greenThumb.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 4
++      },
++      "level": 4
++    },
++    "effectKey": "perks.greenThumb.effect",
++    "effect": "greenThumb"
++  },
++  {
++    "id": "gunRunner",
++    "nameKey": "perks.gunRunner.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 6
++      },
++      "level": 4
++    },
++    "effectKey": "perks.gunRunner.effect",
++    "effect": "gunRunner"
++  },
++  {
++    "id": "happyCamper",
++    "nameKey": "perks.happyCamper.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7,
++        "END": 6
++      },
++      "level": 3
++    },
++    "effectKey": "perks.happyCamper.effect",
++    "effect": "happyCamper"
++  },
++  {
++    "id": "happyGoLucky",
++    "nameKey": "perks.happyGoLucky.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 9
++      },
++      "level": 17
++    },
++    "effectKey": "perks.happyGoLucky.effect",
++    "effect": "happyGoLucky"
++  },
++  {
++    "id": "healingHands",
++    "nameKey": "perks.healingHands.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8,
++        "INT": 7
++      },
++      "level": 18
++    },
++    "effectKey": "perks.healingHands.effect",
++    "effect": "healingHands"
++  },
++  {
++    "id": "hiredHelp",
++    "nameKey": "perks.hiredHelp.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      }
++    },
++    "effectKey": "perks.hiredHelp.effect",
++    "effect": "hiredHelp"
++  },
++  {
++    "id": "homeDefense",
++    "nameKey": "perks.homeDefense.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 6
++      },
++      "level": 5
++    },
++    "effectKey": "perks.homeDefense.effect",
++    "effect": "homeDefense"
++  },
++  {
++    "id": "homebody",
++    "nameKey": "perks.homebody.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 5
++    },
++    "effectKey": "perks.homebody.effect",
++    "effect": "homebody"
++  },
++  {
++    "id": "incisor",
++    "nameKey": "perks.incisor.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      },
++      "level": 2
++    },
++    "effectKey": "perks.incisor.effect",
++    "effect": "incisor"
++  },
++  {
++    "id": "ironclad",
++    "nameKey": "perks.ironclad.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 5
++    },
++    "effectKey": "perks.ironclad.effect",
++    "effect": "ironclad"
++  },
++  {
++    "id": "junkShield",
++    "nameKey": "perks.junkShield.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 7
++      },
++      "level": 1
++    },
++    "effectKey": "perks.junkShield.effect",
++    "effect": "junkShield"
++  },
++  {
++    "id": "licensedPlumber",
++    "nameKey": "perks.licensedPlumber.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 6
++      },
++      "level": 5
++    },
++    "effectKey": "perks.licensedPlumber.effect",
++    "effect": "licensedPlumber"
++  },
++  {
++    "id": "localLeader",
++    "nameKey": "perks.localLeader.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      },
++      "level": 2
++    },
++    "effectKey": "perks.localLeader.effect",
++    "effect": "localLeader"
++  },
++  {
++    "id": "lockAndLoad",
++    "nameKey": "perks.lockAndLoad.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 7
++      },
++      "level": 2
++    },
++    "effectKey": "perks.lockAndLoad.effect",
++    "effect": "lockAndLoad"
++  },
++  {
++    "id": "martialArtist",
++    "nameKey": "perks.martialArtist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      },
++      "level": 8
++    },
++    "effectKey": "perks.martialArtist.effect",
++    "effect": "martialArtist"
++  },
++  {
++    "id": "mechanicalMenace",
++    "nameKey": "perks.mechanicalMenace.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6,
++        "INT": 5
++      }
++    },
++    "effectKey": "perks.mechanicalMenace.effect",
++    "effect": "mechanicalMenace"
++  },
++  {
++    "id": "modernRenegade",
++    "nameKey": "perks.modernRenegade.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 7
++      },
++      "level": 8
++    },
++    "effectKey": "perks.modernRenegade.effect",
++    "effect": "modernRenegade"
++  },
++  {
++    "id": "mysteriousSavior",
++    "nameKey": "perks.mysteriousSavior.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 7
++      }
++    },
++    "effectKey": "perks.mysteriousSavior.effect",
++    "effect": "mysteriousSavior"
++  },
++  {
++    "id": "naturalResistance",
++    "nameKey": "perks.naturalResistance.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 10
++    },
++    "effectKey": "perks.naturalResistance.effect",
++    "effect": "naturalResistance"
++  },
++  {
++    "id": "nightEyes",
++    "nameKey": "perks.nightEyes.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 8
++      },
++      "level": 7
++    },
++    "effectKey": "perks.nightEyes.effect",
++    "effect": "nightEyes"
++  },
++  {
++    "id": "nocturnalFortitude",
++    "nameKey": "perks.nocturnalFortitude.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 12,
++      "notForRobots": true
++    },
++    "effectKey": "perks.nocturnalFortitude.effect",
++    "effect": "nocturnalFortitude"
++  },
++  {
++    "id": "overlyGenerous",
++    "nameKey": "perks.overlyGenerous.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      },
++      "level": 12
++    },
++    "effectKey": "perks.overlyGenerous.effect",
++    "effect": "overlyGenerous"
++  },
++  {
++    "id": "packRat",
++    "nameKey": "perks.packRat.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 6
++      },
++      "level": 4
++    },
++    "effectKey": "perks.packRat.effect",
++    "effect": "packRat"
++  },
++  {
++    "id": "pannapictagraphist",
++    "nameKey": "perks.pannapictagraphist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 5
++      }
++    },
++    "effectKey": "perks.pannapictagraphist.effect",
++    "effect": "pannapictagraphist"
++  },
++  {
++    "id": "pharmacist",
++    "nameKey": "perks.pharmacist.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 8
++      },
++      "level": 2
++    },
++    "effectKey": "perks.pharmacist.effect",
++    "effect": "pharmacist"
++  },
++  {
++    "id": "photosynthetic",
++    "nameKey": "perks.photosynthetic.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 5
++    },
++    "effectKey": "perks.photosynthetic.effect",
++    "effect": "photosynthetic"
++  },
++  {
++    "id": "powerPatcher",
++    "nameKey": "perks.powerPatcher.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 6
++      },
++      "level": 5
++    },
++    "effectKey": "perks.powerPatcher.effect",
++    "effect": "powerPatcher"
++  },
++  {
++    "id": "powerUser",
++    "nameKey": "perks.powerUser.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 9
++      },
++      "level": 10
++    },
++    "effectKey": "perks.powerUser.effect",
++    "effect": "powerUser"
++  },
++  {
++    "id": "psychopath",
++    "nameKey": "perks.psychopath.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 8
++      },
++      "level": 11
++    },
++    "effectKey": "perks.psychopath.effect",
++    "effect": "psychopath"
++  },
++  {
++    "id": "quackSurgeon",
++    "nameKey": "perks.quackSurgeon.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      },
++      "level": 12
++    },
++    "effectKey": "perks.quackSurgeon.effect",
++    "effect": "quackSurgeon"
++  },
++  {
++    "id": "radicool",
++    "nameKey": "perks.radicool.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 6
++      },
++      "level": 12
++    },
++    "effectKey": "perks.radicool.effect",
++    "effect": "radicool"
++  },
++  {
++    "id": "rejuvenated",
++    "nameKey": "perks.rejuvenated.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 12,
++      "notForRobots": true
++    },
++    "effectKey": "perks.rejuvenated.effect",
++    "effect": "rejuvenated"
++  },
++  {
++    "id": "responder",
++    "nameKey": "perks.responder.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 8,
++        "INT": 7
++      },
++      "level": 9
++    },
++    "effectKey": "perks.responder.effect",
++    "effect": "responder"
++  },
++  {
++    "id": "retribution",
++    "nameKey": "perks.retribution.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 8,
++        "LCK": 8
++      },
++      "level": 2
++    },
++    "effectKey": "perks.retribution.effect",
++    "effect": "retribution"
++  },
++  {
++    "id": "revenant",
++    "nameKey": "perks.revenant.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 8
++      },
++      "level": 12
++    },
++    "effectKey": "perks.revenant.effect",
++    "effect": "revenant"
++  },
++  {
++    "id": "robotWrangler",
++    "nameKey": "perks.robotWrangler.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 5
++      }
++    },
++    "effectKey": "perks.robotWrangler.effect",
++    "effect": "robotWrangler"
++  },
++  {
++    "id": "scattershot",
++    "nameKey": "perks.scattershot.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 7
++      },
++      "level": 10
++    },
++    "effectKey": "perks.scattershot.effect",
++    "effect": "scattershot"
++  },
++  {
++    "id": "secretAgent",
++    "nameKey": "perks.secretAgent.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "AGI": 9
++      },
++      "level": 7
++    },
++    "effectKey": "perks.secretAgent.effect",
++    "effect": "secretAgent"
++  },
++  {
++    "id": "serendipity",
++    "nameKey": "perks.serendipity.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 7
++      },
++      "level": 5
++    },
++    "effectKey": "perks.serendipity.effect",
++    "effect": "serendipity"
++  },
++  {
++    "id": "slowMetabolizer",
++    "nameKey": "perks.slowMetabolizer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 5,
++      "notForRobots": true
++    },
++    "effectKey": "perks.slowMetabolizer.effect",
++    "effect": "slowMetabolizer"
++  },
++  {
++    "id": "spiritualHealer",
++    "nameKey": "perks.spiritualHealer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      },
++      "level": 6
++    },
++    "effectKey": "perks.spiritualHealer.effect",
++    "effect": "spiritualHealer"
++  },
++  {
++    "id": "squadManeuvers",
++    "nameKey": "perks.squadManeuvers.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      }
++    },
++    "effectKey": "perks.squadManeuvers.effect",
++    "effect": "squadManeuvers"
++  },
++  {
++    "id": "stabilized",
++    "nameKey": "perks.stabilized.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "INT": 7
++      },
++      "level": 16
++    },
++    "effectKey": "perks.stabilized.effect",
++    "effect": "stabilized"
++  },
++  {
++    "id": "stormChaser",
++    "nameKey": "perks.stormChaser.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 6
++      },
++      "level": 15
++    },
++    "effectKey": "perks.stormChaser.effect",
++    "effect": "stormChaser"
++  },
++  {
++    "id": "sturdyFrame",
++    "nameKey": "perks.sturdyFrame.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "STR": 8
++      },
++      "level": 5
++    },
++    "effectKey": "perks.sturdyFrame.effect",
++    "effect": "sturdyFrame"
++  },
++  {
++    "id": "superDuper",
++    "nameKey": "perks.superDuper.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "LCK": 6
++      },
++      "level": 3
++    },
++    "effectKey": "perks.superDuper.effect",
++    "effect": "superDuper"
++  },
++  {
++    "id": "suppressor",
++    "nameKey": "perks.suppressor.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 6
++      },
++      "level": 10
++    },
++    "effectKey": "perks.suppressor.effect",
++    "effect": "suppressor"
++  },
++  {
++    "id": "takingOneForTheTeam",
++    "nameKey": "perks.takingOneForTheTeam.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7,
++        "CHA": 6
++      },
++      "level": 1
++    },
++    "effectKey": "perks.takingOneForTheTeam.effect",
++    "effect": "takingOneForTheTeam"
++  },
++  {
++    "id": "tenderizer",
++    "nameKey": "perks.tenderizer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "CHA": 7
++      },
++      "level": 8
++    },
++    "effectKey": "perks.tenderizer.effect",
++    "effect": "tenderizer"
++  },
++  {
++    "id": "thirstQuencher",
++    "nameKey": "perks.thirstQuencher.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 6
++    },
++    "effectKey": "perks.thirstQuencher.effect",
++    "effect": "thirstQuencher"
++  },
++  {
++    "id": "tinkerer",
++    "nameKey": "perks.tinkerer.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 5,
++        "INT": 5
++      }
++    },
++    "effectKey": "perks.tinkerer.effect",
++    "effect": "tinkerer"
++  },
++  {
++    "id": "trueFriends",
++    "nameKey": "perks.trueFriends.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "PER": 6,
++        "CHA": 6
++      }
++    },
++    "effectKey": "perks.trueFriends.effect",
++    "effect": "trueFriends"
++  },
++  {
++    "id": "vaccinated",
++    "nameKey": "perks.vaccinated.name",
++    "maxRanks": 1,
++    "prerequisites": {
++      "special": {
++        "END": 7
++      },
++      "level": 16
++    },
++    "effectKey": "perks.vaccinated.effect",
++    "effect": "vaccinated"
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/perks/perks.json b/modules/fallout/i18n/en-EN/data/perks/perks.json
+index bbff941..b5866a8 100644
+--- a/modules/fallout/i18n/en-EN/data/perks/perks.json
++++ b/modules/fallout/i18n/en-EN/data/perks/perks.json
+@@ -26,8 +26,8 @@
+   },
+   {
+     "id": "gunFu",
+-    "name": "Center Mass",
+-    "effect": "When making a ranged attack, you can target the Torso without increasing difficulty. You can reroll 1d20 of your attack."
++    "name": "Gun Fu",
++    "effect": "On a successful ranged attack, spend 1 AP and 1 ammo to hit a second target at Close range from the first for the same damage. Rank 2: 2 AP and 2 ammo, two extra targets. Rank 3: 3 AP and 3 ammo, three extra targets."
+   },
+   {
+     "id": "silverTongue",
+@@ -162,7 +162,7 @@
+   {
+     "id": "scrounger",
+     "name": "Scrounger",
+-    "effect": "When you find ammo: Rank 1: +3 CD, Rank 2: +6 CD, Rank 3: +10 CD (same type as found)."
++    "effect": "Rank 1: find +3 {/CD} extra ammo. Rank 2: +6 {/CD}. Rank 3: +10 {/CD}."
+   },
+   {
+     "id": "pharmaFarmer",
+@@ -211,8 +211,8 @@
+   },
+   {
+     "id": "medic",
+-    "name": "Healer",
+-    "effect": "When you heal with First Aid, +1 HP healed per rank."
++    "name": "Medic",
++    "effect": "When you use the First Aid action to treat an injury, you may re-roll 1d20."
+   },
+   {
+     "id": "heaveHo",
+@@ -240,9 +240,9 @@
+     "effect": "Ranged attack with a heavy weapon, +1 CD damage per rank."
+   },
+   {
+-    "id": "bullRush",
++    "id": "painTrain",
+     "name": "Pain Train",
+-    "effect": "Rank 1: Gain Charge major action to damage and knock prone enemies with a Str + Athletics test. Rank 2: +1 CD damage and Stun damage effect."
++    "effect": "If you wear power armor or are a super mutant, you may use Charge as a major action. Rank 2: add +1 {/CD} and the Stun effect."
+   },
+   {
+     "id": "quickHands",
+@@ -357,7 +357,7 @@
+   {
+     "id": "scrapper",
+     "name": "Scrapper",
+-    "effect": "Rank 1: When scrapping, also get uncommon components. Rank 2: Also get rare components."
++    "effect": "Rank 1: when scrapping, also get uncommon and common materials. Rank 2: also get rare materials."
+   },
+   {
+     "id": "refractor",
+@@ -430,19 +430,14 @@
+     "effect": "On ranged attack with extra ammo, reroll up to 3 damage CD."
+   },
+   {
+-    "id": "slacker",
++    "id": "dodger",
+     "name": "Dodger",
+     "effect": "Rank 1: On Defend action, -1 difficulty to test. Rank 2: Improving defense costs only 1 AP."
+   },
+-  {
+-    "id": "triggerRush",
+-    "name": "Gun Fu",
+-    "effect": "On successful ranged attack, spend 1 AP and 1 ammo to hit an additional target at short range. +1 target per rank."
+-  },
+   {
+     "id": "slayer",
+     "name": "Slayer",
+-    "effect": "On unarmed or melee attack with at least 1 damage, spend 1 luck point to inflict a critical hit."
++    "effect": "When you deal damage with an unarmed or melee attack, you may spend 1 Luck point to inflict a critical hit and injure the limb."
+   },
+   {
+     "id": "killer",
+@@ -468,5 +463,425 @@
+     "id": "lifeGiver",
+     "name": "Lifegiver",
+     "effect": "Add your Endurance value to your maximum hit points."
++  },
++  {
++    "id": "allNightLong",
++    "name": "All Night Long",
++    "effect": "You don't get more hungry or thirsty at nighttime."
++  },
++  {
++    "id": "ammosmith",
++    "name": "Ammosmith",
++    "effect": "You can craft ammunition."
++  },
++  {
++    "id": "archer",
++    "name": "Archer",
++    "effect": "Increases the damage of bows and crossbows."
++  },
++  {
++    "id": "blocker",
++    "name": "Blocker",
++    "effect": "Increases damage resistance against melee attacks."
++  },
++  {
++    "id": "bloodsucker",
++    "name": "Bloodsucker",
++    "effect": "Blood packs heal you more effectively, and also quench your thirst."
++  },
++  {
++    "id": "bodyguards",
++    "name": "Bodyguards",
++    "effect": "Nearby allies increase your damage resistance."
++  },
++  {
++    "id": "bornSurvivor",
++    "name": "Born Survivor",
++    "effect": "You automatically use a stimpak when falling below 25% of your maximum health."
++  },
++  {
++    "id": "bowBeforeMe",
++    "name": "Bow Before Me",
++    "effect": "Adds or increases the Piercing effect to bows and crossbows."
++  },
++  {
++    "id": "bulletShield",
++    "name": "Bullet Shield",
++    "effect": "Increases damage resistance while wielding a big gun."
++  },
++  {
++    "id": "butchersBounty",
++    "name": "Butcher's Bounty",
++    "effect": "Find additional portions of meat when butchering animals."
++  },
++  {
++    "id": "cannibal",
++    "name": "Cannibal",
++    "effect": "Allows the character to butcher and eat the flesh of dead humanoids."
++  },
++  {
++    "id": "centerMass",
++    "name": "Center Mass",
++    "effect": "When making a ranged attack, you may target the torso (or equivalent) without increasing difficulty. You may also re-roll 1d20 on the attack test."
++  },
++  {
++    "id": "colaNut",
++    "name": "Cola Nut",
++    "effect": "Nuka-Cola beverages heal you twice as much."
++  },
++  {
++    "id": "communityOrganizer",
++    "name": "Community Organizer",
++    "effect": "Improves defence, food and resource gathering in the player's settlement."
++  },
++  {
++    "id": "contractor",
++    "name": "Contractor",
++    "effect": "Improves the efficiency of building objects and structures in settlements."
++  },
++  {
++    "id": "covertOperator",
++    "name": "Covert Operator",
++    "effect": "Improves damage with ranged sneak attacks."
++  },
++  {
++    "id": "crackShot",
++    "name": "Crack Shot",
++    "effect": "Increases range and accuracy when aiming one-handed ranged weapons."
++  },
++  {
++    "id": "deadManSprinting",
++    "name": "Dead Man Sprinting",
++    "effect": "When sprinting while injured, you can spend an Action Point to move faster."
++  },
++  {
++    "id": "dromedary",
++    "name": "Dromedary",
++    "effect": "Drinking relieves thirst more effectively."
++  },
++  {
++    "id": "dryNurse",
++    "name": "Dry Nurse",
++    "effect": "Stimpaks are sometimes not used up when used to stabilize an ally."
++  },
++  {
++    "id": "emt",
++    "name": "EMT",
++    "effect": "Provides health regeneration to revived players."
++  },
++  {
++    "id": "enforcer",
++    "name": "Enforcer",
++    "effect": "Adds the Debilitating effect to targeted shotgun attacks."
++  },
++  {
++    "id": "escapeArtist",
++    "name": "Escape Artist",
++    "effect": "You can attempt to hide during combat, so long as no enemies can see you."
++  },
++  {
++    "id": "evasive",
++    "name": "Evasive",
++    "effect": "Increases Physical and Energy damage resistance based on your Agility."
++  },
++  {
++    "id": "fieldSurgeon",
++    "name": "Field Surgeon",
++    "effect": "Improves the efficiency of Stimpaks and RadAway used in First Aid."
++  },
++  {
++    "id": "fireInTheHole",
++    "name": "Fire in the Hole",
++    "effect": "Reduces difficulty of attacks with thrown Blast weapons."
++  },
++  {
++    "id": "fireproof",
++    "name": "Fireproof",
++    "effect": "Increases damage resistance against fire and Blast weapons."
++  },
++  {
++    "id": "ghoulish",
++    "name": "Ghoulish",
++    "effect": "Radiation heals you."
++  },
++  {
++    "id": "gladiator",
++    "name": "Gladiator",
++    "effect": "Increases damage with one-handed melee weapons."
++  },
++  {
++    "id": "glowSight",
++    "name": "Glow Sight",
++    "effect": "Do extra damage to glowing enemies."
++  },
++  {
++    "id": "goatLegs",
++    "name": "Goat Legs",
++    "effect": "Increases resistance to falling damage."
++  },
++  {
++    "id": "greenThumb",
++    "name": "Green Thumb",
++    "effect": "Find twice as much food when foraging in the wilderness."
++  },
++  {
++    "id": "gunRunner",
++    "name": "Gun Runner",
++    "effect": "Increases distance moved when sprinting while holding a one-handed ranged weapon."
++  },
++  {
++    "id": "happyCamper",
++    "name": "Happy Camper",
++    "effect": "Don't get more hungry if sated when camping. Don't get more thirsty if hydrated when camping."
++  },
++  {
++    "id": "happyGoLucky",
++    "name": "Happy Go Lucky",
++    "effect": "Regain a Luck point when drinking alcohol."
++  },
++  {
++    "id": "healingHands",
++    "name": "Healing Hands",
++    "effect": "Automatically remove Radiation damage when stabilizing a dying ally."
++  },
++  {
++    "id": "hiredHelp",
++    "name": "Hired Help",
++    "effect": "Recruit a humanoid NPC companion."
++  },
++  {
++    "id": "homeDefense",
++    "name": "Home Defense",
++    "effect": "Craft and set traps."
++  },
++  {
++    "id": "homebody",
++    "name": "Homebody",
++    "effect": "Recuperate in a home settlement without sleeping."
++  },
++  {
++    "id": "incisor",
++    "name": "Incisor",
++    "effect": "Adds or improves the Piercing effect for melee weapons."
++  },
++  {
++    "id": "ironclad",
++    "name": "Ironclad",
++    "effect": "Improves damage resistance when wearing armor."
++  },
++  {
++    "id": "junkShield",
++    "name": "Junk Shield",
++    "effect": "Carried junk provides additional Physical and Energy damage resistance."
++  },
++  {
++    "id": "licensedPlumber",
++    "name": "Licensed Plumber",
++    "effect": "Your pipe weapons are not unreliable."
++  },
++  {
++    "id": "localLeader",
++    "name": "Local Leader",
++    "effect": "Establish supply lines between settlements, and build stores and workbenches."
++  },
++  {
++    "id": "lockAndLoad",
++    "name": "Lock and Load",
++    "effect": "Increases the fire rate of big guns."
++  },
++  {
++    "id": "martialArtist",
++    "name": "Martial Artist",
++    "effect": "Spend an Action Point to make a second melee attack."
++  },
++  {
++    "id": "mechanicalMenace",
++    "name": "Mechanical Menace / Class Freak",
++    "effect": "Robots or mutated humans may refuse to attack you, and you find it easier to influence them."
++  },
++  {
++    "id": "modernRenegade",
++    "name": "Modern Renegade",
++    "effect": "Grants additional action points when firing one-handed weapons from the hip."
++  },
++  {
++    "id": "mysteriousSavior",
++    "name": "Mysterious Savior",
++    "effect": "After spending a Luck point, a Mysterious Stranger may appear to assist in combat by reviving you."
++  },
++  {
++    "id": "naturalResistance",
++    "name": "Natural Resistance",
++    "effect": "Protects you from toxic fumes and sleeping rough."
++  },
++  {
++    "id": "nightEyes",
++    "name": "Night Eyes",
++    "effect": "When attempting to be stealthy, ignore difficulty penalties for darkness."
++  },
++  {
++    "id": "nocturnalFortitude",
++    "name": "Nocturnal Fortitude",
++    "effect": "Your HP maximum increases at nighttime."
++  },
++  {
++    "id": "overlyGenerous",
++    "name": "Overly Generous",
++    "effect": "When sufficiently radiated, your melee attacks become Radioactive."
++  },
++  {
++    "id": "packRat",
++    "name": "Pack Rat",
++    "effect": "Reduces the carry weight of junk items."
++  },
++  {
++    "id": "pannapictagraphist",
++    "name": "Pannapictagraphist",
++    "effect": "You can re-roll if you find a random magazine you have already read."
++  },
++  {
++    "id": "pharmacist",
++    "name": "Pharmacist",
++    "effect": "RadAway administered by you heals more Radiation."
++  },
++  {
++    "id": "photosynthetic",
++    "name": "Photosynthetic",
++    "effect": "You slowly regenerate HP while in direct sunlight."
++  },
++  {
++    "id": "powerPatcher",
++    "name": "Power Patcher",
++    "effect": "You repair power armor more efficiently."
++  },
++  {
++    "id": "powerUser",
++    "name": "Power User",
++    "effect": "Your power cores contain more charges."
++  },
++  {
++    "id": "psychopath",
++    "name": "Psychopath",
++    "effect": "Chance to regain Luck points each time you kill an enemy."
++  },
++  {
++    "id": "quackSurgeon",
++    "name": "Quack Surgeon",
++    "effect": "You can use alcoholic beverages to administer first aid."
++  },
++  {
++    "id": "radicool",
++    "name": "Radicool",
++    "effect": "Boosts strength-based rolls and melee damage while irradiated."
++  },
++  {
++    "id": "rejuvenated",
++    "name": "Rejuvenated",
++    "effect": "You gain additional benefits from being full or quenched, and remain full or quenched longer."
++  },
++  {
++    "id": "responder",
++    "name": "Responder",
++    "effect": "When you give First Aid, you wake and heal your patient much more efficiently."
++  },
++  {
++    "id": "retribution",
++    "name": "Retribution",
++    "effect": "Recover HP and AP when your damage reduction prevents all damage from an attack."
++  },
++  {
++    "id": "revenant",
++    "name": "Revenant",
++    "effect": "Increased damage after being revived."
++  },
++  {
++    "id": "robotWrangler",
++    "name": "Robot Wrangler",
++    "effect": "Recruit a robot NPC companion."
++  },
++  {
++    "id": "scattershot",
++    "name": "Scattershot",
++    "effect": "Spend an Action Point to make a second attack with a shotgun."
++  },
++  {
++    "id": "secretAgent",
++    "name": "Secret Agent",
++    "effect": "Stealth Boys last longer."
++  },
++  {
++    "id": "serendipity",
++    "name": "Serendipity",
++    "effect": "While injured, you can spend Luck points to have attacks against you miss."
++  },
++  {
++    "id": "slowMetabolizer",
++    "name": "Slow Metabolizer",
++    "effect": "Eating relieves hunger more effectively."
++  },
++  {
++    "id": "spiritualHealer",
++    "name": "Spiritual Healer",
++    "effect": "Successfully stabilizing a dying ally also heals yourself."
++  },
++  {
++    "id": "squadManeuvers",
++    "name": "Squad Maneuvers",
++    "effect": "You can maintain a hurried pace for longer. You can coordinate movements in combat with allies."
++  },
++  {
++    "id": "stabilized",
++    "name": "Stabilized",
++    "effect": "Improves accuracy and piercing effects with big guns used while wearing power armor."
++  },
++  {
++    "id": "stormChaser",
++    "name": "Storm Chaser",
++    "effect": "Rain and rad storms heal you."
++  },
++  {
++    "id": "sturdyFrame",
++    "name": "Sturdy Frame",
++    "effect": "Reduces the weight of armor you wear."
++  },
++  {
++    "id": "superDuper",
++    "name": "Super Duper",
++    "effect": "Items you craft have a chance to use up half as many components."
++  },
++  {
++    "id": "suppressor",
++    "name": "Suppressor",
++    "effect": "When you successfully attack, spend an action point to reduce the damage your target does for one turn."
++  },
++  {
++    "id": "takingOneForTheTeam",
++    "name": "Taking One for the Team",
++    "effect": "You have a chance to take damage for nearby allies. Taking damage this way grants Action Points."
++  },
++  {
++    "id": "tenderizer",
++    "name": "Tenderizer",
++    "effect": "When you hit an enemy, spend 1 AP to increase the damage they take from attacks for one turn."
++  },
++  {
++    "id": "thirstQuencher",
++    "name": "Thirst Quencher",
++    "effect": "Cannot catch diseases from dirty water."
++  },
++  {
++    "id": "tinkerer",
++    "name": "Tinkerer",
++    "effect": "You can more easily repair robots, and temporarily increase their maximum HP."
++  },
++  {
++    "id": "trueFriends",
++    "name": "True Friends",
++    "effect": "You have a chance to avoid reputation loss with factions and settlements, and a chance to increase reputation gain."
++  },
++  {
++    "id": "vaccinated",
++    "name": "Vaccinated",
++    "effect": "Cannot catch diseases from animal attacks."
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/perks/perks.json b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+index 994e53a..3d0ba2d 100644
+--- a/modules/fallout/i18n/ru-RU/data/perks/perks.json
++++ b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+@@ -27,7 +27,7 @@
+   {
+     "id": "gunFu",
+     "name": "ГАН-ФУ",
+-    "effect": "Когда вы добиваетесь успеха в дальнобойной атаке, вы можете потратить 1 ОД и 1 боеприпас, чтобы поразить вторую цель в пределах близкой дистанции от вашей первой цели. Вторая цель получает тот же урон, что и первая цель."
++    "effect": "Когда вы добиваетесь успеха в дальнобойной атаке, вы можете потратить 1 ОД и 1 боеприпас, чтобы поразить вторую цель в пределах близкой дистанции от вашей первой цели. Вторая цель получает тот же урон, что и первая цель. На 2 ранге вы можете потратить 2 ОД и 2 боеприпаса, чтобы поразить две дополнительные цели. На 3-м ранге вы можете потратить 3 ОД и 3 боеприпаса, чтобы поразить три дополнительные цели."
+   },
+   {
+     "id": "silverTongue",
+@@ -161,8 +161,8 @@
+   },
+   {
+     "id": "scrounger",
+-    "name": "МУСОРЩИК",
+-    "effect": "Когда вы разбираете предмет на составляющие, вы можете получить как необычные, так и обычные материалы."
++    "name": "ХАЛЯВЩИК",
++    "effect": "На 1-м ранге вы находите +3 {/CD} дополнительных патронов. На 2-м ранге вы находите +6 {/CD} дополнительных патронов. На 3-м ранге вы получаете +10 {/CD} дополнительных патронов."
+   },
+   {
+     "id": "pharmaFarmer",
+@@ -212,7 +212,7 @@
+   {
+     "id": "medic",
+     "name": "МЕДИК",
+-    "effect": "Когда вы используете действие 'Первая помощь', чтобы попытаться вылечить травму, вы можете повторно бросить 1d20."
++    "effect": "Когда вы используете действие «Первая помощь», чтобы попытаться вылечить травму, вы можете повторно бросить 1d20."
+   },
+   {
+     "id": "heaveHo",
+@@ -240,9 +240,9 @@
+     "effect": "Когда вы совершаете дальнобойную атаку любым тяжелым оружием, вы добавляете +1 {/CD} к урону оружия за ранг."
+   },
+   {
+-    "id": "bullRush",
++    "id": "painTrain",
+     "name": "ПОЕЗД БОЛИ",
+-    "effect": "Вы можете использовать 'Заряд' в качестве основного действия. Это действие движения, и вы не можете перемещаться или совершать спринт в один и тот же ход. Вы перемещаетесь в зону досягаемости противника в пределах средней дистанции (1 зона) и делаете проверку на СИЛ + Атлетика со сложностью 2. Если вы добиваетесь успеха, противник получает урон, равный вашему обычному рукопашному урону, и будет сбит с ног."
++    "effect": "Если вы носите силовую броню или являетесь супермутантом, вы можете использовать «Заряд» в качестве основного действия. Это действие движения, и вы не можете перемещаться или совершать спринт в один и тот же ход. При выполнении этого действия вы перемещаетесь в зону досягаемости противника в пределах средней дистанции (1 зона) и делаете проверку на СИЛ + Атлетика со сложностью 2. Если вы добиваетесь успеха, противник получает урон, равный вашему обычному рукопашному урону, и будет сбит с ног. На 2-м ранге вы добавляете +1 {/CD} и эффект оглушения вдобавок к нанесенному урону."
+   },
+   {
+     "id": "quickHands",
+@@ -356,8 +356,8 @@
+   },
+   {
+     "id": "scrapper",
+-    "name": "РУБАКА",
+-    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание - и тем самым нанести увечье конечности."
++    "name": "МУСОРЩИК",
++    "effect": "Когда вы разбираете предмет на составляющие, вы можете получить как необычные, так и обычные материалы. На 2 ранге вы также сможете добывать редкие материалы."
+   },
+   {
+     "id": "refractor",
+@@ -430,19 +430,14 @@
+     "effect": "Когда вы совершаете дальнобойную атаку и тратите боеприпасы, чтобы увеличить урон, вы можете перебросить до 3 {/CD} для нанесения урона."
+   },
+   {
+-    "id": "slacker",
++    "id": "dodger",
+     "name": "ЛОВКАЧ",
+     "effect": "При выполнении основного действия 'Защита' вы снижаете сложность проверки навыка на 1."
+   },
+-  {
+-    "id": "triggerRush",
+-    "name": "ХАЛЯВЩИК",
+-    "effect": "Каждый раз, когда вы совершаете бросок, чтобы узнать, сколько патронов вы нашли, вы находите +3 {/CD} дополнительных патронов."
+-  },
+   {
+     "id": "slayer",
+     "name": "РУБАКА",
+-    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание - и тем самым нанести увечье конечности."
++    "effect": "Когда вы наносите урон рукопашной атакой или оружием ближнего боя, вы можете потратить 1 очко удачи, чтобы немедленно нанести критическое попадание — и тем самым нанести увечье конечности."
+   },
+   {
+     "id": "killer",
+@@ -468,5 +463,425 @@
+     "id": "lifeGiver",
+     "name": "ДАЮЩИЙ ЖИЗНЬ",
+     "effect": "Увеличьте максимальное количество очков здоровья на уровень Выносливости."
++  },
++  {
++    "id": "allNightLong",
++    "name": "All Night Long",
++    "effect": "You don't get more hungry or thirsty at nighttime."
++  },
++  {
++    "id": "ammosmith",
++    "name": "Ammosmith",
++    "effect": "You can craft ammunition."
++  },
++  {
++    "id": "archer",
++    "name": "Archer",
++    "effect": "Increases the damage of bows and crossbows."
++  },
++  {
++    "id": "blocker",
++    "name": "Blocker",
++    "effect": "Increases damage resistance against melee attacks."
++  },
++  {
++    "id": "bloodsucker",
++    "name": "Bloodsucker",
++    "effect": "Blood packs heal you more effectively, and also quench your thirst."
++  },
++  {
++    "id": "bodyguards",
++    "name": "Bodyguards",
++    "effect": "Nearby allies increase your damage resistance."
++  },
++  {
++    "id": "bornSurvivor",
++    "name": "Born Survivor",
++    "effect": "You automatically use a stimpak when falling below 25% of your maximum health."
++  },
++  {
++    "id": "bowBeforeMe",
++    "name": "Bow Before Me",
++    "effect": "Adds or increases the Piercing effect to bows and crossbows."
++  },
++  {
++    "id": "bulletShield",
++    "name": "Bullet Shield",
++    "effect": "Increases damage resistance while wielding a big gun."
++  },
++  {
++    "id": "butchersBounty",
++    "name": "Butcher's Bounty",
++    "effect": "Find additional portions of meat when butchering animals."
++  },
++  {
++    "id": "cannibal",
++    "name": "Cannibal",
++    "effect": "Allows the character to butcher and eat the flesh of dead humanoids."
++  },
++  {
++    "id": "centerMass",
++    "name": "ЦЕНТР МАСС",
++    "effect": "Когда вы совершаете дальнобойную атаку, вы можете выбрать местом удара тело цели (или эквивалент, для существ, имеющих другую анатомию) без увеличения сложности атаки. Кроме того, вы можете повторно бросить 1d20 при проверке на атаку."
++  },
++  {
++    "id": "colaNut",
++    "name": "Cola Nut",
++    "effect": "Nuka-Cola beverages heal you twice as much."
++  },
++  {
++    "id": "communityOrganizer",
++    "name": "Community Organizer",
++    "effect": "Improves defence, food and resource gathering in the player's settlement."
++  },
++  {
++    "id": "contractor",
++    "name": "Contractor",
++    "effect": "Improves the efficiency of building objects and structures in settlements."
++  },
++  {
++    "id": "covertOperator",
++    "name": "Covert Operator",
++    "effect": "Improves damage with ranged sneak attacks."
++  },
++  {
++    "id": "crackShot",
++    "name": "Crack Shot",
++    "effect": "Increases range and accuracy when aiming one-handed ranged weapons."
++  },
++  {
++    "id": "deadManSprinting",
++    "name": "Dead Man Sprinting",
++    "effect": "When sprinting while injured, you can spend an Action Point to move faster."
++  },
++  {
++    "id": "dromedary",
++    "name": "Dromedary",
++    "effect": "Drinking relieves thirst more effectively."
++  },
++  {
++    "id": "dryNurse",
++    "name": "Dry Nurse",
++    "effect": "Stimpaks are sometimes not used up when used to stabilize an ally."
++  },
++  {
++    "id": "emt",
++    "name": "EMT",
++    "effect": "Provides health regeneration to revived players."
++  },
++  {
++    "id": "enforcer",
++    "name": "Enforcer",
++    "effect": "Adds the Debilitating effect to targeted shotgun attacks."
++  },
++  {
++    "id": "escapeArtist",
++    "name": "Escape Artist",
++    "effect": "You can attempt to hide during combat, so long as no enemies can see you."
++  },
++  {
++    "id": "evasive",
++    "name": "Evasive",
++    "effect": "Increases Physical and Energy damage resistance based on your Agility."
++  },
++  {
++    "id": "fieldSurgeon",
++    "name": "Field Surgeon",
++    "effect": "Improves the efficiency of Stimpaks and RadAway used in First Aid."
++  },
++  {
++    "id": "fireInTheHole",
++    "name": "Fire in the Hole",
++    "effect": "Reduces difficulty of attacks with thrown Blast weapons."
++  },
++  {
++    "id": "fireproof",
++    "name": "Fireproof",
++    "effect": "Increases damage resistance against fire and Blast weapons."
++  },
++  {
++    "id": "ghoulish",
++    "name": "Ghoulish",
++    "effect": "Radiation heals you."
++  },
++  {
++    "id": "gladiator",
++    "name": "Gladiator",
++    "effect": "Increases damage with one-handed melee weapons."
++  },
++  {
++    "id": "glowSight",
++    "name": "Glow Sight",
++    "effect": "Do extra damage to glowing enemies."
++  },
++  {
++    "id": "goatLegs",
++    "name": "Goat Legs",
++    "effect": "Increases resistance to falling damage."
++  },
++  {
++    "id": "greenThumb",
++    "name": "Green Thumb",
++    "effect": "Find twice as much food when foraging in the wilderness."
++  },
++  {
++    "id": "gunRunner",
++    "name": "Gun Runner",
++    "effect": "Increases distance moved when sprinting while holding a one-handed ranged weapon."
++  },
++  {
++    "id": "happyCamper",
++    "name": "Happy Camper",
++    "effect": "Don't get more hungry if sated when camping. Don't get more thirsty if hydrated when camping."
++  },
++  {
++    "id": "happyGoLucky",
++    "name": "Happy Go Lucky",
++    "effect": "Regain a Luck point when drinking alcohol."
++  },
++  {
++    "id": "healingHands",
++    "name": "Healing Hands",
++    "effect": "Automatically remove Radiation damage when stabilizing a dying ally."
++  },
++  {
++    "id": "hiredHelp",
++    "name": "Hired Help",
++    "effect": "Recruit a humanoid NPC companion."
++  },
++  {
++    "id": "homeDefense",
++    "name": "Home Defense",
++    "effect": "Craft and set traps."
++  },
++  {
++    "id": "homebody",
++    "name": "Homebody",
++    "effect": "Recuperate in a home settlement without sleeping."
++  },
++  {
++    "id": "incisor",
++    "name": "Incisor",
++    "effect": "Adds or improves the Piercing effect for melee weapons."
++  },
++  {
++    "id": "ironclad",
++    "name": "Ironclad",
++    "effect": "Improves damage resistance when wearing armor."
++  },
++  {
++    "id": "junkShield",
++    "name": "Junk Shield",
++    "effect": "Carried junk provides additional Physical and Energy damage resistance."
++  },
++  {
++    "id": "licensedPlumber",
++    "name": "Licensed Plumber",
++    "effect": "Your pipe weapons are not unreliable."
++  },
++  {
++    "id": "localLeader",
++    "name": "Local Leader",
++    "effect": "Establish supply lines between settlements, and build stores and workbenches."
++  },
++  {
++    "id": "lockAndLoad",
++    "name": "Lock and Load",
++    "effect": "Increases the fire rate of big guns."
++  },
++  {
++    "id": "martialArtist",
++    "name": "Martial Artist",
++    "effect": "Spend an Action Point to make a second melee attack."
++  },
++  {
++    "id": "mechanicalMenace",
++    "name": "Mechanical Menace / Class Freak",
++    "effect": "Robots or mutated humans may refuse to attack you, and you find it easier to influence them."
++  },
++  {
++    "id": "modernRenegade",
++    "name": "Modern Renegade",
++    "effect": "Grants additional action points when firing one-handed weapons from the hip."
++  },
++  {
++    "id": "mysteriousSavior",
++    "name": "Mysterious Savior",
++    "effect": "After spending a Luck point, a Mysterious Stranger may appear to assist in combat by reviving you."
++  },
++  {
++    "id": "naturalResistance",
++    "name": "Natural Resistance",
++    "effect": "Protects you from toxic fumes and sleeping rough."
++  },
++  {
++    "id": "nightEyes",
++    "name": "Night Eyes",
++    "effect": "When attempting to be stealthy, ignore difficulty penalties for darkness."
++  },
++  {
++    "id": "nocturnalFortitude",
++    "name": "Nocturnal Fortitude",
++    "effect": "Your HP maximum increases at nighttime."
++  },
++  {
++    "id": "overlyGenerous",
++    "name": "Overly Generous",
++    "effect": "When sufficiently radiated, your melee attacks become Radioactive."
++  },
++  {
++    "id": "packRat",
++    "name": "Pack Rat",
++    "effect": "Reduces the carry weight of junk items."
++  },
++  {
++    "id": "pannapictagraphist",
++    "name": "Pannapictagraphist",
++    "effect": "You can re-roll if you find a random magazine you have already read."
++  },
++  {
++    "id": "pharmacist",
++    "name": "Pharmacist",
++    "effect": "RadAway administered by you heals more Radiation."
++  },
++  {
++    "id": "photosynthetic",
++    "name": "Photosynthetic",
++    "effect": "You slowly regenerate HP while in direct sunlight."
++  },
++  {
++    "id": "powerPatcher",
++    "name": "Power Patcher",
++    "effect": "You repair power armor more efficiently."
++  },
++  {
++    "id": "powerUser",
++    "name": "Power User",
++    "effect": "Your power cores contain more charges."
++  },
++  {
++    "id": "psychopath",
++    "name": "Psychopath",
++    "effect": "Chance to regain Luck points each time you kill an enemy."
++  },
++  {
++    "id": "quackSurgeon",
++    "name": "Quack Surgeon",
++    "effect": "You can use alcoholic beverages to administer first aid."
++  },
++  {
++    "id": "radicool",
++    "name": "Radicool",
++    "effect": "Boosts strength-based rolls and melee damage while irradiated."
++  },
++  {
++    "id": "rejuvenated",
++    "name": "Rejuvenated",
++    "effect": "You gain additional benefits from being full or quenched, and remain full or quenched longer."
++  },
++  {
++    "id": "responder",
++    "name": "Responder",
++    "effect": "When you give First Aid, you wake and heal your patient much more efficiently."
++  },
++  {
++    "id": "retribution",
++    "name": "Retribution",
++    "effect": "Recover HP and AP when your damage reduction prevents all damage from an attack."
++  },
++  {
++    "id": "revenant",
++    "name": "Revenant",
++    "effect": "Increased damage after being revived."
++  },
++  {
++    "id": "robotWrangler",
++    "name": "Robot Wrangler",
++    "effect": "Recruit a robot NPC companion."
++  },
++  {
++    "id": "scattershot",
++    "name": "Scattershot",
++    "effect": "Spend an Action Point to make a second attack with a shotgun."
++  },
++  {
++    "id": "secretAgent",
++    "name": "Secret Agent",
++    "effect": "Stealth Boys last longer."
++  },
++  {
++    "id": "serendipity",
++    "name": "Serendipity",
++    "effect": "While injured, you can spend Luck points to have attacks against you miss."
++  },
++  {
++    "id": "slowMetabolizer",
++    "name": "Slow Metabolizer",
++    "effect": "Eating relieves hunger more effectively."
++  },
++  {
++    "id": "spiritualHealer",
++    "name": "Spiritual Healer",
++    "effect": "Successfully stabilizing a dying ally also heals yourself."
++  },
++  {
++    "id": "squadManeuvers",
++    "name": "Squad Maneuvers",
++    "effect": "You can maintain a hurried pace for longer. You can coordinate movements in combat with allies."
++  },
++  {
++    "id": "stabilized",
++    "name": "Stabilized",
++    "effect": "Improves accuracy and piercing effects with big guns used while wearing power armor."
++  },
++  {
++    "id": "stormChaser",
++    "name": "Storm Chaser",
++    "effect": "Rain and rad storms heal you."
++  },
++  {
++    "id": "sturdyFrame",
++    "name": "Sturdy Frame",
++    "effect": "Reduces the weight of armor you wear."
++  },
++  {
++    "id": "superDuper",
++    "name": "Super Duper",
++    "effect": "Items you craft have a chance to use up half as many components."
++  },
++  {
++    "id": "suppressor",
++    "name": "Suppressor",
++    "effect": "When you successfully attack, spend an action point to reduce the damage your target does for one turn."
++  },
++  {
++    "id": "takingOneForTheTeam",
++    "name": "Taking One for the Team",
++    "effect": "You have a chance to take damage for nearby allies. Taking damage this way grants Action Points."
++  },
++  {
++    "id": "tenderizer",
++    "name": "Tenderizer",
++    "effect": "When you hit an enemy, spend 1 AP to increase the damage they take from attacks for one turn."
++  },
++  {
++    "id": "thirstQuencher",
++    "name": "Thirst Quencher",
++    "effect": "Cannot catch diseases from dirty water."
++  },
++  {
++    "id": "tinkerer",
++    "name": "Tinkerer",
++    "effect": "You can more easily repair robots, and temporarily increase their maximum HP."
++  },
++  {
++    "id": "trueFriends",
++    "name": "True Friends",
++    "effect": "You have a chance to avoid reputation loss with factions and settlements, and a chance to increase reputation gain."
++  },
++  {
++    "id": "vaccinated",
++    "name": "Vaccinated",
++    "effect": "Cannot catch diseases from animal attacks."
+   }
+ ]
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index bedba21..4e2d977 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -10,6 +10,12 @@ import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
+ import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+ import { debugLog } from '../debug/falloutDebug';
+ 
++const PERK_ID_REMAP_V18 = {
++  triggerRush: 'scrounger',
++  slacker: 'dodger',
++  bullRush: 'painTrain',
++};
++
+ 
+ /**
+  * Преобразует атрибуты из старого формата [{name, value}] в словарь
+@@ -1048,6 +1054,28 @@ const MIGRATIONS = [
+     };
+   },
+ 
++  // v17 -> v18: канонические id перков. triggerRush был смесью Халявщика и
++  // Ган-фу; в RU это Халявщик → scrounger. slacker → dodger, bullRush → painTrain.
++  (state) => {
++    if (!Array.isArray(state.selectedPerks)) return state;
++    const remapped = state.selectedPerks.map((selected) => {
++      if (!selected || typeof selected !== 'object') return selected;
++      const id = selected.id || selected.perkId;
++      const nextId = PERK_ID_REMAP_V18[id];
++      if (!nextId) return selected;
++      return { ...selected, id: nextId };
++    });
++    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(remapped, getPerks());
++    if (removed.length === 0) {
++      return { ...state, selectedPerks };
++    }
++    return {
++      ...state,
++      selectedPerks,
++      pendingPerkDuplicateNotice: true,
++    };
++  },
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index a4eeb4c..0610c2f 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -37,7 +37,8 @@
+ // v15 — состояние универсальных проверок риска в текущей реальной сцене.
+ // v16 — одноразовый модификатор сложности для следующей новой категории риска.
+ // v17 — снять лишние ранги перков сверх catalog maxRanks; сейв перка — {id, rank}.
+-export const CURRENT_SCHEMA_VERSION = 17;
++// v18 — id перков: triggerRush→scrounger, slacker→dodger, bullRush→painTrain.
++export const CURRENT_SCHEMA_VERSION = 18;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).

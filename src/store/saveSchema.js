@@ -37,7 +37,8 @@
 // v15 — состояние универсальных проверок риска в текущей реальной сцене.
 // v16 — снять лишние ранги перков сверх maxRanks и освободить слоты.
 // v17 — selectedPerks хранит только { id, rank }; имя/описание — из каталога.
-export const CURRENT_SCHEMA_VERSION = 17;
+// v18 — переименование id перков: triggerRush→scrounger, slacker→dodger, bullRush→painTrain.
+export const CURRENT_SCHEMA_VERSION = 18;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

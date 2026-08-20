@@ -13,8 +13,8 @@ describe('v15 to v16 duplicate perk ranks', () => {
       ],
     });
 
-    expect(CURRENT_SCHEMA_VERSION).toBe(17);
-    expect(migrated.schemaVersion).toBe(17);
+    expect(CURRENT_SCHEMA_VERSION).toBe(18);
+    expect(migrated.schemaVersion).toBe(18);
     expect(migrated.selectedPerks).toEqual([
       { id: 'junktownVendor', rank: 1 },
       { id: 'snakeater', rank: 1 },
@@ -38,7 +38,31 @@ describe('v15 to v16 duplicate perk ranks', () => {
       selectedPerks: [{ perk_name: 'Broken Vendor' }],
     });
 
-    expect(migrated.schemaVersion).toBe(17);
+    expect(migrated.schemaVersion).toBe(18);
     expect(migrated.selectedPerks).toEqual([{ perk_name: 'Broken Vendor' }]);
+  });
+
+  it('v18 remaps triggerRush to scrounger and drops extras over maxRanks', () => {
+    const migrated = migrateCharacterState({
+      schemaVersion: 17,
+      selectedPerks: [
+        { id: 'triggerRush', rank: 1 },
+        { id: 'scrounger', rank: 1 },
+        { id: 'scrounger', rank: 2 },
+        { id: 'scrounger', rank: 3 },
+        { id: 'slacker', rank: 1 },
+        { id: 'bullRush', rank: 1 },
+      ],
+    });
+
+    expect(migrated.schemaVersion).toBe(18);
+    expect(migrated.selectedPerks).toEqual([
+      { id: 'scrounger', rank: 1 },
+      { id: 'scrounger', rank: 2 },
+      { id: 'scrounger', rank: 3 },
+      { id: 'dodger', rank: 1 },
+      { id: 'painTrain', rank: 1 },
+    ]);
+    expect(migrated.pendingPerkDuplicateNotice).toBe(true);
   });
 });
