@@ -1,0 +1,28 @@
+diff --git a/styles/PerksAndTraitsScreen.styles.js b/styles/PerksAndTraitsScreen.styles.js
+index 09090bb..0379535 100644
+--- a/styles/PerksAndTraitsScreen.styles.js
++++ b/styles/PerksAndTraitsScreen.styles.js
+@@ -5,20 +5,13 @@ const styles = StyleSheet.create({
+   scrollView: { width: '100%' },
+   scrollContent: { paddingBottom: 72 },
+   sectionTitle: {
+-    color: '#fff',
+-    backgroundColor: '#1a1a1a',
++    width: '100%',
++    color: '#000',
+     fontSize: 15,
+     fontWeight: '700',
+-    letterSpacing: 0.4,
+-    textTransform: 'uppercase',
+-    paddingVertical: 8,
+-    paddingHorizontal: 12,
+-    borderWidth: 1,
+-    borderColor: '#5a5a5a',
+-    borderRadius: 5,
++    textAlign: 'center',
+     marginBottom: 8,
+     marginTop: 8,
+-    overflow: 'hidden',
+   },
+   spoiler: { marginBottom: 8, width: '100%' },
+   spoilerHeader: {
