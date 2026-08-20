@@ -32,7 +32,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
   });
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
-import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
@@ -73,7 +73,9 @@ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
 import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
-import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
+import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
+import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
+import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
 import { Alert, Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
@@ -159,6 +161,11 @@ const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventor
 // ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
 // (контроль — инвариант-тест __tests__/i18n/no-fallbacks.test.js).
 const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()][key];
+const PERK_ALERTS_DICT = {
+  'ru-RU': ruPerksAndTraitsScreen.alerts,
+  'en-EN': enPerksAndTraitsScreen.alerts,
+};
+const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
 // Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
 // что использует обычная броня при выборе слота.
 const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
@@ -820,6 +827,22 @@ export const CharacterProvider = ({ children }) => {
       setAttributesSaved(data.attributesSaved ?? false);
       setSkillsSaved(data.skillsSaved ?? false);
       setSelectedPerks(data.selectedPerks || []);
+      if (data.pendingPerkDuplicateNotice) {
+        paAlert(tPerkAlert('duplicatePerksFixedTitle'), tPerkAlert('duplicatePerksFixedMessage'));
+      }
+      const perkInspection = inspectSelectedPerkRecords(data.selectedPerks || [], getPerks());
+      const brokenPerkLabels = [
+        ...perkInspection.missingId,
+        ...perkInspection.unknownId,
+      ].map((entry) => entry.label);
+      if (brokenPerkLabels.length > 0) {
+        paAlert(
+          tPerkAlert('perkMissingIdTitle'),
+          brokenPerkLabels
+            .map((label) => tPerkAlert('perkMissingIdMessage').replace('{perk}', label))
+            .join('\n'),
+        );
+      }
       setCarryWeight(data.carryWeight ?? 150);
       setMeleeBonus(data.meleeBonus ?? 0);
       setInitiative(data.initiative ?? 0);
@@ -914,7 +937,7 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const addPerkAttributePoints = (points) => {
-    setAvailablePerkAttributePoints(prev => prev + points);
+    setAvailablePerkAttributePoints(prev => Math.max(0, prev + points));
   };
 
   /**
@@ -1378,9 +1401,9 @@ export const CharacterProvider = ({ children }) => {
     availablePerkAttributePoints,
     addPerkAttributePoints,
     commitAttributeChanges,
-    meetsPerkRequirements: (perk) => meetsPerkRequirements(perk, attributes, level),
-    getPerkUnmetReasons: (perk) => getPerkUnmetReasons(perk, attributes, level),
-    annotatePerks: (perks) => annotatePerks(perks, attributes, level),
+    meetsPerkRequirements: (perk, options) => meetsPerkRequirements(perk, attributes, level, selectedPerks, options),
+    getPerkUnmetReasons: (perk, options) => getPerkUnmetReasons(perk, attributes, level, selectedPerks, options),
+    annotatePerks: (perks, options) => annotatePerks(perks, attributes, level, selectedPerks, options),
   };
 
   return (

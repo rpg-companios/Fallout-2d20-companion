@@ -6,7 +6,7 @@ import { getPerkDisplay } from './perksDisplay';
 
 const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
 
-const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => {
+const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRemovePerk, title }) => {
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [selectedPerk, setSelectedPerk] = useState(null);
 
@@ -26,7 +26,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>{tPerksAndTraits('modal.title')}</Text>
+          <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
 
           <ScrollView style={{ maxHeight: 420 }}>
             {(annotatedPerks || []).map((entry, index) => {
@@ -64,6 +64,18 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
                               {tPerksAndTraits('modal.requiresLevel')
                                 .replace('{required}', unmet.level.required)
                                 .replace('{current}', unmet.level.current)}
+                            </Text>
+                          )}
+                          {unmet.maxRank && (
+                            <Text style={styles.unmetText}>
+                              {tPerksAndTraits('modal.alreadyAtMaxRank')
+                                .replace('{current}', unmet.maxRank.current)
+                                .replace('{max}', unmet.maxRank.max)}
+                            </Text>
+                          )}
+                          {unmet.excluded && (
+                            <Text style={styles.unmetText}>
+                              {tPerksAndTraits('modal.excludedByPerk')}
                             </Text>
                           )}
                           {unmet.attributes && Object.entries(unmet.attributes).map(([code, info]) => (
@@ -105,6 +117,17 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => 
           </ScrollView>
 
           <View style={styles.modalButtons}>
+            {onRemovePerk && (
+              <TouchableOpacity
+                style={[styles.modalButton, styles.removeButton]}
+                onPress={() => {
+                  onRemovePerk();
+                  onClose();
+                }}
+              >
+                <Text style={styles.modalButtonText}>{tPerksAndTraits('modal.buttons.remove')}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity 
               style={[styles.modalButton, styles.confirmButton]} 
               onPress={() => {

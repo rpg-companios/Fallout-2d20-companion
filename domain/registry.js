@@ -14,6 +14,7 @@ import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
 
 import moduleOrigins from '../modules/fallout/data/origins/origins.json';
 import moduleTraits from '../modules/fallout/data/traits/traits.json';
+import modulePerks from '../modules/fallout/data/perks/perks.json';
 import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
 import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
 import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
@@ -70,6 +71,14 @@ export function getOrigins() {
  */
 export function getTraits() {
   return moduleTraits;
+}
+
+/**
+ * Перки активного сеттинга. Каталог живёт в модуле; движок читает его
+ * только через реестр.
+ */
+export function getPerks() {
+  return modulePerks;
 }
 
 /**

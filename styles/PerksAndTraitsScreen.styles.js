@@ -28,6 +28,9 @@ const styles = StyleSheet.create({
   nameColumn: { width: 160, flexShrink: 0, flexGrow: 0 },
   rankColumn: { width: 60, flexShrink: 0, flexGrow: 0, textAlign: 'center' },
   descriptionColumn: { flex: 1, borderRightWidth: 0, minWidth: 0 },
+  selectedPerkRow: { backgroundColor: '#f8fafc' },
+  perkNameText: { color: '#000' },
+  reassignHint: { color: '#0369a1', fontSize: 12, marginTop: 2 },
   placeholder: { padding: 10, color: '#888', textAlign: 'center' },
   addPerkButton: {
     position: 'absolute',

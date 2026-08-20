@@ -35,11 +35,16 @@ export const getPerkDisplay = (perk) => {
   };
 };
 
-export const withPerkDisplay = (perk) => {
-  const display = getPerkDisplay(perk);
+export const getPerkSheetDisplay = (perk) => {
+  const id = perk?.id || perk?.perkId;
+  if (id) {
+    const localized = getLocaleMap().get(id);
+    if (localized?.name) {
+      return { name: localized.name, description: localized.effect };
+    }
+  }
   return {
-    ...perk,
-    perk_name: display.name,
-    description: display.description,
+    name: perk?.perk_name || perk?.name || perk?.nameKey || id || '',
+    description: perk?.description || '',
   };
 };

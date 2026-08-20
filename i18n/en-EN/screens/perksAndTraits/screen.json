@@ -5,15 +5,22 @@
     "description": "Description"
   },
   "buttons": {
-    "addPerk": "+ Add perk"
+    "addPerk": "+ Add perk",
+    "changePerk": "Change",
+    "removePerk": "Remove"
   },
   "alerts": {
     "warningTitle": "Warning",
     "errorTitle": "Error",
-    "perkSelectedTitle": "Perk selected"
+    "perkSelectedTitle": "Perk selected",
+    "duplicatePerksFixedTitle": "Duplicate perks found",
+    "duplicatePerksFixedMessage": "The extra ranks were removed. You can spend the freed slots on other perks.",
+    "perkMissingIdTitle": "Perk data error",
+    "perkMissingIdMessage": "Perk {perk} has no ID. Contact the developer."
   },
   "warnings": {
-    "perkLimitReached": "No more perks can be taken at the current level"
+    "perkLimitReached": "No more perks can be taken at the current level",
+    "perkAlreadyAtMaxRank": "This perk is already at its maximum rank"
   },
   "errors": {
     "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
@@ -23,13 +30,17 @@
   },
   "modal": {
     "title": "Select a perk",
+    "replaceTitle": "Change perk",
     "requiresLevel": "Requires level: {required} (current: {current})",
     "requiresAttribute": "Requires {code}: {required} (current: {current})",
+    "alreadyAtMaxRank": "Already taken at maximum rank ({current}/{max})",
+    "excludedByPerk": "Cannot be taken together with an already selected perk",
     "buttons": {
       "choose": "Select",
       "cancelChoice": "Cancel selection",
       "confirm": "Confirm",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "remove": "Remove perk"
     }
   }
 }

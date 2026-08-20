@@ -68,6 +68,7 @@ const styles = StyleSheet.create({
     borderColor: '#15803d',
     marginRight: 8,
   },
+  removeButton: { backgroundColor: '#64748b', borderColor: '#475569' },
   cancelButton: { backgroundColor: '#ef4444', borderColor: '#b91c1c' },
   modalButtonText: { color: '#fff', fontWeight: 'bold' },
 });

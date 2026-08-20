@@ -5,7 +5,8 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
 import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { generateItemId } from '../../domain/itemIdentity';
-import { getUniqQualityName } from '../../domain/registry';
+import { getPerks, getUniqQualityName } from '../../domain/registry';
+import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { debugLog } from '../debug/falloutDebug';
 
@@ -1029,6 +1030,22 @@ const MIGRATIONS = [
       }),
     );
     return { ...state, sceneRiskStates };
+  },
+
+  // v16 -> v17: лишние ранги перка сверх catalog maxRanks снимаются,
+  // слот освобождается; сейв перка сжимается до { id, rank }.
+  // Запись без id не сжимаем — её нужно показать в алерте.
+  (state) => {
+    if (!Array.isArray(state.selectedPerks)) return state;
+    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(state.selectedPerks, getPerks());
+    if (removed.length === 0) {
+      return { ...state, selectedPerks };
+    }
+    return {
+      ...state,
+      selectedPerks,
+      pendingPerkDuplicateNotice: true,
+    };
   },
 
 ];
