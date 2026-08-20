@@ -1,9 +1,9 @@
 diff --git a/__tests__/perks/perk-selection.test.js b/__tests__/perks/perk-selection.test.js
 new file mode 100644
-index 0000000..ecdf3ff
+index 0000000..16e2015
 --- /dev/null
 +++ b/__tests__/perks/perk-selection.test.js
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,195 @@
 +import { describe, expect, it } from 'vitest';
 +import perksData from '../../modules/fallout/data/perks/perks.json';
 +import {
@@ -16,6 +16,7 @@ index 0000000..ecdf3ff
 +  getRequiredLevelForRank,
 +  meetsPerkRequirements,
 +  removeSelectedPerkAt,
++  inspectSelectedPerkRecords,
 +  trimSelectedPerksToMaxRanks,
 +  withAssignedPerkRanks,
 +} from '../../domain/perks';
@@ -39,7 +40,7 @@ index 0000000..ecdf3ff
 +
 +    const first = applyPerkSelection([], junktownVendor);
 +    expect(first.ok).toBe(true);
-+    expect(first.selectedPerks).toEqual([expect.objectContaining({ id: 'junktownVendor', rank: 1 })]);
++    expect(first.selectedPerks).toEqual([{ id: 'junktownVendor', rank: 1 }]);
 +
 +    const second = applyPerkSelection(first.selectedPerks, junktownVendor);
 +    expect(second.ok).toBe(false);
@@ -152,12 +153,35 @@ index 0000000..ecdf3ff
 +    expect(selectedPerks.map((perk) => perk.rank)).toEqual([1, 1]);
 +  });
 +
-+  it('does not invent a max rank when the catalog and save have no maxRanks', () => {
++  it('does not invent a max rank when the catalog has no such perk', () => {
 +    const orphan = { id: 'unknownCustomPerk' };
 +    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks([orphan, orphan], []);
 +
 +    expect(removed).toHaveLength(0);
 +    expect(selectedPerks).toHaveLength(2);
++  });
++
++  it('reads maxRanks only from the catalog, never from the save', () => {
++    const inflated = { id: 'junktownVendor', maxRanks: 99 };
++    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(
++      [inflated, inflated],
++      perksData,
++    );
++
++    expect(removed).toHaveLength(1);
++    expect(selectedPerks).toEqual([{ id: 'junktownVendor', rank: 1 }]);
++  });
++});
++
++describe('inspect selected perk records', () => {
++  it('flags a saved perk without id and an id missing from the catalog', () => {
++    const inspection = inspectSelectedPerkRecords(
++      [{ perk_name: 'Broken Vendor' }, { id: 'notInCatalog' }, { id: 'junktownVendor', rank: 1 }],
++      perksData,
++    );
++
++    expect(inspection.missingId.map((entry) => entry.label)).toEqual(['Broken Vendor']);
++    expect(inspection.unknownId.map((entry) => entry.label)).toEqual(['notInCatalog']);
 +  });
 +});
 +
@@ -176,32 +200,34 @@ index 0000000..ecdf3ff
 +  });
 +});
 diff --git a/__tests__/securitron/shadow-migration.test.js b/__tests__/securitron/shadow-migration.test.js
-index 174db12..e73e2cf 100644
+index 57355f1..483356f 100644
 --- a/__tests__/securitron/shadow-migration.test.js
 +++ b/__tests__/securitron/shadow-migration.test.js
-@@ -26,7 +26,7 @@ const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.nam
+@@ -25,8 +25,8 @@ const makeShadowSave = (attributes, version = 9) => ({
+ const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
  
  describe('Текущая версия формата сейва', () => {
-   it('равна 15', () => {
--    expect(CURRENT_SCHEMA_VERSION).toBe(15);
-+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+-  it('равна 16', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(16);
++  it('равна 17', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(17);
    });
  });
  
 diff --git a/__tests__/store/perk-duplicate-migration.test.js b/__tests__/store/perk-duplicate-migration.test.js
 new file mode 100644
-index 0000000..53d6197
+index 0000000..a0e2bdc
 --- /dev/null
 +++ b/__tests__/store/perk-duplicate-migration.test.js
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,44 @@
 +import { describe, expect, it } from 'vitest';
 +import { migrateCharacterState } from '../../src/store/migrations';
 +import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 +
-+describe('v15 to v16 duplicate perk ranks', () => {
-+  it('trims extra rank-1 picks, frees the slot and asks to show a notice', () => {
++describe('v16 to v17 duplicate perk ranks', () => {
++  it('trims extra rank-1 picks, slims to {id, rank} and asks to show a notice', () => {
 +    const migrated = migrateCharacterState({
-+      schemaVersion: 15,
++      schemaVersion: 16,
 +      selectedPerks: [
 +        { id: 'junktownVendor', maxRanks: 1 },
 +        { id: 'junktownVendor', maxRanks: 1 },
@@ -209,52 +235,92 @@ index 0000000..53d6197
 +      ],
 +    });
 +
-+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
-+    expect(migrated.schemaVersion).toBe(16);
-+    expect(migrated.selectedPerks.map((perk) => perk.id)).toEqual(['junktownVendor', 'snakeater']);
++    expect(CURRENT_SCHEMA_VERSION).toBe(17);
++    expect(migrated.schemaVersion).toBe(17);
++    expect(migrated.selectedPerks).toEqual([
++      { id: 'junktownVendor', rank: 1 },
++      { id: 'snakeater', rank: 1 },
++    ]);
 +    expect(migrated.pendingPerkDuplicateNotice).toBe(true);
 +  });
 +
 +  it('does not raise a notice when there is nothing to trim', () => {
 +    const migrated = migrateCharacterState({
-+      schemaVersion: 15,
-+      selectedPerks: [{ id: 'junktownVendor', maxRanks: 1 }],
++      schemaVersion: 16,
++      selectedPerks: [{ id: 'junktownVendor', maxRanks: 1, perk_name: 'Junktown Vendor' }],
 +    });
 +
-+    expect(migrated.selectedPerks).toHaveLength(1);
++    expect(migrated.selectedPerks).toEqual([{ id: 'junktownVendor', rank: 1 }]);
 +    expect(migrated.pendingPerkDuplicateNotice).toBeUndefined();
++  });
++
++  it('keeps a perk without id so the load alert can name it', () => {
++    const migrated = migrateCharacterState({
++      schemaVersion: 16,
++      selectedPerks: [{ perk_name: 'Broken Vendor' }],
++    });
++
++    expect(migrated.schemaVersion).toBe(17);
++    expect(migrated.selectedPerks).toEqual([{ perk_name: 'Broken Vendor' }]);
 +  });
 +});
 diff --git a/__tests__/store/scene-risk-migration.test.js b/__tests__/store/scene-risk-migration.test.js
-index 4c72c6d..d28c624 100644
+index 7abe37c..acd761c 100644
 --- a/__tests__/store/scene-risk-migration.test.js
 +++ b/__tests__/store/scene-risk-migration.test.js
-@@ -9,9 +9,9 @@ describe('v14 to v15 scene-risk state migration', () => {
+@@ -3,15 +3,15 @@ import { migrateCharacterState } from '../../src/store/migrations';
+ import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
+ 
+ describe('scene-risk state migrations', () => {
+-  it('adds the canonical empty state through the v14 to v16 migration chain', () => {
++  it('adds the canonical empty state through the v14 to v17 migration chain', () => {
+     const migrated = migrateCharacterState({
+       schemaVersion: 14,
        characterName: 'Courier',
      });
  
--    expect(CURRENT_SCHEMA_VERSION).toBe(15);
-+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+-    expect(CURRENT_SCHEMA_VERSION).toBe(16);
++    expect(CURRENT_SCHEMA_VERSION).toBe(17);
      expect(migrated).toMatchObject({
--      schemaVersion: 15,
-+      schemaVersion: 16,
+-      schemaVersion: 16,
++      schemaVersion: 17,
        characterName: 'Courier',
        sceneRiskStates: {},
      });
+@@ -30,7 +30,7 @@ describe('scene-risk state migrations', () => {
+     });
+ 
+     expect(migrated).toEqual({
+-      schemaVersion: 16,
++      schemaVersion: 17,
+       sceneRiskStates: {
+         diseaseExposure: {
+           sceneStartedAt: 1_000,
 diff --git a/components/CharacterContext.js b/components/CharacterContext.js
-index 7ca0eea..067d60d 100644
+index 5e878dc..a7853ba 100644
 --- a/components/CharacterContext.js
 +++ b/components/CharacterContext.js
-@@ -73,6 +73,8 @@ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
+@@ -32,7 +32,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
+   });
+ };
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+-import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
++import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
+@@ -73,7 +73,9 @@ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
  import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
  import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
  import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
+-import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
 +import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
 +import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
- import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
++import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
  import { Alert, Platform } from 'react-native';
  
-@@ -158,6 +160,11 @@ const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventor
+ // Zustand Store integration (Task 4.1)
+@@ -159,6 +161,11 @@ const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventor
  // ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
  // (контроль — инвариант-тест __tests__/i18n/no-fallbacks.test.js).
  const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()][key];
@@ -266,17 +332,30 @@ index 7ca0eea..067d60d 100644
  // Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
  // что использует обычная броня при выборе слота.
  const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
-@@ -817,6 +824,9 @@ export const CharacterProvider = ({ children }) => {
+@@ -820,6 +827,22 @@ export const CharacterProvider = ({ children }) => {
        setAttributesSaved(data.attributesSaved ?? false);
        setSkillsSaved(data.skillsSaved ?? false);
        setSelectedPerks(data.selectedPerks || []);
 +      if (data.pendingPerkDuplicateNotice) {
 +        paAlert(tPerkAlert('duplicatePerksFixedTitle'), tPerkAlert('duplicatePerksFixedMessage'));
 +      }
++      const perkInspection = inspectSelectedPerkRecords(data.selectedPerks || [], getPerks());
++      const brokenPerkLabels = [
++        ...perkInspection.missingId,
++        ...perkInspection.unknownId,
++      ].map((entry) => entry.label);
++      if (brokenPerkLabels.length > 0) {
++        paAlert(
++          tPerkAlert('perkMissingIdTitle'),
++          brokenPerkLabels
++            .map((label) => tPerkAlert('perkMissingIdMessage').replace('{perk}', label))
++            .join('\n'),
++        );
++      }
        setCarryWeight(data.carryWeight ?? 150);
        setMeleeBonus(data.meleeBonus ?? 0);
        setInitiative(data.initiative ?? 0);
-@@ -911,7 +921,7 @@ export const CharacterProvider = ({ children }) => {
+@@ -914,7 +937,7 @@ export const CharacterProvider = ({ children }) => {
    };
  
    const addPerkAttributePoints = (points) => {
@@ -285,7 +364,7 @@ index 7ca0eea..067d60d 100644
    };
  
    /**
-@@ -1378,9 +1388,9 @@ export const CharacterProvider = ({ children }) => {
+@@ -1378,9 +1401,9 @@ export const CharacterProvider = ({ children }) => {
      availablePerkAttributePoints,
      addPerkAttributePoints,
      commitAttributeChanges,
@@ -358,10 +437,10 @@ index 3961a17..55dfa15 100644
                style={[styles.modalButton, styles.confirmButton]} 
                onPress={() => {
 diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
-index cc30b42..d32818e 100644
+index cc30b42..755598a 100644
 --- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
 +++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
-@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
+@@ -2,13 +2,14 @@ import React, { useMemo, useState } from 'react';
  import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
  import { useCharacter } from '../../CharacterContext';
  import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
@@ -369,7 +448,15 @@ index cc30b42..d32818e 100644
  import { useLocale, useModuleLocale } from '../../../i18n/locale';
  import perksData from '../../../modules/fallout/data/perks/perks.json';
  import PerkSelectModal from './PerkSelectModal';
-@@ -18,72 +19,110 @@ const PerksAndTraitsScreen = () => {
+ import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
+ import styles from '../../../styles/PerksAndTraitsScreen.styles';
+ import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
+-import { getPerkDisplay, withPerkDisplay } from './perksDisplay';
++import { getPerkDisplay, getPerkSheetDisplay } from './perksDisplay';
+ 
+ const PerksAndTraitsScreen = () => {
+   const { 
+@@ -18,72 +19,109 @@ const PerksAndTraitsScreen = () => {
    useLocale(); // интерфейс движка
    useModuleLocale(); // контент активного сеттинга
    const [isPerkModalVisible, setPerkModalVisible] = useState(false);
@@ -454,12 +541,12 @@ index cc30b42..d32818e 100644
        return;
      }
  
-     const selectedPerk = withPerkDisplay(perk);
+-    const selectedPerk = withPerkDisplay(perk);
 +    const previousPerk = isReplacing ? selectedPerks[replacingIndex] : null;
  
      // Специальная обработка перка по стабильному id, без привязки к русскому названию.
 -    if (selectedPerk.id === 'intenseTraining') {
-+    if (selectedPerk.id === 'intenseTraining' && previousPerk?.id !== 'intenseTraining') {
++    if (perk.id === 'intenseTraining' && previousPerk?.id !== 'intenseTraining') {
        const canTakeIntensiveTraining = level >= 2 || attributesSaved;
        
        if (!canTakeIntensiveTraining) {
@@ -477,20 +564,21 @@ index cc30b42..d32818e 100644
 -      addPerkAttributePoints(attributeBonus);
 -      
        const successMessage = tPerksAndTraits('perkSelected.intensiveTrainingSuccess')
-         .replace('{perkName}', selectedPerk.perk_name)
+-        .replace('{perkName}', selectedPerk.perk_name)
 -        .replace('{bonus}', attributeBonus);
 -      if (Platform.OS === 'web') {
 -        window.alert(successMessage);
 -      } else {
 -        Alert.alert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
 -      }
++        .replace('{perkName}', getPerkDisplay(perk).name)
 +        .replace('{bonus}', 1);
 +      showAlert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
      }
  
 -    setSelectedPerks(prev => [...prev, selectedPerk]);
 -    setPerkModalVisible(false);
-+    const result = applyPerkSelection(selectedPerks, selectedPerk, {
++    const result = applyPerkSelection(selectedPerks, perk, {
 +      replaceIndex: isReplacing ? replacingIndex : undefined,
 +    });
 +    if (!result.ok) {
@@ -498,7 +586,7 @@ index cc30b42..d32818e 100644
 +      return;
 +    }
 +
-+    applyIntenseTrainingDelta(previousPerk, selectedPerk);
++    applyIntenseTrainingDelta(previousPerk, perk);
 +    setSelectedPerks(result.selectedPerks);
 +    closePerkModal();
 +  };
@@ -512,13 +600,14 @@ index cc30b42..d32818e 100644
    };
  
    return (
-@@ -131,14 +170,21 @@ const PerksAndTraitsScreen = () => {
+@@ -131,14 +169,21 @@ const PerksAndTraitsScreen = () => {
            })()}
  
            {/* Выбранные перки (по уровням) */}
 -          {selectedPerks.map((perk, idx) => {
+-            const display = getPerkDisplay(perk);
 +          {rankedPerks.map((perk, idx) => {
-             const display = getPerkDisplay(perk);
++            const display = getPerkSheetDisplay(perk);
              return (
 -              <View key={`perk-${perk.id || idx}`} style={styles.row}>
 -                <Text style={[styles.cell, styles.nameColumn]}>{display.name}</Text>
@@ -538,7 +627,7 @@ index cc30b42..d32818e 100644
              );
            })}
  
-@@ -160,12 +206,14 @@ const PerksAndTraitsScreen = () => {
+@@ -160,12 +205,14 @@ const PerksAndTraitsScreen = () => {
  
        <PerkSelectModal
          visible={isPerkModalVisible}
@@ -555,20 +644,40 @@ index cc30b42..d32818e 100644
  
 -export default PerksAndTraitsScreen; 
 +export default PerksAndTraitsScreen;
+diff --git a/components/screens/PerksAndTraitsScreen/perksDisplay.js b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+index a2eadde..ec742f6 100644
+--- a/components/screens/PerksAndTraitsScreen/perksDisplay.js
++++ b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+@@ -35,11 +35,16 @@ export const getPerkDisplay = (perk) => {
+   };
+ };
+ 
+-export const withPerkDisplay = (perk) => {
+-  const display = getPerkDisplay(perk);
++export const getPerkSheetDisplay = (perk) => {
++  const id = perk?.id || perk?.perkId;
++  if (id) {
++    const localized = getLocaleMap().get(id);
++    if (localized?.name) {
++      return { name: localized.name, description: localized.effect };
++    }
++  }
+   return {
+-    ...perk,
+-    perk_name: display.name,
+-    description: display.description,
++    name: perk?.perk_name || perk?.name || perk?.nameKey || id || '',
++    description: perk?.description || '',
+   };
+ };
 diff --git a/domain/perks.js b/domain/perks.js
-index 8c978ee..02d14ba 100644
+index 8c978ee..230f866 100644
 --- a/domain/perks.js
 +++ b/domain/perks.js
-@@ -49,43 +49,174 @@ const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites ||
+@@ -49,43 +49,202 @@ const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites ||
  const getLevelRequirement = (req) => req.char_lvl ?? req.level;
  const getAttributeRequirements = (req) => req.attributes || req.special || {};
  
--/**
-- * Returns true if the character meets a specific perk's requirements.
-- * Considers level and SPECIAL minimums. SPECIAL keys from perks.json are used directly.
-- */
--export function meetsPerkRequirements(perk, attributes, level) {
--    if (!perk) return false;
 +export function getPerkMaxRanks(perk) {
 +    const maxRanks = Number(perk?.maxRanks ?? perk?.maxRank ?? 1);
 +    return Number.isFinite(maxRanks) && maxRanks > 0 ? maxRanks : 1;
@@ -585,16 +694,13 @@ index 8c978ee..02d14ba 100644
 +}
 +
 +export function getRequiredLevelForRank(perk, rank) {
-     const req = getPrerequisites(perk);
++    const req = getPrerequisites(perk);
 +    const baseLevel = getLevelRequirement(req);
 +    const increase = Number(req.levelIncreasePerRank) || 0;
 +    const base = typeof baseLevel === 'number' ? baseLevel : 1;
 +    return base + (Math.max(1, Number(rank) || 1) - 1) * increase;
 +}
- 
--    const requiredLevel = getLevelRequirement(req);
--    if (typeof requiredLevel === 'number' && level < requiredLevel) {
--        return false;
++
 +export function canSelectPerk(perk, selectedPerks = [], { replaceIndex } = {}) {
 +    if (!perk?.id) return false;
 +    return getPerkSelectionCount(selectedPerks, perk.id, { ignoreIndex: replaceIndex }) < getPerkMaxRanks(perk);
@@ -606,8 +712,7 @@ index 8c978ee..02d14ba 100644
 +        const id = toSelectedPerkId(selected);
 +        if (!id) return selected;
 +        counts[id] = (counts[id] || 0) + 1;
-+        if (typeof selected === 'string') return { id: selected, rank: counts[id] };
-+        return { ...selected, rank: counts[id] };
++        return { id, rank: counts[id] };
 +    });
 +}
 +
@@ -615,17 +720,12 @@ index 8c978ee..02d14ba 100644
 +    if (!perk?.id) return { ok: false, reason: 'missing-perk', selectedPerks };
 +    if (!canSelectPerk(perk, selectedPerks, { replaceIndex })) {
 +        return { ok: false, reason: 'max-rank', selectedPerks };
-     }
- 
--    const attrReq = getAttributeRequirements(req);
--    if (attrReq && Object.keys(attrReq).length > 0) {
--        const valueByName = buildAttributeValueMap(attributes);
--        for (const [code, minVal] of Object.entries(attrReq)) {
--            const currentVal = valueByName[code] ?? 0;
--            if (currentVal < minVal) return false;
++    }
++
++    const pick = { id: perk.id };
 +    const next = replaceIndex != null
-+        ? (selectedPerks || []).map((entry, index) => (index === replaceIndex ? perk : entry))
-+        : [...(selectedPerks || []), perk];
++        ? (selectedPerks || []).map((entry, index) => (index === replaceIndex ? pick : entry))
++        : [...(selectedPerks || []), pick];
 +
 +    return { ok: true, reason: null, selectedPerks: withAssignedPerkRanks(next) };
 +}
@@ -640,22 +740,30 @@ index 8c978ee..02d14ba 100644
 +const resolveCatalogMaxRanks = (selected, catalogById) => {
 +    const id = toSelectedPerkId(selected);
 +    const catalogPerk = id ? catalogById.get(id) : null;
-+    const rawMax = catalogPerk?.maxRanks ?? (isObject(selected) ? selected.maxRanks : undefined);
++    const rawMax = catalogPerk?.maxRanks;
 +    if (typeof rawMax !== 'number' || !Number.isFinite(rawMax) || rawMax < 1) return null;
 +    return rawMax;
 +};
 +
-+/**
-+ * Keep at most maxRanks picks of each perk. Extra picks are dropped so the
-+ * freed slots can be spent on other perks. If maxRanks is missing from both
-+ * the catalog and the saved perk, the entry is left untouched.
-+ */
+ /**
+- * Returns true if the character meets a specific perk's requirements.
+- * Considers level and SPECIAL minimums. SPECIAL keys from perks.json are used directly.
++ * Keep at most catalog maxRanks picks of each perk. Extra picks are dropped
++ * so the freed slots can be spent on other perks. maxRanks is read only from
++ * the setting catalog — never from the saved perk record.
+  */
+-export function meetsPerkRequirements(perk, attributes, level) {
+-    if (!perk) return false;
+-    const req = getPrerequisites(perk);
 +export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []) {
 +    const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
 +    const keptCounts = {};
 +    const kept = [];
 +    const removed = [];
-+
+ 
+-    const requiredLevel = getLevelRequirement(req);
+-    if (typeof requiredLevel === 'number' && level < requiredLevel) {
+-        return false;
 +    for (const selected of selectedPerks || []) {
 +        const id = toSelectedPerkId(selected);
 +        const maxRanks = resolveCatalogMaxRanks(selected, catalogById);
@@ -667,17 +775,49 @@ index 8c978ee..02d14ba 100644
 +        if (keptCounts[id] >= maxRanks) {
 +            removed.push(selected);
 +            continue;
-         }
++        }
 +        keptCounts[id] += 1;
 +        kept.push(selected);
      }
  
--    // Other requirements (e.g., "notForRobots") are ignored for now per scope.
--    return true;
+-    const attrReq = getAttributeRequirements(req);
+-    if (attrReq && Object.keys(attrReq).length > 0) {
+-        const valueByName = buildAttributeValueMap(attributes);
+-        for (const [code, minVal] of Object.entries(attrReq)) {
+-            const currentVal = valueByName[code] ?? 0;
+-            if (currentVal < minVal) return false;
 +    return {
 +        selectedPerks: withAssignedPerkRanks(kept),
 +        removed,
 +    };
++}
++
++export function identifySelectedPerk(selected, index) {
++    if (typeof selected === 'string' && selected) return selected;
++    return toSelectedPerkId(selected)
++        || selected?.perk_name
++        || selected?.name
++        || selected?.nameKey
++        || `#${index + 1}`;
++}
++
++export function inspectSelectedPerkRecords(selectedPerks = [], perkCatalog = []) {
++    const catalogIds = new Set((perkCatalog || []).map((perk) => perk?.id).filter(Boolean));
++    const missingId = [];
++    const unknownId = [];
++
++    (selectedPerks || []).forEach((selected, index) => {
++        const id = toSelectedPerkId(selected);
++        if (!id) {
++            missingId.push({ selected, label: identifySelectedPerk(selected, index) });
++            return;
++        }
++        if (!catalogIds.has(id)) {
++            unknownId.push({ selected, label: identifySelectedPerk(selected, index) });
+         }
++    });
++
++    return { missingId, unknownId };
 +}
 +
 +/**
@@ -692,8 +832,10 @@ index 8c978ee..02d14ba 100644
 +        if (!id) continue;
 +        if (!groups.has(id)) groups.set(id, []);
 +        groups.get(id).push(selected);
-+    }
-+
+     }
+ 
+-    // Other requirements (e.g., "notForRobots") are ignored for now per scope.
+-    return true;
 +    return [...groups.values()].map((entries) => {
 +        const first = entries[0];
 +        const rank = entries.length > 1
@@ -728,7 +870,10 @@ index 8c978ee..02d14ba 100644
 +    const ignoreIndex = options.replaceIndex;
 +    const currentRanks = getPerkSelectionCount(selectedPerks, perk.id, { ignoreIndex });
 +    const maxRanks = getPerkMaxRanks(perk);
-+
+ 
+-    const requiredLevel = getLevelRequirement(req);
+-    if (typeof requiredLevel === 'number' && level < requiredLevel) {
+-        reasons.level = { required: requiredLevel, current: level };
 +    if (currentRanks >= maxRanks) {
 +        reasons.maxRank = { current: currentRanks, max: maxRanks };
 +    } else {
@@ -737,10 +882,7 @@ index 8c978ee..02d14ba 100644
 +            reasons.level = { required: requiredLevel, current: level };
 +        }
 +    }
- 
--    const requiredLevel = getLevelRequirement(req);
--    if (typeof requiredLevel === 'number' && level < requiredLevel) {
--        reasons.level = { required: requiredLevel, current: level };
++
 +    const excluded = req.excludedPerks || [];
 +    if (excluded.length > 0) {
 +        const blockedBy = [];
@@ -755,7 +897,7 @@ index 8c978ee..02d14ba 100644
      }
  
      const attrReq = getAttributeRequirements(req);
-@@ -103,10 +234,10 @@ export function getPerkUnmetReasons(perk, attributes, level) {
+@@ -103,10 +262,10 @@ export function getPerkUnmetReasons(perk, attributes, level) {
  /**
   * Helper to annotate a list of perks with availability status.
   */
@@ -769,7 +911,7 @@ index 8c978ee..02d14ba 100644
          return { perk, available, unmet };
      });
  }
-@@ -145,7 +276,7 @@ export function calculatePerkEffects(perks = [], selectedPerks = [], state = {})
+@@ -145,7 +304,7 @@ export function calculatePerkEffects(perks = [], selectedPerks = [], state = {})
      let bonuses = {};
      const applied = [];
  
@@ -806,10 +948,10 @@ index 9642846..48d77ca 100644
   * Планы тела (движковые данные; сеттинг может добавить свои).
   */
 diff --git a/i18n/en-EN/screens/perksAndTraits/screen.json b/i18n/en-EN/screens/perksAndTraits/screen.json
-index a7c076c..8733418 100644
+index a7c076c..2ec7bc8 100644
 --- a/i18n/en-EN/screens/perksAndTraits/screen.json
 +++ b/i18n/en-EN/screens/perksAndTraits/screen.json
-@@ -5,15 +5,20 @@
+@@ -5,15 +5,22 @@
      "description": "Description"
    },
    "buttons": {
@@ -824,7 +966,9 @@ index a7c076c..8733418 100644
 -    "perkSelectedTitle": "Perk selected"
 +    "perkSelectedTitle": "Perk selected",
 +    "duplicatePerksFixedTitle": "Duplicate perks found",
-+    "duplicatePerksFixedMessage": "The extra ranks were removed. You can spend the freed slots on other perks."
++    "duplicatePerksFixedMessage": "The extra ranks were removed. You can spend the freed slots on other perks.",
++    "perkMissingIdTitle": "Perk data error",
++    "perkMissingIdMessage": "Perk {perk} has no ID. Contact the developer."
    },
    "warnings": {
 -    "perkLimitReached": "No more perks can be taken at the current level"
@@ -833,7 +977,7 @@ index a7c076c..8733418 100644
    },
    "errors": {
      "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
-@@ -23,13 +28,17 @@
+@@ -23,13 +30,17 @@
    },
    "modal": {
      "title": "Select a perk",
@@ -853,10 +997,10 @@ index a7c076c..8733418 100644
    }
  }
 diff --git a/i18n/ru-RU/screens/perksAndTraits/screen.json b/i18n/ru-RU/screens/perksAndTraits/screen.json
-index 875e520..5ebd53b 100644
+index 875e520..b336998 100644
 --- a/i18n/ru-RU/screens/perksAndTraits/screen.json
 +++ b/i18n/ru-RU/screens/perksAndTraits/screen.json
-@@ -5,15 +5,20 @@
+@@ -5,15 +5,22 @@
      "description": "Описание"
    },
    "buttons": {
@@ -871,7 +1015,9 @@ index 875e520..5ebd53b 100644
 -    "perkSelectedTitle": "Перк выбран"
 +    "perkSelectedTitle": "Перк выбран",
 +    "duplicatePerksFixedTitle": "Найдено задвоение перков",
-+    "duplicatePerksFixedMessage": "Ошибочные ранги сняты. Освободившиеся слоты можно потратить на другие перки."
++    "duplicatePerksFixedMessage": "Ошибочные ранги сняты. Освободившиеся слоты можно потратить на другие перки.",
++    "perkMissingIdTitle": "Ошибка данных перка",
++    "perkMissingIdMessage": "У перка {perk} отсутствует ID. Свяжитесь с разработчиком."
    },
    "warnings": {
 -    "perkLimitReached": "На текущем уровне больше перков взять нельзя"
@@ -880,7 +1026,7 @@ index 875e520..5ebd53b 100644
    },
    "errors": {
      "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
-@@ -23,13 +28,17 @@
+@@ -23,13 +30,17 @@
    },
    "modal": {
      "title": "Выберите перк",
@@ -900,7 +1046,7 @@ index 875e520..5ebd53b 100644
    }
  }
 diff --git a/src/store/migrations.js b/src/store/migrations.js
-index 6f5a96a..7b07ebf 100644
+index 46ec0d1..bedba21 100644
 --- a/src/store/migrations.js
 +++ b/src/store/migrations.js
 @@ -5,7 +5,8 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
@@ -913,12 +1059,13 @@ index 6f5a96a..7b07ebf 100644
  import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
  import { debugLog } from '../debug/falloutDebug';
  
-@@ -1000,6 +1001,21 @@ const MIGRATIONS = [
-     sceneRiskStates: {},
-   }),
+@@ -1031,6 +1032,22 @@ const MIGRATIONS = [
+     return { ...state, sceneRiskStates };
+   },
  
-+  // v15 -> v16: лишние ранги перка сверх maxRanks снимаются, слот
-+  // освобождается. Алерт показывается при загрузке, если что-то сняли.
++  // v16 -> v17: лишние ранги перка сверх catalog maxRanks снимаются,
++  // слот освобождается; сейв перка сжимается до { id, rank }.
++  // Запись без id не сжимаем — её нужно показать в алерте.
 +  (state) => {
 +    if (!Array.isArray(state.selectedPerks)) return state;
 +    const { selectedPerks, removed } = trimSelectedPerksToMaxRanks(state.selectedPerks, getPerks());
@@ -936,16 +1083,16 @@ index 6f5a96a..7b07ebf 100644
  /**
   * Мерж комплекта снаряжения при сохранении снапшота.
 diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
-index 5145b6a..cb5a121 100644
+index a871fda..a4eeb4c 100644
 --- a/src/store/saveSchema.js
 +++ b/src/store/saveSchema.js
-@@ -35,7 +35,8 @@
- // v14 — «Тень»: старый комплект (default_caps_only) заменяется на NIGHTKIN;
+@@ -36,7 +36,8 @@
  //       флаг nightkinKitPending — предметы выдаются после загрузки.
  // v15 — состояние универсальных проверок риска в текущей реальной сцене.
--export const CURRENT_SCHEMA_VERSION = 15;
-+// v16 — снять лишние ранги перков сверх maxRanks и освободить слоты.
-+export const CURRENT_SCHEMA_VERSION = 16;
+ // v16 — одноразовый модификатор сложности для следующей новой категории риска.
+-export const CURRENT_SCHEMA_VERSION = 16;
++// v17 — снять лишние ранги перков сверх catalog maxRanks; сейв перка — {id, rank}.
++export const CURRENT_SCHEMA_VERSION = 17;
  
  // Версия, которая ставится при отсутствии schemaVersion в сохранении
  // (старые сохранения без поля — считаем v0, текущим форматом).
