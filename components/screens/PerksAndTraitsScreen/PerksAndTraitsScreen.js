@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
-import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
+import { getTraitI18nById } from '../../../domain/traits';
 import {
   applyPerkSelection,
   collapseSelectedPerks,
@@ -28,7 +28,7 @@ const PerksAndTraitsScreen = () => {
     addPerkAttributePoints, attributesSaved,
   } = useCharacter();
   useLocale();
-  useModuleLocale();
+  const moduleLocale = useModuleLocale();
   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
   const [replacingIndex, setReplacingIndex] = useState(null);
   const [openSpoilers, setOpenSpoilers] = useState({});
@@ -61,20 +61,21 @@ const PerksAndTraitsScreen = () => {
 
   const traitSpoilers = useMemo(() => {
     if (!trait) return [];
-    const selectedNames = trait?.modifiers?.selectedTraitNames;
-    if (Array.isArray(selectedNames) && selectedNames.length > 0) {
-      return selectedNames.map((name, idx) => ({
-        spoilerKey: `trait-${idx}-${name}`,
-        title: resolveTraitDisplayName(name),
-        description: getTraitDisplayDescription({ name }),
-      }));
+    const selectedIds = Array.isArray(trait?.modifiers?.selectedTraitIds) && trait.modifiers.selectedTraitIds.length > 0
+      ? trait.modifiers.selectedTraitIds
+      : (Array.isArray(trait.ids) && trait.ids.length > 0 ? trait.ids : (trait.id ? [trait.id] : []));
+    if (selectedIds.length === 0) {
+      throw new Error('[PerksAndTraitsScreen] У выбранной черты нет id');
     }
-    return [{
-      spoilerKey: `trait-${trait.id || 'current'}`,
-      title: getTraitNameKey(trait),
-      description: getTraitDisplayDescription(trait),
-    }];
-  }, [trait]);
+    return selectedIds.map((id) => {
+      const display = getTraitI18nById(id);
+      return {
+        spoilerKey: `trait-${id}`,
+        title: display.name,
+        description: display.description,
+      };
+    });
+  }, [trait, moduleLocale]);
 
   const annotatedPerks = useMemo(
     () => annotatePerks(perksData, { replaceIndex: replacingIndex }),
@@ -204,12 +205,14 @@ const PerksAndTraitsScreen = () => {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.sectionTitle}>{tPerksAndTraits('labels.traitsSection')}</Text>
         {traitSpoilers.map((entry) => renderSpoiler({
           spoilerKey: entry.spoilerKey,
           title: entry.title,
           description: entry.description,
         }))}
 
+        <Text style={styles.sectionTitle}>{tPerksAndTraits('labels.perksSection')}</Text>
         {perkSpoilers.map(({ perk, replaceIndex, spoilerKey }) => {
           const display = getPerkSheetDisplay(perk);
           const rankLabel = perk?.rank != null

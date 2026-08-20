@@ -1,0 +1,129 @@
+diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index c108d47..89cc5a8 100644
+--- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -1,7 +1,7 @@
+ import React, { useMemo, useState } from 'react';
+ import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+ import { useCharacter } from '../../CharacterContext';
+-import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
++import { getTraitI18nById } from '../../../domain/traits';
+ import {
+   applyPerkSelection,
+   collapseSelectedPerks,
+@@ -28,7 +28,7 @@ const PerksAndTraitsScreen = () => {
+     addPerkAttributePoints, attributesSaved,
+   } = useCharacter();
+   useLocale();
+-  useModuleLocale();
++  const moduleLocale = useModuleLocale();
+   const [isPerkModalVisible, setPerkModalVisible] = useState(false);
+   const [replacingIndex, setReplacingIndex] = useState(null);
+   const [openSpoilers, setOpenSpoilers] = useState({});
+@@ -61,20 +61,21 @@ const PerksAndTraitsScreen = () => {
+ 
+   const traitSpoilers = useMemo(() => {
+     if (!trait) return [];
+-    const selectedNames = trait?.modifiers?.selectedTraitNames;
+-    if (Array.isArray(selectedNames) && selectedNames.length > 0) {
+-      return selectedNames.map((name, idx) => ({
+-        spoilerKey: `trait-${idx}-${name}`,
+-        title: resolveTraitDisplayName(name),
+-        description: getTraitDisplayDescription({ name }),
+-      }));
++    const selectedIds = Array.isArray(trait?.modifiers?.selectedTraitIds) && trait.modifiers.selectedTraitIds.length > 0
++      ? trait.modifiers.selectedTraitIds
++      : (Array.isArray(trait.ids) && trait.ids.length > 0 ? trait.ids : (trait.id ? [trait.id] : []));
++    if (selectedIds.length === 0) {
++      throw new Error('[PerksAndTraitsScreen] У выбранной черты нет id');
+     }
+-    return [{
+-      spoilerKey: `trait-${trait.id || 'current'}`,
+-      title: getTraitNameKey(trait),
+-      description: getTraitDisplayDescription(trait),
+-    }];
+-  }, [trait]);
++    return selectedIds.map((id) => {
++      const display = getTraitI18nById(id);
++      return {
++        spoilerKey: `trait-${id}`,
++        title: display.name,
++        description: display.description,
++      };
++    });
++  }, [trait, moduleLocale]);
+ 
+   const annotatedPerks = useMemo(
+     () => annotatePerks(perksData, { replaceIndex: replacingIndex }),
+@@ -204,12 +205,14 @@ const PerksAndTraitsScreen = () => {
+   return (
+     <View style={styles.container}>
+       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
++        <Text style={styles.sectionTitle}>{tPerksAndTraits('labels.traitsSection')}</Text>
+         {traitSpoilers.map((entry) => renderSpoiler({
+           spoilerKey: entry.spoilerKey,
+           title: entry.title,
+           description: entry.description,
+         }))}
+ 
++        <Text style={styles.sectionTitle}>{tPerksAndTraits('labels.perksSection')}</Text>
+         {perkSpoilers.map(({ perk, replaceIndex, spoilerKey }) => {
+           const display = getPerkSheetDisplay(perk);
+           const rankLabel = perk?.rank != null
+diff --git a/i18n/en-EN/screens/perksAndTraits/screen.json b/i18n/en-EN/screens/perksAndTraits/screen.json
+index 3da9017..c5b766b 100644
+--- a/i18n/en-EN/screens/perksAndTraits/screen.json
++++ b/i18n/en-EN/screens/perksAndTraits/screen.json
+@@ -3,7 +3,9 @@
+     "name": "Name",
+     "rank": "Rank",
+     "rankValue": "Rank {rank}",
+-    "description": "Description"
++    "description": "Description",
++    "traitsSection": "Traits",
++    "perksSection": "Perks"
+   },
+   "buttons": {
+     "addPerk": "+ Add perk",
+diff --git a/i18n/ru-RU/screens/perksAndTraits/screen.json b/i18n/ru-RU/screens/perksAndTraits/screen.json
+index 9f6976c..279a6b7 100644
+--- a/i18n/ru-RU/screens/perksAndTraits/screen.json
++++ b/i18n/ru-RU/screens/perksAndTraits/screen.json
+@@ -3,7 +3,9 @@
+     "name": "Название",
+     "rank": "Ранг",
+     "rankValue": "Ранг {rank}",
+-    "description": "Описание"
++    "description": "Описание",
++    "traitsSection": "Черты",
++    "perksSection": "Перки"
+   },
+   "buttons": {
+     "addPerk": "+ Добавить перк",
+diff --git a/styles/PerksAndTraitsScreen.styles.js b/styles/PerksAndTraitsScreen.styles.js
+index e197397..09090bb 100644
+--- a/styles/PerksAndTraitsScreen.styles.js
++++ b/styles/PerksAndTraitsScreen.styles.js
+@@ -4,6 +4,22 @@ const styles = StyleSheet.create({
+   container: { flex: 1, padding: 16, alignItems: 'center' },
+   scrollView: { width: '100%' },
+   scrollContent: { paddingBottom: 72 },
++  sectionTitle: {
++    color: '#fff',
++    backgroundColor: '#1a1a1a',
++    fontSize: 15,
++    fontWeight: '700',
++    letterSpacing: 0.4,
++    textTransform: 'uppercase',
++    paddingVertical: 8,
++    paddingHorizontal: 12,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    marginBottom: 8,
++    marginTop: 8,
++    overflow: 'hidden',
++  },
+   spoiler: { marginBottom: 8, width: '100%' },
+   spoilerHeader: {
+     flexDirection: 'row',
