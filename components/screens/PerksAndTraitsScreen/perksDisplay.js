@@ -21,7 +21,43 @@ const getLocaleMap = () => {
   return localizedPerks;
 };
 
-export const getPerkDisplay = (perk) => {
+const getRankEffects = (localized) => {
+  if (localized.rankEffects == null) return null;
+  if (!Array.isArray(localized.rankEffects) || localized.rankEffects.length === 0) {
+    throw new Error(`[perksDisplay] У перка "${localized.id}" rankEffects должен быть непустым массивом`);
+  }
+  return localized.rankEffects;
+};
+
+const requireRankText = (localized, rank) => {
+  const rankEffects = getRankEffects(localized);
+  if (!rankEffects) return localized.effect;
+  const requested = Number(rank);
+  if (!Number.isFinite(requested) || requested < 1) {
+    throw new Error(`[perksDisplay] Для перка "${localized.id}" нужен номер ранга`);
+  }
+  const text = rankEffects[requested - 1];
+  if (typeof text !== 'string' || text.length === 0) {
+    throw new Error(`[perksDisplay] У перка "${localized.id}" нет текста ранга ${requested}`);
+  }
+  return text;
+};
+
+const requireTakenRankTexts = (localized, rank) => {
+  const rankEffects = getRankEffects(localized);
+  if (!rankEffects) return localized.effect;
+  const requested = Number(rank);
+  if (!Number.isFinite(requested) || requested < 1) {
+    throw new Error(`[perksDisplay] Для перка "${localized.id}" нужен номер ранга`);
+  }
+  const taken = [];
+  for (let index = 1; index <= requested; index += 1) {
+    taken.push(requireRankText(localized, index));
+  }
+  return taken.join('\n\n');
+};
+
+export const getPerkDisplay = (perk, { rank } = {}) => {
   if (!perk) return { name: '', description: '' };
   if (!perk.id) throw new Error('[perksDisplay] Перк без id');
   const localized = getLocaleMap().get(perk.id);
@@ -31,7 +67,7 @@ export const getPerkDisplay = (perk) => {
 
   return {
     name: localized.name,
-    description: localized.effect,
+    description: rank == null ? localized.effect : requireRankText(localized, rank),
   };
 };
 
@@ -40,7 +76,10 @@ export const getPerkSheetDisplay = (perk) => {
   if (id) {
     const localized = getLocaleMap().get(id);
     if (localized?.name) {
-      return { name: localized.name, description: localized.effect };
+      return {
+        name: localized.name,
+        description: requireTakenRankTexts(localized, perk?.rank ?? 1),
+      };
     }
   }
   return {

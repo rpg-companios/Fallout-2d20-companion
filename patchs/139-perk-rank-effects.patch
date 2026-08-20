@@ -1,0 +1,192 @@
+diff --git a/__tests__/perks/perk-display.test.js b/__tests__/perks/perk-display.test.js
+new file mode 100644
+index 0000000..c99f9a8
+--- /dev/null
++++ b/__tests__/perks/perk-display.test.js
+@@ -0,0 +1,36 @@
++import { beforeEach, describe, expect, it } from 'vitest';
++import { setCurrentModuleLocale } from '../../i18n/locale';
++import { getPerkDisplay, getPerkSheetDisplay } from '../../components/screens/PerksAndTraitsScreen/perksDisplay';
++
++describe('perk rank texts', () => {
++  beforeEach(() => {
++    setCurrentModuleLocale('ru-RU');
++  });
++
++  it('shows only the next rank in the perk list', () => {
++    const perk = { id: 'leadBelly' };
++    expect(getPerkDisplay(perk, { rank: 1 }).description).toBe(
++      'Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков.',
++    );
++    expect(getPerkDisplay(perk, { rank: 2 }).description).toBe(
++      'У вас появляется иммунитет к радиационному урону от употребления облученной пищи или напитков.',
++    );
++  });
++
++  it('joins taken ranks as paragraphs on the sheet', () => {
++    const display = getPerkSheetDisplay({ id: 'leadBelly', rank: 2 });
++    expect(display.description).toBe(
++      'Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков.\n\nУ вас появляется иммунитет к радиационному урону от употребления облученной пищи или напитков.',
++    );
++  });
++
++  it('keeps a single effect when rankEffects are not in the data', () => {
++    const perk = { id: 'scrounger' };
++    const listed = getPerkDisplay(perk, { rank: 2 });
++    const sheet = getPerkSheetDisplay({ id: 'scrounger', rank: 2 });
++    expect(listed.description).toBe(
++      'На 1-м ранге вы находите +3 {/CD} дополнительных патронов. На 2-м ранге вы находите +6 {/CD} дополнительных патронов. На 3-м ранге вы получаете +10 {/CD} дополнительных патронов.',
++    );
++    expect(sheet.description).toBe(listed.description);
++  });
++});
+diff --git a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+index 55dfa15..9a74d6e 100644
+--- a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
++++ b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+@@ -30,9 +30,9 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
+ 
+           <ScrollView style={{ maxHeight: 420 }}>
+             {(annotatedPerks || []).map((entry, index) => {
+-              const { perk, available, unmet } = entry;
++              const { perk, available, unmet, nextRank } = entry;
+               const isExpanded = expandedIndex === index;
+-              const display = getPerkDisplay(perk);
++              const display = getPerkDisplay(perk, nextRank == null ? {} : { rank: nextRank });
+               const isSelected = isSamePerkRank(selectedPerk, perk);
+               
+               // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
+diff --git a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index 89cc5a8..2db6d83 100644
+--- a/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -5,6 +5,8 @@ import { getTraitI18nById } from '../../../domain/traits';
+ import {
+   applyPerkSelection,
+   collapseSelectedPerks,
++  getPerkMaxRanks,
++  getPerkSelectionCount,
+   removeSelectedPerkAt,
+   withAssignedPerkRanks,
+ } from '../../../domain/perks';
+@@ -78,7 +80,15 @@ const PerksAndTraitsScreen = () => {
+   }, [trait, moduleLocale]);
+ 
+   const annotatedPerks = useMemo(
+-    () => annotatePerks(perksData, { replaceIndex: replacingIndex }),
++    () => annotatePerks(perksData, { replaceIndex: replacingIndex }).map((entry) => {
++      const perkId = entry.perk?.id;
++      const taken = getPerkSelectionCount(selectedPerks, perkId, { ignoreIndex: replacingIndex });
++      const maxRanks = getPerkMaxRanks(entry.perk);
++      return {
++        ...entry,
++        nextRank: Math.min(taken + 1, maxRanks),
++      };
++    }),
+     [annotatePerks, selectedPerks, replacingIndex],
+   );
+ 
+diff --git a/components/screens/PerksAndTraitsScreen/perksDisplay.js b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+index ec742f6..af51d76 100644
+--- a/components/screens/PerksAndTraitsScreen/perksDisplay.js
++++ b/components/screens/PerksAndTraitsScreen/perksDisplay.js
+@@ -21,7 +21,43 @@ const getLocaleMap = () => {
+   return localizedPerks;
+ };
+ 
+-export const getPerkDisplay = (perk) => {
++const getRankEffects = (localized) => {
++  if (localized.rankEffects == null) return null;
++  if (!Array.isArray(localized.rankEffects) || localized.rankEffects.length === 0) {
++    throw new Error(`[perksDisplay] У перка "${localized.id}" rankEffects должен быть непустым массивом`);
++  }
++  return localized.rankEffects;
++};
++
++const requireRankText = (localized, rank) => {
++  const rankEffects = getRankEffects(localized);
++  if (!rankEffects) return localized.effect;
++  const requested = Number(rank);
++  if (!Number.isFinite(requested) || requested < 1) {
++    throw new Error(`[perksDisplay] Для перка "${localized.id}" нужен номер ранга`);
++  }
++  const text = rankEffects[requested - 1];
++  if (typeof text !== 'string' || text.length === 0) {
++    throw new Error(`[perksDisplay] У перка "${localized.id}" нет текста ранга ${requested}`);
++  }
++  return text;
++};
++
++const requireTakenRankTexts = (localized, rank) => {
++  const rankEffects = getRankEffects(localized);
++  if (!rankEffects) return localized.effect;
++  const requested = Number(rank);
++  if (!Number.isFinite(requested) || requested < 1) {
++    throw new Error(`[perksDisplay] Для перка "${localized.id}" нужен номер ранга`);
++  }
++  const taken = [];
++  for (let index = 1; index <= requested; index += 1) {
++    taken.push(requireRankText(localized, index));
++  }
++  return taken.join('\n\n');
++};
++
++export const getPerkDisplay = (perk, { rank } = {}) => {
+   if (!perk) return { name: '', description: '' };
+   if (!perk.id) throw new Error('[perksDisplay] Перк без id');
+   const localized = getLocaleMap().get(perk.id);
+@@ -31,7 +67,7 @@ export const getPerkDisplay = (perk) => {
+ 
+   return {
+     name: localized.name,
+-    description: localized.effect,
++    description: rank == null ? localized.effect : requireRankText(localized, rank),
+   };
+ };
+ 
+@@ -40,7 +76,10 @@ export const getPerkSheetDisplay = (perk) => {
+   if (id) {
+     const localized = getLocaleMap().get(id);
+     if (localized?.name) {
+-      return { name: localized.name, description: localized.effect };
++      return {
++        name: localized.name,
++        description: requireTakenRankTexts(localized, perk?.rank ?? 1),
++      };
+     }
+   }
+   return {
+diff --git a/modules/fallout/i18n/en-EN/data/perks/perks.json b/modules/fallout/i18n/en-EN/data/perks/perks.json
+index b5866a8..804152d 100644
+--- a/modules/fallout/i18n/en-EN/data/perks/perks.json
++++ b/modules/fallout/i18n/en-EN/data/perks/perks.json
+@@ -42,7 +42,11 @@
+   {
+     "id": "leadBelly",
+     "name": "Lead Belly",
+-    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink."
++    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink.",
++    "rankEffects": [
++      "Reroll radiation CD from irradiated food/drink.",
++      "Immune to radiation from food/drink."
++    ]
+   },
+   {
+     "id": "juryRigging",
+diff --git a/modules/fallout/i18n/ru-RU/data/perks/perks.json b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+index 3d0ba2d..53c7be0 100644
+--- a/modules/fallout/i18n/ru-RU/data/perks/perks.json
++++ b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+@@ -42,7 +42,11 @@
+   {
+     "id": "leadBelly",
+     "name": "СВИНЦОВОЕ БРЮХО",
+-    "effect": "Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков."
++    "effect": "Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков.",
++    "rankEffects": [
++      "Вы можете перебросить D, чтобы определить, получаете ли вы радиационный урон от облученной пищи или напитков.",
++      "У вас появляется иммунитет к радиационному урону от употребления облученной пищи или напитков."
++    ]
+   },
+   {
+     "id": "juryRigging",

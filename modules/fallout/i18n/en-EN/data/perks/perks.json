@@ -42,7 +42,11 @@
   {
     "id": "leadBelly",
     "name": "Lead Belly",
-    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink."
+    "effect": "Rank 1: Reroll radiation CD from irradiated food/drink. Rank 2: Immune to radiation from food/drink.",
+    "rankEffects": [
+      "Reroll radiation CD from irradiated food/drink.",
+      "Immune to radiation from food/drink."
+    ]
   },
   {
     "id": "juryRigging",

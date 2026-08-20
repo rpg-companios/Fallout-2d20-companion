@@ -30,9 +30,9 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
 
           <ScrollView style={{ maxHeight: 420 }}>
             {(annotatedPerks || []).map((entry, index) => {
-              const { perk, available, unmet } = entry;
+              const { perk, available, unmet, nextRank } = entry;
               const isExpanded = expandedIndex === index;
-              const display = getPerkDisplay(perk);
+              const display = getPerkDisplay(perk, nextRank == null ? {} : { rank: nextRank });
               const isSelected = isSamePerkRank(selectedPerk, perk);
               
               // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.

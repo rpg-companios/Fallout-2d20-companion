@@ -5,6 +5,8 @@ import { getTraitI18nById } from '../../../domain/traits';
 import {
   applyPerkSelection,
   collapseSelectedPerks,
+  getPerkMaxRanks,
+  getPerkSelectionCount,
   removeSelectedPerkAt,
   withAssignedPerkRanks,
 } from '../../../domain/perks';
@@ -78,7 +80,15 @@ const PerksAndTraitsScreen = () => {
   }, [trait, moduleLocale]);
 
   const annotatedPerks = useMemo(
-    () => annotatePerks(perksData, { replaceIndex: replacingIndex }),
+    () => annotatePerks(perksData, { replaceIndex: replacingIndex }).map((entry) => {
+      const perkId = entry.perk?.id;
+      const taken = getPerkSelectionCount(selectedPerks, perkId, { ignoreIndex: replacingIndex });
+      const maxRanks = getPerkMaxRanks(entry.perk);
+      return {
+        ...entry,
+        nextRank: Math.min(taken + 1, maxRanks),
+      };
+    }),
     [annotatePerks, selectedPerks, replacingIndex],
   );
 
