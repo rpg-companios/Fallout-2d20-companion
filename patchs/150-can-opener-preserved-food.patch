@@ -1,0 +1,156 @@
+diff --git a/__tests__/perks/found-item-bonus.test.js b/__tests__/perks/found-item-bonus.test.js
+index 587c31b..fdbdc2e 100644
+--- a/__tests__/perks/found-item-bonus.test.js
++++ b/__tests__/perks/found-item-bonus.test.js
+@@ -9,6 +9,7 @@ afterEach(() => {
+ 
+ const scrounger = perksData.find((perk) => perk.id === 'scrounger');
+ const fortuneFinder = perksData.find((perk) => perk.id === 'fortuneFinder');
++const canOpener = perksData.find((perk) => perk.id === 'canOpener');
+ 
+ describe('found item perk bonuses', () => {
+   it('gives Scrounger extra ammo combat dice by rank', () => {
+@@ -40,6 +41,13 @@ describe('found item perk bonuses', () => {
+       { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 10 },
+     ]);
+   });
++
++  it('gives Can Opener +1 preserved food', () => {
++    const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }]);
++    expect(result.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'canOpener', itemType: 'food', extra: 1, match: { preserved: true } },
++    ]);
++  });
+ });
+ 
+ describe('rollFoundItemBonuses', () => {
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 767460f..78534df 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -487,10 +487,8 @@ const InventoryScreen = () => {
+ 
+   const handleAddItem = (item, quantity = 1, source = 'loot') => {
+     const localizedItem = resolveLocalizedItem(item);
+-    const bonusEvents = source === 'loot'
+-      && getItemType(localizedItem) === 'ammo'
+-      && !isFusionCoreItem(localizedItem)
+-      ? rollFoundItemBonuses(storePerkBonuses, 'ammo')
++    const bonusEvents = source === 'loot' && !isFusionCoreItem(localizedItem)
++      ? rollFoundItemBonuses(storePerkBonuses, getItemType(localizedItem), localizedItem)
+       : [];
+     quantity += sumFoundItemBonus(bonusEvents);
+ 
+diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
+index 9420939..bc0fdad 100644
+--- a/domain/foundItemBonus.js
++++ b/domain/foundItemBonus.js
+@@ -2,18 +2,35 @@
+ // Универсальный бонус «нашёл X → +n того же типа».
+ // Перк кладёт запись в perkBonuses.foundItemBonuses;
+ // UI после попадания предметов в инвентарь показывает алерт.
++//
++// Запись:
++//   combatDice — сумма бросков CD;
++//   extra — фиксированное число;
++//   match — поля предмета, которые должны совпасть (например preserved: true).
+ 
+ import { rollMultipleCombatDice } from './diceRollsLogic';
+ 
+-export function rollFoundItemBonuses(perkBonuses, itemType) {
++const itemMatchesBonus = (item, match) => {
++  if (!match || typeof match !== 'object' || Array.isArray(match)) return true;
++  if (!item || typeof item !== 'object') return false;
++  return Object.entries(match).every(([key, value]) => item[key] === value);
++};
++
++export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+   const bonuses = perkBonuses?.foundItemBonuses;
+   if (!Array.isArray(bonuses) || !itemType) return [];
+ 
+   return bonuses.flatMap((bonus) => {
+     if (!bonus || bonus.itemType !== itemType) return [];
++    if (!itemMatchesBonus(item, bonus.match)) return [];
++
++    const extra = Number(bonus.extra) || 0;
+     const combatDice = Number(bonus.combatDice) || 0;
+-    if (combatDice <= 0) return [];
+-    const amount = rollMultipleCombatDice(combatDice).total;
++    let amount = extra;
++    if (combatDice > 0) {
++      amount += rollMultipleCombatDice(combatDice).total;
++    }
++    if (amount <= 0) return [];
+     return [{
+       perkId: bonus.perkId,
+       itemType,
+diff --git a/domain/perks/canOpener.js b/domain/perks/canOpener.js
+new file mode 100644
+index 0000000..aa37bed
+--- /dev/null
++++ b/domain/perks/canOpener.js
+@@ -0,0 +1,16 @@
++// domain/perks/canOpener.js
++// Добыча еды с preserved: true — к введённому количеству +1.
++
++export const canOpenerPerk = {
++  id: 'canOpener',
++  apply() {
++    return {
++      foundItemBonuses: [{
++        perkId: 'canOpener',
++        itemType: 'food',
++        extra: 1,
++        match: { preserved: true },
++      }],
++    };
++  },
++};
+diff --git a/domain/perks/index.js b/domain/perks/index.js
+index a7d1fa7..5391a3e 100644
+--- a/domain/perks/index.js
++++ b/domain/perks/index.js
+@@ -14,6 +14,7 @@ import { fastMetabolismPerk } from './fastMetabolism';
+ import { leadBellyPerk } from './leadBelly';
+ import { scroungerPerk } from './scrounger';
+ import { fortuneFinderPerk } from './fortuneFinder';
++import { canOpenerPerk } from './canOpener';
+ 
+ export const perkEffects = {
+   [intenseTrainingPerk.id]: intenseTrainingPerk,
+@@ -32,6 +33,7 @@ export const perkEffects = {
+   [leadBellyPerk.id]: leadBellyPerk,
+   [scroungerPerk.id]: scroungerPerk,
+   [fortuneFinderPerk.id]: fortuneFinderPerk,
++  [canOpenerPerk.id]: canOpenerPerk,
+ };
+ 
+ export function getPerkEffect(effectId) {
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 8c9e0d2..ed48887 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -96,7 +96,8 @@
+   },
+   "foundItemTypes": {
+     "ammo": "ammo",
+-    "caps": "caps"
++    "caps": "caps",
++    "food": "food"
+   },
+   "actions": {
+     "cancel": "Cancel",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index b93b06b..aeeff64 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -96,7 +96,8 @@
+   },
+   "foundItemTypes": {
+     "ammo": "патронов",
+-    "caps": "крышек"
++    "caps": "крышек",
++    "food": "еды"
+   },
+   "actions": {
+     "cancel": "Отмена",
