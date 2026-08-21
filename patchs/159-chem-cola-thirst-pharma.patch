@@ -1,12 +1,12 @@
 diff --git a/__tests__/perks/chem-cola-thirst-pharma.test.js b/__tests__/perks/chem-cola-thirst-pharma.test.js
 new file mode 100644
-index 0000000..8dfe64a
+index 0000000..7d4c631
 --- /dev/null
 +++ b/__tests__/perks/chem-cola-thirst-pharma.test.js
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,88 @@
 +import { afterEach, describe, expect, it, vi } from 'vitest';
 +import { checkAddiction, resolveConsumableVitalChanges } from '../../domain/effects';
-+import { pickRandomItem, rollFoundItemBonuses } from '../../domain/foundItemBonus';
++import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../domain/foundItemBonus';
 +import { calculatePerkEffects } from '../../domain/perks';
 +import { COLA_NUT_DRINK_IDS } from '../../domain/perks/colaNut';
 +import { DIRTY_WATER_ID } from '../../domain/perks/thirstQuencher';
@@ -19,6 +19,12 @@ index 0000000..8dfe64a
 +
 +const byId = (id) => perksData.find((perk) => perk.id === id);
 +const drinkById = (id) => drinks.find((item) => item.id === id);
++
++const getHeal = (item) => {
++  const pe = item.positiveEffect;
++  if (pe && typeof pe === 'object' && pe.hpModifier?.op === '+') return Number(pe.hpModifier.value) || 0;
++  return Number(item.hpHealed) || 0;
++};
 +
 +describe('chemResistant', () => {
 +  it('penalizes addiction dice at rank 1 and grants immunity at rank 2', () => {
@@ -60,12 +66,6 @@ index 0000000..8dfe64a
 +  });
 +});
 +
-+const getHeal = (item) => {
-+  const pe = item.positiveEffect;
-+  if (pe && typeof pe === 'object' && pe.hpModifier?.op === '+') return Number(pe.hpModifier.value) || 0;
-+  return Number(item.hpHealed) || 0;
-+};
-+
 +describe('thirstQuencher', () => {
 +  it('flags dirty water disease skip', () => {
 +    const result = calculatePerkEffects([byId('thirstQuencher')], [{ id: 'thirstQuencher', rank: 1 }]);
@@ -75,15 +75,16 @@ index 0000000..8dfe64a
 +});
 +
 +describe('pharmaFarmer', () => {
-+  it('adds one of the same chem and marks a random extra chem', () => {
++  it('adds one random chem from the catalog, not extra of the looted chem', () => {
 +    const result = calculatePerkEffects([byId('pharmaFarmer')], [{ id: 'pharmaFarmer', rank: 1 }]);
 +    expect(result.bonuses.foundItemBonuses).toEqual([
 +      { perkId: 'pharmaFarmer', itemType: 'chem', extra: 1, extraRandom: true },
 +    ]);
 +    const events = rollFoundItemBonuses(result.bonuses, 'chem', { name: 'Стимулятор' });
-+    expect(events[0].amount).toBe(1);
-+    expect(events[0].itemName).toBe('Стимулятор');
-+    expect(events[0].extraRandom).toBe(true);
++    expect(events).toEqual([
++      { perkId: 'pharmaFarmer', itemType: 'chem', amount: 1, extraRandom: true },
++    ]);
++    expect(sumFoundItemBonus(events)).toBe(0);
 +  });
 +
 +  it('picks a named catalog item', () => {
@@ -162,7 +163,7 @@ index 8a5d8ab..55a1e07 100644
          setConditions((prev) => [...prev, 'addicted']);
          // Перманентный эффект зависимости: отображается в карточке эффектов,
 diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
-index bdf9dc7..c01df05 100644
+index bdf9dc7..3e7b900 100644
 --- a/components/screens/InventoryScreen/InventoryScreen.js
 +++ b/components/screens/InventoryScreen/InventoryScreen.js
 @@ -24,7 +24,7 @@ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.j
@@ -174,7 +175,47 @@ index bdf9dc7..c01df05 100644
  import { getPerkDisplay } from '../PerksAndTraitsScreen/perksDisplay';
  import { debugLog } from '../../../src/debug/falloutDebug';
  import { useLocale, useModuleLocale } from '../../../i18n/locale';
-@@ -515,7 +515,7 @@ const InventoryScreen = () => {
+@@ -330,7 +330,7 @@ const InventoryScreen = () => {
+ 
+   const showFoundItemBonusAlerts = (events) => {
+     (events || []).forEach((event) => {
+-      if (!event?.amount) return;
++      if (!event?.amount || event.extraRandom) return;
+       showAlert(formatInventoryText(tInventory('screen.alerts.foundItemBonus'), {
+         perkName: getPerkDisplay({ id: event.perkId }).name,
+         amount: event.amount,
+@@ -341,6 +341,30 @@ const InventoryScreen = () => {
+     });
+   };
+ 
++  const extraRandomCatalogFor = (itemType) => {
++    if (itemType === 'chem' || itemType === 'chems') return equipmentCatalog.chems;
++    throw new Error(`[InventoryScreen] Нет каталога случайных предметов для типа ${itemType}`);
++  };
++
++  const finishLootBonuses = (events) => {
++    (events || []).forEach((event) => {
++      if (!event?.extraRandom) return;
++      const count = Number(event.amount) || 0;
++      const catalog = extraRandomCatalogFor(event.itemType);
++      for (let i = 0; i < count; i += 1) {
++        const picked = pickRandomItem(catalog);
++        handleAddItem(picked, 1, 'perkBonus');
++        showFoundItemBonusAlerts([{
++          perkId: event.perkId,
++          itemType: event.itemType,
++          amount: 1,
++          itemName: picked.name,
++        }]);
++      }
++    });
++    showFoundItemBonusAlerts(events);
++  };
++
+   const handleSaveCaps = (amount) => {
+     if (capsOperationType === 'add') {
+       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
+@@ -515,7 +539,7 @@ const InventoryScreen = () => {
            });
          }
        }
@@ -183,7 +224,7 @@ index bdf9dc7..c01df05 100644
        return;
      }
  
-@@ -538,11 +538,11 @@ const InventoryScreen = () => {
+@@ -538,11 +562,11 @@ const InventoryScreen = () => {
        const existingItem = findUnequippedStoreItemByStackKey(stackKey);
        if (existingItem) {
          adjustStoreItemQuantity(existingItem.id, quantity);
@@ -197,7 +238,7 @@ index bdf9dc7..c01df05 100644
        return;
      }
  
-@@ -562,7 +562,7 @@ const InventoryScreen = () => {
+@@ -562,7 +586,7 @@ const InventoryScreen = () => {
            durabilityWearRemainder: 0,
          });
        }
@@ -206,7 +247,7 @@ index bdf9dc7..c01df05 100644
        return;
      }
  
-@@ -571,7 +571,7 @@ const InventoryScreen = () => {
+@@ -571,7 +595,7 @@ const InventoryScreen = () => {
  
      if (existingItem) {
        adjustStoreItemQuantity(existingItem.id, quantity);
@@ -215,7 +256,7 @@ index bdf9dc7..c01df05 100644
        return;
      }
  
-@@ -580,7 +580,7 @@ const InventoryScreen = () => {
+@@ -580,7 +604,7 @@ const InventoryScreen = () => {
        itemType: getItemType(localizedItem),
        quantity,
      });
@@ -225,10 +266,34 @@ index bdf9dc7..c01df05 100644
  
  
 diff --git a/domain/effects.js b/domain/effects.js
-index 2bb9b20..d16d23f 100644
+index 2bb9b20..8136292 100644
 --- a/domain/effects.js
 +++ b/domain/effects.js
-@@ -628,6 +628,7 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+@@ -236,8 +236,10 @@ export const recordDoseWithinWindow = (doseLog, dose, { now, windowMs }) => {
+  *
+  * @param {object} item          — предмет с полем addictionLevel
+  * @param {number} dosesToday    — сколько всего доз препаратов принято за 24 ч (включая текущую)
+- * @param {object} [options]     — { anyEffect?: boolean } (Тень и Стелс-бой:
+- *                                 зависимость при ЛЮБОМ эффекте на кубике)
++ * @param {object} [options]     — { anyEffect?: boolean, dicePenalty?: number }
++ *                                 anyEffect: Тень и Стелс-бой — зависимость при
++ *                                 ЛЮБОМ эффекте на кубике.
++ *                                 dicePenalty: меньше CD (не ниже 0).
+  * @returns {{ addicted: boolean, effectCount: number, faces: number[], addictionLevel: number }}
+  */
+ export const checkAddiction = (item, dosesToday, options = {}) => {
+@@ -245,7 +247,9 @@ export const checkAddiction = (item, dosesToday, options = {}) => {
+     if (addictionLevel === 0 || !item?.negativeEffect) {
+         return { addicted: false, effectCount: 0, faces: [], addictionLevel: 0 };
+     }
+-    const { effectCount, faces } = rollCombatDiceEffects(dosesToday);
++    const dicePenalty = Number(options.dicePenalty) || 0;
++    const diceCount = Math.max(0, (Number(dosesToday) || 0) - dicePenalty);
++    const { effectCount, faces } = rollCombatDiceEffects(diceCount);
+     const addicted = options.anyEffect
+         ? effectCount > 0 // Тень: любой эффект на кубике → зависимость
+         : effectCount >= addictionLevel;
+@@ -628,6 +632,7 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
          maxHealth,
          radiation,
          hpHealBonus = 0,
@@ -236,7 +301,7 @@ index 2bb9b20..d16d23f 100644
          radiationImmune = false,
          skipIrradiatedRadiation = false,
      } = options;
-@@ -636,11 +637,13 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+@@ -636,11 +641,13 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
          || !Number.isFinite(maxHealth)
          || !Number.isFinite(radiation)
          || !Number.isFinite(hpHealBonus)
@@ -252,38 +317,41 @@ index 2bb9b20..d16d23f 100644
          ? Math.max(0, instantHealAmount + hpHealBonus)
          : 0;
 diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
-index 92599a8..3e721ef 100644
+index 92599a8..ae27de0 100644
 --- a/domain/foundItemBonus.js
 +++ b/domain/foundItemBonus.js
-@@ -31,18 +31,22 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
-     if (combatDice > 0) {
-       amount += rollMultipleCombatDice(combatDice).total;
-     }
--    if (amount <= 0) return [];
-+    if (amount <= 0 && !bonus.extraRandom) return [];
-     const event = {
-       perkId: bonus.perkId,
+@@ -6,8 +6,9 @@
+ // Запись:
+ //   combatDice — сумма бросков CD;
+ //   extra — фиксированное число;
++//   extraRandom — true: extra штук случайных из каталога типа, не того же предмета;
+ //   match — поля предмета, которые должны совпасть (например state: 'cooked').
+-// Имя в алерте: если передан предмет, берётся item.name.
++// Имя в алерте: если передан предмет и бонус не extraRandom, берётся item.name.
+ 
+ import { rollMultipleCombatDice } from './diceRollsLogic';
+ 
+@@ -37,7 +38,9 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
        itemType,
        amount,
      };
 -    if (item) {
-+    if (bonus.extraRandom) event.extraRandom = true;
-+    if (item && amount > 0) {
++    if (bonus.extraRandom) {
++      event.extraRandom = true;
++    } else if (item) {
        if (typeof item.name !== 'string' || item.name.length === 0) {
          throw new Error('[foundItemBonus] Для алерта нужно имя предмета');
        }
-       event.itemName = item.name;
-     }
-+    if (amount <= 0 && bonus.extraRandom) {
-+      return [{ perkId: bonus.perkId, itemType, amount: 0, extraRandom: true }];
-+    }
-     return [event];
-   });
+@@ -48,5 +51,20 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
  }
-@@ -50,3 +54,15 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+ 
  export function sumFoundItemBonus(events) {
-   return (events || []).reduce((sum, event) => sum + (Number(event.amount) || 0), 0);
- }
+-  return (events || []).reduce((sum, event) => sum + (Number(event.amount) || 0), 0);
++  return (events || []).reduce((sum, event) => {
++    if (event?.extraRandom) return sum;
++    return sum + (Number(event.amount) || 0);
++  }, 0);
++}
 +
 +export function pickRandomItem(items) {
 +  if (!Array.isArray(items) || items.length === 0) {
@@ -295,7 +363,7 @@ index 92599a8..3e721ef 100644
 +    throw new Error('[foundItemBonus] У случайного предмета нет имени');
 +  }
 +  return picked;
-+}
+ }
 diff --git a/domain/perks/chemResistant.js b/domain/perks/chemResistant.js
 new file mode 100644
 index 0000000..767b5da
@@ -368,12 +436,13 @@ index 807d5ae..3a520bd 100644
  export function getPerkEffect(effectId) {
 diff --git a/domain/perks/pharmaFarmer.js b/domain/perks/pharmaFarmer.js
 new file mode 100644
-index 0000000..5ae3da0
+index 0000000..c30bbcb
 --- /dev/null
 +++ b/domain/perks/pharmaFarmer.js
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,17 @@
 +// domain/perks/pharmaFarmer.js
-+// Добыча препарата: n+1 того же + 1 случайный препарат из всего каталога.
++// Добыча препарата: +1 случайный препарат из всего каталога.
++// Введённое количество того же препарата не увеличивается.
 +
 +export const pharmaFarmerPerk = {
 +  id: 'pharmaFarmer',
