@@ -1,0 +1,788 @@
+diff --git a/data/bodyplans/bodyplans.json b/data/bodyplans/bodyplans.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/bodyplans/bodyplans.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/conditions/diseases.json b/data/conditions/diseases.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/conditions/diseases.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/consumables/chems.json b/data/consumables/chems.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/consumables/chems.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/consumables/drinks.json b/data/consumables/drinks.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/data/consumables/drinks.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/data/consumables/food.json b/data/consumables/food.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/data/consumables/food.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/data/consumables/magazines.json b/data/consumables/magazines.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/consumables/magazines.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/ammo.json b/data/equipment/ammo.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/ammo.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/armor.json b/data/equipment/armor.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/armor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/armor_effects.json b/data/equipment/armor_effects.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/armor_effects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/armor_mods.json b/data/equipment/armor_mods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/armor_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/clothes.json b/data/equipment/clothes.json
+deleted file mode 100644
+index 73c1efe..0000000
+--- a/data/equipment/clothes.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "clothes": [] }
+diff --git a/data/equipment/general_goods.json b/data/equipment/general_goods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/general_goods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/oddities.json b/data/equipment/oddities.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/oddities.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/powerArmor.json b/data/equipment/powerArmor.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/powerArmor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/robot/armor.json b/data/equipment/robot/armor.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/robot/armor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/robot/armor_plating.json b/data/equipment/robot/armor_plating.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/robot/armor_plating.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/robot/frames.json b/data/equipment/robot/frames.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/robot/frames.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/robot/robotarms.json b/data/equipment/robot/robotarms.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/robot/robotarms.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/robot/robotbody.json b/data/equipment/robot/robotbody.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/robot/robotbody.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/robot/robotheads.json b/data/equipment/robot/robotheads.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/robot/robotheads.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/robot/robotlegs.json b/data/equipment/robot/robotlegs.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/robot/robotlegs.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/robot/weapons.json b/data/equipment/robot/weapons.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/robot/weapons.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/robotparts.json b/data/equipment/robotparts.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/robotparts.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/uniq_armor_mods.json b/data/equipment/uniq_armor_mods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/uniq_armor_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/uniq_qualities.json b/data/equipment/uniq_qualities.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/uniq_qualities.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/equipment/weapon_mod_slots.json b/data/equipment/weapon_mod_slots.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/equipment/weapon_mod_slots.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/equipment/weapon_mods.json b/data/equipment/weapon_mods.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/data/equipment/weapon_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/data/equipment/weapons.json b/data/equipment/weapons.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/equipment/weapons.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/_stubs.json b/data/loot/_stubs.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/_stubs.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/brewery.json b/data/loot/brewery.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/brewery.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/chems.json b/data/loot/chems.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/chems.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/food.json b/data/loot/food.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/food.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/outcast.json b/data/loot/outcast.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/outcast.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/trinkets.json b/data/loot/trinkets.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/trinkets.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/loot/weapons_melee.json b/data/loot/weapons_melee.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/loot/weapons_melee.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/origins/origins.json b/data/origins/origins.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/origins/origins.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/perks/perks.json b/data/perks/perks.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/perks/perks.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/data/skillRewards.json b/data/skillRewards.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/data/skillRewards.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/data/traits/traits.json b/data/traits/traits.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/data/traits/traits.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/conditions/diseases.json b/i18n/en-EN/data/conditions/diseases.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/conditions/diseases.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/consumables/chems.json b/i18n/en-EN/data/consumables/chems.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/consumables/chems.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/consumables/drinks.json b/i18n/en-EN/data/consumables/drinks.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/i18n/en-EN/data/consumables/drinks.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/i18n/en-EN/data/consumables/food.json b/i18n/en-EN/data/consumables/food.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/i18n/en-EN/data/consumables/food.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/i18n/en-EN/data/consumables/magazines.json b/i18n/en-EN/data/consumables/magazines.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/consumables/magazines.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/ammo/ammo_types.json b/i18n/en-EN/data/equipment/ammo/ammo_types.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/ammo/ammo_types.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/armor/armor.json b/i18n/en-EN/data/equipment/armor/armor.json
+deleted file mode 100644
+index 14a3e3e..0000000
+--- a/i18n/en-EN/data/equipment/armor/armor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "armor": [] }
+diff --git a/i18n/en-EN/data/equipment/armor/armor_effects.json b/i18n/en-EN/data/equipment/armor/armor_effects.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/en-EN/data/equipment/armor/armor_effects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/en-EN/data/equipment/armor/armor_mods.json b/i18n/en-EN/data/equipment/armor/armor_mods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/armor/armor_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/armor/clothes.json b/i18n/en-EN/data/equipment/armor/clothes.json
+deleted file mode 100644
+index 73c1efe..0000000
+--- a/i18n/en-EN/data/equipment/armor/clothes.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "clothes": [] }
+diff --git a/i18n/en-EN/data/equipment/armor/powerArmor.json b/i18n/en-EN/data/equipment/armor/powerArmor.json
+deleted file mode 100644
+index 0faf07a..0000000
+--- a/i18n/en-EN/data/equipment/armor/powerArmor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "powerArmor": [] }
+diff --git a/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json b/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/general_goods.json b/i18n/en-EN/data/equipment/general_goods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/general_goods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/items.json b/i18n/en-EN/data/equipment/items.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/items.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/oddities.json b/i18n/en-EN/data/equipment/oddities.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/oddities.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/armor.json b/i18n/en-EN/data/equipment/robot/armor.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/armor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/frames.json b/i18n/en-EN/data/equipment/robot/frames.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/frames.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/items.json b/i18n/en-EN/data/equipment/robot/items.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/items.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/locations.json b/i18n/en-EN/data/equipment/robot/locations.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/en-EN/data/equipment/robot/locations.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/en-EN/data/equipment/robot/modules.json b/i18n/en-EN/data/equipment/robot/modules.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/modules.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/plating.json b/i18n/en-EN/data/equipment/robot/plating.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/plating.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/robotarms.json b/i18n/en-EN/data/equipment/robot/robotarms.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/robotarms.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/robotbody.json b/i18n/en-EN/data/equipment/robot/robotbody.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/robotbody.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/robotheads.json b/i18n/en-EN/data/equipment/robot/robotheads.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/robotheads.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/robotlegs.json b/i18n/en-EN/data/equipment/robot/robotlegs.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/robotlegs.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/robot/weapons.json b/i18n/en-EN/data/equipment/robot/weapons.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/robot/weapons.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/equipment/weapons/weapon_mods.json b/i18n/en-EN/data/equipment/weapons/weapon_mods.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/i18n/en-EN/data/equipment/weapons/weapon_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/i18n/en-EN/data/equipment/weapons/weapons.json b/i18n/en-EN/data/equipment/weapons/weapons.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/equipment/weapons/weapons.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/loot/stubs.json b/i18n/en-EN/data/loot/stubs.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/loot/stubs.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/perks/perks.json b/i18n/en-EN/data/perks/perks.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/perks/perks.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/system/damageEffects.json b/i18n/en-EN/data/system/damageEffects.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/system/damageEffects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/system/effects.json b/i18n/en-EN/data/system/effects.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/en-EN/data/system/effects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/en-EN/data/system/equipmentKits.json b/i18n/en-EN/data/system/equipmentKits.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/i18n/en-EN/data/system/equipmentKits.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/i18n/en-EN/data/system/origins.json b/i18n/en-EN/data/system/origins.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/en-EN/data/system/origins.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/en-EN/data/system/qualities.json b/i18n/en-EN/data/system/qualities.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/en-EN/data/system/qualities.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/en-EN/data/system/traits.json b/i18n/en-EN/data/system/traits.json
+deleted file mode 100644
+index 9bbfe15..0000000
+--- a/i18n/en-EN/data/system/traits.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "traits": {} }
+diff --git a/i18n/ru-RU/data/conditions/diseases.json b/i18n/ru-RU/data/conditions/diseases.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/conditions/diseases.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/consumables/chems.json b/i18n/ru-RU/data/consumables/chems.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/consumables/chems.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/consumables/drinks.json b/i18n/ru-RU/data/consumables/drinks.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/i18n/ru-RU/data/consumables/drinks.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/i18n/ru-RU/data/consumables/food.json b/i18n/ru-RU/data/consumables/food.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/i18n/ru-RU/data/consumables/food.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/i18n/ru-RU/data/consumables/magazines.json b/i18n/ru-RU/data/consumables/magazines.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/consumables/magazines.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/ammo/ammo_types.json b/i18n/ru-RU/data/equipment/ammo/ammo_types.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/ammo/ammo_types.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/armor/armor.json b/i18n/ru-RU/data/equipment/armor/armor.json
+deleted file mode 100644
+index 14a3e3e..0000000
+--- a/i18n/ru-RU/data/equipment/armor/armor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "armor": [] }
+diff --git a/i18n/ru-RU/data/equipment/armor/armor_effects.json b/i18n/ru-RU/data/equipment/armor/armor_effects.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/ru-RU/data/equipment/armor/armor_effects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/ru-RU/data/equipment/armor/armor_mods.json b/i18n/ru-RU/data/equipment/armor/armor_mods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/armor/armor_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/armor/clothes.json b/i18n/ru-RU/data/equipment/armor/clothes.json
+deleted file mode 100644
+index 73c1efe..0000000
+--- a/i18n/ru-RU/data/equipment/armor/clothes.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "clothes": [] }
+diff --git a/i18n/ru-RU/data/equipment/armor/powerArmor.json b/i18n/ru-RU/data/equipment/armor/powerArmor.json
+deleted file mode 100644
+index 0faf07a..0000000
+--- a/i18n/ru-RU/data/equipment/armor/powerArmor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "powerArmor": [] }
+diff --git a/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json b/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/general_goods.json b/i18n/ru-RU/data/equipment/general_goods.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/general_goods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/items.json b/i18n/ru-RU/data/equipment/items.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/items.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/oddities.json b/i18n/ru-RU/data/equipment/oddities.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/oddities.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/armor.json b/i18n/ru-RU/data/equipment/robot/armor.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/armor.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/frames.json b/i18n/ru-RU/data/equipment/robot/frames.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/frames.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/items.json b/i18n/ru-RU/data/equipment/robot/items.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/items.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/locations.json b/i18n/ru-RU/data/equipment/robot/locations.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/ru-RU/data/equipment/robot/locations.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/ru-RU/data/equipment/robot/modules.json b/i18n/ru-RU/data/equipment/robot/modules.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/modules.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/plating.json b/i18n/ru-RU/data/equipment/robot/plating.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/plating.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotarms.json b/i18n/ru-RU/data/equipment/robot/robotarms.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/robotarms.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotbody.json b/i18n/ru-RU/data/equipment/robot/robotbody.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/robotbody.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotheads.json b/i18n/ru-RU/data/equipment/robot/robotheads.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/robotheads.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/robotlegs.json b/i18n/ru-RU/data/equipment/robot/robotlegs.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/robotlegs.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/robot/weapons.json b/i18n/ru-RU/data/equipment/robot/weapons.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/robot/weapons.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/equipment/weapons/weapon_mods.json b/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
+deleted file mode 100644
+index 0637a08..0000000
+--- a/i18n/ru-RU/data/equipment/weapons/weapon_mods.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+\ No newline at end of file
+diff --git a/i18n/ru-RU/data/equipment/weapons/weapons.json b/i18n/ru-RU/data/equipment/weapons/weapons.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/equipment/weapons/weapons.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/loot/stubs.json b/i18n/ru-RU/data/loot/stubs.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/loot/stubs.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/perks/perks.json b/i18n/ru-RU/data/perks/perks.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/perks/perks.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/system/damageEffects.json b/i18n/ru-RU/data/system/damageEffects.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/system/damageEffects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/system/effects.json b/i18n/ru-RU/data/system/effects.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/ru-RU/data/system/effects.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/ru-RU/data/system/equipmentKits.json b/i18n/ru-RU/data/system/equipmentKits.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/i18n/ru-RU/data/system/equipmentKits.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/i18n/ru-RU/data/system/origins.json b/i18n/ru-RU/data/system/origins.json
+deleted file mode 100644
+index 0967ef4..0000000
+--- a/i18n/ru-RU/data/system/origins.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+diff --git a/i18n/ru-RU/data/system/qualities.json b/i18n/ru-RU/data/system/qualities.json
+deleted file mode 100644
+index fe51488..0000000
+--- a/i18n/ru-RU/data/system/qualities.json
++++ /dev/null
+@@ -1 +0,0 @@
+-[]
+diff --git a/i18n/ru-RU/data/system/traits.json b/i18n/ru-RU/data/system/traits.json
+deleted file mode 100644
+index 9bbfe15..0000000
+--- a/i18n/ru-RU/data/system/traits.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{ "traits": {} }
