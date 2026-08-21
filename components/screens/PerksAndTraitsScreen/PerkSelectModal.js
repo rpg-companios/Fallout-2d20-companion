@@ -1,21 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Modal, View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
 import styles from '../../../styles/PerkSelectModal.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
 import { getPerkModalDisplay } from './perksDisplay';
+import { PERK_ATTRIBUTE_FILTER_CODES, perkMatchesAttributeFilters } from '../../../domain/perks';
 
 const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
 
 const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRemovePerk, title }) => {
-  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const [selectedPerk, setSelectedPerk] = useState(null);
+  const [search, setSearch] = useState('');
+  const [attributeFilters, setAttributeFilters] = useState([]);
 
   useEffect(() => {
     if (visible) {
-      setExpandedIndex(null);
+      setExpandedId(null);
       setSelectedPerk(null);
+      setSearch('');
+      setAttributeFilters([]);
     }
   }, [visible]);
+
+  const toggleAttribute = (code) => {
+    setAttributeFilters((prev) => (
+      prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]
+    ));
+    setExpandedId(null);
+  };
+
+  const visiblePerks = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (annotatedPerks || []).filter((entry) => {
+      if (entry.unmet?.maxRank) return false;
+      if (!perkMatchesAttributeFilters(entry.perk, attributeFilters)) return false;
+      if (!term) return true;
+      const display = getPerkModalDisplay(entry.perk, { taken: entry.taken || 0 });
+      return String(display.name || '').toLowerCase().includes(term);
+    });
+  }, [annotatedPerks, attributeFilters, search]);
 
   return (
     <Modal
@@ -28,10 +51,39 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
 
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={(value) => {
+              setSearch(value);
+              setExpandedId(null);
+            }}
+            placeholder={tPerksAndTraits('modal.searchPlaceholder')}
+          />
+
+          <View style={styles.filterRow}>
+            {PERK_ATTRIBUTE_FILTER_CODES.map((code) => {
+              const checked = attributeFilters.includes(code);
+              return (
+                <TouchableOpacity
+                  key={code}
+                  style={styles.filterItem}
+                  onPress={() => toggleAttribute(code)}
+                >
+                  <View style={[styles.filterCheckbox, checked && styles.filterCheckboxChecked]}>
+                    {checked ? <Text style={styles.filterCheckMark}>✓</Text> : null}
+                  </View>
+                  <Text style={styles.filterLabel}>{tPerksAndTraits(`modal.attributeFilters.${code}`)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <ScrollView style={{ maxHeight: 420 }}>
-            {(annotatedPerks || []).filter((entry) => !entry.unmet?.maxRank).map((entry, index) => {
+            {visiblePerks.map((entry, index) => {
               const { perk, available, unmet, taken = 0, maxRanks = 1 } = entry;
-              const isExpanded = expandedIndex === index;
+              const perkId = perk.id || `index-${index}`;
+              const isExpanded = expandedId === perkId;
               const display = getPerkModalDisplay(perk, { taken });
               const isSelected = isSamePerkRank(selectedPerk, perk);
               const rankLabel = maxRanks > 1
@@ -40,10 +92,10 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
                   .replace('{max}', maxRanks)
                 : '';
               const nameStyle = [styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName];
-              
+
               // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
               const shouldShowExpanded = isExpanded && !isSelected;
-              
+
               return (
                 <View
                   key={`${perk.id || index}-${perk.rank || ''}`}
@@ -51,8 +103,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
                 >
                   <TouchableOpacity
                     onPress={() => {
-                      // При клике на заголовок перка переключаем показ описания.
-                      setExpandedIndex(isExpanded ? null : index);
+                      setExpandedId(isExpanded ? null : perkId);
                     }}
                     style={[styles.perkHeader, isSelected && styles.selectedPerk]}
                   >
@@ -104,10 +155,8 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
                       <TouchableOpacity
                         onPress={() => {
                           if (isSelected) {
-                            // Отменить выбор
                             setSelectedPerk(null);
                           } else {
-                            // Выбрать один перк для текущего открытия модального окна
                             setSelectedPerk(perk);
                           }
                         }}
@@ -141,8 +190,8 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
                 <Text style={styles.modalButtonText}>{tPerksAndTraits('modal.buttons.remove')}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton]} 
+            <TouchableOpacity
+              style={[styles.modalButton, styles.confirmButton]}
               onPress={() => {
                 if (selectedPerk) {
                   onChoosePerk && onChoosePerk(selectedPerk);

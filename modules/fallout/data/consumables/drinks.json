@@ -79,6 +79,11 @@
     "rarity": 0,
     "hpHealed": 2,
     "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
     "effectKey": "",
     "isAlcohol": false,
     "sceneRiskEvents": [

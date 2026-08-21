@@ -87,7 +87,16 @@
         "removed": "All diseases cured.",
         "notPresent": "No active diseases."
       }
-    }
+    },
+    "leadBellyRerollTitle": "Lead Belly",
+    "leadBellyRerollMessage": "You may take {radiationAmount} radiation damage. Reroll the value?",
+    "leadBellyRerollConfirm": "Reroll",
+    "leadBellyRerollKeep": "Keep",
+    "foundItemBonus": "{perkName}: you received + {amount} {itemType}."
+  },
+  "foundItemTypes": {
+    "ammo": "ammo",
+    "caps": "caps"
   },
   "actions": {
     "cancel": "Cancel",

@@ -35,6 +35,16 @@
   "modal": {
     "title": "Выберите перк",
     "replaceTitle": "Заменить перк",
+    "searchPlaceholder": "Поиск",
+    "attributeFilters": {
+      "STR": "СИЛ",
+      "END": "ВЫН",
+      "PER": "ВОС",
+      "AGI": "ЛОВ",
+      "INT": "ИНТ",
+      "CHA": "ХАР",
+      "LCK": "УДЧ"
+    },
     "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
     "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
     "alreadyAtMaxRank": "Уже взят на максимальном ранге ({current}/{max})",

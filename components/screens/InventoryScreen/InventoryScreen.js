@@ -22,7 +22,10 @@ import {
 } from '../../../domain/powerArmor';
 import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+import { rerollConsumableRadiationRoll } from '../../../domain/effects';
 import { buildConsumableResultReport } from './logic/consumableResultReport';
+import { rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
+import { getPerkDisplay } from '../PerksAndTraitsScreen/perksDisplay';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -74,6 +77,7 @@ const InventoryScreen = () => {
     equippedRobotSlots, setEquippedRobotSlots,
     caps, setCaps,
     applyConsumableFull,
+    previewConsumableRadiation,
     getModifiedItem,
     trait,
     origin,
@@ -324,12 +328,27 @@ const InventoryScreen = () => {
     setIsCapsModalVisible(true);
   };
 
+  const showFoundItemBonusAlerts = (events) => {
+    (events || []).forEach((event) => {
+      if (!event?.amount) return;
+      showAlert(formatInventoryText(tInventory('screen.alerts.foundItemBonus'), {
+        perkName: getPerkDisplay({ id: event.perkId }).name,
+        amount: event.amount,
+        itemType: Object.hasOwn(event, 'itemName')
+          ? event.itemName
+          : tInventory(`screen.foundItemTypes.${event.itemType}`),
+      }));
+    });
+  };
+
   const handleSaveCaps = (amount) => {
     if (capsOperationType === 'add') {
-      setCaps(prev => prev + amount);
-    } else {
-      setCaps(prev => Math.max(0, prev - amount));
+      const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
+      setCaps((prev) => prev + amount + sumFoundItemBonus(bonusEvents));
+      showFoundItemBonusAlerts(bonusEvents);
+      return;
     }
+    setCaps((prev) => Math.max(0, prev - amount));
   };
 
   const handleApplyConsumable = (item) => {
@@ -350,12 +369,45 @@ const InventoryScreen = () => {
         return;
       }
 
-      // Полная логика расходника меняет показатели в порядке: лечение, радиация,
-      // затем обрабатывает длительные эффекты, состояния и зависимость.
-      const result = applyConsumableFull(consumableItem);
-      const report = buildConsumableResultReport({ itemName, ...result });
-      showAlert(report.title, report.message);
-      handleRemoveItem(consumableItem, 1);
+      const finish = (radiationRequestedAmount) => {
+        const result = applyConsumableFull(consumableItem, { radiationRequestedAmount });
+        const report = buildConsumableResultReport({ itemName, ...result });
+        showAlert(report.title, report.message);
+        handleRemoveItem(consumableItem, 1);
+      };
+
+      const preview = previewConsumableRadiation(consumableItem);
+      if (!preview.canOfferReroll) {
+        finish(preview.requestedAmount);
+        return;
+      }
+
+      const title = tInventory('screen.alerts.leadBellyRerollTitle');
+      const message = formatInventoryText(tInventory('screen.alerts.leadBellyRerollMessage'), {
+        radiationAmount: preview.receivedRadiationDamage,
+      });
+      const applyReroll = () => {
+        const rerolled = rerollConsumableRadiationRoll(consumableItem, preview.rolls);
+        finish(rerolled.requestedAmount);
+      };
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+        if (window.confirm(`${title}\n\n${message}`)) applyReroll();
+        else finish(preview.requestedAmount);
+        return;
+      }
+
+      Alert.alert(title, message, [
+        {
+          text: tInventory('screen.alerts.leadBellyRerollKeep'),
+          style: 'cancel',
+          onPress: () => finish(preview.requestedAmount),
+        },
+        {
+          text: tInventory('screen.alerts.leadBellyRerollConfirm'),
+          onPress: applyReroll,
+        },
+      ]);
     };
 
     const applyToOther = () => {
@@ -437,6 +489,10 @@ const InventoryScreen = () => {
 
   const handleAddItem = (item, quantity = 1, source = 'loot') => {
     const localizedItem = resolveLocalizedItem(item);
+    const bonusEvents = source === 'loot' && !isFusionCoreItem(localizedItem)
+      ? rollFoundItemBonuses(storePerkBonuses, getItemType(localizedItem), localizedItem)
+      : [];
+    quantity += sumFoundItemBonus(bonusEvents);
 
     // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
     // бросок (покупка 5 шт = 5 независимых бросков), стекаются только одинаковые.
@@ -459,6 +515,7 @@ const InventoryScreen = () => {
           });
         }
       }
+      showFoundItemBonusAlerts(bonusEvents);
       return;
     }
 
@@ -481,9 +538,11 @@ const InventoryScreen = () => {
       const existingItem = findUnequippedStoreItemByStackKey(stackKey);
       if (existingItem) {
         adjustStoreItemQuantity(existingItem.id, quantity);
+        showFoundItemBonusAlerts(bonusEvents);
         return;
       }
       addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
+      showFoundItemBonusAlerts(bonusEvents);
       return;
     }
 
@@ -503,6 +562,7 @@ const InventoryScreen = () => {
           durabilityWearRemainder: 0,
         });
       }
+      showFoundItemBonusAlerts(bonusEvents);
       return;
     }
 
@@ -511,6 +571,7 @@ const InventoryScreen = () => {
 
     if (existingItem) {
       adjustStoreItemQuantity(existingItem.id, quantity);
+      showFoundItemBonusAlerts(bonusEvents);
       return;
     }
 
@@ -519,8 +580,8 @@ const InventoryScreen = () => {
       itemType: getItemType(localizedItem),
       quantity,
     });
+    showFoundItemBonusAlerts(bonusEvents);
   };
-
 
 
 

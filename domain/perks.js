@@ -49,6 +49,21 @@ const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites || 
 const getLevelRequirement = (req) => req.char_lvl ?? req.level;
 const getAttributeRequirements = (req) => req.attributes || req.special || {};
 
+export const PERK_ATTRIBUTE_FILTER_CODES = ['STR', 'END', 'PER', 'AGI', 'INT', 'CHA', 'LCK'];
+
+export function getPerkAttributeRequirementCodes(perk) {
+    const spec = getAttributeRequirements(getPrerequisites(perk));
+    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return [];
+    return Object.keys(spec);
+}
+
+export function perkMatchesAttributeFilters(perk, selectedCodes = []) {
+    if (!Array.isArray(selectedCodes) || selectedCodes.length === 0) return true;
+    const required = getPerkAttributeRequirementCodes(perk);
+    if (required.length === 0) return true;
+    return selectedCodes.every((code) => required.includes(code));
+}
+
 export function getPerkMaxRanks(perk) {
     const maxRanks = Number(perk?.maxRanks ?? perk?.maxRank ?? 1);
     return Number.isFinite(maxRanks) && maxRanks > 0 ? maxRanks : 1;

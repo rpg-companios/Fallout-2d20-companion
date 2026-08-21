@@ -1,7 +1,7 @@
 import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
 import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
 import { getCurrentModuleLocale } from '../i18n/locale';
-import { rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
+import { rollCombatDice, rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
 
 const SCENE_DURATION_MINUTES = 5;
 const SCENE_DURATION_MS = SCENE_DURATION_MINUTES * 60 * 1000;
@@ -538,9 +538,18 @@ export const getInstantHealAmount = (item) => {
  * - бросковый: { op, rollType: 'rollCD', rollValue }.
  * null означает, что изменения не было (нет модификатора или есть иммунитет).
  */
-export const resolveConsumableRadiationAmount = (item, { radiationImmune = false } = {}) => {
+export const resolveConsumableRadiationRoll = (item, {
+    radiationImmune = false,
+    skipIrradiatedRadiation = false,
+} = {}) => {
+    if (item?.irradiated && skipIrradiatedRadiation) {
+        return { requestedAmount: null, rolls: null };
+    }
+
     const modifier = item?.radiationModifier;
-    if (modifier == null || radiationImmune) return null;
+    if (modifier == null || radiationImmune) {
+        return { requestedAmount: null, rolls: null };
+    }
 
     if (
         typeof modifier !== 'object'
@@ -561,7 +570,8 @@ export const resolveConsumableRadiationAmount = (item, { radiationImmune = false
         if (!Number.isFinite(modifier.value) || modifier.value <= 0) {
             throw new Error('[effects] Некорректный radiationModifier расходника');
         }
-        return modifier.op === '+' ? modifier.value : -modifier.value;
+        const requestedAmount = modifier.op === '+' ? modifier.value : -modifier.value;
+        return { requestedAmount, rolls: null };
     }
 
     if (
@@ -572,22 +582,55 @@ export const resolveConsumableRadiationAmount = (item, { radiationImmune = false
         throw new Error('[effects] Некорректный radiationModifier расходника');
     }
 
-    const { total } = rollMultipleCombatDice(modifier.rollValue);
-    return modifier.op === '+' ? total : -total;
+    const rolled = rollMultipleCombatDice(modifier.rollValue);
+    const requestedAmount = modifier.op === '+' ? rolled.total : -rolled.total;
+    return { requestedAmount, rolls: rolled.rolls };
 };
+
+export const rerollConsumableRadiationRoll = (item, rolls) => {
+    if (!item?.irradiated) {
+        throw new Error('[effects] Переброс радиации только для облучённого расходника');
+    }
+    if (!Array.isArray(rolls) || rolls.length === 0) {
+        throw new Error('[effects] Нет броска для переброса');
+    }
+    const modifier = item.radiationModifier;
+    if (
+        !modifier
+        || modifier.rollType !== 'rollCD'
+        || !['+', '-'].includes(modifier.op)
+    ) {
+        throw new Error('[effects] Некорректный radiationModifier расходника');
+    }
+    const nextRolls = [...rolls];
+    const index = nextRolls.findIndex((value) => value > 0);
+    if (index === -1) {
+        throw new Error('[effects] Нет кубика с уроном для переброса');
+    }
+    nextRolls[index] = rollCombatDice();
+    const total = nextRolls.reduce((sum, value) => sum + value, 0);
+    const requestedAmount = modifier.op === '+' ? total : -total;
+    return { requestedAmount, rolls: nextRolls };
+};
+
+export const resolveConsumableRadiationAmount = (item, options = {}) => (
+    resolveConsumableRadiationRoll(item, options).requestedAmount
+);
 
 /**
  * Рассчитывает мгновенные изменения здоровья и радиации от расходника.
  * Лечение рассчитывается первым. Радиация меняет только счётчик radiation:
  * сопротивление радиации частей тела здесь намеренно не применяется.
  */
-export const resolveConsumableVitalChanges = (item, {
-    currentHealth,
-    maxHealth,
-    radiation,
-    hpHealBonus = 0,
-    radiationImmune = false,
-} = {}) => {
+export const resolveConsumableVitalChanges = (item, options = {}) => {
+    const {
+        currentHealth,
+        maxHealth,
+        radiation,
+        hpHealBonus = 0,
+        radiationImmune = false,
+        skipIrradiatedRadiation = false,
+    } = options;
     if (
         !Number.isFinite(currentHealth)
         || !Number.isFinite(maxHealth)
@@ -606,7 +649,9 @@ export const resolveConsumableVitalChanges = (item, {
         : currentHealth;
 
     // Строгий порядок: сначала здоровье, затем расчёт и изменение радиации.
-    const requestedRadiationAmount = resolveConsumableRadiationAmount(item, { radiationImmune });
+    const requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
+        ? options.radiationRequestedAmount
+        : resolveConsumableRadiationAmount(item, { radiationImmune, skipIrradiatedRadiation });
     const radiationAfter = requestedRadiationAmount === null
         ? radiation
         : Math.max(0, radiation + requestedRadiationAmount);

@@ -35,6 +35,16 @@
   "modal": {
     "title": "Select a perk",
     "replaceTitle": "Change perk",
+    "searchPlaceholder": "Search",
+    "attributeFilters": {
+      "STR": "STR",
+      "END": "END",
+      "PER": "PER",
+      "AGI": "AGI",
+      "INT": "INT",
+      "CHA": "CHA",
+      "LCK": "LCK"
+    },
     "requiresLevel": "Requires level: {required} (current: {current})",
     "requiresAttribute": "Requires {code}: {required} (current: {current})",
     "alreadyAtMaxRank": "Already taken at maximum rank ({current}/{max})",

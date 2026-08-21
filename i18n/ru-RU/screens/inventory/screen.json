@@ -87,7 +87,16 @@
         "removed": "Все болезни вылечены.",
         "notPresent": "Активных болезней нет."
       }
-    }
+    },
+    "leadBellyRerollTitle": "Свинцовое брюхо",
+    "leadBellyRerollMessage": "Вы можете получить {radiationAmount} урона радиацией. Хотите перебросить значение?",
+    "leadBellyRerollConfirm": "Перебросить",
+    "leadBellyRerollKeep": "Оставить",
+    "foundItemBonus": "{perkName}: вы получили + {amount} {itemType}."
+  },
+  "foundItemTypes": {
+    "ammo": "патронов",
+    "caps": "крышек"
   },
   "actions": {
     "cancel": "Отмена",

@@ -33,7 +33,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
-import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
 import { isSkillTagged } from '../domain/d20Checks';
@@ -1027,7 +1027,32 @@ export const CharacterProvider = ({ children }) => {
    * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
    * removeCondition, проверку зависимости и явно объявленный риск заражения.
    */
-  const applyConsumableFull = (item) => {
+  const previewConsumableRadiation = (item) => {
+    const {
+      irradiatedConsumableRadiationImmune = false,
+      irradiatedConsumableRadiationRerollIfDamage = 0,
+    } = useCharacterStore.getState().perkBonuses || {};
+    const roll = resolveConsumableRadiationRoll(item, {
+      radiationImmune: hasRadiationImmunity({ origin, trait }),
+      skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+    });
+    const receivedRadiationDamage = roll.requestedAmount == null
+      ? 0
+      : Math.max(0, radiation + roll.requestedAmount) - radiation;
+    return {
+      requestedAmount: roll.requestedAmount,
+      receivedRadiationDamage,
+      rolls: roll.rolls,
+      canOfferReroll: Boolean(
+        item?.irradiated
+        && Number(irradiatedConsumableRadiationRerollIfDamage) > 0
+        && receivedRadiationDamage > 0
+        && Array.isArray(roll.rolls)
+      ),
+    };
+  };
+
+  const applyConsumableFull = (item, options = {}) => {
     debugLog('consumable.apply.start', {
       itemName: item?.name || item?.Name,
       itemId: item?.id || item?.code,
@@ -1036,14 +1061,22 @@ export const CharacterProvider = ({ children }) => {
     });
 
     // 1. Мгновенные показатели: сначала лечение, затем радиация.
-    const { hpHealBonus = 0 } = useCharacterStore.getState().perkBonuses || {};
-    const vitalChanges = resolveConsumableVitalChanges(item, {
+    const {
+      hpHealBonus = 0,
+      irradiatedConsumableRadiationImmune = false,
+    } = useCharacterStore.getState().perkBonuses || {};
+    const vitalOptions = {
       currentHealth,
       maxHealth: calculateMaxHealth(attributes, level),
       radiation,
       hpHealBonus,
       radiationImmune: hasRadiationImmunity({ origin, trait }),
-    });
+      skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+    };
+    if (Object.hasOwn(options, 'radiationRequestedAmount')) {
+      vitalOptions.radiationRequestedAmount = options.radiationRequestedAmount;
+    }
+    const vitalChanges = resolveConsumableVitalChanges(item, vitalOptions);
     if (vitalChanges.healAmount > 0) {
       setCurrentHealth(vitalChanges.healthAfter);
     }
@@ -1351,6 +1384,7 @@ export const CharacterProvider = ({ children }) => {
     sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
     applyConsumableTimedEffects,
     applyConsumableFull,
+    previewConsumableRadiation,
     conditions, setConditions,
     chemDosesLog,
     advanceScene,

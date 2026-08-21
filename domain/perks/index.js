@@ -11,6 +11,11 @@ import { partyBoyPerk } from './partyBoy';
 import { tagPerk } from './tag';
 import { nuclearPhysicistPerk } from './nuclearPhysicist';
 import { fastMetabolismPerk } from './fastMetabolism';
+import { leadBellyPerk } from './leadBelly';
+import { scroungerPerk } from './scrounger';
+import { fortuneFinderPerk } from './fortuneFinder';
+import { canOpenerPerk } from './canOpener';
+import { butchersBountyPerk } from './butchersBounty';
 
 export const perkEffects = {
   [intenseTrainingPerk.id]: intenseTrainingPerk,
@@ -26,6 +31,11 @@ export const perkEffects = {
   [tagPerk.id]: tagPerk,
   [nuclearPhysicistPerk.id]: nuclearPhysicistPerk,
   [fastMetabolismPerk.id]: fastMetabolismPerk,
+  [leadBellyPerk.id]: leadBellyPerk,
+  [scroungerPerk.id]: scroungerPerk,
+  [fortuneFinderPerk.id]: fortuneFinderPerk,
+  [canOpenerPerk.id]: canOpenerPerk,
+  [butchersBountyPerk.id]: butchersBountyPerk,
 };
 
 export function getPerkEffect(effectId) {
