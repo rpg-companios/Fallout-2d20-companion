@@ -1,0 +1,159 @@
+diff --git a/__tests__/consumables/raw-meat-flag.test.js b/__tests__/consumables/raw-meat-flag.test.js
+new file mode 100644
+index 0000000..fd3afe4
+--- /dev/null
++++ b/__tests__/consumables/raw-meat-flag.test.js
+@@ -0,0 +1,29 @@
++import { describe, expect, it } from 'vitest';
++import food from '../../modules/fallout/data/consumables/food.json';
++
++const RAW_MEAT_IDS = [
++  'food_bloatfly_meat',
++  'food_bloodbug_meat',
++  'food_brahmin_meat',
++  'food_deathclaw_meat',
++  'food_mirelurk_meat',
++  'food_mirelurk_queen_meat',
++  'food_softshell_mirelurk_meat',
++  'food_mole_rat_meat',
++  'food_dog_meat',
++  'food_mutant_hound_meat',
++  'food_radroach_meat',
++  'food_radscorpion_meat',
++  'food_radstag_meat',
++  'food_stingwing_meat',
++  'food_yao_guai_meat',
++];
++
++describe('rawMeat flag', () => {
++  it('marks only the listed raw meats', () => {
++    const flagged = food.filter((item) => item.rawMeat === true).map((item) => item.id);
++    expect(flagged.sort()).toEqual([...RAW_MEAT_IDS].sort());
++    expect(food.find((item) => item.id === 'food_squirrel_bits').rawMeat).toBeUndefined();
++    expect(food.find((item) => item.id === 'food_deathclaw_egg').rawMeat).toBeUndefined();
++  });
++});
+diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/consumables/food.json
+index 0fb1225..8b198dd 100644
+--- a/modules/fallout/data/consumables/food.json
++++ b/modules/fallout/data/consumables/food.json
+@@ -59,6 +59,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -87,6 +88,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -133,6 +135,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -375,6 +378,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -755,6 +759,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -819,6 +824,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -847,6 +853,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -893,6 +900,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1069,6 +1077,7 @@
+     },
+     "effectKey": "itemEffects.food.mirelurkQueenMeat",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1097,6 +1106,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1171,6 +1181,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1217,6 +1228,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1377,6 +1389,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1487,6 +1500,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
+@@ -1633,6 +1647,7 @@
+     },
+     "effectKey": "",
+     "state": "raw",
++    "rawMeat": true,
+     "preserved": false,
+     "sceneRiskEvents": [
+       {
