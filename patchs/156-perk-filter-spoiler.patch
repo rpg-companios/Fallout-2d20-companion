@@ -1,0 +1,181 @@
+diff --git a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+index 244b04e..4e0ac9d 100644
+--- a/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
++++ b/components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+@@ -12,6 +12,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
+   const [selectedPerk, setSelectedPerk] = useState(null);
+   const [search, setSearch] = useState('');
+   const [attributeFilters, setAttributeFilters] = useState([]);
++  const [filterOpen, setFilterOpen] = useState(false);
+ 
+   useEffect(() => {
+     if (visible) {
+@@ -19,6 +20,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
+       setSelectedPerk(null);
+       setSearch('');
+       setAttributeFilters([]);
++      setFilterOpen(false);
+     }
+   }, [visible]);
+ 
+@@ -51,35 +53,47 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
+         <View style={styles.modalContainer}>
+           <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
+ 
+-          <TextInput
+-            style={styles.searchInput}
+-            value={search}
+-            onChangeText={(value) => {
+-              setSearch(value);
+-              setExpandedId(null);
+-            }}
+-            placeholder={tPerksAndTraits('modal.searchPlaceholder')}
+-          />
+-
+-          <View style={styles.filterRow}>
+-            {PERK_ATTRIBUTE_FILTER_CODES.map((code) => {
+-              const checked = attributeFilters.includes(code);
+-              return (
+-                <TouchableOpacity
+-                  key={code}
+-                  style={styles.filterItem}
+-                  onPress={() => toggleAttribute(code)}
+-                >
+-                  <View style={[styles.filterCheckbox, checked && styles.filterCheckboxChecked]}>
+-                    {checked ? <Text style={styles.filterCheckMark}>✓</Text> : null}
+-                  </View>
+-                  <Text style={styles.filterLabel}>{tPerksAndTraits(`modal.attributeFilters.${code}`)}</Text>
+-                </TouchableOpacity>
+-              );
+-            })}
++          <View style={styles.filterPanel}>
++            <TouchableOpacity
++              style={styles.filterSpoilerHeader}
++              onPress={() => setFilterOpen((open) => !open)}
++            >
++              <Text style={styles.filterSpoilerTitle}>{tPerksAndTraits('modal.filterSpoiler')}</Text>
++              <Text style={styles.filterSpoilerArrow}>{filterOpen ? '▼' : '►'}</Text>
++            </TouchableOpacity>
++            {filterOpen && (
++              <View style={styles.filterSpoilerBody}>
++                <TextInput
++                  style={styles.searchInput}
++                  value={search}
++                  onChangeText={(value) => {
++                    setSearch(value);
++                    setExpandedId(null);
++                  }}
++                  placeholder={tPerksAndTraits('modal.searchPlaceholder')}
++                />
++                <View style={styles.filterRow}>
++                  {PERK_ATTRIBUTE_FILTER_CODES.map((code) => {
++                    const checked = attributeFilters.includes(code);
++                    return (
++                      <TouchableOpacity
++                        key={code}
++                        style={styles.filterItem}
++                        onPress={() => toggleAttribute(code)}
++                      >
++                        <View style={[styles.filterCheckbox, checked && styles.filterCheckboxChecked]}>
++                          {checked ? <Text style={styles.filterCheckMark}>✓</Text> : null}
++                        </View>
++                        <Text style={styles.filterLabel}>{tPerksAndTraits(`modal.attributeFilters.${code}`)}</Text>
++                      </TouchableOpacity>
++                    );
++                  })}
++                </View>
++              </View>
++            )}
+           </View>
+ 
+-          <ScrollView style={{ maxHeight: 420 }}>
++          <ScrollView style={styles.perkList}>
+             {visiblePerks.map((entry, index) => {
+               const { perk, available, unmet, taken = 0, maxRanks = 1 } = entry;
+               const perkId = perk.id || `index-${index}`;
+diff --git a/i18n/en-EN/screens/perksAndTraits/screen.json b/i18n/en-EN/screens/perksAndTraits/screen.json
+index 13e32a0..33fced0 100644
+--- a/i18n/en-EN/screens/perksAndTraits/screen.json
++++ b/i18n/en-EN/screens/perksAndTraits/screen.json
+@@ -36,6 +36,7 @@
+     "title": "Select a perk",
+     "replaceTitle": "Change perk",
+     "searchPlaceholder": "Search",
++    "filterSpoiler": "Search and filter",
+     "attributeFilters": {
+       "STR": "STR",
+       "END": "END",
+diff --git a/i18n/ru-RU/screens/perksAndTraits/screen.json b/i18n/ru-RU/screens/perksAndTraits/screen.json
+index eb48ad3..dc94ec1 100644
+--- a/i18n/ru-RU/screens/perksAndTraits/screen.json
++++ b/i18n/ru-RU/screens/perksAndTraits/screen.json
+@@ -36,6 +36,7 @@
+     "title": "Выберите перк",
+     "replaceTitle": "Заменить перк",
+     "searchPlaceholder": "Поиск",
++    "filterSpoiler": "Поиск и фильтр",
+     "attributeFilters": {
+       "STR": "СИЛ",
+       "END": "ВЫН",
+diff --git a/styles/PerkSelectModal.styles.js b/styles/PerkSelectModal.styles.js
+index 8ea5ed9..2004309 100644
+--- a/styles/PerkSelectModal.styles.js
++++ b/styles/PerkSelectModal.styles.js
+@@ -22,19 +22,56 @@ const styles = StyleSheet.create({
+     fontSize: 16,
+     marginBottom: 8,
+   },
++  filterPanel: {
++    backgroundColor: '#f1f5f9',
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 6,
++    marginBottom: 8,
++    paddingBottom: 0,
++  },
++  filterSpoilerHeader: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingHorizontal: 10,
++    paddingVertical: 8,
++  },
++  filterSpoilerTitle: {
++    color: '#000',
++    fontWeight: 'bold',
++  },
++  filterSpoilerArrow: {
++    color: '#000',
++    fontWeight: 'bold',
++  },
++  filterSpoilerBody: {
++    paddingHorizontal: 10,
++    paddingBottom: 8,
++    borderTopWidth: 1,
++    borderTopColor: '#cbd5e1',
++  },
+   searchInput: {
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     borderRadius: 4,
+     paddingHorizontal: 10,
+     paddingVertical: 8,
++    marginTop: 8,
+     marginBottom: 8,
+     color: '#000',
++    backgroundColor: '#fff',
+   },
+   filterRow: {
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+-    marginBottom: 8,
++  },
++  perkList: {
++    maxHeight: 420,
++    borderTopWidth: 1,
++    borderTopColor: '#5a5a5a',
++    paddingTop: 8,
++    backgroundColor: '#fff',
+   },
+   filterItem: {
+     flexDirection: 'row',
