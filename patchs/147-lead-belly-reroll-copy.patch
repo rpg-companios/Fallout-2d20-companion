@@ -1,0 +1,62 @@
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index fcdc7d3..8a5d8ab 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1036,13 +1036,17 @@ export const CharacterProvider = ({ children }) => {
+       radiationImmune: hasRadiationImmunity({ origin, trait }),
+       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+     });
++    const receivedRadiationDamage = roll.requestedAmount == null
++      ? 0
++      : Math.max(0, radiation + roll.requestedAmount) - radiation;
+     return {
+       requestedAmount: roll.requestedAmount,
++      receivedRadiationDamage,
+       rolls: roll.rolls,
+       canOfferReroll: Boolean(
+         item?.irradiated
+         && Number(irradiatedConsumableRadiationRerollIfDamage) > 0
+-        && roll.requestedAmount > 0
++        && receivedRadiationDamage > 0
+         && Array.isArray(roll.rolls)
+       ),
+     };
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index e8fc496..081d358 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -367,7 +367,7 @@ const InventoryScreen = () => {
+ 
+       const title = tInventory('screen.alerts.leadBellyRerollTitle');
+       const message = formatInventoryText(tInventory('screen.alerts.leadBellyRerollMessage'), {
+-        radiationAmount: preview.requestedAmount,
++        radiationAmount: preview.receivedRadiationDamage,
+       });
+       const applyReroll = () => {
+         const rerolled = rerollConsumableRadiationRoll(consumableItem, preview.rolls);
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 57be15a..3968383 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -89,7 +89,7 @@
+       }
+     },
+     "leadBellyRerollTitle": "Lead Belly",
+-    "leadBellyRerollMessage": "Radiation: {radiationAmount}. Reroll 1 combat die?",
++    "leadBellyRerollMessage": "You may take {radiationAmount} radiation damage. Reroll the value?",
+     "leadBellyRerollConfirm": "Reroll",
+     "leadBellyRerollKeep": "Keep"
+   },
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 3154210..6ba61c7 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -89,7 +89,7 @@
+       }
+     },
+     "leadBellyRerollTitle": "Свинцовое брюхо",
+-    "leadBellyRerollMessage": "Радиация: {radiationAmount}. Перебросить 1 боевой кубик?",
++    "leadBellyRerollMessage": "Вы можете получить {radiationAmount} урона радиацией. Хотите перебросить значение?",
+     "leadBellyRerollConfirm": "Перебросить",
+     "leadBellyRerollKeep": "Оставить"
+   },
