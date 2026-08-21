@@ -1,13 +1,13 @@
 diff --git a/__tests__/perks/lead-belly.test.js b/__tests__/perks/lead-belly.test.js
 new file mode 100644
-index 0000000..61ffc75
+index 0000000..ddbabcf
 --- /dev/null
 +++ b/__tests__/perks/lead-belly.test.js
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,71 @@
 +import { afterEach, describe, expect, it, vi } from 'vitest';
 +import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
 +import moduleFood from '../../modules/fallout/data/consumables/food.json';
-+import { resolveConsumableVitalChanges, rollConsumableRadiation } from '../../domain/effects';
++import { resolveConsumableRadiationAmount, resolveConsumableVitalChanges } from '../../domain/effects';
 +import { calculatePerkEffects } from '../../domain/perks';
 +import perksData from '../../modules/fallout/data/perks/perks.json';
 +
@@ -18,12 +18,12 @@ index 0000000..61ffc75
 +const byId = (items, id) => items.find((item) => item.id === id);
 +const leadBelly = perksData.find((perk) => perk.id === 'leadBelly');
 +const dirtyWater = byId(moduleDrinks, 'drink_dirty_water');
-+const rawMeat = byId(moduleFood, 'food_bloatfly_meat');
++const rawMeat = moduleFood.find((item) => item.irradiated && item.radiationModifier?.rollValue === 1);
 +
 +describe('leadBelly data', () => {
 +  it('gives dirty water a radiation CD roll without removing disease risk', () => {
 +    expect(dirtyWater.irradiated).toBe(true);
-+    expect(dirtyWater.radModifier).toEqual({
++    expect(dirtyWater.radiationModifier).toEqual({
 +      op: '+',
 +      rollType: 'rollCD',
 +      rollValue: 1,
@@ -46,16 +46,16 @@ index 0000000..61ffc75
 +describe('leadBelly radiation rolls', () => {
 +  it('rerolls one contributing CD when the first roll dealt radiation', () => {
 +    vi.spyOn(Math, 'random')
-+      .mockReturnValueOnce(0.2) // грань 2 => 2
-+      .mockReturnValueOnce(0.4); // переброс, грань 3 => 0
++      .mockReturnValueOnce(0.2)
++      .mockReturnValueOnce(0.4);
 +
-+    expect(rollConsumableRadiation(rawMeat, { rerollOneIfDamage: 1 })).toBe(0);
++    expect(resolveConsumableRadiationAmount(rawMeat, { rerollOneIfDamage: 1 })).toBe(0);
 +  });
 +
 +  it('does not reroll when the first roll dealt no radiation', () => {
-+    const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.4); // грань 3 => 0
++    const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.4);
 +
-+    expect(rollConsumableRadiation(rawMeat, { rerollOneIfDamage: 1 })).toBe(0);
++    expect(resolveConsumableRadiationAmount(rawMeat, { rerollOneIfDamage: 1 })).toBe(0);
 +    expect(random).toHaveBeenCalledTimes(1);
 +  });
 +
@@ -68,20 +68,18 @@ index 0000000..61ffc75
 +      skipIrradiatedRadiation: true,
 +    });
 +
-+    expect(result).toEqual({
-+      healAmount: 2,
-+      healthAfter: 6,
-+      radiationAmount: null,
-+      radiationAfter: 1,
-+    });
++    expect(result.healAmount).toBe(2);
++    expect(result.healthAfter).toBe(6);
++    expect(result.radiationAmount).toBe(null);
++    expect(result.radiationAfter).toBe(1);
 +    expect(random).not.toHaveBeenCalled();
 +  });
 +});
 diff --git a/components/CharacterContext.js b/components/CharacterContext.js
-index d518c86..5adcdac 100644
+index a7853ba..1308016 100644
 --- a/components/CharacterContext.js
 +++ b/components/CharacterContext.js
-@@ -1047,13 +1047,19 @@ export const CharacterProvider = ({ children }) => {
+@@ -1036,13 +1036,19 @@ export const CharacterProvider = ({ children }) => {
      });
  
      // 1. Мгновенные показатели: сначала лечение, затем радиация.
@@ -103,7 +101,7 @@ index d518c86..5adcdac 100644
      if (vitalChanges.healAmount > 0) {
        setCurrentHealth(vitalChanges.healthAfter);
 diff --git a/domain/effects.js b/domain/effects.js
-index b387757..8861cdd 100644
+index eb75898..27a5c84 100644
 --- a/domain/effects.js
 +++ b/domain/effects.js
 @@ -1,7 +1,7 @@
@@ -115,23 +113,23 @@ index b387757..8861cdd 100644
  
  const SCENE_DURATION_MINUTES = 5;
  const SCENE_DURATION_MS = SCENE_DURATION_MINUTES * 60 * 1000;
-@@ -490,7 +490,13 @@ export const getInstantHealAmount = (item) => {
-  * Бросает модификатор радиации расходника по единой схеме движка.
-  * null означает, что броска не было (нет модификатора или есть иммунитет).
+@@ -538,7 +538,13 @@ export const getInstantHealAmount = (item) => {
+  * - бросковый: { op, rollType: 'rollCD', rollValue }.
+  * null означает, что изменения не было (нет модификатора или есть иммунитет).
   */
--export const rollConsumableRadiation = (item, { radiationImmune = false } = {}) => {
-+export const rollConsumableRadiation = (item, {
+-export const resolveConsumableRadiationAmount = (item, { radiationImmune = false } = {}) => {
++export const resolveConsumableRadiationAmount = (item, {
 +    radiationImmune = false,
 +    skipIrradiatedRadiation = false,
 +    rerollOneIfDamage = 0,
 +} = {}) => {
 +    if (item?.irradiated && skipIrradiatedRadiation) return null;
 +
-     const modifier = item?.radModifier;
+     const modifier = item?.radiationModifier;
      if (modifier == null || radiationImmune) return null;
  
-@@ -505,7 +511,19 @@ export const rollConsumableRadiation = (item, { radiationImmune = false } = {})
-         throw new Error('[effects] Некорректный radModifier расходника');
+@@ -572,7 +578,19 @@ export const resolveConsumableRadiationAmount = (item, { radiationImmune = false
+         throw new Error('[effects] Некорректный radiationModifier расходника');
      }
  
 -    const { total } = rollMultipleCombatDice(modifier.rollValue);
@@ -151,7 +149,7 @@ index b387757..8861cdd 100644
      return modifier.op === '+' ? total : -total;
  };
  
-@@ -520,6 +538,8 @@ export const resolveConsumableVitalChanges = (item, {
+@@ -587,6 +605,8 @@ export const resolveConsumableVitalChanges = (item, {
      radiation,
      hpHealBonus = 0,
      radiationImmune = false,
@@ -160,19 +158,19 @@ index b387757..8861cdd 100644
  } = {}) => {
      if (
          !Number.isFinite(currentHealth)
-@@ -539,7 +559,11 @@ export const resolveConsumableVitalChanges = (item, {
+@@ -606,7 +626,11 @@ export const resolveConsumableVitalChanges = (item, {
          : currentHealth;
  
-     // Строгий порядок: сначала здоровье, затем бросок и изменение радиации.
--    const radiationAmount = rollConsumableRadiation(item, { radiationImmune });
-+    const radiationAmount = rollConsumableRadiation(item, {
+     // Строгий порядок: сначала здоровье, затем расчёт и изменение радиации.
+-    const requestedRadiationAmount = resolveConsumableRadiationAmount(item, { radiationImmune });
++    const requestedRadiationAmount = resolveConsumableRadiationAmount(item, {
 +        radiationImmune,
 +        skipIrradiatedRadiation,
 +        rerollOneIfDamage,
 +    });
-     const radiationAfter = radiationAmount === null
+     const radiationAfter = requestedRadiationAmount === null
          ? radiation
-         : Math.max(0, radiation + radiationAmount);
+         : Math.max(0, radiation + requestedRadiationAmount);
 diff --git a/domain/perks/index.js b/domain/perks/index.js
 index 5db5afd..f55d730 100644
 --- a/domain/perks/index.js
@@ -215,14 +213,14 @@ index 0000000..40313b6
 +  },
 +};
 diff --git a/modules/fallout/data/consumables/drinks.json b/modules/fallout/data/consumables/drinks.json
-index 90be68e..eada834 100644
+index 90be68e..8436c97 100644
 --- a/modules/fallout/data/consumables/drinks.json
 +++ b/modules/fallout/data/consumables/drinks.json
 @@ -79,6 +79,11 @@
      "rarity": 0,
      "hpHealed": 2,
      "irradiated": true,
-+    "radModifier": {
++    "radiationModifier": {
 +      "op": "+",
 +      "rollType": "rollCD",
 +      "rollValue": 1
