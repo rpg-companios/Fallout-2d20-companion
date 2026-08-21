@@ -12,6 +12,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
   const [selectedPerk, setSelectedPerk] = useState(null);
   const [search, setSearch] = useState('');
   const [attributeFilters, setAttributeFilters] = useState([]);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -19,6 +20,7 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
       setSelectedPerk(null);
       setSearch('');
       setAttributeFilters([]);
+      setFilterOpen(false);
     }
   }, [visible]);
 
@@ -51,35 +53,47 @@ const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk, onRem
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>{title || tPerksAndTraits('modal.title')}</Text>
 
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={(value) => {
-              setSearch(value);
-              setExpandedId(null);
-            }}
-            placeholder={tPerksAndTraits('modal.searchPlaceholder')}
-          />
-
-          <View style={styles.filterRow}>
-            {PERK_ATTRIBUTE_FILTER_CODES.map((code) => {
-              const checked = attributeFilters.includes(code);
-              return (
-                <TouchableOpacity
-                  key={code}
-                  style={styles.filterItem}
-                  onPress={() => toggleAttribute(code)}
-                >
-                  <View style={[styles.filterCheckbox, checked && styles.filterCheckboxChecked]}>
-                    {checked ? <Text style={styles.filterCheckMark}>✓</Text> : null}
-                  </View>
-                  <Text style={styles.filterLabel}>{tPerksAndTraits(`modal.attributeFilters.${code}`)}</Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.filterPanel}>
+            <TouchableOpacity
+              style={styles.filterSpoilerHeader}
+              onPress={() => setFilterOpen((open) => !open)}
+            >
+              <Text style={styles.filterSpoilerTitle}>{tPerksAndTraits('modal.filterSpoiler')}</Text>
+              <Text style={styles.filterSpoilerArrow}>{filterOpen ? '▼' : '►'}</Text>
+            </TouchableOpacity>
+            {filterOpen && (
+              <View style={styles.filterSpoilerBody}>
+                <TextInput
+                  style={styles.searchInput}
+                  value={search}
+                  onChangeText={(value) => {
+                    setSearch(value);
+                    setExpandedId(null);
+                  }}
+                  placeholder={tPerksAndTraits('modal.searchPlaceholder')}
+                />
+                <View style={styles.filterRow}>
+                  {PERK_ATTRIBUTE_FILTER_CODES.map((code) => {
+                    const checked = attributeFilters.includes(code);
+                    return (
+                      <TouchableOpacity
+                        key={code}
+                        style={styles.filterItem}
+                        onPress={() => toggleAttribute(code)}
+                      >
+                        <View style={[styles.filterCheckbox, checked && styles.filterCheckboxChecked]}>
+                          {checked ? <Text style={styles.filterCheckMark}>✓</Text> : null}
+                        </View>
+                        <Text style={styles.filterLabel}>{tPerksAndTraits(`modal.attributeFilters.${code}`)}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
 
-          <ScrollView style={{ maxHeight: 420 }}>
+          <ScrollView style={styles.perkList}>
             {visiblePerks.map((entry, index) => {
               const { perk, available, unmet, taken = 0, maxRanks = 1 } = entry;
               const perkId = perk.id || `index-${index}`;
