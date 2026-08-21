@@ -1,303 +1,64 @@
-# Пакет контракта сеттинга (движок + сеттинг)
+# Контракт сеттинга (движок + пакет)
 
-> Единый файл для новой реализации сеттингов. Собран 2026-08-16.
-> Содержит: контракт, адаптер, менеджер, манифест, аудит.
-> Всё, что обсуждалось: движок = математика + UI-кирпичики; сеттинг = пакет;
-> загрузка по URL + офлайн; свой сплэш у каждого; разделение после импорта через реестр.
+**Статус:** единый черновик к ревью. Собран 2026-08-21 из корневого `setting-contract.md` (2026-08-16) и `docs/architecture/setting-pack.md`. Кода загрузчика нет, пока документ не утверждён.
 
----
-
-## 1. КОНТРАКТ СЕТТИНГА
-
-### 1.1 Идея
-
-Движок — это «математика» (domain/) + универсальные UI-кирпичики
-(components/ui/) + ядро загрузки (core/). Сеттинг — упакованный пакет
-(manifest + data + i18n + splash + опционально свои экраны), который
-подключается к движку через **адаптер**. Движок не знает, откуда данные:
-встроенный Fallout, скачанный по URL, офлайн-файл, будущий HoMM 2d20.
-
-### 1.2 Манифест сеттинга (manifest.json)
-
-```json
-{
-  "id": "fallout",
-  "name": "Fallout 2d20",
-  "version": "1",
-  "requiresCore": ">=1.0",
-  "locales": ["ru-RU", "en-EN"],
-  "splash": {
-    "image": "splash/annihilation.png",
-    "backgroundColor": "#050508"
-  },
-  "data": {
-    "weapons": "data/weapons.json",
-    "origins": "data/origins.json",
-    "traits": "data/traits.json"
-  },
-  "i18n": {
-    "ru-RU": "i18n/ru-RU.json",
-    "en-EN": "i18n/en-EN.json"
-  },
-  "screens": {}
-}
-```
-
-Поля:
-- `id` — уникальный идентификатор (латиница);
-- `name` — отображаемое имя;
-- `version` — версия пакета;
-- `requiresCore` — минимальная версия движка;
-- `locales` — поддерживаемые локали;
-- `splash` — сплэш-скрин сеттинга (картинка + фон);
-- `data` — карта путей к JSON-данным;
-- `i18n` — карта путей к переводам по локалям;
-- `screens` — опционально: свои экраны/компоненты сеттинга.
-
-### 1.3 Интерфейс адаптера (движок → сеттинг)
-
-```js
-class SettingAdapter {
-  getManifest()                    // { id, name, version, ... }
-  getWeapons()                     // оружие
-  getOrigins()                     // ориджины
-  getTraits()                      // трейты
-  getBodyPlans()                   // планы тела
-  getEquipmentKits()               // комплекты
-  getChems()                       // химка
-  getI18n(locale)                  // переводы
-  getSplash()                      // компонент сплэша (null = движковый)
-  getScreen(name)                  // опционально: свой экран (null = движковый)
-}
-```
-
-### 1.4 Универсальные UI-кирпичики (components/ui/)
-
-Переиспользуемые компоненты, из которых сеттинги собирают экраны:
-- `StatBox` — ячейка характеристики (название + значение + модификаторы);
-- `HealthCounter` — счётчик здоровья;
-- `AttributeCell` — ячейка атрибута (STR/AGI/... с +/−);
-- `InventorySlot` — ячейка инвентаря;
-- `EffectsPanel` — панель эффектов;
-- `ProgressBar` — полоса (для сплэша/прочности).
-
-Сеттинг может использовать их или предоставить свои (в `screens`).
-
-### 1.5 Загрузка и хранение
-
-- Встроенный сеттинг (fallout) — всегда доступен (в бандле);
-- Скачанный сеттинг — пакет (zip или JSON по URL), хранится офлайн
-  (IndexedDB/AsyncStorage/файловая система);
-- Активный сеттинг запоминается (AsyncStorage) — при старте грузится последний;
-- UI выбора сеттинга — в настройках;
-- Поддержка офлайн: пользователь скачал файл на работе → загрузил дома.
+Этот файл — **единственная** спецификация. `docs/architecture/setting-pack.md` больше не ведётся.
 
 ---
 
-## 2. АДАПТЕР (core/settingAdapter.js)
+## 0. Решения владельца (зафиксировано)
 
-```js
-// core/settingAdapter.js
-// Адаптер сеттинга: движок читает данные ТОЛЬКО через этот интерфейс.
-// Движок не знает, откуда данные: встроенный Fallout, скачанный по URL,
-// офлайн-файл, будущий HoMM 2d20.
-//
-// Контракт: docs/architecture/setting-contract.md
+- Движок **пустой**: без пакета нет каталога, персонажей не создаём.
+- Пакет = zip **папки модуля** (как `modules/fallout/` сейчас).
+- Пакет **не** «только JSON». В нём данные, переводы, настройки, планы тела, сплэш, **свои экраны и оформление**. Экранов может быть больше или меньше, чем у Fallout.
+- Движок **обрастает** сеттингами: удачные кирпичи, экраны, настройки из пакета можно потом взять в движок и отдавать другим сеттингам.
+- Движок читает сеттинг только через **адаптер**. Откуда пакет (URL, файл, когда-то бандл) — адаптеру, не экранам.
+- Фолбэков и нормализации чужих форматов нет. Нет файла / битый JSON — ошибка с путём.
+- БД — только состояние (сейвы, выбранный пакет). Каталог — из пакета.
 
-import {
-  getOrigins,
-  getTraits,
-  getBodyPlans,
-  getOriginI18n,
-  getTraitI18n,
-  getModuleWeapons,
-  getModuleGeneralGoods,
-  getModuleEquipmentKits,
-  getModuleI18n,
-  getUniqQualities,
-  getUniqQualityName,
-  getEquipmentCatalogForLocale,
-} from '../domain/registry';
-
-import manifest from '../modules/fallout/manifest.json';
-
-/**
- * Базовый интерфейс адаптера сеттинга.
- * Каждый сеттинг (встроенный или скачанный) реализует эти методы.
- */
-export class SettingAdapter {
-  getManifest() { throw new Error('Not implemented'); }
-  getWeapons() { throw new Error('Not implemented'); }
-  getOrigins() { throw new Error('Not implemented'); }
-  getTraits() { throw new Error('Not implemented'); }
-  getBodyPlans() { throw new Error('Not implemented'); }
-  getEquipmentKits() { throw new Error('Not implemented'); }
-  getChems() { throw new Error('Not implemented'); }
-  getI18n(locale) { throw new Error('Not implemented'); }
-  getSplash() { throw new Error('Not implemented'); }
-  getScreen(name) { throw new Error('Not implemented'); }
-}
-
-/**
- * Адаптер встроенного сеттинга Fallout.
- * Оборачивает domain/registry — текущий источник данных.
- */
-export class FalloutSettingAdapter extends SettingAdapter {
-  getManifest() {
-    return manifest;
-  }
-
-  getWeapons() {
-    return getModuleWeapons();
-  }
-
-  getOrigins() {
-    return getOrigins();
-  }
-
-  getTraits() {
-    return getTraits();
-  }
-
-  getBodyPlans() {
-    return getBodyPlans();
-  }
-
-  getEquipmentKits() {
-    return getModuleEquipmentKits();
-  }
-
-  getChems() {
-    const catalog = getEquipmentCatalogForLocale('ru-RU');
-    return catalog?.chems || [];
-  }
-
-  getI18n(locale) {
-    return {
-      origins: getOriginI18n(locale),
-      traits: getTraitI18n(locale),
-      ...getModuleI18n(locale),
-    };
-  }
-
-  getUniqQualityName(id, locale) {
-    return getUniqQualityName(id, locale);
-  }
-
-  getUniqQualities() {
-    return getUniqQualities();
-  }
-
-  getGeneralGoods() {
-    return getModuleGeneralGoods();
-  }
-
-  // Сплэш-скрин встроенного сеттинга — пока общий (движковый).
-  // Свой (из positronium-boot) подключим на этапе сплэшей.
-  getSplash() {
-    return null; // null = использовать дефолтный движковый
-  }
-
-  getScreen() {
-    return null; // null = использовать дефолтные экраны движка
-  }
-}
-
-// Единственный экземпляр активного адаптера.
-// Пока — всегда встроенный Fallout; менеджер сеттинга будет подменять.
-let activeAdapter = new FalloutSettingAdapter();
-
-export const getActiveAdapter = () => activeAdapter;
-
-export const setActiveAdapter = (adapter) => {
-  if (!adapter) throw new Error('setActiveAdapter: adapter required');
-  activeAdapter = adapter;
-};
-```
+**Не сделано в репозитории:** `core/settingAdapter.js`, `core/settingManager.js`, `components/ui/`. Образцы кода из старого контракта в дерево не попали. Галочки «адаптер готов» были про замысел.
 
 ---
 
-## 3. МЕНЕДЖЕР (core/settingManager.js)
+## 1. Роли
 
-```js
-// core/settingManager.js
-// Менеджер сеттингов: список доступных, активный, запоминание выбора.
-//
-// Пока — базовая версия:
-//   - встроенный сеттинг fallout всегда доступен;
-//   - активный сеттинг хранится в AsyncStorage ('activeSettingId');
-//   - при старте грузится последний выбранный (или fallout по умолчанию).
-//
-// Позже: регистрация скачанных пакетов (URL/офлайн), распаковка, активация.
+| | Движок | Пакет сеттинга |
+|---|---|---|
+| Сейчас | математика (`domain/`), экраны, сейвы | `modules/fallout/` в этом репо (исходник, не рантайм-загрузка) |
+| Цель | математика, ядро загрузки, **набор кирпичей**, накопленных из сеттингов | zip: манифест + data + i18n + settings + bodyplans + splash + экраны |
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FalloutSettingAdapter, setActiveAdapter, getActiveAdapter } from './settingAdapter';
+Сеттинг говорит: какие экраны есть, какие кирпичи движка использовать, какие экраны свои. HoMM 2d20 — другой пакет, не форк Fallout в бандле.
 
-const STORAGE_KEY = 'activeSettingId';
-
-/** Встроенные сеттинги (всегда доступны). */
-const BUILTIN_SETTINGS = [
-  {
-    id: 'fallout',
-    name: 'Fallout 2d20',
-    version: 1,
-    builtin: true,
-    adapter: new FalloutSettingAdapter(),
-  },
-];
-
-/** Список всех доступных сеттингов. */
-export const getAvailableSettings = () => [...BUILTIN_SETTINGS];
-
-/** Найти сеттинг по id. */
-export const getSettingById = (id) =>
-  getAvailableSettings().find((s) => s.id === id) || null;
-
-let activeSettingId = 'fallout';
-
-/** Текущий активный сеттинг. */
-export const getActiveSetting = () =>
-  getSettingById(activeSettingId) || getSettingById('fallout');
-
-/**
- * Активировать сеттинг: подменяет адаптер движка и запоминает выбор.
- * @param {string} id — id сеттинга
- */
-export const activateSetting = async (id) => {
-  const setting = getSettingById(id);
-  if (!setting) throw new Error(`[settingManager] unknown setting: ${id}`);
-  activeSettingId = id;
-  setActiveAdapter(setting.adapter);
-  await AsyncStorage.setItem(STORAGE_KEY, id);
-  return setting;
-};
-
-/**
- * Инициализация при старте: восстановить последний выбранный сеттинг.
- * Вызывается до первого рендера экранов (App.js).
- */
-export const initSettingManager = async () => {
-  try {
-    const saved = await AsyncStorage.getItem(STORAGE_KEY);
-    if (saved && getSettingById(saved)) {
-      activeSettingId = saved;
-      const setting = getSettingById(saved);
-      setActiveAdapter(setting.adapter);
-    } else {
-      activeSettingId = 'fallout';
-      setActiveAdapter(getSettingById('fallout').adapter);
-    }
-  } catch (e) {
-    activeSettingId = 'fallout';
-    setActiveAdapter(getSettingById('fallout').adapter);
-  }
-  return getActiveSetting();
-};
-```
+Промоут в движок (экран/кирпич/настройка стали общими) — **патч движка**, не автоимпорт из чужого zip.
 
 ---
 
-## 4. МАНИФЕСТ (пример — Fallout)
+## 2. Что в пакете
+
+Корень zip (Q1) — сразу содержимое модуля:
+
+```
+manifest.json
+settings.json
+data/          — категории отдельно, как сейчас (оружие, броня, перки, комплекты, origins, traits, bodyplans, …)
+i18n/<locale>/ — зеркало data/
+splash/        — картинка и оформление заставки
+screens/       — экраны и оформление этого сеттинга
+```
+
+Имя zip любое. Идентичность — `manifest.id`.
+
+Может **не быть** целых категорий, которых нет в этом мире. Может быть **больше** экранов. Обязательное — то, что объявил манифест и что движок этой `packFormat` умеет прочитать. Нет объявленного файла — ошибка, не пустой массив.
+
+Данные персонажа/предметов — JSON. Экраны и оформление — часть пакета; формат поставки экранов — Q10 (раскладка из кирпичей / модули экранов).
+
+`data/equipmentKits/index.js` сейчас склеивает комплекты кодом. Для данных комплектов нужен JSON-индекс (Q3), даже если экраны не JSON.
+
+---
+
+## 3. Манифест
+
+Сейчас в Fallout:
 
 ```json
 {
@@ -305,31 +66,186 @@ export const initSettingManager = async () => {
   "name": "Fallout 2d20",
   "version": 1,
   "requiresCore": ">=1.0",
+  "defaultLocale": "ru-RU",
   "locales": ["ru-RU", "en-EN"]
 }
 ```
 
+Для пакета нужно больше (поля ниже — предложение, Q2/Q11):
+
+```json
+{
+  "id": "fallout",
+  "name": "Fallout 2d20",
+  "version": 1,
+  "packFormat": 1,
+  "requiresCore": ">=1.0",
+  "defaultLocale": "ru-RU",
+  "locales": ["ru-RU", "en-EN"],
+  "splash": {
+    "image": "splash/annihilation.png",
+    "backgroundColor": "#050508"
+  },
+  "screens": {
+    "character": "screens/character",
+    "perks": "screens/perks"
+  }
+}
+```
+
+| Поле | Смысл |
+|---|---|
+| `id` | латиница, ключ сейвов и кэша |
+| `name` | имя в UI |
+| `version` | версия **контента** |
+| `packFormat` | версия **контракта** (какие пути/экраны движок понимает) |
+| `requiresCore` | минимальная версия движка |
+| `locales` / `defaultLocale` | языки пакета |
+| `splash` | заставка этого сеттинга |
+| `screens` | какие экраны есть и откуда |
+| карта data/i18n | либо белый список `packFormat`, либо явные пути (Q11) |
+
+`settings.json` — по-прежнему в пакете. Значения в сторе по `settingId`, пакеты не смешиваются.
+
+Кирпичи, которые сеттинг хочет взять из движка (уже промоученные), тоже объявляются — список id кирпичей (Q12). Нет кирпича в этой версии движка — ошибка, не молчаливый дефолтный экран.
+
 ---
 
-## 5. АУДИТ (принципы движок/сеттинг — кратко)
+## 4. Адаптер (ещё не в коде)
 
-- Модульность данных обязательна: категория = файл, не смешивать; переводы зеркалят данные.
-- Модуль — единственный источник данных; merge-слои и фолбэки запрещены.
-- БД — только состояние (персонажи/настройки); сейвы обогащаются из файлов и мигрируются.
-- Данные динамичны: меняются, обогащаются, влияют друг на друга.
-- Настройки — часть сеттинга (settings.json в модуле; значения по модулям).
-- Упакованные сеттинги: скоро новый модуль; программа грузит пакеты по выбору пользователя;
-  офлайн (скачал → загрузил).
-- UI и переводы экранов — в модуль (после данных).
-- Следующий шаг: разделение движка и сеттинга ПОСЛЕ импорта через реестр (адаптер).
+Движок не импортирует `modules/fallout/...`. Экраны и domain ходят в активный адаптер.
+
+```
+getManifest()
+getSettings()
+getOrigins()
+getTraits()
+getPerks()
+getBodyPlans()
+getWeapons()
+getEquipmentKits()
+getI18n(locale)
+getSplash()
+getScreen(name)    // экран пакета; нет такого имени — ошибка, не «тихий» экран движка
+listScreens()      // какие экраны этот сеттинг вообще показывает
+listEngineBricks() // какие кирпичи движка этот пакет просит
+```
+
+Набор `get*` не фиксируем списком из старого черновика: адаптер отдаёт **то, что есть в пакете**. Нет оружия в сеттинге — нет `getWeapons` / метод бросает «категории нет», UI не рисует вкладку. Не подставлять Fallout-каталог.
+
+Образцы `FalloutSettingAdapter` / `settingManager` со встроенным `fallout` из старого файла **не копировать**: они противоречат пустому движку.
 
 ---
 
-## 6. ДОРОЖНАЯ КАРТА
+## 5. Кирпичи и промоут
 
-1. [x] Контракт + адаптер для встроенного Fallout
-2. [ ] Перевод движка на чтение через адаптер (180 статических импортов → адаптер)
-3. [ ] Загрузка сеттинга по URL (zip/JSON) + офлайн-хранение
-4. [x] Запоминание активного сеттинга + автозагрузка (в менеджере)
-5. [ ] Сплэш-скрин сеттинга (свой у каждого; positronium-boot как основа)
-6. [ ] HoMM 2d20 как отдельный сеттинг
+`components/ui/` — то, что **уже** общее (после решения владельца). Примеры из старого списка, не обязательный набор:
+
+- ячейка характеристики, счётчик ОЗ, атрибут, слот инвентаря, панель эффектов, полоса прочности/сплэша.
+
+Пакет может:
+
+- собрать экран из кирпичей движка;
+- принести **свой** экран (другое число вкладок, другая вёрстка);
+- принести новый кирпич только для себя.
+
+Если второй сеттинг хочет тот же экран/кирпич — владелец движка переносит его в `components/ui/` (или в «общий» слой) отдельным патчем. С этого момента любой пакет может сослаться на id кирпича.
+
+---
+
+## 6. Сборка и загрузка
+
+Репозиторий **данных/экранов** отдельно от движка. Сценарий:
+
+```
+править модуль
+./pack-setting.sh   →  dist/<id>-<version>.zip
+выложить (Release, Pages, хост)
+в движке: URL или файл с диска
+```
+
+Упаковщик проверяет манифест, объявленные пути, JSON данных, что `requiresCore`/`packFormat` заполнены. Это не сборка Expo.
+
+Движок:
+
+1. нет пакета → экран «укажите URL или файл»;
+2. скачать/прочитать zip;
+3. проверить манифест, `packFormat`, `requiresCore`, файлы;
+4. активировать адаптер над этим снимком;
+5. кэш на диск — следующий запуск офлайн;
+6. запомнить активный пакет.
+
+Неудачная подмена **не** затирает уже рабочий кэш.
+
+| Ошибка | Поведение |
+|---|---|
+| нет сети и нет кэша | экран выбора пакета |
+| HTTP ≠ 200 | статус, пакет не меняется |
+| не zip | сообщение |
+| нет манифеста / битый JSON | путь внутри zip |
+| нет объявленного файла | путь |
+| `requiresCore` / `packFormat` не подходят | обновить движок или пакет |
+
+CORS у GitHub raw — ограничение браузера (Q6).
+
+---
+
+## 7. Сейвы
+
+В метаданных персонажа: `settingId` + `settingVersion`.
+
+- Другой `id` пакета — не открывать, сообщение.
+- Тот же id, в каталоге нет перка/предмета — строка остаётся, сообщение как у перков без id.
+
+Q5: один активный пакет на установку или несколько с привязкой персонажа.
+
+---
+
+## 8. Факт в репозитории vs цель
+
+**Есть:** `modules/fallout/` (data, i18n, settings, bodyplans, manifest); реестр со статическими import; сейвы отдельно от каталога.
+
+**Нет:** адаптер, менеджер пакетов, zip-загрузчик, экран «нет пакета», `components/ui/`, сплэш из пакета, экраны в пакете, data-repo.
+
+Пока загрузчика нет, `modules/fallout/` — исходник официального пакета.
+
+---
+
+## 9. Дорожная карта (после утверждения)
+
+1. Ответы на вопросы §10.
+2. JSON-индекс комплектов вместо `equipmentKits/index.js` (данные).
+3. Адаптер + перевод чтений с `import modules/fallout` на адаптер (ещё можно временно кормить адаптер текущим модулем).
+4. `packFormat` = обязательные/объявленные пути.
+5. Упаковщик zip.
+6. Загрузчик URL + файл + кэш; пустой старт.
+7. Сплэш из пакета.
+8. Экраны из пакета (формат — Q10).
+9. Data-repo; каталог убрать из бандла движка.
+10. Промоут кирпичей — по мере вторых сеттингов, не заранее.
+
+---
+
+## 10. Вопросы владельцу
+
+- **Q1.** Корень zip — сразу `manifest.json`, без `modules/fallout/`?
+- **Q2.** Отдельное поле `packFormat` (с `1`) или хватит `version` + `requiresCore`?
+- **Q3.** Комплекты: JSON-индекс вместо `index.js` — да?
+- **Q4.** Файл в zip, которого движок не знает и манифест не объявил — игнорировать или отклонить пакет?
+- **Q5.** Один активный пакет на установку или несколько, персонаж привязан к `settingId`?
+- **Q6.** URL: если GitHub raw без CORS — требовать Release/jsDelivr/свой хост, или движок сам нормализует известные GitHub-ссылки?
+- **Q7.** Лимит zip (5 / 20 / 50 МБ)?
+- **Q8.** Checksum/подпись в первой версии — нет?
+- **Q9.** Официальный Fallout — отдельный data-repo с zip в Release?
+- **Q10.** Экраны в пакете: JSON-раскладка из кирпичей движка, модули экранов в пакете, или сначала только кирпичи + позже свои экраны?
+- **Q11.** Пути data/i18n: как сейчас дерево файлов (белый список `packFormat`) или явная карта в манифесте?
+- **Q12.** Как пакет ссылается на кирпич движка — список id в манифесте?
+
+---
+
+## 11. Что сознательно не копировали из старых файлов
+
+- Встроенный Fallout «всегда в бандле» — отменено (пустой движок).
+- «В пакете только JSON» — ошибка черновика pack; экраны и оформление входят.
+- Готовый `FalloutSettingAdapter` с `catalog?.chems || []` — фолбэк, в код не брать.
+- Сжатый i18n в один `ru-RU.json` — не делаем, пока Q11 не скажет иначе; сейчас зеркало папок.
