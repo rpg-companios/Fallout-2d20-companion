@@ -1,0 +1,407 @@
+diff --git a/__tests__/perks/chem-cola-thirst-pharma.test.js b/__tests__/perks/chem-cola-thirst-pharma.test.js
+new file mode 100644
+index 0000000..8dfe64a
+--- /dev/null
++++ b/__tests__/perks/chem-cola-thirst-pharma.test.js
+@@ -0,0 +1,87 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { checkAddiction, resolveConsumableVitalChanges } from '../../domain/effects';
++import { pickRandomItem, rollFoundItemBonuses } from '../../domain/foundItemBonus';
++import { calculatePerkEffects } from '../../domain/perks';
++import { COLA_NUT_DRINK_IDS } from '../../domain/perks/colaNut';
++import { DIRTY_WATER_ID } from '../../domain/perks/thirstQuencher';
++import perksData from '../../modules/fallout/data/perks/perks.json';
++import drinks from '../../modules/fallout/data/consumables/drinks.json';
++
++afterEach(() => {
++  vi.restoreAllMocks();
++});
++
++const byId = (id) => perksData.find((perk) => perk.id === id);
++const drinkById = (id) => drinks.find((item) => item.id === id);
++
++describe('chemResistant', () => {
++  it('penalizes addiction dice at rank 1 and grants immunity at rank 2', () => {
++    const rank1 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 1 }]);
++    const rank2 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 2 }]);
++    expect(rank1.bonuses).toEqual({ chemAddictionDicePenalty: 1 });
++    expect(rank2.bonuses).toEqual({ chemAddictionImmune: true });
++  });
++
++  it('rolls one fewer combat die', () => {
++    const random = vi.spyOn(Math, 'random').mockReturnValue(0.9);
++    const item = { addictionLevel: 1, negativeEffect: 'addiction' };
++    checkAddiction(item, 2, { dicePenalty: 1 });
++    expect(random).toHaveBeenCalledTimes(1);
++  });
++});
++
++describe('colaNut', () => {
++  it('binds to the three Nuka-Cola ids', () => {
++    const result = calculatePerkEffects([byId('colaNut')], [{ id: 'colaNut', rank: 1 }]);
++    expect(result.bonuses.colaNutDrinkIds).toEqual(COLA_NUT_DRINK_IDS);
++    expect(result.bonuses.colaNutHealMultiplier).toBe(2);
++    expect(COLA_NUT_DRINK_IDS).toEqual([
++      'drink_nuka_cola',
++      'drink_nuka_cherry',
++      'drink_nuka_cola_quantum',
++    ]);
++  });
++
++  it('doubles instant healing for a bound drink', () => {
++    const nuka = drinkById('drink_nuka_cherry');
++    const result = resolveConsumableVitalChanges(nuka, {
++      currentHealth: 1,
++      maxHealth: 20,
++      radiation: 0,
++      hpHealMultiplier: 2,
++    });
++    expect(result.healAmount).toBe(getHeal(nuka) * 2);
++  });
++});
++
++const getHeal = (item) => {
++  const pe = item.positiveEffect;
++  if (pe && typeof pe === 'object' && pe.hpModifier?.op === '+') return Number(pe.hpModifier.value) || 0;
++  return Number(item.hpHealed) || 0;
++};
++
++describe('thirstQuencher', () => {
++  it('flags dirty water disease skip', () => {
++    const result = calculatePerkEffects([byId('thirstQuencher')], [{ id: 'thirstQuencher', rank: 1 }]);
++    expect(result.bonuses).toEqual({ dirtyWaterDiseaseImmune: true });
++    expect(DIRTY_WATER_ID).toBe('drink_dirty_water');
++  });
++});
++
++describe('pharmaFarmer', () => {
++  it('adds one of the same chem and marks a random extra chem', () => {
++    const result = calculatePerkEffects([byId('pharmaFarmer')], [{ id: 'pharmaFarmer', rank: 1 }]);
++    expect(result.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'pharmaFarmer', itemType: 'chem', extra: 1, extraRandom: true },
++    ]);
++    const events = rollFoundItemBonuses(result.bonuses, 'chem', { name: 'Стимулятор' });
++    expect(events[0].amount).toBe(1);
++    expect(events[0].itemName).toBe('Стимулятор');
++    expect(events[0].extraRandom).toBe(true);
++  });
++
++  it('picks a named catalog item', () => {
++    const picked = pickRandomItem([{ id: 'a', name: 'А' }, { id: 'b', name: 'Б' }]);
++    expect(['А', 'Б']).toContain(picked.name);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 8a5d8ab..55a1e07 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -955,6 +955,12 @@ export const CharacterProvider = ({ children }) => {
+   };
+ 
+   const applyDiseaseExposureForConsumable = (item) => {
++    if (
++      item?.id === 'drink_dirty_water'
++      && Boolean(useCharacterStore.getState().perkBonuses?.dirtyWaterDiseaseImmune)
++    ) {
++      return null;
++    }
+     const ruleMatches = getSceneRiskRules()
+       .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
+       .filter(({ event }) => event !== null);
+@@ -1061,15 +1067,22 @@ export const CharacterProvider = ({ children }) => {
+     });
+ 
+     // 1. Мгновенные показатели: сначала лечение, затем радиация.
++    const perkBonuses = useCharacterStore.getState().perkBonuses || {};
+     const {
+       hpHealBonus = 0,
+       irradiatedConsumableRadiationImmune = false,
+-    } = useCharacterStore.getState().perkBonuses || {};
++      colaNutDrinkIds,
++      colaNutHealMultiplier = 1,
++    } = perkBonuses;
++    const hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
++      ? Number(colaNutHealMultiplier) || 1
++      : 1;
+     const vitalOptions = {
+       currentHealth,
+       maxHealth: calculateMaxHealth(attributes, level),
+       radiation,
+       hpHealBonus,
++      hpHealMultiplier,
+       radiationImmune: hasRadiationImmunity({ origin, trait }),
+       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+     };
+@@ -1133,7 +1146,9 @@ export const CharacterProvider = ({ children }) => {
+     // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
+     const hasPartyBoyImmunity =
+       item?.isAlcohol === true &&
+-      Boolean(useCharacterStore.getState().perkBonuses?.alcoholAddictionImmune);
++      Boolean(perkBonuses.alcoholAddictionImmune);
++    const isChemItem = item?.itemType === 'chem' || item?.itemType === 'chems';
++    const hasChemAddictionImmunity = isChemItem && Boolean(perkBonuses.chemAddictionImmune);
+ 
+     let addictionResult = null;
+     // Стелс-бой: зависимость возможна ТОЛЬКО у Тени (решение владельца).
+@@ -1145,12 +1160,16 @@ export const CharacterProvider = ({ children }) => {
+       item?.addictionLevel > 0 &&
+       item?.negativeEffect === 'addiction' &&
+       !hasPartyBoyImmunity &&
++      !hasChemAddictionImmunity &&
+       (!isStealthBoy || isShadowCharacter)
+     ) {
+       // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
+       // (бросок CD, грани 5/6 = эффект).
+       const anyEffect = isShadowCharacter && isStealthBoy;
+-      addictionResult = checkAddiction(item, dosesToday, { anyEffect });
++      addictionResult = checkAddiction(item, dosesToday, {
++        anyEffect,
++        dicePenalty: isChemItem ? (Number(perkBonuses.chemAddictionDicePenalty) || 0) : 0,
++      });
+       if (addictionResult.addicted && !conditions.includes('addicted')) {
+         setConditions((prev) => [...prev, 'addicted']);
+         // Перманентный эффект зависимости: отображается в карточке эффектов,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index bdf9dc7..c01df05 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -24,7 +24,7 @@ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.j
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { rerollConsumableRadiationRoll } from '../../../domain/effects';
+ import { buildConsumableResultReport } from './logic/consumableResultReport';
+-import { rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
++import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
+ import { getPerkDisplay } from '../PerksAndTraitsScreen/perksDisplay';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+@@ -515,7 +515,7 @@ const InventoryScreen = () => {
+           });
+         }
+       }
+-      showFoundItemBonusAlerts(bonusEvents);
++      finishLootBonuses(bonusEvents);
+       return;
+     }
+ 
+@@ -538,11 +538,11 @@ const InventoryScreen = () => {
+       const existingItem = findUnequippedStoreItemByStackKey(stackKey);
+       if (existingItem) {
+         adjustStoreItemQuantity(existingItem.id, quantity);
+-        showFoundItemBonusAlerts(bonusEvents);
++        finishLootBonuses(bonusEvents);
+         return;
+       }
+       addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
+-      showFoundItemBonusAlerts(bonusEvents);
++      finishLootBonuses(bonusEvents);
+       return;
+     }
+ 
+@@ -562,7 +562,7 @@ const InventoryScreen = () => {
+           durabilityWearRemainder: 0,
+         });
+       }
+-      showFoundItemBonusAlerts(bonusEvents);
++      finishLootBonuses(bonusEvents);
+       return;
+     }
+ 
+@@ -571,7 +571,7 @@ const InventoryScreen = () => {
+ 
+     if (existingItem) {
+       adjustStoreItemQuantity(existingItem.id, quantity);
+-      showFoundItemBonusAlerts(bonusEvents);
++      finishLootBonuses(bonusEvents);
+       return;
+     }
+ 
+@@ -580,7 +580,7 @@ const InventoryScreen = () => {
+       itemType: getItemType(localizedItem),
+       quantity,
+     });
+-    showFoundItemBonusAlerts(bonusEvents);
++    finishLootBonuses(bonusEvents);
+   };
+ 
+ 
+diff --git a/domain/effects.js b/domain/effects.js
+index 2bb9b20..d16d23f 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -628,6 +628,7 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+         maxHealth,
+         radiation,
+         hpHealBonus = 0,
++        hpHealMultiplier = 1,
+         radiationImmune = false,
+         skipIrradiatedRadiation = false,
+     } = options;
+@@ -636,11 +637,13 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+         || !Number.isFinite(maxHealth)
+         || !Number.isFinite(radiation)
+         || !Number.isFinite(hpHealBonus)
++        || !Number.isFinite(hpHealMultiplier)
++        || hpHealMultiplier <= 0
+     ) {
+         throw new Error('[effects] Некорректное состояние персонажа для применения расходника');
+     }
+ 
+-    const instantHealAmount = getInstantHealAmount(item);
++    const instantHealAmount = getInstantHealAmount(item) * hpHealMultiplier;
+     const healAmount = instantHealAmount > 0
+         ? Math.max(0, instantHealAmount + hpHealBonus)
+         : 0;
+diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
+index 92599a8..3e721ef 100644
+--- a/domain/foundItemBonus.js
++++ b/domain/foundItemBonus.js
+@@ -31,18 +31,22 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+     if (combatDice > 0) {
+       amount += rollMultipleCombatDice(combatDice).total;
+     }
+-    if (amount <= 0) return [];
++    if (amount <= 0 && !bonus.extraRandom) return [];
+     const event = {
+       perkId: bonus.perkId,
+       itemType,
+       amount,
+     };
+-    if (item) {
++    if (bonus.extraRandom) event.extraRandom = true;
++    if (item && amount > 0) {
+       if (typeof item.name !== 'string' || item.name.length === 0) {
+         throw new Error('[foundItemBonus] Для алерта нужно имя предмета');
+       }
+       event.itemName = item.name;
+     }
++    if (amount <= 0 && bonus.extraRandom) {
++      return [{ perkId: bonus.perkId, itemType, amount: 0, extraRandom: true }];
++    }
+     return [event];
+   });
+ }
+@@ -50,3 +54,15 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+ export function sumFoundItemBonus(events) {
+   return (events || []).reduce((sum, event) => sum + (Number(event.amount) || 0), 0);
+ }
++
++export function pickRandomItem(items) {
++  if (!Array.isArray(items) || items.length === 0) {
++    throw new Error('[foundItemBonus] Нет каталога для случайного предмета');
++  }
++  const index = Math.floor(Math.random() * items.length);
++  const picked = items[index];
++  if (!picked || typeof picked.name !== 'string' || picked.name.length === 0) {
++    throw new Error('[foundItemBonus] У случайного предмета нет имени');
++  }
++  return picked;
++}
+diff --git a/domain/perks/chemResistant.js b/domain/perks/chemResistant.js
+new file mode 100644
+index 0000000..767b5da
+--- /dev/null
++++ b/domain/perks/chemResistant.js
+@@ -0,0 +1,14 @@
++// domain/perks/chemResistant.js
++// Ранг 1 — на 1 CD меньше в броске зависимости от препаратов (не ниже 0).
++// Ранг 2 — зависимость от препаратов не наступает.
++
++export const chemResistantPerk = {
++  id: 'chemResistant',
++  apply(ctx) {
++    const rank = ctx.state.rank || 1;
++    if (rank >= 2) {
++      return { chemAddictionImmune: true };
++    }
++    return { chemAddictionDicePenalty: 1 };
++  },
++};
+diff --git a/domain/perks/colaNut.js b/domain/perks/colaNut.js
+new file mode 100644
+index 0000000..c8fddf5
+--- /dev/null
++++ b/domain/perks/colaNut.js
+@@ -0,0 +1,18 @@
++// domain/perks/colaNut.js
++// Лечение ×2 только у этих id. Без разбора названия.
++
++export const COLA_NUT_DRINK_IDS = [
++  'drink_nuka_cola',
++  'drink_nuka_cherry',
++  'drink_nuka_cola_quantum',
++];
++
++export const colaNutPerk = {
++  id: 'colaNut',
++  apply() {
++    return {
++      colaNutDrinkIds: COLA_NUT_DRINK_IDS,
++      colaNutHealMultiplier: 2,
++    };
++  },
++};
+diff --git a/domain/perks/index.js b/domain/perks/index.js
+index 807d5ae..3a520bd 100644
+--- a/domain/perks/index.js
++++ b/domain/perks/index.js
+@@ -16,6 +16,10 @@ import { scroungerPerk } from './scrounger';
+ import { fortuneFinderPerk } from './fortuneFinder';
+ import { canOpenerPerk } from './canOpener';
+ import { butchersBountyPerk } from './butchersBounty';
++import { chemResistantPerk } from './chemResistant';
++import { colaNutPerk } from './colaNut';
++import { thirstQuencherPerk } from './thirstQuencher';
++import { pharmaFarmerPerk } from './pharmaFarmer';
+ 
+ export const perkEffects = {
+   [intenseTrainingPerk.id]: intenseTrainingPerk,
+@@ -36,6 +40,10 @@ export const perkEffects = {
+   [fortuneFinderPerk.id]: fortuneFinderPerk,
+   [canOpenerPerk.id]: canOpenerPerk,
+   [butchersBountyPerk.id]: butchersBountyPerk,
++  [chemResistantPerk.id]: chemResistantPerk,
++  [colaNutPerk.id]: colaNutPerk,
++  [thirstQuencherPerk.id]: thirstQuencherPerk,
++  [pharmaFarmerPerk.id]: pharmaFarmerPerk,
+ };
+ 
+ export function getPerkEffect(effectId) {
+diff --git a/domain/perks/pharmaFarmer.js b/domain/perks/pharmaFarmer.js
+new file mode 100644
+index 0000000..5ae3da0
+--- /dev/null
++++ b/domain/perks/pharmaFarmer.js
+@@ -0,0 +1,16 @@
++// domain/perks/pharmaFarmer.js
++// Добыча препарата: n+1 того же + 1 случайный препарат из всего каталога.
++
++export const pharmaFarmerPerk = {
++  id: 'pharmaFarmer',
++  apply() {
++    return {
++      foundItemBonuses: [{
++        perkId: 'pharmaFarmer',
++        itemType: 'chem',
++        extra: 1,
++        extraRandom: true,
++      }],
++    };
++  },
++};
+diff --git a/domain/perks/thirstQuencher.js b/domain/perks/thirstQuencher.js
+new file mode 100644
+index 0000000..70927a4
+--- /dev/null
++++ b/domain/perks/thirstQuencher.js
+@@ -0,0 +1,11 @@
++// domain/perks/thirstQuencher.js
++// Грязная вода (drink_dirty_water) не вызывает бросок болезни.
++
++export const DIRTY_WATER_ID = 'drink_dirty_water';
++
++export const thirstQuencherPerk = {
++  id: 'thirstQuencher',
++  apply() {
++    return { dirtyWaterDiseaseImmune: true };
++  },
++};
