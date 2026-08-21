@@ -236,8 +236,10 @@ export const recordDoseWithinWindow = (doseLog, dose, { now, windowMs }) => {
  *
  * @param {object} item          — предмет с полем addictionLevel
  * @param {number} dosesToday    — сколько всего доз препаратов принято за 24 ч (включая текущую)
- * @param {object} [options]     — { anyEffect?: boolean } (Тень и Стелс-бой:
- *                                 зависимость при ЛЮБОМ эффекте на кубике)
+ * @param {object} [options]     — { anyEffect?: boolean, dicePenalty?: number }
+ *                                 anyEffect: Тень и Стелс-бой — зависимость при
+ *                                 ЛЮБОМ эффекте на кубике.
+ *                                 dicePenalty: меньше CD (не ниже 0).
  * @returns {{ addicted: boolean, effectCount: number, faces: number[], addictionLevel: number }}
  */
 export const checkAddiction = (item, dosesToday, options = {}) => {
@@ -245,7 +247,9 @@ export const checkAddiction = (item, dosesToday, options = {}) => {
     if (addictionLevel === 0 || !item?.negativeEffect) {
         return { addicted: false, effectCount: 0, faces: [], addictionLevel: 0 };
     }
-    const { effectCount, faces } = rollCombatDiceEffects(dosesToday);
+    const dicePenalty = Number(options.dicePenalty) || 0;
+    const diceCount = Math.max(0, (Number(dosesToday) || 0) - dicePenalty);
+    const { effectCount, faces } = rollCombatDiceEffects(diceCount);
     const addicted = options.anyEffect
         ? effectCount > 0 // Тень: любой эффект на кубике → зависимость
         : effectCount >= addictionLevel;
@@ -628,6 +632,7 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
         maxHealth,
         radiation,
         hpHealBonus = 0,
+        hpHealMultiplier = 1,
         radiationImmune = false,
         skipIrradiatedRadiation = false,
     } = options;
@@ -636,11 +641,13 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
         || !Number.isFinite(maxHealth)
         || !Number.isFinite(radiation)
         || !Number.isFinite(hpHealBonus)
+        || !Number.isFinite(hpHealMultiplier)
+        || hpHealMultiplier <= 0
     ) {
         throw new Error('[effects] Некорректное состояние персонажа для применения расходника');
     }
 
-    const instantHealAmount = getInstantHealAmount(item);
+    const instantHealAmount = getInstantHealAmount(item) * hpHealMultiplier;
     const healAmount = instantHealAmount > 0
         ? Math.max(0, instantHealAmount + hpHealBonus)
         : 0;

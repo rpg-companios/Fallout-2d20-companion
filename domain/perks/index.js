@@ -16,6 +16,10 @@ import { scroungerPerk } from './scrounger';
 import { fortuneFinderPerk } from './fortuneFinder';
 import { canOpenerPerk } from './canOpener';
 import { butchersBountyPerk } from './butchersBounty';
+import { chemResistantPerk } from './chemResistant';
+import { colaNutPerk } from './colaNut';
+import { thirstQuencherPerk } from './thirstQuencher';
+import { pharmaFarmerPerk } from './pharmaFarmer';
 
 export const perkEffects = {
   [intenseTrainingPerk.id]: intenseTrainingPerk,
@@ -36,6 +40,10 @@ export const perkEffects = {
   [fortuneFinderPerk.id]: fortuneFinderPerk,
   [canOpenerPerk.id]: canOpenerPerk,
   [butchersBountyPerk.id]: butchersBountyPerk,
+  [chemResistantPerk.id]: chemResistantPerk,
+  [colaNutPerk.id]: colaNutPerk,
+  [thirstQuencherPerk.id]: thirstQuencherPerk,
+  [pharmaFarmerPerk.id]: pharmaFarmerPerk,
 };
 
 export function getPerkEffect(effectId) {

@@ -24,7 +24,7 @@ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.j
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { rerollConsumableRadiationRoll } from '../../../domain/effects';
 import { buildConsumableResultReport } from './logic/consumableResultReport';
-import { rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
+import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
 import { getPerkDisplay } from '../PerksAndTraitsScreen/perksDisplay';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
@@ -330,7 +330,7 @@ const InventoryScreen = () => {
 
   const showFoundItemBonusAlerts = (events) => {
     (events || []).forEach((event) => {
-      if (!event?.amount) return;
+      if (!event?.amount || event.extraRandom) return;
       showAlert(formatInventoryText(tInventory('screen.alerts.foundItemBonus'), {
         perkName: getPerkDisplay({ id: event.perkId }).name,
         amount: event.amount,
@@ -339,6 +339,30 @@ const InventoryScreen = () => {
           : tInventory(`screen.foundItemTypes.${event.itemType}`),
       }));
     });
+  };
+
+  const extraRandomCatalogFor = (itemType) => {
+    if (itemType === 'chem' || itemType === 'chems') return equipmentCatalog.chems;
+    throw new Error(`[InventoryScreen] Нет каталога случайных предметов для типа ${itemType}`);
+  };
+
+  const finishLootBonuses = (events) => {
+    (events || []).forEach((event) => {
+      if (!event?.extraRandom) return;
+      const count = Number(event.amount) || 0;
+      const catalog = extraRandomCatalogFor(event.itemType);
+      for (let i = 0; i < count; i += 1) {
+        const picked = pickRandomItem(catalog);
+        handleAddItem(picked, 1, 'perkBonus');
+        showFoundItemBonusAlerts([{
+          perkId: event.perkId,
+          itemType: event.itemType,
+          amount: 1,
+          itemName: picked.name,
+        }]);
+      }
+    });
+    showFoundItemBonusAlerts(events);
   };
 
   const handleSaveCaps = (amount) => {
@@ -515,7 +539,7 @@ const InventoryScreen = () => {
           });
         }
       }
-      showFoundItemBonusAlerts(bonusEvents);
+      finishLootBonuses(bonusEvents);
       return;
     }
 
@@ -538,11 +562,11 @@ const InventoryScreen = () => {
       const existingItem = findUnequippedStoreItemByStackKey(stackKey);
       if (existingItem) {
         adjustStoreItemQuantity(existingItem.id, quantity);
-        showFoundItemBonusAlerts(bonusEvents);
+        finishLootBonuses(bonusEvents);
         return;
       }
       addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
-      showFoundItemBonusAlerts(bonusEvents);
+      finishLootBonuses(bonusEvents);
       return;
     }
 
@@ -562,7 +586,7 @@ const InventoryScreen = () => {
           durabilityWearRemainder: 0,
         });
       }
-      showFoundItemBonusAlerts(bonusEvents);
+      finishLootBonuses(bonusEvents);
       return;
     }
 
@@ -571,7 +595,7 @@ const InventoryScreen = () => {
 
     if (existingItem) {
       adjustStoreItemQuantity(existingItem.id, quantity);
-      showFoundItemBonusAlerts(bonusEvents);
+      finishLootBonuses(bonusEvents);
       return;
     }
 
@@ -580,7 +604,7 @@ const InventoryScreen = () => {
       itemType: getItemType(localizedItem),
       quantity,
     });
-    showFoundItemBonusAlerts(bonusEvents);
+    finishLootBonuses(bonusEvents);
   };
 
 

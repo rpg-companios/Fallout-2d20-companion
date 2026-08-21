@@ -6,8 +6,9 @@
 // Запись:
 //   combatDice — сумма бросков CD;
 //   extra — фиксированное число;
+//   extraRandom — true: extra штук случайных из каталога типа, не того же предмета;
 //   match — поля предмета, которые должны совпасть (например state: 'cooked').
-// Имя в алерте: если передан предмет, берётся item.name.
+// Имя в алерте: если передан предмет и бонус не extraRandom, берётся item.name.
 
 import { rollMultipleCombatDice } from './diceRollsLogic';
 
@@ -37,7 +38,9 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
       itemType,
       amount,
     };
-    if (item) {
+    if (bonus.extraRandom) {
+      event.extraRandom = true;
+    } else if (item) {
       if (typeof item.name !== 'string' || item.name.length === 0) {
         throw new Error('[foundItemBonus] Для алерта нужно имя предмета');
       }
@@ -48,5 +51,20 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
 }
 
 export function sumFoundItemBonus(events) {
-  return (events || []).reduce((sum, event) => sum + (Number(event.amount) || 0), 0);
+  return (events || []).reduce((sum, event) => {
+    if (event?.extraRandom) return sum;
+    return sum + (Number(event.amount) || 0);
+  }, 0);
+}
+
+export function pickRandomItem(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('[foundItemBonus] Нет каталога для случайного предмета');
+  }
+  const index = Math.floor(Math.random() * items.length);
+  const picked = items[index];
+  if (!picked || typeof picked.name !== 'string' || picked.name.length === 0) {
+    throw new Error('[foundItemBonus] У случайного предмета нет имени');
+  }
+  return picked;
 }

@@ -955,6 +955,12 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const applyDiseaseExposureForConsumable = (item) => {
+    if (
+      item?.id === 'drink_dirty_water'
+      && Boolean(useCharacterStore.getState().perkBonuses?.dirtyWaterDiseaseImmune)
+    ) {
+      return null;
+    }
     const ruleMatches = getSceneRiskRules()
       .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
       .filter(({ event }) => event !== null);
@@ -1061,15 +1067,22 @@ export const CharacterProvider = ({ children }) => {
     });
 
     // 1. Мгновенные показатели: сначала лечение, затем радиация.
+    const perkBonuses = useCharacterStore.getState().perkBonuses || {};
     const {
       hpHealBonus = 0,
       irradiatedConsumableRadiationImmune = false,
-    } = useCharacterStore.getState().perkBonuses || {};
+      colaNutDrinkIds,
+      colaNutHealMultiplier = 1,
+    } = perkBonuses;
+    const hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
+      ? Number(colaNutHealMultiplier) || 1
+      : 1;
     const vitalOptions = {
       currentHealth,
       maxHealth: calculateMaxHealth(attributes, level),
       radiation,
       hpHealBonus,
+      hpHealMultiplier,
       radiationImmune: hasRadiationImmunity({ origin, trait }),
       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
     };
@@ -1133,7 +1146,9 @@ export const CharacterProvider = ({ children }) => {
     // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
     const hasPartyBoyImmunity =
       item?.isAlcohol === true &&
-      Boolean(useCharacterStore.getState().perkBonuses?.alcoholAddictionImmune);
+      Boolean(perkBonuses.alcoholAddictionImmune);
+    const isChemItem = item?.itemType === 'chem' || item?.itemType === 'chems';
+    const hasChemAddictionImmunity = isChemItem && Boolean(perkBonuses.chemAddictionImmune);
 
     let addictionResult = null;
     // Стелс-бой: зависимость возможна ТОЛЬКО у Тени (решение владельца).
@@ -1145,12 +1160,16 @@ export const CharacterProvider = ({ children }) => {
       item?.addictionLevel > 0 &&
       item?.negativeEffect === 'addiction' &&
       !hasPartyBoyImmunity &&
+      !hasChemAddictionImmunity &&
       (!isStealthBoy || isShadowCharacter)
     ) {
       // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
       // (бросок CD, грани 5/6 = эффект).
       const anyEffect = isShadowCharacter && isStealthBoy;
-      addictionResult = checkAddiction(item, dosesToday, { anyEffect });
+      addictionResult = checkAddiction(item, dosesToday, {
+        anyEffect,
+        dicePenalty: isChemItem ? (Number(perkBonuses.chemAddictionDicePenalty) || 0) : 0,
+      });
       if (addictionResult.addicted && !conditions.includes('addicted')) {
         setConditions((prev) => [...prev, 'addicted']);
         // Перманентный эффект зависимости: отображается в карточке эффектов,
