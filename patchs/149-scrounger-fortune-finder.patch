@@ -1,0 +1,325 @@
+diff --git a/__tests__/perks/found-item-bonus.test.js b/__tests__/perks/found-item-bonus.test.js
+new file mode 100644
+index 0000000..587c31b
+--- /dev/null
++++ b/__tests__/perks/found-item-bonus.test.js
+@@ -0,0 +1,65 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { rollFoundItemBonuses, sumFoundItemBonus } from '../../domain/foundItemBonus';
++import { calculatePerkEffects } from '../../domain/perks';
++import perksData from '../../modules/fallout/data/perks/perks.json';
++
++afterEach(() => {
++  vi.restoreAllMocks();
++});
++
++const scrounger = perksData.find((perk) => perk.id === 'scrounger');
++const fortuneFinder = perksData.find((perk) => perk.id === 'fortuneFinder');
++
++describe('found item perk bonuses', () => {
++  it('gives Scrounger extra ammo combat dice by rank', () => {
++    const rank1 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 1 }]);
++    const rank2 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 2 }]);
++    const rank3 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 3 }]);
++    expect(rank1.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'scrounger', itemType: 'ammo', combatDice: 3 },
++    ]);
++    expect(rank2.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'scrounger', itemType: 'ammo', combatDice: 6 },
++    ]);
++    expect(rank3.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'scrounger', itemType: 'ammo', combatDice: 10 },
++    ]);
++  });
++
++  it('gives Fortune Finder extra caps combat dice by rank', () => {
++    const rank1 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 1 }]);
++    const rank2 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 2 }]);
++    const rank3 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 3 }]);
++    expect(rank1.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 3 },
++    ]);
++    expect(rank2.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 6 },
++    ]);
++    expect(rank3.bonuses.foundItemBonuses).toEqual([
++      { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 10 },
++    ]);
++  });
++});
++
++describe('rollFoundItemBonuses', () => {
++  it('adds the sum of matching combat dice and ignores other item types', () => {
++    vi.spyOn(Math, 'random')
++      .mockReturnValueOnce(0.2) // 2
++      .mockReturnValueOnce(0.2) // 2
++      .mockReturnValueOnce(0.2); // 2
++
++    const bonuses = {
++      foundItemBonuses: [
++        { perkId: 'scrounger', itemType: 'ammo', combatDice: 3 },
++        { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 3 },
++      ],
++    };
++    const ammoEvents = rollFoundItemBonuses(bonuses, 'ammo');
++    expect(ammoEvents).toEqual([
++      { perkId: 'scrounger', itemType: 'ammo', amount: 6 },
++    ]);
++    expect(sumFoundItemBonus(ammoEvents)).toBe(6);
++    expect(rollFoundItemBonuses(bonuses, 'food')).toEqual([]);
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 081d358..767460f 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -24,6 +24,8 @@ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.j
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { rerollConsumableRadiationRoll } from '../../../domain/effects';
+ import { buildConsumableResultReport } from './logic/consumableResultReport';
++import { rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
++import { getPerkDisplay } from '../PerksAndTraitsScreen/perksDisplay';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+@@ -326,12 +328,25 @@ const InventoryScreen = () => {
+     setIsCapsModalVisible(true);
+   };
+ 
++  const showFoundItemBonusAlerts = (events) => {
++    (events || []).forEach((event) => {
++      if (!event?.amount) return;
++      showAlert(formatInventoryText(tInventory('screen.alerts.foundItemBonus'), {
++        perkName: getPerkDisplay({ id: event.perkId }).name,
++        amount: event.amount,
++        itemType: tInventory(`screen.foundItemTypes.${event.itemType}`),
++      }));
++    });
++  };
++
+   const handleSaveCaps = (amount) => {
+     if (capsOperationType === 'add') {
+-      setCaps(prev => prev + amount);
+-    } else {
+-      setCaps(prev => Math.max(0, prev - amount));
++      const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
++      setCaps((prev) => prev + amount + sumFoundItemBonus(bonusEvents));
++      showFoundItemBonusAlerts(bonusEvents);
++      return;
+     }
++    setCaps((prev) => Math.max(0, prev - amount));
+   };
+ 
+   const handleApplyConsumable = (item) => {
+@@ -472,6 +487,12 @@ const InventoryScreen = () => {
+ 
+   const handleAddItem = (item, quantity = 1, source = 'loot') => {
+     const localizedItem = resolveLocalizedItem(item);
++    const bonusEvents = source === 'loot'
++      && getItemType(localizedItem) === 'ammo'
++      && !isFusionCoreItem(localizedItem)
++      ? rollFoundItemBonuses(storePerkBonuses, 'ammo')
++      : [];
++    quantity += sumFoundItemBonus(bonusEvents);
+ 
+     // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
+     // бросок (покупка 5 шт = 5 независимых бросков), стекаются только одинаковые.
+@@ -494,6 +515,7 @@ const InventoryScreen = () => {
+           });
+         }
+       }
++      showFoundItemBonusAlerts(bonusEvents);
+       return;
+     }
+ 
+@@ -516,9 +538,11 @@ const InventoryScreen = () => {
+       const existingItem = findUnequippedStoreItemByStackKey(stackKey);
+       if (existingItem) {
+         adjustStoreItemQuantity(existingItem.id, quantity);
++        showFoundItemBonusAlerts(bonusEvents);
+         return;
+       }
+       addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
++      showFoundItemBonusAlerts(bonusEvents);
+       return;
+     }
+ 
+@@ -538,6 +562,7 @@ const InventoryScreen = () => {
+           durabilityWearRemainder: 0,
+         });
+       }
++      showFoundItemBonusAlerts(bonusEvents);
+       return;
+     }
+ 
+@@ -546,6 +571,7 @@ const InventoryScreen = () => {
+ 
+     if (existingItem) {
+       adjustStoreItemQuantity(existingItem.id, quantity);
++      showFoundItemBonusAlerts(bonusEvents);
+       return;
+     }
+ 
+@@ -554,11 +580,11 @@ const InventoryScreen = () => {
+       itemType: getItemType(localizedItem),
+       quantity,
+     });
++    showFoundItemBonusAlerts(bonusEvents);
+   };
+ 
+ 
+ 
+-
+   const handleSelectCatalogItem = (item, quantity = 1) => {
+     if (itemSelectionMode === 'buy') {
+       setSelectedItemForBuy(item);
+diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
+new file mode 100644
+index 0000000..9420939
+--- /dev/null
++++ b/domain/foundItemBonus.js
+@@ -0,0 +1,27 @@
++// domain/foundItemBonus.js
++// Универсальный бонус «нашёл X → +n того же типа».
++// Перк кладёт запись в perkBonuses.foundItemBonuses;
++// UI после попадания предметов в инвентарь показывает алерт.
++
++import { rollMultipleCombatDice } from './diceRollsLogic';
++
++export function rollFoundItemBonuses(perkBonuses, itemType) {
++  const bonuses = perkBonuses?.foundItemBonuses;
++  if (!Array.isArray(bonuses) || !itemType) return [];
++
++  return bonuses.flatMap((bonus) => {
++    if (!bonus || bonus.itemType !== itemType) return [];
++    const combatDice = Number(bonus.combatDice) || 0;
++    if (combatDice <= 0) return [];
++    const amount = rollMultipleCombatDice(combatDice).total;
++    return [{
++      perkId: bonus.perkId,
++      itemType,
++      amount,
++    }];
++  });
++}
++
++export function sumFoundItemBonus(events) {
++  return (events || []).reduce((sum, event) => sum + (Number(event.amount) || 0), 0);
++}
+diff --git a/domain/perks/fortuneFinder.js b/domain/perks/fortuneFinder.js
+new file mode 100644
+index 0000000..c3e16db
+--- /dev/null
++++ b/domain/perks/fortuneFinder.js
+@@ -0,0 +1,23 @@
++// domain/perks/fortuneFinder.js
++// Внесение крышек: к введённому количеству добавляется сумма CD.
++// Ранг 1 — 3 CD, ранг 2 — 6 CD, ранг 3 — 10 CD.
++
++const COMBAT_DICE_BY_RANK = {
++  1: 3,
++  2: 6,
++  3: 10,
++};
++
++export const fortuneFinderPerk = {
++  id: 'fortuneFinder',
++  apply(ctx) {
++    const rank = Math.min(3, Math.max(1, ctx.state.rank || 1));
++    return {
++      foundItemBonuses: [{
++        perkId: 'fortuneFinder',
++        itemType: 'caps',
++        combatDice: COMBAT_DICE_BY_RANK[rank],
++      }],
++    };
++  },
++};
+diff --git a/domain/perks/index.js b/domain/perks/index.js
+index a297f03..a7d1fa7 100644
+--- a/domain/perks/index.js
++++ b/domain/perks/index.js
+@@ -12,6 +12,8 @@ import { tagPerk } from './tag';
+ import { nuclearPhysicistPerk } from './nuclearPhysicist';
+ import { fastMetabolismPerk } from './fastMetabolism';
+ import { leadBellyPerk } from './leadBelly';
++import { scroungerPerk } from './scrounger';
++import { fortuneFinderPerk } from './fortuneFinder';
+ 
+ export const perkEffects = {
+   [intenseTrainingPerk.id]: intenseTrainingPerk,
+@@ -27,6 +29,9 @@ export const perkEffects = {
+   [tagPerk.id]: tagPerk,
+   [nuclearPhysicistPerk.id]: nuclearPhysicistPerk,
+   [fastMetabolismPerk.id]: fastMetabolismPerk,
++  [leadBellyPerk.id]: leadBellyPerk,
++  [scroungerPerk.id]: scroungerPerk,
++  [fortuneFinderPerk.id]: fortuneFinderPerk,
+ };
+ 
+ export function getPerkEffect(effectId) {
+diff --git a/domain/perks/scrounger.js b/domain/perks/scrounger.js
+new file mode 100644
+index 0000000..9481d1c
+--- /dev/null
++++ b/domain/perks/scrounger.js
+@@ -0,0 +1,23 @@
++// domain/perks/scrounger.js
++// Добыча патронов: к введённому количеству добавляется сумма CD.
++// Ранг 1 — 3 CD, ранг 2 — 6 CD, ранг 3 — 10 CD.
++
++const COMBAT_DICE_BY_RANK = {
++  1: 3,
++  2: 6,
++  3: 10,
++};
++
++export const scroungerPerk = {
++  id: 'scrounger',
++  apply(ctx) {
++    const rank = Math.min(3, Math.max(1, ctx.state.rank || 1));
++    return {
++      foundItemBonuses: [{
++        perkId: 'scrounger',
++        itemType: 'ammo',
++        combatDice: COMBAT_DICE_BY_RANK[rank],
++      }],
++    };
++  },
++};
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 3968383..8c9e0d2 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -91,7 +91,12 @@
+     "leadBellyRerollTitle": "Lead Belly",
+     "leadBellyRerollMessage": "You may take {radiationAmount} radiation damage. Reroll the value?",
+     "leadBellyRerollConfirm": "Reroll",
+-    "leadBellyRerollKeep": "Keep"
++    "leadBellyRerollKeep": "Keep",
++    "foundItemBonus": "{perkName}: you received + {amount} {itemType}."
++  },
++  "foundItemTypes": {
++    "ammo": "ammo",
++    "caps": "caps"
+   },
+   "actions": {
+     "cancel": "Cancel",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 6ba61c7..b93b06b 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -91,7 +91,12 @@
+     "leadBellyRerollTitle": "Свинцовое брюхо",
+     "leadBellyRerollMessage": "Вы можете получить {radiationAmount} урона радиацией. Хотите перебросить значение?",
+     "leadBellyRerollConfirm": "Перебросить",
+-    "leadBellyRerollKeep": "Оставить"
++    "leadBellyRerollKeep": "Оставить",
++    "foundItemBonus": "{perkName}: вы получили + {amount} {itemType}."
++  },
++  "foundItemTypes": {
++    "ammo": "патронов",
++    "caps": "крышек"
+   },
+   "actions": {
+     "cancel": "Отмена",
