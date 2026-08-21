@@ -1,9 +1,13 @@
 diff --git a/__tests__/perks/found-item-bonus.test.js b/__tests__/perks/found-item-bonus.test.js
-index 1f1698c..fdbdc2e 100644
+index 1f1698c..81baa72 100644
 --- a/__tests__/perks/found-item-bonus.test.js
 +++ b/__tests__/perks/found-item-bonus.test.js
-@@ -45,13 +45,7 @@ describe('found item perk bonuses', () => {
-   it('gives Can Opener +1 preserved food', () => {
+@@ -42,16 +42,10 @@ describe('found item perk bonuses', () => {
+     ]);
+   });
+ 
+-  it('gives Can Opener +1 preserved food', () => {
++  it('gives Can Opener +1 cooked food', () => {
      const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }]);
      expect(result.bonuses.foundItemBonuses).toEqual([
 -      {
@@ -13,15 +17,58 @@ index 1f1698c..fdbdc2e 100644
 -        match: { preserved: true },
 -        useItemName: true,
 -      },
-+      { perkId: 'canOpener', itemType: 'food', extra: 1, match: { preserved: true } },
++      { perkId: 'canOpener', itemType: 'food', extra: 1, match: { state: 'cooked' } },
      ]);
    });
  });
+@@ -76,4 +70,32 @@ describe('rollFoundItemBonuses', () => {
+     expect(sumFoundItemBonus(ammoEvents)).toBe(6);
+     expect(rollFoundItemBonuses(bonuses, 'food')).toEqual([]);
+   });
++
++  it('puts the found item name on the event for the shared alert', () => {
++    vi.spyOn(Math, 'random').mockReturnValue(0.2); // CD 2
++    const bonuses = {
++      foundItemBonuses: [
++        { perkId: 'scrounger', itemType: 'ammo', combatDice: 1 },
++        { perkId: 'canOpener', itemType: 'food', extra: 1, match: { state: 'cooked' } },
++      ],
++    };
++    expect(rollFoundItemBonuses(bonuses, 'ammo', { name: '10-мм патрон' })).toEqual([
++      { perkId: 'scrounger', itemType: 'ammo', amount: 2, itemName: '10-мм патрон' },
++    ]);
++    expect(rollFoundItemBonuses(bonuses, 'food', {
++      state: 'cooked',
++      name: 'Стейк солсбери',
++    })).toEqual([
++      {
++        perkId: 'canOpener',
++        itemType: 'food',
++        amount: 1,
++        itemName: 'Стейк солсбери',
++      },
++    ]);
++    expect(rollFoundItemBonuses(bonuses, 'food', {
++      state: 'raw',
++      name: 'Мясо радтаракана',
++    })).toEqual([]);
++  });
+ });
 diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
-index 7867593..0674962 100644
+index 7867593..92599a8 100644
 --- a/domain/foundItemBonus.js
 +++ b/domain/foundItemBonus.js
-@@ -36,8 +36,8 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+@@ -6,7 +6,8 @@
+ // Запись:
+ //   combatDice — сумма бросков CD;
+ //   extra — фиксированное число;
+-//   match — поля предмета, которые должны совпасть (например preserved: true).
++//   match — поля предмета, которые должны совпасть (например state: 'cooked').
++// Имя в алерте: если передан предмет, берётся item.name.
+ 
+ import { rollMultipleCombatDice } from './diceRollsLogic';
+ 
+@@ -36,8 +37,8 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
        itemType,
        amount,
      };
@@ -33,14 +80,24 @@ index 7867593..0674962 100644
        }
        event.itemName = item.name;
 diff --git a/domain/perks/canOpener.js b/domain/perks/canOpener.js
-index 5edf536..aa37bed 100644
+index 5edf536..680a832 100644
 --- a/domain/perks/canOpener.js
 +++ b/domain/perks/canOpener.js
-@@ -10,7 +10,6 @@ export const canOpenerPerk = {
+@@ -1,5 +1,6 @@
+ // domain/perks/canOpener.js
+-// Добыча еды с preserved: true — к введённому количеству +1.
++// Добыча еды, кроме raw: к введённому количеству +1.
++// В каталоге не-raw еда имеет state: 'cooked' (включая preserved).
+ 
+ export const canOpenerPerk = {
+   id: 'canOpener',
+@@ -9,8 +10,7 @@ export const canOpenerPerk = {
+         perkId: 'canOpener',
          itemType: 'food',
          extra: 1,
-         match: { preserved: true },
+-        match: { preserved: true },
 -        useItemName: true,
++        match: { state: 'cooked' },
        }],
      };
    },
