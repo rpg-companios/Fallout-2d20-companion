@@ -1,0 +1,46 @@
+diff --git a/__tests__/perks/found-item-bonus.test.js b/__tests__/perks/found-item-bonus.test.js
+index 1f1698c..fdbdc2e 100644
+--- a/__tests__/perks/found-item-bonus.test.js
++++ b/__tests__/perks/found-item-bonus.test.js
+@@ -45,13 +45,7 @@ describe('found item perk bonuses', () => {
+   it('gives Can Opener +1 preserved food', () => {
+     const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }]);
+     expect(result.bonuses.foundItemBonuses).toEqual([
+-      {
+-        perkId: 'canOpener',
+-        itemType: 'food',
+-        extra: 1,
+-        match: { preserved: true },
+-        useItemName: true,
+-      },
++      { perkId: 'canOpener', itemType: 'food', extra: 1, match: { preserved: true } },
+     ]);
+   });
+ });
+diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
+index 7867593..0674962 100644
+--- a/domain/foundItemBonus.js
++++ b/domain/foundItemBonus.js
+@@ -36,8 +36,8 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+       itemType,
+       amount,
+     };
+-    if (bonus.useItemName) {
+-      if (typeof item?.name !== 'string' || item.name.length === 0) {
++    if (item) {
++      if (typeof item.name !== 'string' || item.name.length === 0) {
+         throw new Error('[foundItemBonus] Для алерта нужно имя предмета');
+       }
+       event.itemName = item.name;
+diff --git a/domain/perks/canOpener.js b/domain/perks/canOpener.js
+index 5edf536..aa37bed 100644
+--- a/domain/perks/canOpener.js
++++ b/domain/perks/canOpener.js
+@@ -10,7 +10,6 @@ export const canOpenerPerk = {
+         itemType: 'food',
+         extra: 1,
+         match: { preserved: true },
+-        useItemName: true,
+       }],
+     };
+   },
