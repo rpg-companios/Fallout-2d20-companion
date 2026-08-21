@@ -1,0 +1,99 @@
+diff --git a/__tests__/perks/found-item-bonus.test.js b/__tests__/perks/found-item-bonus.test.js
+index fdbdc2e..1f1698c 100644
+--- a/__tests__/perks/found-item-bonus.test.js
++++ b/__tests__/perks/found-item-bonus.test.js
+@@ -45,7 +45,13 @@ describe('found item perk bonuses', () => {
+   it('gives Can Opener +1 preserved food', () => {
+     const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }]);
+     expect(result.bonuses.foundItemBonuses).toEqual([
+-      { perkId: 'canOpener', itemType: 'food', extra: 1, match: { preserved: true } },
++      {
++        perkId: 'canOpener',
++        itemType: 'food',
++        extra: 1,
++        match: { preserved: true },
++        useItemName: true,
++      },
+     ]);
+   });
+ });
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 78534df..bdf9dc7 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -334,7 +334,9 @@ const InventoryScreen = () => {
+       showAlert(formatInventoryText(tInventory('screen.alerts.foundItemBonus'), {
+         perkName: getPerkDisplay({ id: event.perkId }).name,
+         amount: event.amount,
+-        itemType: tInventory(`screen.foundItemTypes.${event.itemType}`),
++        itemType: Object.hasOwn(event, 'itemName')
++          ? event.itemName
++          : tInventory(`screen.foundItemTypes.${event.itemType}`),
+       }));
+     });
+   };
+diff --git a/domain/foundItemBonus.js b/domain/foundItemBonus.js
+index bc0fdad..7867593 100644
+--- a/domain/foundItemBonus.js
++++ b/domain/foundItemBonus.js
+@@ -31,11 +31,18 @@ export function rollFoundItemBonuses(perkBonuses, itemType, item = null) {
+       amount += rollMultipleCombatDice(combatDice).total;
+     }
+     if (amount <= 0) return [];
+-    return [{
++    const event = {
+       perkId: bonus.perkId,
+       itemType,
+       amount,
+-    }];
++    };
++    if (bonus.useItemName) {
++      if (typeof item?.name !== 'string' || item.name.length === 0) {
++        throw new Error('[foundItemBonus] Для алерта нужно имя предмета');
++      }
++      event.itemName = item.name;
++    }
++    return [event];
+   });
+ }
+ 
+diff --git a/domain/perks/canOpener.js b/domain/perks/canOpener.js
+index aa37bed..5edf536 100644
+--- a/domain/perks/canOpener.js
++++ b/domain/perks/canOpener.js
+@@ -10,6 +10,7 @@ export const canOpenerPerk = {
+         itemType: 'food',
+         extra: 1,
+         match: { preserved: true },
++        useItemName: true,
+       }],
+     };
+   },
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index ed48887..8c9e0d2 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -96,8 +96,7 @@
+   },
+   "foundItemTypes": {
+     "ammo": "ammo",
+-    "caps": "caps",
+-    "food": "food"
++    "caps": "caps"
+   },
+   "actions": {
+     "cancel": "Cancel",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index aeeff64..b93b06b 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -96,8 +96,7 @@
+   },
+   "foundItemTypes": {
+     "ammo": "патронов",
+-    "caps": "крышек",
+-    "food": "еды"
++    "caps": "крышек"
+   },
+   "actions": {
+     "cancel": "Отмена",
