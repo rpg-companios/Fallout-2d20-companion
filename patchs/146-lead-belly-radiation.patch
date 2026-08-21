@@ -1,0 +1,244 @@
+diff --git a/__tests__/perks/lead-belly.test.js b/__tests__/perks/lead-belly.test.js
+new file mode 100644
+index 0000000..61ffc75
+--- /dev/null
++++ b/__tests__/perks/lead-belly.test.js
+@@ -0,0 +1,73 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
++import moduleFood from '../../modules/fallout/data/consumables/food.json';
++import { resolveConsumableVitalChanges, rollConsumableRadiation } from '../../domain/effects';
++import { calculatePerkEffects } from '../../domain/perks';
++import perksData from '../../modules/fallout/data/perks/perks.json';
++
++afterEach(() => {
++  vi.restoreAllMocks();
++});
++
++const byId = (items, id) => items.find((item) => item.id === id);
++const leadBelly = perksData.find((perk) => perk.id === 'leadBelly');
++const dirtyWater = byId(moduleDrinks, 'drink_dirty_water');
++const rawMeat = byId(moduleFood, 'food_bloatfly_meat');
++
++describe('leadBelly data', () => {
++  it('gives dirty water a radiation CD roll without removing disease risk', () => {
++    expect(dirtyWater.irradiated).toBe(true);
++    expect(dirtyWater.radModifier).toEqual({
++      op: '+',
++      rollType: 'rollCD',
++      rollValue: 1,
++    });
++    expect(dirtyWater.sceneRiskEvents).toEqual([
++      { ruleId: 'diseaseExposure', eventId: 'dirtyWater' },
++    ]);
++  });
++});
++
++describe('leadBelly bonuses', () => {
++  it('rerolls one CD at rank 1 and skips irradiated radiation at rank 2', () => {
++    const rank1 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 1 }]);
++    const rank2 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 2 }]);
++    expect(rank1.bonuses).toEqual({ irradiatedConsumableRadiationRerollIfDamage: 1 });
++    expect(rank2.bonuses).toEqual({ irradiatedConsumableRadiationImmune: true });
++  });
++});
++
++describe('leadBelly radiation rolls', () => {
++  it('rerolls one contributing CD when the first roll dealt radiation', () => {
++    vi.spyOn(Math, 'random')
++      .mockReturnValueOnce(0.2) // грань 2 => 2
++      .mockReturnValueOnce(0.4); // переброс, грань 3 => 0
++
++    expect(rollConsumableRadiation(rawMeat, { rerollOneIfDamage: 1 })).toBe(0);
++  });
++
++  it('does not reroll when the first roll dealt no radiation', () => {
++    const random = vi.spyOn(Math, 'random').mockReturnValueOnce(0.4); // грань 3 => 0
++
++    expect(rollConsumableRadiation(rawMeat, { rerollOneIfDamage: 1 })).toBe(0);
++    expect(random).toHaveBeenCalledTimes(1);
++  });
++
++  it('skips the radiation roll for irradiated consumables at rank 2', () => {
++    const random = vi.spyOn(Math, 'random');
++    const result = resolveConsumableVitalChanges(dirtyWater, {
++      currentHealth: 4,
++      maxHealth: 10,
++      radiation: 1,
++      skipIrradiatedRadiation: true,
++    });
++
++    expect(result).toEqual({
++      healAmount: 2,
++      healthAfter: 6,
++      radiationAmount: null,
++      radiationAfter: 1,
++    });
++    expect(random).not.toHaveBeenCalled();
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index d518c86..5adcdac 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1047,13 +1047,19 @@ export const CharacterProvider = ({ children }) => {
+     });
+ 
+     // 1. Мгновенные показатели: сначала лечение, затем радиация.
+-    const { hpHealBonus = 0 } = useCharacterStore.getState().perkBonuses || {};
++    const {
++      hpHealBonus = 0,
++      irradiatedConsumableRadiationImmune = false,
++      irradiatedConsumableRadiationRerollIfDamage = 0,
++    } = useCharacterStore.getState().perkBonuses || {};
+     const vitalChanges = resolveConsumableVitalChanges(item, {
+       currentHealth,
+       maxHealth: calculateMaxHealth(attributes, level),
+       radiation,
+       hpHealBonus,
+       radiationImmune: hasRadiationImmunity({ origin, trait }),
++      skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
++      rerollOneIfDamage: Number(irradiatedConsumableRadiationRerollIfDamage) || 0,
+     });
+     if (vitalChanges.healAmount > 0) {
+       setCurrentHealth(vitalChanges.healthAfter);
+diff --git a/domain/effects.js b/domain/effects.js
+index b387757..8861cdd 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -1,7 +1,7 @@
+ import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
+ import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
+ import { getCurrentModuleLocale } from '../i18n/locale';
+-import { rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
++import { rollCombatDice, rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
+ 
+ const SCENE_DURATION_MINUTES = 5;
+ const SCENE_DURATION_MS = SCENE_DURATION_MINUTES * 60 * 1000;
+@@ -490,7 +490,13 @@ export const getInstantHealAmount = (item) => {
+  * Бросает модификатор радиации расходника по единой схеме движка.
+  * null означает, что броска не было (нет модификатора или есть иммунитет).
+  */
+-export const rollConsumableRadiation = (item, { radiationImmune = false } = {}) => {
++export const rollConsumableRadiation = (item, {
++    radiationImmune = false,
++    skipIrradiatedRadiation = false,
++    rerollOneIfDamage = 0,
++} = {}) => {
++    if (item?.irradiated && skipIrradiatedRadiation) return null;
++
+     const modifier = item?.radModifier;
+     if (modifier == null || radiationImmune) return null;
+ 
+@@ -505,7 +511,19 @@ export const rollConsumableRadiation = (item, { radiationImmune = false } = {})
+         throw new Error('[effects] Некорректный radModifier расходника');
+     }
+ 
+-    const { total } = rollMultipleCombatDice(modifier.rollValue);
++    const rolled = rollMultipleCombatDice(modifier.rollValue);
++    let total = rolled.total;
++    const rolls = [...rolled.rolls];
++    let remainingRerolls = item?.irradiated ? Number(rerollOneIfDamage) || 0 : 0;
++    if (remainingRerolls > 0 && total > 0) {
++        for (let index = 0; index < rolls.length && remainingRerolls > 0; index += 1) {
++            if (rolls[index] <= 0) continue;
++            const next = rollCombatDice();
++            total = total - rolls[index] + next;
++            rolls[index] = next;
++            remainingRerolls -= 1;
++        }
++    }
+     return modifier.op === '+' ? total : -total;
+ };
+ 
+@@ -520,6 +538,8 @@ export const resolveConsumableVitalChanges = (item, {
+     radiation,
+     hpHealBonus = 0,
+     radiationImmune = false,
++    skipIrradiatedRadiation = false,
++    rerollOneIfDamage = 0,
+ } = {}) => {
+     if (
+         !Number.isFinite(currentHealth)
+@@ -539,7 +559,11 @@ export const resolveConsumableVitalChanges = (item, {
+         : currentHealth;
+ 
+     // Строгий порядок: сначала здоровье, затем бросок и изменение радиации.
+-    const radiationAmount = rollConsumableRadiation(item, { radiationImmune });
++    const radiationAmount = rollConsumableRadiation(item, {
++        radiationImmune,
++        skipIrradiatedRadiation,
++        rerollOneIfDamage,
++    });
+     const radiationAfter = radiationAmount === null
+         ? radiation
+         : Math.max(0, radiation + radiationAmount);
+diff --git a/domain/perks/index.js b/domain/perks/index.js
+index 5db5afd..f55d730 100644
+--- a/domain/perks/index.js
++++ b/domain/perks/index.js
+@@ -11,6 +11,7 @@ import { partyBoyPerk } from './partyBoy';
+ import { tagPerk } from './tag';
+ import { nuclearPhysicistPerk } from './nuclearPhysicist';
+ import { fastMetabolismPerk } from './fastMetabolism';
++import { leadBellyPerk } from './leadBelly';
+ 
+ export const perkEffects = {
+   [intenseTrainingPerk.id]: intenseTrainingPerk,
+@@ -26,6 +27,7 @@ export const perkEffects = {
+   [tagPerk.id]: tagPerk,
+   [nuclearPhysicistPerk.id]: nuclearPhysicistPerk,
+   [fastMetabolismPerk.id]: fastMetabolismPerk,
++  [leadBellyPerk.id]: leadBellyPerk,
+ };
+ 
+ export function getPerkEffect(effectId) {
+diff --git a/domain/perks/leadBelly.js b/domain/perks/leadBelly.js
+new file mode 100644
+index 0000000..40313b6
+--- /dev/null
++++ b/domain/perks/leadBelly.js
+@@ -0,0 +1,15 @@
++// domain/perks/leadBelly.js
++// Облучённая еда и напитки (item.irradiated):
++//   ранг 1 — если бросок радиации дал урон, перебросить 1 CD и взять новый результат;
++//   ранг 2 — броска радиации нет, болезнь (sceneRisk) не трогаем.
++
++export const leadBellyPerk = {
++  id: 'leadBelly',
++  apply(ctx) {
++    const rank = ctx.state.rank || 1;
++    if (rank >= 2) {
++      return { irradiatedConsumableRadiationImmune: true };
++    }
++    return { irradiatedConsumableRadiationRerollIfDamage: 1 };
++  },
++};
+diff --git a/modules/fallout/data/consumables/drinks.json b/modules/fallout/data/consumables/drinks.json
+index 90be68e..eada834 100644
+--- a/modules/fallout/data/consumables/drinks.json
++++ b/modules/fallout/data/consumables/drinks.json
+@@ -79,6 +79,11 @@
+     "rarity": 0,
+     "hpHealed": 2,
+     "irradiated": true,
++    "radModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
+     "effectKey": "",
+     "isAlcohol": false,
+     "sceneRiskEvents": [
+diff --git a/setting-contract.md b/setting-contract.md
+index 235263b..abbe51a 100644
+--- a/setting-contract.md
++++ b/setting-contract.md
+@@ -15,6 +15,7 @@
+ - Движок читает сеттинг только через **адаптер**. Откуда пакет (URL, файл, когда-то бандл) — адаптеру, не экранам.
+ - Фолбэков и нормализации чужих форматов нет. Нет файла / битый JSON — ошибка с путём.
+ - БД — только состояние (сейвы, выбранный пакет). Каталог — из пакета.
++- **Тронули сеттинговые данные — они в модуле.** Если правка касается категории, которая ещё лежит в движковом `data/` / легаси-i18n, после правки категория целиком переезжает в `modules/<id>/`. Перки тронули — перки в модуль. Оружие — оружие. Препараты — препараты. Не оставлять «ещё чуть-чуть» в движке.
+ 
+ **Не сделано в репозитории:** `core/settingAdapter.js`, `core/settingManager.js`, `components/ui/`. Образцы кода из старого контракта в дерево не попали. Галочки «адаптер готов» были про замысел.
+ 

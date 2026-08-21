@@ -1,7 +1,7 @@
 import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
 import enEffects from '../modules/fallout/i18n/en-EN/data/system/effects.json';
 import { getCurrentModuleLocale } from '../i18n/locale';
-import { rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
+import { rollCombatDice, rollCombatDiceEffects, rollMultipleCombatDice } from './diceRollsLogic';
 
 const SCENE_DURATION_MINUTES = 5;
 const SCENE_DURATION_MS = SCENE_DURATION_MINUTES * 60 * 1000;
@@ -490,7 +490,13 @@ export const getInstantHealAmount = (item) => {
  * Бросает модификатор радиации расходника по единой схеме движка.
  * null означает, что броска не было (нет модификатора или есть иммунитет).
  */
-export const rollConsumableRadiation = (item, { radiationImmune = false } = {}) => {
+export const rollConsumableRadiation = (item, {
+    radiationImmune = false,
+    skipIrradiatedRadiation = false,
+    rerollOneIfDamage = 0,
+} = {}) => {
+    if (item?.irradiated && skipIrradiatedRadiation) return null;
+
     const modifier = item?.radModifier;
     if (modifier == null || radiationImmune) return null;
 
@@ -505,7 +511,19 @@ export const rollConsumableRadiation = (item, { radiationImmune = false } = {}) 
         throw new Error('[effects] Некорректный radModifier расходника');
     }
 
-    const { total } = rollMultipleCombatDice(modifier.rollValue);
+    const rolled = rollMultipleCombatDice(modifier.rollValue);
+    let total = rolled.total;
+    const rolls = [...rolled.rolls];
+    let remainingRerolls = item?.irradiated ? Number(rerollOneIfDamage) || 0 : 0;
+    if (remainingRerolls > 0 && total > 0) {
+        for (let index = 0; index < rolls.length && remainingRerolls > 0; index += 1) {
+            if (rolls[index] <= 0) continue;
+            const next = rollCombatDice();
+            total = total - rolls[index] + next;
+            rolls[index] = next;
+            remainingRerolls -= 1;
+        }
+    }
     return modifier.op === '+' ? total : -total;
 };
 
@@ -520,6 +538,8 @@ export const resolveConsumableVitalChanges = (item, {
     radiation,
     hpHealBonus = 0,
     radiationImmune = false,
+    skipIrradiatedRadiation = false,
+    rerollOneIfDamage = 0,
 } = {}) => {
     if (
         !Number.isFinite(currentHealth)
@@ -539,7 +559,11 @@ export const resolveConsumableVitalChanges = (item, {
         : currentHealth;
 
     // Строгий порядок: сначала здоровье, затем бросок и изменение радиации.
-    const radiationAmount = rollConsumableRadiation(item, { radiationImmune });
+    const radiationAmount = rollConsumableRadiation(item, {
+        radiationImmune,
+        skipIrradiatedRadiation,
+        rerollOneIfDamage,
+    });
     const radiationAfter = radiationAmount === null
         ? radiation
         : Math.max(0, radiation + radiationAmount);

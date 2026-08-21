@@ -1047,13 +1047,19 @@ export const CharacterProvider = ({ children }) => {
     });
 
     // 1. Мгновенные показатели: сначала лечение, затем радиация.
-    const { hpHealBonus = 0 } = useCharacterStore.getState().perkBonuses || {};
+    const {
+      hpHealBonus = 0,
+      irradiatedConsumableRadiationImmune = false,
+      irradiatedConsumableRadiationRerollIfDamage = 0,
+    } = useCharacterStore.getState().perkBonuses || {};
     const vitalChanges = resolveConsumableVitalChanges(item, {
       currentHealth,
       maxHealth: calculateMaxHealth(attributes, level),
       radiation,
       hpHealBonus,
       radiationImmune: hasRadiationImmunity({ origin, trait }),
+      skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+      rerollOneIfDamage: Number(irradiatedConsumableRadiationRerollIfDamage) || 0,
     });
     if (vitalChanges.healAmount > 0) {
       setCurrentHealth(vitalChanges.healthAfter);
