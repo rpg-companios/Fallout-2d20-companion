@@ -1,0 +1,24 @@
+diff --git a/styles/PerkSelectModal.styles.js b/styles/PerkSelectModal.styles.js
+index 445aaab..35671ba 100644
+--- a/styles/PerkSelectModal.styles.js
++++ b/styles/PerkSelectModal.styles.js
+@@ -23,9 +23,9 @@ const styles = StyleSheet.create({
+     marginBottom: 8,
+   },
+   filterPanel: {
+-    backgroundColor: '#f1f5f9',
++    backgroundColor: 'rgb(245, 245, 245)',
+     borderWidth: 1,
+-    borderColor: '#5a5a5a',
++    borderColor: 'rgb(221, 221, 221)',
+     borderRadius: 6,
+     marginBottom: 8,
+     paddingBottom: 0,
+@@ -36,6 +36,7 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     paddingHorizontal: 10,
+     paddingVertical: 8,
++    backgroundColor: 'rgb(245, 245, 245)',
+   },
+   filterSpoilerTitle: {
+     color: '#000',
