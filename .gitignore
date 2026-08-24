@@ -35,3 +35,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# кошельки, распакованные из .trpg (не в движок)
+сеттинги/
+settings/pins.json
