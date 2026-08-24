@@ -4,7 +4,7 @@
 
 import rewardData from '../modules/fallout/data/skillRewards.json';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
-import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
+import { resolveRandomLootByRoll } from '../modules/fallout/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';
 import { findCatalogEntry } from './resolveItem';
 import { debugLog } from '../src/debug/falloutDebug';

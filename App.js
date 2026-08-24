@@ -19,15 +19,18 @@ import { useLocale, useModuleLocale } from './i18n/locale';
 import { tApp } from './i18n/appI18n';
 
 import HomeScreen from './components/screens/HomeScreen/HomeScreen';
-import CharacterScreen from './components/screens/CharacterScreen/CharacterScreen';
-import EquipmentScreen from './components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
+import CharacterScreen from './modules/fallout/screens/CharacterScreen/CharacterScreen';
+import EquipmentScreen from './modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
 import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
-import PerksAndTraitsScreen from './components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
+import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
 import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
 import useAppSettingsStore, {
   selectBootScreenEnabled,
   selectSettingsHydrated,
 } from './src/store/appSettingsStore';
+import useSettingPackStore, {
+  selectBundledSettingActive,
+} from './src/store/settingPackStore';
 
 const Tab = createMaterialTopTabNavigator();
 const TAB_ROUTES = {
@@ -49,6 +52,7 @@ function App() {
   const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
   const locale = useLocale();
   useModuleLocale();
+  const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
 
   useEffect(() => {
     if (settingsHydrated && bootEnabledForLaunch === null) {
@@ -102,7 +106,7 @@ function App() {
     <PaperProvider>
       <SafeAreaProvider>
         <CharacterProvider>
-          <NavigationContainer key={locale}>
+          <NavigationContainer key={`${locale}:${bundledSettingActive ? 'fallout' : 'empty'}`}>
             <View style={{ flex: 1, backgroundColor: 'white' }}>
               <ImageBackground
                 source={require('./assets/bg.png')}
@@ -151,42 +155,46 @@ function App() {
                         ),
                       }}
                     />
-                    <Tab.Screen
-                      name={TAB_ROUTES.CHARACTER}
-                      component={CharacterScreen}
-                      options={{
-                        tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
-                        ),
-                      }}
-                    />
-                    <Tab.Screen
-                      name={TAB_ROUTES.EQUIPMENT}
-                      component={EquipmentScreen}
-                      options={{
-                        tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
-                        ),
-                      }}
-                    />
-                    <Tab.Screen
-                      name={TAB_ROUTES.INVENTORY}
-                      component={InventoryScreen}
-                      options={{
-                        tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
-                        ),
-                      }}
-                    />
-                    <Tab.Screen
-                      name={TAB_ROUTES.PERKS}
-                      component={PerksAndTraitsScreen}
-                      options={{
-                        tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
-                        ),
-                      }}
-                    />
+                    {bundledSettingActive ? (
+                      <>
+                        <Tab.Screen
+                          name={TAB_ROUTES.CHARACTER}
+                          component={CharacterScreen}
+                          options={{
+                            tabBarLabel: ({ focused, color }) => (
+                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
+                            ),
+                          }}
+                        />
+                        <Tab.Screen
+                          name={TAB_ROUTES.EQUIPMENT}
+                          component={EquipmentScreen}
+                          options={{
+                            tabBarLabel: ({ focused, color }) => (
+                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
+                            ),
+                          }}
+                        />
+                        <Tab.Screen
+                          name={TAB_ROUTES.INVENTORY}
+                          component={InventoryScreen}
+                          options={{
+                            tabBarLabel: ({ focused, color }) => (
+                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
+                            ),
+                          }}
+                        />
+                        <Tab.Screen
+                          name={TAB_ROUTES.PERKS}
+                          component={PerksAndTraitsScreen}
+                          options={{
+                            tabBarLabel: ({ focused, color }) => (
+                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
+                            ),
+                          }}
+                        />
+                      </>
+                    ) : null}
                   </Tab.Navigator>
                 </SafeAreaView>
               </ImageBackground>

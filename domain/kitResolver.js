@@ -1,12 +1,12 @@
 import { debugLog } from '../src/debug/falloutDebug';
 import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../db/Database';
-import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
+import { resolveRandomLootByRoll } from '../modules/fallout/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getUniqQualityName } from './registry';
 import { enrichWeaponItem } from './enrichItem';
 import { composeNameWithUniqQualities } from './uniqQuality';
-import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+import { tWeaponsAndArmorScreen } from '../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
 
 // Уникальные качества записи комплекта прикрепляются к предмету: поле
 // uniqQualities уходит в стор, имена качеств добавляются к имени предмета

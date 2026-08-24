@@ -1,9 +1,4 @@
 {
-  "caps": {
-    "title": "Крышки",
-    "subtract": "↓ Списать",
-    "add": "↑ Внести"
-  },
   "alerts": {
     "conditionsRemovedTitle": "Снято состояние",
     "conditionsRemovedMessage": "Снято: {conditions}",
@@ -29,40 +24,7 @@
     "applyConsumableQuestion": "Вы хотите применить {itemName} на себя или другого персонажа?",
     "windowApplyConsumableQuestion": "Применить {itemName} на себя? Нажмите \"Отмена\", чтобы применить на другого персонажа.",
     "healMessage": "Восстановлено {healAmount} единиц здоровья.",
-    "radiationTitle": "Радиация",
-    "radiationMessage": "Изменение уровня радиации: {radiationAmount}.",
     "appliedMessage": "Применено: {itemName}.",
-    "robotCannotSelfUseTitle": "Ограничение робота",
-    "robotCannotSelfUseMessage": "Роботы не могут применять еду, напитки и препараты на себя.",
-    "robotOnlyWeaponTitle": "Ограничение экипировки",
-    "robotOnlyWeaponMessage": "Это оружие могут использовать только роботы.",
-    "robotBodyWeaponMismatchTitle": "Несовместимое робот-оружие",
-    "robotBodyWeaponMismatchMessage": "Текущий корпус робота не поддерживает это оружие.",
-    "manipulatorRequiredTitle": "Требуется манипулятор",
-    "manipulatorRequiredMessage": "Для экипировки обычного оружия роботу сначала нужен манипулятор.",
-    "robotNoHandlingLimbMessage": "У вас нет аналога рук, который мог бы удерживать предметы.",
-    "manipulatorWeightTitle": "Перегрузка манипулятора",
-    "manipulatorWeightMessage": "Это оружие превышает допустимый удерживаемый вес манипулятора ({maxHeldWeight} фунтов).",
-    "robotCannotUseTwoHandedMessage": "Текущие руки/манипуляторы робота не могут использовать двуручное оружие.",
-    "robotArmorOnlyTitle": "Ограничение экипировки",
-    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.",
-    "powerArmorNeedsCoreTitle": "Силовая броня",
-    "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.",
-    "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.",
-    "powerArmorDepletedTitle": "Питание исчерпано",
-    "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь.",
-    "mutantCannotWearStandardArmorTitle": "Ограничение экипировки",
-    "mutantCannotWearStandardArmorMessage": "Супермутантам силовая броня запрещена.",
-    "powerArmorChooseCoreTitle": "Выбор Ядерного блока",
-    "powerArmorBrokenPieceMessage": "Прочность части на нуле — её нельзя надеть. Почините её в инвентаре.",
-    "mk2AppliedTitle": "ОС Mk II установлена",
-    "mk2AppliedMessage": "Ракетная установка и гранатомёт активированы.",
-    "mk2ApplyFailedTitle": "Нельзя применить",
-    "mk2Reason": {
-      "requiresSecuritron": "Драйвер совместим только с Секьюритроном.",
-      "alreadyInstalled": "ОС Mk II уже установлена.",
-      "noDriver": "Предмет драйвера не найден."
-    },
     "diseaseCheckPassedTitle": "Проверка заражения пройдена",
     "diseaseCheckFailedTitle": "Проверка заражения провалена",
     "diseaseCheckMessage": "Сложность: {difficulty}\nБроски d20: {rolls}\nУспехи: {successes}",
@@ -72,8 +34,6 @@
     "consumableResultTitle": "Результат применения",
     "positiveResultSection": "Положительный результат",
     "negativeResultSection": "Отрицательный результат",
-    "radiationIncreaseMessage": "Уровень радиации повышен на {radiationAmount}.",
-    "radiationDecreaseMessage": "Уровень радиации снижен на {radiationAmount}.",
     "diseaseCheckPassedSummary": "Проверка заражения пройдена.",
     "diseaseInfectedSummary": "Проверка заражения провалена. Заражение: {diseaseName}.",
     "diseaseDuplicateSummary": "Проверка заражения провалена. Болезнь «{diseaseName}» уже активна.",
@@ -88,15 +48,10 @@
         "notPresent": "Активных болезней нет."
       }
     },
-    "leadBellyRerollTitle": "Свинцовое брюхо",
-    "leadBellyRerollMessage": "Вы можете получить {radiationAmount} урона радиацией. Хотите перебросить значение?",
-    "leadBellyRerollConfirm": "Перебросить",
-    "leadBellyRerollKeep": "Оставить",
     "foundItemBonus": "{perkName}: вы получили + {amount} {itemType}."
   },
   "foundItemTypes": {
-    "ammo": "патронов",
-    "caps": "крышек"
+    "ammo": "патронов"
   },
   "actions": {
     "cancel": "Отмена",
@@ -132,21 +87,6 @@
     "totalWeight": "Общий вес",
     "totalPrice": "Общая цена",
     "durability": "Прочность (ОЗ)",
-    "ammo": "Боеприпас",
-    "requiresMkII": "Требуется ОС Mk II"
-  },
-  "powerArmor": {
-    "containerTitle": "Силовая броня",
-    "summary": "Частей: {parts}/6 · Блок: {core}",
-    "coreRow": "Ядерный блок: {value}",
-    "pieceInSlot": "{name} — {slot}",
-    "slots": {
-      "head": "Голова",
-      "body": "Корпус",
-      "leftArm": "левая рука",
-      "rightArm": "правая рука",
-      "leftLeg": "левая нога",
-      "rightLeg": "правая нога"
-    }
+    "ammo": "Боеприпас"
   }
 }

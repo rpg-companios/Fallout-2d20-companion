@@ -10,7 +10,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 const BG = '#050508';
-const ART = require('../../assets/boot/annihilation.png');
+const ART = require('../../modules/fallout/splash/annihilation.png');
 const BAR_FILL = require('../../assets/boot/bar-fill.png');
 const ART_RATIO = 704 / 1520;
 const BAR_TOP = 0.6947;

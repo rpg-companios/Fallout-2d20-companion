@@ -71,8 +71,7 @@ import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
 import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
 import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
-import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
-import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
+import { INVENTORY_DICTIONARIES } from './screens/InventoryScreen/logic/inventoryI18n';
 import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
 import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
 import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
@@ -157,7 +156,10 @@ const paLocalizedCatalogItem = (catalogId) => {
   }
   return localized;
 };
-const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
+const INV_ALERTS_DICT = {
+  'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.alerts,
+  'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.alerts,
+};
 // ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
 // (контроль — инвариант-тест __tests__/i18n/no-fallbacks.test.js).
 const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()][key];
@@ -168,8 +170,14 @@ const PERK_ALERTS_DICT = {
 const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
 // Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
 // что использует обычная броня при выборе слота.
-const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
-const INV_ACTIONS_DICT = { 'ru-RU': ruInventoryScreen.actions, 'en-EN': enInventoryScreen.actions };
+const INV_LABELS_DICT = {
+  'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.labels,
+  'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.labels,
+};
+const INV_ACTIONS_DICT = {
+  'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.actions,
+  'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.actions,
+};
 const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
 const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()][key];
 // Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,

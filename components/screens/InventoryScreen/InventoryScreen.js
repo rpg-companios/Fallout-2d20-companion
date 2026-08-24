@@ -25,7 +25,7 @@ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { rerollConsumableRadiationRoll } from '../../../domain/effects';
 import { buildConsumableResultReport } from './logic/consumableResultReport';
 import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
-import { getPerkDisplay } from '../PerksAndTraitsScreen/perksDisplay';
+import { getPerkDisplay } from '../../../modules/fallout/screens/PerksAndTraitsScreen/perksDisplay';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';

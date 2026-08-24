@@ -1,0 +1,73 @@
+{
+  "labels": {
+    "capsShort": "caps",
+    "physDR": "Phys DR",
+    "enrgDR": "Enrg DR",
+    "plating": "Plating",
+    "frame": "Frame",
+    "mind": "Mind",
+    "body": "Body"
+  },
+  "alerts": {
+    "spiritsFavorTitle": "The Spirits Favor You",
+    "spiritsFavorMessage": "The spirits are kind to you. You do not spend a Luck Point."
+  },
+  "skillsCatalog": {
+    "ATHLETICS": "Athletics",
+    "BARTER": "Barter",
+    "BIG_GUNS": "Big Guns",
+    "ENERGY_WEAPONS": "Energy Weapons",
+    "EXPLOSIVES": "Explosives",
+    "LOCKPICK": "Lockpick",
+    "MEDICINE": "Medicine",
+    "MELEE_WEAPONS": "Melee Weapons",
+    "PILOT": "Pilot",
+    "REPAIR": "Repair",
+    "SCIENCE": "Science",
+    "SMALL_GUNS": "Small Guns",
+    "SNEAK": "Sneak",
+    "SPEECH": "Speech",
+    "SURVIVAL": "Survival",
+    "THROWING": "Throwing",
+    "UNARMED": "Unarmed"
+  },
+  "modals": {
+    "ncrCitizen": {
+      "title": "Origin trait: NCR Citizen",
+      "originLabel": "NCR Citizen"
+    },
+    "origins": {
+      "survivorTitle": "Origin Trait «Survivor»",
+      "ncrTitle": "Origin Trait «NCR Citizen»",
+      "tribalTitle": "Origin Trait «Tribal»",
+      "treeFamiliesTitle": "Origin Trait «Strip Families»"
+    },
+    "survivor": {
+      "twoTraits": "2 traits",
+      "twoTraitsDesc": "Any combination: 2 Survivor, 2 NCR, or 1+1",
+      "oneTraitOnePerk": "1 trait and 1 perk",
+      "selectTwoTraitsHint": "Select 2 traits in any combination.",
+      "survivorTraitsList": "Survivor Traits List",
+      "ncrTraitsList": "NCR Traits List"
+    },
+    "tribal": {
+      "twoTraits": "2 traits",
+      "twoTraitsDesc": "Any combination: 2 Tribal, 2 Survivor, or 1+1",
+      "oneTraitOnePerk": "1 trait and 1 perk",
+      "selectTwoTraitsHint": "Select 2 traits in any combination.",
+      "tribalTraitsList": "Tribal Traits List",
+      "survivorTraitsList": "Survivor Traits List",
+      "ncrTraitsList": "NCR Traits List"
+    },
+    "treeFamilies": {
+      "selectFamilyHint": "Choose one family: each grants its own advantage."
+    },
+    "armor": {
+      "upgradePlating": "Upgrade Plating",
+      "upgradeFrame": "Upgrade Frame"
+    },
+    "limb": {
+      "upgradeLimb": "Upgrade Limb"
+    }
+  }
+}

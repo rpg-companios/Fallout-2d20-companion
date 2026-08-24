@@ -1,9 +1,4 @@
 {
-  "caps": {
-    "title": "Caps",
-    "subtract": "↓ Spend",
-    "add": "↑ Add"
-  },
   "alerts": {
     "conditionsRemovedTitle": "Condition removed",
     "conditionsRemovedMessage": "Removed: {conditions}",
@@ -29,40 +24,7 @@
     "applyConsumableQuestion": "Do you want to use {itemName} on yourself or another character?",
     "windowApplyConsumableQuestion": "Use {itemName} on yourself? Press Cancel to use it on another character.",
     "healMessage": "Restored {healAmount} health.",
-    "radiationTitle": "Radiation",
-    "radiationMessage": "Radiation level change: {radiationAmount}.",
     "appliedMessage": "Used: {itemName}.",
-    "robotCannotSelfUseTitle": "Robot restriction",
-    "robotCannotSelfUseMessage": "Robots cannot use food, drinks or chems on themselves.",
-    "robotOnlyWeaponTitle": "Equipment restriction",
-    "robotOnlyWeaponMessage": "Only robots can use this weapon.",
-    "robotBodyWeaponMismatchTitle": "Incompatible robot weapon",
-    "robotBodyWeaponMismatchMessage": "The current robot body does not support this weapon.",
-    "manipulatorRequiredTitle": "No hands available",
-    "manipulatorRequiredMessage": "A manipulator must be equipped before a robot can equip a standard weapon.",
-    "robotNoHandlingLimbMessage": "You have no hand equivalent capable of holding items.",
-    "manipulatorWeightTitle": "Manipulator overload",
-    "manipulatorWeightMessage": "This weapon exceeds the manipulator held-weight limit ({maxHeldWeight} lbs).",
-    "robotCannotUseTwoHandedMessage": "Current robot hands/manipulators cannot use two-handed weapons.",
-    "robotArmorOnlyTitle": "Equipment restriction",
-    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.",
-    "powerArmorNeedsCoreTitle": "Power Armor",
-    "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.",
-    "powerArmorNeedsFrameMessage": "Equip the power armor frame first.",
-    "powerArmorDepletedTitle": "Power depleted",
-    "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory.",
-    "mutantCannotWearStandardArmorTitle": "Equipment restriction",
-    "mutantCannotWearStandardArmorMessage": "Super mutants cannot wear power armor.",
-    "powerArmorChooseCoreTitle": "Fusion Core selection",
-    "powerArmorBrokenPieceMessage": "This piece is broken (0 HP) and cannot be equipped. Repair it in the inventory.",
-    "mk2AppliedTitle": "Mk II OS installed",
-    "mk2AppliedMessage": "Missile launcher and grenade launcher are now operational.",
-    "mk2ApplyFailedTitle": "Cannot apply",
-    "mk2Reason": {
-      "requiresSecuritron": "The driver is only compatible with a Securitron.",
-      "alreadyInstalled": "Mk II OS is already installed.",
-      "noDriver": "Driver item not found."
-    },
     "diseaseCheckPassedTitle": "Disease check passed",
     "diseaseCheckFailedTitle": "Disease check failed",
     "diseaseCheckMessage": "Difficulty: {difficulty}\nd20 rolls: {rolls}\nSuccesses: {successes}",
@@ -72,8 +34,6 @@
     "consumableResultTitle": "Use result",
     "positiveResultSection": "Positive result",
     "negativeResultSection": "Negative result",
-    "radiationIncreaseMessage": "Radiation level increased by {radiationAmount}.",
-    "radiationDecreaseMessage": "Radiation level decreased by {radiationAmount}.",
     "diseaseCheckPassedSummary": "Disease check passed.",
     "diseaseInfectedSummary": "Disease check failed. Infected with {diseaseName}.",
     "diseaseDuplicateSummary": "Disease check failed. {diseaseName} is already active.",
@@ -88,15 +48,10 @@
         "notPresent": "No active diseases."
       }
     },
-    "leadBellyRerollTitle": "Lead Belly",
-    "leadBellyRerollMessage": "You may take {radiationAmount} radiation damage. Reroll the value?",
-    "leadBellyRerollConfirm": "Reroll",
-    "leadBellyRerollKeep": "Keep",
     "foundItemBonus": "{perkName}: you received + {amount} {itemType}."
   },
   "foundItemTypes": {
-    "ammo": "ammo",
-    "caps": "caps"
+    "ammo": "ammo"
   },
   "actions": {
     "cancel": "Cancel",
@@ -132,21 +87,6 @@
     "totalWeight": "Total weight",
     "totalPrice": "Total price",
     "durability": "Durability (HP)",
-    "ammo": "Ammo",
-    "requiresMkII": "Requires Mk II OS"
-  },
-  "powerArmor": {
-    "containerTitle": "Power Armor",
-    "summary": "Parts: {parts}/6 · Core: {core}",
-    "coreRow": "Fusion core: {value}",
-    "pieceInSlot": "{name} — {slot}",
-    "slots": {
-      "head": "Head",
-      "body": "Body",
-      "leftArm": "left arm",
-      "rightArm": "right arm",
-      "leftLeg": "left leg",
-      "rightLeg": "right leg"
-    }
+    "ammo": "Ammo"
   }
 }

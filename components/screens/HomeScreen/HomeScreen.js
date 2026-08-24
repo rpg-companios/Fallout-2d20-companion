@@ -44,6 +44,10 @@ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
+import GameSettingsModal from '../../settings/GameSettingsModal';
+import useSettingPackStore, {
+  selectBundledSettingActive,
+} from '../../../src/store/settingPackStore';
 import useAppSettingsStore, {
   selectCharacterDeleteActionPlacement,
   selectCharacterFoldersEnabled,
@@ -191,6 +195,8 @@ export default function HomeScreen({ navigation }) {
   const [aboutVisible, setAboutVisible] = useState(false);
   const [communityVisible, setCommunityVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
+  const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -413,11 +419,13 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleCreate = () => {
+    if (!bundledSettingActive) return;
     resetCharacter();
     navigation.navigate('CharacterTab');
   };
 
   const handleOpen = async (id) => {
+    if (!bundledSettingActive) return;
     const ok = await loadCharacter(id);
     if (ok) {
       navigation.navigate('CharacterTab');
@@ -738,6 +746,7 @@ export default function HomeScreen({ navigation }) {
                       icon={tHomeScreen('createButton.plus')}
                       label={tHomeScreen('createButton.text')}
                       onPress={handleCreate}
+                      disabled={!bundledSettingActive}
                     />
                   );
                 }
@@ -795,6 +804,10 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Pressable style={styles.menuPanel} onPress={() => {}}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setGameSettingsVisible(true); }}>
+              <MaterialCommunityIcons name="book-open-page-variant-outline" size={20} color="#d4af37" />
+              <Text style={styles.menuText}>{tHomeScreen('menu.gameSetting')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
               <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
@@ -835,6 +848,7 @@ export default function HomeScreen({ navigation }) {
       </Modal>
 
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
+      <GameSettingsModal visible={gameSettingsVisible} onClose={() => setGameSettingsVisible(false)} />
 
       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalBackdropCenter}>

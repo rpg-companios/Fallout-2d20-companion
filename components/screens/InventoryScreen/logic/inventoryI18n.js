@@ -8,25 +8,34 @@ import ruSellItemModal from '../../../../i18n/ru-RU/screens/inventory/modals/sel
 import enSellItemModal from '../../../../i18n/en-EN/screens/inventory/modals/sellItemModal.json';
 import ruBuyItemModal from '../../../../i18n/ru-RU/screens/inventory/modals/buyItemModal.json';
 import enBuyItemModal from '../../../../i18n/en-EN/screens/inventory/modals/buyItemModal.json';
+import ruSettingInventoryScreen from '../../../../modules/fallout/i18n/ru-RU/screens/inventory/screen.json';
+import enSettingInventoryScreen from '../../../../modules/fallout/i18n/en-EN/screens/inventory/screen.json';
+import ruSettingAddItemModal from '../../../../modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json';
+import enSettingAddItemModal from '../../../../modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json';
+import ruSettingCapsModal from '../../../../modules/fallout/i18n/ru-RU/screens/inventory/modals/capsModal.json';
+import enSettingCapsModal from '../../../../modules/fallout/i18n/en-EN/screens/inventory/modals/capsModal.json';
+import ruSettingBuyItemModal from '../../../../modules/fallout/i18n/ru-RU/screens/inventory/modals/buyItemModal.json';
+import enSettingBuyItemModal from '../../../../modules/fallout/i18n/en-EN/screens/inventory/modals/buyItemModal.json';
 import { getCurrentLocale } from '../../../../i18n/locale';
+import { deepMerge } from '../../../../i18n/mergeDicts';
 
-const DICTIONARIES = {
+export const INVENTORY_DICTIONARIES = {
   'ru-RU': {
-    screen: ruInventoryScreen,
+    screen: deepMerge(ruInventoryScreen, ruSettingInventoryScreen),
     modals: {
-      addItemModal: ruAddItemModal,
-      capsModal: ruCapsModal,
+      addItemModal: deepMerge(ruAddItemModal, ruSettingAddItemModal),
+      capsModal: deepMerge(ruCapsModal, ruSettingCapsModal),
       sellItemModal: ruSellItemModal,
-      buyItemModal: ruBuyItemModal,
+      buyItemModal: deepMerge(ruBuyItemModal, ruSettingBuyItemModal),
     },
   },
   'en-EN': {
-    screen: enInventoryScreen,
+    screen: deepMerge(enInventoryScreen, enSettingInventoryScreen),
     modals: {
-      addItemModal: enAddItemModal,
-      capsModal: enCapsModal,
+      addItemModal: deepMerge(enAddItemModal, enSettingAddItemModal),
+      capsModal: deepMerge(enCapsModal, enSettingCapsModal),
       sellItemModal: enSellItemModal,
-      buyItemModal: enBuyItemModal,
+      buyItemModal: deepMerge(enBuyItemModal, enSettingBuyItemModal),
     },
   },
 };
@@ -43,7 +52,7 @@ const resolvePath = (source, path) => {
 export const tInventory = (path) => {
   // ПРАВИЛО (владелец): никаких фолбэков и хардкода — ключ обязан быть в словаре;
   // промах ключа — дефект данных, видимый маркер — сам путь.
-  return resolvePath(DICTIONARIES[getCurrentLocale()], path);
+  return resolvePath(INVENTORY_DICTIONARIES[getCurrentLocale()], path);
 };
 
 export const formatInventoryText = (template, params = {}) =>

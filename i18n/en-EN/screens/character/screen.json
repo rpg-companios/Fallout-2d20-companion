@@ -24,18 +24,11 @@
     "extraSlotsAvailable": "Extra slots available",
     "onePerk": "1 perk",
     "unknownItem": "Unknown item",
-    "capsShort": "caps",
     "pcsShort": "pcs.",
-    "physDR": "Phys DR",
-    "enrgDR": "Enrg DR",
     "carry": "Carry",
     "requires": "Requires: ",
-    "plating": "Plating",
     "armor": "Armor",
-    "frame": "Frame",
-    "mind": "Mind",
     "other": "Other",
-    "body": "Body",
     "carryWeight": "Carry Weight",
     "rarity": "Rarity",
     "complexity": "Complexity"
@@ -78,9 +71,7 @@
   "alerts": {
     "errorTitle": "Error",
     "warningTitle": "Warning",
-    "infoTitle": "Info",
-    "spiritsFavorTitle": "The Spirits Favor You",
-    "spiritsFavorMessage": "The spirits are kind to you. You do not spend a Luck Point."
+    "infoTitle": "Info"
   },
   "errors": {
     "distributeAllPerkAttributePoints": "You must distribute all available attribute points.",
@@ -101,10 +92,6 @@
     "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it."
   },
   "modals": {
-    "ncrCitizen": {
-      "title": "Origin trait: NCR Citizen",
-      "originLabel": "NCR Citizen"
-    },
     "origin": {
       "title": "Select origin"
     },
@@ -122,28 +109,11 @@
       "title": "Select equipment kit",
       "empty": "No equipment kits available"
     },
-    "origins": {
-      "survivorTitle": "Origin Trait «Survivor»",
-      "ncrTitle": "Origin Trait «NCR Citizen»",
-      "tribalTitle": "Origin Trait «Tribal»",
-      "treeFamiliesTitle": "Origin Trait «Strip Families»"
-    },
-    "survivor": {
-      "twoTraits": "2 traits",
-      "twoTraitsDesc": "Any combination: 2 Survivor, 2 NCR, or 1+1",
-      "oneTraitOnePerk": "1 trait and 1 perk",
-      "selectTwoTraitsHint": "Select 2 traits in any combination.",
-      "survivorTraitsList": "Survivor Traits List",
-      "ncrTraitsList": "NCR Traits List"
-    },
     "armor": {
-      "upgradePlating": "Upgrade Plating",
       "upgradeArmor": "Upgrade Armor",
-      "upgradeFrame": "Upgrade Frame",
       "noItems": "No items available"
     },
     "limb": {
-      "upgradeLimb": "Upgrade Limb",
       "noLimbs": "No limbs available"
     },
     "skillPick": {
@@ -151,18 +121,6 @@
       "description": "Choose skills from the provided group. They will be marked as extra.",
       "choose1": "Choose 1 skill",
       "chooseN": "Choose {count} skills"
-    },
-    "tribal": {
-      "twoTraits": "2 traits",
-      "twoTraitsDesc": "Any combination: 2 Tribal, 2 Survivor, or 1+1",
-      "oneTraitOnePerk": "1 trait and 1 perk",
-      "selectTwoTraitsHint": "Select 2 traits in any combination.",
-      "tribalTraitsList": "Tribal Traits List",
-      "survivorTraitsList": "Survivor Traits List",
-      "ncrTraitsList": "NCR Traits List"
-    },
-    "treeFamilies": {
-      "selectFamilyHint": "Choose one family: each grants its own advantage."
     }
   },
   "origins": {
@@ -192,24 +150,5 @@
     "INT": "INT",
     "CHA": "CHA",
     "LCK": "LCK"
-  },
-  "skillsCatalog": {
-    "ATHLETICS": "Athletics",
-    "BARTER": "Barter",
-    "BIG_GUNS": "Big Guns",
-    "ENERGY_WEAPONS": "Energy Weapons",
-    "EXPLOSIVES": "Explosives",
-    "LOCKPICK": "Lockpick",
-    "MEDICINE": "Medicine",
-    "MELEE_WEAPONS": "Melee Weapons",
-    "PILOT": "Pilot",
-    "REPAIR": "Repair",
-    "SCIENCE": "Science",
-    "SMALL_GUNS": "Small Guns",
-    "SNEAK": "Sneak",
-    "SPEECH": "Speech",
-    "SURVIVAL": "Survival",
-    "THROWING": "Throwing",
-    "UNARMED": "Unarmed"
   }
 }

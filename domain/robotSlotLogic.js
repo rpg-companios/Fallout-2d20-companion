@@ -1,7 +1,7 @@
 // RobotSlotLogic.js
 // Pure logic extracted from RobotSlot for testability (no React, no UI deps).
 
-import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+import { tWeaponsAndArmorScreen } from '../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
 import { getBodyPlan } from './bodyplan';
 
 /**

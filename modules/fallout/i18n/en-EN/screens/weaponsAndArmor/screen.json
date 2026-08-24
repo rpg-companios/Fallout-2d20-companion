@@ -1,0 +1,198 @@
+{
+  "stats": {
+    "meleeBonus": "Melee Bonus",
+    "radiation": "Radiation",
+    "poisonResistance": "Poison Res.",
+    "defense": "Defense"
+  },
+  "effectsPanel": {
+    "immunityTypes": {
+      "radiation": "Radiation",
+      "poison": "Poison",
+      "disease": "Disease"
+    }
+  },
+  "armor": {
+    "slots": {
+      "head": {
+        "title": "Head",
+        "subtitle": "1-2"
+      },
+      "leftArm": {
+        "title": "Left Arm",
+        "subtitle": "9-11"
+      },
+      "rightArm": {
+        "title": "Right Arm",
+        "subtitle": "12-14"
+      },
+      "body": {
+        "title": "Body",
+        "subtitle": "3-8"
+      },
+      "leftLeg": {
+        "title": "Left Leg",
+        "subtitle": "15-17"
+      },
+      "rightLeg": {
+        "title": "Right Leg",
+        "subtitle": "18-20"
+      },
+      "chassis": {
+        "title": "Chassis",
+        "subtitle": "15-20"
+      },
+      "thruster": {
+        "title": "Thruster",
+        "subtitle": "15-20"
+      },
+      "arm1": {
+        "title": "Arm 1",
+        "subtitle": "9-11"
+      },
+      "arm2": {
+        "title": "Arm 2",
+        "subtitle": "12-14"
+      },
+      "arm3": {
+        "title": "Arm 3",
+        "subtitle": "15-17"
+      }
+    },
+    "fields": {
+      "physical": "Phys. DR",
+      "energy": "Energy DR",
+      "radiation": "Rad. DR"
+    },
+    "groups": {
+      "robotArmor": "Robot Armor"
+    }
+  },
+  "weapon": {
+    "rangeNames": {
+      "Close": "Close",
+      "Medium": "Medium",
+      "Long": "Long",
+      "Extreme": "Extreme"
+    },
+    "modSlots": {
+      "barrel": "Barrel",
+      "receiver": "Receiver",
+      "sight": "Sight",
+      "muzzle": "Muzzle",
+      "stock": "Stock",
+      "grip": "Grip",
+      "magazine": "Magazine",
+      "capacitor": "Capacitor",
+      "canister": "Canister",
+      "concentrate": "Concentrate",
+      "container": "Container",
+      "dishe": "Dish",
+      "fuel": "Fuel",
+      "launcher": "Launcher",
+      "nozzle": "Nozzle",
+      "tank": "Tank",
+      "frame": "Frame",
+      "winch": "Winch",
+      "chamber": "Chamber",
+      "unique": "Unique",
+      "other": "Other"
+    },
+    "requiresMkII": "Requires Mk II OS"
+  },
+  "robotSlot": {
+    "noLimb": "No Limb",
+    "slotNames": {
+      "head": "Head",
+      "body": "Body",
+      "leftArm": "Left Arm",
+      "rightArm": "Right Arm",
+      "leftLeg": "Left Leg",
+      "rightLeg": "Right Leg",
+      "arm1": "Arm 1",
+      "arm2": "Arm 2",
+      "arm3": "Arm 3",
+      "thruster": "Thruster",
+      "chassis": "Chassis",
+      "wheel": "Wheel"
+    },
+    "layers": {
+      "plating": "Plating",
+      "armor": "Armor",
+      "frame": "Frame"
+    },
+    "weapon": {
+      "damage": "DMG"
+    },
+    "buttons": {
+      "upgradeLimb": "Limb",
+      "upgradeArmor": "Armor",
+      "upgradePlating": "Plating",
+      "upgradeFrame": "Frame"
+    }
+  },
+  "robotSlots": {
+    "misterHandy": {
+      "head": "Optics",
+      "body": "Body",
+      "leftArm": "Arm 1",
+      "rightArm": "Arm 2",
+      "leftLeg": "Arm 3",
+      "rightLeg": "Thruster"
+    }
+  },
+  "robotBodyUpgrade": {
+    "title": "Body upgrade",
+    "comingSoon": "Coming soon"
+  },
+  "powerArmor": {
+    "durability": "Durability (HP)",
+    "core": "Fusion Core: {value}"
+  },
+  "kitResolver": {
+    "currency": "Caps",
+    "currencyNcr": "NCR Dollars"
+  },
+  "robotLimbs": {
+    "robot_head_protectron": "Protectron Head",
+    "robot_head_mister_handy_eye_stalk": "Mister Handy Eye Stalk",
+    "robot_head_assaultron": "Assaultron Head",
+    "robot_head_assaultron_laser": "Assaultron Head (Laser)",
+    "robot_head_robobrain": "Robobrain Head",
+    "robot_head_sentry_bot": "Sentry Bot Head",
+    "robot_body_mister_handy": "Mr. Handy Body",
+    "robot_body_protectron": "Protectron Body",
+    "robot_body_assaultron": "Assaultron Body",
+    "robot_body_robobrain": "Robobrain Body",
+    "robot_body_sentry_bot": "Sentry Bot Body",
+    "robot_legs_mister_handy_thruster": "Mister Handy Thruster",
+    "robot_legs_protectron": "Protectron Legs",
+    "robot_legs_assaultron": "Assaultron Legs",
+    "robot_legs_robobrain_treads": "Robobrain Treads",
+    "robot_legs_sentry_bot": "Sentry Bot Legs",
+    "robot_weapon_manipulator": "Manipulator",
+    "robot_weapon_protectron_manipulator": "Protectron Manipulator",
+    "robot_arm_protectron": "Protectron Arm",
+    "robot_arm_mister_handy": "Mister Handy Arm",
+    "robot_arm_assaultron": "Assaultron Arm",
+    "robot_arm_assaultron_shocker": "Assaultron Shocker Arms",
+    "robot_arm_robobrain": "Robobrain Arm",
+    "robot_arm_sentry_bot": "Sentry Bot Arm",
+    "robot_weapon_flamethrower": "Flamethrower",
+    "robot_weapon_circular_saw": "Circular Saw",
+    "robot_weapon_laser_cutter": "Laser Cutter",
+    "robot_weapon_auto_10mm": "Automatic 10mm Pistol",
+    "robot_weapon_cryojet": "Cryojet",
+    "robot_weapon_shocker_arms": "Shocker Arms",
+    "robot_weapon_construction_claw": "Construction Claw",
+    "robot_weapon_drill": "Drill",
+    "robot_weapon_vice_grip": "Vice Grip",
+    "robot_weapon_claw": "Claw",
+    "robot_weapon_tesla_arm": "Tesla Carbine",
+    "robot_arm_smoke_manipulator": "Smoke Manipulator",
+    "robot_head_securitron": "Securitron Head",
+    "robot_body_securitron": "Securitron Body",
+    "robot_arm_securitron": "Securitron Arm",
+    "robot_legs_securitron": "Securitron Wheel"
+  }
+}

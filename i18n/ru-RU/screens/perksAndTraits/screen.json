@@ -26,26 +26,11 @@
     "perkLimitReached": "На текущем уровне больше перков взять нельзя",
     "perkAlreadyAtMaxRank": "Этот перк уже взят на максимальном ранге"
   },
-  "errors": {
-    "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
-  },
-  "perkSelected": {
-    "intensiveTrainingSuccess": "Перк \"{perkName}\" выбран! Вы получили +{bonus} очко атрибута. Перейдите на вкладку \"Персонаж\", чтобы распределить его."
-  },
   "modal": {
     "title": "Выберите перк",
     "replaceTitle": "Заменить перк",
     "searchPlaceholder": "Поиск",
     "filterSpoiler": "Поиск и фильтр",
-    "attributeFilters": {
-      "STR": "СИЛ",
-      "END": "ВЫН",
-      "PER": "ВОС",
-      "AGI": "ЛОВ",
-      "INT": "ИНТ",
-      "CHA": "ХАР",
-      "LCK": "УДЧ"
-    },
     "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
     "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
     "alreadyAtMaxRank": "Уже взят на максимальном ранге ({current}/{max})",

@@ -1,10 +1,13 @@
 import ruApp from './ru-RU/App.json';
 import enApp from './en-EN/App.json';
+import ruSettingApp from '../modules/fallout/i18n/ru-RU/App.json';
+import enSettingApp from '../modules/fallout/i18n/en-EN/App.json';
 import { getCurrentLocale } from './locale';
+import { deepMerge } from './mergeDicts';
 
 const DICTIONARIES = {
-  'ru-RU': ruApp,
-  'en-EN': enApp,
+  'ru-RU': deepMerge(ruApp, ruSettingApp),
+  'en-EN': deepMerge(enApp, enSettingApp),
 };
 
 export const tApp = (path) => {

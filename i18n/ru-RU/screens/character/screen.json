@@ -24,18 +24,11 @@
     "extraSlotsAvailable": "Доступно дополнительных слотов",
     "onePerk": "1 перк",
     "unknownItem": "Неизвестный предмет",
-    "capsShort": "крышек",
     "pcsShort": "шт.",
-    "physDR": "ФЗ",
-    "enrgDR": "ЭЗ",
     "carry": "Груз",
     "requires": "Требует: ",
-    "plating": "Обшивка",
     "armor": "Броня",
-    "frame": "Рама",
-    "mind": "Разум",
     "other": "Прочее",
-    "body": "Корпус",
     "carryWeight": "Грузоподъёмность",
     "rarity": "Редкость",
     "complexity": "Сложность"
@@ -78,9 +71,7 @@
   "alerts": {
     "errorTitle": "Ошибка",
     "warningTitle": "Предупреждение",
-    "infoTitle": "Информация",
-    "spiritsFavorTitle": "Духи благосклонны",
-    "spiritsFavorMessage": "Духи к вам благосклонны. Вы не тратите очко удачи."
+    "infoTitle": "Информация"
   },
   "errors": {
     "distributeAllPerkAttributePoints": "Вы должны распределить все доступные очки атрибутов.",
@@ -101,10 +92,6 @@
     "cannotTagBannedSkill": "Этот навык нельзя отметить (ограничение черты). Очки вкладывать можно."
   },
   "modals": {
-    "ncrCitizen": {
-      "title": "Черта происхождения «Житель НКР»",
-      "originLabel": "Житель НКР"
-    },
     "origin": {
       "title": "Выберите происхождение"
     },
@@ -122,28 +109,11 @@
       "title": "Выберите комплект снаряжения",
       "empty": "Нет комплектов снаряжения"
     },
-    "origins": {
-      "survivorTitle": "Черта происхождения «Выживший»",
-      "ncrTitle": "Черта происхождения «Житель НКР»",
-      "tribalTitle": "Черта происхождения «Дикарь»",
-      "treeFamiliesTitle": "Черта происхождения «Три семьи»"
-    },
-    "survivor": {
-      "twoTraits": "2 черты",
-      "twoTraitsDesc": "Любая комбинация: 2 Выжившего, 2 НКР или 1+1",
-      "oneTraitOnePerk": "1 черта и 1 перк",
-      "selectTwoTraitsHint": "Выберите 2 черты в любой комбинации.",
-      "survivorTraitsList": "Список черт Выжившего",
-      "ncrTraitsList": "Список черт НКР"
-    },
     "armor": {
-      "upgradePlating": "Улучшить обшивку",
       "upgradeArmor": "Улучшить броню",
-      "upgradeFrame": "Улучшить раму",
       "noItems": "Нет доступных предметов"
     },
     "limb": {
-      "upgradeLimb": "Модернизировать конечность",
       "noLimbs": "Нет доступных конечностей"
     },
     "skillPick": {
@@ -151,18 +121,6 @@
       "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные.",
       "choose1": "Выберите 1 навык",
       "chooseN": "Выберите {count} навыка"
-    },
-    "tribal": {
-      "twoTraits": "2 черты",
-      "twoTraitsDesc": "Любая комбинация: 2 Дикаря, 2 Выжившего или 1+1",
-      "oneTraitOnePerk": "1 черта и 1 перк",
-      "selectTwoTraitsHint": "Выберите 2 черты в любой комбинации.",
-      "tribalTraitsList": "Список черт Дикаря",
-      "survivorTraitsList": "Список черт Выжившего",
-      "ncrTraitsList": "Список черт НКР"
-    },
-    "treeFamilies": {
-      "selectFamilyHint": "Выберите одну семью: каждая даёт своё преимущество."
     }
   },
   "origins": {
@@ -192,24 +150,5 @@
     "INT": "ИНТ",
     "CHA": "ХАР",
     "LCK": "УДЧ"
-  },
-  "skillsCatalog": {
-    "ATHLETICS": "Атлетика",
-    "BARTER": "Бартер",
-    "BIG_GUNS": "Тяжелое оружие",
-    "ENERGY_WEAPONS": "Энергооружие",
-    "EXPLOSIVES": "Взрывчатка",
-    "LOCKPICK": "Отмычки",
-    "MEDICINE": "Медицина",
-    "MELEE_WEAPONS": "Ближний бой",
-    "PILOT": "Управление ТС",
-    "REPAIR": "Ремонт",
-    "SCIENCE": "Наука",
-    "SMALL_GUNS": "Стрелковое оружие",
-    "SNEAK": "Скрытность",
-    "SPEECH": "Красноречие",
-    "SURVIVAL": "Выживание",
-    "THROWING": "Метание",
-    "UNARMED": "Рукопашная"
   }
 }

@@ -1,6 +1,5 @@
 {
   "title": "Character Manager",
-  "subtitle": "Fallout Tabletop Roleplaying (2d20)",
   "createButton": {
     "text": "Create\nCharacter",
     "plus": "+"
@@ -57,10 +56,8 @@
     "buyCoffee": "Buy author a coffee",
     "buyCoffeeDescription": "Support the app's development on Boosty.",
     "checkUpdates": "Check for updates",
-    "settings": "Settings"
-  },
-  "about": {
-    "description": "Fallout 2d20 Companion is a character manager for tabletop RPG: create, store, edit, import/export, and sync through cloud."
+    "settings": "Settings",
+    "gameSetting": "Game setting"
   },
   "cloudSync": {
     "unsupported": "Cloud sync is available only in web version.",
@@ -114,5 +111,17 @@
     "deleteConfirm": "Delete folder and characters",
     "moveHint": "Hold the arrow icon, then tap a folder to move the character.",
     "moving": "Select a destination folder"
+  },
+  "subtitle": "Positronium",
+  "about": {
+    "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud."
+  },
+  "gameSetting": {
+    "title": "Game setting",
+    "select": "Select",
+    "delete": "Delete",
+    "chooseSetting": "Choose a setting",
+    "install": "Install",
+    "localTrpg": ".trpg"
   }
 }
