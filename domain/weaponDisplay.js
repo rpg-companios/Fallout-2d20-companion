@@ -1,0 +1,188 @@
+/**
+ * domain/weaponDisplay.js
+ * Helpers for resolving weapon display strings (qualities, damageType)
+ * from structured data to localized human-readable strings.
+ */
+
+import ruQualities from '../modules/fallout/i18n/ru-RU/data/system/qualities.json';
+import enQualities from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
+import ruEffects from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
+import enEffects from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
+import { getCurrentModuleLocale } from '../i18n/locale';
+
+const QUALITY_DICTS = {
+  'ru-RU': ruQualities,
+  'en-EN': enQualities,
+};
+
+const EFFECT_DICTS = {
+  'ru-RU': ruEffects,
+  'en-EN': enEffects,
+};
+
+const DAMAGE_TYPE_LABELS = {
+  'ru-RU': {
+    physical: 'Физический',
+    energy: 'Энергетический',
+    radiation: 'Радиационный',
+    poison: 'Ядовитый',
+    fire: 'Огненный',
+    special: 'Особый',
+  },
+  'en-EN': {
+    physical: 'Physical',
+    energy: 'Energy',
+    radiation: 'Radiation',
+    poison: 'Poison',
+    fire: 'Fire',
+    special: 'Special',
+  },
+};
+
+/**
+ * Resolves a weapon's qualities array to a localized comma-separated string.
+ *
+ * Accepts:
+ *  - Array of { qualityId, value? }  (new data/ format)
+ *  - JSON string of the above        (from DB)
+ *  - Plain string                    (legacy)
+ *  - null / undefined
+ *
+ * @param {any} qualities
+ * @returns {string}
+ */
+export function resolveWeaponQualities(qualities) {
+  const locale = getCurrentModuleLocale();
+  const dict = QUALITY_DICTS[locale];
+  if (!dict) {
+    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря качеств`);
+  }
+  const qualityMap = Object.fromEntries(dict.map((q) => [q.id, q.name]));
+
+  let arr = qualities;
+
+  // Parse JSON string from DB
+  if (typeof arr === 'string') {
+    try {
+      arr = JSON.parse(arr);
+    } catch {
+      return arr; // legacy plain string — return as-is
+    }
+  }
+
+  if (!Array.isArray(arr) || arr.length === 0) return '';
+
+  return arr
+    .map((q) => {
+      if (typeof q === 'string') return q;
+      if (!q || typeof q !== 'object') return '';
+      const name = qualityMap[q.qualityId] || q.qualityId || '';
+      if (q.value != null) return `${name} ${q.value}`;
+      return name;
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * Локализованный список ЭФФЕКТОВ оружия (effect_* — срабатывают при выпадении
+ символа эффекта). В отличие от качеств, эффекты — отдельная сущность.
+ Принимает массив {effectId, value?} (или JSON-строку из БД).
+ */
+export function resolveWeaponEffects(effects) {
+  const locale = getCurrentModuleLocale();
+  const dict = EFFECT_DICTS[locale];
+  if (!dict) {
+    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря эффектов урона`);
+  }
+  const effectMap = Object.fromEntries(dict.map((e) => [e.id, e.name]));
+
+  let arr = effects;
+  if (typeof arr === 'string') {
+    try {
+      arr = JSON.parse(arr);
+    } catch {
+      return arr;
+    }
+  }
+  if (!Array.isArray(arr) || arr.length === 0) return '';
+
+  return arr
+    .map((e) => {
+      if (typeof e === 'string') return e;
+      if (!e || typeof e !== 'object') return '';
+      const name = effectMap[e.effectId] || e.effectId || '';
+      if (e.value != null) return `${name} ${e.value}`;
+      return name;
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * Resolves a weapon's damageType to a localized string.
+ *
+ * Supports:
+ *  - Array of strings: ["energy", "physical"] → "Энергетический + Физический"
+ *  - JSON string of array: '["energy","physical"]' → "Энергетический + Физический"
+ *  - Plain string: "physical" → "Физический"
+ *  - null / undefined → ''
+ *
+ * @param {any} damageType  e.g. ["physical", "energy"], "physical", '["energy"]'
+ * @returns {string}
+ */
+export function resolveWeaponDamageType(damageType) {
+  if (!damageType) return '';
+
+  const locale = getCurrentModuleLocale();
+  const labels = DAMAGE_TYPE_LABELS[locale];
+  if (!labels) {
+    throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря типов урона`);
+  }
+
+  // Parse JSON string if needed
+  let arr = damageType;
+  if (typeof arr === 'string') {
+    try {
+      arr = JSON.parse(arr);
+    } catch {
+      // Legacy plain string — return as-is
+      return labels[arr] || arr;
+    }
+  }
+
+  // Support array of damage types
+  if (Array.isArray(arr)) {
+    if (arr.length === 0) return '';
+    return arr
+      .map(dt => labels[dt] || dt)
+      .join(' + ');
+  }
+
+  // Single string value
+  return labels[arr] || arr;
+}
+
+// ---------------------------------------------------------------------------
+// Порядок оружия на экране снаряжения (ПРАВИЛО владельца):
+//   0. виртуальная рукопашная атака (Unarmed: кулаки/манипулятор) — ВСЕГДА
+//      в 1-м слоте, для всех ориджинов, независимо от надетого оружия;
+//   1. рукопашное оружие (Melee: ножи, кастеты — это предмет инвентаря);
+//   2. встроенное оружие конечностей (лазер/ПП секьюритрона и т.п.);
+//   3. нерабочее Mk II оружие (требует установки драйвера) — после встроенного;
+//   4. всё остальное (стрелковое, экипированное из инвентаря) — в конце.
+// Сортировка стабильная: порядок внутри групп сохраняется.
+// ---------------------------------------------------------------------------
+
+export const getWeaponDisplayPriority = (weapon) => {
+  if (!weapon) return 4;
+  const weaponType = weapon?.weaponType;
+  if (weaponType === 'Unarmed') return 0;
+  if (weaponType === 'Melee') return 1;
+  if (weapon?.requiresMkII) return 3;
+  if (weapon?.isBuiltin || weapon?.isManipulator) return 2;
+  return 4;
+};
+
+export const sortWeaponsForDisplay = (weapons = []) =>
+  [...weapons].sort((a, b) => getWeaponDisplayPriority(a) - getWeaponDisplayPriority(b));

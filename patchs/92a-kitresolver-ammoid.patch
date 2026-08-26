@@ -1,0 +1,14 @@
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -219,6 +219,10 @@ export async function resolveWeaponItem(item) {
+     displayName,
+     name: displayName,
+     itemType: 'weapon',
++    // Канонический id патронов — всегда пробрасываем из каталога, чтобы
++    // инвентарь/экран «Снаряжение» показывали тип боеприпаса без угадывания.
++    ammoId: weaponData.ammoId ?? item.ammoId ?? null,
++    // resolvedAmmunition (боезапас комплекта) идёт отдельно.
+     resolvedAmmunition,
+     hasMods: weaponData.hasMods ?? false,
+   };

@@ -1,0 +1,326 @@
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index f9b037c..70c20d5 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -99,7 +99,7 @@ const InventoryScreen = () => {
+   const updateItem = useCharacterStore((state) => state.updateItem);
+   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+-  const randomWeaponDurabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++  const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+ 
+   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
+     return inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
+@@ -495,7 +495,7 @@ const InventoryScreen = () => {
+     }
+ 
+     // Durability is per weapon instance: tracked weapons must never be stacked.
+-    if (randomWeaponDurabilityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
++    if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
+       for (let index = 0; index < quantity; index += 1) {
+         const durability = source === 'buy' ? 100 : rollWeaponDurability();
+         const uniqueId = `${localizedItem.id}_durability_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 8)}`;
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 58a8203..5fdfc5c 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -125,7 +125,7 @@ const RadiationCounter = ({ isEnabled }) => {
+ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
+   const storeItems = useCharacterStore((state) => state.items);
+   const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
+-  const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++  const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+   const baseLossPer10Shots = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
+ 
+   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
+@@ -142,7 +142,7 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) =>
+     item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
+   );
+   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+-  const isBroken = durabilityEnabled && Number(durability) <= 0;
++  const isBroken = durabilityLossEnabled && Number(durability) <= 0;
+   const canSpend = totalAmmo >= ammoPerShot && !isBroken;
+ 
+   const handleSpend = () => {
+@@ -151,7 +151,7 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) =>
+       weaponInstanceId,
+       ammoIds,
+       ammoAmount: ammoPerShot,
+-      durabilityEnabled,
++      durabilityEnabled: durabilityLossEnabled,
+       baseLossPer10Shots,
+     });
+   };
+@@ -279,7 +279,8 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
+ 
+ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+     const { hasTrait, attributes, skills, trait } = useCharacter();
+-    const durabilityEnabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++    const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
++    const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+     if (!weapon) {
+       return (
+         <View style={localStyles.weaponCardContainer}>
+@@ -360,7 +361,7 @@ const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = f
+     const rawAmmoId = displayWeapon?.ammoId ?? displayWeapon?.ammo_id ?? '';
+     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
+     const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
+-    const showDurability = durabilityEnabled && isAmmoWeapon(displayWeapon);
++    const showDurability = (randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon);
+ 
+     const stats = [
+       { label: tWeaponsAndArmorScreen('weapon.fields.success'), value: `${successValue}` },
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+index 225f0e9..b7ceec6 100644
+--- a/components/settings/SettingsModal.js
++++ b/components/settings/SettingsModal.js
+@@ -4,20 +4,152 @@ import useAppSettingsStore from '../../src/store/appSettingsStore';
+ import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
+ 
+ export default function SettingsModal({ visible, onClose }) {
+-  const enabled = useAppSettingsStore((state) => state.randomWeaponDurabilityEnabled);
++  const qualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
++  const durabilityLossEnabled = useAppSettingsStore((state) => state.weaponDurabilityLossEnabled);
+   const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
+-  const setEnabled = useAppSettingsStore((state) => state.setRandomWeaponDurabilityEnabled);
+-  const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
+   const foldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
++
++  const setQualityEnabled = useAppSettingsStore((state) => state.setRandomWeaponQualityEnabled);
++  const setDurabilityLossEnabled = useAppSettingsStore((state) => state.setWeaponDurabilityLossEnabled);
++  const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
+   const setFoldersEnabled = useAppSettingsStore((state) => state.setCharacterFoldersEnabled);
+-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+-    <View style={styles.backdrop}><View style={styles.modal}>
+-      <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
+-      <View style={styles.row}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text></View><Switch value={enabled} onValueChange={setEnabled} /></View>
+-      {enabled && <View style={styles.loss}><Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text><View style={styles.counter}><TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}><Text style={styles.button}>−</Text></TouchableOpacity><Text style={styles.value}>{loss}</Text><TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}><Text style={styles.button}>+</Text></TouchableOpacity></View><Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text></View>}
+-      <View style={[styles.row, styles.loss]}><View style={styles.text}><Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text><Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text></View><Switch value={foldersEnabled} onValueChange={setFoldersEnabled} /></View>
+-      <TouchableOpacity onPress={onClose} style={styles.close}><Text>OK</Text></TouchableOpacity>
+-    </View></View>
+-  </Modal>;
++
++  return (
++    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++      <View style={styles.backdrop}>
++        <View style={styles.modal}>
++          <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
++
++          {/* Настройки режима "Выживание" */}
++          <Text style={styles.sectionTitle}>{tHomeScreen('settings.survivalModeTitle')}</Text>
++
++          <View style={styles.row}>
++            <View style={styles.text}>
++              <Text style={styles.label}>{tHomeScreen('settings.qualityTitle')}</Text>
++              <Text style={styles.description}>{tHomeScreen('settings.qualityDescription')}</Text>
++            </View>
++            <Switch value={qualityEnabled} onValueChange={setQualityEnabled} />
++          </View>
++
++          <View style={[styles.row, styles.settingRow]}>
++            <View style={styles.text}>
++              <Text style={styles.label}>{tHomeScreen('settings.durabilityTitle')}</Text>
++              <Text style={styles.description}>{tHomeScreen('settings.durabilityDescription')}</Text>
++            </View>
++            <Switch value={durabilityLossEnabled} onValueChange={setDurabilityLossEnabled} />
++          </View>
++
++          {durabilityLossEnabled && (
++            <View style={styles.loss}>
++              <Text style={styles.label}>{tHomeScreen('settings.lossTitle')}</Text>
++              <View style={styles.counter}>
++                <TouchableOpacity disabled={loss <= 1} onPress={() => setLoss(loss - 1)}>
++                  <Text style={styles.button}>−</Text>
++                </TouchableOpacity>
++                <Text style={styles.value}>{loss}</Text>
++                <TouchableOpacity disabled={loss >= 100} onPress={() => setLoss(loss + 1)}>
++                  <Text style={styles.button}>+</Text>
++                </TouchableOpacity>
++              </View>
++              <Text style={styles.description}>{tHomeScreen('settings.lossDescription')}</Text>
++            </View>
++          )}
++
++          {/* Разделитель */}
++          <View style={styles.separator} />
++
++          {/* Каталоги персонажей */}
++          <View style={styles.row}>
++            <View style={styles.text}>
++              <Text style={styles.label}>{tHomeScreen('settings.foldersTitle')}</Text>
++              <Text style={styles.description}>{tHomeScreen('settings.foldersDescription')}</Text>
++            </View>
++            <Switch value={foldersEnabled} onValueChange={setFoldersEnabled} />
++          </View>
++
++          <TouchableOpacity onPress={onClose} style={styles.close}>
++            <Text>OK</Text>
++          </TouchableOpacity>
++        </View>
++      </View>
++    </Modal>
++  );
+ }
+-const styles=StyleSheet.create({backdrop:{flex:1,backgroundColor:'rgba(0,0,0,.6)',justifyContent:'center',padding:20},modal:{backgroundColor:'#fff',borderRadius:12,padding:20},title:{fontSize:22,fontWeight:'700',marginBottom:18},row:{flexDirection:'row',gap:12},text:{flex:1},label:{fontSize:16,fontWeight:'700'},description:{fontSize:13,color:'#555',lineHeight:18,marginTop:6},loss:{borderTopWidth:1,borderColor:'#ddd',marginTop:18,paddingTop:16},counter:{flexDirection:'row',alignItems:'center',marginTop:12,gap:20},button:{fontSize:28,fontWeight:'700',paddingHorizontal:12},value:{fontSize:22,minWidth:45,textAlign:'center'},close:{alignSelf:'flex-end',marginTop:18,padding:10}});
++
++const styles = StyleSheet.create({
++  backdrop: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,.6)',
++    justifyContent: 'center',
++    padding: 20,
++  },
++  modal: {
++    backgroundColor: '#fff',
++    borderRadius: 12,
++    padding: 20,
++  },
++  title: {
++    fontSize: 22,
++    fontWeight: '700',
++    marginBottom: 18,
++  },
++  sectionTitle: {
++    fontSize: 16,
++    fontWeight: '600',
++    color: '#333',
++    marginBottom: 12,
++  },
++  row: {
++    flexDirection: 'row',
++    gap: 12,
++    alignItems: 'center',
++  },
++  settingRow: {
++    marginTop: 16,
++  },
++  text: {
++    flex: 1,
++  },
++  label: {
++    fontSize: 16,
++    fontWeight: '700',
++  },
++  description: {
++    fontSize: 13,
++    color: '#555',
++    lineHeight: 18,
++    marginTop: 6,
++  },
++  separator: {
++    height: 1,
++    backgroundColor: '#ddd',
++    marginVertical: 18,
++  },
++  loss: {
++    borderTopWidth: 1,
++    borderColor: '#ddd',
++    marginTop: 18,
++    paddingTop: 16,
++  },
++  counter: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    marginTop: 12,
++    gap: 20,
++  },
++  button: {
++    fontSize: 28,
++    fontWeight: '700',
++    paddingHorizontal: 12,
++  },
++  value: {
++    fontSize: 22,
++    minWidth: 45,
++    textAlign: 'center',
++  },
++  close: {
++    alignSelf: 'flex-end',
++    marginTop: 18,
++    padding: 10,
++  },
++});
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 71e54bc..c9f3ddc 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -66,8 +66,11 @@
+   },
+   "settings": {
+     "title": "Settings",
+-    "durabilityTitle": "Random weapon durability",
+-    "durabilityDescription": "Weapons obtained through “Add Loot” have random durability from 1 to 100. Firing weapons consumes durability.",
++    "survivalModeTitle": "Survival Mode Settings",
++    "qualityTitle": "Random weapon quality",
++    "qualityDescription": "Weapons added through \"Loot\" have random quality. Merchant weapons are always 100% quality.",
++    "durabilityTitle": "Weapon wear on firing",
++    "durabilityDescription": "Enable weapon wear mechanic when firing.",
+     "lossTitle": "Durability loss per 10 shots",
+     "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much.",
+     "foldersTitle": "Character folders",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 9bb3b8a..1faf956 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -66,8 +66,11 @@
+   },
+   "settings": {
+     "title": "Настройки",
+-    "durabilityTitle": "Случайная прочность оружия",
+-    "durabilityDescription": "Оружие, получаемое через «Добавить добычу», обладает случайной прочностью от 1 до 100. Выстрелы из оружия тратят прочность.",
++    "survivalModeTitle": "Настройки режима «Выживание»",
++    "qualityTitle": "Произвольное качество оружия",
++    "qualityDescription": "Оружие, добавленное через «Лут», имеет произвольное качество. Оружие торговцев всегда 100% качество.",
++    "durabilityTitle": "Износ оружия при выстреле",
++    "durabilityDescription": "Включить механику износа оружия при выстрелах.",
+     "lossTitle": "Расход прочности за 10 выстрелов",
+     "lossDescription": "По умолчанию расходуется 1 прочность за 10 выстрелов. «Ненадёжное» оружие тратит в 2 раза больше, а «Надёжное» — в 2 раза меньше.",
+     "foldersTitle": "Каталоги персонажей",
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 94127b7..82b4287 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -7,21 +7,40 @@ const clampLoss = (value) => Math.min(100, Math.max(1, Math.floor(Number(value)
+ const useAppSettingsStore = create(
+   persist(
+     (set) => ({
+-      randomWeaponDurabilityEnabled: false,
++      randomWeaponQualityEnabled: false,
++      weaponDurabilityLossEnabled: false,
+       weaponDurabilityLossPer10Shots: 1,
+       characterFoldersEnabled: false,
+       setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
+-      setRandomWeaponDurabilityEnabled: (enabled) => set({ randomWeaponDurabilityEnabled: Boolean(enabled) }),
++      setRandomWeaponQualityEnabled: (enabled) => set({ randomWeaponQualityEnabled: Boolean(enabled) }),
++      setWeaponDurabilityLossEnabled: (enabled) => set({ weaponDurabilityLossEnabled: Boolean(enabled) }),
+       setWeaponDurabilityLossPer10Shots: (value) => set({ weaponDurabilityLossPer10Shots: clampLoss(value) }),
+     }),
+     {
+       name: 'fallout2d20:settings',
+       storage: createJSONStorage(() => AsyncStorage),
+       partialize: (state) => ({
+-        randomWeaponDurabilityEnabled: state.randomWeaponDurabilityEnabled,
++        randomWeaponQualityEnabled: state.randomWeaponQualityEnabled,
++        weaponDurabilityLossEnabled: state.weaponDurabilityLossEnabled,
+         characterFoldersEnabled: state.characterFoldersEnabled,
+         weaponDurabilityLossPer10Shots: state.weaponDurabilityLossPer10Shots,
+       }),
++      migrate: (persistedState, version) => {
++        // Миграция v0 -> v1: переименование randomWeaponDurabilityEnabled -> randomWeaponQualityEnabled
++        if (persistedState?.randomWeaponDurabilityEnabled !== undefined) {
++          const { randomWeaponDurabilityEnabled, ...rest } = persistedState;
++          return {
++            ...rest,
++            randomWeaponQualityEnabled: Boolean(randomWeaponDurabilityEnabled),
++            weaponDurabilityLossEnabled: false,
++          };
++        }
++        return {
++          ...persistedState,
++          weaponDurabilityLossEnabled: persistedState?.weaponDurabilityLossEnabled ?? false,
++        };
++      },
++      version: 1,
+     },
+   ),
+ );

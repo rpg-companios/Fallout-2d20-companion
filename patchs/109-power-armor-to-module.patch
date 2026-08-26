@@ -1,0 +1,1399 @@
+diff --git a/__tests__/power-armor/data-catalog.test.js b/__tests__/power-armor/data-catalog.test.js
+index e3d251d..888950a 100644
+--- a/__tests__/power-armor/data-catalog.test.js
++++ b/__tests__/power-armor/data-catalog.test.js
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from 'vitest';
+-import dataPowerArmor from '../../data/equipment/powerArmor.json';
++import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+ import dataAmmo from '../../data/equipment/ammo.json';
+ import { PA_CORE_DRAIN_PER_HOUR, FUSION_CORE_CHARGES_ROLL } from '../../domain/powerArmor';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+diff --git a/__tests__/power-armor/domain-mechanics.test.js b/__tests__/power-armor/domain-mechanics.test.js
+index fa05674..3d11dfe 100644
+--- a/__tests__/power-armor/domain-mechanics.test.js
++++ b/__tests__/power-armor/domain-mechanics.test.js
+@@ -1,5 +1,5 @@
+ import { describe, it, expect } from 'vitest';
+-import dataPowerArmor from '../../data/equipment/powerArmor.json';
++import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+ import {
+   PA_CORE_DRAIN_PER_HOUR,
+   PA_MS_PER_CHARGE,
+diff --git a/__tests__/power-armor/ui-integration.test.js b/__tests__/power-armor/ui-integration.test.js
+index 28e45ab..9722e92 100644
+--- a/__tests__/power-armor/ui-integration.test.js
++++ b/__tests__/power-armor/ui-integration.test.js
+@@ -1,6 +1,6 @@
+ import { describe, it, expect } from 'vitest';
+ import { readFileSync } from 'fs';
+-import dataPowerArmor from '../../data/equipment/powerArmor.json';
++import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+ import dataAmmo from '../../data/equipment/ammo.json';
+ import {
+   FUSION_CORE_ID,
+diff --git a/__tests__/securitron/power-armor-module-move.test.js b/__tests__/securitron/power-armor-module-move.test.js
+new file mode 100644
+index 0000000..c78bddf
+--- /dev/null
++++ b/__tests__/securitron/power-armor-module-move.test.js
+@@ -0,0 +1,58 @@
++/**
++ * Разделение движок/сеттинг (патч 109): силовая броня перенесена в модуль
++ * ЦЕЛИКОМ. data/equipment/powerArmor.json — пустая движковая база ({}),
++ * легаси i18n — {powerArmor: []}. Форматы сохранены: механика — сеты
++ * {frame, raiderPower, t45, t51, t60, x01} с pieces; переводы — группы
++ * {powerArmor:[{categoryKey, type, items}]}.
++ */
++import { describe, it, expect, beforeAll } from 'vitest';
++import { getEquipmentCatalogForLocale } from '../../domain/registry';
++import { setCurrentLocale } from '../../i18n/locale';
++import modulePowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
++import moduleRuPowerArmor from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json';
++import moduleEnPowerArmor from '../../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
++import dataPowerArmor from '../../data/equipment/powerArmor.json';
++import legacyRuPowerArmor from '../../i18n/ru-RU/data/equipment/armor/powerArmor.json';
++import legacyEnPowerArmor from '../../i18n/en-EN/data/equipment/armor/powerArmor.json';
++
++const countPieces = (pa) =>
++  Object.values(pa || {}).reduce((sum, set) => sum + (set?.pieces || []).length, 0);
++
++describe('Силовая броня в модуле (сеттинг), data/ — пустой движок', () => {
++  beforeAll(() => setCurrentLocale('ru-RU'));
++
++  it('модуль содержит полную механику: 6 сетов (frame + 5), 21 деталь', () => {
++    expect(Object.keys(modulePowerArmor).sort()).toEqual(['frame', 'raiderPower', 't45', 't51', 't60', 'x01']);
++    expect(countPieces(modulePowerArmor)).toBe(21);
++    const piece = modulePowerArmor.t45.pieces[0];
++    expect(piece).toHaveProperty('damageResistance');
++    expect(piece).toHaveProperty('weight');
++  });
++
++  it('переводы — группы {powerArmor:[...]}, 6 групп в каждой локали', () => {
++    for (const i18n of [moduleRuPowerArmor, moduleEnPowerArmor]) {
++      expect(i18n.powerArmor).toHaveLength(6);
++      const items = i18n.powerArmor.flatMap((g) => g.items || []);
++      expect(items).toHaveLength(21);
++      for (const item of items) {
++        expect(item.id).toBeTruthy();
++        expect(item.name.length).toBeGreaterThan(0);
++      }
++    }
++  });
++
++  it('data/ и легаси i18n пусты (движок без сеттинга)', () => {
++    expect(dataPowerArmor).toEqual({});
++    expect(legacyRuPowerArmor).toEqual({ powerArmor: [] });
++    expect(legacyEnPowerArmor).toEqual({ powerArmor: [] });
++  });
++
++  it('каталог собирает силовую броню из модуля (powerArmorList, powerArmorRaw)', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(catalog.powerArmorRaw).toBe(modulePowerArmor);
++    expect(catalog.powerArmorList).toHaveLength(21);
++    const item = catalog.powerArmorList[0];
++    expect(item.name.length).toBeGreaterThan(0);
++    expect(item.powerArmorSetKey).toBeTruthy();
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index cb779b5..a074ae2 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -62,7 +62,7 @@ import {
+   FUSION_CORE_ID,
+ } from '../domain/powerArmor';
+ import { canEquipArmor } from '../domain/equipEquip';
+-import dataPowerArmor from '../data/equipment/powerArmor.json';
++import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+ import dataAmmo from '../data/equipment/ammo.json';
+ import { getCurrentLocale } from '../i18n/locale';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index c342a45..d74c129 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -47,7 +47,7 @@ import {
+ // Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
+ // базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
+ import { applyFrameAttributeModifiers, hasFrame } from "../../../domain/powerArmor";
+-import dataPowerArmor from "../../../data/equipment/powerArmor.json";
++import dataPowerArmor from "../../../modules/fallout/data/equipment/powerArmor.json";
+ import {
+   getSkillDisplayName,
+   tCharacterScreen,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index afe091f..4809804 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -22,7 +22,7 @@ import {
+   hasFrame,
+   FUSION_CORE_ID,
+ } from '../../../domain/powerArmor';
+-import dataPowerArmor from '../../../data/equipment/powerArmor.json';
++import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale } from '../../../i18n/locale';
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index d748e87..36248f0 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -35,7 +35,7 @@ import {
+   applyFrameAttributeModifiers,
+   FUSION_CORE_ID,
+ } from '../../../domain/powerArmor';
+-import dataPowerArmor from '../../../data/equipment/powerArmor.json';
++import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+ 
+ // Силовая броня: каталог механики по id (рейтинги/прочность частей, модификаторы каркаса).
+ const PA_CATALOG_BY_ID = Object.fromEntries(
+diff --git a/data/equipment/powerArmor.json b/data/equipment/powerArmor.json
+index c5148ab..0967ef4 100644
+--- a/data/equipment/powerArmor.json
++++ b/data/equipment/powerArmor.json
+@@ -1,325 +1 @@
+-{
+-  "frame": {
+-    "pieces": [
+-      {
+-        "id": "power_armor_frame",
+-        "itemType": "powerArmor",
+-        "set": "frame",
+-        "protectedAreas": ["Head", "Body", "Hand", "Leg"],
+-        "imageName": "Power Armor Frame",
+-        "physicalDamageRating": 0,
+-        "energyDamageRating": 0,
+-        "radiationDamageRating": 0,
+-        "weight": 150,
+-        "cost": 4500,
+-        "rarity": 4,
+-        "modifiers": {
+-          "attributeModifier": {
+-            "STR": { "op": "set", "value": 11 }
+-          }
+-        },
+-        "effects": []
+-      }
+-    ]
+-  },
+-  "raiderPower": {
+-    "pieces": [
+-      {
+-        "id": "power_armor_raider_helmet",
+-        "itemType": "powerArmor",
+-        "set": "raiderPower",
+-        "protectedAreas": ["Head"],
+-        "imageName": "Raider Power Armor Helmet",
+-        "physicalDamageRating": 6,
+-        "energyDamageRating": 4,
+-        "radiationDamageRating": 7,
+-        "hp": 7,
+-        "weight": 7,
+-        "cost": 50,
+-        "rarity": 2
+-      },
+-      {
+-        "id": "power_armor_raider_chest",
+-        "itemType": "powerArmor",
+-        "set": "raiderPower",
+-        "protectedAreas": ["Body"],
+-        "imageName": "Raider Power Armor Chest Piece",
+-        "physicalDamageRating": 8,
+-        "energyDamageRating": 6,
+-        "radiationDamageRating": 9,
+-        "hp": 10,
+-        "weight": 11,
+-        "cost": 100,
+-        "rarity": 2
+-      },
+-      {
+-        "id": "power_armor_raider_arm",
+-        "itemType": "powerArmor",
+-        "set": "raiderPower",
+-        "protectedAreas": ["Hand"],
+-        "imageName": "Raider Power Armor Arm",
+-        "physicalDamageRating": 4,
+-        "energyDamageRating": 3,
+-        "radiationDamageRating": 7,
+-        "hp": 7,
+-        "weight": 8,
+-        "cost": 75,
+-        "rarity": 2
+-      },
+-      {
+-        "id": "power_armor_raider_leg",
+-        "itemType": "powerArmor",
+-        "set": "raiderPower",
+-        "protectedAreas": ["Leg"],
+-        "imageName": "Raider Power Armor Leg",
+-        "physicalDamageRating": 4,
+-        "energyDamageRating": 3,
+-        "radiationDamageRating": 7,
+-        "hp": 7,
+-        "weight": 8.5,
+-        "cost": 75,
+-        "rarity": 2
+-      }
+-    ]
+-  },
+-  "t45": {
+-    "pieces": [
+-      {
+-        "id": "power_armor_t45_helmet",
+-        "itemType": "powerArmor",
+-        "set": "t45",
+-        "protectedAreas": ["Head"],
+-        "imageName": "T-45 Helmet",
+-        "physicalDamageRating": 6,
+-        "energyDamageRating": 4,
+-        "radiationDamageRating": 7,
+-        "hp": 7,
+-        "weight": 6,
+-        "cost": 60,
+-        "rarity": 2
+-      },
+-      {
+-        "id": "power_armor_t45_chest",
+-        "itemType": "powerArmor",
+-        "set": "t45",
+-        "protectedAreas": ["Body"],
+-        "imageName": "T-45 Chest Piece",
+-        "physicalDamageRating": 8,
+-        "energyDamageRating": 7,
+-        "radiationDamageRating": 9,
+-        "hp": 14,
+-        "weight": 10,
+-        "cost": 140,
+-        "rarity": 2
+-      },
+-      {
+-        "id": "power_armor_t45_arm",
+-        "itemType": "powerArmor",
+-        "set": "t45",
+-        "protectedAreas": ["Hand"],
+-        "imageName": "T-45 Arm",
+-        "physicalDamageRating": 4,
+-        "energyDamageRating": 3,
+-        "radiationDamageRating": 7,
+-        "hp": 7,
+-        "weight": 7.5,
+-        "cost": 100,
+-        "rarity": 2
+-      },
+-      {
+-        "id": "power_armor_t45_leg",
+-        "itemType": "powerArmor",
+-        "set": "t45",
+-        "protectedAreas": ["Leg"],
+-        "imageName": "T-45 Leg",
+-        "physicalDamageRating": 4,
+-        "energyDamageRating": 3,
+-        "radiationDamageRating": 7,
+-        "hp": 7,
+-        "weight": 7.5,
+-        "cost": 100,
+-        "rarity": 2
+-      }
+-    ]
+-  },
+-  "t51": {
+-    "pieces": [
+-      {
+-        "id": "power_armor_t51_helmet",
+-        "itemType": "powerArmor",
+-        "set": "t51",
+-        "protectedAreas": ["Head"],
+-        "imageName": "T-51 Helmet",
+-        "physicalDamageRating": 6,
+-        "energyDamageRating": 5,
+-        "radiationDamageRating": 7,
+-        "hp": 9,
+-        "weight": 6,
+-        "cost": 80,
+-        "rarity": 3
+-      },
+-      {
+-        "id": "power_armor_t51_chest",
+-        "itemType": "powerArmor",
+-        "set": "t51",
+-        "protectedAreas": ["Body"],
+-        "imageName": "T-51 Chest Piece",
+-        "physicalDamageRating": 8,
+-        "energyDamageRating": 7,
+-        "radiationDamageRating": 9,
+-        "hp": 18,
+-        "weight": 10,
+-        "cost": 180,
+-        "rarity": 3
+-      },
+-      {
+-        "id": "power_armor_t51_arm",
+-        "itemType": "powerArmor",
+-        "set": "t51",
+-        "protectedAreas": ["Hand"],
+-        "imageName": "T-51 Arm",
+-        "physicalDamageRating": 5,
+-        "energyDamageRating": 4,
+-        "radiationDamageRating": 7,
+-        "hp": 9,
+-        "weight": 7.5,
+-        "cost": 130,
+-        "rarity": 3
+-      },
+-      {
+-        "id": "power_armor_t51_leg",
+-        "itemType": "powerArmor",
+-        "set": "t51",
+-        "protectedAreas": ["Leg"],
+-        "imageName": "T-51 Leg",
+-        "physicalDamageRating": 5,
+-        "energyDamageRating": 4,
+-        "radiationDamageRating": 7,
+-        "hp": 9,
+-        "weight": 7.5,
+-        "cost": 130,
+-        "rarity": 3
+-      }
+-    ]
+-  },
+-  "t60": {
+-    "pieces": [
+-      {
+-        "id": "power_armor_t60_helmet",
+-        "itemType": "powerArmor",
+-        "set": "t60",
+-        "protectedAreas": ["Head"],
+-        "imageName": "T-60 Helmet",
+-        "physicalDamageRating": 7,
+-        "energyDamageRating": 6,
+-        "radiationDamageRating": 7,
+-        "hp": 10,
+-        "weight": 6,
+-        "cost": 130,
+-        "rarity": 4
+-      },
+-      {
+-        "id": "power_armor_t60_chest",
+-        "itemType": "powerArmor",
+-        "set": "t60",
+-        "protectedAreas": ["Body"],
+-        "imageName": "T-60 Chest Piece",
+-        "physicalDamageRating": 9,
+-        "energyDamageRating": 8,
+-        "radiationDamageRating": 9,
+-        "hp": 21,
+-        "weight": 10,
+-        "cost": 250,
+-        "rarity": 4
+-      },
+-      {
+-        "id": "power_armor_t60_arm",
+-        "itemType": "powerArmor",
+-        "set": "t60",
+-        "protectedAreas": ["Hand"],
+-        "imageName": "T-60 Arm",
+-        "physicalDamageRating": 6,
+-        "energyDamageRating": 5,
+-        "radiationDamageRating": 7,
+-        "hp": 10,
+-        "weight": 7.5,
+-        "cost": 170,
+-        "rarity": 4
+-      },
+-      {
+-        "id": "power_armor_t60_leg",
+-        "itemType": "powerArmor",
+-        "set": "t60",
+-        "protectedAreas": ["Leg"],
+-        "imageName": "T-60 Leg",
+-        "physicalDamageRating": 6,
+-        "energyDamageRating": 5,
+-        "radiationDamageRating": 7,
+-        "hp": 10,
+-        "weight": 7.5,
+-        "cost": 170,
+-        "rarity": 4
+-      }
+-    ]
+-  },
+-  "x01": {
+-    "pieces": [
+-      {
+-        "id": "power_armor_x01_helmet",
+-        "itemType": "powerArmor",
+-        "set": "x01",
+-        "protectedAreas": ["Head"],
+-        "imageName": "X-01 Helmet",
+-        "physicalDamageRating": 8,
+-        "energyDamageRating": 7,
+-        "radiationDamageRating": 7,
+-        "hp": 12,
+-        "weight": 6,
+-        "cost": 140,
+-        "rarity": 5
+-      },
+-      {
+-        "id": "power_armor_x01_chest",
+-        "itemType": "powerArmor",
+-        "set": "x01",
+-        "protectedAreas": ["Body"],
+-        "imageName": "X-01 Chest Piece",
+-        "physicalDamageRating": 10,
+-        "energyDamageRating": 8,
+-        "radiationDamageRating": 9,
+-        "hp": 24,
+-        "weight": 10,
+-        "cost": 280,
+-        "rarity": 5
+-      },
+-      {
+-        "id": "power_armor_x01_arm",
+-        "itemType": "powerArmor",
+-        "set": "x01",
+-        "protectedAreas": ["Hand"],
+-        "imageName": "X-01 Arm",
+-        "physicalDamageRating": 7,
+-        "energyDamageRating": 6,
+-        "radiationDamageRating": 7,
+-        "hp": 12,
+-        "weight": 7.5,
+-        "cost": 200,
+-        "rarity": 5
+-      },
+-      {
+-        "id": "power_armor_x01_leg",
+-        "itemType": "powerArmor",
+-        "set": "x01",
+-        "protectedAreas": ["Leg"],
+-        "imageName": "X-01 Leg",
+-        "physicalDamageRating": 7,
+-        "energyDamageRating": 6,
+-        "radiationDamageRating": 7,
+-        "hp": 12,
+-        "weight": 7.5,
+-        "cost": 200,
+-        "rarity": 5
+-      }
+-    ]
+-  }
+-}
++{}
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 3f86db2..39b24d9 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -18,6 +18,14 @@
+ - **Данные динамичны**: меняются, обогащаются, влияют на другие данные и/или подменяют их. Отображение и расчёт предмета — единый конвейер (база → моды → уникальные качества → свойства), чтобы имя/статы считались одинаково во всех местах. Урок: баг «модифицированное оружие комплекта — в одном месте имя без модов, в другом с модами, но моды не считались и новые не ставились».
+ - **Будущие механики**: уникальные моды, применимость которых зависит от типа оружия, его параметров, перков и наличия других модов (меняют/дополняют/соседствуют); свойства, получаемые крафтом или иным образом и прикрепляемые к предметам в процессе (не числятся изначально или числятся на части id/категорий/по фильтру).
+ - **UI и его переводы переезжают в модуль** (полный перенос; очередь после данных).
++- **Упакованные сеттинги (требование владельца, 2026-08-15)**: скоро появится
++  новый модуль-сеттинг; программа должна уметь загружать УПАКОВАННЫЕ сеттинги
++  по выбору пользователя. Фундамент уже есть: `modules/<id>/manifest.json`
++  (id/name/version/requiresCore/locales), модуль самодостаточен (данные + i18n
++  внутри, без чтения data/). Механизм выбора/загрузки пакетов (UI настроек,
++  распаковка, активация модуля, переключение каталога на активный модуль)
++  проектируется отдельным дизайн-патчем — перенос данных продолжается так,
++  чтобы каждый модуль оставался автономным пакетом.
+ 
+ ## 2. Что уже реализовано
+ 
+@@ -61,6 +69,7 @@ modules/fallout/
+ | armor | 56 (6 категорий, tiers/pieces) | 0 (`{}`) | патч 104 |
+ | armor_mods / uniq_armor_mods | 15 + 22 | 0 (`[]`) | патч 105 |
+ | armor_effects | 12 (словарь механик) | 0 (`{}`) | патч 105 |
++| powerArmor | 21 (6 сетов) | 0 (`{}`) | патч 109 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -88,7 +97,6 @@ modules/fallout/
+ |---|---|---|
+ | Перки | `data/perks/perks.json` | 94 |
+ | Патроны | `data/equipment/ammo.json` | 42 |
+-| Силовая броня | `data/equipment/powerArmor.json` | 21 деталь (5 сетов) |
+ | Диковины | `data/equipment/oddities.json` | 20 |
+ | Общие товары (база) | `data/equipment/general_goods.json` | 31 |
+ | Одежда (база) | `data/equipment/clothes.json` | 3 |
+diff --git a/i18n/en-EN/data/equipment/armor/powerArmor.json b/i18n/en-EN/data/equipment/armor/powerArmor.json
+index c783368..0faf07a 100644
+--- a/i18n/en-EN/data/equipment/armor/powerArmor.json
++++ b/i18n/en-EN/data/equipment/armor/powerArmor.json
+@@ -1,61 +1 @@
+-{
+-  "powerArmor": [
+-    {
+-      "categoryKey": "frame",
+-      "type": "Frame",
+-      "items": [
+-        { "id": "power_armor_frame", "name": "Power Armor Frame" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "raiderPower",
+-      "type": "Raider Power Armor",
+-      "items": [
+-        { "id": "power_armor_raider_helmet", "name": "Raider Power Armor Helmet" },
+-        { "id": "power_armor_raider_chest", "name": "Raider Power Armor Chest Piece" },
+-        { "id": "power_armor_raider_arm", "name": "Raider Power Armor Arm" },
+-        { "id": "power_armor_raider_leg", "name": "Raider Power Armor Leg" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "t45",
+-      "type": "T-45 Power Armor",
+-      "items": [
+-        { "id": "power_armor_t45_helmet", "name": "T-45 Helmet" },
+-        { "id": "power_armor_t45_chest", "name": "T-45 Chest Piece" },
+-        { "id": "power_armor_t45_arm", "name": "T-45 Arm" },
+-        { "id": "power_armor_t45_leg", "name": "T-45 Leg" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "t51",
+-      "type": "T-51 Power Armor",
+-      "items": [
+-        { "id": "power_armor_t51_helmet", "name": "T-51 Helmet" },
+-        { "id": "power_armor_t51_chest", "name": "T-51 Chest Piece" },
+-        { "id": "power_armor_t51_arm", "name": "T-51 Arm" },
+-        { "id": "power_armor_t51_leg", "name": "T-51 Leg" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "t60",
+-      "type": "T-60 Power Armor",
+-      "items": [
+-        { "id": "power_armor_t60_helmet", "name": "T-60 Helmet" },
+-        { "id": "power_armor_t60_chest", "name": "T-60 Chest Piece" },
+-        { "id": "power_armor_t60_arm", "name": "T-60 Arm" },
+-        { "id": "power_armor_t60_leg", "name": "T-60 Leg" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "x01",
+-      "type": "X-01 Power Armor",
+-      "items": [
+-        { "id": "power_armor_x01_helmet", "name": "X-01 Helmet" },
+-        { "id": "power_armor_x01_chest", "name": "X-01 Chest Piece" },
+-        { "id": "power_armor_x01_arm", "name": "X-01 Arm" },
+-        { "id": "power_armor_x01_leg", "name": "X-01 Leg" }
+-      ]
+-    }
+-  ]
+-}
++{ "powerArmor": [] }
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index b1f8fbd..de42aaa 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -1,6 +1,5 @@
+ // Locale-specific display data (names, descriptions, flavour text)
+ import ruClothes from './ru-RU/data/equipment/armor/clothes.json';
+-import ruPowerArmor from './ru-RU/data/equipment/armor/powerArmor.json';
+ import ruAmmoTypes from './ru-RU/data/equipment/ammo/ammo_types.json';
+ import ruMiscItems from './ru-RU/data/equipment/items.json';
+ import ruRobotWeapons from './ru-RU/data/equipment/robot/weapons.json';
+@@ -20,7 +19,6 @@ import ruOddities from './ru-RU/data/equipment/oddities.json';
+ import ruEffects from './ru-RU/data/system/effects.json';
+ 
+ import enClothes from './en-EN/data/equipment/armor/clothes.json';
+-import enPowerArmor from './en-EN/data/equipment/armor/powerArmor.json';
+ import enAmmoTypes from './en-EN/data/equipment/ammo/ammo_types.json';
+ import enMiscItems from './en-EN/data/equipment/items.json';
+ import enRobotWeapons from './en-EN/data/equipment/robot/weapons.json';
+@@ -52,6 +50,8 @@ import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system
+ import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+ import moduleRuArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor.json';
+ import moduleEnArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor.json';
++import moduleRuPowerArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json';
++import moduleEnPowerArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
+ import moduleRuArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json';
+ import moduleEnArmorModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json';
+ import moduleRuUniqArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json';
+@@ -77,6 +77,7 @@ import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumable
+ // Locale-independent technical data (stats, ids, game mechanics)
+ import dataClothes from '../data/equipment/clothes.json';
+ import moduleArmor from '../modules/fallout/data/equipment/armor.json';
++import modulePowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+ import moduleArmorMods from '../modules/fallout/data/equipment/armor_mods.json';
+ import moduleUniqArmorMods from '../modules/fallout/data/equipment/uniq_armor_mods.json';
+ import moduleArmorEffects from '../modules/fallout/data/equipment/armor_effects.json';
+@@ -86,7 +87,6 @@ import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
+ import moduleChems from '../modules/fallout/data/consumables/chems.json';
+ import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
+ import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+-import dataPowerArmor from '../data/equipment/powerArmor.json';
+ import dataAmmo from '../data/equipment/ammo.json';
+ import dataRobotParts from '../data/equipment/robotparts.json';
+ import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
+@@ -112,6 +112,7 @@ import { expandTrueItems } from '../domain/packMerge';
+  */
+ const moduleRuI18n = {
+   armor: moduleRuArmorI18n,
++  powerArmor: moduleRuPowerArmorI18n,
+   armorMods: moduleRuArmorModsI18n,
+   uniqArmorMods: moduleRuUniqArmorModsI18n,
+   armorEffects: moduleRuArmorEffectsI18n,
+@@ -130,6 +131,7 @@ const moduleRuI18n = {
+ 
+ const moduleEnI18n = {
+   armor: moduleEnArmorI18n,
++  powerArmor: moduleEnPowerArmorI18n,
+   armorMods: moduleEnArmorModsI18n,
+   uniqArmorMods: moduleEnUniqArmorModsI18n,
+   armorEffects: moduleEnArmorEffectsI18n,
+@@ -156,7 +158,6 @@ const EQUIPMENT_BY_LOCALE = {
+     qualities: ruQualities,
+     effects: ruEffects,
+     clothes: ruClothes,
+-    powerArmor: ruPowerArmor,
+     chems: ruChems,
+     magazines: ruMagazines,
+     miscellaneous: ruMiscItems,
+@@ -179,7 +180,6 @@ const EQUIPMENT_BY_LOCALE = {
+     qualities: enQualities,
+     effects: enEffects,
+     clothes: enClothes,
+-    powerArmor: enPowerArmor,
+     chems: enChems,
+     magazines: enMagazines,
+     miscellaneous: enMiscItems,
+@@ -321,9 +321,9 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+ 
+   // Power armor: i18n file carries group titles/item names ({powerArmor:[{categoryKey,type,items}]}),
+   // data file carries mechanics per set ({<setKey>:{pieces:[...]}}).
+-  const powerArmorGroups = (i18n.powerArmor?.powerArmor || []).map((group) => {
++  const powerArmorGroups = (moduleI18n.powerArmor?.powerArmor || []).map((group) => {
+     const statsById = Object.fromEntries(
+-      (dataPowerArmor[group.categoryKey]?.pieces || []).map((piece) => [piece.id, piece]),
++      (modulePowerArmor[group.categoryKey]?.pieces || []).map((piece) => [piece.id, piece]),
+     );
+     return {
+       ...group,
+@@ -413,7 +413,7 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+     armorIndex,
+     powerArmor: { powerArmor: powerArmorGroups },
+     powerArmorList,
+-    powerArmorRaw: dataPowerArmor,
++    powerArmorRaw: modulePowerArmor,
+     clothes: { clothes: allClothesGroups },
+     ammoTypes: mergedAmmo,
+     chems: mergedChems,
+diff --git a/i18n/ru-RU/data/equipment/armor/powerArmor.json b/i18n/ru-RU/data/equipment/armor/powerArmor.json
+index 38e5500..0faf07a 100644
+--- a/i18n/ru-RU/data/equipment/armor/powerArmor.json
++++ b/i18n/ru-RU/data/equipment/armor/powerArmor.json
+@@ -1,61 +1 @@
+-{
+-  "powerArmor": [
+-    {
+-      "categoryKey": "frame",
+-      "type": "Каркас",
+-      "items": [
+-        { "id": "power_armor_frame", "name": "Каркас силовой брони" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "raiderPower",
+-      "type": "Силовая броня рейдера",
+-      "items": [
+-        { "id": "power_armor_raider_helmet", "name": "Шлем силовой брони рейдера" },
+-        { "id": "power_armor_raider_chest", "name": "Нагрудник силовой брони рейдера" },
+-        { "id": "power_armor_raider_arm", "name": "Наручи силовой брони рейдера" },
+-        { "id": "power_armor_raider_leg", "name": "Поножи силовой брони рейдера" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "t45",
+-      "type": "Силовая броня Т-45",
+-      "items": [
+-        { "id": "power_armor_t45_helmet", "name": "Шлем Т-45" },
+-        { "id": "power_armor_t45_chest", "name": "Нагрудник Т-45" },
+-        { "id": "power_armor_t45_arm", "name": "Наручи Т-45" },
+-        { "id": "power_armor_t45_leg", "name": "Поножи Т-45" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "t51",
+-      "type": "Силовая броня Т-51",
+-      "items": [
+-        { "id": "power_armor_t51_helmet", "name": "Шлем Т-51" },
+-        { "id": "power_armor_t51_chest", "name": "Нагрудник Т-51" },
+-        { "id": "power_armor_t51_arm", "name": "Наручи Т-51" },
+-        { "id": "power_armor_t51_leg", "name": "Поножи Т-51" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "t60",
+-      "type": "Силовая броня Т-60",
+-      "items": [
+-        { "id": "power_armor_t60_helmet", "name": "Шлем Т-60" },
+-        { "id": "power_armor_t60_chest", "name": "Нагрудник Т-60" },
+-        { "id": "power_armor_t60_arm", "name": "Наручи Т-60" },
+-        { "id": "power_armor_t60_leg", "name": "Поножи Т-60" }
+-      ]
+-    },
+-    {
+-      "categoryKey": "x01",
+-      "type": "Силовая броня X-01",
+-      "items": [
+-        { "id": "power_armor_x01_helmet", "name": "Шлем X-01" },
+-        { "id": "power_armor_x01_chest", "name": "Нагрудник X-01" },
+-        { "id": "power_armor_x01_arm", "name": "Наручи X-01" },
+-        { "id": "power_armor_x01_leg", "name": "Поножи X-01" }
+-      ]
+-    }
+-  ]
+-}
++{ "powerArmor": [] }
+diff --git a/modules/fallout/data/equipment/powerArmor.json b/modules/fallout/data/equipment/powerArmor.json
+new file mode 100644
+index 0000000..e3668cc
+--- /dev/null
++++ b/modules/fallout/data/equipment/powerArmor.json
+@@ -0,0 +1,373 @@
++{
++  "frame": {
++    "pieces": [
++      {
++        "id": "power_armor_frame",
++        "itemType": "powerArmor",
++        "set": "frame",
++        "protectedAreas": [
++          "Head",
++          "Body",
++          "Hand",
++          "Leg"
++        ],
++        "imageName": "Power Armor Frame",
++        "physicalDamageRating": 0,
++        "energyDamageRating": 0,
++        "radiationDamageRating": 0,
++        "weight": 150,
++        "cost": 4500,
++        "rarity": 4,
++        "modifiers": {
++          "attributeModifier": {
++            "STR": {
++              "op": "set",
++              "value": 11
++            }
++          }
++        },
++        "effects": []
++      }
++    ]
++  },
++  "raiderPower": {
++    "pieces": [
++      {
++        "id": "power_armor_raider_helmet",
++        "itemType": "powerArmor",
++        "set": "raiderPower",
++        "protectedAreas": [
++          "Head"
++        ],
++        "imageName": "Raider Power Armor Helmet",
++        "physicalDamageRating": 6,
++        "energyDamageRating": 4,
++        "radiationDamageRating": 7,
++        "hp": 7,
++        "weight": 7,
++        "cost": 50,
++        "rarity": 2
++      },
++      {
++        "id": "power_armor_raider_chest",
++        "itemType": "powerArmor",
++        "set": "raiderPower",
++        "protectedAreas": [
++          "Body"
++        ],
++        "imageName": "Raider Power Armor Chest Piece",
++        "physicalDamageRating": 8,
++        "energyDamageRating": 6,
++        "radiationDamageRating": 9,
++        "hp": 10,
++        "weight": 11,
++        "cost": 100,
++        "rarity": 2
++      },
++      {
++        "id": "power_armor_raider_arm",
++        "itemType": "powerArmor",
++        "set": "raiderPower",
++        "protectedAreas": [
++          "Hand"
++        ],
++        "imageName": "Raider Power Armor Arm",
++        "physicalDamageRating": 4,
++        "energyDamageRating": 3,
++        "radiationDamageRating": 7,
++        "hp": 7,
++        "weight": 8,
++        "cost": 75,
++        "rarity": 2
++      },
++      {
++        "id": "power_armor_raider_leg",
++        "itemType": "powerArmor",
++        "set": "raiderPower",
++        "protectedAreas": [
++          "Leg"
++        ],
++        "imageName": "Raider Power Armor Leg",
++        "physicalDamageRating": 4,
++        "energyDamageRating": 3,
++        "radiationDamageRating": 7,
++        "hp": 7,
++        "weight": 8.5,
++        "cost": 75,
++        "rarity": 2
++      }
++    ]
++  },
++  "t45": {
++    "pieces": [
++      {
++        "id": "power_armor_t45_helmet",
++        "itemType": "powerArmor",
++        "set": "t45",
++        "protectedAreas": [
++          "Head"
++        ],
++        "imageName": "T-45 Helmet",
++        "physicalDamageRating": 6,
++        "energyDamageRating": 4,
++        "radiationDamageRating": 7,
++        "hp": 7,
++        "weight": 6,
++        "cost": 60,
++        "rarity": 2
++      },
++      {
++        "id": "power_armor_t45_chest",
++        "itemType": "powerArmor",
++        "set": "t45",
++        "protectedAreas": [
++          "Body"
++        ],
++        "imageName": "T-45 Chest Piece",
++        "physicalDamageRating": 8,
++        "energyDamageRating": 7,
++        "radiationDamageRating": 9,
++        "hp": 14,
++        "weight": 10,
++        "cost": 140,
++        "rarity": 2
++      },
++      {
++        "id": "power_armor_t45_arm",
++        "itemType": "powerArmor",
++        "set": "t45",
++        "protectedAreas": [
++          "Hand"
++        ],
++        "imageName": "T-45 Arm",
++        "physicalDamageRating": 4,
++        "energyDamageRating": 3,
++        "radiationDamageRating": 7,
++        "hp": 7,
++        "weight": 7.5,
++        "cost": 100,
++        "rarity": 2
++      },
++      {
++        "id": "power_armor_t45_leg",
++        "itemType": "powerArmor",
++        "set": "t45",
++        "protectedAreas": [
++          "Leg"
++        ],
++        "imageName": "T-45 Leg",
++        "physicalDamageRating": 4,
++        "energyDamageRating": 3,
++        "radiationDamageRating": 7,
++        "hp": 7,
++        "weight": 7.5,
++        "cost": 100,
++        "rarity": 2
++      }
++    ]
++  },
++  "t51": {
++    "pieces": [
++      {
++        "id": "power_armor_t51_helmet",
++        "itemType": "powerArmor",
++        "set": "t51",
++        "protectedAreas": [
++          "Head"
++        ],
++        "imageName": "T-51 Helmet",
++        "physicalDamageRating": 6,
++        "energyDamageRating": 5,
++        "radiationDamageRating": 7,
++        "hp": 9,
++        "weight": 6,
++        "cost": 80,
++        "rarity": 3
++      },
++      {
++        "id": "power_armor_t51_chest",
++        "itemType": "powerArmor",
++        "set": "t51",
++        "protectedAreas": [
++          "Body"
++        ],
++        "imageName": "T-51 Chest Piece",
++        "physicalDamageRating": 8,
++        "energyDamageRating": 7,
++        "radiationDamageRating": 9,
++        "hp": 18,
++        "weight": 10,
++        "cost": 180,
++        "rarity": 3
++      },
++      {
++        "id": "power_armor_t51_arm",
++        "itemType": "powerArmor",
++        "set": "t51",
++        "protectedAreas": [
++          "Hand"
++        ],
++        "imageName": "T-51 Arm",
++        "physicalDamageRating": 5,
++        "energyDamageRating": 4,
++        "radiationDamageRating": 7,
++        "hp": 9,
++        "weight": 7.5,
++        "cost": 130,
++        "rarity": 3
++      },
++      {
++        "id": "power_armor_t51_leg",
++        "itemType": "powerArmor",
++        "set": "t51",
++        "protectedAreas": [
++          "Leg"
++        ],
++        "imageName": "T-51 Leg",
++        "physicalDamageRating": 5,
++        "energyDamageRating": 4,
++        "radiationDamageRating": 7,
++        "hp": 9,
++        "weight": 7.5,
++        "cost": 130,
++        "rarity": 3
++      }
++    ]
++  },
++  "t60": {
++    "pieces": [
++      {
++        "id": "power_armor_t60_helmet",
++        "itemType": "powerArmor",
++        "set": "t60",
++        "protectedAreas": [
++          "Head"
++        ],
++        "imageName": "T-60 Helmet",
++        "physicalDamageRating": 7,
++        "energyDamageRating": 6,
++        "radiationDamageRating": 7,
++        "hp": 10,
++        "weight": 6,
++        "cost": 130,
++        "rarity": 4
++      },
++      {
++        "id": "power_armor_t60_chest",
++        "itemType": "powerArmor",
++        "set": "t60",
++        "protectedAreas": [
++          "Body"
++        ],
++        "imageName": "T-60 Chest Piece",
++        "physicalDamageRating": 9,
++        "energyDamageRating": 8,
++        "radiationDamageRating": 9,
++        "hp": 21,
++        "weight": 10,
++        "cost": 250,
++        "rarity": 4
++      },
++      {
++        "id": "power_armor_t60_arm",
++        "itemType": "powerArmor",
++        "set": "t60",
++        "protectedAreas": [
++          "Hand"
++        ],
++        "imageName": "T-60 Arm",
++        "physicalDamageRating": 6,
++        "energyDamageRating": 5,
++        "radiationDamageRating": 7,
++        "hp": 10,
++        "weight": 7.5,
++        "cost": 170,
++        "rarity": 4
++      },
++      {
++        "id": "power_armor_t60_leg",
++        "itemType": "powerArmor",
++        "set": "t60",
++        "protectedAreas": [
++          "Leg"
++        ],
++        "imageName": "T-60 Leg",
++        "physicalDamageRating": 6,
++        "energyDamageRating": 5,
++        "radiationDamageRating": 7,
++        "hp": 10,
++        "weight": 7.5,
++        "cost": 170,
++        "rarity": 4
++      }
++    ]
++  },
++  "x01": {
++    "pieces": [
++      {
++        "id": "power_armor_x01_helmet",
++        "itemType": "powerArmor",
++        "set": "x01",
++        "protectedAreas": [
++          "Head"
++        ],
++        "imageName": "X-01 Helmet",
++        "physicalDamageRating": 8,
++        "energyDamageRating": 7,
++        "radiationDamageRating": 7,
++        "hp": 12,
++        "weight": 6,
++        "cost": 140,
++        "rarity": 5
++      },
++      {
++        "id": "power_armor_x01_chest",
++        "itemType": "powerArmor",
++        "set": "x01",
++        "protectedAreas": [
++          "Body"
++        ],
++        "imageName": "X-01 Chest Piece",
++        "physicalDamageRating": 10,
++        "energyDamageRating": 8,
++        "radiationDamageRating": 9,
++        "hp": 24,
++        "weight": 10,
++        "cost": 280,
++        "rarity": 5
++      },
++      {
++        "id": "power_armor_x01_arm",
++        "itemType": "powerArmor",
++        "set": "x01",
++        "protectedAreas": [
++          "Hand"
++        ],
++        "imageName": "X-01 Arm",
++        "physicalDamageRating": 7,
++        "energyDamageRating": 6,
++        "radiationDamageRating": 7,
++        "hp": 12,
++        "weight": 7.5,
++        "cost": 200,
++        "rarity": 5
++      },
++      {
++        "id": "power_armor_x01_leg",
++        "itemType": "powerArmor",
++        "set": "x01",
++        "protectedAreas": [
++          "Leg"
++        ],
++        "imageName": "X-01 Leg",
++        "physicalDamageRating": 7,
++        "energyDamageRating": 6,
++        "radiationDamageRating": 7,
++        "hp": 12,
++        "weight": 7.5,
++        "cost": 200,
++        "rarity": 5
++      }
++    ]
++  }
++}
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json b/modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json
+new file mode 100644
+index 0000000..10f7e5f
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json
+@@ -0,0 +1,124 @@
++{
++  "powerArmor": [
++    {
++      "categoryKey": "frame",
++      "type": "Frame",
++      "items": [
++        {
++          "id": "power_armor_frame",
++          "name": "Power Armor Frame"
++        }
++      ]
++    },
++    {
++      "categoryKey": "raiderPower",
++      "type": "Raider Power Armor",
++      "items": [
++        {
++          "id": "power_armor_raider_helmet",
++          "name": "Raider Power Armor Helmet"
++        },
++        {
++          "id": "power_armor_raider_chest",
++          "name": "Raider Power Armor Chest Piece"
++        },
++        {
++          "id": "power_armor_raider_arm",
++          "name": "Raider Power Armor Arm"
++        },
++        {
++          "id": "power_armor_raider_leg",
++          "name": "Raider Power Armor Leg"
++        }
++      ]
++    },
++    {
++      "categoryKey": "t45",
++      "type": "T-45 Power Armor",
++      "items": [
++        {
++          "id": "power_armor_t45_helmet",
++          "name": "T-45 Helmet"
++        },
++        {
++          "id": "power_armor_t45_chest",
++          "name": "T-45 Chest Piece"
++        },
++        {
++          "id": "power_armor_t45_arm",
++          "name": "T-45 Arm"
++        },
++        {
++          "id": "power_armor_t45_leg",
++          "name": "T-45 Leg"
++        }
++      ]
++    },
++    {
++      "categoryKey": "t51",
++      "type": "T-51 Power Armor",
++      "items": [
++        {
++          "id": "power_armor_t51_helmet",
++          "name": "T-51 Helmet"
++        },
++        {
++          "id": "power_armor_t51_chest",
++          "name": "T-51 Chest Piece"
++        },
++        {
++          "id": "power_armor_t51_arm",
++          "name": "T-51 Arm"
++        },
++        {
++          "id": "power_armor_t51_leg",
++          "name": "T-51 Leg"
++        }
++      ]
++    },
++    {
++      "categoryKey": "t60",
++      "type": "T-60 Power Armor",
++      "items": [
++        {
++          "id": "power_armor_t60_helmet",
++          "name": "T-60 Helmet"
++        },
++        {
++          "id": "power_armor_t60_chest",
++          "name": "T-60 Chest Piece"
++        },
++        {
++          "id": "power_armor_t60_arm",
++          "name": "T-60 Arm"
++        },
++        {
++          "id": "power_armor_t60_leg",
++          "name": "T-60 Leg"
++        }
++      ]
++    },
++    {
++      "categoryKey": "x01",
++      "type": "X-01 Power Armor",
++      "items": [
++        {
++          "id": "power_armor_x01_helmet",
++          "name": "X-01 Helmet"
++        },
++        {
++          "id": "power_armor_x01_chest",
++          "name": "X-01 Chest Piece"
++        },
++        {
++          "id": "power_armor_x01_arm",
++          "name": "X-01 Arm"
++        },
++        {
++          "id": "power_armor_x01_leg",
++          "name": "X-01 Leg"
++        }
++      ]
++    }
++  ]
++}
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json b/modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json
+new file mode 100644
+index 0000000..5f9d74f
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json
+@@ -0,0 +1,124 @@
++{
++  "powerArmor": [
++    {
++      "categoryKey": "frame",
++      "type": "Каркас",
++      "items": [
++        {
++          "id": "power_armor_frame",
++          "name": "Каркас силовой брони"
++        }
++      ]
++    },
++    {
++      "categoryKey": "raiderPower",
++      "type": "Силовая броня рейдера",
++      "items": [
++        {
++          "id": "power_armor_raider_helmet",
++          "name": "Шлем силовой брони рейдера"
++        },
++        {
++          "id": "power_armor_raider_chest",
++          "name": "Нагрудник силовой брони рейдера"
++        },
++        {
++          "id": "power_armor_raider_arm",
++          "name": "Наручи силовой брони рейдера"
++        },
++        {
++          "id": "power_armor_raider_leg",
++          "name": "Поножи силовой брони рейдера"
++        }
++      ]
++    },
++    {
++      "categoryKey": "t45",
++      "type": "Силовая броня Т-45",
++      "items": [
++        {
++          "id": "power_armor_t45_helmet",
++          "name": "Шлем Т-45"
++        },
++        {
++          "id": "power_armor_t45_chest",
++          "name": "Нагрудник Т-45"
++        },
++        {
++          "id": "power_armor_t45_arm",
++          "name": "Наручи Т-45"
++        },
++        {
++          "id": "power_armor_t45_leg",
++          "name": "Поножи Т-45"
++        }
++      ]
++    },
++    {
++      "categoryKey": "t51",
++      "type": "Силовая броня Т-51",
++      "items": [
++        {
++          "id": "power_armor_t51_helmet",
++          "name": "Шлем Т-51"
++        },
++        {
++          "id": "power_armor_t51_chest",
++          "name": "Нагрудник Т-51"
++        },
++        {
++          "id": "power_armor_t51_arm",
++          "name": "Наручи Т-51"
++        },
++        {
++          "id": "power_armor_t51_leg",
++          "name": "Поножи Т-51"
++        }
++      ]
++    },
++    {
++      "categoryKey": "t60",
++      "type": "Силовая броня Т-60",
++      "items": [
++        {
++          "id": "power_armor_t60_helmet",
++          "name": "Шлем Т-60"
++        },
++        {
++          "id": "power_armor_t60_chest",
++          "name": "Нагрудник Т-60"
++        },
++        {
++          "id": "power_armor_t60_arm",
++          "name": "Наручи Т-60"
++        },
++        {
++          "id": "power_armor_t60_leg",
++          "name": "Поножи Т-60"
++        }
++      ]
++    },
++    {
++      "categoryKey": "x01",
++      "type": "Силовая броня X-01",
++      "items": [
++        {
++          "id": "power_armor_x01_helmet",
++          "name": "Шлем X-01"
++        },
++        {
++          "id": "power_armor_x01_chest",
++          "name": "Нагрудник X-01"
++        },
++        {
++          "id": "power_armor_x01_arm",
++          "name": "Наручи X-01"
++        },
++        {
++          "id": "power_armor_x01_leg",
++          "name": "Поножи X-01"
++        }
++      ]
++    }
++  ]
++}
+diff --git a/src/store/resolvers.js b/src/store/resolvers.js
+index 973ce5e..676a975 100644
+--- a/src/store/resolvers.js
++++ b/src/store/resolvers.js
+@@ -112,7 +112,7 @@ import { effectsDictToLegacyArray } from './effectsSync.js';
+ // К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
+ // атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
+ import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
+-import dataPowerArmor from '../../data/equipment/powerArmor.json';
++import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+ 
+ const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+ 

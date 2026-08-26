@@ -1,0 +1,39 @@
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index cc6f79d..4b47979 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1283,6 +1283,7 @@ const InventoryScreen = () => {
+           visible={isAddItemModalVisible}
+           onClose={() => setAddItemModalVisible(false)}
+           onSelectItem={handleSelectCatalogItem}
++          selectionMode={itemSelectionMode}
+           rootTitleKey={itemSelectionMode === 'buy' ? 'modals.addItemModal.buyTitle' : 'modals.addItemModal.title'}
+         />
+         <BuyItemModal
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 1416b79..1cdae36 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -35,7 +35,7 @@ const mapWeaponTypeToDbValue = {
+   explosive: 'Explosive',
+ };
+
+-const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title' }) => {
++const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot' }) => {
+   const locale = useLocale();
+   const [currentPath, setCurrentPath] = useState([]);
+   const [searchTerm, setSearchTerm] = useState('');
+@@ -196,6 +196,13 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+
+   const handleSelect = (item) => {
+     if (typeof item === 'object' && item?.name) {
++      if (selectionMode === 'buy') {
++        // В режиме покупки промежуточный экран «Добавить» не нужен:
++        // сразу открываем окно покупки (количество и цена задаются там)
++        onSelectItem(item, 1);
++        onClose();
++        return;
++      }
+       setPendingItem(item);
+       setPendingQuantity('1');
+       return;

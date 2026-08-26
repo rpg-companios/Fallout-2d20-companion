@@ -1,0 +1,1792 @@
+diff --git a/App.js b/App.js
+index 48603af..1bef351 100644
+--- a/App.js
++++ b/App.js
+@@ -12,6 +12,7 @@ import { Text, View, StyleSheet, ImageBackground, ActivityIndicator } from 'reac
+ import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+ import { Provider as PaperProvider } from 'react-native-paper';
+ import { CharacterProvider } from './components/CharacterContext';
++import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import { initDatabase } from './db/Database';
+ import { seedDatabase } from './db/seed';
+ import { useLocale } from './i18n/locale';
+@@ -154,6 +155,8 @@ function App() {
+               </ImageBackground>
+             </View>
+           </NavigationContainer>
++          {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
++          <FusionCoreChoiceModal />
+         </CharacterProvider>
+       </SafeAreaProvider>
+     </PaperProvider>
+diff --git a/__tests__/power-armor/data-catalog.test.js b/__tests__/power-armor/data-catalog.test.js
+index 94e5c17..073da8c 100644
+--- a/__tests__/power-armor/data-catalog.test.js
++++ b/__tests__/power-armor/data-catalog.test.js
+@@ -120,14 +120,20 @@ describe('i18n экранов — строки силовой брони на м
+     expect(enAddItemModal.itemTypes.powerArmor).toContain('Power Armor');
+   });
+ 
+-  it('экран брони: слой, названия частей, «Прочность»/«HP», блок, починка', () => {
+-    expect(ruWaAScreen.powerArmor.layer).toBe('Силовая броня');
++  it('экран брони: «Прочность»/«HP», блок, починка (названия PART — из каталога, не из словаря)', () => {
++    // ПРАВИЛО (владелец, pa3-редизайн): СБ — не отдельный блок, а модернизация
++    // существующей сетки; слоты/заголовки — общие с бронёй (armor.slots.*), имя
++    // части — из equipmentCatalog. Ключей layer/frame/partNames/unequip больше нет.
+     expect(ruWaAScreen.powerArmor.durability).toBe('Прочность');
+     expect(enWaAScreen.powerArmor.durability).toBe('HP');
+-    expect(ruWaAScreen.powerArmor.partNames).toEqual({ helmet: 'Шлем', chest: 'Нагрудник', arm: 'Наручи', leg: 'Поножи' });
+     expect(typeof ruWaAScreen.powerArmor.core).toBe('string');
++    expect(ruWaAScreen.powerArmor.core).toContain('{value}');
+     expect(ruWaAScreen.powerArmor.repair).toBe('Починить');
+     expect(enWaAScreen.powerArmor.repair).toBe('Repair');
++    expect(ruWaAScreen.powerArmor.layer).toBeUndefined();
++    expect(ruWaAScreen.powerArmor.frame).toBeUndefined();
++    expect(ruWaAScreen.powerArmor.partNames).toBeUndefined();
++    expect(ruWaAScreen.powerArmor.unequip).toBeUndefined();
+   });
+ 
+   it('алерты инвентаря: нужен блок, нужен каркас, питание исчерпано', () => {
+diff --git a/__tests__/power-armor/domain-mechanics.test.js b/__tests__/power-armor/domain-mechanics.test.js
+index 7b0bd9a..ade3656 100644
+--- a/__tests__/power-armor/domain-mechanics.test.js
++++ b/__tests__/power-armor/domain-mechanics.test.js
+@@ -7,7 +7,8 @@ import {
+   createEmptyEquippedPowerArmor,
+   createEmptyPowerArmorRuntime,
+   isPowerArmorFrame,
+-  powerArmorSlotFor,
++  powerArmorSlotsFor,
++  resolvePowerArmorPieceTarget,
+   fusionCoreStackKey,
+   powerArmorPieceStackKey,
+   powerArmorFrameStackKey,
+@@ -27,7 +28,7 @@ import {
+   needsRepair,
+   repairPowerArmorPiece,
+   adjustPieceHp,
+-  suppressesLowerLayers,
++  suppressesLayerAt,
+   getFrameAttributeModifiers,
+   applyAttributeModifierValue,
+ } from '../../domain/powerArmor';
+@@ -50,9 +51,13 @@ const robotChar = { origin: { characterType: 'robot' } };
+ const humanChar = { origin: { characterType: 'human' } };
+ 
+ describe('состояние пакета: конструкторы и слоты', () => {
+-  it('createEmptyEquippedPowerArmor: каркаса нет, 4 слота пусты, экземпляры независимы', () => {
++  it('createEmptyEquippedPowerArmor: каркаса нет, 6 слотов пусты, экземпляры независимы', () => {
+     const a = createEmptyEquippedPowerArmor();
+-    expect(a).toEqual({ frame: null, pieces: { head: null, body: null, hands: null, legs: null } });
++    expect(a).toEqual({ frame: null, pieces: {
++      head: null, body: null,
++      leftArm: null, rightArm: null,
++      leftLeg: null, rightLeg: null,
++    } });
+     const b = createEmptyEquippedPowerArmor();
+     a.pieces.head = piece('x', 7);
+     expect(b.pieces.head).toBeNull();
+@@ -63,15 +68,34 @@ describe('состояние пакета: конструкторы и слот
+   });
+ 
+   it('слоты частей по данным; каркас слотом части не является', () => {
+-    expect(powerArmorSlotFor(T45_HELMET)).toBe('head');
+-    expect(powerArmorSlotFor(T45_CHEST)).toBe('body');
+-    expect(powerArmorSlotFor(dataPowerArmor.t45.pieces[2])).toBe('hands'); // arm
+-    expect(powerArmorSlotFor(dataPowerArmor.t45.pieces[3])).toBe('legs');  // leg
+-    expect(powerArmorSlotFor(FRAME_CATALOG)).toBeNull();
++    // Наруч/понож — один предмет на любую сторону пары (как у обычной брони).
++    expect(powerArmorSlotsFor(T45_HELMET)).toEqual(['head']);
++    expect(powerArmorSlotsFor(T45_CHEST)).toEqual(['body']);
++    expect(powerArmorSlotsFor(dataPowerArmor.t45.pieces[2])).toEqual(['leftArm', 'rightArm']); // arm
++    expect(powerArmorSlotsFor(dataPowerArmor.t45.pieces[3])).toEqual(['leftLeg', 'rightLeg']); // leg
++    expect(powerArmorSlotsFor(FRAME_CATALOG)).toEqual([]);
+     expect(isPowerArmorFrame(FRAME_CATALOG)).toBe(true);
+     expect(isPowerArmorFrame(T45_CHEST)).toBe(false);
+-    expect(powerArmorSlotFor({ itemType: 'powerArmor', protectedAreas: ['Knee'] })).toBeNull();
+-    expect(PA_PIECE_SLOTS).toEqual(['head', 'body', 'hands', 'legs']);
++    expect(powerArmorSlotsFor({ itemType: 'powerArmor', protectedAreas: ['Knee'] })).toEqual([]);
++    expect(PA_PIECE_SLOTS).toEqual(['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']);
++  });
++});
++
++describe('целевой слот части (§5.2)', () => {
++  it('свободная сторона пары → она; одна занята → вторая; обе заняты → выбор L/R', () => {
++    let eq = wornFrameWithCuts();
++    // обе руки свободны → первый свободный (левая)
++    expect(resolvePowerArmorPieceTarget(eq, ['leftArm', 'rightArm'])).toEqual({ kind: 'slot', slot: 'leftArm' });
++    // левая занята → правая
++    eq = equipPowerArmorPiece(eq, 'leftArm', piece('power_armor_t45_arm', 10));
++    expect(resolvePowerArmorPieceTarget(eq, ['leftArm', 'rightArm'])).toEqual({ kind: 'slot', slot: 'rightArm' });
++    // обе заняты → игрок выбирает
++    eq = equipPowerArmorPiece(eq, 'rightArm', piece('power_armor_t45_arm', 10));
++    expect(resolvePowerArmorPieceTarget(eq, ['leftArm', 'rightArm']))
++      .toEqual({ kind: 'choice', slots: ['leftArm', 'rightArm'] });
++    // одиночный слот занят → замена без выбора
++    eq = equipPowerArmorPiece(eq, 'head', piece('power_armor_t45_helmet', 5));
++    expect(resolvePowerArmorPieceTarget(eq, ['head'])).toEqual({ kind: 'slot', slot: 'head' });
+   });
+ });
+ 
+@@ -120,7 +144,7 @@ describe('экипировка пакета (§5.1/§5.2)', () => {
+     const packed = packPackage(eq);
+     expect(packed.installedCore).toEqual({ charges: 11 });
+     expect(packed.installedPieces.head).toEqual(piece('power_armor_t45_helmet', 3, { plated: 'mod_x01' }));
+-    expect(packed.installedPieces.hands).toBeNull();
++    expect(packed.installedPieces.leftArm).toBeNull();
+     const eq2 = unpackPackage(packed);
+     expect(eq2).toEqual(eq);
+     expect(hasFrame(eq2)).toBe(true);
+@@ -224,9 +248,15 @@ describe('прочность и починка (§5.7)', () => {
+ 
+ describe('подавление нижних слоёв (§5.5)', () => {
+   it('голый каркас НЕ подавляет; любая часть — подавляет', () => {
+-    expect(suppressesLowerLayers(wornFrameWithCuts())).toBe(false);
+-    expect(suppressesLowerLayers(equipPowerArmorPiece(wornFrameWithCuts(), 'hands', piece('a', 5)))).toBe(true);
+-    expect(suppressesLowerLayers(equipPowerArmorPiece(wornFrameWithCuts(), 'head', piece('h', 5)))).toBe(true);
++    const bareFrame = wornFrameWithCuts();
++    expect(suppressesLayerAt(bareFrame, 'head')).toBe(false);
++    expect(suppressesLayerAt(bareFrame, 'leftArm')).toBe(false);
++    const withLeftArm = equipPowerArmorPiece(bareFrame, 'leftArm', piece('a', 5));
++    // Часть подавляет ТОЛЬКО свою ячейку; соседние видят нижние слои.
++    expect(suppressesLayerAt(withLeftArm, 'leftArm')).toBe(true);
++    expect(suppressesLayerAt(withLeftArm, 'rightArm')).toBe(false);
++    expect(suppressesLayerAt(withLeftArm, 'head')).toBe(false);
++    expect(suppressesLayerAt(equipPowerArmorPiece(bareFrame, 'head', piece('h', 5)), 'head')).toBe(true);
+   });
+ });
+ 
+diff --git a/__tests__/power-armor/ui-integration.test.js b/__tests__/power-armor/ui-integration.test.js
+new file mode 100644
+index 0000000..e97e158
+--- /dev/null
++++ b/__tests__/power-armor/ui-integration.test.js
+@@ -0,0 +1,156 @@
++import { describe, it, expect } from 'vitest';
++import dataPowerArmor from '../../data/equipment/powerArmor.json';
++import dataAmmo from '../../data/equipment/ammo.json';
++import {
++  FUSION_CORE_ID,
++  applyFrameAttributeModifiers,
++  isFusionCoreItem,
++  fusionCoreStackKey,
++} from '../../domain/powerArmor';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import ruInventoryScreen from '../../i18n/ru-RU/screens/inventory/screen.json';
++import enInventoryScreen from '../../i18n/en-EN/screens/inventory/screen.json';
++import ruWaasScreen from '../../i18n/ru-RU/screens/weaponsAndArmor/screen.json';
++import enWaasScreen from '../../i18n/en-EN/screens/weaponsAndArmor/screen.json';
++
++// Специфика: docs/architecture/power-armor-plan.md §5.6 (модификаторы атрибутов
++// каркаса на отображении/производных) + контракт UI-данных пакета pa3.
++// Тесты — белый список: можно то, что разрешено.
++
++const FRAME_CATALOG = dataPowerArmor.frame.pieces[0];
++
++describe('power-armor ui-integration: applyFrameAttributeModifiers', () => {
++  it('надетый реальный каркас: СИЛА становится 11 (set из данных), прочие атрибуты не тронуты', () => {
++    const attributes = [
++      { name: 'STR', value: 6 },
++      { name: 'PER', value: 5 },
++      { name: 'END', value: 5 },
++    ];
++    const effective = applyFrameAttributeModifiers(attributes, FRAME_CATALOG);
++    expect(effective.find((a) => a.name === 'STR').value).toBe(11);
++    expect(effective.find((a) => a.name === 'PER').value).toBe(5);
++    expect(effective.find((a) => a.name === 'END').value).toBe(5);
++  });
++
++  it('не мутирует входной массив и его элементы', () => {
++    const attributes = [{ name: 'STR', value: 6 }];
++    const effective = applyFrameAttributeModifiers(attributes, FRAME_CATALOG);
++    expect(attributes[0].value).toBe(6);
++    expect(effective).not.toBe(attributes);
++    expect(effective[0]).not.toBe(attributes[0]);
++  });
++
++  it('каркаса/модификаторов нет → возвращается та же ссылка (Объект строго тот же)', () => {
++    const attributes = [{ name: 'STR', value: 6 }];
++    expect(applyFrameAttributeModifiers(attributes, null)).toBe(attributes);
++    expect(applyFrameAttributeModifiers(attributes, { id: 'synthetic_no_mods' })).toBe(attributes);
++  });
++
++  it('белый список ключей: неканонические имена (СИЛ, str) НЕ получают модификатор', () => {
++    const attributes = [{ name: 'СИЛ', value: 4 }, { name: 'str', value: 4 }, { name: 'STR', value: 4 }];
++    const effective = applyFrameAttributeModifiers(attributes, FRAME_CATALOG);
++    expect(effective[0].value).toBe(4);
++    expect(effective[1].value).toBe(4);
++    expect(effective[2].value).toBe(11); // канонический STR — единственное разрешённое совпадение
++  });
++
++  it('операции + и - прибавляют/отнимают от базы (синтетический предмет, белый список операций)', () => {
++    const synthetic = { modifiers: { attributeModifier: { STR: { op: '+', value: 2 }, PER: { op: '-', value: 1 } } } };
++    const effective = applyFrameAttributeModifiers(
++      [{ name: 'STR', value: 6 }, { name: 'PER', value: 5 }],
++      synthetic,
++    );
++    expect(effective[0].value).toBe(8);
++    expect(effective[1].value).toBe(4);
++  });
++});
++
++describe('power-armor ui-integration: контракт данных для UI', () => {
++  it('Ядерный блок — боеприпас с maxCharges в данных (максимум живёт в предмете, не в коде)', () => {
++    const walk = (node) => {
++      if (Array.isArray(node)) return node.map(walk).find(Boolean) || null;
++      if (node && typeof node === 'object') {
++        if (node.id === FUSION_CORE_ID) return node;
++        return walk(node.items ?? Object.values(node));
++      }
++      return null;
++    };
++    const core = walk(dataAmmo);
++    expect(core).toBeTruthy();
++    expect(core.maxCharges).toBe(20);
++    expect(core.weight).toBe(4);
++  });
++
++  it('isFusionCoreItem признаёт и каталожный id, и стор-weaponId', () => {
++    expect(isFusionCoreItem({ id: FUSION_CORE_ID })).toBe(true);
++    expect(isFusionCoreItem({ weaponId: FUSION_CORE_ID })).toBe(true);
++    expect(isFusionCoreItem({ id: 'ammo_fusion_core:charges:7', weaponId: FUSION_CORE_ID })).toBe(true);
++    expect(isFusionCoreItem({ id: 'chem_stimpak' })).toBe(false);
++  });
++
++  it('разный заряд → разные стек-ключи, одинаковый → слияние (§2)', () => {
++    expect(fusionCoreStackKey(7)).not.toBe(fusionCoreStackKey(20));
++    expect(fusionCoreStackKey(7)).toBe(fusionCoreStackKey(7));
++  });
++
++  it('каталог отдаёт секцию powerArmor с именами частей в обеих локалях', () => {
++    for (const locale of ['ru-RU', 'en-EN']) {
++      const catalog = getEquipmentCatalog(locale);
++      expect(Array.isArray(catalog.powerArmorList)).toBe(true);
++      const frame = catalog.powerArmorList.find((p) => p.id === 'power_armor_frame');
++      expect(frame).toBeTruthy();
++      expect(frame.name).toBeTruthy();
++      expect(frame.itemType).toBe('powerArmor');
++      expect(catalog.powerArmorList.length).toBe(21); // каркас + 20 частей
++    }
++  });
++
++  it('защита частей PA по слотам: рука и нога — общие части на пару', () => {
++    const handAreas = Object.values(dataPowerArmor)
++      .flatMap((set) => set.pieces)
++      .filter((p) => (p.protectedAreas || [])[0] === 'Hand');
++    expect(handAreas.length).toBe(5); // raider, t45, t51, t60, x01
++  });
++});
++
++describe('power-armor ui-integration: i18n-ключи экранов (pa3)', () => {
++  it('inventory: починка, выбор блока, запрет мутанта и робота — в обеих локалях', () => {
++    const required = [
++      'mutantCannotWearStandardArmorTitle',
++      'mutantCannotWearStandardArmorMessage',
++      'powerArmorChooseCoreTitle',
++      'powerArmorBrokenPieceMessage',
++      'robotArmorOnlyTitle',
++      'robotArmorOnlyMessage',
++      'powerArmorNeedsCoreTitle',
++      'powerArmorNeedsCoreMessage',
++      'powerArmorNeedsFrameMessage',
++      'powerArmorDepletedTitle',
++      'powerArmorDepletedMessage',
++    ];
++    for (const dict of [ruInventoryScreen, enInventoryScreen]) {
++      for (const key of required) {
++        expect(typeof dict.alerts[key], key).toBe('string');
++        expect(dict.alerts[key].length, key).toBeGreaterThan(0);
++      }
++      expect(typeof dict.actions.repair).toBe('string');
++      expect(typeof dict.labels.durability).toBe('string');
++    }
++  });
++
++  it('weaponsAndArmor: powerArmor — только используемые ключи (мёртвых данных нет)', () => {
++    for (const dict of [ruWaasScreen, enWaasScreen]) {
++      const pa = dict.powerArmor;
++      // Используются ячейками сетки и панелью эффектов.
++      for (const key of ['durability', 'core', 'repair']) {
++        expect(typeof pa[key], key).toBe('string');
++      }
++      expect(pa.core).toContain('{value}');
++      // Редизайн (владелец): отдельного блока СБ нет — мёртвые ключи удалены.
++      expect(pa.layer).toBeUndefined();
++      expect(pa.frame).toBeUndefined();
++      expect(pa.partNames).toBeUndefined();
++      expect(pa.unequip).toBeUndefined();
++    }
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index ee4245a..f3103e5 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -37,6 +37,37 @@ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ import { isRobotCharacter } from '../domain/origins';
+ import { resolveBodyPlan } from '../domain/bodyplan';
+ import { createEmptyEquippedArmor } from '../domain/equippedArmor';
++import {
++  createEmptyEquippedPowerArmor,
++  createEmptyPowerArmorRuntime,
++  tickCoreAccumulator,
++  drainActiveCore,
++  packPackage,
++  unpackPackage,
++  insertCore,
++  equipPowerArmorPiece,
++  canEquipPowerArmorPiece,
++  findChargedFusionCores,
++  pickFusionCore,
++  powerArmorPieceStackKey,
++  powerArmorSlotsFor,
++  resolvePowerArmorPieceTarget,
++  repairPowerArmorPiece,
++  adjustPieceHp,
++  needsRepair,
++  hasFrame,
++  isPieceBroken,
++  isPowerArmorFrame,
++  FUSION_CORE_ID,
++} from '../domain/powerArmor';
++import { canEquipArmor } from '../domain/equipEquip';
++import dataPowerArmor from '../data/equipment/powerArmor.json';
++import dataAmmo from '../data/equipment/ammo.json';
++import { getCurrentLocale } from '../i18n/locale';
++import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
++import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
++import { Alert, Platform } from 'react-native';
+ 
+ // Zustand Store integration (Task 4.1)
+ import useCharacterStore from '../src/store/characterStore';
+@@ -75,6 +106,55 @@ const deserializeState = (data) => ({
+   schemaVersion: data.schemaVersion ?? 0,
+ });
+ 
++// ─── Силовая броня: каталожные справочники и тексты алертов ────────────────
++// Механика — domain/powerArmor.js; специфика — docs/architecture/power-armor-plan.md.
++const PA_CATALOG_BY_ID = Object.fromEntries(
++  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
++);
++// Каталожная запись Ядерного блока: предел зарядов (maxCharges) живёт в данных боеприпаса.
++const findCatalogEntryById = (node, id) => {
++  if (Array.isArray(node)) {
++    for (const entry of node) {
++      const hit = findCatalogEntryById(entry, id);
++      if (hit) return hit;
++    }
++    return null;
++  }
++  if (node && typeof node === 'object') {
++    if (node.id === id) return node;
++    return findCatalogEntryById(node.items ?? Object.values(node), id);
++  }
++  return null;
++};
++const FUSION_CORE_CATALOG = findCatalogEntryById(dataAmmo, FUSION_CORE_ID);
++// Каталожные данные части PA в текущей локали (имя); механика — из canonical data.
++const paLocalizedCatalogItem = (catalogId) => {
++  const localized = (getEquipmentCatalog(getCurrentLocale())?.powerArmorList || [])
++    .find((p) => p.id === catalogId);
++  return localized || PA_CATALOG_BY_ID[catalogId];
++};
++const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
++const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()]?.[key] ?? INV_ALERTS_DICT['ru-RU']?.[key] ?? key;
++// Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
++// что использует обычная броня при выборе слота.
++const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
++const INV_ACTIONS_DICT = { 'ru-RU': ruInventoryScreen.actions, 'en-EN': enInventoryScreen.actions };
++const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()]?.[key] ?? INV_LABELS_DICT['ru-RU']?.[key] ?? key;
++const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()]?.[key] ?? INV_ACTIONS_DICT['ru-RU']?.[key] ?? key;
++// Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
++// как showAlert в InventoryScreen.
++const paAlert = (title, message = '') => {
++  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
++    window.alert(message ? `${title}\n\n${message}` : title);
++    return;
++  }
++  if (message) Alert.alert(title, message);
++  else Alert.alert(title);
++};
++// Тик таймера расхода блока (§5.3): заряд сгорает за 12 минут аптайма,
++// точность тика на порядок ниже — расход ведёт накопитель, а не тик.
++const PA_CORE_TICK_MS = 15000;
++
+ // Берём данные из стора ТОЛЬКО если они реально заполнены. denormalize* возвращает
+ // пустой массив [] при пустом сторе, а `[] ?? snapshot` оставляет [] (массив не nullish)
+ // и затирает реальные атрибуты/навыки снапшота → сохранёнка теряла данные (#5).
+@@ -148,6 +228,20 @@ export const CharacterProvider = ({ children }) => {
+     });
+   }, []);
+   const [equippedArmor, setEquippedArmor] = useState(() => createEmptyEquippedArmor());
++  const [equippedPowerArmor, setEquippedPowerArmor] = useState(() => createEmptyEquippedPowerArmor());
++  const [powerArmorRuntime, setPowerArmorRuntime] = useState(() => createEmptyPowerArmorRuntime());
++  // Диалог выбора Ядерного Блока (§5.1/§5.4): null, или
++  // { kind: 'equip'|'depleted', equipped, frameItem?, cores: [] }
++  const [pendingCoreChoice, setPendingCoreChoice] = useState(null);
++
++  // Refs: таймер расхода и алерты читают актуальное состояние без пересоздания.
++  const equippedPowerArmorRef = useRef(equippedPowerArmor);
++  const powerArmorRuntimeRef = useRef(powerArmorRuntime);
++  const pendingCoreChoiceRef = useRef(pendingCoreChoice);
++  useEffect(() => { equippedPowerArmorRef.current = equippedPowerArmor; }, [equippedPowerArmor]);
++  useEffect(() => { powerArmorRuntimeRef.current = powerArmorRuntime; }, [powerArmorRuntime]);
++  useEffect(() => { pendingCoreChoiceRef.current = pendingCoreChoice; }, [pendingCoreChoice]);
++
+   const [caps, setCaps] = useState(0);
+   const [currentHealth, setCurrentHealth] = useState(0);
+   const [radiation, setRadiationRaw] = useState(0);
+@@ -209,9 +303,15 @@ export const CharacterProvider = ({ children }) => {
+       trait,
+       level,
+       isRobot,
+-      equipmentState: { equippedArmor, equippedRobotSlots, isRobot },
++      // Надетый каркас СБ → модификаторы атрибутов (СИЛ=set 11) в производных, §5.6.
++      equipmentState: {
++        equippedArmor,
++        equippedRobotSlots,
++        isRobot,
++        powerArmorFrameId: equippedPowerArmor?.frame ? equippedPowerArmor.frame.catalogId : null,
++      },
+     });
+-  }, [attributes, trait, level, origin, equippedArmor, equippedRobotSlots]);
++  }, [attributes, trait, level, origin, equippedArmor, equippedRobotSlots, equippedPowerArmor]);
+ 
+   // Подписываемся на derivedStats стора и зеркалим их в локальный стейт,
+   // чтобы все экраны, читающие carryWeight/meleeBonus/defense/initiative из
+@@ -244,6 +344,272 @@ export const CharacterProvider = ({ children }) => {
+     return () => clearInterval(interval);
+   }, []);
+ 
++  // ═══ Силовая броня: действия (специфика docs/architecture/power-armor-plan.md) ═══
++  // Слой СБ отдельный от equippedArmor: надевание ИЗЫМАЕТ предмет из стековой
++  // записи инвентаря (quantity −1, при 0 запись удаляется — декремент-модель,
++  // как adjustStoreItemQuantity в InventoryScreen), снятие возвращает стопку
++  // через addNewItem (сливается с существующей по stackKey).
++
++  const paDecrementStoreStack = useCallback((storeItemId, count = 1) => {
++    const { items } = useCharacterStore.getState();
++    const item = items[storeItemId];
++    if (!item) return;
++    const newQty = (item.quantity || 1) - count;
++    if (newQty <= 0) {
++      const updated = { ...items };
++      delete updated[storeItemId];
++      useCharacterStore.setState({ items: updated });
++      return;
++    }
++    useCharacterStore.getState().updateItem(storeItemId, { quantity: newQty });
++  }, []);
++
++  // Положить стек-предмет в инвентарь. Ключ записи = stackKey: для каждого
++  // состояния (заряд/прочность/состав частей) ключ уникален, а одинаковые
++  // стопки всё равно сольются стек-поиском addNewItem по тому же stackKey.
++  const paAddStackToInventory = useCallback((stackItem) => {
++    useCharacterStore.getState().addNewItem({ ...stackItem, uniqueId: stackItem.stackKey, quantity: 1 });
++  }, []);
++
++  // Надетая часть → инвентарный стек-предмет (подпись: каталожный id + моды + прочность).
++  const paPieceToStackItem = useCallback((piece) => ({
++    ...paLocalizedCatalogItem(piece.catalogId),
++    appliedMods: piece.appliedMods || {},
++    hpCurrent: piece.hpCurrent,
++    stackKey: powerArmorPieceStackKey(piece),
++  }), []);
++
++  // Надетый пакет → инвентарная стопка-каркас: packPackage даёт контракт полей
++  // и stackKey; вес/цена/имя добираем из каталога текущей локали.
++  const paPackageToStackItem = useCallback((equipped) => {
++    const packed = packPackage(equipped);
++    return { ...paLocalizedCatalogItem(packed.id), ...packed };
++  }, []);
++
++  // ── §5.1 Надеть пакет (каркас + установленные части + блок, если он внутри) ──
++  const equipPowerArmorPackage = useCallback((frameStackItem) => {
++    // ПРАВИЛО (от владельца): супермутантам силовая запрещена. И роботам — политика
++    // экипировки брони общая (domain/equipEquip.canEquipArmor).
++    const check = canEquipArmor(frameStackItem, { origin, trait });
++    if (!check.allowed) {
++      if (check.reason === 'equip.error.robotCannotWearStandardArmor') {
++        paAlert(tPA('robotArmorOnlyTitle'), tPA('robotArmorOnlyMessage'));
++      } else {
++        paAlert(tPA('mutantCannotWearStandardArmorTitle'), tPA('mutantCannotWearStandardArmorMessage'));
++      }
++      return;
++    }
++    if (hasFrame(equippedPowerArmorRef.current)) return; // второй пакет поверх не надевается
++
++    const equipped = unpackPackage(frameStackItem);
++    if (equipped.frame.core) {
++      // Блок уже в пакете → надеваем молча.
++      paDecrementStoreStack(frameStackItem.id);
++      setEquippedPowerArmor(equipped);
++      return;
++    }
++    const pick = pickFusionCore(findChargedFusionCores(Object.values(useCharacterStore.getState().items || {})));
++    if (pick.kind === 'none') {
++      paAlert(tPA('powerArmorNeedsCoreTitle'), tPA('powerArmorNeedsCoreMessage'));
++      return;
++    }
++    if (pick.kind === 'auto') {
++      // Заряд одинаковый у всех блоков → молча берём первый из стопки (ПРАВИЛО владельца).
++      paDecrementStoreStack(pick.core.id);
++      paDecrementStoreStack(frameStackItem.id);
++      setEquippedPowerArmor(insertCore(equipped, pick.core));
++      return;
++    }
++    // Разный заряд → игрок выбирает; пакет снимем со стопки после выбора (resolveCoreChoice).
++    setPendingCoreChoice({ kind: 'equip', equipped, frameStoreKey: frameStackItem.id, cores: pick.cores });
++  }, [origin, trait, paDecrementStoreStack]);
++
++  // Разрешение диалога выбора блока (§5.1/§5.4): coreStoreKey — ключ записи в сторе, null — отмена.
++  const resolveCoreChoice = useCallback((coreStoreKey) => {
++    const pending = pendingCoreChoiceRef.current;
++    setPendingCoreChoice(null);
++    if (!pending) return;
++
++    if (!coreStoreKey) {
++      if (pending.kind === 'depleted') {
++        // От замены отказались → пакет снимается в инвентарь, как при отсутствии блоков.
++        paAddStackToInventory(paPackageToStackItem(pending.equipped));
++        setEquippedPowerArmor(createEmptyEquippedPowerArmor());
++        paAlert(tPA('powerArmorDepletedTitle'), tPA('powerArmorDepletedMessage'));
++      }
++      // kind 'equip' + отмена → надевание не состоялось, инвентарь не тронут.
++      return;
++    }
++
++    const coreItem = useCharacterStore.getState().items[coreStoreKey];
++    if (!coreItem || !(coreItem.charges > 0)) return;
++    paDecrementStoreStack(coreStoreKey);
++    if (pending.kind === 'equip' && pending.frameStoreKey) {
++      paDecrementStoreStack(pending.frameStoreKey);
++    }
++    setEquippedPowerArmor(insertCore(pending.equipped, coreItem));
++  }, [paDecrementStoreStack, paAddStackToInventory, paPackageToStackItem]);
++
++  // ── Снять весь пакет: части и блок уезжают в инвентарь ВНУТРИ стопки-каркаса (§4) ──
++  const unequipPowerArmorPackage = useCallback(() => {
++    const equipped = equippedPowerArmorRef.current;
++    if (!hasFrame(equipped)) return;
++    paAddStackToInventory(paPackageToStackItem(equipped));
++    setEquippedPowerArmor(createEmptyEquippedPowerArmor());
++  }, [paAddStackToInventory, paPackageToStackItem]);
++
++  // ── §5.2 Надеть часть из инвентаря; вытесненная часть слота уходит в инвентарь ──
++  // Наруч/понож — один предмет на любую сторону (как обычная броня): свободный
++  // слот пары → туда; обе стороны заняты → игрок выбирает L/R тем же алертом.
++  const equipPowerArmorPieceInto = useCallback((pieceStackItem) => {
++    // Каталожный id: у стор-предмета — weaponId, у свежего из каталога — id.
++    const catalogId = pieceStackItem.weaponId || pieceStackItem.id;
++    const piece = {
++      catalogId,
++      appliedMods: pieceStackItem.appliedMods || {},
++      hpCurrent: pieceStackItem.hpCurrent,
++    };
++    const candidateSlots = powerArmorSlotsFor(PA_CATALOG_BY_ID[catalogId]);
++    if (candidateSlots.length === 0) return;
++    const check = canEquipPowerArmorPiece(equippedPowerArmorRef.current, piece);
++    if (!check.ok) {
++      paAlert(
++        tPA('powerArmorNeedsCoreTitle'),
++        tPA(check.reason === 'needsFrame' ? 'powerArmorNeedsFrameMessage' : 'powerArmorBrokenPieceMessage'),
++      );
++      return;
++    }
++
++    const doEquip = (slot) => {
++      const equipped = equippedPowerArmorRef.current;
++      const replaced = equipped.pieces[slot];
++      setEquippedPowerArmor(equipPowerArmorPiece(equipped, slot, piece));
++      paDecrementStoreStack(pieceStackItem.id);
++      if (replaced) paAddStackToInventory(paPieceToStackItem(replaced));
++    };
++
++    const target = resolvePowerArmorPieceTarget(equippedPowerArmorRef.current, candidateSlots);
++    if (target.kind === 'slot') {
++      doEquip(target.slot);
++      return;
++    }
++
++    // Пара занята → выбор стороны, формулировки — как у обычной брони.
++    const [leftSlot, rightSlot] = target.slots;
++    const leftLabel = tPALabel(leftSlot);
++    const rightLabel = tPALabel(rightSlot);
++    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
++      const promptText = tPA('bothSlotsBusyPrompt')
++        .replace('{leftLabel}', leftLabel)
++        .replace('{rightLabel}', rightLabel);
++      const answer = window.prompt(promptText, '1');
++      if (answer === '1') doEquip(leftSlot);
++      else if (answer === '2') doEquip(rightSlot);
++      return;
++    }
++    Alert.alert(tPA('replaceEquipmentTitle'), tPA('bothSlotsBusy'), [
++      { text: leftLabel, onPress: () => doEquip(leftSlot) },
++      { text: rightLabel, onPress: () => doEquip(rightSlot) },
++      { text: tPAAction('cancel'), style: 'cancel' },
++    ]);
++  }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem]);
++
++  // Снять часть слота → в инвентарь своей стопкой.
++  const unequipPowerArmorPieceAt = useCallback((slot) => {
++    const equipped = equippedPowerArmorRef.current;
++    const piece = equipped?.pieces?.[slot];
++    if (!piece) return;
++    setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: null } });
++    paAddStackToInventory(paPieceToStackItem(piece));
++  }, [paAddStackToInventory, paPieceToStackItem]);
++
++  // ── §5.7 Кнопки −/+ прочности части; упала до 0 → часть сама слетает в инвентарь ──
++  const adjustPowerArmorDurability = useCallback((slot, delta) => {
++    const equipped = equippedPowerArmorRef.current;
++    const piece = equipped?.pieces?.[slot];
++    if (!piece) return;
++    const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
++    if (!Number.isFinite(maxHp)) return;
++    const adjusted = adjustPieceHp(piece, delta, maxHp);
++    if (isPieceBroken(adjusted)) {
++      setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: null } });
++      paAddStackToInventory(paPieceToStackItem(adjusted));
++      return;
++    }
++    setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: adjusted } });
++  }, [paAddStackToInventory, paPieceToStackItem]);
++
++  // Починка надетой части (ПРАВИЛО владельца: бесплатно до максимума).
++  const repairPowerArmorPieceAt = useCallback((slot) => {
++    const equipped = equippedPowerArmorRef.current;
++    const piece = equipped?.pieces?.[slot];
++    if (!piece) return;
++    const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
++    if (!Number.isFinite(maxHp) || !needsRepair(piece, maxHp)) return;
++    setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: repairPowerArmorPiece(piece, maxHp) } });
++  }, []);
++
++  // Починка части прямо в инвентаре (кнопка «Починить» на строке). Прочность входит
++  // в подпись стопки → после починки стопка либо переподписывается, либо сливается
++  // с уже существующей целой (quantity переносится).
++  const repairPowerArmorStack = useCallback((storeItemId) => {
++    const { items } = useCharacterStore.getState();
++    const item = items[storeItemId];
++    if (!item || item.itemType !== 'powerArmor' || isPowerArmorFrame(item)) return;
++    const catalogId = item.weaponId || item.id;
++    const maxHp = PA_CATALOG_BY_ID[catalogId]?.hp;
++    if (!Number.isFinite(maxHp) || !needsRepair({ hpCurrent: item.hpCurrent }, maxHp)) return;
++    const newStackKey = powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: maxHp });
++    const wholeTwinKey = Object.keys(items).find(
++      (key) => key !== storeItemId && (items[key]?.stackKey || items[key]?.id) === newStackKey,
++    );
++    if (wholeTwinKey) {
++      const updated = { ...items };
++      updated[wholeTwinKey] = { ...updated[wholeTwinKey], quantity: (updated[wholeTwinKey].quantity || 1) + (item.quantity || 1) };
++      delete updated[storeItemId];
++      useCharacterStore.setState({ items: updated });
++      return;
++    }
++    useCharacterStore.getState().updateItem(storeItemId, { hpCurrent: maxHp, stackKey: newStackKey });
++  }, []);
++
++  // ── §5.3/§5.4 Таймер расхода Ядерного блока ──
++  // Тикает только пока приложение открыто («приложение закрыто — отсчёт на паузе»);
++  // накопитель аптайма персистентный (сохраняется со снапшотом персонажа).
++  useEffect(() => {
++    const interval = setInterval(() => {
++      const equipped = equippedPowerArmorRef.current;
++      if (!hasFrame(equipped) || !equipped.frame.core) return;
++
++      const tick = tickCoreAccumulator(powerArmorRuntimeRef.current, PA_CORE_TICK_MS);
++      setPowerArmorRuntime({ coreAccumulatorMs: tick.coreAccumulatorMs });
++      if (tick.chargesConsumed <= 0) return;
++
++      const { equipped: drained, depleted } = drainActiveCore(equipped, tick.chargesConsumed);
++      if (!depleted) {
++        setEquippedPowerArmor(drained);
++        return;
++      }
++
++      // Блок исчерпан: есть замена — молча (одинаковый заряд) или выбором (разный);
++      // блоков нет совсем — пакет снимается в инвентарь (ПРАВИЛО владельца §5.4).
++      const pick = pickFusionCore(findChargedFusionCores(Object.values(useCharacterStore.getState().items || {})));
++      if (pick.kind === 'auto') {
++        paDecrementStoreStack(pick.core.id);
++        setEquippedPowerArmor(insertCore(drained, pick.core));
++        return;
++      }
++      if (pick.kind === 'choice') {
++        setPendingCoreChoice({ kind: 'depleted', equipped: drained, cores: pick.cores });
++        return;
++      }
++      paAddStackToInventory(paPackageToStackItem(drained));
++      setEquippedPowerArmor(createEmptyEquippedPowerArmor());
++      paAlert(tPA('powerArmorDepletedTitle'), tPA('powerArmorDepletedMessage'));
++    }, PA_CORE_TICK_MS);
++    return () => clearInterval(interval);
++  }, [paDecrementStoreStack, paAddStackToInventory, paPackageToStackItem]);
++
+   // Build a full character state snapshot.
+   const buildSnapshot = useCallback(() => ({
+     characterName,
+@@ -263,6 +629,8 @@ export const CharacterProvider = ({ children }) => {
+     equippedRobotSlots,
+     equippedRobotModules,
+     equippedArmor,
++    equippedPowerArmor,
++    powerArmorRuntime,
+     caps,
+     currentHealth,
+     radiation,
+@@ -283,7 +651,8 @@ export const CharacterProvider = ({ children }) => {
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+-    equippedArmor, caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
++    equippedArmor, equippedPowerArmor, powerArmorRuntime,
++    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+     carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog,
+   ]);
+@@ -313,7 +682,8 @@ export const CharacterProvider = ({ children }) => {
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+-    equippedArmor, caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
++    equippedArmor, equippedPowerArmor, powerArmorRuntime,
++    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+     carryWeight, meleeBonus, initiative, defense, buildSnapshot,
+   ]);
+@@ -389,6 +759,9 @@ export const CharacterProvider = ({ children }) => {
+       setEquippedRobotSlots(data.equippedRobotSlots ?? null);
+       setEquippedRobotModules(data.equippedRobotModules ?? []);
+       setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
++      setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
++      setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
++      setPendingCoreChoice(null);
+       setCaps(data.caps ?? 0);
+       setCurrentHealth(data.currentHealth ?? 0);
+       setRadiationRaw(Math.max(0, data.radiation ?? 0));
+@@ -655,6 +1028,9 @@ export const CharacterProvider = ({ children }) => {
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+     setEquippedArmor(createEmptyEquippedArmor());
++    setEquippedPowerArmor(createEmptyEquippedPowerArmor());
++    setPowerArmorRuntime(createEmptyPowerArmorRuntime());
++    setPendingCoreChoice(null);
+     setCaps(0);
+     setSelectedPerks([]);
+     setConditions([]);
+@@ -703,6 +1079,19 @@ export const CharacterProvider = ({ children }) => {
+     equippedRobotSlots, setEquippedRobotSlots,
+     equippedRobotModules, setEquippedRobotModules,
+     equippedArmor, setEquippedArmor,
++    // Силовая броня (docs/architecture/power-armor-plan.md): состояние пакета,
++    // накопитель расхода блока, диалог выбора блока и действия слоя.
++    equippedPowerArmor, setEquippedPowerArmor,
++    powerArmorRuntime,
++    pendingCoreChoice,
++    resolveCoreChoice,
++    equipPowerArmorPackage,
++    unequipPowerArmorPackage,
++    equipPowerArmorPiece: equipPowerArmorPieceInto,
++    unequipPowerArmorPieceAt,
++    adjustPowerArmorDurability,
++    repairPowerArmorPieceAt,
++    repairPowerArmorStack,
+     caps, setCaps,
+     currentHealth, setCurrentHealth,
+     radiation, setRadiation,
+diff --git a/components/powerArmor/FusionCoreChoiceModal.js b/components/powerArmor/FusionCoreChoiceModal.js
+new file mode 100644
+index 0000000..3919daf
+--- /dev/null
++++ b/components/powerArmor/FusionCoreChoiceModal.js
+@@ -0,0 +1,113 @@
++/**
++ * FusionCoreChoiceModal — диалог выбора Ядерного блока (план §5.1/§5.4).
++ *
++ * Поднимается контекстом (pendingCoreChoice) только когда в инвентаре несколько
++ * блоков с РАЗНЫМ зарядом — игрок выбирает, какой поставить в каркас. Если заряд
++ * одинаковый у всех, контекст берёт первый блок молча и диалог не показывается.
++ *
++ * kind 'equip'   — отмена (крест/Отмена) прерывает надевание каркаса;
++ * kind 'depleted'— отмена снимает обесточенный пакет в инвентарь.
++ */
++import React from 'react';
++import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
++import { useCharacter } from '../CharacterContext';
++import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { useLocale } from '../../i18n/locale';
++import { FUSION_CORE_ID } from '../../domain/powerArmor';
++
++const FusionCoreChoiceModal = () => {
++  const locale = useLocale();
++  const { pendingCoreChoice, resolveCoreChoice } = useCharacter();
++
++  if (!pendingCoreChoice) return null;
++
++  const coreCatalogName = (getEquipmentCatalog(locale)?.ammoTypes || [])
++    .find((entry) => entry.id === FUSION_CORE_ID)?.name || FUSION_CORE_ID;
++
++  return (
++    <Modal
++      visible
++      transparent
++      animationType="fade"
++      onRequestClose={() => resolveCoreChoice(null)}
++    >
++      <View style={localStyles.overlay}>
++        <View style={localStyles.content}>
++          <Text style={localStyles.title}>
++            {tInventory('screen.alerts.powerArmorChooseCoreTitle', 'Выбор Ядерного блока')}
++          </Text>
++          {(pendingCoreChoice.cores || []).map((core) => (
++            <TouchableOpacity
++              key={core.id}
++              style={localStyles.coreRow}
++              onPress={() => resolveCoreChoice(core.id)}
++            >
++              <Text style={localStyles.coreRowText}>
++                {`${coreCatalogName} (${core.charges}/${core.maxCharges})`}
++              </Text>
++            </TouchableOpacity>
++          ))}
++          <TouchableOpacity
++            style={localStyles.cancelRow}
++            onPress={() => resolveCoreChoice(null)}
++          >
++            <Text style={localStyles.cancelRowText}>
++              {tInventory('screen.actions.cancel', 'Отмена')}
++            </Text>
++          </TouchableOpacity>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const localStyles = StyleSheet.create({
++  overlay: {
++    flex: 1,
++    backgroundColor: 'rgba(0, 0, 0, 0.7)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    padding: 24,
++  },
++  content: {
++    width: '100%',
++    maxWidth: 360,
++    backgroundColor: '#1a1a1a',
++    borderColor: '#5a5a5a',
++    borderWidth: 1,
++    borderRadius: 8,
++    padding: 16,
++  },
++  title: {
++    color: '#f0e68c',
++    fontSize: 16,
++    fontWeight: 'bold',
++    textAlign: 'center',
++    marginBottom: 12,
++  },
++  coreRow: {
++    borderColor: '#5a5a5a',
++    borderWidth: 1,
++    borderRadius: 6,
++    paddingVertical: 10,
++    paddingHorizontal: 12,
++    marginBottom: 8,
++  },
++  coreRowText: {
++    color: '#e0e0e0',
++    fontSize: 14,
++    textAlign: 'center',
++  },
++  cancelRow: {
++    paddingVertical: 10,
++    marginTop: 4,
++  },
++  cancelRowText: {
++    color: '#f0e68c',
++    fontSize: 14,
++    textAlign: 'center',
++  },
++});
++
++export default FusionCoreChoiceModal;
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 430de05..ee2a488 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -41,10 +41,16 @@ import {
+   normalizeAttributeMap,
+   getTraitAttributeBonus,
+ } from "../../../domain/characterCreation";
++// Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
++// базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
++import { applyFrameAttributeModifiers, hasFrame } from "../../../domain/powerArmor";
++import dataPowerArmor from "../../../data/equipment/powerArmor.json";
+ import {
+   getSkillDisplayName,
+   tCharacterScreen,
+ } from "./logic/characterScreenI18n";
++
++const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+ import { useLocale } from "../../../i18n/locale";
+ import { AttributesSection } from "./AttributesSection";
+ import styles from "../../../styles/CharacterScreen.styles";
+@@ -290,6 +296,7 @@ export default function CharacterScreen() {
+     setEquippedWeapons,
+     setEquippedRobotSlots,
+     setEquippedRobotModules,
++    equippedPowerArmor,
+   } = useCharacter();
+ 
+   const debugLocale = useLocale();
+@@ -417,12 +424,20 @@ export default function CharacterScreen() {
+   const isPerkAttributeMode = tempAttributes !== null;
+   const currentAttributes = isPerkAttributeMode ? tempAttributes : attributes;
+   const timedAttributeModifiers = getTimedAttributeModifiers(activeTimedEffects);
+-  const displayAttributes = (!isPerkAttributeMode && attributesSaved)
+-    ? currentAttributes.map((attr) => ({
+-      ...attr,
+-      value: attr.value + (timedAttributeModifiers[getCanonicalAttributeKey(attr.name)] || 0),
+-    }))
+-    : currentAttributes;
++  // §5.6: пока надет каркас силовой брони, его модификаторы атрибутов действуют
++  // на отображаемом значении. Режим перка редактирует натуральную базу — не трогаем.
++  const withPowerArmorModifiers = (attrs) =>
++    applyFrameAttributeModifiers(attrs, hasFrame(equippedPowerArmor) ? PA_FRAME_CATALOG : null);
++  const displayAttributes = isPerkAttributeMode
++    ? currentAttributes
++    : withPowerArmorModifiers(
++        attributesSaved
++          ? currentAttributes.map((attr) => ({
++            ...attr,
++            value: attr.value + (timedAttributeModifiers[getCanonicalAttributeKey(attr.name)] || 0),
++          }))
++          : currentAttributes,
++      );
+ 
+   const remainingInitialPoints = getRemainingAttributePoints(attributes, trait);
+   const remainingPerkPoints = isPerkAttributeMode
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index e4a4a64..a1582fe 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -12,6 +12,15 @@ import { calculateMaxHealth } from '../../../domain/characterCreation';
+ import { getInstantHealAmount } from '../../../domain/effects';
+ import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
++import {
++  isFusionCoreItem,
++  fusionCoreStackKey,
++  isPowerArmorFrame,
++  powerArmorPieceStackKey,
++  powerArmorFrameStackKey,
++  rollNewFusionCoreCharges,
++} from '../../../domain/powerArmor';
++import dataPowerArmor from '../../../data/equipment/powerArmor.json';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+@@ -23,6 +32,11 @@ const PARAM_FIELDS = [
+   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
+ ];
+ 
++// Каталог механики силовой брони по id (макс. прочность частей, зоны защиты).
++const PA_CATALOG_BY_ID = Object.fromEntries(
++  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
++);
++
+ const flattenItemParams = (item) => {
+   if (!item) return item;
+   const flat = { ...item };
+@@ -59,6 +73,13 @@ const InventoryScreen = () => {
+     getModifiedItem,
+     trait,
+     origin,
++    // Силовая броня: свой слой и свои действия (docs/architecture/power-armor-plan.md).
++    equippedPowerArmor,
++    equipPowerArmorPackage,
++    equipPowerArmorPiece,
++    unequipPowerArmorPackage,
++    unequipPowerArmorPieceAt,
++    repairPowerArmorStack,
+   } = useCharacter();
+ 
+   const storeItems = useCharacterStore((state) => state.items);
+@@ -161,6 +182,18 @@ const InventoryScreen = () => {
+     return modIds.length ? modIds.join('|') : 'none';
+   };
+   const getStackKey = (item) => {
++    // Ядерный Блок: блоки с разным зарядом лежат отдельными стопками (§2 плана).
++    // Ветка ПЕРВАЯ: блок — разновидность ammo, но его подпись строится по зарядам.
++    if (isFusionCoreItem(item)) return fusionCoreStackKey(item.charges);
++    if (item?.itemType === 'powerArmor') {
++      // Каталожный id у стор-предмета живёт в weaponId, у свежего из каталога — в id.
++      const catalogId = item.weaponId || item.id;
++      if (isPowerArmorFrame(item)) {
++        // Пакет: подпись считает домен по составу установленных частей и заряду блока.
++        return powerArmorFrameStackKey({ ...item, id: catalogId });
++      }
++      return powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: item.hpCurrent });
++    }
+     const itemType = getItemType(item);
+     if (itemType === 'weapon') {
+       const baseWeaponId = item?.weaponId || item?.id || getItemName(item);
+@@ -180,6 +213,7 @@ const InventoryScreen = () => {
+     if (itemType === 'drinks') return '🥤';
+     if (itemType === 'food') return '🍖';
+     if (itemType === 'ammo') return '🔹';
++    if (itemType === 'powerArmor') return '⚡';
+     if (itemType === 'misc') return '🔧';
+     return '📦';
+   };
+@@ -482,6 +516,55 @@ const InventoryScreen = () => {
+ 
+   const handleAddItem = (item, quantity = 1) => {
+     const localizedItem = resolveLocalizedItem(item);
++
++    // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
++    // бросок (покупка 5 шт = 5 независимых бросков), стекаются только одинаковые.
++    if (isFusionCoreItem(localizedItem)) {
++      for (let i = 0; i < quantity; i += 1) {
++        const charges = rollNewFusionCoreCharges(localizedItem.maxCharges);
++        const stackKey = fusionCoreStackKey(charges);
++        const existingItem = findUnequippedStoreItemByStackKey(stackKey);
++        if (existingItem) {
++          adjustStoreItemQuantity(existingItem.id, 1);
++        } else {
++          addNewItem({
++            ...localizedItem,
++            itemType: 'ammo',
++            quantity: 1,
++            charges,
++            stackKey,
++            uniqueId: stackKey,
++          });
++        }
++      }
++      return;
++    }
++
++    // Силовая броня (§4): часть приходит со своей прочностью (hpCurrent = max),
++    // каркас — пустым пакетом (без частей и блока). Подпись стопки — доменная.
++    if (localizedItem.itemType === 'powerArmor') {
++      const prepared = isPowerArmorFrame(localizedItem)
++        ? {
++          ...localizedItem,
++          appliedMods: localizedItem.appliedMods || {},
++          installedPieces: { head: null, body: null, hands: null, legs: null },
++          installedCore: null,
++        }
++        : {
++          ...localizedItem,
++          appliedMods: localizedItem.appliedMods || {},
++          hpCurrent: localizedItem.hpCurrent ?? PA_CATALOG_BY_ID[localizedItem.id]?.hp,
++        };
++      const stackKey = getStackKey(prepared);
++      const existingItem = findUnequippedStoreItemByStackKey(stackKey);
++      if (existingItem) {
++        adjustStoreItemQuantity(existingItem.id, quantity);
++        return;
++      }
++      addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
++      return;
++    }
++
+     const stackKey = getStackKey(localizedItem);
+     const existingItem = findUnequippedStoreItemByStackKey(stackKey);
+ 
+@@ -940,6 +1023,47 @@ const InventoryScreen = () => {
+     });
+   };
+   
++  // Силовая броня: надетый каркас и части показываются строками с «Снять»
++  // (модель оружия: экипировка уменьшила стек, строка осталась как надетая), §6.
++  // Строки добавляются ПОСЛЕ подсчёта остатков стеков — двойного вычитания нет.
++  const equippedPowerArmorRows = useMemo(() => {
++    if (!equippedPowerArmor) return [];
++    const paCatalogEntry = (catalogId) =>
++      (equipmentCatalog?.powerArmorList || []).find((p) => p.id === catalogId)
++      || PA_CATALOG_BY_ID[catalogId] || {};
++    const rows = [];
++    if (equippedPowerArmor.frame) {
++      const frameEntry = paCatalogEntry(equippedPowerArmor.frame.catalogId);
++      rows.push({
++        ...frameEntry,
++        id: equippedPowerArmor.frame.catalogId,
++        set: 'frame',
++        itemType: 'powerArmor',
++        isEquipped: true,
++        quantity: 1,
++        uniqueId: 'pa-equipped-frame',
++        name: frameEntry.name || equippedPowerArmor.frame.catalogId,
++      });
++    }
++    Object.entries(equippedPowerArmor.pieces || {}).forEach(([slot, piece]) => {
++      if (!piece) return;
++      const pieceEntry = paCatalogEntry(piece.catalogId);
++      rows.push({
++        ...pieceEntry,
++        id: piece.catalogId,
++        itemType: 'powerArmor',
++        isEquipped: true,
++        quantity: 1,
++        uniqueId: `pa-equipped-${slot}`,
++        paSlot: slot,
++        name: pieceEntry.name || piece.catalogId,
++        hpCurrent: piece.hpCurrent,
++        appliedMods: piece.appliedMods || {},
++      });
++    });
++    return rows;
++  }, [equippedPowerArmor, equipmentCatalog]);
++
+   const displayItems = useMemo(() => {
+     const equippedItemsList = [];
+     (equippedWeaponsForDisplay || []).forEach((w, i) => {
+@@ -1031,8 +1155,8 @@ const InventoryScreen = () => {
+         })
+         .filter(Boolean);
+ 
+-    return [...equippedItemsList, ...inventoryItemsList];
+-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot]);
++    return [...equippedItemsList, ...equippedPowerArmorRows, ...inventoryItemsList];
++  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, equippedPowerArmorRows]);
+ 
+   const renderTableHeader = () => {
+     return (
+@@ -1057,7 +1181,19 @@ const InventoryScreen = () => {
+     const localizedDisplayItem = resolveLocalizedItem(displayItem);
+     const itemName = getItemName(localizedDisplayItem) || tInventory('screen.labels.unknownItem');
+     const itemIcon = getItemTypeIcon(item.itemType);
+-    const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing';
++    // Ядерный Блок: заряд стопки показываем суффиксом в имени — «Ядерный блок (7/20)».
++    const coreChargeSuffix = isFusionCoreItem(item) && item.charges != null
++      ? ` (${item.charges}/${item.maxCharges})`
++      : '';
++    // Часть силовой брони: строка прочности + «Починить» при hp < max (бесплатно — правило владельца).
++    const isPAItem = item.itemType === 'powerArmor';
++    const paMaxHp = isPAItem && !isPowerArmorFrame(item)
++      ? PA_CATALOG_BY_ID[item.weaponId || item.id]?.hp
++      : null;
++    const showPARepair = Boolean(
++      isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
++    );
++    const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
+     const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
+ 
+     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
+@@ -1079,12 +1215,28 @@ const InventoryScreen = () => {
+         if (item.isEquipped) {
+             if (item.itemType === 'weapon') {
+                 handleUnequipWeapon(item, item.slot);
++            } else if (item.itemType === 'powerArmor') {
++                // Слой СБ: каркас снимается комплектом (части и блок внутри),
++                // часть — по её слоту; как обычная броня/оружие (§6 плана).
++                if (isPowerArmorFrame(item)) {
++                    unequipPowerArmorPackage();
++                } else {
++                    unequipPowerArmorPieceAt(item.paSlot);
++                }
+             } else {
+                 handleUnequipArmor(item);
+             }
+         } else {
+             if (item.itemType === 'weapon') {
+                 handleEquipWeapon(item);
++            } else if (item.itemType === 'powerArmor') {
++                // Силовая броня — свой слой: каркас надевается пакетом, часть — в слот
++                // надетого пакета. Через equippedArmor/слоты брони не проходит (план §5).
++                if (isPowerArmorFrame(item)) {
++                    equipPowerArmorPackage(item);
++                } else {
++                    equipPowerArmorPiece(item);
++                }
+             } else {
+                 handleEquipArmor(item);
+             }
+@@ -1101,7 +1253,7 @@ const InventoryScreen = () => {
+       <View style={styles.tableRow}>
+         <View style={styles.mainRowContent}>
+           <View style={styles.itemNameContainer}>
+-            <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}</Text>
++            <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}{coreChargeSuffix}</Text>
+             <Text style={styles.itemTypeIcon}>{itemIcon}</Text>
+           </View>
+         </View>
+@@ -1117,6 +1269,14 @@ const InventoryScreen = () => {
+               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+           )}
+ 
++          {showPARepair && (
++              <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => repairPowerArmorStack(item.id)}>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
++              </TouchableOpacity>
++          )}
++
+           {isConsumable && !item.isEquipped && !isRobot && (
+               <TouchableOpacity 
+                   style={[styles.actionButton, styles.applyButton]} 
+@@ -1131,6 +1291,9 @@ const InventoryScreen = () => {
+           )}
+         </View>
+         <View style={styles.itemSubRow}>
++          {Number.isFinite(paMaxHp) && (
++            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
++          )}
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 2bb9f0f..2dd16c6 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -26,6 +26,20 @@ import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+ import { getRobotSlotKeys } from '../../../domain/robotEquip';
++import {
++  hasFrame,
++  suppressesLayerAt,
++  needsRepair,
++  applyFrameAttributeModifiers,
++  FUSION_CORE_ID,
++} from '../../../domain/powerArmor';
++import dataPowerArmor from '../../../data/equipment/powerArmor.json';
++
++// Силовая броня: каталог механики по id (рейтинги/прочность частей, модификаторы каркаса).
++const PA_CATALOG_BY_ID = Object.fromEntries(
++  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
++);
++const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+ 
+ // Импортируем модальное окно модификаций
+ import WeaponModificationModal from './modal/WeaponModificationModal';
+@@ -161,13 +175,16 @@ const WeaponAmmoCell = ({ ammoId, qualities }) => {
+   );
+ };
+ 
+-const EffectsPanel = ({ effects, immunities = [] }) => {
++// extraRows: постоянные строки (силовая броня: «Ядерный блок: n/max», эффекты каркаса) —
++// рендерятся как иммунитеты, с «∞» в колонке таймера.
++const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+   const [isOpen, setIsOpen] = useState(false);
+   useLocale();
+ 
+   const hasImmunities = immunities.length > 0;
+   const hasEffects = (effects || []).length > 0;
+-  const isEmpty = !hasImmunities && !hasEffects;
++  const hasExtraRows = extraRows.length > 0;
++  const isEmpty = !hasImmunities && !hasEffects && !hasExtraRows;
+ 
+   const immunityLabel = hasImmunities
+     ? `${tWeaponsAndArmorScreen('effectsPanel.immunityPrefix')} ${immunities
+@@ -187,6 +204,12 @@ const EffectsPanel = ({ effects, immunities = [] }) => {
+             <Text style={localStyles.effectsPanelEmpty}>{tWeaponsAndArmorScreen('effectsPanel.empty')}</Text>
+           ) : (
+             <>
++              {extraRows.map((row) => (
++                <View key={row.key} style={localStyles.effectsPanelRow}>
++                  <Text style={[localStyles.effectText, localStyles.positiveEffectText]}>{row.text}</Text>
++                  <Text style={localStyles.effectTimerText}>∞</Text>
++                </View>
++              ))}
+               {immunityLabel ? (
+                 <View style={localStyles.effectsPanelRow}>
+                   <Text style={[localStyles.effectText, localStyles.positiveEffectText]}>{immunityLabel}</Text>
+@@ -246,7 +269,7 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats }) => {
+                 {stats.map((stat, index) => (
+                     <View key={index} style={[localStyles.armorStatRow, { borderBottomWidth: index === stats.length - 1 ? 0 : 1 }]}>
+                         <Text style={localStyles.armorStatLabel}>{stat.label}</Text>
+-                        {stat.type === 'button' ? (
++                        {stat.custom ? stat.custom : stat.type === 'button' ? (
+                           <TouchableOpacity style={localStyles.armorModificationButton} onPress={stat.onPress}>
+                             <Text style={localStyles.armorModificationButtonText}>{stat.value}</Text>
+                           </TouchableOpacity>
+@@ -511,6 +534,10 @@ const WeaponsAndArmorScreen = () => {
+     trait,
+     origin,
+     radiation,
++    // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
++    equippedPowerArmor,
++    adjustPowerArmorDurability,
++    repairPowerArmorPieceAt,
+   } = useCharacter();
+ 
+   const storeItems = useCharacterStore((state) => state.items);
+@@ -544,11 +571,17 @@ const WeaponsAndArmorScreen = () => {
+   const locale = useLocale();
+ 
+   const isRobot = isRobotCharacter({ origin, trait });
+-  const initiative = calculateInitiative(attributes);
+-  const defense = calculateDefense(attributes);
+-  const meleeBonus = calculateMeleeBonus(attributes, trait);
+-  const meleeBonusValue = calculateMeleeBonusValue(attributes, trait);
+-  const maxHealth = attributesSaved ? calculateMaxHealth(attributes, level) : 0;
++  // §5.6: пока надет каркас, его attributeModifier подменяет базу атрибутов
++  // (каркас: СИЛА = set 11 — значение из данных, не из кода).
++  const attributesEffective = useMemo(
++    () => applyFrameAttributeModifiers(attributes, hasFrame(equippedPowerArmor) ? PA_FRAME_CATALOG : null),
++    [attributes, equippedPowerArmor],
++  );
++  const initiative = calculateInitiative(attributesEffective);
++  const defense = calculateDefense(attributesEffective);
++  const meleeBonus = calculateMeleeBonus(attributesEffective, trait);
++  const meleeBonusValue = calculateMeleeBonusValue(attributesEffective, trait);
++  const maxHealth = attributesSaved ? calculateMaxHealth(attributesEffective, level) : 0;
+   const timedMaxHpBonus = getTimedMaxHpBonus(activeTimedEffects);
+   const effectiveMaxHealth = maxHealth + timedMaxHpBonus;
+   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
+@@ -697,6 +730,28 @@ const WeaponsAndArmorScreen = () => {
+     handleOpenModificationModal(weapon);
+   };
+ 
++  // ═══ Силовая броня (план §5): секция надетого пакета НАД сеткой обычной брони ═══
++
++  // Строки для панели «Эффекты»: «Ядерный блок: n/max» + тексты эффектов каркаса.
++  const powerArmorEffectRows = useMemo(() => {
++    if (!hasFrame(equippedPowerArmor)) return [];
++    const rows = [];
++    const coreCharges = equippedPowerArmor.frame?.core?.charges;
++    if (coreCharges != null) {
++      const maxCharges = (equipmentCatalog?.ammoTypes || [])
++        .find((entry) => entry.id === FUSION_CORE_ID)?.maxCharges;
++      rows.push({
++        key: 'powerArmorCore',
++        text: tWeaponsAndArmorScreen('powerArmor.core').replace('{value}', `${coreCharges}/${maxCharges}`),
++      });
++    }
++    // Тексты эффектов каркаса живут в данных; список пока пуст (книжные тексты — §9 плана).
++    (PA_FRAME_CATALOG?.effects || []).forEach((text, index) => {
++      rows.push({ key: `powerArmorFrameEffect_${index}`, text });
++    });
++    return rows;
++  }, [equippedPowerArmor, equipmentCatalog]);
++
+   const renderArmorPart = (slotKey) => {
+     // Проверяем является ли персонаж роботом
+     const isRobot = isRobotCharacter({ origin, trait });
+@@ -724,6 +779,55 @@ const WeaponsAndArmorScreen = () => {
+       subtitle: tWeaponsAndArmorScreen(`armor.slots.${slotKey}.subtitle`),
+     };
+ 
++    // Силовая броня (§5.5, ПРАВИЛО владельца): надетая часть СБ подменяет СВОЮ
++    // ячейку сетки — показывает только свои параметры (нижние слои ячейки
++    // подавлены). Ячейки без части показывают обычную броню/одежду как раньше.
++    if (!isRobot && suppressesLayerAt(equippedPowerArmor, slotKey)) {
++      const paPiece = equippedPowerArmor.pieces[slotKey];
++      const paCatalogItem = PA_CATALOG_BY_ID[paPiece.catalogId];
++      const paLocalized = (equipmentCatalog?.powerArmorList || []).find((p) => p.id === paPiece.catalogId);
++      const paMaxHp = paCatalogItem?.hp;
++      const paNeedsRepair = Number.isFinite(paMaxHp) && needsRepair(paPiece, paMaxHp);
++      const paRating = (value) => (value > 0 ? value : tWeaponsAndArmorScreen('common.none'));
++
++      const paStats = [
++        { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: paRating(Number(paCatalogItem?.physicalDamageRating || 0) + (timedDR.physical || 0)) },
++        { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: paRating(Number(paCatalogItem?.energyDamageRating || 0) + (timedDR.energy || 0)) },
++        { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : paRating(Number(paCatalogItem?.radiationDamageRating || 0) + (timedDR.radiation || 0)) },
++        {
++          label: tWeaponsAndArmorScreen('powerArmor.durability'),
++          custom: (
++            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
++              <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slotKey, -1)}>
++                <Text style={localStyles.armorModificationButtonText}>−</Text>
++              </TouchableOpacity>
++              <Text style={[localStyles.armorStatValue, { marginHorizontal: 8 }]}>{paPiece.hpCurrent}/{paMaxHp}</Text>
++              <TouchableOpacity style={localStyles.armorModificationButton} onPress={() => adjustPowerArmorDurability(slotKey, 1)}>
++                <Text style={localStyles.armorModificationButtonText}>+</Text>
++              </TouchableOpacity>
++            </View>
++          ),
++        },
++        // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
++        ...(paNeedsRepair ? [{
++          label: '',
++          value: tWeaponsAndArmorScreen('powerArmor.repair'),
++          type: 'button',
++          onPress: () => repairPowerArmorPieceAt(slotKey),
++        }] : []),
++      ];
++
++      return (
++        <ArmorPart
++          key={slotKey}
++          title={config.title}
++          subtitle={config.subtitle}
++          armorName={paLocalized?.name}
++          stats={paStats}
++        />
++      );
++    }
++
+     const { item: modifiedArmor } = applyArmorMods(armorItem, equipmentCatalog);
+     const { item: modifiedClothing } = applyArmorMods(clothingItem, equipmentCatalog, { standardKey: 'appliedClothingModId', uniqueKey: 'unused' });
+ 
+@@ -788,7 +892,7 @@ const WeaponsAndArmorScreen = () => {
+                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
+                 </StatBox>
+             </View>
+-            <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} />
++            <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} extraRows={powerArmorEffectRows} />
+             </View>
+ 
+             {/* Броня / Слоты робота */}
+@@ -816,6 +920,8 @@ const WeaponsAndArmorScreen = () => {
+               </View>
+             ) : (
+               <View style={{ marginBottom: 16 }}>
++              {/* Силовая броня — не отдельный блок: часть подменяет СВОЮ ячейку
++                  этой сетки (renderArmorPart), нижние слои ячейки подавляются (§5.5). */}
+               <View style={localStyles.statsRow}>
+                   {renderArmorPart('leftArm')}
+                   {renderArmorPart('head')}
+diff --git a/domain/powerArmor.js b/domain/powerArmor.js
+index 0058e75..7957359 100644
+--- a/domain/powerArmor.js
++++ b/domain/powerArmor.js
+@@ -8,6 +8,7 @@
+  */
+ 
+ import { rollByType } from './diceRollsLogic';
++import { getCanonicalAttributeKey } from './characterCreation';
+ 
+ // Расход зарядов Ядерного блока каркасом, зарядов в час. Временное значение (§3.3 плана).
+ export const PA_CORE_DRAIN_PER_HOUR = 5;
+@@ -23,11 +24,17 @@ export const PA_MS_PER_CHARGE = 3600000 / PA_CORE_DRAIN_PER_HOUR;
+ 
+ export const FUSION_CORE_ID = 'ammo_fusion_core';
+ 
+-// Слоты частей пакета (§2 плана): наручи и поножи — одна часть на пару конечностей.
+-export const PA_PIECE_SLOTS = Object.freeze(['head', 'body', 'hands', 'legs']);
++// Слоты частей пакета (§2 плана): как у обычной брони — левая/правая рука и нога
++// отдельно. Наруч/понож — ОДИН предмет, подходящий на любую сторону пары.
++export const PA_PIECE_SLOTS = Object.freeze(['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']);
+ 
+-// Явная карта «зона данных → слот пакета». Других зон у частей PA быть не должно.
+-const PA_AREA_TO_SLOT = Object.freeze({ Head: 'head', Body: 'body', Hand: 'hands', Leg: 'legs' });
++// Явная карта «зона данных → слоты-кандидаты пакета». Других зон у частей PA быть не должно.
++const PA_AREA_TO_CANDIDATE_SLOTS = Object.freeze({
++  Head: ['head'],
++  Body: ['body'],
++  Hand: ['leftArm', 'rightArm'],
++  Leg: ['leftLeg', 'rightLeg'],
++});
+ 
+ const PA_FRAME_SET_KEY = 'frame';
+ 
+@@ -36,7 +43,11 @@ const PA_FRAME_SET_KEY = 'frame';
+ /** Пустое состояние надетого пакета. */
+ export const createEmptyEquippedPowerArmor = () => ({
+   frame: null,
+-  pieces: { head: null, body: null, hands: null, legs: null },
++  pieces: {
++    head: null, body: null,
++    leftArm: null, rightArm: null,
++    leftLeg: null, rightLeg: null,
++  },
+ });
+ 
+ /** Накопитель расхода (персистентный, §5.3): время работы приложения. */
+@@ -49,14 +60,30 @@ export const isPowerArmorFrame = (item) =>
+   item?.itemType === 'powerArmor' && item?.set === PA_FRAME_SET_KEY;
+ 
+ /**
+- * Слот пакета для части PA по её данным. Каркас → null (это не часть).
+- * Часть с неизвестной зоной → null (не проходит по белому списку).
++ * Слоты-кандидаты части PA по её данным. Каркас → [] (это не часть).
++ * Наруч → ['leftArm','rightArm'], понож → ['leftLeg','rightLeg'] (один предмет
++ * на любую сторону, как у обычной брони). Часть с неизвестной зоной → []
++ * (не проходит по белому списку).
+  */
+-export const powerArmorSlotFor = (item) => {
+-  if (!item || item.itemType !== 'powerArmor' || isPowerArmorFrame(item)) return null;
++export const powerArmorSlotsFor = (item) => {
++  if (!item || item.itemType !== 'powerArmor' || isPowerArmorFrame(item)) return [];
+   const areas = item.protectedAreas;
+-  if (!Array.isArray(areas) || areas.length !== 1) return null;
+-  return PA_AREA_TO_SLOT[areas[0]] ?? null;
++  if (!Array.isArray(areas) || areas.length !== 1) return [];
++  return PA_AREA_TO_CANDIDATE_SLOTS[areas[0]] ?? [];
++};
++
++/**
++ * Целевой слот для части (как у обычной брони, §5.2):
++ *  - есть свободный кандидат        → { kind: 'slot', slot }  (надеваем в него)
++ *  - кандидат один и он занят        → { kind: 'slot', slot }  (замена: старая часть → инвентарь)
++ *  - пара и обе стороны заняты       → { kind: 'choice', slots }  (игрок выбирает L/R)
++ */
++export const resolvePowerArmorPieceTarget = (equipped, candidateSlots) => {
++  const slots = candidateSlots || [];
++  const free = slots.find((slot) => !equipped?.pieces?.[slot]);
++  if (free) return { kind: 'slot', slot: free };
++  if (slots.length === 1) return { kind: 'slot', slot: slots[0] };
++  return { kind: 'choice', slots };
+ };
+ 
+ // ─── Стекинг (§4) ───────────────────────────────────────────────────────────
+@@ -141,7 +168,9 @@ export const insertCore = (equipped, core) => ({
+ 
+ // ─── Ядерный Блок ───────────────────────────────────────────────────────────
+ 
+-export const isFusionCoreItem = (item) => item?.id === FUSION_CORE_ID;
++// id — каталожный id (предмет из каталога), weaponId — канонический id в стор-инвентаре
++// (addNewItem кладёт каталожный id в поле weaponId для всех типов предметов).
++export const isFusionCoreItem = (item) => item?.id === FUSION_CORE_ID || item?.weaponId === FUSION_CORE_ID;
+ 
+ /** Заряженные блоки среди предметов инвентаря. */
+ export const findChargedFusionCores = (inventoryItems) =>
+@@ -217,11 +246,11 @@ export const adjustPieceHp = (piece, delta, maxHp) => ({
+ // ─── Подавление нижних слоёв (§5.5) ─────────────────────────────────────────
+ 
+ /**
+- * ПРАВИЛО ВЛАДЕЛЬЦА: голый каркас НЕ подавляет нижние слои; подавляет надетая часть.
+- * Один флаг: есть хотя бы одна часть пакета → параметры одежды/брони скрыты.
++ * ПРАВИЛО ВЛАДЕЛЬЦА: подавление ЯЧЕЙКОВОЕ — надетая часть подавляет нижние слои
++ * только своего слота; голый каркас не подавляет ничего. Сетка на экране видна
++ * всегда, ячейка со частью СБ показывает только её параметры.
+  */
+-export const suppressesLowerLayers = (equipped) =>
+-  PA_PIECE_SLOTS.some((slot) => Boolean(equipped?.pieces?.[slot]));
++export const suppressesLayerAt = (equipped, slot) => Boolean(equipped?.pieces?.[slot]);
+ 
+ // ─── Модификаторы каркаса (§3.4/§5.6) ───────────────────────────────────────
+ 
+@@ -242,3 +271,20 @@ export const applyAttributeModifierValue = (base, entry) => {
+   if (entry?.op === '-') return base - value;
+   throw new Error(`[powerArmor] неизвестная операция атрибут-модификатора: ${entry?.op}`);
+ };
++
++/**
++ * Эффективные атрибуты с применёнными модификаторами каркаса (§5.6):
++ * получает массив [{name, value}] и КАТАЛОЖНЫЙ предмет каркаса (с modifiers).
++ * Каркаса нет / атрибутов нет → возвращает массив как есть (та же ссылка).
++ * Ключи атрибутов канонизируются (STR/СИЛ) — совпадает только объявленное в данных.
++ */
++export const applyFrameAttributeModifiers = (attributesArray, catalogFrameItem) => {
++  const mods = getFrameAttributeModifiers(catalogFrameItem);
++  if (!mods || !Array.isArray(attributesArray)) return attributesArray;
++  return attributesArray.map((attr) => {
++    const key = getCanonicalAttributeKey(attr?.name ?? attr?.id);
++    const entry = key ? mods[key] : null;
++    if (!entry) return attr;
++    return { ...attr, value: applyAttributeModifierValue(Number(attr.value) || 0, entry) };
++  });
++};
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index 4eb48d3..47077d1 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -35,7 +35,11 @@
+     "manipulatorWeightMessage": "This weapon exceeds the manipulator held-weight limit ({maxHeldWeight} lbs).",
+     "robotCannotUseTwoHandedMessage": "Current robot hands/manipulators cannot use two-handed weapons.",
+     "robotArmorOnlyTitle": "Equipment restriction",
+-    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.", "powerArmorNeedsCoreTitle": "Power Armor", "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.", "powerArmorNeedsFrameMessage": "Equip the power armor frame first.", "powerArmorDepletedTitle": "Power depleted", "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory."
++    "robotArmorOnlyMessage": "Robots cannot equip standard or power armor.", "powerArmorNeedsCoreTitle": "Power Armor", "powerArmorNeedsCoreMessage": "A charged Fusion Core is required to equip the frame.", "powerArmorNeedsFrameMessage": "Equip the power armor frame first.", "powerArmorDepletedTitle": "Power depleted", "powerArmorDepletedMessage": "The Fusion Core is depleted — the power armor has been removed to the inventory.",
++    "mutantCannotWearStandardArmorTitle": "Equipment restriction",
++    "mutantCannotWearStandardArmorMessage": "Super mutants cannot wear power armor.",
++    "powerArmorChooseCoreTitle": "Fusion Core selection",
++    "powerArmorBrokenPieceMessage": "This piece is broken (0 HP) and cannot be equipped. Repair it in the inventory."
+   },
+   "actions": {
+     "cancel": "Cancel",
+@@ -50,7 +54,8 @@
+     "apply": "Use",
+     "sell": "Sell",
+     "addLoot": "Add loot",
+-    "buyItems": "Buy items"
++    "buyItems": "Buy items",
++    "repair": "Repair"
+   },
+   "labels": {
+     "leftArm": "Left bracer",
+@@ -66,6 +71,7 @@
+     "pieces": "pcs",
+     "inventoryEmpty": "Inventory is empty",
+     "totalWeight": "Total weight",
+-    "totalPrice": "Total price"
++    "totalPrice": "Total price",
++    "durability": "HP"
+   }
+ }
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 913e630..231fcc4 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -165,14 +165,6 @@
+     }
+   },
+   "powerArmor": {
+-    "layer": "Power Armor",
+-    "frame": "Frame",
+-    "partNames": {
+-      "helmet": "Helmet",
+-      "chest": "Chest Piece",
+-      "arm": "Arm",
+-      "leg": "Leg"
+-    },
+     "durability": "HP",
+     "core": "Fusion Core: {value}",
+     "repair": "Repair"
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index c0a8441..ffaa2eb 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -35,7 +35,11 @@
+     "manipulatorWeightMessage": "Это оружие превышает допустимый удерживаемый вес манипулятора ({maxHeldWeight} фунтов).",
+     "robotCannotUseTwoHandedMessage": "Текущие руки/манипуляторы робота не могут использовать двуручное оружие.",
+     "robotArmorOnlyTitle": "Ограничение экипировки",
+-    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.", "powerArmorNeedsCoreTitle": "Силовая броня", "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.", "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.", "powerArmorDepletedTitle": "Питание исчерпано", "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь."
++    "robotArmorOnlyMessage": "Роботы не могут экипировать типовую или силовую броню.", "powerArmorNeedsCoreTitle": "Силовая броня", "powerArmorNeedsCoreMessage": "Чтобы надеть каркас, нужен заряженный Ядерный блок.", "powerArmorNeedsFrameMessage": "Сначала наденьте каркас силовой брони.", "powerArmorDepletedTitle": "Питание исчерпано", "powerArmorDepletedMessage": "Заряд Ядерного блока исчерпан — силовая броня снята в инвентарь.",
++    "mutantCannotWearStandardArmorTitle": "Ограничение экипировки",
++    "mutantCannotWearStandardArmorMessage": "Супермутантам силовая броня запрещена.",
++    "powerArmorChooseCoreTitle": "Выбор Ядерного блока",
++    "powerArmorBrokenPieceMessage": "Прочность части на нуле — её нельзя надеть. Почините её в инвентаре."
+   },
+   "actions": {
+     "cancel": "Отмена",
+@@ -50,7 +54,8 @@
+     "apply": "Применить",
+     "sell": "Продать",
+     "addLoot": "Добавить добычу",
+-    "buyItems": "Купить предметы"
++    "buyItems": "Купить предметы",
++    "repair": "Починить"
+   },
+   "labels": {
+     "leftArm": "Левый наруч",
+@@ -66,6 +71,7 @@
+     "pieces": "шт.",
+     "inventoryEmpty": "Инвентарь пуст",
+     "totalWeight": "Общий вес",
+-    "totalPrice": "Общая цена"
++    "totalPrice": "Общая цена",
++    "durability": "Прочность"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 1c18576..49e0af6 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -165,14 +165,6 @@
+     }
+   },
+   "powerArmor": {
+-    "layer": "Силовая броня",
+-    "frame": "Каркас",
+-    "partNames": {
+-      "helmet": "Шлем",
+-      "chest": "Нагрудник",
+-      "arm": "Наручи",
+-      "leg": "Поножи"
+-    },
+     "durability": "Прочность",
+     "core": "Ядерный блок: {value}",
+     "repair": "Починить"
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index d22662e..60198d7 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -545,8 +545,10 @@ const useCharacterStore = create(devtools(
+         // Generate unique ID for this item instance
+         const itemId = item.uniqueId || generateItemId(weaponId, appliedMods);
+         
+-        // Generate stackKey for stacking identical items
+-        const stackKey = generateStackKey(weaponId, appliedMods);
++        // Generate stackKey for stacking identical items.
++        // Предметы со своим ключом (силовая броня, Ядерный Блок — signature
++        // по прочности/зарядам/модам, см. domain/powerArmor) приносят ключ с собой.
++        const stackKey = item.stackKey || generateStackKey(weaponId, appliedMods);
+         
+         // Normalize item data with parameters
+         const normalizedItem = {
+@@ -609,6 +611,14 @@ const useCharacterStore = create(devtools(
+           protectedAreas: item.protectedAreas,
+           equippedSlots: item.equippedSlots,
+           equipInstanceId: item.equipInstanceId,
++
++          // Силовая броня / Ядерный Блок (docs/architecture/power-armor-plan.md §4)
++          set: item.set,
++          charges: item.charges,
++          maxCharges: item.maxCharges,
++          hpCurrent: item.hpCurrent,
++          installedPieces: item.installedPieces,
++          installedCore: item.installedCore,
+         };
+         
+         // Apply mod modifiers to parameters
+diff --git a/src/store/resolvers.js b/src/store/resolvers.js
+index bb40cd3..a2b50e7 100644
+--- a/src/store/resolvers.js
++++ b/src/store/resolvers.js
+@@ -108,6 +108,14 @@ import {
+ 
+ import { effectsDictToLegacyArray } from './effectsSync.js';
+ 
++// Силовая броня: модификаторы надетого каркаса (СИЛ=set 11 и др. — данные) применяются
++// К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
++// атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
++import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
++import dataPowerArmor from '../../data/equipment/powerArmor.json';
++
++const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
++
+ /**
+  * Calculate derived stats from attributes, effects, and trait
+  * @param {Object} attributes - Normalized attributes object
+@@ -124,6 +132,12 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+     value: attr.base,
+   }));
+ 
++  // Надетый каркас силовой брони подменяет атрибуты (set/add) для производных.
++  const attributesEffective = applyFrameAttributeModifiers(
++    attributesArray,
++    equipmentState?.powerArmorFrameId ? PA_FRAME_CATALOG : null,
++  );
++
+   const effectsArray = effectsDictToLegacyArray(effects);
+ 
+   const stats = {
+@@ -140,7 +154,7 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+   };
+ 
+   // Max Health: END + LCK + level
+-  stats.maxHealth.base = calculateMaxHealth(attributesArray, level);
++  stats.maxHealth.base = calculateMaxHealth(attributesEffective, level);
+   
+   // Timed effects: getTimedMaxHpBonus
+   const hpBonus = getTimedMaxHpBonus(effectsArray);
+@@ -168,15 +182,15 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+   });
+   
+   // Initiative: PER + AGI
+-  stats.initiative.base = calculateInitiative(attributesArray);
++  stats.initiative.base = calculateInitiative(attributesEffective);
+   stats.initiative.total = calculateAttributeTotal(stats.initiative);
+   
+   // Defense: AGI >= 9 ? 2 : 1
+-  stats.defense.base = calculateDefense(attributesArray);
++  stats.defense.base = calculateDefense(attributesEffective);
+   stats.defense.total = calculateAttributeTotal(stats.defense);
+   
+   // Melee Bonus: STR-based
+-  stats.meleeBonus.base = calculateMeleeBonusValue(attributesArray, trait);
++  stats.meleeBonus.base = calculateMeleeBonusValue(attributesEffective, trait);
+   stats.meleeBonus.total = calculateAttributeTotal(stats.meleeBonus);
+   
+   // Carry Weight:
+@@ -186,7 +200,7 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+   if (equipmentState.isRobot) {
+     stats.carryWeight.base = calculateRobotCarryWeight(robotSlots || {}, trait);
+   } else {
+-    stats.carryWeight.base = calculateCarryWeight(attributesArray, trait, equipmentState);
++    stats.carryWeight.base = calculateCarryWeight(attributesEffective, trait, equipmentState);
+   }
+   stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
+   

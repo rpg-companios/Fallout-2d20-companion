@@ -1,0 +1,317 @@
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index 9dfaf0a..a914cf3 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -1029,6 +1029,23 @@ export default function CharacterScreen() {
+     }
+ 
+     setSkillsSaved(true);
++
++    // Награды за выбранные навыки — молча добавляем в инвентарь.
++    try {
++      const allSkillKeys = [...selectedSkills, ...extraTaggedSkills];
++      if (allSkillKeys.length > 0) {
++        const { resolveSkillRewards } = await import('../../../domain/skillRewards');
++        // AmmoId берём прямо из стора — комплект уже резолвился при выборе,
++        // патроны лежат среди items. Никаких index.json и сканирования файлов.
++        const storeItems = Object.values(useCharacterStore.getState().items);
++        const ammoItem = storeItems.find(i => i.itemType === 'ammo');
++        const rewards = await resolveSkillRewards(allSkillKeys, { ammoFromKit: ammoItem?.id || null });
++        const { addNewItem } = useCharacterStore.getState();
++        rewards.forEach(item => addNewItem(item));
++      }
++    } catch (e) {
++      console.warn('skillRewards:', e?.message);
++    }
+   };
+ 
+   const handleResetAttributes = () => {
+diff --git a/data/skillRewards.json b/data/skillRewards.json
+new file mode 100644
+index 0000000..027cedf
+--- /dev/null
++++ b/data/skillRewards.json
+@@ -0,0 +1,104 @@
++{
++  "ATHLETICS": {
++    "items": [
++      { "itemId": "clothing_casual_clothes", "itemType": "clothing" },
++      { "itemId": "chem_buffout", "itemType": "chems", "quantity": 1 }
++    ]
++  },
++  "SMALL_GUNS": {
++    "items": [
++      { "rollType": "rollCD", "base": 6, "rollValue": 3, "itemType": "ammo_from_kit" }
++    ]
++  },
++  "BIG_GUNS": {
++    "items": [
++      { "rollType": "rollCD", "base": 4, "rollValue": 2, "itemId": "ammo_flamer_fuel", "itemType": "ammo" }
++    ]
++  },
++  "ENERGY_WEAPONS": {
++    "items": [
++      { "rollType": "rollCD", "base": 6, "rollValue": 3, "itemId": "ammo_energy_cell", "itemType": "ammo" }
++    ]
++  },
++  "MELEE_WEAPONS": {
++    "items": [
++      { "pickOne": [
++          { "itemId": "weapon_machete", "itemType": "weapon" },
++          { "itemId": "weapon_baseball_bat", "itemType": "weapon" }
++        ]
++      }
++    ]
++  },
++  "UNARMED": {
++    "items": [
++      { "itemId": "weapon_knuckles", "itemType": "weapon" }
++    ]
++  },
++  "THROWING": {
++    "items": [
++      { "pickOne": [
++          { "itemId": "weapon_throwing_knife", "itemType": "weapon", "rollType": "rollCD", "base": 4, "rollValue": 2 },
++          { "itemId": "weapon_tomahawk", "itemType": "weapon", "rollType": "rollCD", "base": 2, "rollValue": 1 }
++        ]
++      }
++    ]
++  },
++  "MEDICINE": {
++    "items": [
++      { "itemId": "item_doctors_bag", "itemType": "misc", "quantity": 1 },
++      { "itemId": "chem_stimpak", "itemType": "chems", "quantity": 1 }
++    ]
++  },
++  "SNEAK": {
++    "items": [
++      { "itemId": "chem_calmex", "itemType": "chems", "quantity": 1 }
++    ]
++  },
++  "LOCKPICK": {
++    "items": [
++      { "rollType": "rollCD", "base": 4, "rollValue": 2, "itemId": "item_bobby_pin", "itemType": "misc" }
++    ]
++  },
++  "PILOT": {
++    "items": [
++      { "rollType": "rollD20", "tableId": "trinklet", "quantity": 5, "countItems": true }
++    ]
++  },
++  "BARTER": {
++    "items": [
++      { "itemType": "currency", "rollType": "rollD20", "rollCount": 2 }
++    ]
++  },
++  "EXPLOSIVES": {
++    "items": [
++      { "pickOne": [
++          { "itemId": "weapon_molotov", "itemType": "weapon", "quantity": 2 },
++          { "itemId": "weapon_baseball_grenade", "itemType": "weapon", "quantity": 2 }
++        ]
++      }
++    ]
++  },
++  "SURVIVAL": {
++    "items": [
++      { "itemId": "drink_purified_water", "itemType": "drinks", "quantity": 2 },
++      { "itemId": "food_iguana_on_a_stick", "itemType": "food", "quantity": 2 }
++    ]
++  },
++  "REPAIR": {
++    "items": [
++      { "itemId": "item_multi_tool", "itemType": "misc", "quantity": 1 }
++    ]
++  },
++  "SCIENCE": {
++    "items": [
++      { "itemId": "clothing_lab_coat", "itemType": "clothing" },
++      { "itemId": "chem_mentats", "itemType": "chems", "quantity": 1 }
++    ]
++  },
++  "SPEECH": {
++    "items": [
++      { "itemId": "headwear_casual_hat", "itemType": "clothing" },
++      { "itemId": "clothing_casual_clothes", "itemType": "clothing" }
++    ]
++  }
++}
+diff --git a/domain/skillRewards.js b/domain/skillRewards.js
+new file mode 100644
+index 0000000..dbcd031
+--- /dev/null
++++ b/domain/skillRewards.js
+@@ -0,0 +1,173 @@
++// domain/skillRewards.js
++// Резолвит награды за выбранные навыки из data/skillRewards.json.
++// Механизм похож на kitResolver, но без UI — молча добавляет предметы в стор.
++
++import rewardData from '../data/skillRewards.json';
++import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
++import { evaluateRollConfig } from './diceRollsLogic';
++import { tWeaponsAndArmorScreen } from '../components/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
++import { debugLog } from '../src/debug/falloutDebug';
++
++const toNumber = (v) => Number.isFinite(v) ? v : Number(v) || 0;
++
++// Каталог по itemType для поиска предмета по id.
++const findInCatalog = (catalog, id, itemType) => {
++  const search = (arr) => (arr || []).find((e) => e.id === id);
++  switch (itemType) {
++    case 'weapon':
++      return search(catalog?.weapons) || null;
++    case 'ammo':
++      return search(catalog?.ammoTypes) || null;
++    case 'armor':
++      return catalog?.armorIndex?.byId?.get(id) || null;
++    case 'clothing':
++    case 'outfit': {
++      const all = (catalog?.clothes?.clothes || []).flatMap((g) => g.items || []);
++      return search(all) || null;
++    }
++    case 'chem':
++    case 'chems':
++      return search(catalog?.chems) || null;
++    case 'drinks':
++      return search(catalog?.drinks) || null;
++    case 'food':
++      return search(catalog?.food) || null;
++    case 'misc':
++    default: {
++      const misc = (catalog?.miscellaneous || []).flatMap((g) => g?.items || []);
++      return search(misc) || search(catalog?.generalGoods) || null;
++    }
++  }
++};
++
++// Бросок кубика (боевой): base + rollValue * CD результат.
++const rollCD = (base, rollValue) => {
++  const result = evaluateRollConfig({
++    rollType: 'rollCD',
++    base: toNumber(base),
++    rollValue: toNumber(rollValue),
++    op: '+',
++  });
++  return Math.max(toNumber(base), toNumber(result));
++};
++
++// Бросок d20 для currency.
++const rollD20Currency = () => {
++  return Math.floor(Math.random() * 20) + 1;
++};
++
++/**
++ * Резолвит одну запись награды в массив предметов для addNewItem.
++ * @param {object} entry — запись из skillRewards.json
++ * @param {object} catalog — getEquipmentCatalog()
++ * @param {object} kitContext — { ammoFromKit?: string } (для SMALL_GUNS)
++ * @returns {Promise<object[]>} — массив предметов
++ */
++const resolveEntry = async (entry, catalog, kitContext) => {
++  // pickOne — выбор одного из вариантов (случайно).
++  if (entry.pickOne) {
++    const options = entry.pickOne;
++    const chosen = options[Math.floor(Math.random() * options.length)];
++    return resolveEntry(chosen, catalog, kitContext);
++  }
++
++  // Currency (крышки).
++  if (entry.itemType === 'currency') {
++    const count = entry.rollCount || 1;
++    const items = [];
++    for (let i = 0; i < count; i++) {
++      const amount = rollD20Currency();
++      items.push({
++        id: `currency_${Date.now()}_${i}`,
++        itemType: 'misc',
++        subtype: 'currency',
++        name: tWeaponsAndArmorScreen('kitResolver.currency'),
++        quantity: amount,
++        weight: 0,
++        cost: amount,
++        stackKey: `currency:${amount}`,
++      });
++    }
++    return items;
++  }
++
++  // Бросок по таблице лута (d20 → таблица).
++  if (entry.rollType === 'rollD20' && entry.tableId) {
++    const count = entry.quantity || 1;
++    const result = await resolveRandomLootByRoll(entry.tableId, count);
++    return result || [];
++  }
++
++  // Боевой кубик (CD) — определяет количество.
++  let quantity = entry.quantity || 1;
++  if (entry.rollType === 'rollCD') {
++    quantity = rollCD(entry.base, entry.rollValue);
++  }
++
++  // Патроны из комплекта (SMALL_GUNS).
++  if (entry.itemType === 'ammo_from_kit') {
++    if (!kitContext?.ammoFromKit) {
++      debugLog('skillRewards.noKitAmmo', { skill: 'SMALL_GUNS' });
++      return [];
++    }
++    const base = findInCatalog(catalog, kitContext.ammoFromKit, 'ammo');
++    if (!base) return [];
++    return [{
++      ...base,
++      itemType: 'ammo',
++      quantity,
++      stackKey: `ammo:${kitContext.ammoFromKit}`,
++    }];
++  }
++
++  // Конкретный предмет.
++  if (entry.itemId) {
++    const base = findInCatalog(catalog, entry.itemId, entry.itemType);
++    if (!base) {
++      debugLog('skillRewards.itemNotFound', { id: entry.itemId, itemType: entry.itemType });
++      return [];
++    }
++    return [{
++      ...base,
++      itemType: entry.itemType || base.itemType,
++      quantity,
++    }];
++  }
++
++  return [];
++};
++
++/**
++ * Главная функция: берёт выбранные навыки, резолвит награды.
++ * @param {string[]} skillKeys — ["ATHLETICS", "BARTER", ...]
++ * @param {object} [options] — { ammoFromKit?: string } (id патрона из комплекта)
++ * @returns {Promise<object[]>} — массив предметов для addNewItem
++ */
++export const resolveSkillRewards = async (skillKeys, options = {}) => {
++  const catalog = getEquipmentCatalog();
++  const kitContext = { ammoFromKit: options.ammoFromKit || null };
++  const allItems = [];
++
++  for (const skillKey of skillKeys) {
++    const reward = rewardData[skillKey];
++    if (!reward?.items?.length) continue;
++
++    for (const entry of reward.items) {
++      try {
++        const items = await resolveEntry(entry, catalog, kitContext);
++        allItems.push(...items);
++      } catch (e) {
++        debugLog('skillRewards.resolveError', { skillKey, error: e?.message });
++      }
++    }
++  }
++
++  debugLog('skillRewards.resolved', {
++    skills: skillKeys,
++    itemCount: allItems.length,
++    items: allItems.map((i) => ({ id: i.id, name: i.name, qty: i.quantity })),
++  });
++
++  return allItems;
++};

@@ -1,0 +1,165 @@
+diff --git a/data/loot/weapons_melee.json b/data/loot/weapons_melee.json
+new file mode 100644
+index 0000000..bf66f20
+--- /dev/null
++++ b/data/loot/weapons_melee.json
+@@ -0,0 +1,158 @@
++[
++ {
++  "roll": 2,
++  "id": "weapon_deathclaw_gauntlet"
++ },
++ {
++  "roll": 3,
++  "id": "weapon_shishkebab"
++ },
++ {
++  "roll": 4,
++  "id": "weapon_shishkebab"
++ },
++ {
++  "roll": 5,
++  "id": "weapon_sledgehammer"
++ },
++ {
++  "roll": 6,
++  "id": "weapon_sledgehammer"
++ },
++ {
++  "roll": 7,
++  "id": "weapon_ripper"
++ },
++ {
++  "roll": 8,
++  "id": "weapon_ripper"
++ },
++ {
++  "roll": 9,
++  "id": "weapon_boxing_glove"
++ },
++ {
++  "roll": 10,
++  "id": "weapon_boxing_glove"
++ },
++ {
++  "roll": 11,
++  "id": "weapon_baton"
++ },
++ {
++  "roll": 12,
++  "id": "weapon_baton"
++ },
++ {
++  "roll": 13,
++  "id": "weapon_machete"
++ },
++ {
++  "roll": 14,
++  "id": "weapon_machete"
++ },
++ {
++  "roll": 15,
++  "id": "weapon_walking_cane"
++ },
++ {
++  "roll": 16,
++  "id": "weapon_walking_cane"
++ },
++ {
++  "roll": 17,
++  "id": "weapon_pool_cue"
++ },
++ {
++  "roll": 18,
++  "id": "weapon_pool_cue"
++ },
++ {
++  "roll": 19,
++  "id": "weapon_switchblade"
++ },
++ {
++  "roll": 20,
++  "id": "weapon_switchblade"
++ },
++ {
++  "roll": 21,
++  "id": "weapon_board"
++ },
++ {
++  "roll": 22,
++  "id": "weapon_board"
++ },
++ {
++  "roll": 23,
++  "id": "weapon_lead_pipe"
++ },
++ {
++  "roll": 24,
++  "id": "weapon_lead_pipe"
++ },
++ {
++  "roll": 25,
++  "id": "weapon_rolling_pin"
++ },
++ {
++  "roll": 26,
++  "id": "weapon_rolling_pin"
++ },
++ {
++  "roll": 27,
++  "id": "weapon_pipe_wrench"
++ },
++ {
++  "roll": 28,
++  "id": "weapon_pipe_wrench"
++ },
++ {
++  "roll": 29,
++  "id": "weapon_knuckles"
++ },
++ {
++  "roll": 30,
++  "id": "weapon_knuckles"
++ },
++ {
++  "roll": 31,
++  "id": "weapon_tire_iron"
++ },
++ {
++  "roll": 32,
++  "id": "weapon_tire_iron"
++ },
++ {
++  "roll": 33,
++  "id": "weapon_sword"
++ },
++ {
++  "roll": 34,
++  "id": "weapon_sword"
++ },
++ {
++  "roll": 35,
++  "id": "weapon_baseball_bat_aluminum"
++ },
++ {
++  "roll": 36,
++  "id": "weapon_baseball_bat_aluminum"
++ },
++ {
++  "roll": 37,
++  "id": "weapon_power_fist"
++ },
++ {
++  "roll": 38,
++  "id": "weapon_power_fist"
++ },
++ {
++  "roll": 39,
++  "id": "weapon_super_sledge"
++ },
++ {
++  "roll": 40,
++  "id": "weapon_super_sledge"
++ }
++]
+\ No newline at end of file

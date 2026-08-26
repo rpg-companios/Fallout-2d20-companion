@@ -1,0 +1,92 @@
+{
+  "alerts": {
+    "conditionsRemovedTitle": "Снято состояние",
+    "conditionsRemovedMessage": "Снято: {conditions}",
+    "addictionRollTitle": "Бросок на зависимость",
+    "addictionRollMessage": "Брошено: {faces} — {effectCount} эффект(ов) из {addictionLevel} нужных.",
+    "addictionGainedTitle": "Зависимость",
+    "addictionGainedMessage": "Вы стали зависимы от этого препарата.",
+    "addictionAvoidedTitle": "Зависимость",
+    "addictionAvoidedMessage": "Зависимость не наступила.",
+    "cannotEquipItem": "Этот предмет нельзя экипировать.",
+    "successTitle": "Успешно",
+    "appliedTitle": "Применено",
+    "effectsTitle": "Эффекты",
+    "noItemsTitle": "Ошибка",
+    "noItemsMessage": "Нет доступных предметов для экипировки.",
+    "replaceWeaponTitle": "Заменить оружие",
+    "replaceWeaponMessage": "Какое оружие вы хотите заменить?",
+    "replaceEquipmentTitle": "Замена экипировки",
+    "replaceEquipmentConfirm": "Надетые предметы будут сняты, чтобы освободить место. Продолжить?",
+    "bothSlotsBusy": "Оба слота заняты. Какой предмет заменить?",
+    "bothSlotsBusyPrompt": "Оба слота заняты. Что заменить? Введите 1 ({leftLabel}) или 2 ({rightLabel}).",
+    "applyConsumableTitle": "Применение расходника",
+    "applyConsumableQuestion": "Вы хотите применить {itemName} на себя или другого персонажа?",
+    "windowApplyConsumableQuestion": "Применить {itemName} на себя? Нажмите \"Отмена\", чтобы применить на другого персонажа.",
+    "healMessage": "Восстановлено {healAmount} единиц здоровья.",
+    "appliedMessage": "Применено: {itemName}.",
+    "diseaseCheckPassedTitle": "Проверка заражения пройдена",
+    "diseaseCheckFailedTitle": "Проверка заражения провалена",
+    "diseaseCheckMessage": "Сложность: {difficulty}\nБроски d20: {rolls}\nУспехи: {successes}",
+    "diseaseInfectedMessage": "{check}\nЗаражение: {diseaseName} (d20: {diseaseRoll}).",
+    "diseaseDuplicateMessage": "{check}\nБолезнь «{diseaseName}» уже активна.",
+    "diseaseImmuneMessage": "{check}\nИммунитет предотвращает заражение болезнью «{diseaseName}» (d20: {diseaseRoll}).",
+    "consumableResultTitle": "Результат применения",
+    "positiveResultSection": "Положительный результат",
+    "negativeResultSection": "Отрицательный результат",
+    "diseaseCheckPassedSummary": "Проверка заражения пройдена.",
+    "diseaseInfectedSummary": "Проверка заражения провалена. Заражение: {diseaseName}.",
+    "diseaseDuplicateSummary": "Проверка заражения провалена. Болезнь «{diseaseName}» уже активна.",
+    "diseaseImmuneSummary": "Проверка заражения провалена. Иммунитет предотвратил заражение болезнью «{diseaseName}».",
+    "conditionRemoval": {
+      "addicted": {
+        "removed": "Зависимость вылечена.",
+        "notPresent": "Активной зависимости нет."
+      },
+      "diseased": {
+        "removed": "Все болезни вылечены.",
+        "notPresent": "Активных болезней нет."
+      }
+    },
+    "foundItemBonus": "{perkName}: вы получили + {amount} {itemType}."
+  },
+  "foundItemTypes": {
+    "ammo": "патронов"
+  },
+  "actions": {
+    "cancel": "Отмена",
+    "yes": "Да",
+    "weapon": "Оружие",
+    "weapon1": "Оружие 1",
+    "weapon2": "Оружие 2",
+    "self": "На себя",
+    "other": "На другого",
+    "unequip": "↓ Снять",
+    "equip": "↑ Надеть",
+    "apply": "Применить",
+    "sell": "Продать",
+    "addLoot": "Добавить добычу",
+    "buyItems": "Купить предметы",
+    "repair": "Починить",
+    "contents": "Содержание",
+    "collapse": "Свернуть"
+  },
+  "labels": {
+    "leftArm": "Левый наруч",
+    "rightArm": "Правый наруч",
+    "leftLeg": "Левый понож",
+    "rightLeg": "Правый понож",
+    "item": "ПРЕДМЕТ",
+    "action": "ДЕЙСТВИЕ",
+    "unknownItem": "Неизвестный предмет",
+    "quantity": "Кол-во",
+    "price": "Цена",
+    "weight": "Вес",
+    "pieces": "шт.",
+    "inventoryEmpty": "Инвентарь пуст",
+    "totalWeight": "Общий вес",
+    "totalPrice": "Общая цена",
+    "durability": "Прочность (ОЗ)",
+    "ammo": "Боеприпас"
+  }
+}

@@ -1,0 +1,315 @@
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 21aad7b..4baddc5 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -1,5 +1,6 @@
+ import React, { useState, useMemo, useCallback, useEffect } from 'react';
+ import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useCharacter } from '../../CharacterContext';
+ import useCharacterStore from '../../../src/store/characterStore';
+ import { useShallow } from 'zustand/react/shallow';
+@@ -643,14 +644,16 @@ const WeaponsAndArmorScreen = () => {
+     [dedupedEquippedWeapons],
+   );
+ 
+-  // ── Режим отображения карточек оружия (настройка интерфейса) ─────────────
++  // ── Режим отображения оружия (переключатель — на этом экране) ───────────
+   const weaponCardsDisplayMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
++  const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
+ 
+   // Спойлеры: по умолчанию ЗАКРЫТЫ (в объекте хранятся открытые индексы).
+   const [openSpoilers, setOpenSpoilers] = useState({});
+   const toggleSpoiler = (index) => setOpenSpoilers((prev) => ({ ...prev, [index]: !prev[index] }));
+ 
+-  // Табы: активный индекс + свайп по строке табов.
++  // Табы: третий режим пока скрыт из UI переключателя, но код рендера и
++  // поддержка сохранённого значения 'tabs' сохраняются (ПРАВИЛО владельца).
+   const [activeTab, setActiveTab] = useState(0);
+   const weaponsCount = orderedEquippedWeapons.length;
+   useEffect(() => {
+@@ -991,7 +994,42 @@ const WeaponsAndArmorScreen = () => {
+               </View>
+             )}
+             
+-            {/* Оружие — режим отображения из настроек интерфейса */}
++            {/* Переключение вида оружия — справа между ячейками тела и оружием.
++                Реактивная смена через стор настроек; режимов два: спойлеры и карточки. */}
++            <View style={localStyles.weaponDisplayToggleRow}>
++              <TouchableOpacity
++                accessibilityRole="button"
++                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
++                onPress={() => setWeaponCardsDisplayMode('spoilers')}
++                style={[
++                  localStyles.weaponDisplayToggleBtn,
++                  weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
++                ]}
++              >
++                <MaterialCommunityIcons
++                  name="menu"
++                  size={20}
++                  color={weaponCardsDisplayMode === 'spoilers' ? '#e8a33d' : '#aaa'}
++                />
++              </TouchableOpacity>
++              <TouchableOpacity
++                accessibilityRole="button"
++                accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
++                onPress={() => setWeaponCardsDisplayMode('cards')}
++                style={[
++                  localStyles.weaponDisplayToggleBtn,
++                  weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,
++                ]}
++              >
++                <MaterialCommunityIcons
++                  name="view-column-outline"
++                  size={20}
++                  color={weaponCardsDisplayMode === 'cards' ? '#e8a33d' : '#aaa'}
++                />
++              </TouchableOpacity>
++            </View>
++            
++            {/* Оружие — режим отображения выбирается на этом экране */}
+             {weaponCardsDisplayMode === 'cards' && (
+               <View style={{ marginBottom: 16 }}>
+                 {Array.from({ length: Math.ceil(orderedEquippedWeapons.length / 2) || 1 }, (_, rowIndex) => (
+@@ -1122,7 +1160,6 @@ const WeaponsAndArmorScreen = () => {
+                 )}
+               </View>
+             )}
+-            
+ 
+         </ScrollView>
+       </SafeAreaView>
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+index 4adcb20..31acde9 100644
+--- a/components/settings/SettingsModal.js
++++ b/components/settings/SettingsModal.js
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React from 'react';
+ import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
+ import useAppSettingsStore from '../../src/store/appSettingsStore';
+ import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
+@@ -8,17 +8,11 @@ export default function SettingsModal({ visible, onClose }) {
+   const qualityEnabled = useAppSettingsStore((state) => state.randomWeaponQualityEnabled);
+   const loss = useAppSettingsStore((state) => state.weaponDurabilityLossPer10Shots);
+   const foldersEnabled = useAppSettingsStore((state) => state.characterFoldersEnabled);
+-  const weaponCardsMode = useAppSettingsStore((state) => state.weaponCardsDisplayMode);
+ 
+   const setDurabilityLossEnabled = useAppSettingsStore((state) => state.setWeaponDurabilityLossEnabled);
+   const setQualityEnabled = useAppSettingsStore((state) => state.setRandomWeaponQualityEnabled);
+   const setLoss = useAppSettingsStore((state) => state.setWeaponDurabilityLossPer10Shots);
+   const setFoldersEnabled = useAppSettingsStore((state) => state.setCharacterFoldersEnabled);
+-  const setWeaponCardsMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
+-
+-  // Меню выбора режима карточек оружия (стрелки ^ / v раскрывают пункты).
+-  const [cardsMenuOpen, setCardsMenuOpen] = useState(false);
+-  const WEAPON_CARDS_MODES = ['cards', 'spoilers', 'tabs'];
+ 
+   return (
+     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+@@ -72,45 +66,6 @@ export default function SettingsModal({ visible, onClose }) {
+             <Switch value={foldersEnabled} onValueChange={setFoldersEnabled} />
+           </View>
+ 
+-          <View style={styles.separator} />
+-
+-          <Text style={styles.sectionTitle}>{tHomeScreen('settings.interfaceTitle')}</Text>
+-
+-          <View style={styles.row}>
+-            <View style={styles.text}>
+-              <Text style={styles.label}>{tHomeScreen('settings.weaponCardsTitle')}</Text>
+-              <Text style={styles.description}>{tHomeScreen('settings.weaponCardsDescription')}</Text>
+-            </View>
+-            <View style={styles.cycle}>
+-              <TouchableOpacity onPress={() => setCardsMenuOpen((open) => !open)}>
+-                <Text style={styles.cycleArrow}>^</Text>
+-              </TouchableOpacity>
+-              <Text style={styles.cycleValue}>{tHomeScreen(`settings.weaponCards.${weaponCardsMode}`)}</Text>
+-              <TouchableOpacity onPress={() => setCardsMenuOpen((open) => !open)}>
+-                <Text style={styles.cycleArrow}>v</Text>
+-              </TouchableOpacity>
+-            </View>
+-          </View>
+-
+-          {cardsMenuOpen && (
+-            <View style={styles.menu}>
+-              {WEAPON_CARDS_MODES.map((mode) => (
+-                <TouchableOpacity
+-                  key={mode}
+-                  style={[styles.menuItem, weaponCardsMode === mode && styles.menuItemActive]}
+-                  onPress={() => {
+-                    setWeaponCardsMode(mode);
+-                    setCardsMenuOpen(false);
+-                  }}
+-                >
+-                  <Text style={[styles.menuItemText, weaponCardsMode === mode && styles.menuItemTextActive]}>
+-                    {tHomeScreen(`settings.weaponCards.${mode}`)}
+-                  </Text>
+-                </TouchableOpacity>
+-              ))}
+-            </View>
+-          )}
+-
+           <TouchableOpacity onPress={onClose} style={styles.close}>
+             <Text>OK</Text>
+           </TouchableOpacity>
+@@ -135,19 +90,5 @@ const styles = StyleSheet.create({
+   counter: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 20 },
+   button: { fontSize: 28, fontWeight: '700', paddingHorizontal: 12 },
+   value: { fontSize: 22, minWidth: 45, textAlign: 'center' },
+-  cycle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+-  cycleArrow: { fontSize: 22, fontWeight: '700', paddingHorizontal: 8, color: '#555' },
+-  cycleValue: { fontSize: 15, fontWeight: '600', minWidth: 70, textAlign: 'center' },
+-  menu: {
+-    borderWidth: 1,
+-    borderColor: '#ddd',
+-    borderRadius: 8,
+-    marginTop: 12,
+-    overflow: 'hidden',
+-  },
+-  menuItem: { paddingVertical: 10, paddingHorizontal: 14, backgroundColor: '#fafafa' },
+-  menuItemActive: { backgroundColor: '#e6eef7' },
+-  menuItemText: { fontSize: 15, color: '#333' },
+-  menuItemTextActive: { color: '#0a58ca', fontWeight: '700' },
+   close: { alignSelf: 'flex-end', marginTop: 18, padding: 10 },
+-});
+\ No newline at end of file
++});
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 269e10c..c3cd4c8 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -74,15 +74,7 @@
+     "qualityTitle": "Random weapon quality",
+     "qualityDescription": "Weapons added through \"Loot\" have random durability from 1 to 100. Merchant weapons are always 100%.",
+     "foldersTitle": "Character folders",
+-    "foldersDescription": "Organize created characters into folders.",
+-    "interfaceTitle": "Interface Settings",
+-    "weaponCardsTitle": "Weapon cards display",
+-    "weaponCardsDescription": "How weapons are shown on the equipment screen.",
+-    "weaponCards": {
+-      "cards": "Cards",
+-      "spoilers": "Spoilers",
+-      "tabs": "Tabs"
+-    }
++    "foldersDescription": "Organize created characters into folders."
+   },
+   "folders": {
+     "create": "Create folder",
+@@ -97,4 +89,4 @@
+     "moveHint": "Hold the arrow icon, then tap a folder to move the character.",
+     "moving": "Select a destination folder"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 855f4ce..cb9bf11 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -261,5 +261,9 @@
+     "robot_body_securitron": "Securitron Body",
+     "robot_arm_securitron": "Securitron Arm",
+     "robot_legs_securitron": "Securitron Wheel"
++  },
++  "displayToggle": {
++    "spoilers": "List (spoilers)",
++    "cards": "Weapon cards"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index d0f8bd1..57b24b8 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -74,15 +74,7 @@
+     "qualityTitle": "Произвольное качество оружия",
+     "qualityDescription": "Оружие, добавленное через «Лут», имеет случайную прочность от 1 до 100. Оружие торговцев всегда 100%.",
+     "foldersTitle": "Каталоги персонажей",
+-    "foldersDescription": "Организуйте созданных персонажей по каталогам.",
+-    "interfaceTitle": "Настройки интерфейса",
+-    "weaponCardsTitle": "Отображение карточек оружия",
+-    "weaponCardsDescription": "Способ показа оружия на экране снаряжения.",
+-    "weaponCards": {
+-      "cards": "Карточки",
+-      "spoilers": "Спойлеры",
+-      "tabs": "Табы"
+-    }
++    "foldersDescription": "Организуйте созданных персонажей по каталогам."
+   },
+   "folders": {
+     "create": "Создать каталог",
+@@ -97,4 +89,4 @@
+     "moveHint": "Удерживайте значок стрелок, затем нажмите каталог для переноса.",
+     "moving": "Выберите каталог назначения"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 8ad4706..5f23694 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -261,5 +261,9 @@
+     "robot_body_securitron": "Корпус Секьюритрона",
+     "robot_arm_securitron": "Рука Секьюритрона",
+     "robot_legs_securitron": "Колесо Секьюритрона"
++  },
++  "displayToggle": {
++    "spoilers": "Список (спойлеры)",
++    "cards": "Карточки оружия"
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index dff751f..2e4ab48 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -12,7 +12,7 @@ const useAppSettingsStore = create(
+       weaponDurabilityLossPer10Shots: 1,
+       characterFoldersEnabled: false,
+       // Режим отображения карточек оружия на экране снаряжения:
+-      // 'cards' (по умолчанию) | 'spoilers' | 'tabs'
++      // 'cards' (по умолчанию) | 'spoilers' | 'tabs' (пока скрыт из UI).
+       weaponCardsDisplayMode: 'cards',
+       setCharacterFoldersEnabled: (enabled) => set({ characterFoldersEnabled: Boolean(enabled) }),
+       setRandomWeaponQualityEnabled: (enabled) => set({ randomWeaponQualityEnabled: Boolean(enabled) }),
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index c450ee2..c860b52 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -307,6 +307,31 @@ const styles = StyleSheet.create({
+   weaponSpoilerBody: { alignItems: 'center', marginTop: 8 },
+   weaponSpoilerCard: { width: '66.67%' },
+ 
++  // Переключатель вида оружия на самом экране снаряжения (две векторные иконки
++  // справа: горизонтальные линии = спойлеры, две вертикальные черты = карточки).
++  weaponDisplayToggleRow: {
++    flexDirection: 'row',
++    justifyContent: 'flex-end',
++    alignItems: 'center',
++    gap: 8,
++    marginBottom: 12,
++  },
++  weaponDisplayToggleBtn: {
++    width: 38,
++    height: 32,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: '#2c2c2c',
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++  },
++  weaponDisplayToggleBtnActive: {
++    borderColor: '#e8a33d',
++    backgroundColor: '#4a4a4a',
++  },
++
++  // Третий режим (табы) скрыт из переключателя, но стили рендера сохранены.
+   weaponTabsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10, gap: 6 },
+   weaponTab: {
+     paddingHorizontal: 16,

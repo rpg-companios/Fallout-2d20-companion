@@ -1,0 +1,278 @@
+diff --git a/__tests__/securitron/screens-render.test.js b/__tests__/securitron/screens-render.test.js
+index 0deb06e..668bb69 100644
+--- a/__tests__/securitron/screens-render.test.js
++++ b/__tests__/securitron/screens-render.test.js
+@@ -138,6 +138,34 @@ describe('Экраны рендерятся без TDZ/хук-ошибок', ()
+     const texts = getTexts(renderer.toJSON());
+     expect(texts.length).toBeGreaterThan(0);
+   });
++
++  it('экипированная бритва показывается под своим именем, а не «Складной нож»', () => {
++    useCharacterStore.setState({
++      items: {
++        weapon_switchblade_опасная_бритва: {
++          id: 'weapon_switchblade_опасная_бритва',
++          instanceId: 'weapon_switchblade_опасная_бритва',
++          weaponId: 'weapon_switchblade', // истинный id — нож
++          itemType: 'weapon',
++          name: 'Опасная бритва',
++          baseName: 'Опасная бритва', // заменённое имя варианта
++          equipped: true,
++          quantity: 1,
++          stackKey: 'weapon_switchblade_опасная_бритва',
++          damage: 2,
++          fireRate: 0,
++          qualities: [{ qualityId: 'quality_concealed' }],
++        },
++      },
++    });
++    let renderer;
++    TestRenderer.act(() => {
++      renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
++    });
++    const texts = getTexts(renderer.toJSON());
++    expect(texts.some((t) => String(t).includes('Опасная бритва'))).toBe(true);
++    expect(texts.some((t) => String(t) === 'Складной нож')).toBe(false);
++  });
+ });
+ 
+ describe('Режимы отображения карточек оружия', () => {
+diff --git a/__tests__/securitron/uniq-quality.test.js b/__tests__/securitron/uniq-quality.test.js
+index f83b6ad..6e31f91 100644
+--- a/__tests__/securitron/uniq-quality.test.js
++++ b/__tests__/securitron/uniq-quality.test.js
+@@ -147,6 +147,18 @@ describe('Комплект: крепление качества данными',
+     expect(hat.name).toBe('Дерзкая Формальная шляпа');
+   });
+ 
++  it('комплект Председателей: одежда и шляпа с качеством elegant в названии', async () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    const kit = catalog.equipmentKits.treefamilies_chairmen;
++    const resolved = await resolveKitItems({ id: 'treefamilies_chairmen', items: kit.items });
++    const clothes = resolved.items.find((i) => i.clothingId === 'clothing_fancy_clothes');
++    const hat = resolved.items.find((i) => i.clothingId === 'headwear_fancy_hat');
++    expect(clothes.uniqQualities).toEqual(['elegant']);
++    expect(clothes.name).toBe('Элегантная Формальная одежда');
++    expect(hat.uniqQualities).toEqual(['elegant']);
++    expect(hat.name).toBe('Элегантная Формальная шляпа');
++  });
++
+   it('оружие с качеством: имя = [моды, качества, имя]', async () => {
+     const item = await resolveWeaponItem({
+       type: 'fixed',
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index e2008cd..21aad7b 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -430,8 +430,12 @@ const getLocalizedModifiedWeaponName = (catalog, weapon, base) => {
+     .map((modId) => (catalog?.weaponMods || []).find((mod) => mod.id === modId)?.prefix)
+     .filter(Boolean);
+ 
+-  const localizedBaseName = base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
+-  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : (base?.name || weapon?.name);
++  // Имя варианта (baseName, напр. «Опасная бритва») — важнее каталожного имени
++  // истинного предмета («Складной нож»); имя с уникальными качествами — из стора.
++  const localizedBaseName = weapon?.baseName
++    || (weapon?.uniqQualities?.length ? weapon?.name : undefined)
++    || base?.stockNames?.without || base?.name || weapon?.baseWeaponName || weapon?.name;
++  return prefixes.length ? prefixes.join(' ') + ' ' + localizedBaseName : localizedBaseName;
+ };
+ 
+ const findLocalizedWeapon = (catalog, weapon) => {
+@@ -442,6 +446,10 @@ const findLocalizedWeapon = (catalog, weapon) => {
+   // Если на оружии применены моды (есть baseWeaponName), сохраняем все модифицированные поля.
+   // Иначе — catalog-данные имеют приоритет (для i18n).
+   const hasAppliedMods = weapon.baseWeaponName != null;
++  // Вариант (baseName) или уникальные качества — предмет имеет собственное имя
++  // («Опасная бритва», «Дерзкая …»), каталог по истинному id его не знает:
++  // имя берём из стора, не затираем каталожным.
++  const hasOwnIdentity = weapon.baseName != null || (weapon.uniqQualities || []).length > 0;
+ 
+   return {
+     ...weapon,
+@@ -468,7 +476,7 @@ const findLocalizedWeapon = (catalog, weapon) => {
+       cost: weapon.cost,
+       effects: weapon.effects,
+     } : {
+-      name: base.name || weapon.name,
++      name: hasOwnIdentity ? (weapon.baseName || weapon.name || base.name) : (base.name || weapon.name),
+     }),
+   };
+ };
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0e639d2..c38a811 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,11 @@
+ # Changelog
+ 
++## 67 — Equipment screen knows the variant name; "Elegant" quality for the Chairmen
++
++- FIX: the Equipment screen (WeaponsAndArmorScreen) did not know about the name replacement — for it the razor was the "Складной нож": storeItemToWeaponDisplay sets `id = weaponId` (the true knife id), findLocalizedWeapon found the knife in the catalog and overwrote the name. Items with their own identity (variant `baseName` or uniq qualities `uniqQualities`) now show their stored name: «Опасная бритва», «Дерзкая …»; the modded name composes from the replaced one («Зазубренное лезвие Опасная бритва»). Regular weapons — as before (catalog, i18n).
++- CONTENT: quality `elegant` («Элегантная» / "Elegant") in the module uniq-qualities catalog; the Chairmen kit grants the formal clothes and hat with this quality — «Элегантная Формальная одежда», «Элегантная Формальная шляпа». The quality does nothing yet — only the name (and the stack: elegant ≠ no quality).
++- Tests: equipment-screen render with an equipped razor (name «Опасная бритва», not «Складной нож»), Chairmen kit (clothes/hat with elegant in the name).
++
+ ## 66 — Fix build syntax errors (Metro/Babel)
+ 
+ - `domain/traits.js`: name collision after the registry refactor (patch 62) — the local `getTraitI18n(id)` (trait name/description by id) clashed with the registry import `getTraitI18n(locale)` (locale dictionary). The local one is renamed to `getTraitI18nById`; modals updated (GenericTraitModal, SurvivorModal, TribalModal, TreeFamiliesModal). Only Metro caught it at build time (`Identifier has already been declared`); vitest tolerated it.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c388108..7d66c48 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,14 @@
+ 
+ ---
+ 
++## 67 — Экран «Снаряжение» знает имя варианта; качество «Элегантная» у Председателей
++
++- ФИКС: экран «Снаряжение» (WeaponsAndArmorScreen) не знал о замене имени — для него бритва была «Складным ножом»: `storeItemToWeaponDisplay` подставляет `id = weaponId` (истинный id ножа), `findLocalizedWeapon` находил в каталоге нож и затирал имя. Теперь предметы с собственной идентичностью (вариант `baseName` или уникальные качества `uniqQualities`) показываются под своим именем из стора: «Опасная бритва», «Дерзкая …»; имя с модами собирается от заменённого («Зазубренное лезвие Опасная бритва»). Обычное оружие — как раньше (каталог, i18n).
++- КОНТЕНТ: качество `elegant` («Элегантная» / "Elegant") в каталоге уникальных качеств модуля; комплект Председателей выдаёт формальную одежду и шляпу с этим качеством — «Элегантная Формальная одежда», «Элегантная Формальная шляпа». Качество пока ничего не делает — только имя (и стек: элегантная ≠ без качества).
++- Тесты: рендер экрана «Снаряжение» с экипированной бритвой (имя «Опасная бритва», не «Складной нож»), комплект Председателей (одежда/шляпа с elegant в имени).
++
++---
++
+ ## 66 — Фикс синтаксических ошибок сборки (Metro/Babel)
+ 
+ - `domain/traits.js`: коллизия имён после рефакторинга реестра (патч 62) — локальная `getTraitI18n(id)` (имя/описание трейта по id) конфликтовала с импортом `getTraitI18n(locale)` из реестра (словарь локали). Локальная переименована в `getTraitI18nById`; обновлены модалки (GenericTraitModal, SurvivorModal, TribalModal, TreeFamiliesModal). Ошибку ловил только Metro при сборке (`Identifier has already been declared`), vitest её терпел.
+diff --git a/modules/fallout/data/equipmentKits.json b/modules/fallout/data/equipmentKits.json
+index 39a8ec9..35b8025 100644
+--- a/modules/fallout/data/equipmentKits.json
++++ b/modules/fallout/data/equipmentKits.json
+@@ -1,31 +1,80 @@
+ {
+   "treefamilies_chairmen": {
+     "items": [
+-      { "type": "fixed", "clothingId": "clothing_fancy_clothes", "itemType": "clothing" },
+-      { "type": "fixed", "clothingId": "headwear_fancy_hat", "itemType": "clothing" },
++      {
++        "type": "fixed",
++        "clothingId": "clothing_fancy_clothes",
++        "itemType": "clothing",
++        "uniqQualities": [
++          "elegant"
++        ]
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_fancy_hat",
++        "itemType": "clothing",
++        "uniqQualities": [
++          "elegant"
++        ]
++      },
+       {
+         "type": "fixed",
+         "weaponId": "weapon_9mm_pistol",
+         "itemType": "weapon",
+         "ammo": {
+           "ammoId": "ammo_9mm",
+-          "quantity": { "base": 12, "rollType": "rollCD", "rollValue": 4, "op": "+" }
++          "quantity": {
++            "base": 12,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
+         }
+       },
+-      { "type": "fixed", "weaponId": "weapon_straight_razor", "itemType": "weapon" },
+-      { "type": "fixed", "itemId": "CasinoTopsChip", "itemType": "misc", "quantity": 1 },
+-      { "type": "rollTable", "tableId": "oddity", "roll": { "rollType": "D20", "count": 1, "mode": "separate" } },
+-      { "type": "fixed", "itemId": "item_marked_cards", "itemType": "misc", "quantity": 1 }
++      {
++        "type": "fixed",
++        "weaponId": "weapon_straight_razor",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "itemId": "CasinoTopsChip",
++        "itemType": "misc",
++        "quantity": 1
++      },
++      {
++        "type": "rollTable",
++        "tableId": "oddity",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_marked_cards",
++        "itemType": "misc",
++        "quantity": 1
++      }
+     ]
+   },
+   "treefamilies_omerta": {
+     "items": [
+-      { "type": "fixed", "itemType": "currency", "quantity": 100 }
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 100
++      }
+     ]
+   },
+   "treefamilies_white_glove": {
+     "items": [
+-      { "type": "fixed", "itemType": "currency", "quantity": 100 }
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 100
++      }
+     ]
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/uniq_qualities.json b/modules/fallout/data/uniq_qualities.json
+index fe51488..bffd066 100644
+--- a/modules/fallout/data/uniq_qualities.json
++++ b/modules/fallout/data/uniq_qualities.json
+@@ -1 +1,5 @@
+-[]
++[
++  {
++    "id": "elegant"
++  }
++]
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/en-EN.json b/modules/fallout/i18n/en-EN.json
+index 589d687..9c4dadf 100644
+--- a/modules/fallout/i18n/en-EN.json
++++ b/modules/fallout/i18n/en-EN.json
+@@ -49,5 +49,10 @@
+       "name": "White Glove Society"
+     }
+   },
+-  "uniqQualities": []
++  "uniqQualities": [
++    {
++      "id": "elegant",
++      "name": "Elegant"
++    }
++  ]
+ }
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU.json b/modules/fallout/i18n/ru-RU.json
+index a112fb6..4318068 100644
+--- a/modules/fallout/i18n/ru-RU.json
++++ b/modules/fallout/i18n/ru-RU.json
+@@ -49,5 +49,10 @@
+       "name": "Общество «Белая перчатка»"
+     }
+   },
+-  "uniqQualities": []
++  "uniqQualities": [
++    {
++      "id": "elegant",
++      "name": "Элегантная"
++    }
++  ]
+ }
+\ No newline at end of file

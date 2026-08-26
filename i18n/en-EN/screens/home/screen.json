@@ -1,0 +1,127 @@
+{
+  "title": "Character Manager",
+  "createButton": {
+    "text": "Create\nCharacter",
+    "plus": "+"
+  },
+  "upload": {
+    "icon": "⇪",
+    "button": "Upload\nCharacter",
+    "unsupported": "File import is available only in web version.",
+    "overwriteConfirm": "Character with this name already exists. Overwrite it?",
+    "errors": {
+      "default": "Failed to import character.",
+      "invalidJson": "The file is corrupted: invalid JSON.",
+      "invalidFormat": "Unsupported export file format.",
+      "unsupportedVersion": "This export file version is not supported.",
+      "missingCharacter": "Character block is missing in the file.",
+      "missingName": "Character name is missing in the file.",
+      "missingData": "Character data is missing in the file."
+    }
+  },
+  "download": {
+    "unsupported": "File save/export is available only in web version.",
+    "errors": {
+      "notFound": "Character was not found.",
+      "failed": "Failed to save file."
+    }
+  },
+  "characterActions": {
+    "openMenu": "Character actions",
+    "download": "Download character",
+    "duplicate": "Duplicate character",
+    "delete": "Delete character",
+    "copySuffix": "copy",
+    "duplicateError": "Failed to duplicate character."
+  },
+  "deleteConfirm": "Do you really want to delete this character?",
+  "language": {
+    "russian": "Ru",
+    "english": "En",
+    "settingTitle": "Setting language",
+    "localeCode": "Language {code}"
+  },
+  "labels": {
+    "level": "Lvl."
+  },
+  "buttons": {
+    "yes": "Yes",
+    "no": "No",
+    "ok": "Ok"
+  },
+  "menu": {
+    "sync": "Cloud sync",
+    "about": "About app",
+    "community": "Community",
+    "buyCoffee": "Buy author a coffee",
+    "buyCoffeeDescription": "Support the app's development on Boosty.",
+    "checkUpdates": "Check for updates",
+    "settings": "Settings",
+    "gameSetting": "Game setting"
+  },
+  "cloudSync": {
+    "unsupported": "Cloud sync is available only in web version.",
+    "remoteIsNewer": "Newer character saves were found in cloud. Download them locally?",
+    "success": "Sync completed.",
+    "error": "Cloud sync failed."
+  },
+  "pwa": {
+    "install": "Install App",
+    "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
+    "androidInstructions": "To install the app on Android:\n\nIn Chrome — tap the menu (⋮) in the top right corner and select «Install app» or «Add to Home screen».\n\nIn Samsung Internet — tap the menu (☰) → «Add page» → «On Home screen».",
+    "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
+  },
+  "settings": {
+    "title": "Settings",
+    "appearanceTitle": "Appearance",
+    "bootScreenTitle": "Positronium startup screen",
+    "bootScreenDescription": "Show the engine startup screen when the application launches.",
+    "characterDeleteActionPlacementTitle": "Delete character",
+    "characterDeleteActionPlacementDescription": "Where to show the delete character action.",
+    "characterDeleteActionPlacement": {
+      "menu": "In action menu",
+      "card": "On character card"
+    },
+    "survivalModeTitle": "Survival Mode Settings",
+    "durabilityTitle": "Weapon wear on firing",
+    "durabilityDescription": "Enable weapon wear mechanic when firing.",
+    "lossTitle": "Durability loss per 10 shots",
+    "lossDescription": "The default is 1 durability per 10 shots. Unreliable weapons use twice as much, while Reliable weapons use half as much.",
+    "qualityTitle": "Random weapon quality",
+    "qualityDescription": "Weapons added through \"Loot\" have random durability from 1 to 100. Merchant weapons are always 100%.",
+    "foldersTitle": "Character folders",
+    "foldersDescription": "Organize created characters into folders.",
+    "cardsTitle": "Weapon cards view",
+    "cardsDescription": "How weapon cards are displayed on the equipment screen.",
+    "cards": {
+      "cards": "Cards",
+      "spoilers": "Spoilers",
+      "tabs": "Tabs"
+    }
+  },
+  "folders": {
+    "create": "Create folder",
+    "namePlaceholder": "Folder name",
+    "confirm": "Create",
+    "cancel": "Cancel",
+    "characters": "Characters",
+    "back": "Back",
+    "deleteTitle": "Delete folder?",
+    "deleteMessage": "The folder and all characters inside it will be permanently deleted.",
+    "deleteConfirm": "Delete folder and characters",
+    "moveHint": "Hold the arrow icon, then tap a folder to move the character.",
+    "moving": "Select a destination folder"
+  },
+  "subtitle": "Positronium",
+  "about": {
+    "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud."
+  },
+  "gameSetting": {
+    "title": "Game setting",
+    "select": "Select",
+    "delete": "Delete",
+    "chooseSetting": "Choose a setting",
+    "install": "Install",
+    "localTrpg": ".trpg"
+  }
+}

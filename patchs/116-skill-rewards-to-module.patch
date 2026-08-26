@@ -1,0 +1,391 @@
+diff --git a/__tests__/securitron/skill-rewards-module-move.test.js b/__tests__/securitron/skill-rewards-module-move.test.js
+new file mode 100644
+index 0000000..c86a354
+--- /dev/null
++++ b/__tests__/securitron/skill-rewards-module-move.test.js
+@@ -0,0 +1,24 @@
++/**
++ * Разделение движок/сеттинг (патч 116): награды за навыки перенесены
++ * в модуль с канонизацией itemType ('chems' → 'chem'). data/skillRewards.json
++ * — пустая движковая база ({}).
++ */
++import { describe, it, expect } from 'vitest';
++import moduleSkillRewards from '../../modules/fallout/data/skillRewards.json';
++import dataSkillRewards from '../../data/skillRewards.json';
++
++describe('Награды навыков в модуле (сеттинг), data/ — пустой движок', () => {
++  it('модуль содержит награды для всех навыков, itemType каноничен', () => {
++    expect(Object.keys(moduleSkillRewards).length).toBe(17);
++    for (const [skill, rec] of Object.entries(moduleSkillRewards)) {
++      expect(Array.isArray(rec.items), skill).toBe(true);
++      for (const item of rec.items) {
++        expect(item.itemType, `${skill}.${item.itemId}`).not.toBe('chems');
++      }
++    }
++  });
++
++  it('data/ пуст', () => {
++    expect(dataSkillRewards).toEqual({});
++  });
++});
+diff --git a/data/skillRewards.json b/data/skillRewards.json
+index 027cedf..0967ef4 100644
+--- a/data/skillRewards.json
++++ b/data/skillRewards.json
+@@ -1,104 +1 @@
+-{
+-  "ATHLETICS": {
+-    "items": [
+-      { "itemId": "clothing_casual_clothes", "itemType": "clothing" },
+-      { "itemId": "chem_buffout", "itemType": "chems", "quantity": 1 }
+-    ]
+-  },
+-  "SMALL_GUNS": {
+-    "items": [
+-      { "rollType": "rollCD", "base": 6, "rollValue": 3, "itemType": "ammo_from_kit" }
+-    ]
+-  },
+-  "BIG_GUNS": {
+-    "items": [
+-      { "rollType": "rollCD", "base": 4, "rollValue": 2, "itemId": "ammo_flamer_fuel", "itemType": "ammo" }
+-    ]
+-  },
+-  "ENERGY_WEAPONS": {
+-    "items": [
+-      { "rollType": "rollCD", "base": 6, "rollValue": 3, "itemId": "ammo_energy_cell", "itemType": "ammo" }
+-    ]
+-  },
+-  "MELEE_WEAPONS": {
+-    "items": [
+-      { "pickOne": [
+-          { "itemId": "weapon_machete", "itemType": "weapon" },
+-          { "itemId": "weapon_baseball_bat", "itemType": "weapon" }
+-        ]
+-      }
+-    ]
+-  },
+-  "UNARMED": {
+-    "items": [
+-      { "itemId": "weapon_knuckles", "itemType": "weapon" }
+-    ]
+-  },
+-  "THROWING": {
+-    "items": [
+-      { "pickOne": [
+-          { "itemId": "weapon_throwing_knife", "itemType": "weapon", "rollType": "rollCD", "base": 4, "rollValue": 2 },
+-          { "itemId": "weapon_tomahawk", "itemType": "weapon", "rollType": "rollCD", "base": 2, "rollValue": 1 }
+-        ]
+-      }
+-    ]
+-  },
+-  "MEDICINE": {
+-    "items": [
+-      { "itemId": "item_doctors_bag", "itemType": "misc", "quantity": 1 },
+-      { "itemId": "chem_stimpak", "itemType": "chems", "quantity": 1 }
+-    ]
+-  },
+-  "SNEAK": {
+-    "items": [
+-      { "itemId": "chem_calmex", "itemType": "chems", "quantity": 1 }
+-    ]
+-  },
+-  "LOCKPICK": {
+-    "items": [
+-      { "rollType": "rollCD", "base": 4, "rollValue": 2, "itemId": "item_bobby_pin", "itemType": "misc" }
+-    ]
+-  },
+-  "PILOT": {
+-    "items": [
+-      { "rollType": "rollD20", "tableId": "trinklet", "quantity": 5, "countItems": true }
+-    ]
+-  },
+-  "BARTER": {
+-    "items": [
+-      { "itemType": "currency", "rollType": "rollD20", "rollCount": 2 }
+-    ]
+-  },
+-  "EXPLOSIVES": {
+-    "items": [
+-      { "pickOne": [
+-          { "itemId": "weapon_molotov", "itemType": "weapon", "quantity": 2 },
+-          { "itemId": "weapon_baseball_grenade", "itemType": "weapon", "quantity": 2 }
+-        ]
+-      }
+-    ]
+-  },
+-  "SURVIVAL": {
+-    "items": [
+-      { "itemId": "drink_purified_water", "itemType": "drinks", "quantity": 2 },
+-      { "itemId": "food_iguana_on_a_stick", "itemType": "food", "quantity": 2 }
+-    ]
+-  },
+-  "REPAIR": {
+-    "items": [
+-      { "itemId": "item_multi_tool", "itemType": "misc", "quantity": 1 }
+-    ]
+-  },
+-  "SCIENCE": {
+-    "items": [
+-      { "itemId": "clothing_lab_coat", "itemType": "clothing" },
+-      { "itemId": "chem_mentats", "itemType": "chems", "quantity": 1 }
+-    ]
+-  },
+-  "SPEECH": {
+-    "items": [
+-      { "itemId": "headwear_casual_hat", "itemType": "clothing" },
+-      { "itemId": "clothing_casual_clothes", "itemType": "clothing" }
+-    ]
+-  }
+-}
++{}
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 42ceb42..206d54e 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -76,6 +76,7 @@ modules/fallout/
+ | general_goods | 35 (31 база + 4 модуля) | 0 (`[]`) | патч 113 |
+ | robot | 8 файлов (104 детали) + robotparts | 0 (`[]`/`{}`) | патч 114 |
+ | perks | 94 | 0 (`[]`) | патч 115 |
++| skillRewards | 17 навыков | 0 (`{}`) | патч 116 |
+ 
+ ### 2.3 Категории, где модуль содержит только НОВЫЕ записи (база в `data/`)
+ 
+@@ -103,7 +104,6 @@ modules/fallout/
+ |---|---|---|
+ | Ориджины (база) | `data/origins/origins.json` | 17 |
+ | Трейты (база) | `data/traits/traits.json` | 32 |
+-| Награды навыков | `data/skillRewards.json` | словарь |
+ | Планы тела | `data/bodyplans/bodyplans.json` | словарь |
+ 
+ ### 3.2 Прямые чтения `data/` мимо реестра/каталога
+diff --git a/domain/skillRewards.js b/domain/skillRewards.js
+index 82113d9..d2ca440 100644
+--- a/domain/skillRewards.js
++++ b/domain/skillRewards.js
+@@ -2,7 +2,7 @@
+ // Резолвит награды за выбранные навыки из data/skillRewards.json.
+ // Механизм похож на kitResolver, но без UI — молча добавляет предметы в стор.
+ 
+-import rewardData from '../data/skillRewards.json';
++import rewardData from '../modules/fallout/data/skillRewards.json';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import { resolveRandomLootByRoll } from '../components/screens/CharacterScreen/logic/RandomLootLogic';
+ import { evaluateRollConfig } from './diceRollsLogic';
+diff --git a/modules/fallout/data/skillRewards.json b/modules/fallout/data/skillRewards.json
+new file mode 100644
+index 0000000..86509c8
+--- /dev/null
++++ b/modules/fallout/data/skillRewards.json
+@@ -0,0 +1,212 @@
++{
++  "ATHLETICS": {
++    "items": [
++      {
++        "itemId": "clothing_casual_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "itemId": "chem_buffout",
++        "itemType": "chem",
++        "quantity": 1
++      }
++    ]
++  },
++  "SMALL_GUNS": {
++    "items": [
++      {
++        "rollType": "rollCD",
++        "base": 6,
++        "rollValue": 3,
++        "itemType": "ammo_from_kit"
++      }
++    ]
++  },
++  "BIG_GUNS": {
++    "items": [
++      {
++        "rollType": "rollCD",
++        "base": 4,
++        "rollValue": 2,
++        "itemId": "ammo_flamer_fuel",
++        "itemType": "ammo"
++      }
++    ]
++  },
++  "ENERGY_WEAPONS": {
++    "items": [
++      {
++        "rollType": "rollCD",
++        "base": 6,
++        "rollValue": 3,
++        "itemId": "ammo_energy_cell",
++        "itemType": "ammo"
++      }
++    ]
++  },
++  "MELEE_WEAPONS": {
++    "items": [
++      {
++        "pickOne": [
++          {
++            "itemId": "weapon_machete",
++            "itemType": "weapon"
++          },
++          {
++            "itemId": "weapon_baseball_bat",
++            "itemType": "weapon"
++          }
++        ]
++      }
++    ]
++  },
++  "UNARMED": {
++    "items": [
++      {
++        "itemId": "weapon_knuckles",
++        "itemType": "weapon"
++      }
++    ]
++  },
++  "THROWING": {
++    "items": [
++      {
++        "pickOne": [
++          {
++            "itemId": "weapon_throwing_knife",
++            "itemType": "weapon",
++            "rollType": "rollCD",
++            "base": 4,
++            "rollValue": 2
++          },
++          {
++            "itemId": "weapon_tomahawk",
++            "itemType": "weapon",
++            "rollType": "rollCD",
++            "base": 2,
++            "rollValue": 1
++          }
++        ]
++      }
++    ]
++  },
++  "MEDICINE": {
++    "items": [
++      {
++        "itemId": "item_doctors_bag",
++        "itemType": "misc",
++        "quantity": 1
++      },
++      {
++        "itemId": "chem_stimpak",
++        "itemType": "chem",
++        "quantity": 1
++      }
++    ]
++  },
++  "SNEAK": {
++    "items": [
++      {
++        "itemId": "chem_calmex",
++        "itemType": "chem",
++        "quantity": 1
++      }
++    ]
++  },
++  "LOCKPICK": {
++    "items": [
++      {
++        "rollType": "rollCD",
++        "base": 4,
++        "rollValue": 2,
++        "itemId": "item_bobby_pin",
++        "itemType": "misc"
++      }
++    ]
++  },
++  "PILOT": {
++    "items": [
++      {
++        "rollType": "rollD20",
++        "tableId": "trinklet",
++        "quantity": 5,
++        "countItems": true
++      }
++    ]
++  },
++  "BARTER": {
++    "items": [
++      {
++        "itemType": "currency",
++        "rollType": "rollD20",
++        "rollCount": 2
++      }
++    ]
++  },
++  "EXPLOSIVES": {
++    "items": [
++      {
++        "pickOne": [
++          {
++            "itemId": "weapon_molotov",
++            "itemType": "weapon",
++            "quantity": 2
++          },
++          {
++            "itemId": "weapon_baseball_grenade",
++            "itemType": "weapon",
++            "quantity": 2
++          }
++        ]
++      }
++    ]
++  },
++  "SURVIVAL": {
++    "items": [
++      {
++        "itemId": "drink_purified_water",
++        "itemType": "drinks",
++        "quantity": 2
++      },
++      {
++        "itemId": "food_iguana_on_a_stick",
++        "itemType": "food",
++        "quantity": 2
++      }
++    ]
++  },
++  "REPAIR": {
++    "items": [
++      {
++        "itemId": "item_multi_tool",
++        "itemType": "misc",
++        "quantity": 1
++      }
++    ]
++  },
++  "SCIENCE": {
++    "items": [
++      {
++        "itemId": "clothing_lab_coat",
++        "itemType": "clothing"
++      },
++      {
++        "itemId": "chem_mentats",
++        "itemType": "chem",
++        "quantity": 1
++      }
++    ]
++  },
++  "SPEECH": {
++    "items": [
++      {
++        "itemId": "headwear_casual_hat",
++        "itemType": "clothing"
++      },
++      {
++        "itemId": "clothing_casual_clothes",
++        "itemType": "clothing"
++      }
++    ]
++  }
++}

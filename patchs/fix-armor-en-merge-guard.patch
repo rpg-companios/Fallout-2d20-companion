@@ -1,0 +1,1096 @@
+diff --git a/__tests__/equipment/armor-merge-contract.test.js b/__tests__/equipment/armor-merge-contract.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..e5474b047323606a740eaf5428506b95426f8c59
+--- /dev/null
++++ b/__tests__/equipment/armor-merge-contract.test.js
+@@ -0,0 +1,103 @@
++import { describe, it, expect } from 'vitest';
++import { readFileSync } from 'fs';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import dataArmor from '../../data/equipment/armor.json';
++import ruArmorFile from '../../i18n/ru-RU/data/equipment/armor/armor.json';
++import enArmorFile from '../../i18n/en-EN/data/equipment/armor/armor.json';
++
++// Инвариант исправления «молчаливой» неэкипировки брони (EN):
++// единый источник механики брони — data/equipment/armor.json; i18n-файлы
++// несут только отображаемые поля. Любая локаль обязана давать броне
++// protectedAreas — иначе handleEquipArmor не сможет вычислить слоты.
++// И молчаливый no-op при пустых слотах заменён алертом (структурный чек C).
++
++const MECHANICS = [
++  'protectedAreas',
++  'physicalDamageRating',
++  'energyDamageRating',
++  'radiationDamageRating',
++  'weight',
++  'cost',
++  'rarity',
++  'imageName',
++];
++
++const dataPiecesById = Object.fromEntries(
++  Object.values(dataArmor).flatMap((category) =>
++    Object.values(category?.tiers || {}).flatMap((tier) => (tier?.pieces || [])),
++  ).map((piece) => [piece.id, piece]),
++);
++
++const armorListOf = (locale) => getEquipmentCatalog(locale).armorList;
++
++describe('armor-merge-contract: единый источник механики брони', () => {
++  it.each(['ru-RU', 'en-EN'])('%s: каждая броня имеет полный механический контракт', (locale) => {
++    const list = armorListOf(locale);
++    expect(list.length).toBeGreaterThan(0);
++    const broken = list.filter((item) => {
++      if (item.itemType !== 'armor') return true;
++      if (!Array.isArray(item.protectedAreas) || item.protectedAreas.length === 0) return true;
++      if (!item.armorCategoryKey) return true;
++      return ['weight', 'cost', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating']
++        .some((field) => typeof item[field] !== 'number');
++    });
++    expect(broken.map((item) => item.id)).toEqual([]);
++  });
++
++  it.each(['ru-RU', 'en-EN'])('%s: каждая броня совпадает по механике с data/equipment/armor.json', (locale) => {
++    const drift = [];
++    for (const item of armorListOf(locale)) {
++      const data = dataPiecesById[item.id];
++      if (!data) { drift.push(`${item.id}: нет в data/`); continue; }
++      for (const field of MECHANICS) {
++        if (JSON.stringify(item[field]) !== JSON.stringify(data[field])) {
++          drift.push(`${item.id}.${field}: catalog=${JSON.stringify(item[field])} data=${JSON.stringify(data[field])}`);
++        }
++      }
++    }
++    expect(drift).toEqual([]);
++  });
++
++  it('индексы обеих локалей содержат одинаковый набор id; «тостых» записей больше нет', () => {
++    const ruIndex = getEquipmentCatalog('ru-RU').armorIndex.byId;
++    const enIndex = getEquipmentCatalog('en-EN').armorIndex.byId;
++    const ruIds = [...ruIndex.keys()].sort();
++    const enIds = [...enIndex.keys()].sort();
++    expect(enIds).toEqual(ruIds);
++    for (const id of ruIds) {
++      for (const field of MECHANICS) {
++        expect(
++          JSON.stringify(enIndex.get(id)?.[field]),
++          `${id}.${field}: en-EN != ru-RU`,
++        ).toBe(JSON.stringify(ruIndex.get(id)?.[field]));
++      }
++    }
++  });
++
++  it('i18n-файлы брони тощие: только отображаемые поля {id,name} (дубль механики запрещён)', () => {
++    for (const [name, file] of [['ru-RU', ruArmorFile], ['en-EN', enArmorFile]]) {
++      const violators = [];
++      for (const group of file.armor || []) {
++        for (const item of group.items || []) {
++          const extra = Object.keys(item).filter((key) => key !== 'id' && key !== 'name');
++          if (extra.length > 0) violators.push(`${item.id}: ${extra.join(',')}`);
++        }
++      }
++      expect(violators, name).toEqual([]);
++    }
++  });
++
++  it('локализация имён сохранилась после мёржа (sanity: ru != en имени)', () => {
++    const ru = getEquipmentCatalog('ru-RU').armorIndex.byId.get('armor_leather_chest_001');
++    const en = getEquipmentCatalog('en-EN').armorIndex.byId.get('armor_leather_chest_001');
++    expect(ru.name).toBe('Кожаный Нагрудник');
++    expect(en.name).toBe('Leather Chest Piece');
++  });
++
++  it('C: пустые слоты — алерт cannotEquipItem + трасс-маркер, а не молчаливый no-op', () => {
++    const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
++    expect(src.includes("debugLog('equip.armor:emptySlots'")).toBe(true);
++    expect(src.includes('slotsToOccupy.length === 0')).toBe(true);
++    expect(src.includes("tInventory('screen.alerts.cannotEquipItem')")).toBe(true);
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 8ba00b80f601a08bdc6e763d7b843669a22d7db5..2fe1108e5f88de1c7b22520aa5cb43426fca68c5 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -893,6 +893,20 @@ const InventoryScreen = () => {
+     }
+ 
+     const executeEquip = (slotsToOccupy) => {
++      // ПРАВИЛО (владелец): молчаливых падений нет. Пустой список слотов —
++      // дефект данных предмета (нет protectedAreas): сообщаем, а не no-op.
++      if (!slotsToOccupy || slotsToOccupy.length === 0) {
++        debugLog('equip.armor:emptySlots', {
++          id: itemToEquip?.id || itemToEquip?.armorId || itemToEquip?.weaponId,
++          stackKey: itemToEquip?.stackKey,
++          protectedAreas: itemToEquip?.protectedAreas,
++        });
++        showAlert(
++          tInventory('screen.alerts.robotArmorOnlyTitle'),
++          tInventory('screen.alerts.cannotEquipItem'),
++        );
++        return;
++      }
+       const instancesToUnequip = new Set();
+       const markForUnequip = (slot, type) => {
+         const slotItem = currentEquipped?.[slot]?.[type];
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 3f4c5ea2a2dbe94745dce999747aba081f957522..5193d5100380ab1c1f64dd565ca75da46bf0a6b9 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -276,12 +276,21 @@ export const getEquipmentCatalog = (locale = getCurrentLocale()) => {
+     .map((item) => ({ ...item, itemType: 'robotFrame' }));
+ 
+   // Armor: i18n file has {armor:[{type, categoryKey, items}]}, data file has allowedModCategories per categoryKey
+-  const armorGroups = [
+-    ...(i18n.armor?.armor || []).map((g) => ({
+-      ...g,
+-      items: (g.items || []).map((item) => ({ ...item, armorCategoryKey: g.categoryKey })),
+-    })),
+-  ];
++  // Броня: единый источник механики — data/equipment/armor.json (как у
++  // weapons/clothes/powerArmor). i18n-файл несёт только отображаемые поля
++  // (type группы, name предмета). Тощая i18n-запись (как ранее en-EN) больше
++  // не даёт «молчаливую» неэкипируемую броню — protectedAreas всегда из data.
++  const armorPiecesByCategory = Object.fromEntries(
++    Object.entries(dataArmor || {}).map(([categoryKey, category]) => [
++      categoryKey,
++      Object.values(category?.tiers || {}).flatMap((tier) => tier?.pieces || []),
++    ]),
++  );
++  const armorGroups = (i18n.armor?.armor || []).map((g) => ({
++    ...g,
++    items: mergeById(armorPiecesByCategory[g.categoryKey], g.items)
++      .map((item) => ({ ...item, armorCategoryKey: g.categoryKey })),
++  }));
+   const armorList = flattenArmorGroups({ armor: armorGroups });
+   const armorIndex = buildArmorIndex([...armorList, ...robotPlatingList, ...robotArmorList, ...robotFramesList]);
+ 
+diff --git a/i18n/ru-RU/data/equipment/armor/armor.json b/i18n/ru-RU/data/equipment/armor/armor.json
+index 8bcd2c18903e028de30c4731fc028c26d8798ed2..05a01c70c4cf3e16748246e28582adeb7abeb97a 100644
+--- a/i18n/ru-RU/data/equipment/armor/armor.json
++++ b/i18n/ru-RU/data/equipment/armor/armor.json
+@@ -6,138 +6,39 @@
+       "items": [
+         {
+           "id": "armor_raider_chest_001",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Рейдерский Нагрудник",
+-          "imageName": "raider_armor_chest",
+-          "itemType": "armor",
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 18,
+-          "rarity": 0
++          "name": "Рейдерский Нагрудник"
+         },
+         {
+           "id": "armor_raider_leg_001",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Рейдерский Понож",
+-          "imageName": "raider_armor_leg",
+-          "itemType": "armor",
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 8,
+-          "rarity": 0
++          "name": "Рейдерский Понож"
+         },
+         {
+           "id": "armor_raider_hand_001",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Рейдерский Наруч",
+-          "imageName": "raider_armor_hand",
+-          "itemType": "armor",
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 6,
+-          "rarity": 0
++          "name": "Рейдерский Наруч"
+         },
+         {
+           "id": "armor_raider_chest_002",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Прочный Рейдерский Нагрудник",
+-          "imageName": "raider_armor_chest_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 12,
+-          "cost": 33,
+-          "rarity": 1
++          "name": "Прочный Рейдерский Нагрудник"
+         },
+         {
+           "id": "armor_raider_leg_002",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Прочный Рейдерский Понож",
+-          "imageName": "raider_armor_leg_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 13,
+-          "rarity": 1
++          "name": "Прочный Рейдерский Понож"
+         },
+         {
+           "id": "armor_raider_hand_002",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Прочный Рейдерский Наруч",
+-          "imageName": "raider_armor_hand_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 8,
+-          "rarity": 1
++          "name": "Прочный Рейдерский Наруч"
+         },
+         {
+           "id": "armor_raider_chest_003",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Тяжёлый Рейдерский Нагрудник",
+-          "imageName": "raider_armor_chest_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 17,
+-          "cost": 48,
+-          "rarity": 2
++          "name": "Тяжёлый Рейдерский Нагрудник"
+         },
+         {
+           "id": "armor_raider_leg_003",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Тяжёлый Рейдерский Понож",
+-          "imageName": "raider_armor_leg_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 10,
+-          "cost": 18,
+-          "rarity": 2
++          "name": "Тяжёлый Рейдерский Понож"
+         },
+         {
+           "id": "armor_raider_hand_003",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Тяжёлый Рейдерский Наруч",
+-          "imageName": "raider_armor_hand_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 10,
+-          "cost": 15,
+-          "rarity": 2
++          "name": "Тяжёлый Рейдерский Наруч"
+         }
+       ]
+     },
+@@ -147,138 +48,39 @@
+       "items": [
+         {
+           "id": "armor_leather_chest_001",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Кожаный Нагрудник",
+-          "imageName": "leather_armor_chest",
+-          "itemType": "armor",
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 25,
+-          "rarity": 1
++          "name": "Кожаный Нагрудник"
+         },
+         {
+           "id": "armor_leather_leg_001",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Кожаный Понож",
+-          "imageName": "leather_armor_leg",
+-          "itemType": "armor",
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 10,
+-          "rarity": 1
++          "name": "Кожаный Понож"
+         },
+         {
+           "id": "armor_leather_hand_001",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Кожаный Наруч",
+-          "imageName": "leather_armor_hand",
+-          "itemType": "armor",
+-          "physicalDamageRating": 1,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 8,
+-          "rarity": 1
++          "name": "Кожаный Наруч"
+         },
+         {
+           "id": "armor_leather_chest_002",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Прочный Кожаный Нагрудник",
+-          "imageName": "leather_armor_chest_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 10,
+-          "cost": 50,
+-          "rarity": 2
++          "name": "Прочный Кожаный Нагрудник"
+         },
+         {
+           "id": "armor_leather_leg_002",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Прочный Кожаный Понож",
+-          "imageName": "leather_armor_leg_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 20,
+-          "rarity": 2
++          "name": "Прочный Кожаный Понож"
+         },
+         {
+           "id": "armor_leather_hand_002",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Прочный Кожаный Наруч",
+-          "imageName": "leather_armor_hand_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 18,
+-          "rarity": 2
++          "name": "Прочный Кожаный Наруч"
+         },
+         {
+           "id": "armor_leather_chest_003",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Тяжёлый Кожаный Нагрудник",
+-          "imageName": "leather_armor_chest_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 15,
+-          "cost": 75,
+-          "rarity": 3
++          "name": "Тяжёлый Кожаный Нагрудник"
+         },
+         {
+           "id": "armor_leather_leg_003",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Тяжёлый Кожаный Понож",
+-          "imageName": "leather_armor_leg_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 30,
+-          "rarity": 3
++          "name": "Тяжёлый Кожаный Понож"
+         },
+         {
+           "id": "armor_leather_hand_003",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Тяжёлый Кожаный Наруч",
+-          "imageName": "leather_armor_hand_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 28,
+-          "rarity": 3
++          "name": "Тяжёлый Кожаный Наруч"
+         }
+       ]
+     },
+@@ -288,183 +90,51 @@
+       "items": [
+         {
+           "id": "armor_metal_head_001",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Металлический Шлем",
+-          "imageName": "metal_armor_head",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 15,
+-          "rarity": 1
++          "name": "Металлический Шлем"
+         },
+         {
+           "id": "armor_metal_chest_001",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Металлический Нагрудник",
+-          "imageName": "metal_armor_chest",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 6,
+-          "cost": 40,
+-          "rarity": 1
++          "name": "Металлический Нагрудник"
+         },
+         {
+           "id": "armor_metal_leg_001",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Металлический Понож",
+-          "imageName": "metal_armor_leg",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 15,
+-          "rarity": 1
++          "name": "Металлический Понож"
+         },
+         {
+           "id": "armor_metal_hand_001",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Металлический Наруч",
+-          "imageName": "metal_armor_hand",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 1,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 15,
+-          "rarity": 1
++          "name": "Металлический Наруч"
+         },
+         {
+           "id": "armor_metal_head_002",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Прочный Металлический Шлем",
+-          "imageName": "metal_armor_head_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 8,
+-          "cost": 65,
+-          "rarity": 2
++          "name": "Прочный Металлический Шлем"
+         },
+         {
+           "id": "armor_metal_chest_002",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Прочный Металлический Нагрудник",
+-          "imageName": "metal_armor_chest_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 16,
+-          "cost": 115,
+-          "rarity": 2
++          "name": "Прочный Металлический Нагрудник"
+         },
+         {
+           "id": "armor_metal_leg_002",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Прочный Металлический Понож",
+-          "imageName": "metal_armor_leg_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 8,
+-          "cost": 65,
+-          "rarity": 2
++          "name": "Прочный Металлический Понож"
+         },
+         {
+           "id": "armor_metal_hand_002",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Прочный Металлический Наруч",
+-          "imageName": "metal_armor_hand_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 8,
+-          "cost": 65,
+-          "rarity": 2
++          "name": "Прочный Металлический Наруч"
+         },
+         {
+           "id": "armor_metal_head_003",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Тяжёлый Металлический Шлем",
+-          "imageName": "metal_armor_head_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 12,
+-          "cost": 115,
+-          "rarity": 3
++          "name": "Тяжёлый Металлический Шлем"
+         },
+         {
+           "id": "armor_metal_chest_003",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Тяжёлый Металлический Нагрудник",
+-          "imageName": "metal_armor_chest_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 23,
+-          "cost": 190,
+-          "rarity": 3
++          "name": "Тяжёлый Металлический Нагрудник"
+         },
+         {
+           "id": "armor_metal_leg_003",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Тяжёлый Металлический Понож",
+-          "imageName": "metal_armor_leg_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 12,
+-          "cost": 115,
+-          "rarity": 3
++          "name": "Тяжёлый Металлический Понож"
+         },
+         {
+           "id": "armor_metal_hand_003",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Тяжёлый Металлический Наруч",
+-          "imageName": "metal_armor_hand_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 12,
+-          "cost": 115,
+-          "rarity": 3
++          "name": "Тяжёлый Металлический Наруч"
+         }
+       ]
+     },
+@@ -474,183 +144,51 @@
+       "items": [
+         {
+           "id": "armor_combat_head_001",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Боевой Шлем",
+-          "imageName": "combat_armor_head",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 4,
+-          "cost": 25,
+-          "rarity": 2
++          "name": "Боевой Шлем"
+         },
+         {
+           "id": "armor_combat_chest_001",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Боевой Нагрудник",
+-          "imageName": "combat_armor_chest",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 8,
+-          "cost": 60,
+-          "rarity": 2
++          "name": "Боевой Нагрудник"
+         },
+         {
+           "id": "armor_combat_leg_001",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Боевой Понож",
+-          "imageName": "combat_armor_leg",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 25,
+-          "rarity": 2
++          "name": "Боевой Понож"
+         },
+         {
+           "id": "armor_combat_hand_001",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Боевой Наруч",
+-          "imageName": "combat_armor_hand",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 2,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 25,
+-          "rarity": 2
++          "name": "Боевой Наруч"
+         },
+         {
+           "id": "armor_combat_head_002",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Прочный Боевой Шлем",
+-          "imageName": "combat_armor_head_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 105,
+-          "rarity": 3
++          "name": "Прочный Боевой Шлем"
+         },
+         {
+           "id": "armor_combat_chest_002",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Прочный Боевой Нагрудник",
+-          "imageName": "combat_armor_chest_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 12,
+-          "cost": 140,
+-          "rarity": 3
++          "name": "Прочный Боевой Нагрудник"
+         },
+         {
+           "id": "armor_combat_leg_002",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Прочный Боевой Понож",
+-          "imageName": "combat_armor_leg_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 105,
+-          "rarity": 3
++          "name": "Прочный Боевой Понож"
+         },
+         {
+           "id": "armor_combat_hand_002",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Прочный Боевой Наруч",
+-          "imageName": "combat_armor_hand_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 5,
+-          "cost": 105,
+-          "rarity": 3
++          "name": "Прочный Боевой Наруч"
+         },
+         {
+           "id": "armor_combat_head_003",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Тяжёлый Боевой Шлем",
+-          "imageName": "combat_armor_head_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 185,
+-          "rarity": 4
++          "name": "Тяжёлый Боевой Шлем"
+         },
+         {
+           "id": "armor_combat_chest_003",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Тяжёлый Боевой Нагрудник",
+-          "imageName": "combat_armor_chest_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 16,
+-          "cost": 220,
+-          "rarity": 4
++          "name": "Тяжёлый Боевой Нагрудник"
+         },
+         {
+           "id": "armor_combat_leg_003",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Тяжёлый Боевой Понож",
+-          "imageName": "combat_armor_leg_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 185,
+-          "rarity": 4
++          "name": "Тяжёлый Боевой Понож"
+         },
+         {
+           "id": "armor_combat_hand_003",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Тяжёлый Боевой Наруч",
+-          "imageName": "combat_armor_hand_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 145,
+-          "rarity": 4
++          "name": "Тяжёлый Боевой Наруч"
+         }
+       ]
+     },
+@@ -660,183 +198,51 @@
+       "items": [
+         {
+           "id": "armor_synth_head_001",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Шлем Синтов",
+-          "imageName": "synth_armor_head",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 33,
+-          "rarity": 3
++          "name": "Шлем Синтов"
+         },
+         {
+           "id": "armor_synth_chest_001",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Нагрудник Синтов",
+-          "imageName": "synth_armor_chest",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 75,
+-          "rarity": 3
++          "name": "Нагрудник Синтов"
+         },
+         {
+           "id": "armor_synth_leg_001",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Понож Синтов",
+-          "imageName": "synth_armor_leg",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 30,
+-          "rarity": 3
++          "name": "Понож Синтов"
+         },
+         {
+           "id": "armor_synth_hand_001",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Наруч Синтов",
+-          "imageName": "synth_armor_hand",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 3,
+-          "radiationDamageRating": 0,
+-          "weight": 3,
+-          "cost": 30,
+-          "rarity": 4
++          "name": "Наруч Синтов"
+         },
+         {
+           "id": "armor_synth_head_002",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Прочный Шлем Синтов",
+-          "imageName": "synth_armor_head_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 70,
+-          "rarity": 4
++          "name": "Прочный Шлем Синтов"
+         },
+         {
+           "id": "armor_synth_chest_002",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Прочный Нагрудник Синтов",
+-          "imageName": "synth_armor_chest_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 12,
+-          "cost": 125,
+-          "rarity": 4
++          "name": "Прочный Нагрудник Синтов"
+         },
+         {
+           "id": "armor_synth_leg_002",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Прочный Понож Синтов",
+-          "imageName": "synth_armor_leg_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 80,
+-          "rarity": 4
++          "name": "Прочный Понож Синтов"
+         },
+         {
+           "id": "armor_synth_hand_002",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Прочный Наруч Синтов",
+-          "imageName": "synth_armor_hand_sturdy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 3,
+-          "energyDamageRating": 4,
+-          "radiationDamageRating": 0,
+-          "weight": 7,
+-          "cost": 70,
+-          "rarity": 4
++          "name": "Прочный Наруч Синтов"
+         },
+         {
+           "id": "armor_synth_head_003",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Тяжёлый Шлем Синтов",
+-          "imageName": "synth_armor_head_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 5,
+-          "radiationDamageRating": 0,
+-          "weight": 10,
+-          "cost": 110,
+-          "rarity": 5
++          "name": "Тяжёлый Шлем Синтов"
+         },
+         {
+           "id": "armor_synth_chest_003",
+-          "protectedAreas": [
+-            "Body"
+-          ],
+-          "name": "Тяжёлый Нагрудник Синтов",
+-          "imageName": "synth_armor_chest_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 5,
+-          "radiationDamageRating": 0,
+-          "weight": 17,
+-          "cost": 175,
+-          "rarity": 5
++          "name": "Тяжёлый Нагрудник Синтов"
+         },
+         {
+           "id": "armor_synth_leg_003",
+-          "protectedAreas": [
+-            "Leg"
+-          ],
+-          "name": "Тяжёлый Понож Синтов",
+-          "imageName": "synth_armor_leg_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 5,
+-          "radiationDamageRating": 0,
+-          "weight": 10,
+-          "cost": 130,
+-          "rarity": 5
++          "name": "Тяжёлый Понож Синтов"
+         },
+         {
+           "id": "armor_synth_hand_003",
+-          "protectedAreas": [
+-            "Hand"
+-          ],
+-          "name": "Тяжёлый Наруч Синтов",
+-          "imageName": "synth_armor_hand_heavy",
+-          "itemType": "armor",
+-          "physicalDamageRating": 4,
+-          "energyDamageRating": 5,
+-          "radiationDamageRating": 0,
+-          "weight": 10,
+-          "cost": 110,
+-          "rarity": 5
++          "name": "Тяжёлый Наруч Синтов"
+         }
+       ]
+     },
+@@ -846,37 +252,13 @@
+       "items": [
+         {
+           "id": "armor_vault_head_001",
+-          "protectedAreas": [
+-            "Head"
+-          ],
+-          "name": "Шлем охранника Волт-Тек",
+-          "imageName": "vault_armor_head",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 0,
+-          "weight": 2,
+-          "cost": 20,
+-          "rarity": 1
++          "name": "Шлем охранника Волт-Тек"
+         },
+         {
+           "id": "armor_vault_fullbody_001",
+-          "protectedAreas": [
+-            "Body",
+-            "Hand",
+-            "Leg"
+-          ],
+-          "name": "Броня охранника Волт-Тек",
+-          "imageName": "vault_armor_fullbody",
+-          "itemType": "armor",
+-          "physicalDamageRating": 2,
+-          "energyDamageRating": 0,
+-          "radiationDamageRating": 2,
+-          "weight": 8,
+-          "cost": 16,
+-          "rarity": 1
++          "name": "Броня охранника Волт-Тек"
+         }
+       ]
+     }
+   ]
+-}
+\ No newline at end of file
++}

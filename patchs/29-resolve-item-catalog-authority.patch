@@ -1,0 +1,50 @@
+diff --git a/domain/resolveItem.js b/domain/resolveItem.js
+index cff3c2f..175f32f 100644
+--- a/domain/resolveItem.js
++++ b/domain/resolveItem.js
+@@ -77,19 +77,42 @@ export const findCatalogEntry = (catalog, id, itemType) => {
+   }
+ };
+ 
++// Поля СОСТОЯНИЯ экземпляра — берутся из инстанса (стора/сейва), НЕ из каталога.
++// Всё остальное (вес, цена, эффект, статы, имя, зоны защиты, rarity…) — из каталога,
++// чтобы правки данных JSON применялись сразу и не перекрывались устаревшим инстансом.
++// Модифицированное оружие детализирует findLocalizedWeapon (свои пересчёты статов),
++// а моды брони — applyArmorMods; resolveItem их не касается.
++const INSTANCE_FIELDS = [
++  'id', 'weaponId', 'code', 'Name',          // идентификаторы / ключ экземпляра
++  'itemType',                                 // тип хранится на инстансе
++  'quantity', 'equipped', 'locked',           // состояние инвентаря
++  'appliedMods', 'stackKey',                  // моды и подпись стопки
++  'equipInstanceId', 'uniqueId',              // идентификаторы экипировки
++  'charges', 'hpCurrent',                     // заряд Ядерного Блока / прочность части СБ
++  'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', // мета отображения / роботов
++];
++
+ /**
+  * Обогатить инстанс предмета каталожными данными по id.
++ *
++ * Каталог = источник истины: каталожные данные (вес/цена/эффект/статы/имя) — из
++ * каталога (base); из инстанса — только состояние экземпляра (INSTANCE_FIELDS).
++ * Поэтому правки JSON применяются к уже созданным персонажам сразу. Если записи в
++ * каталоге нет (модифицированное оружие с id-суффиксом, синтетические id) —
++ * инстанс возвращается как есть.
++ *
+  * @param {object} instance — запись из стора/сейва (минимум: { id, itemType? })
+  * @param {object} catalog  — getEquipmentCatalog(locale)
+- * @returns {object} — {...каталожная запись, ...инстанс}; имя — локализованное из каталога.
+- *                     Если записи нет в каталоге — инстанс возвращается как есть.
++ * @returns {object}
+  */
+ export const resolveItem = (instance, catalog) => {
+   if (!instance || !instance.id) return instance;
+   const itemType = instance.itemType || inferItemType(instance);
+   const base = findCatalogEntry(catalog, instance.id, itemType);
+   if (!base) return instance;
+-  return { ...base, ...instance, name: base.name };
++  const instanceState = {};
++  INSTANCE_FIELDS.forEach((f) => { if (instance[f] !== undefined) instanceState[f] = instance[f]; });
++  return { ...base, ...instanceState, name: base.name };
+ };
+ 
+ /**

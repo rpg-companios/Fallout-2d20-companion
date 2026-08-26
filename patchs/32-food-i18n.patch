@@ -1,0 +1,1307 @@
+diff --git a/data/consumables/food.json b/data/consumables/food.json
+index 0399759..59c37aa 100644
+--- a/data/consumables/food.json
++++ b/data/consumables/food.json
+@@ -1,77 +1,762 @@
+ [
+-  { "id": "food_fancy_lads_snack_cakes", "itemType": "food", "weight": 0.5, "cost": 18, "rarity": 0, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_silt_bean", "itemType": "food", "weight": 0.5, "cost": 5, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_noodle_cup", "itemType": "food", "weight": 0.5, "cost": 20, "rarity": 2, "hpHealed": 6, "irradiated": false, "effectKey": "" },
+-  { "id": "food_sugar_bombs", "itemType": "food", "weight": 0.5, "cost": 11, "rarity": 0, "hpHealed": 4, "irradiated": true, "effectKey": "itemEffects.food.sugarBombs" },
+-  { "id": "food_squirrel_bits", "itemType": "food", "weight": 0.5, "cost": 4, "rarity": 1, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_crispy_squirrel_bits", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 2, "hpHealed": 6, "irradiated": false, "effectKey": "" },
+-  { "id": "food_gum_drops", "itemType": "food", "weight": 0.5, "cost": 5, "rarity": 0, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_squirrel_on_a_stick", "itemType": "food", "weight": 0.5, "cost": 15, "rarity": 2, "hpHealed": 7, "irradiated": false, "effectKey": "" },
+-  { "id": "food_iguana_on_a_stick", "itemType": "food", "weight": 0.5, "cost": 33, "rarity": 2, "hpHealed": 6, "irradiated": false, "effectKey": "" },
+-  { "id": "food_carrot", "itemType": "food", "weight": 0.5, "cost": 3, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_radroach_meat", "itemType": "food", "weight": 0.5, "cost": 3, "rarity": 0, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_potato_crisps", "itemType": "food", "weight": 0.5, "cost": 7, "rarity": 0, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_yao_guai_ribs", "itemType": "food", "weight": 0.5, "cost": 90, "rarity": 4, "hpHealed": 13, "irradiated": false, "effectKey": "itemEffects.food.yaoGuaiRibs" },
+-  { "id": "food_dog_ribs", "itemType": "food", "weight": 0.5, "cost": 12, "rarity": 1, "hpHealed": 6, "irradiated": false, "effectKey": "" },
+-  { "id": "food_mutant_hound_ribs", "itemType": "food", "weight": 0.5, "cost": 12, "rarity": 3, "hpHealed": 8, "irradiated": false, "effectKey": "itemEffects.food.mutantHoundRibs" },
+-  { "id": "food_gourd", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_cram", "itemType": "food", "weight": 0.5, "cost": 25, "rarity": 1, "hpHealed": 5, "irradiated": true, "effectKey": "" },
+-  { "id": "food_corn", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_brain_fungus", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_ribeye_steak", "itemType": "food", "weight": 0.5, "cost": 40, "rarity": 2, "hpHealed": 10, "irradiated": false, "effectKey": "" },
+-  { "id": "food_deathclaw_filet", "itemType": "food", "weight": 0.5, "cost": 35, "rarity": 3, "hpHealed": 11, "irradiated": false, "effectKey": "itemEffects.food.deathclawFilet" },
+-  { "id": "food_mutfruit", "itemType": "food", "weight": 0.5, "cost": 8, "rarity": 0, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_tarberry", "itemType": "food", "weight": 0.5, "cost": 5, "rarity": 3, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_canned_bean", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_blamco_mac_and_cheese", "itemType": "food", "weight": 0.5, "cost": 10, "rarity": 1, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_brahmin_meat", "itemType": "food", "weight": 0.5, "cost": 28, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_melon", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_grilled_bloatfly", "itemType": "food", "weight": 0.5, "cost": 15, "rarity": 1, "hpHealed": 6, "irradiated": false, "effectKey": "itemEffects.food.grilledBloatfly" },
+-  { "id": "food_deathclaw_egg", "itemType": "food", "weight": 0.5, "cost": 69, "rarity": 3, "hpHealed": 7, "irradiated": true, "effectKey": "" },
+-  { "id": "food_mirelurk_egg", "itemType": "food", "weight": 0.5, "cost": 0, "rarity": 2, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_radscorpion_egg", "itemType": "food", "weight": 0.5, "cost": 48, "rarity": 3, "hpHealed": 6, "irradiated": true, "effectKey": "" },
+-  { "id": "food_yum_yum_deviled_eggs", "itemType": "food", "weight": 0.5, "cost": 20, "rarity": 0, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_deathclaw_omelette", "itemType": "food", "weight": 0.5, "cost": 80, "rarity": 4, "hpHealed": 11, "irradiated": false, "effectKey": "itemEffects.food.deathclawOmelette" },
+-  { "id": "food_mirelurk_egg_omelette", "itemType": "food", "weight": 0.5, "cost": 30, "rarity": 3, "hpHealed": 7, "irradiated": false, "effectKey": "itemEffects.food.mirelurkEggOmelette" },
+-  { "id": "food_radscorpion_egg_omelette", "itemType": "food", "weight": 0.5, "cost": 65, "rarity": 4, "hpHealed": 9, "irradiated": false, "effectKey": "itemEffects.food.radscorpionEggOmelette" },
+-  { "id": "food_institute_food_packet", "itemType": "food", "weight": 0.5, "cost": 10, "rarity": 2, "hpHealed": 5, "irradiated": false, "effectKey": "" },
+-  { "id": "food_sweet_roll", "itemType": "food", "weight": 0.5, "cost": 9, "rarity": 1, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_food_paste", "itemType": "food", "weight": 0.5, "cost": 0, "rarity": 2, "hpHealed": 7, "irradiated": false, "effectKey": "itemEffects.food.foodPaste" },
+-  { "id": "food_mirelurk_paste", "itemType": "food", "weight": 0.5, "cost": 35, "rarity": 3, "hpHealed": 12, "irradiated": false, "effectKey": "itemEffects.food.mirelurkPaste" },
+-  { "id": "food_dog_food", "itemType": "food", "weight": 0.5, "cost": 6, "rarity": 0, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_potato", "itemType": "food", "weight": 0.5, "cost": 7, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_dandy_boy_apples", "itemType": "food", "weight": 0.5, "cost": 7, "rarity": 0, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_pork_n_beans", "itemType": "food", "weight": 0.5, "cost": 10, "rarity": 0, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_instamash", "itemType": "food", "weight": 0.5, "cost": 20, "rarity": 0, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_grilled_radroach", "itemType": "food", "weight": 0.5, "cost": 7, "rarity": 1, "hpHealed": 5, "irradiated": false, "effectKey": "" },
+-  { "id": "food_grilled_radstag", "itemType": "food", "weight": 0.5, "cost": 60, "rarity": 2, "hpHealed": 11, "irradiated": false, "effectKey": "itemEffects.food.grilledRadstag" },
+-  { "id": "food_squirrel_stew", "itemType": "food", "weight": 0.5, "cost": 24, "rarity": 2, "hpHealed": 10, "irradiated": false, "effectKey": "" },
+-  { "id": "food_radstag_stew", "itemType": "food", "weight": 0.5, "cost": 60, "rarity": 3, "hpHealed": 12, "irradiated": false, "effectKey": "itemEffects.food.radstag_Stew" },
+-  { "id": "food_iguana_stew", "itemType": "food", "weight": 0.5, "cost": 8, "rarity": 1, "hpHealed": 4, "irradiated": true, "effectKey": "" },
+-  { "id": "food_yao_guai_roast", "itemType": "food", "weight": 0.5, "cost": 110, "rarity": 4, "hpHealed": 14, "irradiated": false, "effectKey": "itemEffects.food.yaoGuaiRoast" },
+-  { "id": "food_vegetable_soup", "itemType": "food", "weight": 0.5, "cost": 13, "rarity": 2, "hpHealed": 7, "irradiated": false, "effectKey": "itemEffects.food.vegetableSoup" },
+-  { "id": "food_iguana_soup", "itemType": "food", "weight": 0.5, "cost": 21, "rarity": 3, "hpHealed": 10, "irradiated": false, "effectKey": "" },
+-  { "id": "food_deathclaw_steak", "itemType": "food", "weight": 0.5, "cost": 130, "rarity": 4, "hpHealed": 14, "irradiated": false, "effectKey": "itemEffects.food.deathclawSteak" },
+-  { "id": "food_radscorpion_steak", "itemType": "food", "weight": 0.5, "cost": 65, "rarity": 3, "hpHealed": 12, "irradiated": false, "effectKey": "itemEffects.food.radscorpionSteak" },
+-  { "id": "food_mole_rat_steak", "itemType": "food", "weight": 0.5, "cost": 8, "rarity": 1, "hpHealed": 7, "irradiated": false, "effectKey": "itemEffects.food.moleRatSteak" },
+-  { "id": "food_mirelurk_queen_steak", "itemType": "food", "weight": 0.5, "cost": 130, "rarity": 5, "hpHealed": 14, "irradiated": false, "effectKey": "itemEffects.food.mirelurkQueenSteak" },
+-  { "id": "food_stingwing_steak", "itemType": "food", "weight": 0.5, "cost": 18, "rarity": 2, "hpHealed": 10, "irradiated": false, "effectKey": "itemEffects.food.stingwingSteak" },
+-  { "id": "food_salisbury_steak", "itemType": "food", "weight": 0.5, "cost": 20, "rarity": 0, "hpHealed": 5, "irradiated": true, "effectKey": "" },
+-  { "id": "food_perfectly_preserved_pie", "itemType": "food", "weight": 0.5, "cost": 20, "rarity": 3, "hpHealed": 5, "irradiated": false, "effectKey": "" },
+-  { "id": "food_stray_dog_meat", "itemType": "food", "weight": 0.5, "cost": 28, "rarity": 1, "hpHealed": 3, "irradiated": true, "effectKey": "" },
+-  { "id": "food_deathclaw_meat", "itemType": "food", "weight": 0.5, "cost": 30, "rarity": 1, "hpHealed": 8, "irradiated": true, "effectKey": "" },
+-  { "id": "food_deathclaw_steak_cooked", "itemType": "food", "weight": 0.5, "cost": 110, "rarity": 3, "hpHealed": 9, "irradiated": false, "effectKey": "" },
+-  { "id": "food_mirelurk_meat", "itemType": "food", "weight": 0.5, "cost": 18, "rarity": 1, "hpHealed": 6, "irradiated": true, "effectKey": "" },
+-  { "id": "food_softshell_mirelurk_meat", "itemType": "food", "weight": 0.5, "cost": 22, "rarity": 2, "hpHealed": 6, "irradiated": true, "effectKey": "" },
+-  { "id": "food_grilled_mirelurk_meat", "itemType": "food", "weight": 0.5, "cost": 40, "rarity": 3, "hpHealed": 9, "irradiated": false, "effectKey": "itemEffects.food.grilledMirelurkMeat" },
+-  { "id": "food_roasted_mirelurk_meat", "itemType": "food", "weight": 0.5, "cost": 40, "rarity": 2, "hpHealed": 8, "irradiated": false, "effectKey": "itemEffects.food.roastedMirelurkMeat" },
+-  { "id": "food_mutant_hound_meat", "itemType": "food", "weight": 0.5, "cost": 8, "rarity": 2, "hpHealed": 5, "irradiated": true, "effectKey": "" },
+-  { "id": "food_bloatfly_meat", "itemType": "food", "weight": 0.5, "cost": 8, "rarity": 0, "hpHealed": 2, "irradiated": true, "effectKey": "" },
+-  { "id": "food_radstag_meat", "itemType": "food", "weight": 0.5, "cost": 50, "rarity": 1, "hpHealed": 8, "irradiated": true, "effectKey": "" },
+-  { "id": "food_radscorpion_meat", "itemType": "food", "weight": 0.5, "cost": 55, "rarity": 2, "hpHealed": 9, "irradiated": true, "effectKey": "" },
+-  { "id": "food_mole_rat_meat", "itemType": "food", "weight": 0.5, "cost": 5, "rarity": 0, "hpHealed": 5, "irradiated": true, "effectKey": "" },
+-  { "id": "food_queen_mirelurk_meat", "itemType": "food", "weight": 0.5, "cost": 22, "rarity": 4, "hpHealed": 10, "irradiated": true, "effectKey": "itemEffects.food.queenMirelurkMeat" },
+-  { "id": "food_stingwing_meat", "itemType": "food", "weight": 0.5, "cost": 8, "rarity": 1, "hpHealed": 7, "irradiated": true, "effectKey": "" },
+-  { "id": "food_yao_guai_meat", "itemType": "food", "weight": 0.5, "cost": 85, "rarity": 3, "hpHealed": 9, "irradiated": true, "effectKey": "" },
+-  { "id": "food_canned_meat", "itemType": "food", "weight": 0.5, "cost": 25, "rarity": 0, "hpHealed": 6, "irradiated": true, "effectKey": "itemEffects.food.cannedMeat" }
+-]
++ {
++  "id": "food_fancy_lads_snack_cakes",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 18,
++  "rarity": 0,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_silt_bean",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 5,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_noodle_cup",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 20,
++  "rarity": 2,
++  "hpHealed": 6,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_sugar_bombs",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 11,
++  "rarity": 0,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": "itemEffects.food.sugarBombs"
++ },
++ {
++  "id": "food_squirrel_bits",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 4,
++  "rarity": 1,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_crispy_squirrel_bits",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 2,
++  "hpHealed": 6,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_gum_drops",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 5,
++  "rarity": 0,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_squirrel_on_a_stick",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 15,
++  "rarity": 2,
++  "hpHealed": 7,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_iguana_on_a_stick",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 33,
++  "rarity": 2,
++  "hpHealed": 6,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_carrot",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 3,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_radroach_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 3,
++  "rarity": 0,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_potato_crisps",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 7,
++  "rarity": 0,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_yao_guai_ribs",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 90,
++  "rarity": 4,
++  "hpHealed": 13,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.yaoGuaiRibs"
++ },
++ {
++  "id": "food_dog_ribs",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 12,
++  "rarity": 1,
++  "hpHealed": 6,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_mutant_hound_ribs",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 12,
++  "rarity": 3,
++  "hpHealed": 8,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.mutantHoundRibs"
++ },
++ {
++  "id": "food_gourd",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_cram",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 25,
++  "rarity": 1,
++  "hpHealed": 5,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_corn",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_brain_fungus",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_ribeye_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 40,
++  "rarity": 2,
++  "hpHealed": 10,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_deathclaw_filet",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 35,
++  "rarity": 3,
++  "hpHealed": 11,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.deathclawFilet"
++ },
++ {
++  "id": "food_mutfruit",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 0,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_tarberry",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 5,
++  "rarity": 3,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_canned_bean",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_blamco_mac_and_cheese",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 10,
++  "rarity": 1,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_brahmin_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 28,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_melon",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_grilled_bloatfly",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 15,
++  "rarity": 1,
++  "hpHealed": 6,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.grilledBloatfly"
++ },
++ {
++  "id": "food_deathclaw_egg",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 69,
++  "rarity": 3,
++  "hpHealed": 7,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_mirelurk_egg",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 0,
++  "rarity": 2,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_radscorpion_egg",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 48,
++  "rarity": 3,
++  "hpHealed": 6,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_yum_yum_deviled_eggs",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 20,
++  "rarity": 0,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_deathclaw_omelette",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 80,
++  "rarity": 4,
++  "hpHealed": 11,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.deathclawOmelette"
++ },
++ {
++  "id": "food_mirelurk_egg_omelette",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 30,
++  "rarity": 3,
++  "hpHealed": 7,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.mirelurkEggOmelette"
++ },
++ {
++  "id": "food_radscorpion_egg_omelette",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 65,
++  "rarity": 4,
++  "hpHealed": 9,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.radscorpionEggOmelette"
++ },
++ {
++  "id": "food_institute_food_packet",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 10,
++  "rarity": 2,
++  "hpHealed": 5,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_sweet_roll",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 9,
++  "rarity": 1,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_food_paste",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 0,
++  "rarity": 2,
++  "hpHealed": 7,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.foodPaste"
++ },
++ {
++  "id": "food_mirelurk_paste",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 35,
++  "rarity": 3,
++  "hpHealed": 12,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.mirelurkPaste"
++ },
++ {
++  "id": "food_dog_food",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 6,
++  "rarity": 0,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_potato",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 7,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_dandy_boy_apples",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 7,
++  "rarity": 0,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_pork_n_beans",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 10,
++  "rarity": 0,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_instamash",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 20,
++  "rarity": 0,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_grilled_radroach",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 7,
++  "rarity": 1,
++  "hpHealed": 5,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_grilled_radstag",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 60,
++  "rarity": 2,
++  "hpHealed": 11,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.grilledRadstag"
++ },
++ {
++  "id": "food_squirrel_stew",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 24,
++  "rarity": 2,
++  "hpHealed": 10,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_radstag_stew",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 60,
++  "rarity": 3,
++  "hpHealed": 12,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.radstag_Stew"
++ },
++ {
++  "id": "food_iguana_stew",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 1,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_yao_guai_roast",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 110,
++  "rarity": 4,
++  "hpHealed": 14,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.yaoGuaiRoast"
++ },
++ {
++  "id": "food_vegetable_soup",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 13,
++  "rarity": 2,
++  "hpHealed": 7,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.vegetableSoup"
++ },
++ {
++  "id": "food_iguana_soup",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 21,
++  "rarity": 3,
++  "hpHealed": 10,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_deathclaw_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 130,
++  "rarity": 4,
++  "hpHealed": 14,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.deathclawSteak"
++ },
++ {
++  "id": "food_radscorpion_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 65,
++  "rarity": 3,
++  "hpHealed": 12,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.radscorpionSteak"
++ },
++ {
++  "id": "food_mole_rat_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 1,
++  "hpHealed": 7,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.moleRatSteak"
++ },
++ {
++  "id": "food_mirelurk_queen_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 130,
++  "rarity": 5,
++  "hpHealed": 14,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.mirelurkQueenSteak"
++ },
++ {
++  "id": "food_stingwing_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 18,
++  "rarity": 2,
++  "hpHealed": 10,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.stingwingSteak"
++ },
++ {
++  "id": "food_salisbury_steak",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 20,
++  "rarity": 0,
++  "hpHealed": 5,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_perfectly_preserved_pie",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 20,
++  "rarity": 3,
++  "hpHealed": 5,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_stray_dog_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 28,
++  "rarity": 1,
++  "hpHealed": 3,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_deathclaw_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 30,
++  "rarity": 1,
++  "hpHealed": 8,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_deathclaw_steak_cooked",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 110,
++  "rarity": 3,
++  "hpHealed": 9,
++  "irradiated": false,
++  "effectKey": ""
++ },
++ {
++  "id": "food_mirelurk_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 18,
++  "rarity": 1,
++  "hpHealed": 6,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_softshell_mirelurk_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 22,
++  "rarity": 2,
++  "hpHealed": 6,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_grilled_mirelurk_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 40,
++  "rarity": 3,
++  "hpHealed": 9,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.grilledMirelurkMeat"
++ },
++ {
++  "id": "food_roasted_mirelurk_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 40,
++  "rarity": 2,
++  "hpHealed": 8,
++  "irradiated": false,
++  "effectKey": "itemEffects.food.roastedMirelurkMeat"
++ },
++ {
++  "id": "food_mutant_hound_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 2,
++  "hpHealed": 5,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_bloatfly_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 0,
++  "hpHealed": 2,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_radstag_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 50,
++  "rarity": 1,
++  "hpHealed": 8,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_radscorpion_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 55,
++  "rarity": 2,
++  "hpHealed": 9,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_mole_rat_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 5,
++  "rarity": 0,
++  "hpHealed": 5,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_queen_mirelurk_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 22,
++  "rarity": 4,
++  "hpHealed": 10,
++  "irradiated": true,
++  "effectKey": "itemEffects.food.queenMirelurkMeat"
++ },
++ {
++  "id": "food_stingwing_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 1,
++  "hpHealed": 7,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_yao_guai_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 85,
++  "rarity": 3,
++  "hpHealed": 9,
++  "irradiated": true,
++  "effectKey": ""
++ },
++ {
++  "id": "food_canned_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 25,
++  "rarity": 0,
++  "hpHealed": 6,
++  "irradiated": true,
++  "effectKey": "itemEffects.food.cannedMeat"
++ },
++ {
++  "id": "food_dog_meat",
++  "itemType": "food",
++  "weight": 0.5,
++  "cost": 8,
++  "rarity": 0,
++  "hpHealed": 4,
++  "irradiated": true,
++  "effectKey": ""
++ }
++]
+\ No newline at end of file
+diff --git a/i18n/ru-RU/data/consumables/food.json b/i18n/ru-RU/data/consumables/food.json
+index 9a5bcfc..3219dd6 100644
+--- a/i18n/ru-RU/data/consumables/food.json
++++ b/i18n/ru-RU/data/consumables/food.json
+@@ -1,77 +1,381 @@
+ [
+-  { "id": "food_fancy_lads_snack_cakes", "name": "Fancy Lads Snack Cakes", "effectLabel": "" },
+-  { "id": "food_silt_bean", "name": "Silt Bean", "effectLabel": "" },
+-  { "id": "food_noodle_cup", "name": "Noodle Cup", "effectLabel": "" },
+-  { "id": "food_sugar_bombs", "name": "Sugar Bombs", "effectLabel": "" },
+-  { "id": "food_squirrel_bits", "name": "Squirrel Bits", "effectLabel": "" },
+-  { "id": "food_crispy_squirrel_bits", "name": "Crispy Squirrel Bits", "effectLabel": "" },
+-  { "id": "food_gum_drops", "name": "Gum Drops", "effectLabel": "" },
+-  { "id": "food_squirrel_on_a_stick", "name": "Squirrel on a Stick", "effectLabel": "" },
+-  { "id": "food_iguana_on_a_stick", "name": "Iguana on a Stick", "effectLabel": "" },
+-  { "id": "food_carrot", "name": "Carrot", "effectLabel": "" },
+-  { "id": "food_radroach_meat", "name": "Radroach Meat", "effectLabel": "" },
+-  { "id": "food_potato_crisps", "name": "Potato Crisps", "effectLabel": "" },
+-  { "id": "food_yao_guai_ribs", "name": "Yao Guai Ribs", "effectLabel": "" },
+-  { "id": "food_dog_ribs", "name": "Dog Ribs", "effectLabel": "" },
+-  { "id": "food_mutant_hound_ribs", "name": "Mutant Hound Ribs", "effectLabel": "" },
+-  { "id": "food_gourd", "name": "Gourd", "effectLabel": "" },
+-  { "id": "food_cram", "name": "Cram", "effectLabel": "" },
+-  { "id": "food_corn", "name": "Corn", "effectLabel": "" },
+-  { "id": "food_brain_fungus", "name": "Brain Fungus", "effectLabel": "" },
+-  { "id": "food_ribeye_steak", "name": "Ribeye Steak", "effectLabel": "" },
+-  { "id": "food_deathclaw_filet", "name": "Deathclaw Filet", "effectLabel": "" },
+-  { "id": "food_mutfruit", "name": "Mutfruit", "effectLabel": "" },
+-  { "id": "food_tarberry", "name": "Tarberry", "effectLabel": "" },
+-  { "id": "food_canned_bean", "name": "Canned Bean", "effectLabel": "" },
+-  { "id": "food_blamco_mac_and_cheese", "name": "BlamCo Mac and Cheese", "effectLabel": "" },
+-  { "id": "food_brahmin_meat", "name": "Мясо брамина", "effectLabel": "" },
+-  { "id": "food_melon", "name": "Melon", "effectLabel": "" },
+-  { "id": "food_grilled_bloatfly", "name": "Grilled Bloatfly", "effectLabel": "" },
+-  { "id": "food_deathclaw_egg", "name": "Deathclaw Egg", "effectLabel": "" },
+-  { "id": "food_mirelurk_egg", "name": "Mirelurk Egg", "effectLabel": "" },
+-  { "id": "food_radscorpion_egg", "name": "Radscorpion Egg", "effectLabel": "" },
+-  { "id": "food_yum_yum_deviled_eggs", "name": "Yum Yum Deviled Eggs", "effectLabel": "" },
+-  { "id": "food_deathclaw_omelette", "name": "Deathclaw Omelette", "effectLabel": "" },
+-  { "id": "food_mirelurk_egg_omelette", "name": "Mirelurk Egg Omelette", "effectLabel": "" },
+-  { "id": "food_radscorpion_egg_omelette", "name": "Radscorpion Egg Omelette", "effectLabel": "" },
+-  { "id": "food_institute_food_packet", "name": "Institute Food Packet", "effectLabel": "" },
+-  { "id": "food_sweet_roll", "name": "Sweet Roll", "effectLabel": "" },
+-  { "id": "food_food_paste", "name": "Food Paste", "effectLabel": "" },
+-  { "id": "food_mirelurk_paste", "name": "Mirelurk Paste", "effectLabel": "" },
+-  { "id": "food_dog_food", "name": "Dog Food", "effectLabel": "" },
+-  { "id": "food_potato", "name": "Potato", "effectLabel": "" },
+-  { "id": "food_dandy_boy_apples", "name": "Dandy Boy Apples", "effectLabel": "" },
+-  { "id": "food_pork_n_beans", "name": "Pork n Beans", "effectLabel": "" },
+-  { "id": "food_instamash", "name": "InstaMash", "effectLabel": "" },
+-  { "id": "food_grilled_radroach", "name": "Grilled Radroach", "effectLabel": "" },
+-  { "id": "food_grilled_radstag", "name": "Grilled Radstag", "effectLabel": "" },
+-  { "id": "food_squirrel_stew", "name": "Squirrel Stew", "effectLabel": "" },
+-  { "id": "food_radstag_stew", "name": "Radstag Stew", "effectLabel": "" },
+-  { "id": "food_iguana_stew", "name": "Iguana Stew", "effectLabel": "" },
+-  { "id": "food_yao_guai_roast", "name": "Yao Guai Roast", "effectLabel": "" },
+-  { "id": "food_vegetable_soup", "name": "Vegetable Soup", "effectLabel": "" },
+-  { "id": "food_iguana_soup", "name": "Iguana Soup", "effectLabel": "" },
+-  { "id": "food_deathclaw_steak", "name": "Deathclaw Steak", "effectLabel": "" },
+-  { "id": "food_radscorpion_steak", "name": "Radscorpion Steak", "effectLabel": "" },
+-  { "id": "food_mole_rat_steak", "name": "Mole Rat Steak", "effectLabel": "" },
+-  { "id": "food_mirelurk_queen_steak", "name": "Mirelurk Queen Steak", "effectLabel": "" },
+-  { "id": "food_stingwing_steak", "name": "Stingwing Steak", "effectLabel": "" },
+-  { "id": "food_salisbury_steak", "name": "Salisbury Steak", "effectLabel": "" },
+-  { "id": "food_perfectly_preserved_pie", "name": "Perfectly Preserved Pie", "effectLabel": "" },
+-  { "id": "food_stray_dog_meat", "name": "Stray Dog Meat", "effectLabel": "" },
+-  { "id": "food_deathclaw_meat", "name": "Deathclaw Meat", "effectLabel": "" },
+-  { "id": "food_deathclaw_steak_cooked", "name": "Deathclaw Steak Cooked", "effectLabel": "" },
+-  { "id": "food_mirelurk_meat", "name": "Mirelurk Meat", "effectLabel": "" },
+-  { "id": "food_softshell_mirelurk_meat", "name": "Softshell Mirelurk Meat", "effectLabel": "" },
+-  { "id": "food_grilled_mirelurk_meat", "name": "Grilled Mirelurk Meat", "effectLabel": "" },
+-  { "id": "food_roasted_mirelurk_meat", "name": "Roasted Mirelurk Meat", "effectLabel": "" },
+-  { "id": "food_mutant_hound_meat", "name": "Mutant Hound Meat", "effectLabel": "" },
+-  { "id": "food_bloatfly_meat", "name": "Bloatfly Meat", "effectLabel": "" },
+-  { "id": "food_radstag_meat", "name": "Radstag Meat", "effectLabel": "" },
+-  { "id": "food_radscorpion_meat", "name": "Radscorpion Meat", "effectLabel": "" },
+-  { "id": "food_mole_rat_meat", "name": "Mole Rat Meat", "effectLabel": "" },
+-  { "id": "food_queen_mirelurk_meat", "name": "Queen Mirelurk Meat", "effectLabel": "" },
+-  { "id": "food_stingwing_meat", "name": "Stingwing Meat", "effectLabel": "" },
+-  { "id": "food_yao_guai_meat", "name": "Yao Guai Meat", "effectLabel": "" },
+-  { "id": "food_canned_meat", "name": "Canned Meat", "effectLabel": "" }
+-]
++ {
++  "id": "food_fancy_lads_snack_cakes",
++  "name": "Кексы «Весёлые ребята»",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_silt_bean",
++  "name": "Илофасоль",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_noodle_cup",
++  "name": "Чашка с лапшой",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_sugar_bombs",
++  "name": "Сахарные бомбочки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_squirrel_bits",
++  "name": "Кусочки белки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_crispy_squirrel_bits",
++  "name": "Хрустящие кусочки белки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_gum_drops",
++  "name": "Жевательные пастилки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_squirrel_on_a_stick",
++  "name": "Шашлык из белки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_iguana_on_a_stick",
++  "name": "Игуана на палочке",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_carrot",
++  "name": "Морковь",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radroach_meat",
++  "name": "Мясо Радтаракана",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_potato_crisps",
++  "name": "Картофельные чипсы",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_yao_guai_ribs",
++  "name": "Рёбрышки Яо-Гуая",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_dog_ribs",
++  "name": "Отбивные из собачатины",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mutant_hound_ribs",
++  "name": "Рёбрышки гончей мутанта",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_gourd",
++  "name": "Тыква",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_cram",
++  "name": "СРАМ",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_corn",
++  "name": "Кукуруза",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_brain_fungus",
++  "name": "Мозговой гриб",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_ribeye_steak",
++  "name": "Стейк рибай",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_deathclaw_filet",
++  "name": "Филе когтя смерти",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mutfruit",
++  "name": "Мутафрукт",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_tarberry",
++  "name": "Смоляника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_canned_bean",
++  "name": "Консервированная фасоль",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_blamco_mac_and_cheese",
++  "name": "Макароны с Сыром",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_brahmin_meat",
++  "name": "Мясо Брамина",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_melon",
++  "name": "Дыня",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_grilled_bloatfly",
++  "name": "Печёный дутень",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_deathclaw_egg",
++  "name": "Яйцо Когтя смерти",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mirelurk_egg",
++  "name": "Яйцо Болотника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radscorpion_egg",
++  "name": "Яйцо Радскорпиона",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_yum_yum_deviled_eggs",
++  "name": "Фаршированные яйца «НямНям»",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_deathclaw_omelette",
++  "name": "Омлет из яиц когтя смерти",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mirelurk_egg_omelette",
++  "name": "Омлет из яиц болотника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radscorpion_egg_omelette",
++  "name": "Омлет из яиц радскорпиона",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_institute_food_packet",
++  "name": "Продуктовый набор института",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_sweet_roll",
++  "name": "Сладкий рулет",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_food_paste",
++  "name": "Пищевая паста",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mirelurk_paste",
++  "name": "Паста из болотника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_dog_food",
++  "name": "Собачьи Консервы",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_potato",
++  "name": "Тошка",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_dandy_boy_apples",
++  "name": "Наливные Яблоки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_pork_n_beans",
++  "name": "Свинина с Бобами",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_instamash",
++  "name": "Пюре быстрого приготовления",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_grilled_radroach",
++  "name": "Радтаракан Гриль",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_grilled_radstag",
++  "name": "Радолень гриль",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_squirrel_stew",
++  "name": "Рагу из белки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radstag_stew",
++  "name": "Рагу из радоленя",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_iguana_stew",
++  "name": "Кусочки игуаны",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_yao_guai_roast",
++  "name": "Жаркое из Яо-Гуая",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_vegetable_soup",
++  "name": "Овощной суп",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_iguana_soup",
++  "name": "Суп из игуаны",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_deathclaw_steak",
++  "name": "Стейк из когтя смерти",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radscorpion_steak",
++  "name": "Стейк из радскорпиона",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mole_rat_steak",
++  "name": "Стейк из кротокрыса",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mirelurk_queen_steak",
++  "name": "Стейк из королевы болотников",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_stingwing_steak",
++  "name": "Стейк из жалокрыла",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_salisbury_steak",
++  "name": "Стейк солсбери",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_perfectly_preserved_pie",
++  "name": "Идеально сохранившийся пирог",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_stray_dog_meat",
++  "name": "Мясо бродячей собаки",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_deathclaw_meat",
++  "name": "Мясо Когтя смерти",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_deathclaw_steak_cooked",
++  "name": "Приготовленный стейк когтя смерти",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mirelurk_meat",
++  "name": "Мясо Болотника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_softshell_mirelurk_meat",
++  "name": "Мясо болотника с мягким панцерем",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_grilled_mirelurk_meat",
++  "name": "Жареное мясо болотника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_roasted_mirelurk_meat",
++  "name": "Печёное мясо болотника",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mutant_hound_meat",
++  "name": "Мясо гончей мутанта",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_bloatfly_meat",
++  "name": "Мясо Дутня",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radstag_meat",
++  "name": "Мясо Радоленя",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_radscorpion_meat",
++  "name": "Мясо Радскорпиона",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_mole_rat_meat",
++  "name": "Мясо кротокрыса",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_queen_mirelurk_meat",
++  "name": "Мясо королевы болотников",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_stingwing_meat",
++  "name": "Мясо жалокрыла",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_yao_guai_meat",
++  "name": "Мясо Яо Гуая",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_canned_meat",
++  "name": "Консервированное мясо",
++  "effectLabel": ""
++ },
++ {
++  "id": "food_dog_meat",
++  "name": "Собачатина"
++ }
++]
+\ No newline at end of file

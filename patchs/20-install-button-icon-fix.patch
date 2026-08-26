@@ -1,0 +1,39 @@
+From 64f1a65d6a0a0e2ffb32e8e71f57967acfdbc54c Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Wed, 5 Aug 2026 08:20:42 +0000
+Subject: [PATCH] fix(ui): hide install button in standalone PWA; use vector
+ icon for download
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+1) isStandalone: добавлены display-mode fullscreen и minimal-ui (раньше только standalone — некоторые PWA не определялись). 2) Иконка скачивания: emoji 📥 → MaterialCommunityIcons name=download (векторная, как на кнопке установки, рендерится везде).
+---
+ components/screens/HomeScreen/HomeScreen.js | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 8ea57fe..3515faa 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -81,7 +81,7 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload }) => {
+         }}
+         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+       >
+-        <Text style={styles.downloadIcon}>📥</Text>
++        <MaterialCommunityIcons name="download" size={16} color="#8a8a8a" />
+       </TouchableOpacity>
+       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
+       {character.level ? (
+@@ -113,6 +113,8 @@ export default function HomeScreen({ navigation }) {
+ 
+     const standalone =
+       window.matchMedia?.('(display-mode: standalone)').matches ||
++      window.matchMedia?.('(display-mode: fullscreen)').matches ||
++      window.matchMedia?.('(display-mode: minimal-ui)').matches ||
+       window.navigator.standalone === true;
+     setIsStandalone(standalone);
+ 
+-- 
+2.47.3
+

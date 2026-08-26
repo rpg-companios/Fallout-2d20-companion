@@ -1,0 +1,154 @@
+{
+  "defaultCharacterName": "Character",
+  "labels": {
+    "needToPick": "Need to pick",
+    "characterName": "Name",
+    "origin": "Origin",
+    "trait": "Trait",
+    "attributes": "Attributes",
+    "equipmentKit": "Equipment Kit",
+    "level": "Level",
+    "skills": "Skills",
+    "skill": "Skill",
+    "value": "Value",
+    "rank": "Rank",
+    "points": "Points",
+    "luckPoints": "Luck points",
+    "taggedSkills": "Tagged Skills",
+    "skillPoints": "Skill Points",
+    "attributePoints": "Attribute Points",
+    "isTaggedSkill": "Tagged",
+    "available": "Available",
+    "pointsShort": "points",
+    "extraTaggedSkills": "Extra trait skills",
+    "extraSlotsAvailable": "Extra slots available",
+    "onePerk": "1 perk",
+    "unknownItem": "Unknown item",
+    "pcsShort": "pcs.",
+    "carry": "Carry",
+    "requires": "Requires: ",
+    "armor": "Armor",
+    "other": "Other",
+    "carryWeight": "Carry Weight",
+    "rarity": "Rarity",
+    "complexity": "Complexity"
+  },
+  "buttons": {
+    "save": "Save",
+    "reset": "Reset",
+    "cancel": "Cancel",
+    "agree": "OK",
+    "continue": "Continue",
+    "confirm": "Confirm",
+    "yesReset": "Yes, reset",
+    "select": "Select",
+    "ok": "OK",
+    "understood": "Understood",
+    "selectTrait": "Select Trait",
+    "confirmSelection": "Confirm Selection",
+    "close": "Close",
+    "apply": "Apply",
+    "back": "Back"
+  },
+  "placeholders": {
+    "selectNone": "Not selected",
+    "enterName": "Enter name",
+    "kitUnknown": "Equipment Kit"
+  },
+  "warnings": {
+    "attentionTitle": "Attention!",
+    "resetAllValues": "All values will be reset to initial parameters.",
+    "changeOriginTitle": "Change origin?",
+    "changeOriginConfirm": "All attributes, skills and traits will be reset. Are you sure?",
+    "equipmentResetConfirm": "Inventory, skills and skill rewards will be reset. Attributes are kept. Continue?",
+    "traitAlreadySelected": "Trait for this origin is already selected.",
+    "noTraitsForOrigin": "No traits available for this origin",
+    "selectOriginFirst": "Select origin first",
+    "selectOriginError": "Select origin",
+    "noEquipmentForOrigin": "No equipment kits for this origin.",
+    "equipmentResetOnWeb": "Attention! Choosing a new equipment kit will reset inventory, skills and skill rewards. Attributes are kept. Continue?"
+  },
+  "alerts": {
+    "errorTitle": "Error",
+    "warningTitle": "Warning",
+    "infoTitle": "Info"
+  },
+  "errors": {
+    "distributeAllPerkAttributePoints": "You must distribute all available attribute points.",
+    "saveAttributesFirst": "Distribute and save attributes first.",
+    "cannotUnselectForcedSkill": "You cannot unselect a forced skill.",
+    "skillTagExceedsMaxRank": "Tagging this skill will exceed max rank ({skillMax}). Lower it first.",
+    "maxBaseSkills": "You can choose a maximum of {count} base skills.{extraText}",
+    "saveAttributesFirstSimple": "Save attributes first.",
+    "noSkillPointsLeft": "You have no skill points left to distribute.",
+    "originRequired": "You must select an origin.",
+    "traitRequired": "You must select a trait.",
+    "equipmentRequired": "You must select an equipment kit.",
+    "spendAllAttributePoints": "Spend all attribute points before saving.",
+    "spendAllSkillPoints": "You must distribute all skill points.",
+    "exactBaseSkillsRequired": "You must select exactly {required} base skills. Selected: {selected}.",
+    "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
+    "maxSkillRank": "Error: maximum skill rank is {maxRank}",
+    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it."
+  },
+  "modals": {
+    "origin": {
+      "title": "Select origin"
+    },
+    "traitSkill": {
+      "title": "Select extra skill"
+    },
+    "equipmentKit": {
+      "categories": {
+        "structure": "Standard Structure",
+        "apparel": "Armor & Clothing",
+        "weapon": "Weapons",
+        "module": "Modules",
+        "misc": "Misc"
+      },
+      "title": "Select equipment kit",
+      "empty": "No equipment kits available"
+    },
+    "armor": {
+      "upgradeArmor": "Upgrade Armor",
+      "noItems": "No items available"
+    },
+    "limb": {
+      "noLimbs": "No limbs available"
+    },
+    "skillPick": {
+      "title": "Choose skills",
+      "description": "Choose skills from the provided group. They will be marked as extra.",
+      "choose1": "Choose 1 skill",
+      "chooseN": "Choose {count} skills"
+    }
+  },
+  "origins": {
+    "brotherhoodOfSteel": "Brotherhood of Steel",
+    "assaultron": "Assaultron",
+    "childOfAtom": "Child of Atom",
+    "ghoul": "Ghoul",
+    "minuteman": "Minuteman",
+    "misterHandy": "Mister Handy",
+    "ncr": "NCR Citizen",
+    "brotherhoodOutcast": "Brotherhood Outcast",
+    "protectron": "Protectron",
+    "robobrain": "Robobrain",
+    "supermutant": "Supermutant",
+    "survivor": "Survivor",
+    "vaultDweller": "Vault Dweller",
+    "shadow": "Shadow",
+    "synth": "Synth",
+    "securitron": "Securitron",
+    "TreeFamilies": "Strip Families"
+  },
+  "attributes": {
+    "STR": "STR",
+    "END": "END",
+    "PER": "PER",
+    "AGI": "AGI",
+    "INT": "INT",
+    "CHA": "CHA",
+    "LCK": "LCK"
+  }
+}

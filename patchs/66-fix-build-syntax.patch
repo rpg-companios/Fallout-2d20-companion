@@ -1,0 +1,184 @@
+diff --git a/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js b/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+index e7dd9a4..0f55afa 100644
+--- a/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
++++ b/components/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+@@ -1,6 +1,6 @@
+ import React, { useState, useMemo } from 'react';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+-import { findTraitById, getTraitI18n } from '../../../../../domain/traits';
++import { findTraitById, getTraitI18nById } from '../../../../../domain/traits';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { tCharacterScreen, getSkillDisplayName } from '../../logic/characterScreenI18n';
+ import { ALL_SKILL_KEYS } from '../../../../../domain/characterCreation';
+@@ -11,7 +11,7 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+   const traitId = origin?.traitIds?.[0] || fallbackTraitId;
+ 
+   const canonicalTrait = useMemo(() => findTraitById(traitId), [traitId]);
+-  const { name, description } = getTraitI18n(traitId);
++  const { name, description } = getTraitI18nById(traitId);
+ 
+   const skillPickChoice = canonicalTrait?.modifiers?.skillPickChoice || null;
+ 
+diff --git a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+index 17ff099..e3d3e52 100644
+--- a/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
++++ b/components/screens/CharacterScreen/modals/traits/SurvivorModal.js
+@@ -1,7 +1,7 @@
+ import React, { useMemo, useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+-import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
++import { getTraitI18nById, findTraitById } from '../../../../../domain/traits';
+ import { tCharacterScreen, getSkillDisplayName } from '../../logic/characterScreenI18n';
+ import { ALL_SKILL_KEYS } from '../../../../../domain/characterCreation';
+ 
+@@ -43,8 +43,8 @@ const SurvivorModal = ({
+   const [skillPicks, setSkillPicks] = useState([]);
+ 
+   const traitCatalog = useMemo(() => ({
+-    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
+-    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
++    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
++    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
+   }), []);
+ 
+   const resetState = () => {
+@@ -129,7 +129,7 @@ const SurvivorModal = ({
+       selectedIds = [singleTraitPick];
+     }
+ 
+-    const selectedNames = selectedIds.map((id) => getTraitI18n(id).name);
++    const selectedNames = selectedIds.map((id) => getTraitI18nById(id).name);
+ 
+     const mergedModifiers = selectedIds.reduce((acc, id) => {
+       const dataEntry = findTraitById(id);
+diff --git a/components/screens/CharacterScreen/modals/traits/TreeFamiliesModal.js b/components/screens/CharacterScreen/modals/traits/TreeFamiliesModal.js
+index b418f82..e335308 100644
+--- a/components/screens/CharacterScreen/modals/traits/TreeFamiliesModal.js
++++ b/components/screens/CharacterScreen/modals/traits/TreeFamiliesModal.js
+@@ -1,7 +1,7 @@
+ import React, { useMemo, useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+-import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
++import { getTraitI18nById, findTraitById } from '../../../../../domain/traits';
+ import { tCharacterScreen } from '../../logic/characterScreenI18n';
+ 
+ export const traitConfig = { originId: 'TreeFamilies', modalType: 'choice' };
+@@ -16,7 +16,7 @@ const TreeFamiliesModal = ({ visible, onSelect, onClose }) => {
+   const [selectedFamily, setSelectedFamily] = useState(null);
+ 
+   const familyCatalog = useMemo(
+-    () => FAMILY_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
++    () => FAMILY_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
+     [],
+   );
+ 
+@@ -25,7 +25,7 @@ const TreeFamiliesModal = ({ visible, onSelect, onClose }) => {
+   const handleConfirm = () => {
+     if (!selectedFamily) return;
+     const dataEntry = findTraitById(selectedFamily);
+-    const name = getTraitI18n(selectedFamily).name;
++    const name = getTraitI18nById(selectedFamily).name;
+     onSelect(
+       [selectedFamily],
+       `${tCharacterScreen('origins.TreeFamilies')}: ${name}`,
+diff --git a/components/screens/CharacterScreen/modals/traits/TribalModal.js b/components/screens/CharacterScreen/modals/traits/TribalModal.js
+index 968dadc..bad4115 100644
+--- a/components/screens/CharacterScreen/modals/traits/TribalModal.js
++++ b/components/screens/CharacterScreen/modals/traits/TribalModal.js
+@@ -1,7 +1,7 @@
+ import React, { useMemo, useState } from 'react';
+ import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
+ import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
+-import { getTraitI18n, findTraitById } from '../../../../../domain/traits';
++import { getTraitI18nById, findTraitById } from '../../../../../domain/traits';
+ import { tCharacterScreen, getSkillDisplayName } from '../../logic/characterScreenI18n';
+ import { ALL_SKILL_KEYS } from '../../../../../domain/characterCreation';
+ 
+@@ -48,9 +48,9 @@ const TribalModal = ({
+   const [skillPicks, setSkillPicks] = useState([]);
+ 
+   const traitCatalog = useMemo(() => ({
+-    tribal: TRIBAL_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
+-    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
+-    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18n(id) })),
++    tribal: TRIBAL_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
++    survivor: SURVIVOR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
++    ncr: NCR_TRAIT_IDS.map((id) => ({ id, ...getTraitI18nById(id) })),
+   }), []);
+ 
+   const resetState = () => {
+@@ -131,7 +131,7 @@ const TribalModal = ({
+       selectedIds = [singleTraitPick];
+     }
+ 
+-    const selectedNames = selectedIds.map((id) => getTraitI18n(id).name);
++    const selectedNames = selectedIds.map((id) => getTraitI18nById(id).name);
+ 
+     const mergedModifiers = selectedIds.reduce((acc, id) => {
+       const dataEntry = findTraitById(id);
+diff --git a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 058c7f9..972214a 100644
+--- a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -289,7 +289,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+           weaponId: weaponId ?? dbWeapon?.id,
+           // baseName варианта (напр. «Опасная бритва») важнее имени из БД:
+           // моды должны собираться от перезаписанного имени предмета.
+-          baseWeaponName: weapon?.baseName || dbWeapon?.name ?? weapon?.name ?? '',
++          baseWeaponName: weapon?.baseName || (dbWeapon?.name ?? weapon?.name ?? ''),
+           appliedMods: weapon.appliedMods || {},
+         };
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a23d687..0e639d2 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,11 @@
+ # Changelog
+ 
++## 66 — Fix build syntax errors (Metro/Babel)
++
++- `domain/traits.js`: name collision after the registry refactor (patch 62) — the local `getTraitI18n(id)` (trait name/description by id) clashed with the registry import `getTraitI18n(locale)` (locale dictionary). The local one is renamed to `getTraitI18nById`; modals updated (GenericTraitModal, SurvivorModal, TribalModal, TreeFamiliesModal). Only Metro caught it at build time (`Identifier has already been declared`); vitest tolerated it.
++- `WeaponModificationModal.js`: mixed `||` and `??` without parens in `baseWeaponName` (patch 64) — a Babel syntax error (`Nullish coalescing operator requires parens`). Wrapped in parens.
++- PROCESS: `CI=1 npx expo export --platform web` is now mandatory before shipping a patch (Metro catches what vitest misses).
++
+ ## 65 — Uniq qualities: attachable equipment modifiers
+ 
+ - MODEL (owner): item "свойства" are called **uniq qualities** (like uniq_armor_mods). A quality is an attachable modifier: it has an id (tracking/mechanics) and a name (i18n); the name joins the item name: "Дерзкая" + "Формальная шляпа" = "Дерзкая Формальная шляпа". Quality effects (like mods) are reserved for the future.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d45fb4a..c388108 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,14 @@
+ 
+ ---
+ 
++## 66 — Фикс синтаксических ошибок сборки (Metro/Babel)
++
++- `domain/traits.js`: коллизия имён после рефакторинга реестра (патч 62) — локальная `getTraitI18n(id)` (имя/описание трейта по id) конфликтовала с импортом `getTraitI18n(locale)` из реестра (словарь локали). Локальная переименована в `getTraitI18nById`; обновлены модалки (GenericTraitModal, SurvivorModal, TribalModal, TreeFamiliesModal). Ошибку ловил только Metro при сборке (`Identifier has already been declared`), vitest её терпел.
++- `WeaponModificationModal.js`: смешение `||` и `??` без скобок в `baseWeaponName` (патч 64) — синтаксическая ошибка Babel (`Nullish coalescing operator requires parens`). Обёрнуто в скобки.
++- ПРОЦЕСС: теперь перед выпуском патча обязательна проверка `CI=1 npx expo export --platform web` (Metro ловит то, что vitest пропускает).
++
++---
++
+ ## 65 — Уникальные качества (uniq qualities): навешиваемые модификаторы экипировки
+ 
+ - МОДЕЛЬ (владелец): «свойства» экипировки называются **уникальными качествами** (uniq quality, в духе uniq_armor_mods). Качество — навешиваемый модификатор: у него id (учёт/механика) и имя (i18n), имя добавляется к имени предмета: «Дерзкая» + «Формальная шляпа» = «Дерзкая Формальная шляпа». Эффекты качества (как у модов) — зарезервированы на будущее.
+diff --git a/domain/traits.js b/domain/traits.js
+index c9562a7..92f62f3 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -221,8 +221,10 @@ export function resolveTraitDisplayName(storedName) {
+ /**
+  * Returns fully resolved { name, description } for a trait by id,
+  * using the current locale.
++ * (Назван по id, чтобы не конфликтовать с getTraitI18n(locale) из реестра —
++ * словарём локали.)
+  */
+-export function getTraitI18n(id) {
++export function getTraitI18nById(id) {
+   const dataEntry = findTraitById(id);
+   if (!dataEntry) return { name: id, description: '' };
+   return {

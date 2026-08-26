@@ -1,0 +1,36 @@
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 53d93d5..afe091f 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1494,10 +1494,10 @@ const InventoryScreen = () => {
+           )}
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
++          <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
+           {weaponAmmoNames.length > 0 && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.ammo')}: {weaponAmmoNames.join(', ')}</Text>
+           )}
+-          <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
+         </View>
+       </View>
+     );
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 58dcc65..e66e612 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -97,7 +97,7 @@
+     "totalWeight": "Общий вес",
+     "totalPrice": "Общая цена",
+     "durability": "Прочность (ОЗ)",
+-    "ammo": "Патрон",
++    "ammo": "Боеприпас",
+     "requiresMkII": "Требуется ОС Mk II"
+   },
+   "powerArmor": {
+@@ -114,4 +114,4 @@
+       "rightLeg": "правая нога"
+     }
+   }
+-}
+\ No newline at end of file
++}

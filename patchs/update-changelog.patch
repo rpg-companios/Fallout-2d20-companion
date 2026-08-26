@@ -1,0 +1,33 @@
+diff --git a/docs/changelog.md b/docs/changelog.md
+index 88a3430..654dab9 100644
+--- a/docs/changelog.md
++++ b/docs/changelog.md
+@@ -156,6 +156,28 @@
+ 
+ ---
+ 
++## 47 — Поддержка множественных типов урона / Multiple damage types support
++
++### RU
++
++- Добавлена поддержка комбинированного типа урона для оружия (например, энергетический + физический).
++- Плазменное оружие теперь наносит урон обоих типов: энергетический и физический.
++- Модификации оружия могут изменять тип урона (замена или добавление).
++- Добавлена миграция сохранений (v3 → v4) для преобразования строковых типов урона в массивы.
++- Исправлена ошибка синтаксиса в модальном окне модификации оружия.
++- Исправлен перевод названий дистанций в списке оружия (ранее отображались английские названия).
++
++### EN
++
++- Added support for combined damage types for weapons (e.g., energy + physical).
++- Plasma weapons now deal both damage types: energy and physical.
++- Weapon modifications can change damage type (replace or add).
++- Added save migration (v3 → v4) to convert string damage types to arrays.
++- Fixed syntax error in weapon modification modal.
++- Fixed range name translation in weapon list (previously displayed English names).
++
++---
++
+ ## 46 — Каталоги персонажей / Character folders
+ 
+ ### RU

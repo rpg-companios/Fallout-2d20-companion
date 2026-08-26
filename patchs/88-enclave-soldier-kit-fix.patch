@@ -1,0 +1,287 @@
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/__tests__/equipment/kit-stock-name.test.js /tmp/target88c/__tests__/equipment/kit-stock-name.test.js
+--- a/__tests__/equipment/kit-stock-name.test.js	1970-01-01 00:00:00.000000000 +0000
++++ b/__tests__/equipment/kit-stock-name.test.js	2026-08-13 07:04:04.458657608 +0000
+@@ -0,0 +1,56 @@
++import { describe, it, expect, vi, beforeAll } from 'vitest';
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async () => null,
++  };
++});
++
++import { setCurrentLocale } from '../../i18n/locale';
++import { resolveKitItems } from '../../domain/kitResolver';
++
++beforeAll(() => setCurrentLocale('ru-RU'));
++
++describe('resolveKitItems — ложа превращает пистолет в винтовку', () => {
++  it('лазерный пистолет со стандартной ложей называется «Лазерная винтовка»', async () => {
++    const kit = {
++      id: 't',
++      items: [
++        { type: 'fixed', weaponId: 'weapon_laser_gun', itemType: 'weapon', modIds: ['mod_058'] },
++      ],
++    };
++    const resolved = await resolveKitItems(kit);
++    const pistol = resolved.items.find((i) => i.weaponId === 'weapon_laser_gun');
++    expect(pistol.name).toContain('Лазерная винтовка');
++    expect(pistol.name).not.toContain('Лазерный пистолет');
++  });
++
++  it('длинный ствол добавляет префикс, а ложа меняет имя → «Длинноствольная Лазерная винтовка»', async () => {
++    const kit = {
++      id: 't',
++      items: [
++        { type: 'fixed', weaponId: 'weapon_laser_gun', itemType: 'weapon', modIds: ['mod_058', 'mod_204'] },
++      ],
++    };
++    const resolved = await resolveKitItems(kit);
++    const pistol = resolved.items.find((i) => i.weaponId === 'weapon_laser_gun');
++    expect(pistol.name).toMatch(/Длинноствольн/);
++    expect(pistol.name).toContain('Лазерная винтовка');
++  });
++
++  it('без ложи имя остаётся пистолетом (префикс ствола может быть, но имя пистолета)', async () => {
++    const kit = {
++      id: 't',
++      items: [
++        { type: 'fixed', weaponId: 'weapon_laser_gun', itemType: 'weapon' },
++      ],
++    };
++    const resolved = await resolveKitItems(kit);
++    const pistol = resolved.items.find((i) => i.weaponId === 'weapon_laser_gun');
++    expect(pistol.name).toContain('Лазерный пистолет');
++  });
++});
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/__tests__/securitron/module-data-move.test.js /tmp/target88c/__tests__/securitron/module-data-move.test.js
+--- a/__tests__/securitron/module-data-move.test.js	2026-08-13 07:03:16.682657608 +0000
++++ b/__tests__/securitron/module-data-move.test.js	2026-08-13 07:04:04.458657608 +0000
+@@ -39,7 +39,7 @@
+     const catalog = getEquipmentCatalogForLocale('ru-RU');
+     expect(catalog.food.length).toBe(76);
+     expect(catalog.drinks.length).toBe(22);
+-    expect(catalog.weaponMods.length).toBe(203);
++    expect(catalog.weaponMods.length).toBe(204);
+     // флаги на месте
+     expect(catalog.drinks.find((d) => d.id === 'drink_beer').isAlcohol).toBe(true);
+     expect(catalog.drinks.find((d) => d.id === 'drink_nuka_cola').isAlcohol).toBe(false);
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/components/screens/CharacterScreen/modals/EquipmentKitModal.js /tmp/target88c/components/screens/CharacterScreen/modals/EquipmentKitModal.js
+--- a/components/screens/CharacterScreen/modals/EquipmentKitModal.js	2026-08-13 07:03:16.774657608 +0000
++++ b/components/screens/CharacterScreen/modals/EquipmentKitModal.js	2026-08-13 07:04:04.442657608 +0000
+@@ -18,9 +18,11 @@
+   weapons: require('../../../../data/equipment/robot/weapons.json'),
+ });
+ 
+-const META_CATEGORY_ORDER = ['structure', 'weapon', 'module', 'misc'];
++const META_CATEGORY_ORDER = ['structure', 'apparel', 'weapon', 'module', 'misc'];
+ 
+-// Sub-order inside the "Standard Structure" group: head → body → arm → legs → plating
++// Sub-order inside the "Standard Structure" group: head → body → arm → legs → plating.
++// Сюда входят ТОЛЬКО части тела/конструкции роботов. Одежда и броня человека
++// идут отдельной категорией apparel, чтобы не попадать в «Стандартную конструкцию».
+ const STRUCTURE_SUBORDER = {
+   robotHead: 0,
+   robotBody: 1,
+@@ -28,11 +30,11 @@
+   robotLeg: 3,
+   robotLegs: 3,
+   plating: 4,
+-  armor: 5,
+-  frame: 6,
++  frame: 5,
+ };
+ 
+ const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
++const APPAREL_TYPES = new Set(['clothing', 'armor']);
+ 
+ // Currency itemTypes that are NOT inventory items — tracked via caps counter
+ const CURRENCY_TYPES = new Set(['currency']);
+@@ -40,6 +42,7 @@
+ const getMetaCategory = (item) => {
+   const type = item?.itemType || (item?.weaponId ? 'weapon' : 'misc');
+   if (STRUCTURE_TYPES.has(type)) return 'structure';
++  if (APPAREL_TYPES.has(type)) return 'apparel';
+   if (type === 'weapon') return 'weapon';
+   if (type === 'module') return 'module';
+   return 'misc';
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/db/catalogSource.js /tmp/target88c/db/catalogSource.js
+--- a/db/catalogSource.js	2026-08-13 07:03:16.782657608 +0000
++++ b/db/catalogSource.js	2026-08-13 07:04:04.438657608 +0000
+@@ -63,6 +63,10 @@
+     ammo_id: safeStr(w.ammoId),
+     range: safeStr(w.range),
+     range_name: safeStr(w.rangeName),
++    // Имена оружия с ложей/без ложи (лазерный пистолет → лазерная винтовка).
++    // Необходимо для правила «сток-мод меняет пистолет на винтовку».
++    stock_names: w.stockNames ? JSON.stringify(w.stockNames) : null,
++    stockNames: w.stockNames != null ? w.stockNames : null,
+     main_attr: safeStr(w.mainAttr),
+     main_skill: safeStr(w.mainSkill),
+     rules: safeStr(w.rules),
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/domain/kitResolver.js /tmp/target88c/domain/kitResolver.js
+--- a/domain/kitResolver.js	2026-08-13 07:03:16.782657608 +0000
++++ b/domain/kitResolver.js	2026-08-13 07:04:04.438657608 +0000
+@@ -177,11 +177,23 @@
+     if (mod) mods.push(mod);
+   }
+ 
+-  const prefixes = mods.map((mod) => mod.prefix).filter(Boolean);
+-  const weaponName = weaponData.name || item.weaponId;
++  // Ложа (stock) превращает пистолет в винтовку: имя берём из данных оружия
++  // (stockNames.with), если оно задано. Это правило книги (Any Stock mods
++  // change the weapon to a rifle), обеспеченное ДАННЫМИ — движок лишь знает,
++  // что мод из слота Stocks меняет базовое имя.
++  const hasStock = mods.some((mod) => mod.slot === 'Stocks');
++  // Префикс самой ложи (например, «Стандартная ложа») не пишем — он избыточен,
++  // когда ложа уже меняет имя оружия на винтовку. Префиксы стволов/ёмкостей и
++  // т.п. остаются.
++  const prefixes = mods
++    .filter((mod) => mod.slot !== 'Stocks')
++    .map((mod) => mod.prefix)
++    .filter(Boolean);
++  const stockName = hasStock ? (weaponData.stockNames?.with) : null;
++  const baseName = stockName || weaponData.name || item.weaponId;
+   // Уникальные качества — перед именем: «дерзкая» + «Опасная бритва».
+   const uniqNames = (item.uniqQualities || []).map(getUniqQualityName).filter(Boolean);
+-  const displayName = [...prefixes, ...uniqNames, weaponName].join(' ');
++  const displayName = [...prefixes, ...uniqNames, baseName].join(' ');
+   const resolvedAmmunition = await resolveAmmoObject(item.ammo, weaponData.ammo_id || weaponData.Ammo);
+ 
+   // appliedMods (slot → modId) строится здесь, чтобы любой путь доставки оружия
+@@ -202,7 +214,7 @@
+     ...item,
+     weaponId: resolvedWeaponId,
+     // baseName только у вариантов: у обычного оружия имя — из каталога.
+-    baseName: trueItemId ? weaponName : undefined,
++    baseName: trueItemId ? baseName : undefined,
+     _weapon: weaponData,
+     builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
+     builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/i18n/en-EN/screens/character/screen.json /tmp/target88c/i18n/en-EN/screens/character/screen.json
+--- a/i18n/en-EN/screens/character/screen.json	2026-08-13 07:03:16.782657608 +0000
++++ b/i18n/en-EN/screens/character/screen.json	2026-08-13 07:04:04.450657608 +0000
+@@ -114,6 +114,7 @@
+     "equipmentKit": {
+       "categories": {
+         "structure": "Standard Structure",
++        "apparel": "Armor & Clothing",
+         "weapon": "Weapons",
+         "module": "Modules",
+         "misc": "Misc"
+@@ -211,4 +212,4 @@
+     "THROWING": "Throwing",
+     "UNARMED": "Unarmed"
+   }
+-}
+\ No newline at end of file
++}
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/i18n/ru-RU/screens/character/screen.json /tmp/target88c/i18n/ru-RU/screens/character/screen.json
+--- a/i18n/ru-RU/screens/character/screen.json	2026-08-13 07:03:16.790657608 +0000
++++ b/i18n/ru-RU/screens/character/screen.json	2026-08-13 07:04:04.450657608 +0000
+@@ -114,6 +114,7 @@
+     "equipmentKit": {
+       "categories": {
+         "structure": "Стандартная конструкция",
++        "apparel": "Броня и одежда",
+         "weapon": "Оружие",
+         "module": "Модули",
+         "misc": "Разное"
+@@ -211,4 +212,4 @@
+     "THROWING": "Метание",
+     "UNARMED": "Рукопашная"
+   }
+-}
+\ No newline at end of file
++}
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/modules/fallout/data/equipmentKits/enclave.json /tmp/target88c/modules/fallout/data/equipmentKits/enclave.json
+--- a/modules/fallout/data/equipmentKits/enclave.json	2026-08-13 07:03:16.814657608 +0000
++++ b/modules/fallout/data/equipmentKits/enclave.json	2026-08-13 07:04:04.450657608 +0000
+@@ -45,7 +45,10 @@
+           {
+             "weaponId": "weapon_laser_gun",
+             "itemType": "weapon",
+-            "modIds": ["mod_058", "mod_054"],
++            "modIds": [
++              "mod_058",
++              "mod_204"
++            ],
+             "ammo": {
+               "ammoId": "ammo_energy_cell",
+               "quantity": {
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/modules/fallout/data/weapon_mods.json /tmp/target88c/modules/fallout/data/weapon_mods.json
+--- a/modules/fallout/data/weapon_mods.json	2026-08-13 07:03:16.790657608 +0000
++++ b/modules/fallout/data/weapon_mods.json	2026-08-13 07:04:04.450657608 +0000
+@@ -5413,5 +5413,34 @@
+     ],
+     "effectChanges": [],
+     "qualityChanges": []
++  },
++  {
++    "modType": "weapon",
++    "id": "mod_204",
++    "slot": "Barrels",
++    "complexity": 4,
++    "perk1": "Science! 1",
++    "perk2": "",
++    "skill": "SCIENCE",
++    "rarity": "Uncommon",
++    "materials": "Common x 5 Uncommon x 3",
++    "cost": 24,
++    "weight": 1,
++    "applies_to_ids": [
++      "weapon_institute_laser",
++      "weapon_laser_gun",
++      "weapon_plasma_gun"
++    ],
++    "rangeModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "qualityChanges": [
++      {
++        "op": "lose",
++        "id": "quality_close_quarters"
++      }
++    ],
++    "effectChanges": []
+   }
+-]
+\ No newline at end of file
++]
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/modules/fallout/i18n/en-EN.json /tmp/target88c/modules/fallout/i18n/en-EN.json
+--- a/modules/fallout/i18n/en-EN.json	2026-08-13 07:03:16.814657608 +0000
++++ b/modules/fallout/i18n/en-EN.json	2026-08-13 07:04:04.458657608 +0000
+@@ -1920,6 +1920,12 @@
+       "name": "mod_203",
+       "prefix": "mod_203",
+       "effectDescription": "plus 1 Range"
++    },
++    {
++      "id": "mod_204",
++      "name": "Long Barrel",
++      "prefix": "Long-barreled",
++      "effectDescription": "+1 Range, removes Close Quarters"
+     }
+   ]
+ }
+diff -ruN '--exclude=.git' '--exclude=node_modules' '--exclude=patchs' /tmp/base88b/modules/fallout/i18n/ru-RU.json /tmp/target88c/modules/fallout/i18n/ru-RU.json
+--- a/modules/fallout/i18n/ru-RU.json	2026-08-13 07:03:16.814657608 +0000
++++ b/modules/fallout/i18n/ru-RU.json	2026-08-13 07:04:04.450657608 +0000
+@@ -1919,6 +1919,12 @@
+       "name": "Аэродинамический ствол",
+       "prefix": "Аэродинамический",
+       "effectDescription": "+1 дистанция"
++    },
++    {
++      "id": "mod_204",
++      "name": "Длинный ствол",
++      "prefix": "Длинноствольный",
++      "effectDescription": "+1 Дистанция, Убирает Вплотную"
+     }
+   ]
+ }

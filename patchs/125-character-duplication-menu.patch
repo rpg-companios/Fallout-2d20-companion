@@ -1,0 +1,1148 @@
+diff --git a/__tests__/character-duplication/database-contract.test.js b/__tests__/character-duplication/database-contract.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..f1063c8943da21b287b4035f0a8f7291bcc12c6a
+--- /dev/null
++++ b/__tests__/character-duplication/database-contract.test.js
+@@ -0,0 +1,43 @@
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++
++const database = fs.readFileSync(new URL('../../db/Database.js', import.meta.url), 'utf8');
++const webDatabase = fs.readFileSync(new URL('../../db/Database.web.js', import.meta.url), 'utf8');
++const schema = fs.readFileSync(new URL('../../db/schema.js', import.meta.url), 'utf8');
++const sqliteAdapter = fs.readFileSync(new URL('../../db/adapters/SQLiteAdapter.js', import.meta.url), 'utf8');
++const webAdapter = fs.readFileSync(new URL('../../db/adapters/WebAdapter.js', import.meta.url), 'utf8');
++const characterContext = fs.readFileSync(new URL('../../components/CharacterContext.js', import.meta.url), 'utf8');
++
++describe('character duplication persistence contract', () => {
++  it('stores pending rename state separately from character data', () => {
++    expect(schema).toContain('CREATE TABLE IF NOT EXISTS character_rename_requests');
++    expect(schema).toContain('character_id TEXT PRIMARY KEY');
++  });
++
++  it.each([database, webDatabase])('exposes duplication and rename-marker operations', (source) => {
++    expect(source).toContain('function duplicateCharacter');
++    expect(source).toContain('function clearCharacterRenameRequest');
++    expect(source).toContain('buildCharacterDuplicate');
++  });
++
++  it.each([database, webDatabase])('creates the record, marker, and optional folder membership in one batch', (source) => {
++    const duplicateBody = source.slice(
++      source.indexOf('export async function duplicateCharacter'),
++      source.indexOf('export async function clearCharacterRenameRequest'),
++    );
++    expect(duplicateBody).toContain('INSERT INTO characters');
++    expect(duplicateBody).toContain('INSERT INTO character_rename_requests');
++    expect(duplicateBody).toContain('INSERT INTO character_folder_memberships');
++    expect(duplicateBody).toContain('await runBatch(statements)');
++  });
++
++  it('uses transactional/batched adapter writes on native and web', () => {
++    expect(sqliteAdapter).toContain('withTransactionAsync');
++    expect(webAdapter).toContain('AsyncStorage.multiSet(writes)');
++  });
++
++  it('restores rename-required mode and clears it only when Save succeeds', () => {
++    expect(characterContext).toContain('const saved = !row.renamePending');
++    expect(characterContext).toContain('await db.clearCharacterRenameRequest(id)');
++  });
++});
+diff --git a/__tests__/character-duplication/domain.test.js b/__tests__/character-duplication/domain.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..b56862ee958306982768f99d7471a9db5f9c17de
+--- /dev/null
++++ b/__tests__/character-duplication/domain.test.js
+@@ -0,0 +1,97 @@
++import { describe, expect, it } from 'vitest';
++import {
++  buildCharacterDuplicate,
++  createDuplicateCharacterId,
++  createDuplicateCharacterName,
++} from '../../domain/characterDuplication';
++
++describe('universal character duplication domain', () => {
++  it.each([
++    {
++      sourceName: 'Макс',
++      copyLabel: 'копия',
++      existingNames: ['Макс'],
++      expected: 'Макс — копия',
++    },
++    {
++      sourceName: 'Макс',
++      copyLabel: 'копия',
++      existingNames: ['Макс', 'Макс — копия'],
++      expected: 'Макс — копия 2',
++    },
++    {
++      sourceName: 'Max',
++      copyLabel: 'copy',
++      existingNames: ['Max', 'Max — copy', 'Max — copy 2'],
++      expected: 'Max — copy 3',
++    },
++  ])('builds the localized collision-free name $expected', (input) => {
++    expect(createDuplicateCharacterName(input)).toBe(input.expected);
++  });
++
++  it('changes only record identity, name, timestamps, and the canonical name value', () => {
++    const source = {
++      id: 'char_source',
++      name: 'Max',
++      level: 8,
++      originName: 'vaultDweller',
++      data: {
++        characterName: 'Max',
++        selectedPerks: [{ id: 'perk_1', effect: { id: 'effect_1' } }],
++        inventory: {
++          items: [{ id: 'item_1', uniqueId: 'instance_1', mods: [{ id: 'mod_1' }] }],
++        },
++      },
++    };
++    const original = JSON.parse(JSON.stringify(source));
++
++    const duplicate = buildCharacterDuplicate({
++      source,
++      existingNames: ['Max'],
++      copyLabel: 'copy',
++      duplicateId: 'char_duplicate',
++      timestamp: 1_765_432_100_000,
++    });
++
++    expect(duplicate).toEqual({
++      id: 'char_duplicate',
++      name: 'Max — copy',
++      level: 8,
++      originName: 'vaultDweller',
++      data: {
++        characterName: 'Max — copy',
++        selectedPerks: [{ id: 'perk_1', effect: { id: 'effect_1' } }],
++        inventory: {
++          items: [{ id: 'item_1', uniqueId: 'instance_1', mods: [{ id: 'mod_1' }] }],
++        },
++      },
++      createdAt: 1_765_432_100_000,
++      updatedAt: 1_765_432_100_000,
++    });
++    expect(source).toEqual(original);
++    expect(duplicate.data).not.toBe(source.data);
++    expect(duplicate.data.selectedPerks).not.toBe(source.data.selectedPerks);
++    expect(duplicate.data.inventory.items[0]).not.toBe(source.data.inventory.items[0]);
++  });
++
++  it('creates a new character-record id from injected values', () => {
++    expect(createDuplicateCharacterId(1_765_432_100_000, 'abc123'))
++      .toBe('char_1765432100000_abc123');
++  });
++
++  it('rejects inconsistent persisted name data instead of normalizing it', () => {
++    expect(() => buildCharacterDuplicate({
++      source: {
++        id: 'char_source',
++        name: 'Max',
++        level: 1,
++        originName: null,
++        data: { characterName: 'Other name' },
++      },
++      existingNames: ['Max'],
++      copyLabel: 'copy',
++      duplicateId: 'char_duplicate',
++      timestamp: 123,
++    })).toThrow('source name and data.characterName must match');
++  });
++});
+diff --git a/__tests__/character-duplication/ui-contract.test.js b/__tests__/character-duplication/ui-contract.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f0a1364ebc3ace7cd3713bf55af2185d9f2c801
+--- /dev/null
++++ b/__tests__/character-duplication/ui-contract.test.js
+@@ -0,0 +1,53 @@
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import ruHome from '../../i18n/ru-RU/screens/home/screen.json';
++import enHome from '../../i18n/en-EN/screens/home/screen.json';
++
++const homeScreen = fs.readFileSync(
++  new URL('../../components/screens/HomeScreen/HomeScreen.js', import.meta.url),
++  'utf8',
++);
++
++describe('character card action menu', () => {
++  it('uses the required localized action and error strings', () => {
++    expect(ruHome.characterActions).toMatchObject({
++      download: 'Скачать персонажа',
++      duplicate: 'Дублировать персонажа',
++      delete: 'Удалить персонажа',
++      copySuffix: 'копия',
++      duplicateError: 'Не удалось дублировать персонажа.',
++    });
++    expect(enHome.characterActions).toMatchObject({
++      download: 'Download character',
++      duplicate: 'Duplicate character',
++      delete: 'Delete character',
++      copySuffix: 'copy',
++      duplicateError: 'Failed to duplicate character.',
++    });
++    expect(ruHome.settings).toMatchObject({
++      appearanceTitle: 'Внешний вид',
++      characterDeleteActionPlacementTitle: 'Удаление персонажа',
++      characterDeleteActionPlacementDescription: 'Где показывать действие удаления персонажа.',
++      characterDeleteActionPlacement: { menu: 'В меню действий', card: 'На карточке' },
++    });
++    expect(enHome.settings).toMatchObject({
++      appearanceTitle: 'Appearance',
++      characterDeleteActionPlacementTitle: 'Delete character',
++      characterDeleteActionPlacementDescription: 'Where to show the delete character action.',
++      characterDeleteActionPlacement: { menu: 'In action menu', card: 'On character card' },
++    });
++  });
++
++  it('replaces the card download shortcut with a vertical-dots action menu', () => {
++    expect(homeScreen).toContain('name="dots-vertical"');
++    expect(homeScreen).not.toContain('style={styles.downloadButton}');
++    expect(homeScreen).toContain("tHomeScreen('characterActions.download')");
++    expect(homeScreen).toContain("tHomeScreen('characterActions.duplicate')");
++  });
++
++  it('shows delete in exactly the configured menu or card location', () => {
++    expect(homeScreen).toContain("deleteActionPlacement === 'card'");
++    expect(homeScreen).toContain("deleteActionPlacement === 'menu'");
++    expect(homeScreen).toContain('selectCharacterDeleteActionPlacement');
++  });
++});
+diff --git a/__tests__/character-duplication/web-persistence.test.js b/__tests__/character-duplication/web-persistence.test.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..a27365295bdf1af7cb687c85b3ab9066325a1ca0
+--- /dev/null
++++ b/__tests__/character-duplication/web-persistence.test.js
+@@ -0,0 +1,74 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import * as db from '../../db/Database.web';
++
++const insertCharacter = async ({
++  id,
++  name,
++  createdAt,
++  data = { characterName: name },
++}) => {
++  await db.runQuery(
++    `INSERT INTO characters
++      (id, name, level, origin_name, data, created_at, updated_at)
++     VALUES (?, ?, ?, ?, ?, ?, ?)`,
++    [id, name, 8, 'vaultDweller', JSON.stringify(data), createdAt, createdAt],
++  );
++};
++
++describe('web character duplication persistence', () => {
++  beforeEach(async () => {
++    await AsyncStorage.clear();
++    vi.restoreAllMocks();
++  });
++
++  it('atomically writes an exact nested copy, rename marker, and source folder placement', async () => {
++    const sourceData = {
++      characterName: 'Max',
++      selectedPerks: [{ id: 'perk_1', effect: { id: 'effect_1' } }],
++      inventory: { items: [{ id: 'item_1', uniqueId: 'instance_1' }] },
++    };
++    await insertCharacter({ id: 'char_source', name: 'Max', createdAt: 10, data: sourceData });
++    await insertCharacter({ id: 'char_existing_copy', name: 'Max — copy', createdAt: 11 });
++    await db.runQuery(
++      'INSERT INTO character_folders (id, name, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?)',
++      ['folder_1', 'Party', 1, 1, 0],
++    );
++    await db.runQuery(
++      'INSERT INTO character_folder_memberships (character_id, folder_id) VALUES (?, ?)',
++      ['char_source', 'folder_1'],
++    );
++    const multiSet = vi.spyOn(AsyncStorage, 'multiSet');
++
++    const duplicate = await db.duplicateCharacter('char_source', 'copy');
++
++    expect(duplicate.name).toBe('Max — copy 2');
++    expect(multiSet).toHaveBeenCalledTimes(1);
++    expect(multiSet.mock.calls[0][0].map(([key]) => key).sort()).toEqual([
++      'fallout_db_character_folder_memberships',
++      'fallout_db_character_rename_requests',
++      'fallout_db_characters',
++    ]);
++
++    const loaded = await db.loadCharacterById(duplicate.id);
++    expect(loaded.renamePending).toBe(true);
++    expect(loaded.created_at).toBe(duplicate.createdAt);
++    expect(loaded.updated_at).toBe(duplicate.updatedAt);
++    expect(loaded.data).toEqual({ ...sourceData, characterName: 'Max — copy 2' });
++    expect(await db.getCharacterFolderId(duplicate.id)).toBe('folder_1');
++
++    await db.clearCharacterRenameRequest(duplicate.id);
++    expect((await db.loadCharacterById(duplicate.id)).renamePending).toBe(false);
++  });
++
++  it('keeps a root character duplicate at root', async () => {
++    await insertCharacter({ id: 'char_root', name: 'Макс', createdAt: 20 });
++
++    const duplicate = await db.duplicateCharacter('char_root', 'копия');
++
++    expect(duplicate.name).toBe('Макс — копия');
++    expect(await db.getCharacterFolderId(duplicate.id)).toBeNull();
++    expect((await db.getRootCharactersList()).map((character) => character.id))
++      .toContain(duplicate.id);
++  });
++});
+diff --git a/__tests__/securitron/settings-module.test.js b/__tests__/securitron/settings-module.test.js
+index b0ccd8a159f8441d55f3feb21470f77c228cf31b..5e46dbf0d1e6150371d980c9afd0229a43a86e97 100644
+--- a/__tests__/securitron/settings-module.test.js
++++ b/__tests__/securitron/settings-module.test.js
+@@ -45,10 +45,16 @@ describe('Настройки сеттинга (modules/fallout/settings.json)',
+ 
+   it('движковые настройки — отдельно (каталоги, вид карточек)', () => {
+     expect(ENGINE_SETTINGS.map((s) => s.id).sort()).toEqual([
++      'characterDeleteActionPlacement',
+       'characterFoldersEnabled',
+       'weaponCardsDisplayMode',
+     ]);
+-    expect(getAllSettings()).toHaveLength(7);
++    expect(getAllSettings()).toHaveLength(8);
++    expect(getSettingById('characterDeleteActionPlacement')).toMatchObject({
++      type: 'select',
++      defaultValue: 'menu',
++      options: [{ value: 'menu' }, { value: 'card' }],
++    });
+     expect(getSettingById('characterFoldersEnabled')).not.toBeNull();
+     expect(getSettingById('language')).not.toBeNull();
+   });
+@@ -67,12 +73,28 @@ describe('Настройки сеттинга (modules/fallout/settings.json)',
+       expect(dict.language.en).toBeTruthy();
+     }
+   });
++
++  it('i18n тексты движковой настройки удаления присутствуют в обеих локалях', () => {
++    for (const loc of ['ru-RU', 'en-EN']) {
++      const dict = JSON.parse(readFileSync(
++        path.join(root, `i18n/${loc}/screens/home/screen.json`), 'utf-8'));
++      expect(dict.settings.appearanceTitle).toBeTruthy();
++      expect(dict.settings.characterDeleteActionPlacementTitle).toBeTruthy();
++      expect(dict.settings.characterDeleteActionPlacementDescription).toBeTruthy();
++      expect(dict.settings.characterDeleteActionPlacement.menu).toBeTruthy();
++      expect(dict.settings.characterDeleteActionPlacement.card).toBeTruthy();
++    }
++  });
+ });
+ 
+ describe('Стор настроек: значения по модулям', () => {
+   beforeAll(() => {
+     useAppSettingsStore.setState({ values: {
+-      engine: { characterFoldersEnabled: true, weaponCardsDisplayMode: 'tabs' },
++      engine: {
++        characterFoldersEnabled: true,
++        characterDeleteActionPlacement: 'card',
++        weaponCardsDisplayMode: 'tabs',
++      },
+       fallout: {
+         weaponDurabilityLossEnabled: true,
+         weaponDurabilityLossPer10Shots: 3,
+@@ -88,6 +110,7 @@ describe('Стор настроек: значения по модулям', () =
+     expect(state.getSettingValue('weaponDurabilityLossEnabled')).toBe(true);
+     expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(3);
+     expect(state.getSettingValue('characterFoldersEnabled')).toBe(true);
++    expect(state.getSettingValue('characterDeleteActionPlacement')).toBe('card');
+     expect(state.getSettingValue('weaponCardsDisplayMode')).toBe('tabs');
+     expect(state.getSettingValue('unarmedAttackVisible')).toBe(false);
+     expect(state.getSettingValue('language')).toBe('en-EN');
+@@ -101,7 +124,7 @@ describe('Стор настроек: значения по модулям', () =
+     expect(state.getSettingValue('weaponDurabilityLossPer10Shots')).toBe(1);
+   });
+ 
+-  it('язык — настройка сеттинга: setValue('language') меняет локаль', () => {
++  it("язык — настройка сеттинга: setValue('language') меняет локаль", () => {
+     const before = getCurrentLocale();
+     useAppSettingsStore.getState().setValue('language', 'ru-RU');
+     expect(getCurrentLocale()).toBe('ru-RU');
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 7475f4a7fe71f095460d0fc5cde6292a1a663bb4..becd8c000f52e4814614b90ac17e45afaea2214f 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -725,6 +725,7 @@ export const CharacterProvider = ({ children }) => {
+         snapshot.origin?.id || snapshot.origin?.name || null,
+         serialized
+       );
++      await db.clearCharacterRenameRequest(id);
+       await syncCharacterToCloudIfEnabled(id);
+ 
+       setIsSaved(true);
+@@ -741,9 +742,11 @@ export const CharacterProvider = ({ children }) => {
+       const row = await db.loadCharacterById(id);
+       if (!row) return false;
+       const data = deserializeState(row.data);
++      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
++      isSavedRef.current = false;
+ 
+       setCharacterId(id);
+-      setCharacterName(data.characterName || '');
++      setCharacterName(row.name);
+       setLevel(data.level ?? INITIAL_LEVEL);
+       setAttributes(data.attributes || createInitialAttributes());
+       setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+@@ -830,8 +833,9 @@ export const CharacterProvider = ({ children }) => {
+         }
+       }
+       
+-      setIsSaved(true);
+-      isSavedRef.current = true;
++      const saved = !row.renamePending;
++      setIsSaved(saved);
++      isSavedRef.current = saved;
+       characterIdRef.current = id;
+       return true;
+     } catch (e) {
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 198baf12ad7d6e3a3ea5546d4720dd7fb77e01db..1661f7fdff752d6252e295245209107f6fea238a 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -13,6 +13,7 @@ import {
+   Linking,
+   TextInput,
+   PanResponder,
++  Dimensions,
+ } from 'react-native';
+ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+@@ -32,7 +33,10 @@ import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudS
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import styles from '../../../styles/HomeScreen.styles';
+ import SettingsModal from '../../settings/SettingsModal';
+-import useAppSettingsStore, { selectCharacterFoldersEnabled } from '../../../src/store/appSettingsStore';
++import useAppSettingsStore, {
++  selectCharacterDeleteActionPlacement,
++  selectCharacterFoldersEnabled,
++} from '../../../src/store/appSettingsStore';
+ 
+ const getOriginImage = (originName) => {
+   if (!originName) return null;
+@@ -49,8 +53,41 @@ const ActionCell = ({ icon, label, onPress, disabled = false }) => (
+   </TouchableOpacity>
+ );
+ 
+-const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart, onDragMove, onDragEnd }) => {
++const CHARACTER_ACTION_MENU_WIDTH = 220;
++
++const CharacterCell = ({
++  character,
++  deleteActionPlacement,
++  onPress,
++  onDelete,
++  onDownload,
++  onDuplicate,
++  onDragStart,
++  onDragMove,
++  onDragEnd,
++}) => {
+   const originImage = getOriginImage(character.originName);
++  const actionButtonRef = useRef(null);
++  const [actionMenuPosition, setActionMenuPosition] = useState(null);
++
++  const openActionMenu = (event) => {
++    event?.stopPropagation?.();
++    actionButtonRef.current?.measureInWindow((x, y, width, height) => {
++      const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
++      const menuHeight = deleteActionPlacement === 'menu' ? 144 : 100;
++      const left = Math.max(8, Math.min(x + width - CHARACTER_ACTION_MENU_WIDTH, windowWidth - CHARACTER_ACTION_MENU_WIDTH - 8));
++      const top = y + height + menuHeight + 8 <= windowHeight
++        ? y + height + 4
++        : Math.max(8, y - menuHeight - 4);
++      setActionMenuPosition({ top, left });
++    });
++  };
++
++  const runAction = (action) => {
++    setActionMenuPosition(null);
++    action();
++  };
++
+   // PanResponder keeps ownership of the pointer after it leaves the small handle,
+   // which Touchable's touch callbacks do not guarantee on web and native.
+   const callbacks = useRef({});
+@@ -63,14 +100,55 @@ const CharacterCell = ({ character, onPress, onDelete, onDownload, onDragStart,
+     onPanResponderRelease: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+     onPanResponderTerminate: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+   })).current;
++
+   return (
+     <TouchableOpacity style={styles.characterCell} onPress={onPress} activeOpacity={0.8}>
+       <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
+       <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
+-      <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><Text style={styles.deleteIcon}>🗑</Text></TouchableOpacity>
+-      <TouchableOpacity style={styles.downloadButton} onPress={(event) => { event?.stopPropagation?.(); onDownload(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}><MaterialCommunityIcons name="download" size={16} color="#8a8a8a" /></TouchableOpacity>
++      {deleteActionPlacement === 'card' && (
++        <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }} accessibilityLabel={tHomeScreen('characterActions.delete')}>
++          <Text style={styles.deleteIcon}>🗑</Text>
++        </TouchableOpacity>
++      )}
++      <TouchableOpacity
++        ref={actionButtonRef}
++        style={styles.characterActionButton}
++        onPress={openActionMenu}
++        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
++        accessibilityLabel={tHomeScreen('characterActions.openMenu')}
++      >
++        <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
++      </TouchableOpacity>
+       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
+       {character.level ? <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text> : null}
++
++      <Modal
++        visible={Boolean(actionMenuPosition)}
++        transparent
++        animationType="none"
++        onRequestClose={() => setActionMenuPosition(null)}
++      >
++        <Pressable style={styles.characterActionBackdrop} onPress={() => setActionMenuPosition(null)}>
++          {actionMenuPosition && (
++            <View style={[styles.characterActionMenu, actionMenuPosition]}>
++              <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDownload)}>
++                <MaterialCommunityIcons name="download" size={19} color="#111827" />
++                <Text style={styles.characterActionText}>{tHomeScreen('characterActions.download')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDuplicate)}>
++                <MaterialCommunityIcons name="content-copy" size={19} color="#111827" />
++                <Text style={styles.characterActionText}>{tHomeScreen('characterActions.duplicate')}</Text>
++              </TouchableOpacity>
++              {deleteActionPlacement === 'menu' && (
++                <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDelete)}>
++                  <MaterialCommunityIcons name="delete-outline" size={19} color="#b91c1c" />
++                  <Text style={[styles.characterActionText, styles.characterActionDeleteText]}>{tHomeScreen('characterActions.delete')}</Text>
++                </TouchableOpacity>
++              )}
++            </View>
++          )}
++        </Pressable>
++      </Modal>
+     </TouchableOpacity>
+   );
+ };
+@@ -92,6 +170,7 @@ export default function HomeScreen({ navigation }) {
+   const rootDropRef = useRef(null);
+   const dropBounds = useRef({});
+   const characterFoldersEnabled = useAppSettingsStore(selectCharacterFoldersEnabled);
++  const characterDeleteActionPlacement = useAppSettingsStore(selectCharacterDeleteActionPlacement);
+   const [loading, setLoading] = useState(true);
+   const [menuVisible, setMenuVisible] = useState(false);
+   const [aboutVisible, setAboutVisible] = useState(false);
+@@ -174,7 +253,7 @@ export default function HomeScreen({ navigation }) {
+     { code: 'en-EN', label: tHomeScreen('language.english'), flag: '🇬🇧' },
+   ];
+ 
+-  const loadList = useCallback(async () => {
++  const loadList = useCallback(async ({ duplicatedCharacterId, sourceCharacterId } = {}) => {
+     setLoading(true);
+     try {
+       const savedFolders = await db.getCharacterFolders();
+@@ -182,6 +261,15 @@ export default function HomeScreen({ navigation }) {
+       const counts = Object.fromEntries(savedFolders.map((folder, index) => [folder.id, folderLists[index].length]));
+       const visible = activeFolder ? folderLists[savedFolders.findIndex((folder) => folder.id === activeFolder.id)] || [] : await db.getRootCharactersList();
+       visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
++      if (duplicatedCharacterId && sourceCharacterId) {
++        const duplicateIndex = visible.findIndex((item) => item.id === duplicatedCharacterId);
++        const sourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
++        if (duplicateIndex >= 0 && sourceIndex >= 0) {
++          const [duplicate] = visible.splice(duplicateIndex, 1);
++          const currentSourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
++          visible.splice(currentSourceIndex + 1, 0, duplicate);
++        }
++      }
+       setCharacters(visible);
+       setFolders(savedFolders);
+       setFolderCounts(counts);
+@@ -339,6 +427,24 @@ export default function HomeScreen({ navigation }) {
+     );
+   };
+ 
++  const handleDuplicate = async (character) => {
++    try {
++      const duplicate = await db.duplicateCharacter(
++        character.id,
++        tHomeScreen('characterActions.copySuffix'),
++      );
++      await loadList({
++        duplicatedCharacterId: duplicate.id,
++        sourceCharacterId: character.id,
++      });
++    } catch (error) {
++      console.error('[duplicateCharacter] failed:', error);
++      Alert.alert(
++        tHomeScreen('title'),
++        tHomeScreen('characterActions.duplicateError'),
++      );
++    }
++  };
+ 
+   const handleDownload = async (character) => {
+     if (false) { // cross-platform
+@@ -606,9 +712,11 @@ export default function HomeScreen({ navigation }) {
+                   <CharacterCell
+                     key={item.id}
+                     character={item}
++                    deleteActionPlacement={characterDeleteActionPlacement}
+                     onPress={() => handleOpen(item.id)}
+                     onDelete={() => handleDelete(item)}
+                     onDownload={() => handleDownload(item)}
++                    onDuplicate={() => handleDuplicate(item)}
+                     onDragStart={handleDragStart}
+                     onDragMove={handleDragMove}
+                     onDragEnd={handleDragEnd}
+diff --git a/db/Database.js b/db/Database.js
+index da061e99a57c6ee62f9d459e25659b3c6749d70b..caa05e9b54a1fbbd962b5d07353f0255f6d07284 100644
+--- a/db/Database.js
++++ b/db/Database.js
+@@ -1,4 +1,8 @@
+ import { Platform } from 'react-native';
++import {
++  buildCharacterDuplicate,
++  createDuplicateCharacterId,
++} from '../domain/characterDuplication';
+ import {
+   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
+   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
+@@ -97,6 +101,11 @@ export async function getItemByName(name) {
+ 
+ // ─── Персонажи (СОХРАНЁНКИ — остаются в SQLite) ─────────────────────────────────
+ 
++const makeDuplicateCharacterId = (timestamp) => createDuplicateCharacterId(
++  timestamp,
++  Math.random().toString(36).slice(2, 11),
++);
++
+ export async function saveCharacter(id, name, level, originName, data) {
+   const now = Date.now();
+   const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
+@@ -117,9 +126,14 @@ export async function saveCharacter(id, name, level, originName, data) {
+ export async function loadCharacterById(id) {
+   const row = await getFirst('SELECT * FROM characters WHERE id = ?', [id]);
+   if (!row) return null;
++  const renameRequest = await getFirst(
++    'SELECT character_id FROM character_rename_requests WHERE character_id = ?',
++    [id],
++  );
+   return {
+     ...row,
+     data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
++    renamePending: Boolean(renameRequest),
+   };
+ }
+ 
+@@ -137,8 +151,74 @@ export async function getCharactersList() {
+   }));
+ }
+ 
++/**
++ * Atomically duplicates a character, its folder placement, and its rename marker.
++ * The domain helper owns copy semantics; persistence only stores its result.
++ */
++export async function duplicateCharacter(id, copySuffix) {
++  const source = await getFirst('SELECT * FROM characters WHERE id = ?', [id]);
++  if (!source) throw new Error(`Character not found: ${id}`);
++
++  const existingNames = (await getAll('SELECT name FROM characters')).map(row => row.name);
++  const sourceMembership = await getFirst(
++    'SELECT folder_id FROM character_folder_memberships WHERE character_id = ?',
++    [id],
++  );
++  const timestamp = Date.now();
++  const duplicate = buildCharacterDuplicate({
++    source: {
++      id: source.id,
++      name: source.name,
++      level: source.level,
++      originName: source.origin_name,
++      data: typeof source.data === 'string' ? JSON.parse(source.data) : source.data,
++    },
++    existingNames,
++    copyLabel: copySuffix,
++    duplicateId: makeDuplicateCharacterId(timestamp),
++    timestamp,
++  });
++
++  const statements = [
++    {
++      sql: `INSERT INTO characters
++              (id, name, level, origin_name, data, created_at, updated_at)
++            VALUES (?, ?, ?, ?, ?, ?, ?)`,
++      params: [
++        duplicate.id,
++        duplicate.name,
++        duplicate.level,
++        duplicate.originName,
++        JSON.stringify(duplicate.data),
++        duplicate.createdAt,
++        duplicate.updatedAt,
++      ],
++    },
++    {
++      sql: 'INSERT INTO character_rename_requests (character_id) VALUES (?)',
++      params: [duplicate.id],
++    },
++  ];
++
++  if (sourceMembership) {
++    statements.push({
++      sql: `INSERT INTO character_folder_memberships (character_id, folder_id)
++            VALUES (?, ?)`,
++      params: [duplicate.id, sourceMembership.folder_id],
++    });
++  }
++
++  await runBatch(statements);
++  return duplicate;
++}
++
++export async function clearCharacterRenameRequest(id) {
++  await runQuery('DELETE FROM character_rename_requests WHERE character_id = ?', [id]);
++}
++
+ export async function deleteCharacter(id) {
+   await runBatch([
++    { sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [id] },
+     { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [id] },
+     { sql: 'DELETE FROM characters WHERE id = ?', params: [id] },
+   ]);
+@@ -214,6 +294,7 @@ export async function getCharactersInFolder(folderId) {
+ export async function deleteCharacterFolderAndCharacters(folderId) {
+   const members = await getAll('SELECT character_id FROM character_folder_memberships WHERE folder_id = ?', [folderId]);
+   const statements = members.flatMap((member) => [
++    { sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [member.character_id] },
+     { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [member.character_id] },
+     { sql: 'DELETE FROM characters WHERE id = ?', params: [member.character_id] },
+   ]);
+diff --git a/db/Database.web.js b/db/Database.web.js
+index f6068b7af0fc4273721da60642c5d52f22a36b2d..1f12987413dbf4e402c362f841dacb8b294c2483 100644
+--- a/db/Database.web.js
++++ b/db/Database.web.js
+@@ -1,4 +1,8 @@
+ import { getAll, getFirst, runQuery, initDatabase, runBatch, tableExists } from './adapters/WebAdapter';
++import {
++  buildCharacterDuplicate,
++  createDuplicateCharacterId,
++} from '../domain/characterDuplication';
+ import {
+   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
+   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
+@@ -78,6 +82,11 @@ export async function getItemByName(name) {
+ 
+ // ─── Персонажи (СОХРАНЁНКИ — остаются в SQLite/Web-adapter) ─────────────────────
+ 
++const makeDuplicateCharacterId = (timestamp) => createDuplicateCharacterId(
++  timestamp,
++  Math.random().toString(36).slice(2, 11),
++);
++
+ export async function saveCharacter(id, name, level, originName, data) {
+   const now = Date.now();
+   const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
+@@ -98,9 +107,14 @@ export async function saveCharacter(id, name, level, originName, data) {
+ export async function loadCharacterById(id) {
+   const row = await getFirst('SELECT * FROM characters WHERE id = ?', [id]);
+   if (!row) return null;
++  const renameRequest = await getFirst(
++    'SELECT character_id FROM character_rename_requests WHERE character_id = ?',
++    [id],
++  );
+   return {
+     ...row,
+     data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
++    renamePending: Boolean(renameRequest),
+   };
+ }
+ 
+@@ -118,8 +132,77 @@ export async function getCharactersList() {
+   }));
+ }
+ 
++/**
++ * Atomically duplicates a character, its folder placement, and its rename marker.
++ * The domain helper owns copy semantics; persistence only stores its result.
++ */
++export async function duplicateCharacter(id, copySuffix) {
++  const source = await getFirst('SELECT * FROM characters WHERE id = ?', [id]);
++  if (!source) throw new Error(`Character not found: ${id}`);
++
++  const existingNames = (await getAll('SELECT name FROM characters')).map(row => row.name);
++  const sourceMembership = await getFirst(
++    'SELECT folder_id FROM character_folder_memberships WHERE character_id = ?',
++    [id],
++  );
++  const timestamp = Date.now();
++  const duplicate = buildCharacterDuplicate({
++    source: {
++      id: source.id,
++      name: source.name,
++      level: source.level,
++      originName: source.origin_name,
++      data: typeof source.data === 'string' ? JSON.parse(source.data) : source.data,
++    },
++    existingNames,
++    copyLabel: copySuffix,
++    duplicateId: makeDuplicateCharacterId(timestamp),
++    timestamp,
++  });
++
++  const statements = [
++    {
++      sql: `INSERT INTO characters
++              (id, name, level, origin_name, data, created_at, updated_at)
++            VALUES (?, ?, ?, ?, ?, ?, ?)`,
++      params: [
++        duplicate.id,
++        duplicate.name,
++        duplicate.level,
++        duplicate.originName,
++        JSON.stringify(duplicate.data),
++        duplicate.createdAt,
++        duplicate.updatedAt,
++      ],
++    },
++    {
++      sql: 'INSERT INTO character_rename_requests (character_id) VALUES (?)',
++      params: [duplicate.id],
++    },
++  ];
++
++  if (sourceMembership) {
++    statements.push({
++      sql: `INSERT INTO character_folder_memberships (character_id, folder_id)
++            VALUES (?, ?)`,
++      params: [duplicate.id, sourceMembership.folder_id],
++    });
++  }
++
++  await runBatch(statements);
++  return duplicate;
++}
++
++export async function clearCharacterRenameRequest(id) {
++  await runQuery('DELETE FROM character_rename_requests WHERE character_id = ?', [id]);
++}
++
+ export async function deleteCharacter(id) {
+-  await runBatch([{ sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [id] }]);
++  await runBatch([
++    { sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [id] },
++    { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [id] },
++    { sql: 'DELETE FROM characters WHERE id = ?', params: [id] },
++  ]);
+ }
+ 
+ export async function getPerkEffects(_perkName, _rank = 1) {
+@@ -172,6 +255,6 @@ export async function getCharactersInFolder(folderId) {
+ }
+ export async function deleteCharacterFolderAndCharacters(folderId) {
+   const members = await getAll('SELECT character_id FROM character_folder_memberships WHERE folder_id = ?', [folderId]);
+-  await runBatch([...members.flatMap(({ character_id }) => [{ sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [character_id] }]), { sql: 'DELETE FROM character_folder_memberships WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM character_folders WHERE id = ?', params: [folderId] }]);
++  await runBatch([...members.flatMap(({ character_id }) => [{ sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [character_id] }]), { sql: 'DELETE FROM character_folder_memberships WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM character_folders WHERE id = ?', params: [folderId] }]);
+   return members.map((row) => row.character_id);
+ }
+diff --git a/db/adapters/WebAdapter.js b/db/adapters/WebAdapter.js
+index 0c1259c4cab4b7bf7ad99417c51d0d47e68d7cc7..45bd5480119ceec50e4e6b990a1e21477095242f 100644
+--- a/db/adapters/WebAdapter.js
++++ b/db/adapters/WebAdapter.js
+@@ -196,18 +196,19 @@ export async function runBatch(statements) {
+       await runQuery(sql, params);
+     }
+   }
++  const writes = [];
+   for (const [table, data] of Object.entries(grouped)) {
+     const existing = await readTable(table);
+     const pkField = data.cols[0];
+-    const isReplace = statements.find(s => /INSERT\s+OR\s+REPLACE/i.test(s.sql));
+     const map = new Map(existing.map(r => [r[pkField], r]));
+     for (const params of data.rows) {
+       const obj = {};
+       data.cols.forEach((col, i) => { obj[col] = params[i] ?? null; });
+       map.set(obj[pkField], obj);
+     }
+-    await writeTable(table, Array.from(map.values()));
++    writes.push([PREFIX + table, JSON.stringify(Array.from(map.values()))]);
+   }
++  if (writes.length > 0) await AsyncStorage.multiSet(writes);
+ }
+ 
+ export async function tableExists(tableName) {
+diff --git a/db/schema.js b/db/schema.js
+index a2a41e2a931889b9fba957de24376510267bcb29..cc08880d6929755ced1e77efdd86108584132d68 100644
+--- a/db/schema.js
++++ b/db/schema.js
+@@ -5,7 +5,7 @@
+ //
+ // schema_meta оставлена для версионирования/миграций на будущее.
+ 
+-export const SCHEMA_VERSION = 10;
++export const SCHEMA_VERSION = 11;
+ 
+ export const CREATE_TABLES = [
+   `CREATE TABLE IF NOT EXISTS schema_meta (
+@@ -35,4 +35,8 @@ export const CREATE_TABLES = [
+     character_id TEXT PRIMARY KEY,
+     folder_id TEXT NOT NULL
+   )`,
++
++  `CREATE TABLE IF NOT EXISTS character_rename_requests (
++    character_id TEXT PRIMARY KEY
++  )`,
+ ];
+diff --git a/domain/characterDuplication.js b/domain/characterDuplication.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..28aa2e231edc8a2711fd0d7aec2798a5c76f2365
+--- /dev/null
++++ b/domain/characterDuplication.js
+@@ -0,0 +1,85 @@
++const CHARACTER_ID_PREFIX = 'char_';
++const COPY_SEPARATOR = ' — ';
++
++const assertNonEmptyString = (value, field) => {
++  if (typeof value !== 'string' || value.length === 0) {
++    throw new TypeError(`[characterDuplication] ${field} must be a non-empty string`);
++  }
++};
++
++const cloneData = (value) => {
++  if (Array.isArray(value)) return value.map(cloneData);
++  if (value && typeof value === 'object') {
++    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, cloneData(entry)]));
++  }
++  return value;
++};
++
++export const createDuplicateCharacterId = (timestamp, entropy) => {
++  if (!Number.isFinite(timestamp)) {
++    throw new TypeError('[characterDuplication] timestamp must be finite');
++  }
++  assertNonEmptyString(entropy, 'entropy');
++  return `${CHARACTER_ID_PREFIX}${timestamp}_${entropy}`;
++};
++
++export const createDuplicateCharacterName = ({ sourceName, existingNames, copyLabel }) => {
++  assertNonEmptyString(sourceName, 'sourceName');
++  assertNonEmptyString(copyLabel, 'copyLabel');
++  if (!Array.isArray(existingNames) || existingNames.some((name) => typeof name !== 'string')) {
++    throw new TypeError('[characterDuplication] existingNames must be an array of strings');
++  }
++
++  const occupied = new Set(existingNames);
++  const base = `${sourceName}${COPY_SEPARATOR}${copyLabel}`;
++  if (!occupied.has(base)) return base;
++
++  let sequence = 2;
++  while (occupied.has(`${base} ${sequence}`)) sequence += 1;
++  return `${base} ${sequence}`;
++};
++
++/**
++ * Чистая движковая механика дублирования персонажа.
++ *
++ * Вложенные данные копируются без изменения структуры и внутренних id.
++ * Меняются только имя в каноническом поле characterName, id записи и даты.
++ * Слой хранения отдельно отмечает копию как ожидающую подтверждения имени.
++ */
++export const buildCharacterDuplicate = ({
++  source,
++  existingNames,
++  copyLabel,
++  duplicateId,
++  timestamp,
++}) => {
++  if (!source || typeof source !== 'object') {
++    throw new TypeError('[characterDuplication] source character is required');
++  }
++  assertNonEmptyString(source.id, 'source.id');
++  assertNonEmptyString(source.name, 'source.name');
++  assertNonEmptyString(duplicateId, 'duplicateId');
++  if (!Number.isFinite(timestamp)) {
++    throw new TypeError('[characterDuplication] timestamp must be finite');
++  }
++  if (!source.data || typeof source.data !== 'object' || Array.isArray(source.data)) {
++    throw new TypeError('[characterDuplication] source.data must be an object');
++  }
++  if (typeof source.data.characterName !== 'string' || source.data.characterName !== source.name) {
++    throw new TypeError('[characterDuplication] source name and data.characterName must match');
++  }
++
++  const name = createDuplicateCharacterName({ sourceName: source.name, existingNames, copyLabel });
++  const data = cloneData(source.data);
++  data.characterName = name;
++
++  return {
++    id: duplicateId,
++    name,
++    level: source.level,
++    originName: source.originName,
++    data,
++    createdAt: timestamp,
++    updatedAt: timestamp,
++  };
++};
+diff --git a/domain/settingsCatalog.js b/domain/settingsCatalog.js
+index 55f7c45c3f00d303a1d0f9462953082630ae363a..4df45476edad7d9cab3ddcf835153716df61dc52 100644
+--- a/domain/settingsCatalog.js
++++ b/domain/settingsCatalog.js
+@@ -35,6 +35,18 @@ export const ENGINE_SETTINGS = [
+     descriptionKey: 'settings.foldersDescription',
+     defaultValue: false,
+   },
++  {
++    id: 'characterDeleteActionPlacement',
++    type: 'select',
++    sectionKey: 'appearance',
++    labelKey: 'settings.characterDeleteActionPlacementTitle',
++    descriptionKey: 'settings.characterDeleteActionPlacementDescription',
++    defaultValue: 'menu',
++    options: [
++      { value: 'menu', labelKey: 'settings.characterDeleteActionPlacement.menu' },
++      { value: 'card', labelKey: 'settings.characterDeleteActionPlacement.card' },
++    ],
++  },
+   {
+     id: 'weaponCardsDisplayMode',
+     type: 'select',
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 78d7a3190256cd837e6e1e7ae8ce5c24ea0387ca..eca305b3a7760ec2a709043cd189a74ca1efee65 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -27,6 +27,14 @@
+       "failed": "Failed to save file."
+     }
+   },
++  "characterActions": {
++    "openMenu": "Character actions",
++    "download": "Download character",
++    "duplicate": "Duplicate character",
++    "delete": "Delete character",
++    "copySuffix": "copy",
++    "duplicateError": "Failed to duplicate character."
++  },
+   "deleteConfirm": "Do you really want to delete this character?",
+   "language": {
+     "russian": "Русский",
+@@ -66,6 +74,13 @@
+   },
+   "settings": {
+     "title": "Settings",
++    "appearanceTitle": "Appearance",
++    "characterDeleteActionPlacementTitle": "Delete character",
++    "characterDeleteActionPlacementDescription": "Where to show the delete character action.",
++    "characterDeleteActionPlacement": {
++      "menu": "In action menu",
++      "card": "On character card"
++    },
+     "survivalModeTitle": "Survival Mode Settings",
+     "durabilityTitle": "Weapon wear on firing",
+     "durabilityDescription": "Enable weapon wear mechanic when firing.",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index c9bfd7554d4858e12648c8a53e577bcc7c6c5cb7..1ba48cc8a7c782c50e9d38b9fe9a05d56070ccdd 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -27,6 +27,14 @@
+       "failed": "Не удалось сохранить файл."
+     }
+   },
++  "characterActions": {
++    "openMenu": "Действия персонажа",
++    "download": "Скачать персонажа",
++    "duplicate": "Дублировать персонажа",
++    "delete": "Удалить персонажа",
++    "copySuffix": "копия",
++    "duplicateError": "Не удалось дублировать персонажа."
++  },
+   "deleteConfirm": "Вы действительно хотите удалить этого персонажа?",
+   "language": {
+     "russian": "Русский",
+@@ -66,6 +74,13 @@
+   },
+   "settings": {
+     "title": "Настройки",
++    "appearanceTitle": "Внешний вид",
++    "characterDeleteActionPlacementTitle": "Удаление персонажа",
++    "characterDeleteActionPlacementDescription": "Где показывать действие удаления персонажа.",
++    "characterDeleteActionPlacement": {
++      "menu": "В меню действий",
++      "card": "На карточке"
++    },
+     "survivalModeTitle": "Настройки режима «Выживание»",
+     "durabilityTitle": "Износ оружия при выстреле",
+     "durabilityDescription": "Включить механику износа оружия при выстрелах.",
+diff --git a/src/store/__test-setup__/asyncStorageMock.js b/src/store/__test-setup__/asyncStorageMock.js
+index d7885b244599fdd038b7a80d83f603551bb8c74f..bf9e7279de46b70a2f238dea87cfadfd0c4ae71c 100644
+--- a/src/store/__test-setup__/asyncStorageMock.js
++++ b/src/store/__test-setup__/asyncStorageMock.js
+@@ -9,6 +9,7 @@ vi.mock('@react-native-async-storage/async-storage', () => {
+     default: {
+       getItem: async (k) => (mem.has(k) ? mem.get(k) : null),
+       setItem: async (k, v) => { mem.set(k, v); },
++      multiSet: async (pairs) => { pairs.forEach(([k, v]) => mem.set(k, v)); },
+       removeItem: async (k) => { mem.delete(k); },
+       clear: async () => { mem.clear(); },
+       getAllKeys: async () => Array.from(mem.keys()),
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 4f03f49da53c4d9ec851f5f5fc70f4e38cfce2c8..6dc4e1af1b0d10d2bb11392911d6f8a6d90702d5 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -75,6 +75,7 @@ const useAppSettingsStore = create(
+       getSettingValue: (settingId) => get().getValue(settingId),
+ 
+       setCharacterFoldersEnabled: (v) => get().setValue('characterFoldersEnabled', v),
++      setCharacterDeleteActionPlacement: (v) => get().setValue('characterDeleteActionPlacement', v),
+       setWeaponCardsDisplayMode: (v) => get().setValue('weaponCardsDisplayMode', v),
+       setWeaponDurabilityLossEnabled: (v) => get().setValue('weaponDurabilityLossEnabled', v),
+       setWeaponDurabilityLossPer10Shots: (v) => get().setValue('weaponDurabilityLossPer10Shots', v),
+@@ -129,6 +130,7 @@ export default useAppSettingsStore;
+ 
+ // Подписываемые селекторы (используются в компонентах вместо геттеров).
+ export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('characterFoldersEnabled');
++export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
+ export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');
+ export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValue('weaponDurabilityLossEnabled');
+ export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingValue('weaponDurabilityLossPer10Shots');
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index f8e4c9763576d05606fba762e563d4463cd72c22..4fe78221f1c3e6516798af8753b77d43a6259ebb 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
+     shadowRadius: 2,
+   },
+   deleteIcon: { fontSize: 15, lineHeight: 18 },
+-  downloadButton: {
++  characterActionButton: {
+     position: 'absolute',
+     right: 5,
+     bottom: 5,
+@@ -135,7 +135,31 @@ const styles = StyleSheet.create({
+     shadowOpacity: 0.25,
+     shadowRadius: 2,
+   },
+-  downloadIcon: { fontSize: 16, lineHeight: 18 },
++  characterActionBackdrop: { flex: 1, backgroundColor: 'transparent' },
++  characterActionMenu: {
++    position: 'absolute',
++    width: 220,
++    paddingVertical: 6,
++    borderRadius: 8,
++    borderWidth: 1,
++    borderColor: '#9ca3af',
++    backgroundColor: '#fff',
++    elevation: 12,
++    shadowColor: '#000',
++    shadowOffset: { width: 0, height: 4 },
++    shadowOpacity: 0.28,
++    shadowRadius: 8,
++  },
++  characterActionItem: {
++    minHeight: 44,
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 10,
++    paddingHorizontal: 14,
++    paddingVertical: 10,
++  },
++  characterActionText: { flex: 1, color: '#111827', fontSize: 14 },
++  characterActionDeleteText: { color: '#b91c1c' },
+   characterImage: { width: '100%', height: '100%' },
+   characterImagePlaceholder: {
+     flex: 1,

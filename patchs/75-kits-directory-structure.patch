@@ -1,0 +1,6047 @@
+diff --git a/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js b/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js
+index 92505e5..aa295c5 100644
+--- a/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js
++++ b/__tests__/equipment-kits-split/property1-kit-ids-completeness.test.js
+@@ -11,18 +11,16 @@ import { describe, it, expect } from 'vitest';
+ import fs from 'fs';
+ import path from 'path';
+ import { fileURLToPath } from 'url';
++import moduleEquipmentKits from '../../modules/fallout/data/equipmentKits/index.js';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-const MODULE_KITS_FILE = path.resolve(__dirname, '../../modules/fallout/data/equipmentKits.json');
+ const ORIGINS_FILES = [
+   path.resolve(__dirname, '../../data/origins/origins.json'),
+   path.resolve(__dirname, '../../modules/fallout/data/origins.json'),
+ ];
+ 
+ function loadModuleKitIds() {
+-  if (!fs.existsSync(MODULE_KITS_FILE)) return new Set();
+-  const content = JSON.parse(fs.readFileSync(MODULE_KITS_FILE, 'utf-8'));
+-  return new Set(Object.keys(content));
++  return new Set(Object.keys(moduleEquipmentKits || {}));
+ }
+ 
+ function loadOrigins() {
+@@ -36,8 +34,7 @@ function loadOrigins() {
+ }
+ 
+ describe('Property 1: Полнота kit IDs в модуле', () => {
+-  it('модульный файл комплектов существует и непуст', () => {
+-    expect(fs.existsSync(MODULE_KITS_FILE)).toBe(true);
++  it('модульный индекс комплектов непуст', () => {
+     const ids = loadModuleKitIds();
+     expect(ids.size).toBeGreaterThan(0);
+   });
+diff --git a/__tests__/equipment-kits-split/property2-items-integrity.test.js b/__tests__/equipment-kits-split/property2-items-integrity.test.js
+index 4824a09..1de1f73 100644
+--- a/__tests__/equipment-kits-split/property2-items-integrity.test.js
++++ b/__tests__/equipment-kits-split/property2-items-integrity.test.js
+@@ -7,16 +7,10 @@
+  */
+ 
+ import { describe, it, expect } from 'vitest';
+-import fs from 'fs';
+-import path from 'path';
+-import { fileURLToPath } from 'url';
+-
+-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-const MODULE_KITS_FILE = path.resolve(__dirname, '../../modules/fallout/data/equipmentKits.json');
++import moduleEquipmentKits from '../../modules/fallout/data/equipmentKits/index.js';
+ 
+ function loadModuleKits() {
+-  if (!fs.existsSync(MODULE_KITS_FILE)) return {};
+-  return JSON.parse(fs.readFileSync(MODULE_KITS_FILE, 'utf-8'));
++  return moduleEquipmentKits || {};
+ }
+ 
+ describe('Property 2: Целостность items комплектов в модуле', () => {
+diff --git a/__tests__/equipment-kits-split/property3-kitdata-format.test.js b/__tests__/equipment-kits-split/property3-kitdata-format.test.js
+index 7c94764..23fc844 100644
+--- a/__tests__/equipment-kits-split/property3-kitdata-format.test.js
++++ b/__tests__/equipment-kits-split/property3-kitdata-format.test.js
+@@ -7,22 +7,14 @@
+  */
+ 
+ import { describe, it, expect } from 'vitest';
+-import fs from 'fs';
+-import path from 'path';
+-import { fileURLToPath } from 'url';
+-
+-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-const MODULE_KITS_FILE = path.resolve(__dirname, '../../modules/fallout/data/equipmentKits.json');
++import moduleEquipmentKits from '../../modules/fallout/data/equipmentKits/index.js';
+ 
+ function loadAllKitEntries() {
+-  if (!fs.existsSync(MODULE_KITS_FILE)) return [];
+-  const content = JSON.parse(fs.readFileSync(MODULE_KITS_FILE, 'utf-8'));
+-  return Object.entries(content).map(([kitId, kitData]) => ({ kitId, kitData }));
++  return Object.entries(moduleEquipmentKits || {}).map(([kitId, kitData]) => ({ kitId, kitData }));
+ }
+ 
+ describe('Property 3: Формат KitData в модуле', () => {
+-  it('модульный файл существует и непуст', () => {
+-    expect(fs.existsSync(MODULE_KITS_FILE)).toBe(true);
++  it('модульный индекс непуст', () => {
+     expect(loadAllKitEntries().length).toBeGreaterThan(0);
+   });
+ 
+diff --git a/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js b/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js
+index 4e8f4ed..01eb688 100644
+--- a/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js
++++ b/__tests__/equipment-kits-split/property5-equipment-catalog-shape.test.js
+@@ -7,16 +7,10 @@
+  */
+ 
+ import { describe, it, expect } from 'vitest';
+-import fs from 'fs';
+-import path from 'path';
+-import { fileURLToPath } from 'url';
+-
+-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-const MODULE_KITS_FILE = path.resolve(__dirname, '../../modules/fallout/data/equipmentKits.json');
++import moduleEquipmentKits from '../../modules/fallout/data/equipmentKits/index.js';
+ 
+ function loadAllKitIds() {
+-  if (!fs.existsSync(MODULE_KITS_FILE)) return [];
+-  return Object.keys(JSON.parse(fs.readFileSync(MODULE_KITS_FILE, 'utf-8')));
++  return Object.keys(moduleEquipmentKits || {});
+ }
+ 
+ describe('Property 5: Форма equipmentKits в getEquipmentCatalog()', () => {
+diff --git a/__tests__/securitron/securitron-origin.test.js b/__tests__/securitron/securitron-origin.test.js
+index 83f7544..68b317a 100644
+--- a/__tests__/securitron/securitron-origin.test.js
++++ b/__tests__/securitron/securitron-origin.test.js
+@@ -26,7 +26,7 @@ vi.mock('../../db/Database', async () => {
+ import originsJson from '../../data/origins/origins.json';
+ import traitsJson from '../../data/traits/traits.json';
+ import bodyPlans from '../../data/bodyplans/bodyplans.json';
+-import kitData from '../../modules/fallout/data/equipmentKits.json';
++import kitData from '../../modules/fallout/data/equipmentKits/index.js';
+ import ruTraits from '../../i18n/ru-RU/data/system/traits.json';
+ import enTraits from '../../i18n/en-EN/data/system/traits.json';
+ import moduleRuI18n from '../../modules/fallout/i18n/ru-RU.json';
+diff --git a/data/equipmentKits/brotherhood.json b/data/equipmentKits/brotherhood.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/brotherhood.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/brotherhoodOutcast.json b/data/equipmentKits/brotherhoodOutcast.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/brotherhoodOutcast.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/childOfAtom.json b/data/equipmentKits/childOfAtom.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/childOfAtom.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/default.json b/data/equipmentKits/default.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/default.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/minuteman.json b/data/equipmentKits/minuteman.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/minuteman.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/misterHandy.json b/data/equipmentKits/misterHandy.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/misterHandy.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/ncr.json b/data/equipmentKits/ncr.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/ncr.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/protectron.json b/data/equipmentKits/protectron.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/protectron.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/robobrain.json b/data/equipmentKits/robobrain.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/robobrain.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/securitron.json b/data/equipmentKits/securitron.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/securitron.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/superMutant.json b/data/equipmentKits/superMutant.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/superMutant.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/vaultDweller.json b/data/equipmentKits/vaultDweller.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/vaultDweller.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/data/equipmentKits/wastelander.json b/data/equipmentKits/wastelander.json
+deleted file mode 100644
+index 9e26dfe..0000000
+--- a/data/equipmentKits/wastelander.json
++++ /dev/null
+@@ -1 +0,0 @@
+-{}
+\ No newline at end of file
+diff --git a/domain/registry.js b/domain/registry.js
+index bc7910a..c664bf0 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -22,7 +22,7 @@ import moduleOrigins from '../modules/fallout/data/origins.json';
+ import moduleTraits from '../modules/fallout/data/traits.json';
+ import moduleWeapons from '../modules/fallout/data/weapons.json';
+ import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
+-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits.json';
++import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+ import moduleRuI18n from '../modules/fallout/i18n/ru-RU.json';
+ import moduleEnI18n from '../modules/fallout/i18n/en-EN.json';
+ 
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 0de6f3f..cf36ace 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -56,7 +56,7 @@ import enEffects from './en-EN/data/system/effects.json';
+ // Locale-independent kit data (items composition, no names)
+ import moduleWeapons from '../modules/fallout/data/weapons.json';
+ import moduleGeneralGoods from '../modules/fallout/data/general_goods.json';
+-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits.json';
++import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+ import moduleRuI18n from '../modules/fallout/i18n/ru-RU.json';
+ import moduleEnI18n from '../modules/fallout/i18n/en-EN.json';
+ // Locale-independent technical data (stats, ids, game mechanics)
+diff --git a/modules/fallout/data/equipmentKits.json b/modules/fallout/data/equipmentKits.json
+deleted file mode 100644
+index 673619f..0000000
+--- a/modules/fallout/data/equipmentKits.json
++++ /dev/null
+@@ -1,2807 +0,0 @@
+-{
+-  "brotherhood_initiate": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_bos_uniform",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_bos_hood",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_combat_knife",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_laser_gun",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_energy_cell",
+-              "quantity": {
+-                "base": 5,
+-                "rollType": "rollCD",
+-                "rollValue": 5,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_10mm_pistol",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 5,
+-                "rollType": "rollCD",
+-                "rollValue": 5,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_holotags",
+-        "itemType": "misc"
+-      }
+-    ]
+-  },
+-  "brotherhood_scribe": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_bos_scribe_armor",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_bos_scribe_hat",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_combat_knife",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_laser_gun",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_energy_cell",
+-              "quantity": {
+-                "base": 3,
+-                "rollType": "rollCD",
+-                "rollValue": 3,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_10mm_pistol",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 3,
+-                "rollType": "rollCD",
+-                "rollValue": 3,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_holotags",
+-        "itemType": "misc"
+-      }
+-    ]
+-  },
+-  "outcast_former_knight": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_bos_uniform",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "food_purified_water",
+-        "itemType": "food"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_laser_musket",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 4,
+-            "rollType": "rollCD",
+-            "rollValue": 6,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "outcast",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 2,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "outcast_former_scribe": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_bos_scribe_armor",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_laser_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 4,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_multi_tool",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "outcast",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 3,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 15
+-      }
+-    ]
+-  },
+-  "atom_missionary": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_sturdy_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_walking_cane",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_gamma_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_gamma_round",
+-          "quantity": {
+-            "base": 2,
+-            "rollType": "rollCD",
+-            "rollValue": 2,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_stimpak",
+-        "itemType": "chem"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      }
+-    ]
+-  },
+-  "atom_zealot": {
+-    "items": [
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "clothingId": "clothing_sturdy_clothes",
+-            "itemType": "clothing"
+-          },
+-          {
+-            "clothingId": "clothing_nomad_outfit",
+-            "itemType": "clothing"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_gas_mask",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_machete",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_gamma_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_gamma_round",
+-          "quantity": {
+-            "base": 2,
+-            "rollType": "rollCD",
+-            "rollValue": 2,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 2,
+-          "mode": "separate"
+-        }
+-      }
+-    ]
+-  },
+-  "default_caps_only": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 100
+-      }
+-    ]
+-  },
+-  "minuteman_shooter": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_casual_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_casual_hat",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "armorId": "armor_leather_chest_001",
+-            "itemType": "armor"
+-          },
+-          {
+-            "armorId": "armor_leather_hand_001",
+-            "itemType": "armor"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_laser_musket",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_energy_cell",
+-              "quantity": {
+-                "base": 7,
+-                "rollType": "rollCD",
+-                "rollValue": 7,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_hunting_rifle",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_308",
+-              "quantity": {
+-                "base": 3,
+-                "rollType": "rollCD",
+-                "rollValue": 3,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 4,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 5
+-      }
+-    ]
+-  },
+-  "minuteman_skirmisher": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_casual_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_military_helmet",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_metal_chest_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_double_barrel_shotgun",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_shotgun_shell",
+-              "quantity": {
+-                "base": 3,
+-                "rollType": "rollCD",
+-                "rollValue": 3,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_submachine_gun",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_45",
+-              "quantity": {
+-                "base": 4,
+-                "rollType": "rollCD",
+-                "rollValue": 4,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "chem",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 5
+-      }
+-    ]
+-  },
+-  "mister_handy_assistant": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_mister_handy_eye_stalk",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_mister_handy",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_mister_handy_thruster",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_mister_handy",
+-        "itemType": "robotArm",
+-        "slot": "arm1"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_flamethrower",
+-        "itemType": "weapon",
+-        "slot": "arm2",
+-        "ammo": {
+-          "ammoId": "ammo_flamer_fuel",
+-          "quantity": {
+-            "base": 20
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_circular_saw",
+-        "itemType": "weapon",
+-        "slot": "arm3"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_item_repair_kit",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_boiler",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "mister_handy_brave": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_mister_handy_eye_stalk",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_mister_handy",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_mister_handy_thruster",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_auto_10mm",
+-        "itemType": "weapon",
+-        "slot": "arm1",
+-        "ammo": {
+-          "ammoId": "ammo_10mm",
+-          "quantity": {
+-            "base": 20
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_circular_saw",
+-        "itemType": "weapon",
+-        "slot": "arm2"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_laser_cutter",
+-        "itemType": "weapon",
+-        "slot": "arm3",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 20
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_gutsy_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_recon_sensors",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "mister_handy_nanny": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_mister_handy_eye_stalk",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_mister_handy",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_mister_handy_thruster",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_mister_handy",
+-        "itemType": "robotArm",
+-        "slot": "arm1"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_flamethrower",
+-        "itemType": "weapon",
+-        "slot": "arm2",
+-        "ammo": {
+-          "ammoId": "ammo_flamer_fuel",
+-          "quantity": {
+-            "base": 20
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "slot": "arm3",
+-        "items": [
+-          {
+-            "itemId": "robot_arm_mister_handy",
+-            "itemType": "robotArm",
+-            "slot": "arm3"
+-          },
+-          {
+-            "weaponId": "robot_weapon_laser_cutter",
+-            "itemType": "weapon",
+-            "slot": "arm3",
+-            "ammo": {
+-              "ammoId": "ammo_energy_cell",
+-              "quantity": {
+-                "base": 20
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "robot_weapon_circular_saw",
+-            "itemType": "weapon",
+-            "slot": "arm3"
+-          },
+-          {
+-            "weaponId": "robot_weapon_flamethrower",
+-            "itemType": "weapon",
+-            "slot": "arm3",
+-            "ammo": {
+-              "ammoId": "ammo_flamer_fuel",
+-              "quantity": {
+-                "base": 20
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "robot_weapon_auto_10mm",
+-            "itemType": "weapon",
+-            "slot": "arm3",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 20
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_behavior_analysis",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_hazard_detection",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "mister_handy_medic": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_mister_handy_eye_stalk",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_mister_handy",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_mister_handy_thruster",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "choice",
+-        "slot": "arm1",
+-        "items": [
+-          {
+-            "itemId": "robot_arm_mister_handy",
+-            "itemType": "robotArm",
+-            "slot": "arm1"
+-          },
+-          {
+-            "weaponId": "robot_weapon_circular_saw",
+-            "itemType": "weapon",
+-            "slot": "arm1"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_circular_saw",
+-        "itemType": "weapon",
+-        "slot": "arm2"
+-      },
+-      {
+-        "type": "choice",
+-        "slot": "arm3",
+-        "items": [
+-          {
+-            "itemId": "robot_arm_mister_handy",
+-            "itemType": "robotArm",
+-            "slot": "arm3"
+-          },
+-          {
+-            "weaponId": "robot_weapon_laser_cutter",
+-            "itemType": "weapon",
+-            "slot": "arm3",
+-            "ammo": {
+-              "ammoId": "ammo_energy_cell",
+-              "quantity": {
+-                "base": 20
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "robot_weapon_circular_saw",
+-            "itemType": "weapon",
+-            "slot": "arm3"
+-          },
+-          {
+-            "weaponId": "robot_weapon_flamethrower",
+-            "itemType": "weapon",
+-            "slot": "arm3",
+-            "ammo": {
+-              "ammoId": "ammo_flamer_fuel",
+-              "quantity": {
+-                "base": 20
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "robot_weapon_auto_10mm",
+-            "itemType": "weapon",
+-            "slot": "arm3",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 20
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_stimpak",
+-        "itemType": "chem"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_diagnostics",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "mister_handy_farmer": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_mister_handy_eye_stalk",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_mister_handy",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_mister_handy_thruster",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_mister_handy",
+-        "itemType": "robotArm",
+-        "slot": "arm1"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_circular_saw",
+-        "itemType": "weapon",
+-        "slot": "arm2"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_laser_cutter",
+-        "itemType": "weapon",
+-        "slot": "arm3",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 20
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_fertilizer_bag",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "food_mutafruit",
+-        "itemType": "food",
+-        "quantity": 2
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 25
+-      }
+-    ]
+-  },
+-  "ncr_infantry": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_military_fatigues",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_military_helmet",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_combat_rifle",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_45",
+-              "quantity": {
+-                "base": 4,
+-                "rollType": "rollCD",
+-                "rollValue": 4,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_combat_shotgun",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_shotgun_shell",
+-              "quantity": {
+-                "base": 3,
+-                "rollType": "rollCD",
+-                "rollValue": 3,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_10mm_pistol",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 4,
+-                "rollType": "rollCD",
+-                "rollValue": 4,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_combat_knife",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "food_purified_water",
+-        "itemType": "food"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency_ncr",
+-        "quantity": {
+-          "base": 5,
+-          "rollType": "rollCD",
+-          "rollValue": 5,
+-          "op": "+"
+-        }
+-      }
+-    ]
+-  },
+-  "ncr_caravaneer": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_sturdy_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "armorId": "armor_leather_chest_001",
+-            "itemType": "armor"
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "armorId": "armor_leather_hand_001",
+-                "itemType": "armor"
+-              },
+-              {
+-                "type": "fixed",
+-                "armorId": "armor_leather_leg_001",
+-                "itemType": "armor"
+-              }
+-            ]
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_double_barrel_shotgun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_shotgun_shell",
+-          "quantity": {
+-            "base": 3,
+-            "rollType": "rollCD",
+-            "rollValue": 3,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_combat_knife",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "weaponId": "weapon_knuckles",
+-                "itemType": "weapon"
+-              },
+-              {
+-                "type": "fixed",
+-                "weaponId": "weapon_knuckles",
+-                "itemType": "weapon"
+-              }
+-            ]
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_pack_brahmin",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 3,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "brewery",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 2,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_playing_cards",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency_ncr",
+-        "quantity": {
+-          "base": 2,
+-          "rollType": "D20",
+-          "rollValue": 20,
+-          "op": "multiply"
+-        }
+-      }
+-    ]
+-  },
+-  "ncr_marksman": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_military_fatigues",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_military_helmet",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_hunting_rifle",
+-        "itemType": "weapon",
+-        "modIds": [
+-          "mod_005",
+-          "mod_035"
+-        ],
+-        "ammo": {
+-          "ammoId": "ammo_308",
+-          "quantity": {
+-            "base": 3,
+-            "rollType": "rollCD",
+-            "rollValue": 3,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_mentats",
+-        "itemType": "chem"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "mag_us_covert_operations_manual_02",
+-        "itemType": "magazine"
+-      }
+-    ]
+-  },
+-  "protectron_standard": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_protectron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_protectron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_protectron",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_protectron_manipulator",
+-        "itemType": "weapon",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_protectron_manipulator",
+-        "itemType": "weapon",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_laser_gun",
+-        "itemType": "weapon",
+-        "weight": 0,
+-        "requiresWeaponId": "robot_weapon_protectron_manipulator",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 14,
+-            "rollType": "rollCD",
+-            "rollValue": 7,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_recon_sensors",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_hazard_detection",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_item_repair_kit",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 20
+-      }
+-    ]
+-  },
+-  "protectron_medic": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_protectron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_protectron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_protectron",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_shocker_arms",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_module_diagnostics",
+-        "itemType": "module"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_stimpak",
+-        "itemType": "chem",
+-        "quantity": 2
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_radaway",
+-        "itemType": "chem"
+-      }
+-    ]
+-  },
+-  "protectron_firefighter": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_protectron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_protectron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_protectron",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_cryojet",
+-        "itemType": "weapon",
+-        "slot": "left",
+-        "ammo": {
+-          "ammoId": "ammo_cryo_cell",
+-          "quantity": {
+-            "base": 14,
+-            "rollType": "rollCD",
+-            "rollValue": 7,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "robot_module_hazard_detection",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_sensor_array",
+-            "itemType": "module"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_stimpak",
+-        "itemType": "chem"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "protectron_nukatron": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_protectron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_protectron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_protectron",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_protectron_manipulator",
+-        "itemType": "weapon",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "robot_module_behavior_analysis",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_boiler",
+-            "itemType": "module"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "food_perfectly_preserved_pie",
+-        "itemType": "food"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "itemId": "drink_nuka_cola",
+-                "itemType": "drinks",
+-                "quantity": 4
+-              }
+-            ]
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "itemId": "drink_nuka_cherry",
+-                "itemType": "drinks",
+-                "quantity": 2
+-              }
+-            ]
+-          }
+-        ]
+-      }
+-    ]
+-  },
+-  "protectron_worker": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_protectron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_protectron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_protectron",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_protectron_manipulator",
+-        "itemType": "weapon",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_factory_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_sledgehammer",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_baton",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "weaponId": "weapon_railway_rifle",
+-                "itemType": "weapon",
+-                "overrideQualities": [
+-                  "remove:quality_two-handed"
+-                ],
+-                "ammo": {
+-                  "ammoId": "ammo_railway_spike",
+-                  "quantity": {
+-                    "base": 6,
+-                    "rollType": "rollCD",
+-                    "rollValue": 3,
+-                    "op": "+"
+-                  }
+-                }
+-              }
+-            ]
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "robot_module_hazard_detection",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_sensor_array",
+-            "itemType": "module"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_item_repair_kit",
+-        "itemType": "misc"
+-      }
+-    ]
+-  },
+-  "protectron_model_x": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_protectron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_protectron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_protectron",
+-        "itemType": "robotLeg"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_protectron",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_protectron_manipulator",
+-        "itemType": "weapon",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_protectron_manipulator",
+-        "itemType": "weapon",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_plating_standard_body",
+-        "itemType": "plating"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "armorId": "robot_plating_factory_body",
+-                "itemType": "plating"
+-              }
+-            ]
+-          },
+-          {
+-            "itemId": "robot_module_behavior_analysis",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_diagnostics",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_hacking",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_hazard_detection",
+-            "itemType": "module"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "robot_module_radiation_coils",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_recon_sensors",
+-            "itemType": "module"
+-          },
+-          {
+-            "itemId": "robot_module_sensor_array",
+-            "itemType": "module"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_machete",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_baseball_bat_aluminum",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "weaponId": "weapon_syringer",
+-                "itemType": "weapon",
+-                "ammo": {
+-                  "ammoId": "ammo_syringe_bloodpack",
+-                  "quantity": {
+-                    "base": 10
+-                  }
+-                }
+-              }
+-            ]
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "type": "rollTable",
+-            "tableId": "oddity",
+-            "roll": {
+-              "rollType": "D20",
+-              "count": 1,
+-              "mode": "separate"
+-            }
+-          },
+-          {
+-            "itemId": "robot_item_repair_kit",
+-            "itemType": "misc"
+-          }
+-        ]
+-      }
+-    ]
+-  },
+-  "robobrain_servomechanizmy": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_mesmetron",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_tesla_arm",
+-        "itemType": "weapon",
+-        "slot": "left",
+-        "ammo": {
+-          "ammoId": "ammo_fusion_core",
+-          "quantity": {
+-            "base": 14,
+-            "rollType": "rollCD",
+-            "rollValue": 7,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_smoke_manipulator",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_item_repair_kit",
+-        "itemType": "misc",
+-        "quantity": 2
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "clothingId": "headwear_casual_hat",
+-            "itemType": "clothing"
+-          },
+-          {
+-            "clothingId": "headwear_fancy_hat",
+-            "itemType": "clothing"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      }
+-    ]
+-  },
+-  "robobrain_nonordinary": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_mesmetron",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 14,
+-            "rollType": "rollCD",
+-            "rollValue": 7,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "robot_arm_smoke_manipulator",
+-            "itemType": "robotArm",
+-            "slot": "left"
+-          },
+-          {
+-            "weaponId": "robot_weapon_tesla_arm",
+-            "itemType": "weapon",
+-            "slot": "left"
+-          },
+-          {
+-            "weaponId": "robot_weapon_flamethrower",
+-            "itemType": "weapon",
+-            "slot": "left"
+-          },
+-          {
+-            "weaponId": "weapon_laser_gun",
+-            "itemType": "weapon",
+-            "slot": "left"
+-          },
+-          {
+-            "weaponId": "weapon_sledgehammer",
+-            "itemType": "weapon",
+-            "slot": "left"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "robot_arm_smoke_manipulator",
+-            "itemType": "robotArm",
+-            "slot": "right"
+-          },
+-          {
+-            "weaponId": "robot_weapon_tesla_arm",
+-            "itemType": "weapon",
+-            "slot": "right"
+-          },
+-          {
+-            "weaponId": "robot_weapon_flamethrower",
+-            "itemType": "weapon",
+-            "slot": "right"
+-          },
+-          {
+-            "weaponId": "weapon_laser_gun",
+-            "itemType": "weapon",
+-            "slot": "right"
+-          },
+-          {
+-            "weaponId": "weapon_sledgehammer",
+-            "itemType": "weapon",
+-            "slot": "right"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "ammoId": "ammo_energy_cell",
+-            "itemType": "ammo",
+-            "quantity": {
+-              "base": 14,
+-              "rollType": "rollCD",
+-              "rollValue": 7,
+-              "op": "+"
+-            }
+-          },
+-          {
+-            "ammoId": "ammo_flamer_fuel",
+-            "itemType": "ammo",
+-            "quantity": {
+-              "base": 12,
+-              "rollType": "rollCD",
+-              "rollValue": 6,
+-              "op": "+"
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 2,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "oddity",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "robobrain_us_army": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "weaponId": "robot_weapon_mesmetron",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 14,
+-            "rollType": "rollCD",
+-            "rollValue": 7,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_smoke_manipulator",
+-        "itemType": "robotArm",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_smoke_manipulator",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_combat_rifle",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_45",
+-          "quantity": {
+-            "base": 8,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_armor_factory_body",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_armor_factory_arms",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_armor_factory_arms",
+-        "itemType": "armor"
+-      }
+-    ]
+-  },
+-  "securitron_standard": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_head_securitron",
+-        "itemType": "robotHead"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_body_securitron",
+-        "itemType": "robotBody"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_legs_securitron",
+-        "itemType": "robotLegs"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_securitron",
+-        "itemType": "robotArm",
+-        "slot": "left"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_arm_securitron",
+-        "itemType": "robotArm",
+-        "slot": "right"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_laser_gun",
+-        "itemType": "weapon",
+-        "weight": 0,
+-        "slot": "left",
+-        "builtinToArm": true,
+-        "requiresWeaponId": "robot_arm_securitron",
+-        "modIds": [
+-          "mod_053"
+-        ],
+-        "ammo": {
+-          "ammoId": "ammo_energy_cell",
+-          "quantity": {
+-            "base": 14,
+-            "rollType": "rollCD",
+-            "rollValue": 7,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_submachine_gun",
+-        "itemType": "weapon",
+-        "weight": 0,
+-        "slot": "right",
+-        "builtinToArm": true,
+-        "requiresWeaponId": "robot_arm_securitron",
+-        "ammo": {
+-          "ammoId": "ammo_45",
+-          "quantity": {
+-            "base": 8,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_missile_launcher",
+-        "itemType": "weapon",
+-        "weight": 0,
+-        "requiresMkII": true
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_m79_grenade_launcher",
+-        "itemType": "weapon",
+-        "weight": 0,
+-        "requiresMkII": true
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_armor_factory_body",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_armor_factory_optics",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "robot_armor_factory_arms",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "robot_item_printer",
+-        "itemType": "misc",
+-        "weight": 0
+-      }
+-    ]
+-  },
+-  "supermutant_bruiser": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_raider_chest_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "armorId": "armor_raider_hand_001",
+-            "itemType": "armor"
+-          },
+-          {
+-            "armorId": "armor_raider_leg_001",
+-            "itemType": "armor"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_pipe_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_38",
+-          "quantity": {
+-            "base": 3,
+-            "rollType": "rollCD",
+-            "rollValue": 3,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_baseball_bat",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_machete",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 5
+-      }
+-    ]
+-  },
+-  "supermutant_skirmisher": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_raider_chest_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "armorId": "armor_raider_hand_001",
+-            "itemType": "armor"
+-          },
+-          {
+-            "armorId": "armor_raider_leg_001",
+-            "itemType": "armor"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_pipe_bolt_action",
+-        "itemType": "weapon",
+-        "modIds": [
+-          "mod_005"
+-        ],
+-        "ammo": {
+-          "ammoId": "ammo_308",
+-          "quantity": {
+-            "base": 4,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_board",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 5
+-      }
+-    ]
+-  },
+-  "vault_security": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_vault_jumpsuit",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_vault_fullbody_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_vault_head_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_baton",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_10mm_pistol",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_10mm",
+-          "quantity": {
+-            "base": 4,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_stimpak",
+-        "itemType": "chem"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_pip_boy",
+-        "itemType": "misc"
+-      }
+-    ]
+-  },
+-  "vault_resident": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_vault_jumpsuit",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_switchblade",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_10mm_pistol",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_10mm",
+-          "quantity": {
+-            "base": 3,
+-            "rollType": "rollCD",
+-            "rollValue": 3,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "chem_stimpak",
+-        "itemType": "chem",
+-        "quantity": 2
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_pip_boy",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 10
+-      }
+-    ]
+-  },
+-  "wastelander_mercenary": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_sturdy_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "armorId": "armor_leather_chest_001",
+-            "itemType": "armor"
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "armorId": "armor_leather_hand_001",
+-                "itemType": "armor"
+-              },
+-              {
+-                "type": "fixed",
+-                "armorId": "armor_leather_leg_001",
+-                "itemType": "armor"
+-              }
+-            ]
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_baseball_bat",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_tire_iron",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_10mm_pistol",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 5,
+-                "rollType": "rollCD",
+-                "rollValue": 5,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_44_pistol",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_44_magnum",
+-              "quantity": {
+-                "base": 5,
+-                "rollType": "rollCD",
+-                "rollValue": 5,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_hunting_rifle",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_308",
+-              "quantity": {
+-                "base": 5,
+-                "rollType": "rollCD",
+-                "rollValue": 5,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_pipe_gun",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_38",
+-              "quantity": {
+-                "base": 5,
+-                "rollType": "rollCD",
+-                "rollValue": 5,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_settlement_job_posting",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 15
+-      }
+-    ]
+-  },
+-  "wastelander_settler": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_sturdy_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_switchblade",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_pipe_wrench",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_rolling_pin",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_knuckles",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_pipe_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_38",
+-          "quantity": {
+-            "base": 3,
+-            "rollType": "rollCD",
+-            "rollValue": 3,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 2,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 45
+-      }
+-    ]
+-  },
+-  "wastelander_wanderer": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_nomad_outfit",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_switchblade",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_pipe_wrench",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_rolling_pin",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_knuckles",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_pipe_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_38",
+-          "quantity": {
+-            "base": 4,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "chem_jet",
+-            "itemType": "chem"
+-          },
+-          {
+-            "itemId": "chem_radaway",
+-            "itemType": "chem"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 30
+-      }
+-    ]
+-  },
+-  "wastelander_raider": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_harness",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_raider_chest_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "fixed",
+-        "armorId": "armor_raider_hand_001",
+-        "itemType": "armor"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_lead_pipe",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_pool_cue",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_tire_iron",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_pipe_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_38",
+-          "quantity": {
+-            "base": 5,
+-            "rollType": "rollCD",
+-            "rollValue": 5,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "itemId": "chem_jet",
+-            "itemType": "chem"
+-          },
+-          {
+-            "itemId": "chem_radaway",
+-            "itemType": "chem"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_molotov",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "itemId": "chem_stimpak",
+-            "itemType": "chem"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 15
+-      }
+-    ]
+-  },
+-  "wastelander_trader": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_sturdy_clothes",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "armorId": "armor_leather_chest_001",
+-            "itemType": "armor"
+-          },
+-          {
+-            "group": [
+-              {
+-                "type": "fixed",
+-                "armorId": "armor_leather_hand_001",
+-                "itemType": "armor"
+-              },
+-              {
+-                "type": "fixed",
+-                "armorId": "armor_leather_leg_001",
+-                "itemType": "armor"
+-              }
+-            ]
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_pipe_gun",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_38",
+-          "quantity": {
+-            "base": 4,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "trinklet",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "tables",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 3,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_pack_brahmin",
+-        "itemType": "misc"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemType": "currency",
+-        "quantity": 50
+-      }
+-    ]
+-  },
+-  "treefamilies_chairmen": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_fancy_clothes",
+-        "itemType": "clothing",
+-        "uniqQualities": [
+-          "elegant"
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_fancy_hat",
+-        "itemType": "clothing",
+-        "uniqQualities": [
+-          "elegant"
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_9mm_pistol",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_9mm",
+-          "quantity": {
+-            "base": 12,
+-            "rollType": "rollCD",
+-            "rollValue": 4,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_straight_razor",
+-        "itemType": "weapon"
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "CasinoTopsChip",
+-        "itemType": "misc",
+-        "quantity": 1
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "oddity",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "item_marked_cards",
+-        "itemType": "misc",
+-        "quantity": 1
+-      }
+-    ]
+-  },
+-  "treefamilies_omerta": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_fancy_clothes",
+-        "itemType": "clothing",
+-        "uniqQualities": [
+-          "dashing"
+-        ]
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_combat_knife",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_knuckles",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "itemId": "CasinoGomorrahChip",
+-        "itemType": "misc",
+-        "quantity": 1
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "oddity",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "chem",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 2,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "brewery",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        },
+-        "rerollUntil": {
+-          "isAlcohol": true
+-        }
+-      }
+-    ]
+-  },
+-  "treefamilies_white_glove": {
+-    "items": [
+-      {
+-        "type": "fixed",
+-        "clothingId": "clothing_fancy_clothes",
+-        "itemType": "clothing",
+-        "uniqQualities": [
+-          "refined"
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "clothingId": "headwear_white_glove_mask",
+-        "itemType": "clothing"
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_walking_cane",
+-            "itemType": "weapon"
+-          },
+-          {
+-            "weaponId": "weapon_combat_knife",
+-            "itemType": "weapon"
+-          }
+-        ]
+-      },
+-      {
+-        "type": "fixed",
+-        "weaponId": "weapon_flamer",
+-        "itemType": "weapon",
+-        "ammo": {
+-          "ammoId": "ammo_flamer_fuel",
+-          "quantity": {
+-            "base": 12,
+-            "rollType": "rollCD",
+-            "rollValue": 6,
+-            "op": "+"
+-          }
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "oddity",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 1,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "rollTable",
+-        "tableId": "food",
+-        "roll": {
+-          "rollType": "D20",
+-          "count": 3,
+-          "mode": "separate"
+-        }
+-      },
+-      {
+-        "type": "choice",
+-        "items": [
+-          {
+-            "weaponId": "weapon_double_barrel_shotgun",
+-            "itemType": "weapon",
+-            "modIds": [
+-              "mod_020"
+-            ],
+-            "ammo": {
+-              "ammoId": "ammo_shotgun_shell",
+-              "quantity": {
+-                "base": 6,
+-                "rollType": "rollCD",
+-                "rollValue": 3,
+-                "op": "+"
+-              }
+-            }
+-          },
+-          {
+-            "weaponId": "weapon_10mm_smg",
+-            "itemType": "weapon",
+-            "ammo": {
+-              "ammoId": "ammo_10mm",
+-              "quantity": {
+-                "base": 16,
+-                "rollType": "rollCD",
+-                "rollValue": 4,
+-                "op": "+"
+-              }
+-            }
+-          }
+-        ]
+-      }
+-    ]
+-  }
+-}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/brotherhood.json b/modules/fallout/data/equipmentKits/brotherhood.json
+new file mode 100644
+index 0000000..7569cef
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/brotherhood.json
+@@ -0,0 +1,112 @@
++{
++  "brotherhood_initiate": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_bos_uniform",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_bos_hood",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_combat_knife",
++        "itemType": "weapon"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_laser_gun",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_energy_cell",
++              "quantity": {
++                "base": 5,
++                "rollType": "rollCD",
++                "rollValue": 5,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_10mm_pistol",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 5,
++                "rollType": "rollCD",
++                "rollValue": 5,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_holotags",
++        "itemType": "misc"
++      }
++    ]
++  },
++  "brotherhood_scribe": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_bos_scribe_armor",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_bos_scribe_hat",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_combat_knife",
++        "itemType": "weapon"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_laser_gun",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_energy_cell",
++              "quantity": {
++                "base": 3,
++                "rollType": "rollCD",
++                "rollValue": 3,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_10mm_pistol",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 3,
++                "rollType": "rollCD",
++                "rollValue": 3,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_holotags",
++        "itemType": "misc"
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/brotherhoodOutcast.json b/modules/fallout/data/equipmentKits/brotherhoodOutcast.json
+new file mode 100644
+index 0000000..09e578b
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/brotherhoodOutcast.json
+@@ -0,0 +1,86 @@
++{
++  "outcast_former_knight": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_bos_uniform",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "itemId": "food_purified_water",
++        "itemType": "food"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_musket",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 4,
++            "rollType": "rollCD",
++            "rollValue": 6,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "outcast",
++        "roll": {
++          "rollType": "D20",
++          "count": 2,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "outcast_former_scribe": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_bos_scribe_armor",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 4,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_multi_tool",
++        "itemType": "misc"
++      },
++      {
++        "type": "rollTable",
++        "tableId": "outcast",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 15
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/childOfAtom.json b/modules/fallout/data/equipmentKits/childOfAtom.json
+new file mode 100644
+index 0000000..63d1a00
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/childOfAtom.json
+@@ -0,0 +1,99 @@
++{
++  "atom_missionary": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_sturdy_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_walking_cane",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_gamma_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_gamma_round",
++          "quantity": {
++            "base": 2,
++            "rollType": "rollCD",
++            "rollValue": 2,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_stimpak",
++        "itemType": "chem"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      }
++    ]
++  },
++  "atom_zealot": {
++    "items": [
++      {
++        "type": "choice",
++        "items": [
++          {
++            "clothingId": "clothing_sturdy_clothes",
++            "itemType": "clothing"
++          },
++          {
++            "clothingId": "clothing_nomad_outfit",
++            "itemType": "clothing"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_gas_mask",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_machete",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_gamma_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_gamma_round",
++          "quantity": {
++            "base": 2,
++            "rollType": "rollCD",
++            "rollValue": 2,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 2,
++          "mode": "separate"
++        }
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/default.json b/modules/fallout/data/equipmentKits/default.json
+new file mode 100644
+index 0000000..9032264
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/default.json
+@@ -0,0 +1,11 @@
++{
++  "default_caps_only": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 100
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/index.js b/modules/fallout/data/equipmentKits/index.js
+new file mode 100644
+index 0000000..9a7aa49
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/index.js
+@@ -0,0 +1,42 @@
++// modules/fallout/data/equipmentKits/index.js
++// Индекс комплектов модуля (сеттинг).
++//
++// Комплекты разложены по файлам — по одному на фракцию/группу
++// (brotherhood.json, ncr.json, treefamilies.json и т.д.), чтобы каталог
++// оставался поддерживаемым при росте числа комплектов (1к, 1м…).
++// Этот индекс объединяет их в один объект { [kitId]: { items } }.
++//
++// ПРАВИЛО (владелец): новый комплект = новый файл (или запись в файле
++// своей фракции) + строка импорта здесь. Движок не трогается.
++
++import brotherhood from './brotherhood.json';
++import brotherhoodOutcast from './brotherhoodOutcast.json';
++import childOfAtom from './childOfAtom.json';
++import defaultKit from './default.json';
++import minuteman from './minuteman.json';
++import misterHandy from './misterHandy.json';
++import ncr from './ncr.json';
++import protectron from './protectron.json';
++import robobrain from './robobrain.json';
++import securitron from './securitron.json';
++import superMutant from './superMutant.json';
++import vaultDweller from './vaultDweller.json';
++import wastelander from './wastelander.json';
++import treefamilies from './treefamilies.json';
++
++export default {
++  ...brotherhood,
++  ...brotherhoodOutcast,
++  ...childOfAtom,
++  ...defaultKit,
++  ...minuteman,
++  ...misterHandy,
++  ...ncr,
++  ...protectron,
++  ...robobrain,
++  ...securitron,
++  ...superMutant,
++  ...vaultDweller,
++  ...wastelander,
++  ...treefamilies,
++};
+diff --git a/modules/fallout/data/equipmentKits/minuteman.json b/modules/fallout/data/equipmentKits/minuteman.json
+new file mode 100644
+index 0000000..3c91557
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/minuteman.json
+@@ -0,0 +1,156 @@
++{
++  "minuteman_shooter": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_casual_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_casual_hat",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "armorId": "armor_leather_chest_001",
++            "itemType": "armor"
++          },
++          {
++            "armorId": "armor_leather_hand_001",
++            "itemType": "armor"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_laser_musket",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_energy_cell",
++              "quantity": {
++                "base": 7,
++                "rollType": "rollCD",
++                "rollValue": 7,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_hunting_rifle",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_308",
++              "quantity": {
++                "base": 3,
++                "rollType": "rollCD",
++                "rollValue": 3,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 4,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 5
++      }
++    ]
++  },
++  "minuteman_skirmisher": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_casual_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_military_helmet",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "armorId": "armor_metal_chest_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_double_barrel_shotgun",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_shotgun_shell",
++              "quantity": {
++                "base": 3,
++                "rollType": "rollCD",
++                "rollValue": 3,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_submachine_gun",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_45",
++              "quantity": {
++                "base": 4,
++                "rollType": "rollCD",
++                "rollValue": 4,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "chem",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 5
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/misterHandy.json b/modules/fallout/data/equipmentKits/misterHandy.json
+new file mode 100644
+index 0000000..14dc7c8
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/misterHandy.json
+@@ -0,0 +1,409 @@
++{
++  "mister_handy_assistant": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_mister_handy_eye_stalk",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_mister_handy",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_mister_handy_thruster",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_mister_handy",
++        "itemType": "robotArm",
++        "slot": "arm1"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_flamethrower",
++        "itemType": "weapon",
++        "slot": "arm2",
++        "ammo": {
++          "ammoId": "ammo_flamer_fuel",
++          "quantity": {
++            "base": 20
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_circular_saw",
++        "itemType": "weapon",
++        "slot": "arm3"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_item_repair_kit",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_boiler",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "mister_handy_brave": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_mister_handy_eye_stalk",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_mister_handy",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_mister_handy_thruster",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_auto_10mm",
++        "itemType": "weapon",
++        "slot": "arm1",
++        "ammo": {
++          "ammoId": "ammo_10mm",
++          "quantity": {
++            "base": 20
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_circular_saw",
++        "itemType": "weapon",
++        "slot": "arm2"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_laser_cutter",
++        "itemType": "weapon",
++        "slot": "arm3",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 20
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_gutsy_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_recon_sensors",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "mister_handy_nanny": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_mister_handy_eye_stalk",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_mister_handy",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_mister_handy_thruster",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_mister_handy",
++        "itemType": "robotArm",
++        "slot": "arm1"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_flamethrower",
++        "itemType": "weapon",
++        "slot": "arm2",
++        "ammo": {
++          "ammoId": "ammo_flamer_fuel",
++          "quantity": {
++            "base": 20
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "slot": "arm3",
++        "items": [
++          {
++            "itemId": "robot_arm_mister_handy",
++            "itemType": "robotArm",
++            "slot": "arm3"
++          },
++          {
++            "weaponId": "robot_weapon_laser_cutter",
++            "itemType": "weapon",
++            "slot": "arm3",
++            "ammo": {
++              "ammoId": "ammo_energy_cell",
++              "quantity": {
++                "base": 20
++              }
++            }
++          },
++          {
++            "weaponId": "robot_weapon_circular_saw",
++            "itemType": "weapon",
++            "slot": "arm3"
++          },
++          {
++            "weaponId": "robot_weapon_flamethrower",
++            "itemType": "weapon",
++            "slot": "arm3",
++            "ammo": {
++              "ammoId": "ammo_flamer_fuel",
++              "quantity": {
++                "base": 20
++              }
++            }
++          },
++          {
++            "weaponId": "robot_weapon_auto_10mm",
++            "itemType": "weapon",
++            "slot": "arm3",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 20
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_behavior_analysis",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_hazard_detection",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "mister_handy_medic": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_mister_handy_eye_stalk",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_mister_handy",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_mister_handy_thruster",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "choice",
++        "slot": "arm1",
++        "items": [
++          {
++            "itemId": "robot_arm_mister_handy",
++            "itemType": "robotArm",
++            "slot": "arm1"
++          },
++          {
++            "weaponId": "robot_weapon_circular_saw",
++            "itemType": "weapon",
++            "slot": "arm1"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_circular_saw",
++        "itemType": "weapon",
++        "slot": "arm2"
++      },
++      {
++        "type": "choice",
++        "slot": "arm3",
++        "items": [
++          {
++            "itemId": "robot_arm_mister_handy",
++            "itemType": "robotArm",
++            "slot": "arm3"
++          },
++          {
++            "weaponId": "robot_weapon_laser_cutter",
++            "itemType": "weapon",
++            "slot": "arm3",
++            "ammo": {
++              "ammoId": "ammo_energy_cell",
++              "quantity": {
++                "base": 20
++              }
++            }
++          },
++          {
++            "weaponId": "robot_weapon_circular_saw",
++            "itemType": "weapon",
++            "slot": "arm3"
++          },
++          {
++            "weaponId": "robot_weapon_flamethrower",
++            "itemType": "weapon",
++            "slot": "arm3",
++            "ammo": {
++              "ammoId": "ammo_flamer_fuel",
++              "quantity": {
++                "base": 20
++              }
++            }
++          },
++          {
++            "weaponId": "robot_weapon_auto_10mm",
++            "itemType": "weapon",
++            "slot": "arm3",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 20
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_stimpak",
++        "itemType": "chem"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_diagnostics",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "mister_handy_farmer": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_mister_handy_eye_stalk",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_mister_handy",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_mister_handy_thruster",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_mister_handy",
++        "itemType": "robotArm",
++        "slot": "arm1"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_circular_saw",
++        "itemType": "weapon",
++        "slot": "arm2"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_laser_cutter",
++        "itemType": "weapon",
++        "slot": "arm3",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 20
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_fertilizer_bag",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemId": "food_mutafruit",
++        "itemType": "food",
++        "quantity": 2
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 25
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/ncr.json b/modules/fallout/data/equipmentKits/ncr.json
+new file mode 100644
+index 0000000..2c4b259
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/ncr.json
+@@ -0,0 +1,251 @@
++{
++  "ncr_infantry": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_military_fatigues",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_military_helmet",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_combat_rifle",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_45",
++              "quantity": {
++                "base": 4,
++                "rollType": "rollCD",
++                "rollValue": 4,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_combat_shotgun",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_shotgun_shell",
++              "quantity": {
++                "base": 3,
++                "rollType": "rollCD",
++                "rollValue": 3,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_10mm_pistol",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 4,
++                "rollType": "rollCD",
++                "rollValue": 4,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_combat_knife",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "food_purified_water",
++        "itemType": "food"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency_ncr",
++        "quantity": {
++          "base": 5,
++          "rollType": "rollCD",
++          "rollValue": 5,
++          "op": "+"
++        }
++      }
++    ]
++  },
++  "ncr_caravaneer": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_sturdy_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "armorId": "armor_leather_chest_001",
++            "itemType": "armor"
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "armorId": "armor_leather_hand_001",
++                "itemType": "armor"
++              },
++              {
++                "type": "fixed",
++                "armorId": "armor_leather_leg_001",
++                "itemType": "armor"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_double_barrel_shotgun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_shotgun_shell",
++          "quantity": {
++            "base": 3,
++            "rollType": "rollCD",
++            "rollValue": 3,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_combat_knife",
++            "itemType": "weapon"
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "weaponId": "weapon_knuckles",
++                "itemType": "weapon"
++              },
++              {
++                "type": "fixed",
++                "weaponId": "weapon_knuckles",
++                "itemType": "weapon"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_pack_brahmin",
++        "itemType": "misc"
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "brewery",
++        "roll": {
++          "rollType": "D20",
++          "count": 2,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_playing_cards",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency_ncr",
++        "quantity": {
++          "base": 2,
++          "rollType": "D20",
++          "rollValue": 20,
++          "op": "multiply"
++        }
++      }
++    ]
++  },
++  "ncr_marksman": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_military_fatigues",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_military_helmet",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_hunting_rifle",
++        "itemType": "weapon",
++        "modIds": [
++          "mod_005",
++          "mod_035"
++        ],
++        "ammo": {
++          "ammoId": "ammo_308",
++          "quantity": {
++            "base": 3,
++            "rollType": "rollCD",
++            "rollValue": 3,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_mentats",
++        "itemType": "chem"
++      },
++      {
++        "type": "fixed",
++        "itemId": "mag_us_covert_operations_manual_02",
++        "itemType": "magazine"
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/protectron.json b/modules/fallout/data/equipmentKits/protectron.json
+new file mode 100644
+index 0000000..dbbd03e
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/protectron.json
+@@ -0,0 +1,514 @@
++{
++  "protectron_standard": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_protectron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_protectron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_protectron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_protectron_manipulator",
++        "itemType": "weapon",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_protectron_manipulator",
++        "itemType": "weapon",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_gun",
++        "itemType": "weapon",
++        "weight": 0,
++        "requiresWeaponId": "robot_weapon_protectron_manipulator",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_recon_sensors",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_hazard_detection",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_item_repair_kit",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 20
++      }
++    ]
++  },
++  "protectron_medic": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_protectron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_protectron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_protectron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_shocker_arms",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_diagnostics",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_stimpak",
++        "itemType": "chem",
++        "quantity": 2
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_radaway",
++        "itemType": "chem"
++      }
++    ]
++  },
++  "protectron_firefighter": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_protectron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_protectron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_protectron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_cryojet",
++        "itemType": "weapon",
++        "slot": "left",
++        "ammo": {
++          "ammoId": "ammo_cryo_cell",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "robot_module_hazard_detection",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_sensor_array",
++            "itemType": "module"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_stimpak",
++        "itemType": "chem"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "protectron_nukatron": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_protectron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_protectron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_protectron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_protectron_manipulator",
++        "itemType": "weapon",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "robot_module_behavior_analysis",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_boiler",
++            "itemType": "module"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "food_perfectly_preserved_pie",
++        "itemType": "food"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "itemId": "drink_nuka_cola",
++                "itemType": "drinks",
++                "quantity": 4
++              }
++            ]
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "itemId": "drink_nuka_cherry",
++                "itemType": "drinks",
++                "quantity": 2
++              }
++            ]
++          }
++        ]
++      }
++    ]
++  },
++  "protectron_worker": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_protectron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_protectron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_protectron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_protectron_manipulator",
++        "itemType": "weapon",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_factory_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_sledgehammer",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_baton",
++            "itemType": "weapon"
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "weaponId": "weapon_railway_rifle",
++                "itemType": "weapon",
++                "overrideQualities": [
++                  "remove:quality_two-handed"
++                ],
++                "ammo": {
++                  "ammoId": "ammo_railway_spike",
++                  "quantity": {
++                    "base": 6,
++                    "rollType": "rollCD",
++                    "rollValue": 3,
++                    "op": "+"
++                  }
++                }
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "robot_module_hazard_detection",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_sensor_array",
++            "itemType": "module"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_item_repair_kit",
++        "itemType": "misc"
++      }
++    ]
++  },
++  "protectron_model_x": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_protectron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_protectron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_protectron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_protectron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_protectron_manipulator",
++        "itemType": "weapon",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_protectron_manipulator",
++        "itemType": "weapon",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_plating_standard_body",
++        "itemType": "plating"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "armorId": "robot_plating_factory_body",
++                "itemType": "plating"
++              }
++            ]
++          },
++          {
++            "itemId": "robot_module_behavior_analysis",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_diagnostics",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_hacking",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_hazard_detection",
++            "itemType": "module"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "robot_module_radiation_coils",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_recon_sensors",
++            "itemType": "module"
++          },
++          {
++            "itemId": "robot_module_sensor_array",
++            "itemType": "module"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_machete",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_baseball_bat_aluminum",
++            "itemType": "weapon"
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "weaponId": "weapon_syringer",
++                "itemType": "weapon",
++                "ammo": {
++                  "ammoId": "ammo_syringe_bloodpack",
++                  "quantity": {
++                    "base": 10
++                  }
++                }
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "type": "rollTable",
++            "tableId": "oddity",
++            "roll": {
++              "rollType": "D20",
++              "count": 1,
++              "mode": "separate"
++            }
++          },
++          {
++            "itemId": "robot_item_repair_kit",
++            "itemType": "misc"
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/robobrain.json b/modules/fallout/data/equipmentKits/robobrain.json
+new file mode 100644
+index 0000000..4759e7a
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/robobrain.json
+@@ -0,0 +1,245 @@
++{
++  "robobrain_servomechanizmy": {
++    "items": [
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_mesmetron",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_tesla_arm",
++        "itemType": "weapon",
++        "slot": "left",
++        "ammo": {
++          "ammoId": "ammo_fusion_core",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_smoke_manipulator",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_item_repair_kit",
++        "itemType": "misc",
++        "quantity": 2
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "clothingId": "headwear_casual_hat",
++            "itemType": "clothing"
++          },
++          {
++            "clothingId": "headwear_fancy_hat",
++            "itemType": "clothing"
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      }
++    ]
++  },
++  "robobrain_nonordinary": {
++    "items": [
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_mesmetron",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "robot_arm_smoke_manipulator",
++            "itemType": "robotArm",
++            "slot": "left"
++          },
++          {
++            "weaponId": "robot_weapon_tesla_arm",
++            "itemType": "weapon",
++            "slot": "left"
++          },
++          {
++            "weaponId": "robot_weapon_flamethrower",
++            "itemType": "weapon",
++            "slot": "left"
++          },
++          {
++            "weaponId": "weapon_laser_gun",
++            "itemType": "weapon",
++            "slot": "left"
++          },
++          {
++            "weaponId": "weapon_sledgehammer",
++            "itemType": "weapon",
++            "slot": "left"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "robot_arm_smoke_manipulator",
++            "itemType": "robotArm",
++            "slot": "right"
++          },
++          {
++            "weaponId": "robot_weapon_tesla_arm",
++            "itemType": "weapon",
++            "slot": "right"
++          },
++          {
++            "weaponId": "robot_weapon_flamethrower",
++            "itemType": "weapon",
++            "slot": "right"
++          },
++          {
++            "weaponId": "weapon_laser_gun",
++            "itemType": "weapon",
++            "slot": "right"
++          },
++          {
++            "weaponId": "weapon_sledgehammer",
++            "itemType": "weapon",
++            "slot": "right"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "ammoId": "ammo_energy_cell",
++            "itemType": "ammo",
++            "quantity": {
++              "base": 14,
++              "rollType": "rollCD",
++              "rollValue": 7,
++              "op": "+"
++            }
++          },
++          {
++            "ammoId": "ammo_flamer_fuel",
++            "itemType": "ammo",
++            "quantity": {
++              "base": 12,
++              "rollType": "rollCD",
++              "rollValue": 6,
++              "op": "+"
++            }
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 2,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "oddity",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  },
++  "robobrain_us_army": {
++    "items": [
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_mesmetron",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_smoke_manipulator",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_smoke_manipulator",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_combat_rifle",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_45",
++          "quantity": {
++            "base": 8,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_body",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_arms",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_arms",
++        "itemType": "armor"
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/securitron.json b/modules/fallout/data/equipmentKits/securitron.json
+new file mode 100644
+index 0000000..15c5183
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/securitron.json
+@@ -0,0 +1,107 @@
++{
++  "securitron_standard": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_securitron",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_securitron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_securitron",
++        "itemType": "robotLegs"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_securitron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_securitron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_gun",
++        "itemType": "weapon",
++        "weight": 0,
++        "slot": "left",
++        "builtinToArm": true,
++        "requiresWeaponId": "robot_arm_securitron",
++        "modIds": [
++          "mod_053"
++        ],
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_submachine_gun",
++        "itemType": "weapon",
++        "weight": 0,
++        "slot": "right",
++        "builtinToArm": true,
++        "requiresWeaponId": "robot_arm_securitron",
++        "ammo": {
++          "ammoId": "ammo_45",
++          "quantity": {
++            "base": 8,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_missile_launcher",
++        "itemType": "weapon",
++        "weight": 0,
++        "requiresMkII": true
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_m79_grenade_launcher",
++        "itemType": "weapon",
++        "weight": 0,
++        "requiresMkII": true
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_body",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_optics",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_arms",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_item_printer",
++        "itemType": "misc",
++        "weight": 0
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/superMutant.json b/modules/fallout/data/equipmentKits/superMutant.json
+new file mode 100644
+index 0000000..d83fd2c
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/superMutant.json
+@@ -0,0 +1,123 @@
++{
++  "supermutant_bruiser": {
++    "items": [
++      {
++        "type": "fixed",
++        "armorId": "armor_raider_chest_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "armorId": "armor_raider_hand_001",
++            "itemType": "armor"
++          },
++          {
++            "armorId": "armor_raider_leg_001",
++            "itemType": "armor"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_pipe_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_38",
++          "quantity": {
++            "base": 3,
++            "rollType": "rollCD",
++            "rollValue": 3,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_baseball_bat",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_machete",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 5
++      }
++    ]
++  },
++  "supermutant_skirmisher": {
++    "items": [
++      {
++        "type": "fixed",
++        "armorId": "armor_raider_chest_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "armorId": "armor_raider_hand_001",
++            "itemType": "armor"
++          },
++          {
++            "armorId": "armor_raider_leg_001",
++            "itemType": "armor"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_pipe_bolt_action",
++        "itemType": "weapon",
++        "modIds": [
++          "mod_005"
++        ],
++        "ammo": {
++          "ammoId": "ammo_308",
++          "quantity": {
++            "base": 4,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_board",
++        "itemType": "weapon"
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 5
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/treefamilies.json b/modules/fallout/data/equipmentKits/treefamilies.json
+new file mode 100644
+index 0000000..f91202a
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/treefamilies.json
+@@ -0,0 +1,219 @@
++{
++  "treefamilies_chairmen": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_fancy_clothes",
++        "itemType": "clothing",
++        "uniqQualities": [
++          "elegant"
++        ]
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_fancy_hat",
++        "itemType": "clothing",
++        "uniqQualities": [
++          "elegant"
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_9mm_pistol",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_9mm",
++          "quantity": {
++            "base": 12,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_straight_razor",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "itemId": "CasinoTopsChip",
++        "itemType": "misc",
++        "quantity": 1
++      },
++      {
++        "type": "rollTable",
++        "tableId": "oddity",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_marked_cards",
++        "itemType": "misc",
++        "quantity": 1
++      }
++    ]
++  },
++  "treefamilies_omerta": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_fancy_clothes",
++        "itemType": "clothing",
++        "uniqQualities": [
++          "dashing"
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_combat_knife",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_knuckles",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "CasinoGomorrahChip",
++        "itemType": "misc",
++        "quantity": 1
++      },
++      {
++        "type": "rollTable",
++        "tableId": "oddity",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "chem",
++        "roll": {
++          "rollType": "D20",
++          "count": 2,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "brewery",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        },
++        "rerollUntil": {
++          "isAlcohol": true
++        }
++      }
++    ]
++  },
++  "treefamilies_white_glove": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_fancy_clothes",
++        "itemType": "clothing",
++        "uniqQualities": [
++          "refined"
++        ]
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_white_glove_mask",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_walking_cane",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_combat_knife",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_flamer",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_flamer_fuel",
++          "quantity": {
++            "base": 12,
++            "rollType": "rollCD",
++            "rollValue": 6,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "oddity",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_double_barrel_shotgun",
++            "itemType": "weapon",
++            "modIds": [
++              "mod_020"
++            ],
++            "ammo": {
++              "ammoId": "ammo_shotgun_shell",
++              "quantity": {
++                "base": 6,
++                "rollType": "rollCD",
++                "rollValue": 3,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_10mm_smg",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 16,
++                "rollType": "rollCD",
++                "rollValue": 4,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/vaultDweller.json b/modules/fallout/data/equipmentKits/vaultDweller.json
+new file mode 100644
+index 0000000..c10a7a2
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/vaultDweller.json
+@@ -0,0 +1,94 @@
++{
++  "vault_security": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_vault_jumpsuit",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "armorId": "armor_vault_fullbody_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "armor_vault_head_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_baton",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_10mm_pistol",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_10mm",
++          "quantity": {
++            "base": 4,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_stimpak",
++        "itemType": "chem"
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_pip_boy",
++        "itemType": "misc"
++      }
++    ]
++  },
++  "vault_resident": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_vault_jumpsuit",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_switchblade",
++        "itemType": "weapon"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_10mm_pistol",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_10mm",
++          "quantity": {
++            "base": 3,
++            "rollType": "rollCD",
++            "rollValue": 3,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "chem_stimpak",
++        "itemType": "chem",
++        "quantity": 2
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_pip_boy",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 10
++      }
++    ]
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipmentKits/wastelander.json b/modules/fallout/data/equipmentKits/wastelander.json
+new file mode 100644
+index 0000000..0a52713
+--- /dev/null
++++ b/modules/fallout/data/equipmentKits/wastelander.json
+@@ -0,0 +1,407 @@
++{
++  "wastelander_mercenary": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_sturdy_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "armorId": "armor_leather_chest_001",
++            "itemType": "armor"
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "armorId": "armor_leather_hand_001",
++                "itemType": "armor"
++              },
++              {
++                "type": "fixed",
++                "armorId": "armor_leather_leg_001",
++                "itemType": "armor"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_baseball_bat",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_tire_iron",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_10mm_pistol",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_10mm",
++              "quantity": {
++                "base": 5,
++                "rollType": "rollCD",
++                "rollValue": 5,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_44_pistol",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_44_magnum",
++              "quantity": {
++                "base": 5,
++                "rollType": "rollCD",
++                "rollValue": 5,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_hunting_rifle",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_308",
++              "quantity": {
++                "base": 5,
++                "rollType": "rollCD",
++                "rollValue": 5,
++                "op": "+"
++              }
++            }
++          },
++          {
++            "weaponId": "weapon_pipe_gun",
++            "itemType": "weapon",
++            "ammo": {
++              "ammoId": "ammo_38",
++              "quantity": {
++                "base": 5,
++                "rollType": "rollCD",
++                "rollValue": 5,
++                "op": "+"
++              }
++            }
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_settlement_job_posting",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 15
++      }
++    ]
++  },
++  "wastelander_settler": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_sturdy_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_switchblade",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_pipe_wrench",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_rolling_pin",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_knuckles",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_pipe_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_38",
++          "quantity": {
++            "base": 3,
++            "rollType": "rollCD",
++            "rollValue": 3,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "food",
++        "roll": {
++          "rollType": "D20",
++          "count": 2,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 45
++      }
++    ]
++  },
++  "wastelander_wanderer": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_nomad_outfit",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_switchblade",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_pipe_wrench",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_rolling_pin",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_knuckles",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_pipe_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_38",
++          "quantity": {
++            "base": 4,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "chem_jet",
++            "itemType": "chem"
++          },
++          {
++            "itemId": "chem_radaway",
++            "itemType": "chem"
++          }
++        ]
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 30
++      }
++    ]
++  },
++  "wastelander_raider": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_harness",
++        "itemType": "clothing"
++      },
++      {
++        "type": "fixed",
++        "armorId": "armor_raider_chest_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "armor_raider_hand_001",
++        "itemType": "armor"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_lead_pipe",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_pool_cue",
++            "itemType": "weapon"
++          },
++          {
++            "weaponId": "weapon_tire_iron",
++            "itemType": "weapon"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_pipe_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_38",
++          "quantity": {
++            "base": 5,
++            "rollType": "rollCD",
++            "rollValue": 5,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "itemId": "chem_jet",
++            "itemType": "chem"
++          },
++          {
++            "itemId": "chem_radaway",
++            "itemType": "chem"
++          }
++        ]
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "weaponId": "weapon_molotov",
++            "itemType": "weapon"
++          },
++          {
++            "itemId": "chem_stimpak",
++            "itemType": "chem"
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 15
++      }
++    ]
++  },
++  "wastelander_trader": {
++    "items": [
++      {
++        "type": "fixed",
++        "clothingId": "clothing_sturdy_clothes",
++        "itemType": "clothing"
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "armorId": "armor_leather_chest_001",
++            "itemType": "armor"
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "armorId": "armor_leather_hand_001",
++                "itemType": "armor"
++              },
++              {
++                "type": "fixed",
++                "armorId": "armor_leather_leg_001",
++                "itemType": "armor"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_pipe_gun",
++        "itemType": "weapon",
++        "ammo": {
++          "ammoId": "ammo_38",
++          "quantity": {
++            "base": 4,
++            "rollType": "rollCD",
++            "rollValue": 4,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "trinklet",
++        "roll": {
++          "rollType": "D20",
++          "count": 1,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "tables",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemId": "item_pack_brahmin",
++        "itemType": "misc"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 50
++      }
++    ]
++  }
++}
+\ No newline at end of file

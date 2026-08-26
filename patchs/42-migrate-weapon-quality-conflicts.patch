@@ -1,0 +1,79 @@
+diff --git a/domain/weaponQualityConflicts.js b/domain/weaponQualityConflicts.js
+index 5d12523..b984cff 100644
+--- a/domain/weaponQualityConflicts.js
++++ b/domain/weaponQualityConflicts.js
+@@ -13,3 +13,16 @@ export const applyQualityGain = (qualities, quality) => {
+   if (opposite) qualities.delete(opposite);
+   qualities.set(qualityId, quality?.value != null ? { qualityId, value: quality.value } : { qualityId });
+ };
++
++
++/** Normalizes a saved array of qualities; for a conflicting pair, the last entry wins. */
++export const resolveMutuallyExclusiveQualities = (qualities) => {
++  if (!Array.isArray(qualities)) return qualities;
++  const byId = new Map();
++  qualities.forEach((quality) => {
++    const qualityId = quality?.qualityId || quality?.id || quality;
++    if (!qualityId) return;
++    applyQualityGain(byId, typeof quality === 'string' ? { qualityId } : quality);
++  });
++  return [...byId.values()];
++};
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index df6be01..7f341cc 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -2,6 +2,7 @@
+ // Минимальные миграционные функции для перехода к нормализованному формату
+ 
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
++import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+ 
+ /**
+  * Преобразует атрибуты из старого формата [{name, value}] в словарь
+@@ -452,4 +453,30 @@ const MIGRATIONS = [
+     }
+     return next;
+   },
++  // v2 -> v3: a weapon cannot retain both members of an opposite-quality pair.
++  // The final saved order is authoritative, so the last conflicting quality wins.
++  (state) => {
++    const normalizeWeapon = (item) => {
++      if (!item || typeof item !== 'object') return item;
++      const raw = item.qualities;
++      if (Array.isArray(raw)) return { ...item, qualities: resolveMutuallyExclusiveQualities(raw) };
++      if (typeof raw === 'string') {
++        try {
++          const parsed = JSON.parse(raw);
++          if (Array.isArray(parsed)) return { ...item, qualities: JSON.stringify(resolveMutuallyExclusiveQualities(parsed)) };
++        } catch (_) {}
++      }
++      return item;
++    };
++    return {
++      ...state,
++      equipment: state.equipment
++        ? { ...state.equipment, items: (state.equipment.items || []).map(normalizeWeapon) }
++        : state.equipment,
++      equippedWeapons: Array.isArray(state.equippedWeapons)
++        ? state.equippedWeapons.map(normalizeWeapon)
++        : state.equippedWeapons,
++    };
++  },
++
+ ];
+\ No newline at end of file
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index bd0e214..5e54527 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -12,7 +12,8 @@
+ // v1 — разделение эффектов (effect_) и качеств (quality_) в экипировке
+ //       (см. MIGRATIONS[0] в migrations.js).
+ // v2 — журнал уже выданных наград за отмеченные навыки.
+-export const CURRENT_SCHEMA_VERSION = 2;
++// v3 — normalize mutually exclusive weapon qualities in legacy saves.
++export const CURRENT_SCHEMA_VERSION = 3;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).

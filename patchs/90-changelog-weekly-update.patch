@@ -1,0 +1,93 @@
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e08c4a8..bdbcab9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,42 @@
+ # Changelog
+ 
++---
++
++## Update — Equipment kits, Enclave Remnant, Equipment screen (patches 69–89)
++
++> Recent changes from this week. Older entries (up to 68) follow below in their usual order.
++
++### Equipment kits (engine)
++- One kit modal for all traits/origins: the player makes the choices (weapon, skills), auto-grant no longer silently resolves `choice` entries (71, 73).
++- Kits moved to the setting: `modules/fallout/data/equipmentKits/*.json` (one file per faction) + index; `data/` stays empty (74, 75).
++- A kit can require a trait via `requiresTraitIds` — it is only available to the chosen family/sub-trait. `domain/equipmentKits.js` filters kits the same way for every origin (77).
++- The "Equipment kit" row is disabled until a kit is available (e.g. a family trait not chosen yet) — an empty modal can no longer open (78, 79).
++- Kit modal: human clothes/armor moved into a dedicated "Armor & Clothing" category; "Standard Structure" remains for robot parts only (88).
++
++### Origin "Enclave Remnant" (content)
++- New origin `enclaveRemnant` and the "Hidden and Hunted" trait: tag one extra skill — Sneak or Survival (via `skillPickChoice`) (84).
++- Two kits: "Former Scientist" (lab coat, gas mask, laser pistol + 6+3 {CD} energy cells) and "Former Soldier" (military fatigues, combat armor chest, choice of laser rifle or assault rifle with 8+4 {CD} ammo) (85).
++- New weapon mod `mod_204` "Long Barrel" (for laser/plasma/institute weapons): +1 Range, removes Close Quarters, "Long-barreled" prefix (88).
++- A stock converts a pistol to a rifle: if a Stocks-slot mod is present, the name comes from `stockNames.with` ("Laser Pistol" → "Laser Rifle"); the stock's own prefix is not duplicated. Result for the soldier — "Long-barreled Laser Rifle" (88).
++- The origin-name title was removed from the trait modal — only the trait name (e.g. "Hidden and Hunted") remains (87).
++- Trait descriptions support light markup: `**bold**`, `*italic*`, `- ` bullets, and line breaks via the shared `renderTextWithIcons` (86).
++
++### Equipment screen
++- Weapon-layout toggles live on the screen itself: lines = list (spoilers), two bars = cards. Removed from settings (76).
++- The virtual unarmed attack (fists/manipulator) always occupies the first slot. A hand/palm button on the left of the toolbar shows/hides its card; when hidden, the first slot is taken by a weapon. The setting persists between sessions (80, 81, 82).
++- Attack ordering: Unarmed → Melee → built-in → Mk II → everything else (82).
++
++### Reliability & cleanup
++- FIX: `getWeaponModById is not defined` when granting a kit with weapon mods (affected every kit with mods, not just Enclave). The store now uses synchronous `catalogGetWeaponModById` (89).
++- `stockNames` is now carried through the catalog (`buildWeaponRow`) — without it the "...rifle" name never reached the resolver (88).
++- Removed one-off debug scripts from the repo root (`debug-android-save.js`, `enhanced-debug.js`, `test-android-*.js`, `test-file-transfer.js`).
++
++### Also
++- 69 — Omerta and White Glove Society kits (full contents, auto-reroll, modal choice).
++- 70 — first engine/setting split stage: food, drinks and weapon mods moved to the module entirely.
++
++---
++
+ ## 68 — "Elegant" quality in old saves (migration v7→v8) + kit-modal field loss fix
+ 
+ - CAUSE: clothes granted by the Chairmen kit BEFORE patch 67 have no `uniqQualities` in the save — inventory and the Equipment screen show them as «Формальная одежда» (only new grants have the quality).
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 59726e9..a3a5492 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,41 @@
+ 
+ ---
+ 
++## Обновление — Комплекты снаряжения, Осколок Анклава, экран «Снаряжение» (патчи 69–89)
++
++> Свежие изменения за эту неделю. Старые записи (до 68) идут ниже в обычном порядке.
++
++### Комплекты снаряжения (движок)
++- Единая модалка комплекта для всех трейтов/ориджинов: выборы (оружие, навыки) делает игрок, авто-выдача больше не подставляет `choice`-записи молча (71, 73).
++- Комплекты переехали в сеттинг: `modules/fallout/data/equipmentKits/*.json` (отдельный файл на фракцию) + индекс; `data/` остаётся пустой (74, 75).
++- Комплект может требовать трейт: поле `requiresTraitIds` — комплект доступен только выбранной семье/подчерту. Движковый `domain/equipmentKits.js` фильтрует комплекты одинаково для всех ориджинов (77).
++- Строка «Комплект снаряжения» неактивна, пока нет доступных комплектов (например, у семьи не выбрана семья) — пустая модалка больше не открывается (78, 79).
++- Модалка комплекта: одежда и броня человека вынесены в отдельную категорию «Броня и одежда»; «Стандартная конструкция» осталась только для роботских частей (88).
++
++### Ориджин «Осколок Анклава» (контент)
++- Новый ориджин `enclaveRemnant` и трейт «Скрытный и преследуемый»: отметьте один доп. навык — Скрытность или Выживание (механикой `skillPickChoice`) (84).
++- Два комплекта: «Бывший учёный» (лабораторный халат, противогаз, лазерный пистолет + 6+3 {CD} энергоячеек) и «Бывший солдат» (военная униформа, нагрудник боевой брони, выбор лазерной винтовки или штурмовой винтовки с боезапасом 8+4 {CD}) (85).
++- Новый мод оружия `mod_204` «Длинный ствол» (для лазерного/плазменного/институтского оружия): +1 Дистанция, убирает «Вплотную», префикс «Длинноствольный» (88).
++- Ложа меняет пистолет на винтовку: если на оружии есть мод из слота Stocks, имя берётся из `stockNames.with` («Лазерный пистолет» → «Лазерная винтовка»); префикс самой ложи при этом не дублируется. Итог для солдата — «Длинноствольная Лазерная винтовка» (88).
++- В модалке трейта убран заголовок-имя ориджина — остаётся имя самой черты (например, «Скрытный и преследуемый») (87).
++- Описания трейтов поддерживают простую разметку: `**жирный**`, `*курсив*`, маркеры `- ` и переносы строк — через общий `renderTextWithIcons` (86).
++
++### Экран «Снаряжение»
++- Тумблеры вида оружия на самом экране: линии = список (спойлеры), две черты = карточки. Убрано из настроек (76).
++- Виртуальная рукопашная атака (кулаки/манипулятор) всегда в первом слоте. Кнопка-ладонь слева в тулбаре показывает/скрывает её карточку; когда скрыта — первый слот занимает оружие. Настройка сохраняется между сессиями (80, 81, 82).
++- Порядок атак: Unarmed (рукопашная) → Melee (рукопашное оружие) → встроенное → Mk II → остальное (82).
++
++### Надёжность и чистка
++- ФИКС: `getWeaponModById is not defined` при выдаче комплекта с модами оружия (касалось всех комплектов с модами, не только Анклава). В сторе теперь синхронный `catalogGetWeaponModById` (89).
++- В каталог (`buildWeaponRow`) проброшено поле `stockNames` — без него имя «…винтовка» не доходило до резолвера (88).
++- Удалены разовые отладочные сценарии в корне репозитория (`debug-android-save.js`, `enhanced-debug.js`, `test-android-*.js`, `test-file-transfer.js`).
++
++### Ещё
++- 69 — комплекты Омерты и Общества «Белая перчатка» (полные составы, авто-переброс, выбор в модалке).
++- 70 — первый этап разделения «движок/сеттинг»: еда, напитки и моды оружия целиком переехали в модуль.
++
++---
++
+ ## 68 — Качество «Элегантная» в старых сейвах (миграция v7→v8) + фикс потери полей в модалке комплекта
+ 
+ - ПРИЧИНА: одежда, выданная комплектом Председателей ДО патча 67, лежит в сейве без `uniqQualities` — инвентарь и экран «Снаряжение» показывают её как «Формальная одежда» (качество есть только у новых выдач).

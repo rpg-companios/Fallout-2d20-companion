@@ -1,0 +1,246 @@
+diff --git a/__tests__/securitron/registry.test.js b/__tests__/securitron/registry.test.js
+new file mode 100644
+index 0000000..f3a4c38
+--- /dev/null
++++ b/__tests__/securitron/registry.test.js
+@@ -0,0 +1,26 @@
++/**
++ * Реестр данных движка: единая точка чтения сеттинга.
++ * Пока возвращает статические файлы data/ — поведение не меняется.
++ * В будущем сюда подключится модуль (packStore) — тесты останутся.
++ */
++import { describe, it, expect } from 'vitest';
++import { getOrigins, getTraits, getBodyPlans, getEquipmentCatalogForLocale } from '../../domain/registry';
++
++describe('Реестр данных', () => {
++  it('возвращает ориджины/трейты/планы тела из data/', () => {
++    const origins = getOrigins();
++    const traits = getTraits();
++    const plans = getBodyPlans();
++    expect(origins.length).toBeGreaterThan(0);
++    expect(origins.some((o) => o.id === 'tribal')).toBe(true);
++    expect(traits.some((t) => t.id === 'tribal-tribal')).toBe(true);
++    expect(Object.keys(plans)).toContain('humanoid');
++    expect(Object.keys(plans)).toContain('securitron');
++  });
++
++  it('getEquipmentCatalogForLocale возвращает каталог для локали', () => {
++    const catalog = getEquipmentCatalogForLocale('ru-RU');
++    expect(catalog.equipmentKits['securitron_standard']).toBeDefined();
++    expect(catalog.equipmentKits['securitron_standard'].name).toBeTruthy();
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1a505e7..782a1f3 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,12 @@
+ # Changelog
+ 
++## 61 — Engine data registry (step 1 toward modules)
++
++- Added `domain/registry.js` — a single entry point for reading setting data (origins, traits, bodyplans, catalog). It still returns the same `data/` files; behavior is unchanged.
++- Domain modules (origins/traits/characterCreation/bodyplan) now read through the registry instead of importing JSON directly.
++- This is the foundation for `.posm` modules: once a module exists, the registry will merge its data (deepMerge by id) without touching consumers.
++- Tests: registry.test.js.
++
+ ## 60 — Fix weapon duplication when equipping to a robot
+ 
+ - Fixed: adding 1 weapon and equipping it to a robot's hand duplicated it (stayed in the inventory + a copy in the hand).
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ea21636..a68d553 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,15 @@
+ 
+ ---
+ 
++## 61 — Реестр данных движка (шаг 1 к модулям)
++
++- Добавлен `domain/registry.js` — единая точка чтения данных сеттинга (origins, traits, bodyplans, каталог). Пока возвращает те же файлы `data/`, поведение не меняется.
++- Домен-модули (origins/traits/characterCreation/bodyplan) переключены на реестр — больше не импортируют JSON напрямую.
++- Это фундамент для подключения модулей (`.posm`): когда появится модуль, реестр подмешает его данные (deepMerge по id), не требуя правок в потребителях.
++- Тесты: registry.test.js (реестр отдаёт данные, каталог для локали).
++
++---
++
+ ## 60 — Фикс дубля оружия при экипировке роботу
+ 
+ - Исправлен баг: при добавлении 1 оружия и экипировке роботу в руку предмет дублировался (оставался в инвентаре + копия в руке).
+diff --git a/domain/bodyplan.js b/domain/bodyplan.js
+index 72bdce7..d74d610 100644
+--- a/domain/bodyplan.js
++++ b/domain/bodyplan.js
+@@ -1,4 +1,5 @@
+-const bodyPlansRegistry = require('../data/bodyplans/bodyplans.json');
++import { getBodyPlans } from './registry';
++const bodyPlansRegistry = getBodyPlans();
+ 
+ /**
+  * Capability semantics:
+diff --git a/domain/characterCreation.js b/domain/characterCreation.js
+index 46c49f3..30ed042 100644
+--- a/domain/characterCreation.js
++++ b/domain/characterCreation.js
+@@ -3,8 +3,7 @@
+ // No React, no UI dependencies. No locale literals — skill identity is the
+ // canonical UPPER_SNAKE_CASE key from SKILL_CATALOG_ORDER below.
+ 
+-import originsJson from '../data/origins/origins.json';
+-import traitsJson from '../data/traits/traits.json';
++import { getOrigins, getTraits } from './registry';
+ 
+ // ---------------------------------------------------------------------------
+ // Attribute key utilities (from attributeKeyUtils.js)
+@@ -344,9 +343,9 @@ export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
+ 
+ // ПРАВИЛО (владелец): никакого хардкода. Мульти-трейт ориджины определяются
+ // по данным: ориджин мульти-трейт, если его первый трейт помечен isMultiTrait.
+-export const MULTI_TRAIT_ORIGIN_IDS = originsJson
++export const MULTI_TRAIT_ORIGIN_IDS = getOrigins()
+     .filter((origin) => {
+-        const trait = traitsJson.find((t) => t.id === origin.traitIds?.[0]);
++        const trait = getTraits().find((t) => t.id === origin.traitIds?.[0]);
+         return trait?.modifiers?.isMultiTrait === true;
+     })
+     .map((origin) => origin.id);
+diff --git a/domain/origins.js b/domain/origins.js
+index fae14b7..469595d 100644
+--- a/domain/origins.js
++++ b/domain/origins.js
+@@ -11,7 +11,7 @@
+ //
+ // Image assets stay snake_case (filenames), colocated here because require() cannot live in JSON.
+ 
+-import originsJson from '../data/origins/origins.json';
++import { getOrigins } from './registry';
+ import ruOrigins from '../i18n/ru-RU/data/system/origins.json';
+ import enOrigins from '../i18n/en-EN/data/system/origins.json';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+@@ -167,7 +167,7 @@ export function tOrigin(id) {
+  * Synchronous; JSON is bundled at build time.
+  */
+ export function loadOriginsData() {
+-  return originsJson;
++  return getOrigins();
+ }
+ 
+ /**
+@@ -176,7 +176,7 @@ export function loadOriginsData() {
+  */
+ export function loadEnrichedOrigins() {
+   const { equipmentKits: kitGroups } = getEquipmentCatalog();
+-  return originsJson.map((origin) => {
++  return getOrigins().map((origin) => {
+     const kitIds = origin.equipmentKitIds || [];
+     const equipmentKits = kitIds
+       .map((kitId) => ({ id: kitId, ...(kitGroups[kitId] || {}) }))
+diff --git a/domain/registry.js b/domain/registry.js
+new file mode 100644
+index 0000000..ecbaf48
+--- /dev/null
++++ b/domain/registry.js
+@@ -0,0 +1,45 @@
++// domain/registry.js
++// Реестр данных движка — ЕДИНАЯ точка чтения данных сеттинга.
++//
++// Сейчас реестр возвращает статические файлы data/ (поведение не меняется).
++// В будущем сюда подключится модуль сеттинга (modules/fallout.posm):
++// registry = base(встроенные данные) + user(packStore-модуль), приоритет — модуль.
++//
++// Все потребители (domain/*, компоненты) должны читать данные ТОЛЬКО через
++// реестр, а не напрямую из data/*.json — тогда добавление модуля не потребует
++// правок в сотне мест.
++
++import originsJson from '../data/origins/origins.json';
++import traitsJson from '../data/traits/traits.json';
++import bodyplansJson from '../data/bodyplans/bodyplans.json';
++import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++
++/**
++ * Все ориджины (сырые записи).
++ * TODO(pack): при подключении модуля — слить с модульными (deepMerge по id).
++ */
++export function getOrigins() {
++  return originsJson;
++}
++
++/**
++ * Все трейты (сырые записи).
++ */
++export function getTraits() {
++  return traitsJson;
++}
++
++/**
++ * Планы тела.
++ */
++export function getBodyPlans() {
++  return bodyplansJson;
++}
++
++/**
++ * Каталог снаряжения (оружие/броня/комплекты/i18n).
++ * Уже принимает локаль; при подключении модуля — сюда же добавится merge.
++ */
++export function getEquipmentCatalogForLocale(locale) {
++  return getEquipmentCatalog(locale);
++}
+diff --git a/domain/traits.js b/domain/traits.js
+index dc9418c..6948cb4 100644
+--- a/domain/traits.js
++++ b/domain/traits.js
+@@ -5,7 +5,7 @@
+ // Origins-related helpers (loadOriginsData, tOrigin) have moved to
+ // domain/origins.js — see that module.
+ 
+-import traitsJson from '../data/traits/traits.json';
++import { getTraits } from './registry';
+ import ruTraits from '../i18n/ru-RU/data/system/traits.json';
+ import enTraits from '../i18n/en-EN/data/system/traits.json';
+ import { getCurrentLocale } from '../i18n/locale';
+@@ -41,7 +41,7 @@ export function tTrait(key) {
+  * Synchronous — JSON is bundled at build time.
+  */
+ export function loadTraitsData() {
+-  return traitsJson;
++  return getTraits();
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -54,7 +54,7 @@ export function loadTraitsData() {
+  */
+ export function findTraitByName(name) {
+   if (!name) return undefined;
+-  return traitsJson.find((t) => t.id === name);
++  return getTraits().find((t) => t.id === name);
+ }
+ 
+ /**
+@@ -62,7 +62,7 @@ export function findTraitByName(name) {
+  */
+ export function findTraitById(id) {
+   if (!id) return undefined;
+-  return traitsJson.find((t) => t.id === id);
++  return getTraits().find((t) => t.id === id);
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -174,7 +174,7 @@ export function getTraitExtraSkills(trait) {
+  */
+ function findTraitByLocalizedName(name) {
+   if (!name) return undefined;
+-  return traitsJson.find((t) => tTrait(t.displayNameKey) === name);
++  return getTraits().find((t) => tTrait(t.displayNameKey) === name);
+ }
+ 
+ export function getTraitDescriptionKey(trait) {
+@@ -208,7 +208,7 @@ export function resolveTraitDisplayName(storedName) {
+   const byCurrentLocale = findTraitByLocalizedName(storedName);
+   if (byCurrentLocale) return tTrait(byCurrentLocale.displayNameKey) || storedName;
+   // Slow path: try every locale dictionary to find the matching trait
+-  const found = traitsJson.find((t) =>
++  const found = getTraits().find((t) =>
+     Object.values(TRAIT_DICTIONARIES).some((dict) => {
+       const parts = t.displayNameKey.split('.');
+       let val = dict;

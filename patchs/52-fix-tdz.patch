@@ -1,0 +1,228 @@
+diff --git a/__tests__/securitron/screens-render.test.js b/__tests__/securitron/screens-render.test.js
+new file mode 100644
+index 0000000..9767791
+--- /dev/null
++++ b/__tests__/securitron/screens-render.test.js
+@@ -0,0 +1,139 @@
++/**
++ * Рендер-смок экранов: InventoryScreen и WeaponsAndArmorScreen.
++ *
++ * Ловит TDZ/Правила хуков и прочие ошибки времени выполнения при реальном
++ * монтировании (регрессия: isRobot использовался в useMemo до своего
++ * объявления → «Cannot access 'isRobot' before initialization» при открытии
++ * экрана). Сборка/юнит-тесты такой класс ошибок не видят.
++ */
++import { describe, it, expect, vi, beforeEach } from 'vitest';
++import { createElement as h } from 'react';
++
++vi.mock('react-native', () => ({
++  View: 'View',
++  Text: 'Text',
++  TouchableOpacity: 'TouchableOpacity',
++  ScrollView: 'ScrollView',
++  ImageBackground: 'ImageBackground',
++  SafeAreaView: 'SafeAreaView',
++  Modal: 'Modal',
++  FlatList: 'FlatList',
++  Platform: { OS: 'web', select: (o) => o.web ?? o.default },
++  StyleSheet: { create: (s) => s, flatten: (s) => s },
++  Alert: { alert: () => {} },
++}));
++
++vi.mock('../../db/Database', async () => {
++  const catalog = await import('../../db/catalogSource');
++  return {
++    getWeaponById: async (id) => catalog.catalogGetWeaponById(id),
++    getWeaponModById: async (id) => catalog.catalogGetWeaponModById(id),
++    getAmmoById: async (id) => catalog.catalogGetAmmoById(id),
++    getItemByName: async (name) => catalog.catalogGetItemByName(name),
++  };
++});
++
++// Минимальный, но полный мок useCharacter: данные-значения, остальное — no-op.
++const mockCharacter = () => ({
++  attributes: [],
++  skills: [],
++  trait: null,
++  origin: null,
++  level: 1,
++  radiation: 0,
++  currentHealth: 0,
++  caps: 0,
++  carryWeight: 150,
++  equippedWeapons: [],
++  equippedArmor: {},
++  equippedRobotSlots: null,
++  equippedPowerArmor: { pieces: {} },
++  hasTrait: () => false,
++  getModifiedItem: (x) => x,
++  setEquippedWeapons: () => {},
++  setEquippedArmor: () => {},
++  setEquippedRobotSlots: () => {},
++  setCaps: () => {},
++  setCurrentHealth: () => {},
++  setRadiation: () => {},
++  applyConsumableFull: () => {},
++  saveModifiedItem: () => {},
++  adjustPowerArmorDurability: () => {},
++  equipPowerArmorPackage: () => {},
++  equipPowerArmorPiece: () => {},
++  unequipPowerArmorPackage: () => {},
++  unequipPowerArmorPieceAt: () => {},
++  repairPowerArmorPieceAt: () => {},
++  repairPowerArmorStack: () => {},
++});
++
++vi.mock('../../components/CharacterContext', () => ({
++  useCharacter: () => mockCharacter(),
++}));
++
++// Модалки с JSX и текст-хелперы с PNG — не нужны для смоука экранов.
++vi.mock('../../components/screens/InventoryScreen/modals/CapsModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/InventoryScreen/modals/SellItemModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/InventoryScreen/modals/AddItemModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/InventoryScreen/modals/BuyItemModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/WeaponsAndArmorScreen/RobotSlot', () => ({ default: () => null }));
++vi.mock('../../components/screens/CharacterScreen/modals/LimbUpgradeModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/CharacterScreen/modals/ArmorPickerModal', () => ({ default: () => null }));
++vi.mock('../../components/screens/WeaponsAndArmorScreen/textUtils', () => ({
++  renderTextWithIcons: (text) => text,
++}));
++
++import TestRenderer from 'react-test-renderer';
++import useCharacterStore from '../../src/store/characterStore';
++import InventoryScreen from '../../components/screens/InventoryScreen/InventoryScreen';
++import WeaponsAndArmorScreen from '../../components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
++
++const getTexts = (json, acc = []) => {
++  if (!json) return acc;
++  if (typeof json === 'string') { acc.push(json); return acc; }
++  if (Array.isArray(json)) { json.forEach((j) => getTexts(j, acc)); return acc; }
++  if (json.children) getTexts(json.children, acc);
++  return acc;
++};
++
++describe('Экраны рендерятся без TDZ/хук-ошибок', () => {
++  beforeEach(() => {
++    useCharacterStore.getState().resetCharacterStore();
++    useCharacterStore.setState({
++      robot: { bodyPlan: 'securitron', slots: {}, modules: [], mk2Installed: false },
++    });
++  });
++
++  it('InventoryScreen монтируется (человек)', () => {
++    let renderer;
++    expect(() => {
++      TestRenderer.act(() => {
++        renderer = TestRenderer.create(h(InventoryScreen));
++      });
++    }).not.toThrow();
++    const texts = getTexts(renderer.toJSON());
++    expect(texts.length).toBeGreaterThan(0);
++  });
++
++  it('InventoryScreen монтируется (робот: origin securitron)', () => {
++    let renderer;
++    expect(() => {
++      TestRenderer.act(() => {
++        renderer = TestRenderer.create(h(InventoryScreen));
++      });
++    }).not.toThrow();
++  });
++
++  it('WeaponsAndArmorScreen монтируется', () => {
++    let renderer;
++    expect(() => {
++      TestRenderer.act(() => {
++        renderer = TestRenderer.create(h(WeaponsAndArmorScreen));
++      });
++    }).not.toThrow();
++    const texts = getTexts(renderer.toJSON());
++    expect(texts.length).toBeGreaterThan(0);
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index ddddfc9..79e3073 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -143,6 +143,10 @@ const InventoryScreen = () => {
+     return true;
+   }, [findUnequippedStoreItemByStackKey, adjustStoreItemQuantity, addNewItem, equipItem]);
+ 
++  // isRobot читается из origin.characterType (domain/origins.js). Объявлен ДО
++  // equippedWeaponsForDisplay, который его использует (иначе TDZ при рендере).
++  const isRobot = isRobotCharacter({ origin, trait });
++
+   const equippedWeaponsForDisplay = useMemo(() => {
+     const fromStore = storeEquippedWeapons.map(flattenItemParams);
+     // Роботы: оружие (встроенное и в ладонях) живёт в слотах стора — единый
+@@ -254,11 +258,6 @@ const InventoryScreen = () => {
+     || equippedRobotBodyPart?.robotBodyPlan
+     || null;
+ 
+-  // isRobot now reads origin.characterType directly via domain/origins.js.
+-  // The previous local override (trait.modifiers.isRobot || robotBodyPlan) is gone:
+-  //   - trait.modifiers.isRobot was removed from all 4 robot traits in this refactor
+-  //   - robotBodyPlan alone doesn't imply robot (it's a body shape, not the archetype)
+-  const isRobot = isRobotCharacter({ origin, trait });
+   const robotBodyUpgrade = useMemo(() => {
+     if (!robotBodyPlan) return null;
+     const parts = Array.isArray(equipmentCatalog?.robotPartsUpgrade) ? equipmentCatalog.robotPartsUpgrade : [];
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 140590c..203248f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -17,6 +17,7 @@
+ - Securitron head and wheel cells are now 1/3 width (like a cell in a row of three), centered in the row.
+ - Weapons equipped from the inventory go into the first FREE hand (the second weapon goes to the other hand) instead of always the first by position.
+ - Robot weapons now live in the store slots (single source of truth): built-in weapons (manipulator, laser gun, SMG) and weapons held in the palms (equipped from the inventory) are stored in the robot slot state instead of the React context. Screens read attacks from the slots — this fixes the bug where built-in weapons disappeared from the attack list after saving/reloading a character (only Mk II weapons remained).
++- Fixed an inventory screen crash: isRobot was used in a useMemo before its declaration (TDZ "Cannot access 'isRobot' before initialization"). Added render smoke tests for InventoryScreen/WeaponsAndArmorScreen — this class of errors is now caught by tests.
+ - The "Mk II OS installed" flag is now stored in the character snapshot and restored on load (previously Mk II weapons became inoperable again after reload).
+ 
+ ---
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 669bed9..0f6276d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -19,6 +19,7 @@
+ - Ячейки головы и колеса Секьюритрона — размером 1/3 ширины (как ячейка ряда из трёх), по центру строки.
+ - Оружие, экипируемое из инвентаря, встаёт в первую СВОБОДНУЮ руку (вторая экипировка — в другую руку), а не всегда в первую по расположению.
+ - Робо-оружие перенесено в слоты стора (единый источник): встроенное (манипулятор, лазер, ПП) и оружие в ладонях (экипированное из инвентаря) хранятся в слот-состоянии робота, а не в React-контексте. Экраны читают атаки из слотов — исчез баг, когда после сохранения/перезагрузки встроенное оружие пропадало из списка атак (оставались только Mk II).
++- Исправлен краш экрана инвентаря: isRobot использовался в useMemo до своего объявления (TDZ «Cannot access 'isRobot' before initialization»). Добавлены рендер-смок тесты экранов InventoryScreen/WeaponsAndArmorScreen — такой класс ошибок теперь ловится тестами.
+ - Флаг «ОС Mk II установлена» теперь сохраняется в снапшот персонажа и восстанавливается при загрузке (раньше после перезагрузки Mk II оружие снова становилось нерабочим).
+ 
+ ## 47 — Поддержка множественных типов урона
+diff --git a/vitest.config.js b/vitest.config.js
+index 55a5308..ab74da7 100644
+--- a/vitest.config.js
++++ b/vitest.config.js
+@@ -5,16 +5,24 @@ import jsxPlugin from '@babel/plugin-transform-react-jsx';
+ // Кодовая база — React Native: компоненты лежат в .js с JSX (Metro это
+ // переваривает, а rolldown-парсер vitest — нет). Преобразуем JSX в .js через
+ // babel до трансформации, чтобы компоненты можно было реально рендерить
+-// в тестах (см. __tests__/securitron/weaponcard-render.test.js).
++// в тестах (см. __tests__/securitron/*-render.test.js).
+ const JSX_LIKE = /(?:<\/?[A-Za-z][^>]*>|<>|<\/>)/;
+ 
++// require('<ассет>') в node уходит в нативный лоадер (мимо плагинов vite) и
++// падает «Invalid or unexpected token» при парсинге PNG как JS. Заменяем такие
++// require на {} — для рендер-смоков картинки не нужны.
++const ASSET_REQUIRE_RE = /require\(\s*['"][^'"]+\.(?:png|jpe?g|gif|webp|svg|ico|ttf|otf|woff2?)['"]\s*\)/gi;
++
+ const jsxInJs = {
+   name: 'transform-jsx-in-js',
+   enforce: 'pre',
+   transform(code, id) {
+     if (!id.endsWith('.js') || id.includes('node_modules')) return;
+-    if (!JSX_LIKE.test(code)) return;
+-    const out = babel.transformSync(code, {
++    const stripped = code.replace(ASSET_REQUIRE_RE, '{}');
++    if (!JSX_LIKE.test(stripped)) {
++      return stripped !== code ? { code: stripped, map: null } : undefined;
++    }
++    const out = babel.transformSync(stripped, {
+       filename: id,
+       babelrc: false,
+       configFile: false,

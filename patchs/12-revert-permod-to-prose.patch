@@ -1,0 +1,66 @@
+From 6d52b208565eb11deb5b03c7460e73efa4e52661 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Wed, 5 Aug 2026 06:26:28 +0000
+Subject: [PATCH] revert(ui): per-mod description back to prose
+ effectDescription (not +/- summary)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Патч 10 по ошибке заменил художественное описание мода на сухую сводку +/- ('-неточное', '+перебросить конечность'). Возвращаю текстовое описание effectDescription как было ('Убирает качество Неточное', 'При прицеливании можете перебросить кубик…'). Структурированные данные модификаторов (op/value) остаются — они для расчёта статов/эффектов, а описание — художественный текст. summarizeModChanges удалён. Фикс диапазона из патча 10 сохранён.
+---
+ .../modal/WeaponModificationModal.js          | 31 +------------------
+ 1 file changed, 1 insertion(+), 30 deletions(-)
+
+diff --git a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 817e4af..fbb87bb 100644
+--- a/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/components/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -72,35 +72,6 @@ function getModDisplayName(mod, weaponBaseName) {
+   return weaponBaseName ? declinePrefix(token, weaponBaseName) : token;
+ }
+ 
+-// Чистая сводка действия мода (без prose): Δ урона ({/CD}) / скорострельности /
+-// дистанции + имена добавленных/убранных эффектов и качеств. Никаких «Добавляет …».
+-function summarizeModChanges(mod) {
+-  if (!mod) return '';
+-  const parts = [];
+-  const s = (op) => (op === '-' ? '−' : '+');
+-  if (mod.damageModifier) {
+-    const { op, value } = mod.damageModifier;
+-    parts.push(op === 'set' ? `${tWeaponsAndArmorScreen('modals.weaponDamage')} ${value} {/CD}` : `${s(op)}${value} {/CD}`);
+-  }
+-  if (mod.fireRateModifier) {
+-    const { op, value } = mod.fireRateModifier;
+-    parts.push(`${s(op)}${value} ${tWeaponsAndArmorScreen('modals.weaponFireRate')}`);
+-  }
+-  if (mod.rangeModifier) {
+-    const { op, value } = mod.rangeModifier;
+-    parts.push(`${s(op)}${value} ${tWeaponsAndArmorScreen('modals.weaponRange')}`);
+-  }
+-  (mod.effectChanges || []).forEach((c) => {
+-    const name = resolveWeaponEffects([{ effectId: c.id, value: c.value }]) || c.id;
+-    parts.push(`${c.op === 'gain' ? '+' : '−'}${name}`);
+-  });
+-  (mod.qualityChanges || []).forEach((c) => {
+-    const name = resolveWeaponQualities([{ qualityId: c.id, value: c.value }]) || c.id;
+-    parts.push(`${c.op === 'gain' ? '+' : '−'}${name}`);
+-  });
+-  return parts.filter(Boolean).join(', ');
+-}
+-
+ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
+   const selectedMods = Object.values(selectedBySlot).filter(Boolean);
+   const baseName = baseWeapon.baseWeaponName ?? baseWeapon.name ?? '';
+@@ -443,7 +414,7 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+                     >
+                       <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
+                       <Text style={styles.modificationEffects}>
+-                        {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${summarizeModChanges(mod) || tWeaponsAndArmorScreen('common.empty')}`}
++                        {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
+                       </Text>
+                       <Text style={styles.modificationStats}>
+                         {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
+-- 
+2.47.3
+

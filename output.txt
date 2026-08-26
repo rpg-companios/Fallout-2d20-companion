@@ -1,0 +1,3871 @@
+
+===== src/store/saveSchema.js =====
+43 src/store/saveSchema.js
+// src/store/saveSchema.js
+//
+// ЕДИНСТВЕННЫЙ источник истины для версии формата сохранения персонажа.
+//
+// Правило (владелец):
+//   - Никогда не менять формат сохранения «на лету» в loadCharacter/serializers.
+//   - Любое изменение формата сохранения = новая версия + миграция в migrations.js.
+//   - Эта константа импортируется ВСЕМИ местами, которые пишут/читают schemaVersion,
+//     чтобы версия не разъезжалась по трём файлам (как было с хардкодом schemaVersion: 1).
+//
+// Значение: 0 = начальный (неверсированный) формат.
+// v1 — разделение эффектов (effect_) и качеств (quality_) в экипировке
+//       (см. MIGRATIONS[0] в migrations.js).
+// v2 — журнал уже выданных наград за отмеченные навыки.
+// v3 — normalize mutually exclusive weapon qualities in legacy saves.
+// v4 — damageType из строки в массив (поддержка комбинированного урона).
+// v5 — комплект снаряжения без метаданных → заглушка {id: null, name: null}.
+// v6 — ориджин «savage» переименован в «tribal».
+// v7 — «Опасная бритва» переведена на истинный id (weapon_switchblade) +
+//      baseName (вариант предмета; стек = id + моды + имя).
+// v8 — формальная одежда/шляпа Председателей получают качество «Элегантная»
+//      (uniqQualities) — для сейвов с комплектом из патча 63.
+// v9 — числовые статы предметов приведены к объекту { base, modifiers, total }.
+// v10 — ориджин «Тень»: полный сброс атрибутов к стартовым (STR/END 6,
+//       остальные 4) — лимиты SPECIAL не применялись до исправления формата
+//       трейта, сейвы могли содержать значения вне лимитов.
+// v11 — починка сейвов, повреждённых багом v9->v10 (attributes превращался
+//       из массива в объект): восстановление массива + повторный сброс Тени.
+// v12 — «Тень»: полный сброс состояния распределения (attributesSaved/
+//       skillsSaved = false, значения навыков к стартовым: tagged 2, иные 0) —
+//       очки атрибутов и навыков можно распределить заново; инвентарь не трогается.
+// v13 — «Тень»: сейвы хранят трейт целиком со старым форматом modifiers —
+//       чиним трейт в сейве (→ канонический attributes) и сбрасываем
+//       атрибуты/флаги/навыки к стартовым (инвентарь/уровень не трогаем).
+// v14 — «Тень»: старый комплект (default_caps_only) заменяется на NIGHTKIN;
+//       флаг nightkinKitPending — предметы выдаются после загрузки.
+// v15 — состояние универсальных проверок риска в текущей реальной сцене.
+// v16 — одноразовый модификатор сложности для следующей новой категории риска.
+export const CURRENT_SCHEMA_VERSION = 16;
+
+// Версия, которая ставится при отсутствии schemaVersion в сохранении
+// (старые сохранения без поля — считаем v0, текущим форматом).
+export const LEGACY_SCHEMA_VERSION = 0;
+
+===== src/store/migrations.js =====
+1074 src/store/migrations.js
+// src/store/migrations.js
+// Минимальные миграционные функции для перехода к нормализованному формату
+
+import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
+import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+import { catalogGetWeaponModById } from '../../db/catalogSource';
+import { generateItemId } from '../../domain/itemIdentity';
+import { getUniqQualityName } from '../../domain/registry';
+import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+import { debugLog } from '../debug/falloutDebug';
+
+
+/**
+ * Преобразует атрибуты из старого формата [{name, value}] в словарь
+ */
+export const normalizeAttributes = (attributesArray = []) => {
+  const result = {};
+  
+  attributesArray.forEach(attr => {
+    if (!attr?.name) return;
+    
+    const attrName = attr.name.toUpperCase();
+    result[attrName] = {
+      id: attrName,
+      base: Number(attr.value) || 0,
+      modifiers: [],
+      total: Number(attr.value) || 0,
+    };
+  });
+  
+  return result;
+};
+
+/**
+ * Преобразует навыки из старого формата [{name, value}] в словарь
+ */
+export const normalizeSkills = (skillsArray = []) => {
+  const result = {};
+  
+  skillsArray.forEach(skill => {
+    if (!skill?.name) return;
+    
+    result[skill.name] = {
+      id: skill.name,
+      base: Number(skill.value) || 0,
+      modifiers: [],
+      total: Number(skill.value) || 0,
+    };
+  });
+  
+  return result;
+};
+
+/**
+ * Преобразует предметы из старого формата (массив) в словарь
+ * Объединяет equipment.items и equippedWeapons в один словарь
+ * 
+ * ID предметов берется из item.id (человекопонятный ID из catalog:
+ * - оружие: 'weapon_10mm_pistol'
+ * - броня: 'armor_leather_chest_001'
+ * - одежда: 'leatherArmor_chest'
+ * - химия: 'chem_stimpak'
+ * - и т.д.)
+ */
+export const normalizeItems = (equipment = {}, equippedWeapons = []) => {
+  const result = {};
+  
+  // Сохраняем ВСЕ поля предмета при загрузке из БД — каталожные данные
+  // (вес/цена/эффект/имя) всё равно обогащаются на отображении через
+  // resolveItem по id, но сам инстанс обязан пройти сейв↔загрузку без потерь.
+  //
+  // Прежний короткий fieldsToCopy срезал weight/cost/qualities/effects/
+  // fire_rate/baseWeaponName/positiveEffect/hpHealed/value и т.д. — отсюда
+  // «вес/цена 0» у предметов и слёт пересчитанных статов модов оружия после
+  // перезагрузки персонажа из БД. Каталог = источник истины; инстанс — без потерь.
+  const copyItemFields = (item) => (item && typeof item === 'object' ? { ...item } : {});
+  
+  // Обычные предметы из инвентаря
+  const inventoryItems = equipment?.items || [];
+  inventoryItems.forEach(item => {
+    if (!item) return;
+    
+    // ID предмета — предпочитаем item.id, но принимаем любой доступный идентификатор
+    const itemId = item.id || item.weaponId || item.itemId || item.armorId || item.clothingId || item.code;
+    if (!itemId) return;
+    
+    // Determine if item is equipped (для брони/одежды в equipment.items)
+    const isEquipped = item.equipped === true || Boolean(item.equipInstanceId);
+    
+    // Создаем объект с минимальным набором полей
+    const normalizedItem = {
+      ...copyItemFields(item),
+      id: itemId,
+      equipped: isEquipped,
+    };
+    
+    // Преобразуем простые поля в нормализованные параметры
+    if (item.damage !== undefined) {
+      normalizedItem.damage = typeof item.damage === 'number' 
+        ? { base: item.damage, modifiers: [], total: item.damage }
+        : item.damage;
+    }
+    if (item.fireRate !== undefined) {
+      normalizedItem.fireRate = typeof item.fireRate === 'number' 
+        ? { base: item.fireRate, modifiers: [], total: item.fireRate }
+        : item.fireRate;
+    }
+    if (item.physicalDamageRating !== undefined) {
+      normalizedItem.physicalDamageRating = typeof item.physicalDamageRating === 'number' 
+        ? { base: item.physicalDamageRating, modifiers: [], total: item.physicalDamageRating }
+        : item.physicalDamageRating;
+    }
+    if (item.energyDamageRating !== undefined) {
+      normalizedItem.energyDamageRating = typeof item.energyDamageRating === 'number' 
+        ? { base: item.energyDamageRating, modifiers: [], total: item.energyDamageRating }
+        : item.energyDamageRating;
+    }
+    if (item.radiationDamageRating !== undefined) {
+      normalizedItem.radiationDamageRating = typeof item.radiationDamageRating === 'number' 
+        ? { base: item.radiationDamageRating, modifiers: [], total: item.radiationDamageRating }
+        : item.radiationDamageRating;
+    }
+    
+    result[itemId] = normalizedItem;
+  });
+  
+  // Экипированное оружие
+  equippedWeapons.forEach(item => {
+    if (!item) return;
+    
+    // ID предмета — предпочитаем item.id, но принимаем любой доступный идентификатор
+    const itemId = item.id || item.weaponId || item.itemId || item.armorId || item.clothingId || item.code;
+    if (!itemId) return;
+    
+    // Если предмет уже есть в словаре (из equipment.items), обновляем его
+    if (result[itemId]) {
+      result[itemId] = {
+        ...result[itemId],
+        equipped: true,
+      };
+    } else {
+      // Создаем объект с минимальным набором полей
+      const normalizedItem = {
+        ...copyItemFields(item),
+        id: itemId,
+        equipped: true,
+      };
+      
+      // Преобразуем простые поля в нормализованные параметры
+      if (item.damage !== undefined) {
+        normalizedItem.damage = typeof item.damage === 'number' 
+          ? { base: item.damage, modifiers: [], total: item.damage }
+          : item.damage;
+      }
+      if (item.fireRate !== undefined) {
+        normalizedItem.fireRate = typeof item.fireRate === 'number' 
+          ? { base: item.fireRate, modifiers: [], total: item.fireRate }
+          : item.fireRate;
+      }
+      if (item.physicalDamageRating !== undefined) {
+        normalizedItem.physicalDamageRating = typeof item.physicalDamageRating === 'number' 
+          ? { base: item.physicalDamageRating, modifiers: [], total: item.physicalDamageRating }
+          : item.physicalDamageRating;
+      }
+      if (item.energyDamageRating !== undefined) {
+        normalizedItem.energyDamageRating = typeof item.energyDamageRating === 'number' 
+          ? { base: item.energyDamageRating, modifiers: [], total: item.energyDamageRating }
+          : item.energyDamageRating;
+      }
+      if (item.radiationDamageRating !== undefined) {
+        normalizedItem.radiationDamageRating = typeof item.radiationDamageRating === 'number' 
+          ? { base: item.radiationDamageRating, modifiers: [], total: item.radiationDamageRating }
+          : item.radiationDamageRating;
+      }
+      
+      result[itemId] = normalizedItem;
+    }
+  });
+  
+  return result;
+};
+
+/**
+ * Преобразует эффекты из старого формата в словарь
+ */
+export const normalizeEffects = (activeTimedEffects = []) => {
+  const result = {};
+  
+  activeTimedEffects.forEach(effect => {
+    if (!effect?.id) return;
+    
+    result[effect.id] = {
+      id: effect.id,
+      name: effect.effectLabel || effect.effectName || 'Unnamed Effect',
+      effectName: effect.effectName,
+      effectLabel: effect.effectLabel,
+      effectKind: effect.effectKind,
+      type: effect.effectKind || 'positive',
+      active: true,
+      parameters: [],
+      maxHpModifier: effect.maxHpModifier,
+      damageResistanceModifier: effect.damageResistanceModifier,
+      isPermanent: effect.isPermanent,
+      effectType: effect.effectType,
+      conditionId: effect.conditionId,
+      createdAt: effect.createdAt,
+      expiresAt: effect.expiresAt,
+      durationMs: effect.durationMs,
+      scenesLeft: effect.scenesLeft || 0,
+      sourceName: effect.sourceName,
+    };
+  });
+  
+  return result;
+};
+
+/**
+ * Основная функция нормализации для загрузки данных из БД
+ * Alias for normalizeForStore to match naming convention
+ */
+export const normalizeCharacterState = (data = {}) => {
+  return normalizeForStore(data);
+};
+
+/**
+ * Основная функция нормализации для загрузки данных из БД
+ */
+export const normalizeForStore = (data = {}) => {
+  return {
+    attributes: normalizeAttributes(data.attributes),
+    skills: normalizeSkills(data.skills),
+    items: normalizeItems(data.equipment, data.equippedWeapons),
+    effects: normalizeEffects(data.activeTimedEffects),
+    rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+  };
+};
+
+/**
+ * Преобразует нормализованные атрибуты обратно в массив для базы данных
+ */
+export const denormalizeAttributes = (attributesDict = {}) => {
+  return Object.values(attributesDict).map(attr => ({
+    name: attr.id,
+    value: attr.base,
+  }));
+};
+
+/**
+ * Преобразует нормализованные навыки обратно в массив для базы данных
+ */
+export const denormalizeSkills = (skillsDict = {}) => {
+  return Object.values(skillsDict).map(skill => ({
+    name: skill.id,
+    value: skill.base,
+  }));
+};
+
+/**
+ * Преобразует нормализованные предметы обратно в разделенные массивы
+ */
+export const denormalizeItems = (itemsDict = {}) => {
+  const equipment = { items: [] };
+  const equippedWeapons = [];
+  
+  Object.values(itemsDict).forEach(item => {
+    const simpleItem = { ...item };
+    
+    // Убираем нормализованные параметры
+    delete simpleItem.modifiers;
+    if (simpleItem.damage && typeof simpleItem.damage === 'object') {
+      simpleItem.damage = simpleItem.damage.base;
+    }
+    if (simpleItem.fireRate && typeof simpleItem.fireRate === 'object') {
+      simpleItem.fireRate = simpleItem.fireRate.base;
+    }
+    if (simpleItem.physicalDamageRating && typeof simpleItem.physicalDamageRating === 'object') {
+      simpleItem.physicalDamageRating = simpleItem.physicalDamageRating.base;
+    }
+    if (simpleItem.energyDamageRating && typeof simpleItem.energyDamageRating === 'object') {
+      simpleItem.energyDamageRating = simpleItem.energyDamageRating.base;
+    }
+    if (simpleItem.radiationDamageRating && typeof simpleItem.radiationDamageRating === 'object') {
+      simpleItem.radiationDamageRating = simpleItem.radiationDamageRating.base;
+    }
+    
+    if (item.equipped && item.itemType === 'weapon') {
+      equippedWeapons.push(simpleItem);
+    } else {
+      equipment.items.push(simpleItem);
+    }
+  });
+  
+  return { equipment, equippedWeapons };
+};
+
+/**
+ * Преобразует нормализованные эффекты обратно в массив
+ */
+export const denormalizeEffects = (effectsDict = {}) => {
+  return Object.values(effectsDict)
+    .filter(effect => effect.active)
+    .map(effect => ({
+      id: effect.id,
+      effectName: effect.effectName ?? effect.name,
+      effectLabel: effect.effectLabel ?? effect.name,
+      effectKind: effect.effectKind ?? effect.type,
+      maxHpModifier: effect.maxHpModifier,
+      damageResistanceModifier: effect.damageResistanceModifier,
+      isPermanent: effect.isPermanent,
+      effectType: effect.effectType,
+      conditionId: effect.conditionId,
+      createdAt: effect.createdAt,
+      expiresAt: effect.expiresAt,
+      durationMs: effect.durationMs,
+      scenesLeft: effect.scenesLeft || 0,
+      sourceName: effect.sourceName,
+    }));
+};
+
+/**
+ * Основная функция денормализации для сохранения в БД
+ */
+export const denormalizeForSave = (storeState = {}) => {
+  const { equipment, equippedWeapons } = denormalizeItems(storeState.items || {});
+  
+  return {
+    attributes: denormalizeAttributes(storeState.attributes || {}),
+    skills: denormalizeSkills(storeState.skills || {}),
+    equipment,
+    equippedWeapons,
+    activeTimedEffects: denormalizeEffects(storeState.effects || {}),
+    rewardedSkills: Array.isArray(storeState.rewardedSkills) ? storeState.rewardedSkills : [],
+  };
+};
+
+/**
+ * Alias for denormalizeForSave to match naming convention
+ */
+export const denormalizeCharacterState = (storeState = {}) => {
+  return denormalizeForSave(storeState);
+};
+
+// ---------------------------------------------------------------------------
+// Версионированные миграции сохранения персонажа
+// ---------------------------------------------------------------------------
+//
+// Механизм конвертации старых сохранений в новый формат, чтобы не «плодить
+// fallback» в loadCharacter. Каждая миграция — чистая функция (state) => state',
+// которая переводит сохранение РОВНО на одну версию вперёд.
+//
+// Правила (владелец):
+//   - Индекс миграции в массиве = версия, ИЗ которой она переводит (MIGRATIONS[v0] -> v1).
+//   - Миграция должна быть чистой и идемпотентной: повторный прогон не ломает данные.
+//   - Никогда не удаляй старые миграции — только добавляй новые в конец.
+//   - Новое поле в сохранении = новая миграция, а НЕ `|| fallback` в loadCharacter.
+
+/**
+ * Последовательно применяет миграции, пока состояние не достигнет
+ * CURRENT_SCHEMA_VERSION. Сохранения с неизвестной/будущей версией
+ * не трогаются (вернём как есть), чтобы не повредить данные.
+ */
+export function migrateCharacterState(data) {
+  if (!data || typeof data !== 'object') return data;
+
+  let state = { ...data };
+  const fromVersion = Number.isInteger(state.schemaVersion)
+    ? state.schemaVersion
+    : LEGACY_SCHEMA_VERSION;
+
+  if (fromVersion >= CURRENT_SCHEMA_VERSION) {
+    return state;
+  }
+
+  let version = fromVersion;
+  while (version < CURRENT_SCHEMA_VERSION) {
+    const migrate = MIGRATIONS[version];
+    if (typeof migrate !== 'function') {
+      // Нет миграции для этой версии — не знаем, как преобразовать. Не ломаем данные.
+      break;
+    }
+    state = migrate(state) || state;
+    version += 1;
+    state.schemaVersion = version;
+  }
+
+  return state;
+}
+
+/**
+ * Реестр миграций по версиям.
+ * MIGRATIONS[0] — переход v0 -> v1, MIGRATIONS[1] — v1 -> v2, и т.д.
+ */
+
+// --- v0 -> v1: разделение эффектов (effect_) и качеств (quality_) в экипировке ---
+// В старых сохранениях экипированное оружие хранило качества вперемешку
+// (quality_burst и пр. — теперь это effect_*) и/или поле damageEffects
+// (голые строки). Миграция разводит их по effects/qualities с прямыми id,
+// точно как в data-миграции (патчи 09/11). Идемпотентна.
+const _EFFECT_OLD_IDS = new Set([
+  'quality_burst', 'quality_breaking', 'quality_persistent', 'quality_piercing_x',
+  'quality_radioactive', 'quality_spread', 'quality_stun', 'quality_vicious',
+  'quality_freeze', 'quality_arc',
+]);
+const _ID_RENAME_V0V1 = {
+  quality_burst: 'effect_burst', quality_breaking: 'effect_breaking',
+  quality_persistent: 'effect_persistent', quality_piercing_x: 'effect_piercing_x',
+  quality_radioactive: 'effect_radioactive', quality_spread: 'effect_spread',
+  quality_stun: 'effect_stun', quality_vicious: 'effect_vicious',
+  quality_freeze: 'effect_freeze', quality_arc: 'effect_arc',
+  quality_supressed: 'quality_suppressed',
+};
+const _BARE_TO_EFFECT = {
+  burst: 'effect_burst', piercing: 'effect_piercing_x', persistent: 'effect_persistent',
+  spread: 'effect_spread', vicious: 'effect_vicious', stun: 'effect_stun',
+  radioactive: 'effect_radioactive', breaking: 'effect_breaking', arc: 'effect_arc',
+  freeze: 'effect_freeze',
+};
+const _isEffectId = (id) => String(id).startsWith('effect_');
+const _remapIdV0V1 = (old) => (old === 'quality_silent' ? 'quality_suppressed' : (_ID_RENAME_V0V1[old] || old));
+
+const _migrateEquippedEntryV0V1 = (entry) => {
+  if (!entry || typeof entry !== 'object') return entry;
+  const effectsMap = new Map();
+  (entry.effects || []).forEach((e) => {
+    const id = (e && e.effectId) || e;
+    if (id) effectsMap.set(id, e && e.value != null ? { effectId: id, value: e.value } : { effectId: id });
+  });
+  const qualities = [];
+  (entry.qualities || []).forEach((q) => {
+    const oldId = (q && q.qualityId) || q;
+    const id = _remapIdV0V1(oldId);
+    if (_isEffectId(id)) effectsMap.set(id, q && q.value != null ? { effectId: id, value: q.value } : { effectId: id });
+    else if (id) qualities.push(q && q.value != null ? { qualityId: id, value: q.value } : { qualityId: id });
+  });
+  (entry.damageEffects || []).forEach((name) => {
+    const id = _BARE_TO_EFFECT[name] || name;
+    if (id) effectsMap.set(id, { effectId: id });
+  });
+  const out = { ...entry };
+  out.effects = [...effectsMap.values()];
+  out.qualities = qualities;
+  delete out.damageEffects;
+  delete out.damage_effects;
+  return out;
+};
+
+const MIGRATIONS = [
+  // v0 -> v1: разделить эффекты/качества в экипированном оружии.
+  (state) => {
+    const next = { ...state };
+    if (Array.isArray(next.equippedWeapons)) {
+      next.equippedWeapons = next.equippedWeapons.map(_migrateEquippedEntryV0V1);
+    }
+    return next;
+  },
+  // v1 -> v2: existing saved characters have already received their initial
+  // tagged-skill rewards, so seed their reward journal to prevent duplication.
+  (state) => {
+    const next = { ...state };
+    if (!Array.isArray(next.rewardedSkills)) {
+      next.rewardedSkills = next.skillsSaved
+        ? [...new Set([...(next.selectedSkills || []), ...(next.extraTaggedSkills || [])])]
+        : [];
+    }
+    return next;
+  },
+  // v2 -> v3: a weapon cannot retain both members of an opposite-quality pair.
+  // The final saved order is authoritative, so the last conflicting quality wins.
+  (state) => {
+    const normalizeWeapon = (item) => {
+      if (!item || typeof item !== 'object') return item;
+      const raw = item.qualities;
+      if (Array.isArray(raw)) return { ...item, qualities: resolveMutuallyExclusiveQualities(raw) };
+      if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return { ...item, qualities: JSON.stringify(resolveMutuallyExclusiveQualities(parsed)) };
+        } catch (_) {}
+      }
+      return item;
+    };
+    return {
+      ...state,
+      equipment: state.equipment
+        ? { ...state.equipment, items: (state.equipment.items || []).map(normalizeWeapon) }
+        : state.equipment,
+      equippedWeapons: Array.isArray(state.equippedWeapons)
+        ? state.equippedWeapons.map(normalizeWeapon)
+        : state.equippedWeapons,
+    };
+  },
+
+  // v3 -> v4: damageType из строки в массив (поддержка комбинированного урона).
+  // Миграция преобразует все damageType (строка) в массивы в предметах.
+  // Также пересчитывает моды для оружия, чтобы применить новые damageTypeOverride.
+  // Идемпотентна: если уже массив — не трогает.
+  (state) => {
+    const migrateDamageType = (item) => {
+      if (!item || typeof item !== 'object') return item;
+
+      // Мигрируем damageType и damage_type
+      const migrateField = (value) => {
+        if (!value) return value;
+
+        // Если уже массив — не трогаем
+        if (Array.isArray(value)) return value;
+
+        // Если JSON-строка массива — парсим
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            // Это обычная строка, оборачиваем в массив
+            return [value];
+          }
+        }
+
+        // Обёртываем строку в массив
+        return [value];
+      };
+
+      const out = { ...item };
+
+      if (out.damageType !== undefined) {
+        out.damageType = migrateField(out.damageType);
+      }
+      if (out.damage_type !== undefined) {
+        out.damage_type = migrateField(out.damage_type);
+      }
+
+      return out;
+    };
+
+    // Пересчитываем моды для оружия (применяем новые damageTypeOverride из каталога)
+    const recalculateWeaponMods = (item) => {
+      if (!item || item.itemType !== 'weapon' || !item.appliedMods) return item;
+
+      try {
+        let updatedItem = { ...item };
+        const appliedMods = item.appliedMods || {};
+
+        Object.entries(appliedMods).forEach(([slot, modId]) => {
+          const mod = catalogGetWeaponModById(modId);
+          if (!mod || !mod.damageTypeOverride) return;
+
+          const { op, value } = mod.damageTypeOverride;
+
+          // Получаем текущий damageType
+          let currentType = updatedItem.damageType;
+          if (typeof currentType === 'string') {
+            try {
+              currentType = JSON.parse(currentType);
+            } catch {
+              currentType = [currentType];
+            }
+          }
+          if (!Array.isArray(currentType)) {
+            currentType = currentType ? [currentType] : ['physical'];
+          }
+
+          if (op === 'set') {
+            updatedItem.damageType = Array.isArray(value) ? value : [value];
+          } else if (op === 'add') {
+            const typesToAdd = Array.isArray(value) ? value : [value];
+            for (const t of typesToAdd) {
+              if (!currentType.includes(t)) {
+                currentType.push(t);
+              }
+            }
+            updatedItem.damageType = currentType;
+          }
+        });
+
+        return updatedItem;
+      } catch (error) {
+        // Если пересчёт модов не удался (например, каталог не загружен),
+        // возвращаем предмет с мигрированным damageType, но без пересчёта модов.
+        // Моды пересчитаются при следующем открытии модалки модов.
+        debugLog('migration.v4.weaponModsRecalculationFailed', { message: error?.message });
+        return item;
+      }
+    };
+
+    return {
+      ...state,
+      items: state.items
+        ? Object.fromEntries(
+            Object.entries(state.items).map(([id, item]) => {
+              const migrated = migrateDamageType(item);
+              return [id, recalculateWeaponMods(migrated)];
+            })
+          )
+        : state.items,
+      equipment: state.equipment
+        ? { ...state.equipment, items: (state.equipment.items || []).map(item => recalculateWeaponMods(migrateDamageType(item))) }
+        : state.equipment,
+      equippedWeapons: Array.isArray(state.equippedWeapons)
+        ? state.equippedWeapons.map(item => recalculateWeaponMods(migrateDamageType(item)))
+        : state.equippedWeapons,
+    };
+  },
+
+  // v4 -> v5: старый сейв, где комплект потерял id/name ({items} без метаданных).
+  // Комплект по сути нужен только для выдачи снаряжения; если предметы на месте,
+  // а какой именно был комплект — неизвестно, проставляем заглушку: id: null,
+  // name: «Комплект снаряжения». UI при нажатии на заглушку покажет список
+  // комплектов, а выбор конкретного предложит сброс (т.к. персонаж locked).
+  (state) => {
+    const next = { ...state };
+    const equipment = next.equipment;
+    if (!equipment || typeof equipment !== 'object') return next;
+    // Уже есть id — не трогаем.
+    if (equipment.id) return next;
+    // Есть предметы (снаряжение получено), но id нет — ставим заглушку.
+    const savedItems = Array.isArray(equipment.items) ? equipment.items : [];
+    if (savedItems.length === 0) return next;
+    next.equipment = {
+      ...equipment,
+      id: null,
+      name: null, // name подставит UI (i18n-ключ заглушки)
+    };
+    return next;
+  },
+
+  // v5 -> v6: ориджин «savage» переименован в «tribal» (каноническое англ.
+  // название — Tribal; savage был заглушкой). Старые сейвы с origin.id
+  // 'savage' переводятся на 'tribal', иначе персонаж потеряет ориджин.
+  (state) => {
+    const next = { ...state };
+    const origin = next.origin;
+    if (!origin) return next;
+    const originId = typeof origin === 'string' ? origin : origin?.id;
+    if (originId === 'savage') {
+      next.origin = typeof origin === 'string'
+        ? 'tribal'
+        : { ...origin, id: 'tribal' };
+    }
+    return next;
+  },
+
+  // v6 -> v7: «Опасная бритва» — вариант выкидного ножа (trueItemId +
+  // replaceOriginalNameTo): для программы это нож (истинный id), стек
+  // разделяется именем (baseName). Старые сейвы (патч 63) хранили бритву
+  // отдельным предметом weapon_straight_razor — переводим на истинный id
+  // и пересобираем id/stackKey по правилу «id + моды + имя».
+  (state) => {
+    const next = { ...state };
+    const collections = [];
+    if (Array.isArray(next.equipment?.items)) collections.push(next.equipment.items);
+    if (Array.isArray(next.equippedWeapons)) collections.push(next.equippedWeapons);
+    if (collections.length === 0) return state;
+
+    // Отрезаем префиксы установленных модов от сохранённого имени:
+    // «Зазубренное лезвие Опасная бритва» → «Опасная бритва».
+    const stripModPrefixes = (name, appliedMods) => {
+      if (!name) return name;
+      let out = String(name);
+      for (const modId of Object.values(appliedMods || {})) {
+        const mod = catalogGetWeaponModById(modId);
+        const prefix = mod?.prefix;
+        if (prefix && out.startsWith(`${prefix} `)) out = out.slice(prefix.length + 1);
+      }
+      return out.trim();
+    };
+
+    let changed = false;
+    for (const collection of collections) {
+      for (let i = 0; i < collection.length; i += 1) {
+        const item = collection[i];
+        if (!item || item.weaponId !== 'weapon_straight_razor') continue;
+        changed = true;
+        const baseName = stripModPrefixes(item.name, item.appliedMods) || '';
+        const rewritten = {
+          ...item,
+          weaponId: 'weapon_switchblade',
+          ...(baseName ? { baseName } : {}),
+        };
+        const newId = generateItemId(rewritten.weaponId, rewritten.appliedMods || {}, rewritten.baseName || '');
+        collection[i] = { ...rewritten, id: newId, stackKey: newId };
+      }
+    }
+    return changed ? next : state;
+  },
+
+  // v7 -> v8: качество «Элегантная» у формальной одежды/шляпы Председателей
+  // (патч 67). Старые сейвы (комплект с патча 63) хранят одежду без качества —
+  // если персонаж из семьи Председателей, одежда/шляпа получают
+  // uniqQualities ['elegant'], пересобираются id/stackKey (учитывают качество)
+  // и имя («Элегантная Формальная одежда»).
+  (state) => {
+    const next = { ...state };
+    const trait = next.trait;
+    const isChairmen = Boolean(
+      trait
+      && (trait.id === 'treefamilies-chairmen'
+        || (Array.isArray(trait.ids) && trait.ids.includes('treefamilies-chairmen'))),
+    );
+    if (!isChairmen) return state;
+    const collections = [];
+    if (Array.isArray(next.equipment?.items)) collections.push(next.equipment.items);
+    if (Array.isArray(next.equippedWeapons)) collections.push(next.equippedWeapons);
+    if (collections.length === 0) return state;
+
+    const ELEGANT_CLOTHING_IDS = new Set(['clothing_fancy_clothes', 'headwear_fancy_hat']);
+    const qualityName = getUniqQualityName('elegant');
+    let changed = false;
+    for (const collection of collections) {
+      for (let i = 0; i < collection.length; i += 1) {
+        const item = collection[i];
+        if (!item) continue;
+        const baseId = item.weaponId || item.id || item.clothingId || item.itemId;
+        if (!ELEGANT_CLOTHING_IDS.has(baseId)) continue;
+        if (Array.isArray(item.uniqQualities) && item.uniqQualities.includes('elegant')) continue;
+        changed = true;
+        // Имя уже начинается с качества (было выдано после 67, но поле
+        // потеряно) — не дублируем; иначе собираем «Элегантная» + имя.
+        const name = qualityName && item.name && item.name.startsWith(`${qualityName} `)
+          ? item.name
+          : composeNameWithUniqQualities(item.name || baseId, ['elegant'], getUniqQualityName);
+        const newId = generateItemId(baseId, {}, undefined, undefined, ['elegant']);
+        collection[i] = {
+          ...item,
+          uniqQualities: ['elegant'],
+          name: name || item.name,
+          id: newId,
+          stackKey: newId,
+        };
+      }
+    }
+    return changed ? next : state;
+  },
+
+  // v8 -> v9: старые сейвы хранят числовые статы предметов (damage,
+  // fireRate, защиты брони) строками/числами ("2", 5). Текущий формат —
+  // объект { base, modifiers, total }. Приводим все предметы к объекту,
+  // чтобы нормализаторы не пытались писать .total в примитив.
+  (state) => {
+    const toParam = (value) => {
+      if (value === undefined || value === null || value === '') return undefined;
+      if (typeof value === 'number') return { base: value, modifiers: [], total: value };
+      if (typeof value === 'object') return value;
+      const n = Number(value);
+      return Number.isNaN(n) ? value : { base: n, modifiers: [], total: n };
+    };
+    const migrateItem = (item) => {
+      if (!item || typeof item !== 'object') return item;
+      const out = { ...item };
+      if ('damage' in out) out.damage = toParam(out.damage);
+      if ('fireRate' in out) out.fireRate = toParam(out.fireRate);
+      if ('physicalDamageRating' in out) out.physicalDamageRating = toParam(out.physicalDamageRating);
+      if ('energyDamageRating' in out) out.energyDamageRating = toParam(out.energyDamageRating);
+      if ('radiationDamageRating' in out) out.radiationDamageRating = toParam(out.radiationDamageRating);
+      return out;
+    };
+    const migrateWeapon = (w) => {
+      if (!w) return w;
+      const out = migrateItem(w);
+      // встроенное оружие конечностей робота лежит в limb.builtinWeapons
+      if (Array.isArray(out.builtinWeapons)) {
+        out.builtinWeapons = out.builtinWeapons.map(migrateWeapon);
+      }
+      return out;
+    };
+    const migrateSlot = (slot) => {
+      if (!slot || typeof slot !== 'object') return slot;
+      return {
+        ...slot,
+        // limb может содержать встроенное оружие (builtinWeapons) — мигрируем его целиком.
+        limb: migrateWeapon(slot.limb),
+        heldWeapon: migrateWeapon(slot.heldWeapon),
+      };
+    };
+
+    let changed = false;
+    const next = { ...state };
+
+    if (Array.isArray(next.equipment?.items)) {
+      next.equipment = { ...next.equipment, items: next.equipment.items.map(migrateItem) };
+      changed = true;
+    }
+    if (Array.isArray(next.equippedWeapons)) {
+      next.equippedWeapons = next.equippedWeapons.map(migrateWeapon);
+      changed = true;
+    }
+    if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
+      const slots = {};
+      for (const [k, v] of Object.entries(next.equippedRobotSlots)) slots[k] = migrateSlot(v);
+      next.equippedRobotSlots = slots;
+      changed = true;
+    }
+
+    return changed ? next : state;
+  },
+
+  // v9 -> v10: ориджин «Тень» (shadow) — лимиты SPECIAL не применялись
+  // (трейт объявлял их в формате attributeBonus/attributeLimits, который
+  // движок не читал; формат исправлен на канонический attributes).
+  // Уже созданные персонажи-Тени могли иметь атрибуты ВНЕ лимитов
+  // (STR/END <6 или >12, CHA/INT >8). Решение владельца: ПОЛНЫЙ сброс
+  // всех атрибутов Тени к стартовым значениям — STR/END = 6 (4 + бонус 2),
+  // остальные = 4; очки возвращаются в пул распределения. Навыки и
+  // остальные данные не трогаются.
+  //
+  // ВАЖНО: атрибуты в сейве — МАССИВ [{ name, value }] (формат БД/контекста).
+  // (Первая версия этой миграции обрабатывала их как словарь и ломала
+  // формат — исправлено в v9->v10, починка повреждённых сейвов — v10->v11.)
+  (state) => {
+    const next = { ...state };
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    const isShadow = traitId === 'shadow' || originId === 'shadow';
+    if (!isShadow) return state;
+
+    const attrs = next.attributes;
+    if (!Array.isArray(attrs)) return state;
+
+    const SHADOW_START = {
+      STR: 6, // 4 + бонус 2
+      END: 6,
+      PER: 4,
+      AGI: 4,
+      INT: 4,
+      CHA: 4,
+      LCK: 4,
+    };
+    next.attributes = attrs.map((attr) => {
+      if (!attr || typeof attr !== 'object') return attr;
+      const name = String(attr.name || '').toUpperCase();
+      const start = SHADOW_START[name];
+      if (start === undefined) return attr; // неизвестные атрибуты не трогаем
+      return { ...attr, name, value: start };
+    });
+    return next;
+  },
+
+  // v10 -> v11: починка сейвов, повреждённых багом первой версии миграции
+  // v9->v10 (атрибуты превращались из массива [{ name, value }] в объект
+  // { '0': {...}, '1': {...} } — приложение падало с
+  // «attributes.find is not a function»). Восстанавливаем массив и для
+  // Тени повторно применяем сброс к стартовым значениям.
+  (state) => {
+    const next = { ...state };
+    const attrs = next.attributes;
+    if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) return state;
+
+    const values = Object.values(attrs);
+    const looksLikeAttributes = values.length > 0
+      && values.every((v) => v && typeof v === 'object' && (v.name !== undefined || v.id !== undefined));
+    if (!looksLikeAttributes) return state;
+
+    // восстановление массива в формате БД [{ name, value }]
+    next.attributes = values.map((v) => ({
+      name: v.name || v.id || '',
+      value: v.value ?? v.base ?? v.total ?? 0,
+    }));
+
+    // если персонаж — Тень, повторно сбрасываем атрибуты к стартовым
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return next;
+
+    const SHADOW_START = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    next.attributes = next.attributes.map((attr) => {
+      if (!attr || typeof attr !== 'object') return attr;
+      const name = String(attr.name || '').toUpperCase();
+      const start = SHADOW_START[name];
+      if (start === undefined) return attr;
+      return { ...attr, name, value: start };
+    });
+    return next;
+  },
+
+  // v11 -> v12: «Тень» — полный сброс состояния распределения очков.
+  // Решение владельца (уточнено): персонаж должен выглядеть как после
+  // создания — можно заново распределить и АТРИБУТЫ, и НАВЫКИ.
+  // Сбрасываем флаги attributesSaved/skillsSaved (иначе UI считает очки
+  // распределёнными и не показывает их) и значения навыков к стартовым
+  // (отмеченные (tagged) = 2, остальные = 0). Оружие/предметы/уровень/
+  // ориджин/трейт/выбор отмеченных навыков — НЕ трогаем (награды за
+  // отмеченные навыки не задвоятся: журнал rewardedSkills сохраняется).
+  (state) => {
+    const next = { ...state };
+    const traitId = typeof next.trait === 'string' ? next.trait : next.trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return state;
+
+    const tagged = new Set([
+      ...(Array.isArray(next.selectedSkills) ? next.selectedSkills : []),
+      ...(Array.isArray(next.extraTaggedSkills) ? next.extraTaggedSkills : []),
+    ]);
+
+    let changed = false;
+    if (next.attributesSaved !== false) { next.attributesSaved = false; changed = true; }
+    if (next.skillsSaved !== false) { next.skillsSaved = false; changed = true; }
+
+    if (Array.isArray(next.skills)) {
+      next.skills = next.skills.map((skill) => {
+        if (!skill || typeof skill !== 'object') return skill;
+        const name = String(skill.name || '');
+        const start = tagged.has(name) ? 2 : 0;
+        if (Number(skill.value) === start) return skill;
+        changed = true;
+        return { ...skill, name, value: start };
+      });
+    }
+
+    return changed ? next : state;
+  },
+
+  // v12 -> v13: сейвы Тени, созданные/пересохранённые до исправления трейта,
+  // хранят трейт ЦЕЛИКОМ со старым форматом modifiers (attributeBonus/
+  // attributeLimits). При загрузке используется трейт из сейва (setTrait),
+  // а не из файла данных — поэтому бонусы/лимиты не работают даже при
+  // исправленном traits.json. Чиним трейт в сейве (→ канонический
+  // attributes) и, так как бонусы ранее не применялись (атрибуты могли
+  // остаться 4/4), сбрасываем атрибуты Тени к стартовым (STR/END 6,
+  // остальные 4), флаги распределения и навыки к стартовым
+  // (tagged 2, иные 0). Инвентарь/уровень/награды не трогаем.
+  // Если трейт уже канонический — сейв не трогаем (защита от повторного
+  // сброса уже перераспределённого персонажа).
+  (state) => {
+    const next = { ...state };
+    const trait = next.trait;
+    const traitId = typeof trait === 'string' ? trait : trait?.id;
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (traitId !== 'shadow' && originId !== 'shadow') return state;
+    if (!trait || typeof trait !== 'object' || !trait.modifiers) return state;
+    const m = trait.modifiers;
+    if (!m.attributeLimits && !m.attributeBonus) return state; // уже канонический
+
+    const attributes = {
+      STR: { baseBonus: m.attributeBonus?.STR ?? 0, min: m.attributeLimits?.STR?.min ?? 4, max: m.attributeLimits?.STR?.max ?? 10 },
+      END: { baseBonus: m.attributeBonus?.END ?? 0, min: m.attributeLimits?.END?.min ?? 4, max: m.attributeLimits?.END?.max ?? 10 },
+      CHA: { max: m.attributeLimits?.CHA?.max ?? 10 },
+      INT: { max: m.attributeLimits?.INT?.max ?? 10 },
+    };
+    const newModifiers = { attributes };
+    for (const key of ['skillMaxValue', 'immunities', 'effects', 'armorConstraint',
+      'skillPickSelected', 'goodSoulSelectedSkills', 'forcedSkills']) {
+      if (m[key] !== undefined) newModifiers[key] = m[key];
+    }
+    next.trait = { ...trait, modifiers: newModifiers };
+
+    const start = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    if (Array.isArray(next.attributes)) {
+      next.attributes = next.attributes.map((a) =>
+        a && typeof a === 'object' && start[a.name] !== undefined
+          ? { ...a, name: a.name, value: start[a.name] }
+          : a);
+    }
+    next.attributesSaved = false;
+    next.skillsSaved = false;
+    if (Array.isArray(next.skills)) {
+      const tagged = new Set([
+        ...(Array.isArray(next.selectedSkills) ? next.selectedSkills : []),
+        ...(Array.isArray(next.extraTaggedSkills) ? next.extraTaggedSkills : []),
+      ]);
+      next.skills = next.skills.map((s) =>
+        s && typeof s === 'object' && s.name
+          ? { ...s, name: s.name, value: tagged.has(s.name) ? 2 : 0 }
+          : s);
+    }
+    return next;
+  },
+
+  // v13 -> v14: Тень со старым комплектом («Стартовый капитал»,
+  // default_caps_only) получает новый комплект NIGHTKIN.
+  // Синхронная часть: заменяем метаданные комплекта и ставим флаг
+  // nightkinKitPending=true — предметы выдаются ПОСЛЕ загрузки
+  // (resolveKitItems асинхронный: rollTable бросает кубики),
+  // см. loadCharacter в CharacterContext.
+  (state) => {
+    const next = { ...state };
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    if (originId !== 'shadow') return state;
+    const equipment = next.equipment;
+    if (!equipment || typeof equipment !== 'object') return state;
+    const kitId = equipment.id;
+    if (kitId === 'nightkin') return state; // уже новый комплект
+    if (kitId !== 'default_caps_only' && kitId != null) return state; // не стартовый капитал
+
+    // Заменяем метаданные комплекта; предметы выдадим после загрузки.
+    next.equipment = {
+      ...equipment,
+      id: 'nightkin',
+      name: 'Тень',
+      items: [],
+    };
+    next.nightkinKitPending = true;
+    return next;
+  },
+
+  // v14 -> v15: каноническое состояние универсальных рисков текущей
+  // реальной сцены. Конкретные rule id добавляются по первому событию;
+  // миграция не подменяется load-time fallback в CharacterContext.
+  (state) => ({
+    ...state,
+    sceneRiskStates: {},
+  }),
+
+  // v15 -> v16: осложнения больше не накапливаются до конца сцены. Поле
+  // хранит только модификатор для одной следующей новой категории события.
+  (state) => {
+    if (
+      !state.sceneRiskStates
+      || typeof state.sceneRiskStates !== 'object'
+      || Array.isArray(state.sceneRiskStates)
+    ) {
+      throw new Error('[migrations] v15 sceneRiskStates must be an object');
+    }
+    const sceneRiskStates = Object.fromEntries(
+      Object.entries(state.sceneRiskStates).map(([ruleId, sceneState]) => {
+        if (
+          !sceneState
+          || typeof sceneState !== 'object'
+          || Array.isArray(sceneState)
+          || !Number.isInteger(sceneState.difficultyModifier)
+          || sceneState.difficultyModifier < 0
+        ) {
+          throw new Error(`[migrations] Invalid v15 scene-risk state for rule "${ruleId}"`);
+        }
+        const { difficultyModifier, ...unchanged } = sceneState;
+        return [ruleId, {
+          ...unchanged,
+          pendingDifficultyModifier: difficultyModifier,
+        }];
+      }),
+    );
+    return { ...state, sceneRiskStates };
+  },
+
+];
+/**
+ * Мерж комплекта снаряжения при сохранении снапшота.
+ *
+ * Проблема: denormalizeForSave отдаёт equipment как { items: [...] } — БЕЗ
+ * метаданных (id/name/weight/price). preferFilled отдавал предпочтение стору,
+ * и метаданные выбранного комплекта терялись → после перезагрузки комплект
+ * не отображался, а клик по нему «предлагал сбросить».
+ *
+ * Правило: метаданные — из снапшота (контекст хранит выбранный комплект),
+ * items — из стора (там ВСЕ предметы: комплект + купленные/лут), чтобы ничего
+ * не терять. Если комплект не выбран — возвращаем {items} (или null, если
+ * предметов нет).
+ */
+export const mergeEquipmentWithStore = (snapshotEquipment, storeEquipment) => {
+  const storeItems = Array.isArray(storeEquipment?.items) ? storeEquipment.items : [];
+  if (!snapshotEquipment) {
+    return storeItems.length > 0 ? { items: storeItems } : null;
+  }
+  return { ...snapshotEquipment, items: storeItems };
+};
+
+/**
+ * Мерж списков оружия при сохранении снапшота: снапшот — источник метаданных
+ * (встроенные кулаки у людей и т.п.), стор — источник «живых» предметов.
+ * Объединяем по id без дублей.
+ */
+export const mergeEquippedWeapons = (snapshotWeapons, storeWeapons) => {
+  const snapshotList = Array.isArray(snapshotWeapons) ? snapshotWeapons : [];
+  const storeList = Array.isArray(storeWeapons) ? storeWeapons : [];
+  const seen = new Set();
+  const merged = [];
+  [...snapshotList, ...storeList].forEach((w) => {
+    if (!w) return;
+    const id = w.id || w.weaponId || w.uniqueId;
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    merged.push(w);
+  });
+  return merged;
+};
+
+===== domain/perks.js =====
+168 domain/perks.js
+// domain/perks.js
+// Utilities to evaluate perk requirements and aggregate perk effects.
+
+import { getCanonicalAttributeKey } from './characterCreation';
+import { getPerkEffect } from './perks/index';
+
+const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+
+const getPath = (source, path) => {
+    if (!source || !path) return undefined;
+    return String(path).split('.').reduce((current, key) => {
+        if (current == null) return undefined;
+        return current[key];
+    }, source);
+};
+
+const toSelectedPerkId = (selected) => {
+    if (!selected) return null;
+    if (typeof selected === 'string') return selected;
+    return selected.id || selected.perkId || null;
+};
+
+const toSelectedPerkRank = (selected) => {
+    if (!selected || typeof selected === 'string') return 1;
+    return Number(selected.rank || selected.ranks || selected.count || 1) || 1;
+};
+
+/**
+ * Build a quick lookup map for current attribute values by canonical SPECIAL code.
+ */
+export function buildAttributeValueMap(attributes) {
+    if (isObject(attributes)) {
+        return Object.entries(attributes).reduce((acc, [key, attr]) => {
+            const canonical = getCanonicalAttributeKey(attr?.id || key) || key;
+            acc[canonical] = attr?.total ?? attr?.value ?? attr?.base ?? 0;
+            return acc;
+        }, {});
+    }
+
+    const map = {};
+    for (const attr of attributes || []) {
+        const key = getCanonicalAttributeKey(attr.name);
+        if (key) map[key] = attr.value;
+    }
+    return map;
+}
+
+const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites || {};
+const getLevelRequirement = (req) => req.char_lvl ?? req.level;
+const getAttributeRequirements = (req) => req.attributes || req.special || {};
+
+/**
+ * Returns true if the character meets a specific perk's requirements.
+ * Considers level and SPECIAL minimums. SPECIAL keys from perks.json are used directly.
+ */
+export function meetsPerkRequirements(perk, attributes, level) {
+    if (!perk) return false;
+    const req = getPrerequisites(perk);
+
+    const requiredLevel = getLevelRequirement(req);
+    if (typeof requiredLevel === 'number' && level < requiredLevel) {
+        return false;
+    }
+
+    const attrReq = getAttributeRequirements(req);
+    if (attrReq && Object.keys(attrReq).length > 0) {
+        const valueByName = buildAttributeValueMap(attributes);
+        for (const [code, minVal] of Object.entries(attrReq)) {
+            const currentVal = valueByName[code] ?? 0;
+            if (currentVal < minVal) return false;
+        }
+    }
+
+    // Other requirements (e.g., "notForRobots") are ignored for now per scope.
+    return true;
+}
+
+/**
+ * Returns a structured status for why a perk is not available.
+ */
+export function getPerkUnmetReasons(perk, attributes, level) {
+    const reasons = { level: false, attributes: {} };
+    if (!perk) return reasons;
+    const req = getPrerequisites(perk);
+
+    const requiredLevel = getLevelRequirement(req);
+    if (typeof requiredLevel === 'number' && level < requiredLevel) {
+        reasons.level = { required: requiredLevel, current: level };
+    }
+
+    const attrReq = getAttributeRequirements(req);
+    const valueByName = buildAttributeValueMap(attributes);
+    for (const [code, minVal] of Object.entries(attrReq)) {
+        const currentVal = valueByName[code] ?? 0;
+        if (currentVal < minVal) {
+            reasons.attributes[code] = { required: minVal, current: currentVal };
+        }
+    }
+
+    return reasons;
+}
+
+/**
+ * Helper to annotate a list of perks with availability status.
+ */
+export function annotatePerks(perks, attributes, level) {
+    return (perks || []).map((perk) => {
+        const available = meetsPerkRequirements(perk, attributes, level);
+        const unmet = available ? null : getPerkUnmetReasons(perk, attributes, level);
+        return { perk, available, unmet };
+    });
+}
+
+export function createPerkEffectContext(state = {}, accumulated = {}) {
+    return {
+        state,
+        bonuses: accumulated,
+        resolve(path, fallback = undefined) {
+            const fromBonuses = getPath(accumulated, path);
+            if (fromBonuses !== undefined) return fromBonuses;
+            const fromState = getPath(state, path);
+            return fromState !== undefined ? fromState : fallback;
+        },
+    };
+}
+
+export function mergePerkBonuses(base = {}, addition = {}) {
+    const result = { ...base };
+    for (const [key, value] of Object.entries(addition || {})) {
+        if (typeof value === 'number') {
+            result[key] = (Number(result[key]) || 0) + value;
+        } else if (Array.isArray(value)) {
+            result[key] = [...(Array.isArray(result[key]) ? result[key] : []), ...value];
+        } else if (isObject(value) && isObject(result[key])) {
+            result[key] = mergePerkBonuses(result[key], value);
+        } else {
+            result[key] = value;
+        }
+    }
+    return result;
+}
+
+export function calculatePerkEffects(perks = [], selectedPerks = [], state = {}) {
+    const byId = new Map((perks || []).map((perk) => [perk.id, perk]));
+    let bonuses = {};
+    const applied = [];
+
+    for (const selected of selectedPerks || []) {
+        const id = toSelectedPerkId(selected);
+        if (!id) continue;
+        const perk = byId.get(id) || (isObject(selected) ? selected : null);
+        const effectId = perk?.effect || perk?.effectId || id;
+        const effect = getPerkEffect(effectId);
+        if (!effect?.apply) continue;
+
+        const rank = toSelectedPerkRank(selected);
+        const ctx = createPerkEffectContext({ ...state, perk, rank }, bonuses);
+        const effectBonuses = effect.apply(ctx) || {};
+        bonuses = mergePerkBonuses(bonuses, effectBonuses);
+        applied.push({ perkId: id, effectId, rank, bonuses: effectBonuses });
+    }
+
+    return { bonuses, applied };
+}
+
+export function selectPerkBonuses(state, perks = []) {
+    return calculatePerkEffects(perks, state?.selectedPerks || [], state).bonuses;
+}
+
+===== domain/registry.js =====
+184 domain/registry.js
+// domain/registry.js
+// Реестр данных движка — ЕДИНАЯ точка чтения данных сеттинга.
+//
+// Источники:
+//   base   — встроенные данные data/ (движок поставляется без сеттинга,
+//            но для обратной совместимости пока читает data/);
+//   module — модуль сеттинга modules/fallout/ (новый контент пишется сюда).
+//
+// Приоритет: module > base (по id для массивов, deep merge для словарей i18n).
+// Все потребители (domain/*, компоненты) читают данные ТОЛЬКО через реестр.
+
+// ── Модуль сеттинга (modules/fallout) ──────────────────────────────────────
+import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
+
+import moduleOrigins from '../modules/fallout/data/origins/origins.json';
+import moduleTraits from '../modules/fallout/data/traits/traits.json';
+import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
+import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+
+// i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
+import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
+import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
+import moduleRuTraitsI18n from '../modules/fallout/i18n/ru-RU/data/system/traits.json';
+import moduleEnTraitsI18n from '../modules/fallout/i18n/en-EN/data/system/traits.json';
+import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+import moduleRuUniqQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/uniq_qualities.json';
+import moduleEnUniqQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/uniq_qualities.json';
+import moduleRuWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
+import moduleEnWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
+import moduleRuClothesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
+import moduleEnClothesI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
+import moduleRuGeneralGoodsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
+import moduleEnGeneralGoodsI18n from '../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
+import moduleRuWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
+import moduleEnWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
+import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/food.json';
+import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
+import moduleRuSettingsI18n from '../modules/fallout/i18n/ru-RU/data/system/settings.json';
+import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/settings.json';
+
+
+import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
+
+import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+import { getDiseasesCatalog } from '../i18n/conditionsCatalog';
+import { getCurrentModuleLocale } from '../i18n/locale';
+import { expandTrueItems } from './packMerge';
+
+const requireModuleLocale = (locale) => {
+  if (locale !== 'ru-RU' && locale !== 'en-EN') {
+    throw new Error(`[registry] Для языка сеттинга "${locale}" нет каталога данных`);
+  }
+  return locale;
+};
+
+/**
+ * Все ориджины: база + модуль (модуль перекрывает по id).
+ */
+export function getOrigins() {
+  return moduleOrigins;
+}
+
+/**
+ * Все трейты: база + модуль.
+ */
+export function getTraits() {
+  return moduleTraits;
+}
+
+/**
+ * Планы тела (движковые данные; сеттинг может добавить свои).
+ */
+export function getBodyPlans() {
+  return bodyplansJson;
+}
+
+/**
+ * Словарь имён ориджинов для локали (база + модуль).
+ * Формат: { [originId]: string }
+ */
+export function getOriginI18n(locale) {
+  return requireModuleLocale(locale) === 'en-EN' ? moduleEnOriginsI18n : moduleRuOriginsI18n;
+}
+
+/**
+ * Словарь трейтов для локали (база + модуль, deep merge).
+ * Формат: { traits: { [originKey]: { [traitKey]: { name, description } } } }
+ */
+export function getTraitI18n(locale) {
+  return requireModuleLocale(locale) === 'en-EN' ? moduleEnTraitsI18n : moduleRuTraitsI18n;
+}
+
+/**
+ * Оружие модуля (самодостаточно, патч 102): полный список сеттинга,
+ * варианты (trueItemId) разворачиваются внутри самого модуля — чтения
+ * движковой базы data/ нет.
+ */
+export function getModuleWeapons() {
+  return expandTrueItems(moduleWeapons, moduleWeapons);
+}
+
+/**
+ * Дополнительные предметы модуля (general goods / misc).
+ */
+export function getModuleGeneralGoods() {
+  return moduleGeneralGoods;
+}
+
+/**
+ * Комплекты модуля: { [kitId]: { items } }.
+ */
+export function getModuleEquipmentKits() {
+  return moduleEquipmentKits;
+}
+
+/**
+ * Полный i18n-словарь модуля для локали. Собирается из файлов по категориям
+ * (modules/fallout/i18n/<locale>/data/...): origins, traits, equipmentKits,
+ * uniqQualities, weapons, clothes, generalGoods, weaponMods, food, drinks.
+ */
+export function getModuleI18n(locale) {
+  const isEn = requireModuleLocale(locale) === 'en-EN';
+  return {
+    origins: isEn ? moduleEnOriginsI18n : moduleRuOriginsI18n,
+    traits: isEn ? moduleEnTraitsI18n : moduleRuTraitsI18n,
+    equipmentKits: isEn ? moduleEnEquipmentKitsI18n : moduleRuEquipmentKitsI18n,
+    uniqQualities: isEn ? moduleEnUniqQualitiesI18n : moduleRuUniqQualitiesI18n,
+    weapons: isEn ? moduleEnWeaponsI18n : moduleRuWeaponsI18n,
+    clothes: isEn ? moduleEnClothesI18n : moduleRuClothesI18n,
+    generalGoods: isEn ? moduleEnGeneralGoodsI18n : moduleRuGeneralGoodsI18n,
+    weaponMods: isEn ? moduleEnWeaponModsI18n : moduleRuWeaponModsI18n,
+    food: isEn ? moduleEnFoodI18n : moduleRuFoodI18n,
+    drinks: isEn ? moduleEnDrinksI18n : moduleRuDrinksI18n,
+    settings: isEn ? moduleEnSettingsI18n : moduleRuSettingsI18n,
+  };
+}
+
+/**
+ * Уникальные качества (uniq qualities): навешиваемые на экипировку
+ * модификаторы (имя + эффекты). База + модуль (модуль перекрывает по id).
+ * Сейчас каталог пустой — определения добавляет владелец в модуль.
+ */
+export function getUniqQualities() {
+  return moduleUniqQualities;
+}
+
+/**
+ * Имя уникального качества из i18n модуля по id (для локали).
+ * Пустая строка — имя не задано (качество есть, но имени нет).
+ */
+export function getUniqQualityName(id, locale = getCurrentModuleLocale()) {
+  if (!id) return '';
+  const i18n = requireModuleLocale(locale) === 'en-EN'
+    ? moduleEnUniqQualitiesI18n
+    : moduleRuUniqQualitiesI18n;
+  const entry = (i18n || []).find((q) => q?.id === id);
+  return entry?.name || '';
+}
+
+/**
+ * Каталог снаряжения (оружие/броня/комплекты/i18n).
+ */
+export function getEquipmentCatalogForLocale(locale) {
+  return getEquipmentCatalog(locale);
+}
+
+/**
+ * Canonical real-time scene risk rules declared by the active setting.
+ * Consumables opt into these rules through explicit sceneRiskEvents metadata.
+ */
+export function getSceneRiskRules() {
+  return [moduleDiseaseExposureRule];
+}
+
+/** Localized condition catalog supplied by the active setting. */
+export function getConditionCatalog(conditionType, locale = getCurrentModuleLocale()) {
+  if (conditionType === 'disease') return getDiseasesCatalog(locale);
+  throw new Error(`[registry] Неизвестный тип состояния "${conditionType}"`);
+}
+
+===== components/CharacterContext.js =====
+1488 components/CharacterContext.js
+import { debugLog } from '../src/debug/falloutDebug';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
+import * as db from '../db';
+import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
+import {
+  createInitialAttributes,
+  ALL_SKILLS,
+  ALL_SKILL_KEYS,
+  getLuckPoints,
+  calculateMaxHealth,
+  calculateInitiative,
+  calculateDefense,
+  calculateMeleeBonus,
+  calculateCarryWeight,
+  getAttributeValue,
+} from '../domain/characterCreation';
+
+// One-time migration: legacy saves stored skills with Russian display names as
+// `skill.name` (e.g. "Ремонт"). After the canonical-id refactor, identity is
+// the UPPER_SNAKE_CASE key (e.g. "REPAIR"). This bridge runs only at load.
+const RU_SKILL_NAME_TO_KEY = Object.entries(ruCharacterScreen?.skillsCatalog || {}).reduce(
+  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
+  {},
+);
+const migrateSkillsToCanonical = (rawSkills) => {
+  if (!Array.isArray(rawSkills)) return null;
+  return rawSkills.map((s) => {
+    if (!s || typeof s.name !== 'string') return s;
+    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
+    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
+    return canonical ? { ...s, name: canonical } : s;
+  });
+};
+import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks } from '../domain/perks';
+import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
+import { isSkillTagged } from '../domain/d20Checks';
+import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
+import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+
+import { resolveBodyPlan } from '../domain/bodyplan';
+import { createEmptyEquippedArmor } from '../domain/equippedArmor';
+import {
+  createEmptyEquippedPowerArmor,
+  createEmptyPowerArmorRuntime,
+  tickCoreAccumulator,
+  drainActiveCore,
+  packPackage,
+  unpackPackage,
+  insertCore,
+  equipPowerArmorPiece,
+  canEquipPowerArmorPiece,
+  findChargedFusionCores,
+  pickFusionCore,
+  powerArmorPieceStackKey,
+  powerArmorSlotsFor,
+  resolvePowerArmorPieceTarget,
+  repairPowerArmorPiece,
+  adjustPieceHp,
+  needsRepair,
+  hasFrame,
+  isPieceBroken,
+  isPowerArmorFrame,
+  FUSION_CORE_ID,
+} from '../domain/powerArmor';
+import { canEquipArmor } from '../domain/equipEquip';
+import { resolveKitItems } from '../domain/kitResolver';
+import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
+import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
+import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+import ruInventoryScreen from '../i18n/ru-RU/screens/inventory/screen.json';
+import enInventoryScreen from '../i18n/en-EN/screens/inventory/screen.json';
+import { getConditionCatalog, getSceneRiskRules } from '../domain/registry';
+import { Alert, Platform } from 'react-native';
+
+// Zustand Store integration (Task 4.1)
+import useCharacterStore from '../src/store/characterStore';
+import { denormalizeCharacterState, migrateCharacterState, mergeEquipmentWithStore, mergeEquippedWeapons } from '../src/store/migrations.js';
+import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/saveSchema.js';
+import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
+
+const INITIAL_LEVEL = 1;
+const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const CharacterContext = createContext();
+
+// Resolve saved-character origin through the single source of truth:
+// domain/origins.findEnrichedOrigin(id) returns the localized origin enriched
+// with image + equipmentKits. A missing id/catalog entry is a data error.
+const resolveOrigin = (storedOrigin) => {
+  if (!storedOrigin) return null;
+  const id = typeof storedOrigin === 'string' ? storedOrigin : storedOrigin.id;
+  if (!id) throw new Error('[CharacterContext] Сохранённый ориджин не содержит id');
+  const resolved = findEnrichedOrigin(id);
+  if (!resolved) {
+    throw new Error(`[CharacterContext] Ориджин "${id}" отсутствует в данных активного сеттинга`);
+  }
+  return resolved;
+};
+
+const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+const serializeState = (state) => ({
+  ...state,
+  origin: state.origin?.id ? { id: state.origin.id } : null,
+  modifiedItems: state.modifiedItems instanceof Map
+    ? Array.from(state.modifiedItems.entries())
+    : (Array.isArray(state.modifiedItems) ? state.modifiedItems : []),
+  schemaVersion: CURRENT_SCHEMA_VERSION,
+});
+
+const deserializeState = (data) => {
+  // Прогоняем сохранение через миграции: если формат старый (v0), приводим к
+  // текущей версии. Миграции покрывают будущие изменения формата — вместо
+  // «плодящихся fallback» в loadCharacter.
+  const migrated = migrateCharacterState(data);
+  return {
+    ...migrated,
+    origin: resolveOrigin(migrated.origin),
+    modifiedItems: new Map(Array.isArray(migrated.modifiedItems) ? migrated.modifiedItems : []),
+    schemaVersion: migrated.schemaVersion ?? LEGACY_SCHEMA_VERSION,
+  };
+};
+
+// ─── Силовая броня: каталожные справочники и тексты алертов ────────────────
+// Механика — domain/powerArmor.js; специфика — docs/architecture/power-armor-plan.md.
+const PA_CATALOG_BY_ID = Object.fromEntries(
+  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
+);
+// Каталожная запись Ядерного блока: предел зарядов (maxCharges) живёт в данных боеприпаса.
+const findCatalogEntryById = (node, id) => {
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      const hit = findCatalogEntryById(entry, id);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  if (node && typeof node === 'object') {
+    if (node.id === id) return node;
+    return findCatalogEntryById(node.items ?? Object.values(node), id);
+  }
+  return null;
+};
+const FUSION_CORE_CATALOG = findCatalogEntryById(dataAmmo, FUSION_CORE_ID);
+// Каталожные данные части PA в текущей локали (имя); механика — из canonical data.
+const paLocalizedCatalogItem = (catalogId) => {
+  const localized = (getEquipmentCatalog(getCurrentModuleLocale())?.powerArmorList || [])
+    .find((p) => p.id === catalogId);
+  if (!localized) {
+    throw new Error(`[CharacterContext] Для силовой брони "${catalogId}" нет локализованных данных`);
+  }
+  return localized;
+};
+const INV_ALERTS_DICT = { 'ru-RU': ruInventoryScreen.alerts, 'en-EN': enInventoryScreen.alerts };
+// ПРАВИЛО (владелец): никаких фолбэков — ключ обязан быть в обеих локалях
+// (контроль — инвариант-тест __tests__/i18n/no-fallbacks.test.js).
+const tPA = (key) => INV_ALERTS_DICT[getCurrentLocale()][key];
+// Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
+// что использует обычная броня при выборе слота.
+const INV_LABELS_DICT = { 'ru-RU': ruInventoryScreen.labels, 'en-EN': enInventoryScreen.labels };
+const INV_ACTIONS_DICT = { 'ru-RU': ruInventoryScreen.actions, 'en-EN': enInventoryScreen.actions };
+const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
+const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()][key];
+// Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
+// как showAlert в InventoryScreen.
+const paAlert = (title, message = '') => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+    window.alert(message ? `${title}\n\n${message}` : title);
+    return;
+  }
+  if (message) Alert.alert(title, message);
+  else Alert.alert(title);
+};
+// Тик таймера расхода блока (§5.3): заряд сгорает за 12 минут аптайма,
+// точность тика на порядок ниже — расход ведёт накопитель, а не тик.
+const PA_CORE_TICK_MS = 15000;
+
+// Берём данные из стора ТОЛЬКО если они реально заполнены. denormalize* возвращает
+// пустой массив [] при пустом сторе, а `[] ?? snapshot` оставляет [] (массив не nullish)
+// и затирает реальные атрибуты/навыки снапшота → сохранёнка теряла данные (#5).
+const preferFilled = (storeVal, snapshotVal) => {
+  if (storeVal == null) return snapshotVal;
+  if (Array.isArray(storeVal)) return storeVal.length > 0 ? storeVal : snapshotVal;
+  if (typeof storeVal === 'object') return Object.keys(storeVal).length > 0 ? storeVal : snapshotVal;
+  return storeVal;
+};
+
+/**
+ * Программа заточена на id: origin/trait/equipment — объекты с id, и их НИКОГДА
+ * нельзя затирать «голым» объектом без id из стора. Если стор-значение — объект
+ * без id, а снапшот имеет id — берём снапшот (метаданные), иначе preferFilled.
+ */
+const mergeSnapshotWithStoreData = (snapshot) => {
+  const legacyData = denormalizeCharacterState(useCharacterStore.getState());
+  return {
+    ...snapshot,
+    attributes: preferFilled(legacyData.attributes, snapshot.attributes),
+    skills: preferFilled(legacyData.skills, snapshot.skills),
+    equipment: mergeEquipmentWithStore(snapshot.equipment, legacyData.equipment),
+    equippedWeapons: mergeEquippedWeapons(snapshot.equippedWeapons, legacyData.equippedWeapons),
+    activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
+    rewardedSkills: legacyData.rewardedSkills,
+  };
+};
+
+export const CharacterProvider = ({ children }) => {
+  const [characterName, setCharacterName] = useState('');
+  const [characterId, setCharacterId] = useState(null);
+  const [isSaved, setIsSaved] = useState(false);
+
+  const [level, setLevel] = useState(INITIAL_LEVEL);
+  const [attributes, setAttributes] = useState(createInitialAttributes());
+  const [skills, setSkills] = useState(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+  const [selectedSkills, setSelectedSkills] = useState([]);
+  const [extraTaggedSkills, setExtraTaggedSkills] = useState([]);
+  const [forcedSelectedSkills, setForcedSelectedSkills] = useState([]);
+  const [origin, setOrigin] = useState(null);
+  const [trait, setTrait] = useState(null);
+  const [equipment, setEquipment] = useState(null);
+  const [effects, setEffects] = useState([]);
+  const [activeTimedEffects, setActiveTimedEffects] = useState([]);
+  const [sceneCounter, setSceneCounter] = useState(0);
+  const [equippedWeapons, setEquippedWeapons] = useState([]);
+  const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
+  const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+
+  // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+  // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
+  // sync while ALSO writing through to the store. Screens keep calling the same
+  // setter name; data flows into one place (Fix #2, Step 3). Functional updates
+  // (prev => next) are preserved.
+  const setEquippedRobotSlots = useCallback((updater) => {
+    setEquippedRobotSlotsRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // mirror into the store slice
+      useCharacterStore.getState().loadRobotState({
+        bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
+        slots: next || {},
+        modules: useCharacterStore.getState().robot?.modules ?? [],
+      });
+      return next;
+    });
+  }, []);
+
+  const setEquippedRobotModules = useCallback((updater) => {
+    setEquippedRobotModulesRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      useCharacterStore.getState().loadRobotState({
+        bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
+        slots: useCharacterStore.getState().robot?.slots ?? {},
+        modules: next || [],
+      });
+      return next;
+    });
+  }, []);
+  const [equippedArmor, setEquippedArmor] = useState(() => createEmptyEquippedArmor());
+  const [equippedPowerArmor, setEquippedPowerArmor] = useState(() => createEmptyEquippedPowerArmor());
+  const [powerArmorRuntime, setPowerArmorRuntime] = useState(() => createEmptyPowerArmorRuntime());
+  // Диалог выбора Ядерного Блока (§5.1/§5.4): null, или
+  // { kind: 'equip'|'depleted', equipped, frameItem?, cores: [] }
+  const [pendingCoreChoice, setPendingCoreChoice] = useState(null);
+
+  // Refs: таймер расхода и алерты читают актуальное состояние без пересоздания.
+  const equippedPowerArmorRef = useRef(equippedPowerArmor);
+  const powerArmorRuntimeRef = useRef(powerArmorRuntime);
+  const pendingCoreChoiceRef = useRef(pendingCoreChoice);
+  useEffect(() => { equippedPowerArmorRef.current = equippedPowerArmor; }, [equippedPowerArmor]);
+  useEffect(() => { powerArmorRuntimeRef.current = powerArmorRuntime; }, [powerArmorRuntime]);
+  useEffect(() => { pendingCoreChoiceRef.current = pendingCoreChoice; }, [pendingCoreChoice]);
+
+  const [caps, setCaps] = useState(0);
+  const [currentHealth, setCurrentHealth] = useState(0);
+  const [radiation, setRadiationRaw] = useState(0);
+  const setRadiation = (updater) => setRadiationRaw((prev) => {
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    return Math.max(0, next);
+  });
+  const [modifiedItems, setModifiedItems] = useState(new Map());
+  const [availablePerkAttributePoints, setAvailablePerkAttributePoints] = useState(0);
+  const [luckPoints, setLuckPoints] = useState(0);
+  const [maxLuckPoints, setMaxLuckPoints] = useState(0);
+  const [attributesSaved, setAttributesSaved] = useState(false);
+  const [skillsSaved, setSkillsSaved] = useState(false);
+  const [selectedPerks, setSelectedPerksRaw] = useState([]);
+  const setSelectedPerks = useCallback((updater) => {
+    setSelectedPerksRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      useCharacterStore.getState().setSelectedPerks(next || []);
+      return next || [];
+    });
+  }, []);
+  const [carryWeight, setCarryWeight] = useState(
+    calculateCarryWeight(attributes, null),
+  );
+  const [meleeBonus, setMeleeBonus] = useState(0);
+  const [initiative, setInitiative] = useState(0);
+  const [defense, setDefense] = useState(1);
+  const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
+  const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
+  const [sceneRiskStates, setSceneRiskStates] = useState({});
+  const sceneRiskTrackerRef = useRef(null);
+  if (sceneRiskTrackerRef.current === null) {
+    sceneRiskTrackerRef.current = createSceneRiskTracker(sceneRiskStates);
+  }
+
+  const isSavedRef = useRef(isSaved);
+  const characterIdRef = useRef(characterId);
+  useEffect(() => { isSavedRef.current = isSaved; }, [isSaved]);
+  useEffect(() => { characterIdRef.current = characterId; }, [characterId]);
+
+  // ── Derived stats bridge (Fix #3 + #4) ──────────────────────────────
+  // Производные значения (carryWeight, meleeBonus, defense, initiative …)
+  // считаются ОДИН раз внутри Zustand-стора (calculateDerivedStats) и читаются
+  // обратно сюда, чтобы не было двух источников правды.
+  //
+  // Здесь мы лишь прокидываем в стор актуальные trait / level / экипировку
+  // (раньше стор считал их с заглушкой trait:null, level:1 — баг #4),
+  // а также подстраховываемся, заполняя dict атрибутов из массива Context,
+  // если он ещё пуст (новый несохранённый персонаж).
+  useEffect(() => {
+    const store = useCharacterStore.getState();
+
+    // Подсев атрибутов в стор, если dict пуст, но в Context уже есть значения.
+    const dictEmpty = Object.keys(store.attributes || {}).length === 0;
+    const arrayHasValues = Array.isArray(attributes) && attributes.length > 0;
+    if (dictEmpty && arrayHasValues) {
+      store.loadFromLegacyData({ attributes });
+    }
+
+    // Прокидываем реальный контекст → корректный пересчёт derivedStats.
+    // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
+    const isRobot = isRobotCharacter({ origin, trait });
+    store.setCharacterContext({
+      trait,
+      level,
+      isRobot,
+      // Надетый каркас СБ → модификаторы атрибутов (СИЛ=set 11) в производных, §5.6.
+      equipmentState: {
+        equippedArmor,
+        equippedRobotSlots,
+        isRobot,
+        powerArmorFrameId: equippedPowerArmor?.frame ? equippedPowerArmor.frame.catalogId : null,
+      },
+    });
+  }, [attributes, trait, level, origin, equippedArmor, equippedRobotSlots, equippedPowerArmor]);
+
+  // Подписываемся на derivedStats стора и зеркалим их в локальный стейт,
+  // чтобы все экраны, читающие carryWeight/meleeBonus/defense/initiative из
+  // useCharacter(), получали ЕДИНОЕ каноническое значение из стора.
+  useEffect(() => {
+    const applyDerived = (derivedStats) => {
+      if (!derivedStats) return;
+      const num = (p, fallback) =>
+        typeof p === 'number' ? p : (p && typeof p.total === 'number' ? p.total : fallback);
+      setCarryWeight(num(derivedStats.carryWeight, calculateCarryWeight(attributes, trait, { equippedArmor, equippedRobotSlots })));
+      setMeleeBonus(num(derivedStats.meleeBonus, 0));
+      setInitiative(num(derivedStats.initiative, 0));
+      setDefense(num(derivedStats.defense, 1));
+    };
+    // применить сразу + подписаться на дальнейшие изменения
+    applyDerived(useCharacterStore.getState().derivedStats);
+    const unsub = useCharacterStore.subscribe((state) => applyDerived(state.derivedStats));
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attributes, trait, equippedArmor, equippedRobotSlots]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveTimedEffects((prev) => {
+        const { effects: nextEffects, changed } = pruneExpiredTimedEffects(prev);
+        return changed ? nextEffects : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // ═══ Силовая броня: действия (специфика docs/architecture/power-armor-plan.md) ═══
+  // Слой СБ отдельный от equippedArmor: надевание ИЗЫМАЕТ предмет из стековой
+  // записи инвентаря (quantity −1, при 0 запись удаляется — декремент-модель,
+  // как adjustStoreItemQuantity в InventoryScreen), снятие возвращает стопку
+  // через addNewItem (сливается с существующей по stackKey).
+
+  const paDecrementStoreStack = useCallback((storeItemId, count = 1) => {
+    const { items } = useCharacterStore.getState();
+    const item = items[storeItemId];
+    if (!item) return;
+    const newQty = (item.quantity || 1) - count;
+    if (newQty <= 0) {
+      const updated = { ...items };
+      delete updated[storeItemId];
+      useCharacterStore.setState({ items: updated });
+      return;
+    }
+    useCharacterStore.getState().updateItem(storeItemId, { quantity: newQty });
+  }, []);
+
+  // Положить стек-предмет в инвентарь. Ключ записи = stackKey: для каждого
+  // состояния (заряд/прочность/состав частей) ключ уникален, а одинаковые
+  // стопки всё равно сольются стек-поиском addNewItem по тому же stackKey.
+  const paAddStackToInventory = useCallback((stackItem) => {
+    useCharacterStore.getState().addNewItem({ ...stackItem, uniqueId: stackItem.stackKey, quantity: 1 });
+  }, []);
+
+  // Надетая часть → инвентарный стек-предмет (подпись: каталожный id + моды + прочность).
+  const paPieceToStackItem = useCallback((piece) => ({
+    ...paLocalizedCatalogItem(piece.catalogId),
+    appliedMods: piece.appliedMods || {},
+    hpCurrent: piece.hpCurrent,
+    stackKey: powerArmorPieceStackKey(piece),
+  }), []);
+
+  // Надетый пакет → инвентарная стопка-каркас: packPackage даёт контракт полей
+  // и stackKey; вес/цена/имя добираем из каталога текущей локали.
+  const paPackageToStackItem = useCallback((equipped) => {
+    const packed = packPackage(equipped);
+    return { ...paLocalizedCatalogItem(packed.id), ...packed };
+  }, []);
+
+  // ── §5.1 Надеть пакет (каркас + установленные части + блок, если он внутри) ──
+  const equipPowerArmorPackage = useCallback((frameStackItem) => {
+    // ПРАВИЛО (от владельца): супермутантам силовая запрещена. И роботам — политика
+    // экипировки брони общая (domain/equipEquip.canEquipArmor).
+    const check = canEquipArmor(frameStackItem, { origin, trait });
+    if (!check.allowed) {
+      if (check.reason === 'equip.error.robotCannotWearStandardArmor') {
+        paAlert(tPA('robotArmorOnlyTitle'), tPA('robotArmorOnlyMessage'));
+      } else {
+        paAlert(tPA('mutantCannotWearStandardArmorTitle'), tPA('mutantCannotWearStandardArmorMessage'));
+      }
+      return;
+    }
+    if (hasFrame(equippedPowerArmorRef.current)) return; // второй пакет поверх не надевается
+
+    const equipped = unpackPackage(frameStackItem);
+    if (equipped.frame.core) {
+      // Блок уже в пакете → надеваем молча.
+      paDecrementStoreStack(frameStackItem.id);
+      setEquippedPowerArmor(equipped);
+      return;
+    }
+    const pick = pickFusionCore(findChargedFusionCores(Object.values(useCharacterStore.getState().items || {})));
+    if (pick.kind === 'none') {
+      paAlert(tPA('powerArmorNeedsCoreTitle'), tPA('powerArmorNeedsCoreMessage'));
+      return;
+    }
+    if (pick.kind === 'auto') {
+      // Заряд одинаковый у всех блоков → молча берём первый из стопки (ПРАВИЛО владельца).
+      paDecrementStoreStack(pick.core.id);
+      paDecrementStoreStack(frameStackItem.id);
+      setEquippedPowerArmor(insertCore(equipped, pick.core));
+      return;
+    }
+    // Разный заряд → игрок выбирает; пакет снимем со стопки после выбора (resolveCoreChoice).
+    setPendingCoreChoice({ kind: 'equip', equipped, frameStoreKey: frameStackItem.id, cores: pick.cores });
+  }, [origin, trait, paDecrementStoreStack]);
+
+  // Разрешение диалога выбора блока (§5.1/§5.4): coreStoreKey — ключ записи в сторе, null — отмена.
+  const resolveCoreChoice = useCallback((coreStoreKey) => {
+    const pending = pendingCoreChoiceRef.current;
+    setPendingCoreChoice(null);
+    if (!pending) return;
+
+    if (!coreStoreKey) {
+      if (pending.kind === 'depleted') {
+        // От замены отказались → пакет снимается в инвентарь, как при отсутствии блоков.
+        paAddStackToInventory(paPackageToStackItem(pending.equipped));
+        setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+        paAlert(tPA('powerArmorDepletedTitle'), tPA('powerArmorDepletedMessage'));
+      }
+      // kind 'equip' + отмена → надевание не состоялось, инвентарь не тронут.
+      return;
+    }
+
+    const coreItem = useCharacterStore.getState().items[coreStoreKey];
+    if (!coreItem || !(coreItem.charges > 0)) return;
+    paDecrementStoreStack(coreStoreKey);
+    if (pending.kind === 'equip' && pending.frameStoreKey) {
+      paDecrementStoreStack(pending.frameStoreKey);
+    }
+    setEquippedPowerArmor(insertCore(pending.equipped, coreItem));
+  }, [paDecrementStoreStack, paAddStackToInventory, paPackageToStackItem]);
+
+  // ── Снять весь пакет: части и блок уезжают в инвентарь ВНУТРИ стопки-каркаса (§4) ──
+  const unequipPowerArmorPackage = useCallback(() => {
+    const equipped = equippedPowerArmorRef.current;
+    if (!hasFrame(equipped)) return;
+    paAddStackToInventory(paPackageToStackItem(equipped));
+    setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+  }, [paAddStackToInventory, paPackageToStackItem]);
+
+  // ── §5.2 Надеть часть из инвентаря; вытесненная часть слота уходит в инвентарь ──
+  // Наруч/понож — один предмет на любую сторону (как обычная броня): свободный
+  // слот пары → туда; обе стороны заняты → игрок выбирает L/R тем же алертом.
+  const equipPowerArmorPieceInto = useCallback((pieceStackItem) => {
+    // Каталожный id: у стор-предмета — weaponId, у свежего из каталога — id.
+    const catalogId = pieceStackItem.weaponId || pieceStackItem.id;
+    const piece = {
+      catalogId,
+      appliedMods: pieceStackItem.appliedMods || {},
+      hpCurrent: pieceStackItem.hpCurrent,
+    };
+    const candidateSlots = powerArmorSlotsFor(PA_CATALOG_BY_ID[catalogId]);
+    if (candidateSlots.length === 0) return;
+    const check = canEquipPowerArmorPiece(equippedPowerArmorRef.current, piece);
+    if (!check.ok) {
+      paAlert(
+        tPA('powerArmorNeedsCoreTitle'),
+        tPA(check.reason === 'needsFrame' ? 'powerArmorNeedsFrameMessage' : 'powerArmorBrokenPieceMessage'),
+      );
+      return;
+    }
+
+    const doEquip = (slot) => {
+      const equipped = equippedPowerArmorRef.current;
+      const replaced = equipped.pieces[slot];
+      setEquippedPowerArmor(equipPowerArmorPiece(equipped, slot, piece));
+      paDecrementStoreStack(pieceStackItem.id);
+      if (replaced) paAddStackToInventory(paPieceToStackItem(replaced));
+    };
+
+    const target = resolvePowerArmorPieceTarget(equippedPowerArmorRef.current, candidateSlots);
+    if (target.kind === 'slot') {
+      doEquip(target.slot);
+      return;
+    }
+
+    // Пара занята → выбор стороны, формулировки — как у обычной брони.
+    const [leftSlot, rightSlot] = target.slots;
+    const leftLabel = tPALabel(leftSlot);
+    const rightLabel = tPALabel(rightSlot);
+    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+      const promptText = tPA('bothSlotsBusyPrompt')
+        .replace('{leftLabel}', leftLabel)
+        .replace('{rightLabel}', rightLabel);
+      const answer = window.prompt(promptText, '1');
+      if (answer === '1') doEquip(leftSlot);
+      else if (answer === '2') doEquip(rightSlot);
+      return;
+    }
+    Alert.alert(tPA('replaceEquipmentTitle'), tPA('bothSlotsBusy'), [
+      { text: leftLabel, onPress: () => doEquip(leftSlot) },
+      { text: rightLabel, onPress: () => doEquip(rightSlot) },
+      { text: tPAAction('cancel'), style: 'cancel' },
+    ]);
+  }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem]);
+
+  // Снять часть слота → в инвентарь своей стопкой.
+  const unequipPowerArmorPieceAt = useCallback((slot) => {
+    const equipped = equippedPowerArmorRef.current;
+    const piece = equipped?.pieces?.[slot];
+    if (!piece) return;
+    setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: null } });
+    paAddStackToInventory(paPieceToStackItem(piece));
+  }, [paAddStackToInventory, paPieceToStackItem]);
+
+  // ── §5.7 Кнопки −/+ прочности части; упала до 0 → часть сама слетает в инвентарь ──
+  const adjustPowerArmorDurability = useCallback((slot, delta) => {
+    const equipped = equippedPowerArmorRef.current;
+    const piece = equipped?.pieces?.[slot];
+    if (!piece) return;
+    const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
+    if (!Number.isFinite(maxHp)) return;
+    const adjusted = adjustPieceHp(piece, delta, maxHp);
+    if (isPieceBroken(adjusted)) {
+      setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: null } });
+      paAddStackToInventory(paPieceToStackItem(adjusted));
+      return;
+    }
+    setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: adjusted } });
+  }, [paAddStackToInventory, paPieceToStackItem]);
+
+  // Починка надетой части (ПРАВИЛО владельца: бесплатно до максимума).
+  const repairPowerArmorPieceAt = useCallback((slot) => {
+    const equipped = equippedPowerArmorRef.current;
+    const piece = equipped?.pieces?.[slot];
+    if (!piece) return;
+    const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
+    if (!Number.isFinite(maxHp) || !needsRepair(piece, maxHp)) return;
+    setEquippedPowerArmor({ ...equipped, pieces: { ...equipped.pieces, [slot]: repairPowerArmorPiece(piece, maxHp) } });
+  }, []);
+
+  // Починка части прямо в инвентаре (кнопка «Починить» на строке). Прочность входит
+  // в подпись стопки → после починки стопка либо переподписывается, либо сливается
+  // с уже существующей целой (quantity переносится).
+  const repairPowerArmorStack = useCallback((storeItemId) => {
+    const { items } = useCharacterStore.getState();
+    const item = items[storeItemId];
+    if (!item || item.itemType !== 'powerArmor' || isPowerArmorFrame(item)) return;
+    const catalogId = item.weaponId || item.id;
+    const maxHp = PA_CATALOG_BY_ID[catalogId]?.hp;
+    if (!Number.isFinite(maxHp) || !needsRepair({ hpCurrent: item.hpCurrent }, maxHp)) return;
+    const newStackKey = powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: maxHp });
+    const wholeTwinKey = Object.keys(items).find(
+      (key) => key !== storeItemId && (items[key]?.stackKey || items[key]?.id) === newStackKey,
+    );
+    if (wholeTwinKey) {
+      const updated = { ...items };
+      updated[wholeTwinKey] = { ...updated[wholeTwinKey], quantity: (updated[wholeTwinKey].quantity || 1) + (item.quantity || 1) };
+      delete updated[storeItemId];
+      useCharacterStore.setState({ items: updated });
+      return;
+    }
+    useCharacterStore.getState().updateItem(storeItemId, { hpCurrent: maxHp, stackKey: newStackKey });
+  }, []);
+
+
+  // ── §5.3/§5.4 Таймер расхода Ядерного блока ──
+  // Тикает только пока приложение открыто («приложение закрыто — отсчёт на паузе»);
+  // накопитель аптайма персистентный (сохраняется со снапшотом персонажа).
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const equipped = equippedPowerArmorRef.current;
+      if (!hasFrame(equipped) || !equipped.frame.core) return;
+
+      const tick = tickCoreAccumulator(powerArmorRuntimeRef.current, PA_CORE_TICK_MS);
+      setPowerArmorRuntime({ coreAccumulatorMs: tick.coreAccumulatorMs });
+      if (tick.chargesConsumed <= 0) return;
+
+      const { equipped: drained, depleted } = drainActiveCore(equipped, tick.chargesConsumed);
+      if (!depleted) {
+        setEquippedPowerArmor(drained);
+        return;
+      }
+
+      // Блок исчерпан: есть замена — молча (одинаковый заряд) или выбором (разный);
+      // блоков нет совсем — пакет снимается в инвентарь (ПРАВИЛО владельца §5.4).
+      const pick = pickFusionCore(findChargedFusionCores(Object.values(useCharacterStore.getState().items || {})));
+      if (pick.kind === 'auto') {
+        paDecrementStoreStack(pick.core.id);
+        setEquippedPowerArmor(insertCore(drained, pick.core));
+        return;
+      }
+      if (pick.kind === 'choice') {
+        setPendingCoreChoice({ kind: 'depleted', equipped: drained, cores: pick.cores });
+        return;
+      }
+      paAddStackToInventory(paPackageToStackItem(drained));
+      setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+      paAlert(tPA('powerArmorDepletedTitle'), tPA('powerArmorDepletedMessage'));
+    }, PA_CORE_TICK_MS);
+    return () => clearInterval(interval);
+  }, [paDecrementStoreStack, paAddStackToInventory, paPackageToStackItem]);
+
+  // Build a full character state snapshot.
+  const buildSnapshot = useCallback(() => ({
+    characterName,
+    level,
+    attributes,
+    skills,
+    selectedSkills,
+    extraTaggedSkills,
+    forcedSelectedSkills,
+    origin,
+    trait,
+    equipment,
+    effects,
+    activeTimedEffects,
+    sceneCounter,
+    equippedWeapons,
+    equippedRobotSlots,
+    equippedRobotModules,
+    // ОС Mk II (Секьюритрон) — часть robot-состояния, обязана переживать сейв/загрузку.
+    mk2Installed: useCharacterStore.getState().robot?.mk2Installed ?? false,
+    equippedArmor,
+    equippedPowerArmor,
+    powerArmorRuntime,
+    caps,
+    currentHealth,
+    radiation,
+    modifiedItems,
+    availablePerkAttributePoints,
+    luckPoints,
+    maxLuckPoints,
+    attributesSaved,
+    skillsSaved,
+    selectedPerks,
+    carryWeight,
+    meleeBonus,
+    initiative,
+    defense,
+    conditions,
+    chemDosesLog,
+    sceneRiskStates,
+  }), [
+    characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+    forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+    sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+    equippedArmor, equippedPowerArmor, powerArmorRuntime,
+    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog, sceneRiskStates,
+  ]);
+
+  // Realtime save for already persisted characters.
+  const saveTimeoutRef = useRef(null);
+  useEffect(() => {
+    if (!isSavedRef.current || !characterIdRef.current) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const snapshot = buildSnapshot();
+        const serialized = serializeState(mergeSnapshotWithStoreData(snapshot));
+        await db.saveCharacter(
+          characterIdRef.current,
+          snapshot.characterName,
+          snapshot.level ?? 1,
+          snapshot.origin?.id || snapshot.origin?.name || null,
+          serialized
+        );
+        await syncCharacterToCloudIfEnabled(characterIdRef.current);
+      } catch (e) {
+      }
+    }, 500);
+    return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+  }, [
+    characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+    forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+    sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+    equippedArmor, equippedPowerArmor, powerArmorRuntime,
+    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+    carryWeight, meleeBonus, initiative, defense, buildSnapshot,
+  ]);
+
+  // Initial save triggered from CharacterScreen.
+  const saveCharacter = useCallback(async (name) => {
+    try {
+      const id = characterIdRef.current || generateId();
+      setCharacterId(id);
+      characterIdRef.current = id;
+
+      const snapshot = buildSnapshot();
+      const snapshotWithName = { ...snapshot, characterName: name };
+      const serialized = serializeState(mergeSnapshotWithStoreData(snapshotWithName));
+
+      await db.saveCharacter(
+        id,
+        name,
+        snapshot.level ?? 1,
+        snapshot.origin?.id || snapshot.origin?.name || null,
+        serialized
+      );
+      await db.clearCharacterRenameRequest(id);
+      await syncCharacterToCloudIfEnabled(id);
+
+      setIsSaved(true);
+      isSavedRef.current = true;
+      return id;
+    } catch (e) {
+      return null;
+    }
+  }, [buildSnapshot]);
+
+  // Load character by ID.
+  const loadCharacter = useCallback(async (id) => {
+    try {
+      const row = await db.loadCharacterById(id);
+      if (!row) return false;
+      const data = deserializeState(row.data);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      isSavedRef.current = false;
+
+      setCharacterId(id);
+      setCharacterName(row.name);
+      setLevel(data.level ?? INITIAL_LEVEL);
+      setAttributes(data.attributes || createInitialAttributes());
+      setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+      setSelectedSkills(data.selectedSkills || []);
+      setExtraTaggedSkills(data.extraTaggedSkills || []);
+      setForcedSelectedSkills(data.forcedSelectedSkills || []);
+      setOrigin(data.origin || null);
+      setTrait(data.trait || null);
+      setEquipment(data.equipment || null);
+      setEffects(data.effects || []);
+      setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
+      setSceneCounter(data.sceneCounter ?? 0);
+      sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
+      setSceneRiskStates(data.sceneRiskStates);
+      // Migrate old [null, null] format to dynamic array
+      const rawWeapons = data.equippedWeapons || [];
+      let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
+      // Ensure the archetype's built-in unarmed weapon is present on load
+      // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
+      const loadedOrigin = resolveOrigin(data.origin);
+      const loadedTrait = data.trait || null;
+      const builtin = getBuiltinBaseWeapon({ origin: loadedOrigin, trait: loadedTrait });
+      if (builtin && !migratedWeapons.some(w => w?.id === builtin.id)) {
+        migratedWeapons = [builtin, ...migratedWeapons];
+      }
+      setEquippedWeapons(migratedWeapons);
+      // Seed the store's robot body plan first so derived carry-weight resolves
+      // correctly, then mirror slots/modules through the wrapped setters.
+      useCharacterStore.getState().loadRobotState({
+        bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
+        slots: data.equippedRobotSlots ?? {},
+        modules: data.equippedRobotModules ?? [],
+        mk2Installed: data.mk2Installed ?? false,
+      });
+      setEquippedRobotSlots(data.equippedRobotSlots ?? null);
+      setEquippedRobotModules(data.equippedRobotModules ?? []);
+      // Встроенное оружие конечностей (манипуляторы, ладонные орудия) НЕ хранится
+      // в equippedWeapons: экраны читают его из слотов стора (getBuiltinWeaponsFromSlots)
+      // — единый источник, ничего восстанавливать не нужно.
+      setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
+      setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
+      setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
+      setPendingCoreChoice(null);
+      setCaps(data.caps ?? 0);
+      setCurrentHealth(data.currentHealth ?? 0);
+      setRadiationRaw(Math.max(0, data.radiation ?? 0));
+      setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
+      setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
+      setLuckPoints(data.luckPoints ?? 0);
+      setMaxLuckPoints(data.maxLuckPoints ?? 0);
+      setAttributesSaved(data.attributesSaved ?? false);
+      setSkillsSaved(data.skillsSaved ?? false);
+      setSelectedPerks(data.selectedPerks || []);
+      setCarryWeight(data.carryWeight ?? 150);
+      setMeleeBonus(data.meleeBonus ?? 0);
+      setInitiative(data.initiative ?? 0);
+      setDefense(data.defense ?? 1);
+      setConditions(data.conditions || []);
+      setChemDosesLog(
+        (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS)
+      );
+      
+      // Task 4.4: Migrate old format data to Zustand Store
+      // This normalizes attributes, skills, items, and effects into the store
+      useCharacterStore.getState().loadFromLegacyData(data);
+      
+      // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
+      // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
+      // выдаём здесь, после загрузки. Крышки: старый комплект (100) уже
+      // в data.caps — оставляем как есть (комплект NIGHTKIN крышек не даёт).
+      if (data.nightkinKitPending && data.equipment?.id === 'nightkin') {
+        try {
+          const catalog = getEquipmentCatalog();
+          const kit = catalog?.equipmentKits?.nightkin;
+          if (!kit?.name || !Array.isArray(kit.items)) {
+            throw new Error('[loadCharacter] Комплект nightkin отсутствует в локализованном каталоге');
+          }
+          const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
+          (resolved.items || []).forEach((item) => {
+            useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+          });
+          setEquipment({ id: 'nightkin', name: kit.name, items: resolved.items || [] });
+          // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
+          data.nightkinKitPending = false;
+        } catch (e) {
+          debugLog('character.load.nightkinKitGrantFailed', { message: e?.message });
+        }
+      }
+      
+      const saved = !row.renamePending;
+      setIsSaved(saved);
+      isSavedRef.current = saved;
+      characterIdRef.current = id;
+      return true;
+    } catch (e) {
+      debugLog('character.load.failed', { message: e?.message });
+      return false;
+    }
+  }, []);
+
+  // Get all character records.
+  const getCharactersList = useCallback(async () => {
+    try {
+      return await db.getCharactersList();
+    } catch (e) {
+      return [];
+    }
+  }, []);
+
+  // Delete character by ID.
+  const deleteCharacter = useCallback(async (id) => {
+    try {
+      await db.deleteCharacter(id);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }, []);
+
+  const getItemId = (item) => {
+    if (item.uniqueId) return item.uniqueId;
+    return item.weaponId || item.code || item.id || item.Name;
+  };
+
+  const getModifiedItem = (item) => {
+    const itemId = getItemId(item);
+    const modifiedItem = modifiedItems.get(itemId);
+    if (modifiedItem) return modifiedItem;
+    if (item.itemType !== 'weapon' && item.itemType !== 'armor' && item.itemType !== 'clothing') return item;
+    return item;
+  };
+
+  const saveModifiedItem = (originalItem, modifiedItem) => {
+    const itemId = getItemId(originalItem);
+    setModifiedItems(prev => new Map(prev).set(itemId, modifiedItem));
+  };
+
+  const removeModifiedItem = (item) => {
+    const itemId = getItemId(item);
+    setModifiedItems(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(itemId);
+      return newMap;
+    });
+  };
+
+  const addPerkAttributePoints = (points) => {
+    setAvailablePerkAttributePoints(prev => prev + points);
+  };
+
+  /**
+   * Записывает дозу препарата и возвращает общий размер пула доз за последние 24 ч.
+   */
+  const recordChemDose = (chemId) => {
+    const now = Date.now();
+    const result = recordDoseWithinWindow(
+      chemDosesLog,
+      { chemId, takenAt: now },
+      { now, windowMs: CHEM_DOSE_WINDOW_MS },
+    );
+    setChemDosesLog(result.doseLog);
+    return result.doseCount;
+  };
+
+  const applyDiseaseExposureForConsumable = (item) => {
+    const ruleMatches = getSceneRiskRules()
+      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
+      .filter(({ event }) => event !== null);
+    if (ruleMatches.length === 0) return null;
+    if (ruleMatches.length > 1) {
+      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
+    }
+
+    const { rule, event } = ruleMatches[0];
+    if (rule.resultTable !== 'diseases') {
+      throw new Error(`[CharacterContext] Неизвестная таблица результата проверки риска: ${rule.resultTable}`);
+    }
+
+    const attribute = attributes.find((entry) => entry?.name === rule.test.attribute);
+    const skill = skills.find((entry) => entry?.name === rule.test.skill);
+    if (!attribute || !skill) {
+      throw new Error(
+        `[CharacterContext] Для проверки ${rule.id} отсутствует `
+        + `${rule.test.attribute} или ${rule.test.skill}`,
+      );
+    }
+
+    const { result: riskResult, states: nextStates } = sceneRiskTrackerRef.current.resolveEvent({
+      rule,
+      eventId: event.eventId,
+      attributeValue: getAttributeValue(attributes, rule.test.attribute),
+      skillValue: skill.value,
+      isTagged: isSkillTagged({
+        skillId: skill.name,
+        primaryTaggedSkillIds: selectedSkills,
+        extraTaggedSkillIds: extraTaggedSkills,
+      }),
+    });
+
+    if (riskResult.status === 'duplicate') return riskResult;
+
+    setSceneRiskStates(nextStates);
+
+    if (riskResult.check.passed) {
+      return { ...riskResult, diseaseRoll: null, disease: null, infectionStatus: null };
+    }
+
+    const { roll: diseaseRoll, disease } = rollDiseaseFromCatalog(
+      getConditionCatalog('disease', getCurrentModuleLocale()),
+    );
+    if (hasDamageImmunity({ origin, trait }, rule.immunity)) {
+      return { ...riskResult, diseaseRoll, disease, infectionStatus: 'immune' };
+    }
+
+    const store = useCharacterStore.getState();
+    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(store.effects)).effects;
+    const applied = addPersistentDiseaseEffect(currentEffects, disease);
+    if (applied.added) {
+      syncTimedEffectsToStore(applied.effects, store);
+      setActiveTimedEffects(applied.effects);
+    }
+    setConditions((previous) => (
+      previous.includes('diseased') ? previous : [...previous, 'diseased']
+    ));
+
+    return {
+      ...riskResult,
+      diseaseRoll,
+      disease,
+      infectionStatus: applied.added ? 'infected' : 'duplicate',
+    };
+  };
+
+  /**
+   * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
+   * removeCondition, проверку зависимости и явно объявленный риск заражения.
+   */
+  const applyConsumableFull = (item) => {
+    debugLog('consumable.apply.start', {
+      itemName: item?.name || item?.Name,
+      itemId: item?.id || item?.code,
+      positiveEffect: item?.positiveEffect,
+      positiveEffectType: typeof item?.positiveEffect,
+    });
+
+    // 1. Мгновенные показатели: сначала лечение, затем радиация.
+    const { hpHealBonus = 0 } = useCharacterStore.getState().perkBonuses || {};
+    const vitalChanges = resolveConsumableVitalChanges(item, {
+      currentHealth,
+      maxHealth: calculateMaxHealth(attributes, level),
+      radiation,
+      hpHealBonus,
+      radiationImmune: hasRadiationImmunity({ origin, trait }),
+    });
+    if (vitalChanges.healAmount > 0) {
+      setCurrentHealth(vitalChanges.healthAfter);
+    }
+    if (vitalChanges.radiationAmount !== null) {
+      // Радиация расходника напрямую меняет счётчик: DR частей тела не участвует.
+      setRadiation(vitalChanges.radiationAfter);
+    }
+
+    // 2. Timed-эффекты через Zustand Store
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+    const timedResult = applyConsumableToEffects(item, normalizedCurrent.effects);
+    const normalizedResult = pruneExpiredTimedEffects(timedResult.effects);
+    syncTimedEffectsToStore(normalizedResult.effects, store);
+    setActiveTimedEffects(normalizedResult.effects);
+
+    // 3. removeCondition (аддиктол, антибиотики)
+    const {
+      conditions: nextConditions,
+      removed,
+      requested: conditionRemovalsRequested,
+    } = applyRemoveConditions(item, conditions);
+    if (removed.length > 0) {
+      setConditions(nextConditions);
+      // Снятие зависимости (аддиктол): удаляем перманентный эффект
+      // «Зависимость: Стелс-бой» из активных эффектов.
+      if (removed.includes('addicted')) {
+        const storeNow = useCharacterStore.getState();
+        const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+        const withoutAddiction = currentEffects.filter(
+          (effect) => !(effect.isPermanent && String(effect.effectName || '').includes('Зависимость')),
+        );
+        syncTimedEffectsToStore(withoutAddiction, storeNow);
+        setActiveTimedEffects(withoutAddiction);
+      }
+      if (removed.includes('diseased')) {
+        const storeNow = useCharacterStore.getState();
+        const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+        const withoutDiseases = removePersistentDiseaseEffects(currentEffects).effects;
+        syncTimedEffectsToStore(withoutDiseases, storeNow);
+        setActiveTimedEffects(withoutDiseases);
+      }
+    }
+
+    // 4. Зависимость. Каждая химическая доза входит в общий пул за 24 часа,
+    // даже если у текущего препарата нет свойства зависимости.
+    const dosesToday = item?.itemType === 'chem'
+      ? recordChemDose(item.id)
+      : 0;
+
+    // partyBoy: невосприимчив к алко-зависимости (item.isAlcohol === true)
+    const hasPartyBoyImmunity =
+      item?.isAlcohol === true &&
+      Boolean(useCharacterStore.getState().perkBonuses?.alcoholAddictionImmune);
+
+    let addictionResult = null;
+    // Стелс-бой: зависимость возможна ТОЛЬКО у Тени (решение владельца).
+    // У остальных ориджинов применения Стелс-боя не дают зависимости
+    // (ни броска, ни негативного эффекта).
+    const isShadowCharacter = origin?.id === 'shadow' || trait?.id === 'shadow';
+    const isStealthBoy = item?.id === 'chem_stealth_boy' || item?.id === 'stealth_boy';
+    if (
+      item?.addictionLevel > 0 &&
+      item?.negativeEffect === 'addiction' &&
+      !hasPartyBoyImmunity &&
+      (!isStealthBoy || isShadowCharacter)
+    ) {
+      // Тень: зависимость при ЛЮБОМ эффекте на боевом кубике
+      // (бросок CD, грани 5/6 = эффект).
+      const anyEffect = isShadowCharacter && isStealthBoy;
+      addictionResult = checkAddiction(item, dosesToday, { anyEffect });
+      if (addictionResult.addicted && !conditions.includes('addicted')) {
+        setConditions((prev) => [...prev, 'addicted']);
+        // Перманентный эффект зависимости: отображается в карточке эффектов,
+        // не истекает по сценам; снимается аддиктолом (removeCondition).
+        if (isStealthBoy) {
+          const addictionEffect = {
+            id: `negative-addiction-stealth-boy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            effectName: 'Зависимость: Стелс-бой',
+            effectLabel: 'Сложность тестов на восприятие и интеллект повышается на +2, а тестов на харизму на +1, пока не вылечитесь.',
+            effectKind: 'negative',
+            sourceName: 'Стелс-бой',
+            createdAt: Date.now(),
+            isPermanent: true,
+            scenesLeft: 9999,
+          };
+          const store2 = useCharacterStore.getState();
+          syncTimedEffectsToStore([...normalizedResult.effects, addictionEffect], store2);
+          setActiveTimedEffects([...normalizedResult.effects, addictionEffect]);
+        }
+      }
+    }
+
+    const diseaseRiskResult = applyDiseaseExposureForConsumable(item);
+
+    debugLog('consumable.apply.result', {
+      timedResult,
+      addictionResult,
+      diseaseRiskResult,
+      conditionsRemoved: removed,
+      conditionRemovalsRequested,
+      healAmount: vitalChanges.healAmount,
+      radiationAmount: vitalChanges.radiationAmount,
+    });
+
+    return {
+      timedResult: { ...timedResult, expired: normalizedCurrent.expired },
+      addictionResult,
+      diseaseRiskResult,
+      conditionsRemoved: removed,
+      conditionRemovalsRequested,
+      healAmount: vitalChanges.healAmount,
+      radiationAmount: vitalChanges.radiationAmount,
+    };
+  };
+
+  const applyConsumableTimedEffects = (item) => {
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+    const result = applyConsumableToEffects(item, normalizedCurrent.effects);
+    const normalizedResult = pruneExpiredTimedEffects(result.effects);
+    syncTimedEffectsToStore(normalizedResult.effects, store);
+    setActiveTimedEffects(normalizedResult.effects);
+
+    if (normalizedResult.effects.length > 0) {
+      const timerPreview = normalizedResult.effects
+        .map((effect) => `${effect.effectName || effect.effectLabel}: ${effect.scenesLeft} scenes`)
+        .join(' | ');
+      debugLog('consumable.timedEffects', { timerPreview });
+    } else {
+      debugLog('consumable.timedEffects', { timerPreview: null });
+    }
+
+    return {
+      ...result,
+      expired: normalizedCurrent.expired,
+    };
+  };
+
+  const advanceScene = () => {
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+    const { effects: nextEffects, expired } = advanceEffectsByScene(normalizedCurrent.effects);
+    expired.forEach((effect) => store.expireEffect(effect.id));
+
+    nextEffects.forEach((effect) => {
+      if (store.effects[effect.id]) {
+        store.updateEffect(effect.id, {
+          scenesLeft: effect.scenesLeft,
+          expiresAt: effect.expiresAt,
+          durationMs: effect.durationMs,
+        });
+      }
+    });
+
+    setActiveTimedEffects(nextEffects);
+    setSceneCounter((prev) => prev + 1);
+    store.triggerDependentCalculations();
+    return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+  };
+
+  const commitAttributeChanges = (newAttributes, pointsSpent) => {
+    debugLog('ctx.deprecatedCommitAttributeChanges');
+
+    // Calculate deltas from current attributes to new attributes
+    const currentAttributesArray = attributes;
+    const currentAttributesMap = {};
+    currentAttributesArray.forEach(attr => {
+      currentAttributesMap[attr.name] = attr.value;
+    });
+
+    newAttributes.forEach(newAttr => {
+      const currentAttr = currentAttributesMap[newAttr.name];
+      const delta = newAttr.value - (currentAttr || 0);
+
+      if (delta !== 0) {
+        // Use Zustand Store action
+        useCharacterStore.getState().updateAttribute(newAttr.name, delta);
+      }
+    });
+
+    // Update other state fields
+    setAvailablePerkAttributePoints(prev => prev - pointsSpent);
+    const newLuck = getLuckPoints(newAttributes, trait);
+    setMaxLuckPoints(newLuck);
+    setLuckPoints(prevLuck => Math.min(prevLuck, newLuck));
+    setCarryWeight(calculateCarryWeight(newAttributes, trait, { equippedArmor, equippedRobotSlots }));
+    setMeleeBonus(calculateMeleeBonus(newAttributes, trait));
+    setInitiative(calculateInitiative(newAttributes));
+    setDefense(calculateDefense(newAttributes));
+    const newMaxHealth = calculateMaxHealth(newAttributes, level);
+    setCurrentHealth(prevHealth => Math.min(prevHealth, newMaxHealth));
+  };
+
+  const resetCharacter = (preserveOrigin = false) => {
+    const initialAttributes = createInitialAttributes();
+    const initialLevel = INITIAL_LEVEL;
+    setLevel(initialLevel);
+    const initialSkills = ALL_SKILLS.map(s => ({ ...s, value: 0 }));
+    setAttributes(initialAttributes);
+    setSkills(initialSkills);
+    setSelectedSkills([]);
+    setExtraTaggedSkills([]);
+    setForcedSelectedSkills([]);
+    setAttributesSaved(false);
+    setSkillsSaved(false);
+    const initialLuck = getLuckPoints(initialAttributes);
+    setMaxLuckPoints(initialLuck);
+    setLuckPoints(initialLuck);
+    if (!preserveOrigin) setOrigin(null);
+    setTrait(null);
+    setEquipment(null);
+    setEffects([]);
+    setActiveTimedEffects([]);
+    setSceneCounter(0);
+    const emptySceneRiskStates = {};
+    sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
+    setSceneRiskStates(emptySceneRiskStates);
+    setEquippedWeapons([]);
+    useCharacterStore.persist?.clearStorage?.();
+    useCharacterStore.getState().resetCharacterStore({
+      attributes: initialAttributes,
+      skills: initialSkills,
+    });
+    setEquippedRobotSlots(null);
+    setEquippedRobotModules([]);
+    setEquippedArmor(createEmptyEquippedArmor());
+    setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+    setPowerArmorRuntime(createEmptyPowerArmorRuntime());
+    setPendingCoreChoice(null);
+    setCaps(0);
+    setSelectedPerks([]);
+    setConditions([]);
+    setChemDosesLog([]);
+    setMeleeBonus(0);
+    setInitiative(calculateInitiative(initialAttributes));
+    setDefense(calculateDefense(initialAttributes));
+    const currentMaxHealth = calculateMaxHealth(initialAttributes, initialLevel);
+    setCurrentHealth(currentMaxHealth);
+    setModifiedItems(new Map());
+    // Reset save status.
+    setCharacterName('');
+    setCharacterId(null);
+    setIsSaved(false);
+    isSavedRef.current = false;
+    characterIdRef.current = null;
+  };
+
+  /**
+   * Сброс комплекта снаряжения (при смене ориджина или комплекта):
+   * очищает инвентарь, награды за навыки (rewardedSkills), снаряжение, слоты
+   * робота и крышки. Атрибуты/навыки и сам персонаж сохраняются.
+   */
+  const resetKitAndRewards = useCallback(() => {
+    setEquipment(null);
+    setEquippedWeapons([]);
+    setEquippedRobotSlots(null);
+    setEquippedRobotModules([]);
+    setEquippedArmor(createEmptyEquippedArmor());
+    setCaps(0);
+    // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
+    const { attributes: legacyAttributes, skills: legacySkills } =
+      denormalizeCharacterState(useCharacterStore.getState());
+    useCharacterStore.getState().resetCharacterStore({
+      attributes: legacyAttributes,
+      skills: legacySkills,
+      rewardedSkills: [],
+    });
+    setSelectedSkills([]);
+    setExtraTaggedSkills([]);
+    setForcedSelectedSkills([]);
+    setSkillsSaved(false);
+  }, []);
+
+  const value = {
+    characterName, setCharacterName,
+    characterId,
+    isSaved,
+    saveCharacter,
+    loadCharacter,
+    getCharactersList,
+    deleteCharacter,
+    level, setLevel,
+    attributes, setAttributes,
+    skills, setSkills,
+    selectedSkills, setSelectedSkills,
+    extraTaggedSkills, setExtraTaggedSkills,
+    forcedSelectedSkills, setForcedSelectedSkills,
+    origin, setOrigin,
+    trait, setTrait,
+    equipment, setEquipment,
+    effects, setEffects,
+    activeTimedEffects, setActiveTimedEffects,
+    sceneCounter,
+    sceneRiskStates,
+    sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
+    applyConsumableTimedEffects,
+    applyConsumableFull,
+    conditions, setConditions,
+    chemDosesLog,
+    advanceScene,
+    equippedWeapons, setEquippedWeapons,
+    equippedRobotSlots, setEquippedRobotSlots,
+    equippedRobotModules, setEquippedRobotModules,
+    equippedArmor, setEquippedArmor,
+    // Силовая броня (docs/architecture/power-armor-plan.md): состояние пакета,
+    // накопитель расхода блока, диалог выбора блока и действия слоя.
+    equippedPowerArmor, setEquippedPowerArmor,
+    powerArmorRuntime,
+    pendingCoreChoice,
+    resolveCoreChoice,
+    equipPowerArmorPackage,
+    unequipPowerArmorPackage,
+    equipPowerArmorPiece: equipPowerArmorPieceInto,
+    unequipPowerArmorPieceAt,
+    adjustPowerArmorDurability,
+    repairPowerArmorPieceAt,
+    repairPowerArmorStack,
+    caps, setCaps,
+    currentHealth, setCurrentHealth,
+    radiation, setRadiation,
+    luckPoints, setLuckPoints,
+    maxLuckPoints, setMaxLuckPoints,
+    attributesSaved, setAttributesSaved,
+    skillsSaved, setSkillsSaved,
+    selectedPerks, setSelectedPerks,
+    modifiedItems, setModifiedItems,
+    carryWeight,
+    meleeBonus,
+    initiative,
+    defense,
+    // Canonical id only. No alias/fallback to localized name.
+    // Single-trait: trait.id matches. Multi-trait (NCR/Survivor): trait.ids[] contains it.
+    hasTrait: (id) => !!(
+      trait && (
+        trait.id === id ||
+        (Array.isArray(trait?.ids) && trait.ids.includes(id))
+      )
+    ),
+    getItemId,
+    getModifiedItem,
+    saveModifiedItem,
+    removeModifiedItem,
+    resetCharacter,
+    resetKitAndRewards,
+    availablePerkAttributePoints,
+    addPerkAttributePoints,
+    commitAttributeChanges,
+    meetsPerkRequirements: (perk) => meetsPerkRequirements(perk, attributes, level),
+    getPerkUnmetReasons: (perk) => getPerkUnmetReasons(perk, attributes, level),
+    annotatePerks: (perks) => annotatePerks(perks, attributes, level),
+  };
+
+  return (
+    <CharacterContext.Provider value={value}>
+      {children}
+    </CharacterContext.Provider>
+  );
+};
+
+export const useCharacter = () => {
+  return useContext(CharacterContext);
+};
+
+// --- Wrapper Hooks for Zustand Store (Task 4.1) ---
+
+/**
+ * Hook to access character attributes through Zustand Store
+ * @param {string} attrId - Attribute ID (e.g., 'STR', 'END', 'PER')
+ * @returns {Object} Attribute with base, modifiers, and total
+ */
+export const useCharacterAttribute = (attrId) => {
+  const attribute = useCharacterStore((state) => state.attributes[attrId]);
+
+  // Warn if attribute doesn't exist (should be created on load)
+  if (!attribute) {
+    debugLog('store.attrNotFound', { attrId, where: 'useCharacterAttribute' });
+  }
+
+  return attribute;
+};
+
+/**
+ * Hook to access character items through Zustand Store
+ * @param {string} itemId - Item ID
+ * @returns {Object} Item object with all parameters
+ */
+export const useCharacterItem = (itemId) => {
+  const item = useCharacterStore((state) => state.items[itemId]);
+
+  // Warn if item doesn't exist
+  if (!item) {
+    debugLog('store.itemNotFound', { itemId, where: 'useCharacterItem' });
+  }
+
+  return item;
+};
+
+/**
+ * Hook to access active effects through Zustand Store
+ * @param {string} effectId - Effect ID
+ * @returns {Object} Effect object with parameters
+ */
+export const useCharacterEffect = (effectId) => {
+  const effect = useCharacterStore((state) => state.effects[effectId]);
+
+  // Warn if effect doesn't exist
+  if (!effect) {
+    debugLog('store.effectNotFound', { effectId, where: 'useCharacterEffect' });
+  }
+
+  return effect;
+};
+
+/**
+ * Hook to get all attributes from Zustand Store
+ * @returns {Object} Dictionary of all attributes
+ */
+export const useCharacterAttributes = () => {
+  return useCharacterStore((state) => state.attributes);
+};
+
+/**
+ * Hook to get all items from Zustand Store
+ * @returns {Object} Dictionary of all items
+ */
+export const useCharacterItems = () => {
+  return useCharacterStore((state) => state.items);
+};
+
+/**
+ * Hook to get all active effects from Zustand Store
+ * @returns {Object} Dictionary of all active effects
+ */
+export const useCharacterEffects = () => {
+  return useCharacterStore((state) => state.effects);
+};
+
+// ── Robot selectors (read-only) — экраны читают робо-состояние из стора ──────
+// Используйте эти хуки вместо чтения equippedRobotSlots/Modules из useCharacter(),
+// чтобы UI реактивно обновлялся из единого источника правды и не мутировал данные.
+
+/** Все слоты робота { [slotKey]: SlotData }. */
+export const useRobotSlots = () => {
+  return useCharacterStore((state) => state.robot?.slots || {});
+};
+
+/** Установленные модули робота. */
+export const useRobotModules = () => {
+  return useCharacterStore((state) => state.robot?.modules || []);
+};
+
+/** Текущий body plan робота (e.g. 'protectron'). */
+export const useRobotBodyPlan = () => {
+  return useCharacterStore((state) => state.robot?.bodyPlan ?? null);
+};
+
+===== components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js =====
+171 components/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+import React, { useMemo, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { useCharacter } from '../../CharacterContext';
+import { getTraitNameKey, resolveTraitDisplayName, getTraitDisplayDescription } from '../../../domain/traits';
+import { useLocale, useModuleLocale } from '../../../i18n/locale';
+import perksData from '../../../modules/fallout/data/perks/perks.json';
+import PerkSelectModal from './PerkSelectModal';
+import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
+import styles from '../../../styles/PerksAndTraitsScreen.styles';
+import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
+import { getPerkDisplay, withPerkDisplay } from './perksDisplay';
+
+const PerksAndTraitsScreen = () => {
+  const { 
+    trait, level, selectedPerks, setSelectedPerks, annotatePerks, 
+    addPerkAttributePoints, attributesSaved 
+  } = useCharacter();
+  useLocale(); // интерфейс движка
+  useModuleLocale(); // контент активного сеттинга
+  const [isPerkModalVisible, setPerkModalVisible] = useState(false);
+  const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
+  const perkLimit = level + extraPerkSlots;
+
+  // Создаем массив из 20 строк
+  const emptyRows = Array(20).fill(null);
+
+  const annotatedPerks = useMemo(() => annotatePerks(perksData), [annotatePerks]);
+
+  const handleAddPerkPress = () => {
+    if (selectedPerks.length >= perkLimit) {
+      const message = tPerksAndTraits('warnings.perkLimitReached');
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert(tPerksAndTraits('alerts.warningTitle'), message);
+      }
+      return;
+    }
+    setPerkModalVisible(true);
+  };
+
+  const handleChoosePerk = (perk) => {
+    if (!perk) return;
+    
+    // Блокируем выбор, если уже взяли максимум на уровне (доп. защита)
+    if (selectedPerks.length >= perkLimit) {
+      const message = tPerksAndTraits('warnings.perkLimitReached');
+      if (Platform.OS === 'web') {
+        window.alert(message);
+      } else {
+        Alert.alert(tPerksAndTraits('alerts.warningTitle'), message);
+      }
+      return;
+    }
+
+    const selectedPerk = withPerkDisplay(perk);
+
+    // Специальная обработка перка по стабильному id, без привязки к русскому названию.
+    if (selectedPerk.id === 'intenseTraining') {
+      const canTakeIntensiveTraining = level >= 2 || attributesSaved;
+      
+      if (!canTakeIntensiveTraining) {
+        const message = tPerksAndTraits('errors.intensiveTrainingRequirements');
+        if (Platform.OS === 'web') {
+          window.alert(message);
+        } else {
+          Alert.alert(tPerksAndTraits('alerts.errorTitle'), message);
+        }
+        return;
+      }
+
+      const attributeBonus = 1;
+      addPerkAttributePoints(attributeBonus);
+      
+      const successMessage = tPerksAndTraits('perkSelected.intensiveTrainingSuccess')
+        .replace('{perkName}', selectedPerk.perk_name)
+        .replace('{bonus}', attributeBonus);
+      if (Platform.OS === 'web') {
+        window.alert(successMessage);
+      } else {
+        Alert.alert(tPerksAndTraits('alerts.perkSelectedTitle'), successMessage);
+      }
+    }
+
+    setSelectedPerks(prev => [...prev, selectedPerk]);
+    setPerkModalVisible(false);
+  };
+
+  return (
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.table}>
+          {/* Заголовок таблицы */}
+          <View style={[styles.row, styles.headerRow]}>
+            <Text style={[styles.cell, styles.headerText, styles.nameColumn]}>{tPerksAndTraits('labels.name')}</Text>
+            <Text style={[styles.cell, styles.headerText, styles.rankColumn]}>{tPerksAndTraits('labels.rank')}</Text>
+            <Text style={[styles.cell, styles.headerText, styles.descriptionColumn]}>{tPerksAndTraits('labels.description')}</Text>
+          </View>
+
+          {/* Строка с чертой, если она есть */}
+          {trait && (() => {
+            const selectedNames = trait?.modifiers?.selectedTraitNames;
+            if (Array.isArray(selectedNames) && selectedNames.length > 0) {
+              return selectedNames.map((name, idx) => {
+                const resolvedName = resolveTraitDisplayName(name);
+                return (
+                  <View key={`trait-${idx}-${name}`} style={styles.row}>
+                    <Text style={[styles.cell, styles.nameColumn]}>{resolvedName}</Text>
+                    <Text style={[styles.cell, styles.rankColumn]}></Text>
+                    {renderTextWithIcons(
+                      // getTraitDescriptionKey не читает modifiers — описание резолвится
+                      // по имени внутри домена (findTraitByLocalizedName), легаси-мапа
+                      // TRAITS из удалённого traitsData.js была no-op для рендера.
+                      getTraitDisplayDescription({ name }),
+                      [styles.cell, styles.descriptionColumn]
+                    )}
+                  </View>
+                );
+              });
+            }
+            return (
+              <View style={styles.row}>
+                <Text style={[styles.cell, styles.nameColumn]}>{getTraitNameKey(trait)}</Text>
+                <Text style={[styles.cell, styles.rankColumn]}></Text>
+                {renderTextWithIcons(
+                  getTraitDisplayDescription(trait),
+                  [styles.cell, styles.descriptionColumn]
+                )}
+              </View>
+            );
+          })()}
+
+          {/* Выбранные перки (по уровням) */}
+          {selectedPerks.map((perk, idx) => {
+            const display = getPerkDisplay(perk);
+            return (
+              <View key={`perk-${perk.id || idx}`} style={styles.row}>
+                <Text style={[styles.cell, styles.nameColumn]}>{display.name}</Text>
+                <Text style={[styles.cell, styles.rankColumn]}>{perk.rank ?? ''}</Text>
+                {renderTextWithIcons(display.description, [styles.cell, styles.descriptionColumn])}
+              </View>
+            );
+          })}
+
+          {/* Пустые строки */}
+          {emptyRows.map((_, index) => (
+            <View key={index} style={styles.row}>
+              <Text style={[styles.cell, styles.nameColumn]}></Text>
+              <Text style={[styles.cell, styles.rankColumn]}></Text>
+              <Text style={[styles.cell, styles.descriptionColumn]}></Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Кнопка Добавить перк */}
+      <TouchableOpacity style={styles.addPerkButton} onPress={handleAddPerkPress}>
+        <Text style={styles.addPerkButtonText}>{tPerksAndTraits('buttons.addPerk')}</Text>
+      </TouchableOpacity>
+
+      <PerkSelectModal
+        visible={isPerkModalVisible}
+        onClose={() => setPerkModalVisible(false)}
+        annotatedPerks={annotatedPerks}
+        onChoosePerk={handleChoosePerk}
+      />
+    </View>
+  );
+};
+
+export default PerksAndTraitsScreen; 
+
+===== components/screens/PerksAndTraitsScreen/PerkSelectModal.js =====
+130 components/screens/PerksAndTraitsScreen/PerkSelectModal.js
+import React, { useEffect, useState } from 'react';
+import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import styles from '../../../styles/PerkSelectModal.styles';
+import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
+import { getPerkDisplay } from './perksDisplay';
+
+const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
+
+const PerkSelectModal = ({ visible, onClose, annotatedPerks, onChoosePerk }) => {
+  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [selectedPerk, setSelectedPerk] = useState(null);
+
+  useEffect(() => {
+    if (visible) {
+      setExpandedIndex(null);
+      setSelectedPerk(null);
+    }
+  }, [visible]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>{tPerksAndTraits('modal.title')}</Text>
+
+          <ScrollView style={{ maxHeight: 420 }}>
+            {(annotatedPerks || []).map((entry, index) => {
+              const { perk, available, unmet } = entry;
+              const isExpanded = expandedIndex === index;
+              const display = getPerkDisplay(perk);
+              const isSelected = isSamePerkRank(selectedPerk, perk);
+              
+              // После выбора строка подсвечивается и сворачивается; подтвердить можно кнопкой внизу.
+              const shouldShowExpanded = isExpanded && !isSelected;
+              
+              return (
+                <View
+                  key={`${perk.id || index}-${perk.rank || ''}`}
+                  style={[styles.perkItem, !available && styles.perkDisabled]}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      // При клике на заголовок перка переключаем показ описания.
+                      setExpandedIndex(isExpanded ? null : index);
+                    }}
+                    style={[styles.perkHeader, isSelected && styles.selectedPerk]}
+                  >
+                    <Text style={[styles.perkName, !available && styles.perkNameDisabled, isSelected && styles.selectedPerkName]}>
+                      {display.name}
+                    </Text>
+                  </TouchableOpacity>
+                  {shouldShowExpanded && (
+                    <View style={styles.perkBody}>
+                      <Text style={styles.perkDescription}>{display.description}</Text>
+                      {!available && unmet && (
+                        <View style={styles.unmetContainer}>
+                          {unmet.level && (
+                            <Text style={styles.unmetText}>
+                              {tPerksAndTraits('modal.requiresLevel')
+                                .replace('{required}', unmet.level.required)
+                                .replace('{current}', unmet.level.current)}
+                            </Text>
+                          )}
+                          {unmet.attributes && Object.entries(unmet.attributes).map(([code, info]) => (
+                            <Text key={`${perk.id || index}-${code}`} style={styles.unmetText}>
+                              {tPerksAndTraits('modal.requiresAttribute')
+                                .replace('{code}', code)
+                                .replace('{required}', info.required)
+                                .replace('{current}', info.current)}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (isSelected) {
+                            // Отменить выбор
+                            setSelectedPerk(null);
+                          } else {
+                            // Выбрать один перк для текущего открытия модального окна
+                            setSelectedPerk(perk);
+                          }
+                        }}
+                        style={[
+                          styles.chooseButton,
+                          !available && styles.chooseButtonDisabled,
+                          isSelected && styles.selectedChooseButton
+                        ]}
+                        disabled={!available}
+                      >
+                        <Text style={styles.chooseButtonText}>
+                          {isSelected ? tPerksAndTraits('modal.buttons.cancelChoice') : tPerksAndTraits('modal.buttons.choose')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]} 
+              onPress={() => {
+                if (selectedPerk) {
+                  onChoosePerk && onChoosePerk(selectedPerk);
+                }
+                onClose();
+              }}
+              disabled={!selectedPerk}
+            >
+              <Text style={styles.modalButtonText}>{tPerksAndTraits('modal.buttons.confirm')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={onClose}>
+              <Text style={styles.modalButtonText}>{tPerksAndTraits('modal.buttons.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+export default PerkSelectModal;
+
+===== components/screens/PerksAndTraitsScreen/perksDisplay.js =====
+45 components/screens/PerksAndTraitsScreen/perksDisplay.js
+import ruPerksData from '../../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+import enPerksData from '../../../modules/fallout/i18n/en-EN/data/perks/perks.json';
+import { getCurrentModuleLocale } from '../../../i18n/locale';
+
+const DICTIONARIES = {
+  'ru-RU': ruPerksData,
+  'en-EN': enPerksData,
+};
+
+const byId = (entries = []) => new Map(entries.map((entry) => [entry.id, entry]));
+const PERKS_BY_LOCALE = Object.fromEntries(
+  Object.entries(DICTIONARIES).map(([locale, entries]) => [locale, byId(entries)]),
+);
+
+const getLocaleMap = () => {
+  const locale = getCurrentModuleLocale();
+  const localizedPerks = PERKS_BY_LOCALE[locale];
+  if (!localizedPerks) {
+    throw new Error(`[perksDisplay] Для языка сеттинга "${locale}" нет каталога перков`);
+  }
+  return localizedPerks;
+};
+
+export const getPerkDisplay = (perk) => {
+  if (!perk) return { name: '', description: '' };
+  if (!perk.id) throw new Error('[perksDisplay] Перк без id');
+  const localized = getLocaleMap().get(perk.id);
+  if (!localized) {
+    throw new Error(`[perksDisplay] Для перка "${perk.id}" нет перевода`);
+  }
+
+  return {
+    name: localized.name,
+    description: localized.effect,
+  };
+};
+
+export const withPerkDisplay = (perk) => {
+  const display = getPerkDisplay(perk);
+  return {
+    ...perk,
+    perk_name: display.name,
+    description: display.description,
+  };
+};
+
+===== styles/PerkSelectModal.styles.js =====
+75 styles/PerkSelectModal.styles.js
+import { StyleSheet } from 'react-native';
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '92%',
+    maxWidth: 640,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+  },
+  modalTitle: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  perkItem: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  perkDisabled: { backgroundColor: '#f1f5f9' },
+  selectedPerk: { backgroundColor: '#299764' },
+  selectedPerkName: { color: '#fff' },
+  perkHeader: { paddingHorizontal: 10, paddingVertical: 10 },
+  perkName: { color: '#000', fontWeight: 'bold' },
+  perkNameDisabled: { color: '#9aa1a9' },
+  perkBody: { paddingHorizontal: 10, paddingBottom: 10 },
+  perkDescription: { color: '#000', marginBottom: 8 },
+  chooseButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#16a34a',
+  },
+  chooseButtonDisabled: { backgroundColor: '#9ca3af', borderColor: '#9ca3af' },
+  selectedChooseButton: { backgroundColor: '#ef4444', borderColor: '#b91c1c' },
+  chooseButtonText: { color: '#fff', fontWeight: 'bold' },
+  unmetContainer: { marginBottom: 8 },
+  unmetText: { color: '#dc2626', marginBottom: 2 },
+  modalButtons: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  confirmButton: {
+    backgroundColor: '#16a34a',
+    borderColor: '#15803d',
+    marginRight: 8,
+  },
+  cancelButton: { backgroundColor: '#ef4444', borderColor: '#b91c1c' },
+  modalButtonText: { color: '#fff', fontWeight: 'bold' },
+});
+
+export default styles;
+
+===== styles/PerksAndTraitsScreen.styles.js =====
+46 styles/PerksAndTraitsScreen.styles.js
+import { StyleSheet } from 'react-native';
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 16, alignItems: 'center' },
+  scrollView: { width: '100%' },
+  table: { width: '100%', borderWidth: 1, borderColor: '#5a5a5a' },
+  row: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#5a5a5a',
+    backgroundColor: '#fff',
+    borderStyle: 'dotted',
+    minHeight: 30,
+  },
+  headerRow: { backgroundColor: '#1a1a1a' },
+  cell: {
+    padding: 10,
+    color: '#000',
+    borderRightWidth: 1,
+    borderRightColor: '#5a5a5a',
+  },
+  headerText: {
+    fontWeight: 'bold',
+    color: '#fff',
+    flexWrap: 'nowrap',
+    whiteSpace: 'nowrap',
+  },
+  nameColumn: { width: 160, flexShrink: 0, flexGrow: 0 },
+  rankColumn: { width: 60, flexShrink: 0, flexGrow: 0, textAlign: 'center' },
+  descriptionColumn: { flex: 1, borderRightWidth: 0, minWidth: 0 },
+  placeholder: { padding: 10, color: '#888', textAlign: 'center' },
+  addPerkButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    backgroundColor: '#0ea5e9',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#0369a1',
+  },
+  addPerkButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+});
+
+export default styles;
+
+===== i18n/en-EN/screens/perksAndTraits/screen.json =====
+35 i18n/en-EN/screens/perksAndTraits/screen.json
+{
+  "labels": {
+    "name": "Name",
+    "rank": "Rank",
+    "description": "Description"
+  },
+  "buttons": {
+    "addPerk": "+ Add perk"
+  },
+  "alerts": {
+    "warningTitle": "Warning",
+    "errorTitle": "Error",
+    "perkSelectedTitle": "Perk selected"
+  },
+  "warnings": {
+    "perkLimitReached": "No more perks can be taken at the current level"
+  },
+  "errors": {
+    "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
+  },
+  "perkSelected": {
+    "intensiveTrainingSuccess": "Perk \"{perkName}\" selected! You received +{bonus} attribute point. Go to the \"Character\" tab to distribute it."
+  },
+  "modal": {
+    "title": "Select a perk",
+    "requiresLevel": "Requires level: {required} (current: {current})",
+    "requiresAttribute": "Requires {code}: {required} (current: {current})",
+    "buttons": {
+      "choose": "Select",
+      "cancelChoice": "Cancel selection",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
+    }
+  }
+}
+
+===== i18n/ru-RU/screens/perksAndTraits/screen.json =====
+35 i18n/ru-RU/screens/perksAndTraits/screen.json
+{
+  "labels": {
+    "name": "Название",
+    "rank": "Ранг",
+    "description": "Описание"
+  },
+  "buttons": {
+    "addPerk": "+ Добавить перк"
+  },
+  "alerts": {
+    "warningTitle": "Предупреждение",
+    "errorTitle": "Ошибка",
+    "perkSelectedTitle": "Перк выбран"
+  },
+  "warnings": {
+    "perkLimitReached": "На текущем уровне больше перков взять нельзя"
+  },
+  "errors": {
+    "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
+  },
+  "perkSelected": {
+    "intensiveTrainingSuccess": "Перк \"{perkName}\" выбран! Вы получили +{bonus} очко атрибута. Перейдите на вкладку \"Персонаж\", чтобы распределить его."
+  },
+  "modal": {
+    "title": "Выберите перк",
+    "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
+    "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
+    "buttons": {
+      "choose": "Выбрать",
+      "cancelChoice": "Отменить выбор",
+      "confirm": "Подтвердить",
+      "cancel": "Отмена"
+    }
+  }
+}
+
+===== __tests__/securitron/shadow-migration.test.js =====
+274 __tests__/securitron/shadow-migration.test.js
+/**
+ * Регрессии полной цепочки миграций персонажа-Тени.
+ *
+ * migrateCharacterState всегда проводит сейв до CURRENT_SCHEMA_VERSION,
+ * поэтому ожидания ниже проверяют итог всей цепочки, включая более позднюю
+ * замену старого комплекта на NIGHTKIN.
+ */
+import { describe, it, expect } from 'vitest';
+import { migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
+
+const attrArr = (name, value) => ({ name, value });
+
+const makeShadowSave = (attributes, version = 9) => ({
+  schemaVersion: version,
+  origin: { id: 'shadow' },
+  trait: { id: 'shadow' },
+  attributes,
+  skills: [{ name: 'SNEAK', value: 4 }],
+  selectedSkills: ['SNEAK'],
+  extraTaggedSkills: [],
+  level: 1,
+});
+
+const byName = (entries) => Object.fromEntries(entries.map((entry) => [entry.name, entry.value]));
+
+describe('Текущая версия формата сейва', () => {
+  it('равна 16', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+  });
+});
+
+describe('Полная цепочка от v11: сброс распределения Тени', () => {
+  it('сбрасывает флаги/навыки, сохраняет прочие поля и применяет более позднюю миграцию комплекта', () => {
+    const save = {
+      schemaVersion: 11,
+      origin: { id: 'shadow' },
+      trait: { id: 'shadow' },
+      attributesSaved: true,
+      skillsSaved: true,
+      selectedSkills: ['SNEAK'],
+      extraTaggedSkills: [],
+      skills: [
+        { name: 'SNEAK', value: 5 },
+        { name: 'MELEE_WEAPONS', value: 4 },
+        { name: 'SCIENCE', value: 0 },
+      ],
+      equipment: { items: [{ id: 'weapon_x' }] },
+      level: 2,
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.attributesSaved).toBe(false);
+    expect(migrated.skillsSaved).toBe(false);
+    expect(byName(migrated.skills)).toMatchObject({ SNEAK: 2, MELEE_WEAPONS: 0, SCIENCE: 0 });
+    expect(migrated.selectedSkills).toEqual(['SNEAK']);
+    expect(migrated.level).toBe(2);
+    expect(migrated.equipment).toMatchObject({ id: 'nightkin', name: 'Тень', items: [] });
+    expect(migrated.nightkinKitPending).toBe(true);
+  });
+
+  it('не меняет распределение не-Тени', () => {
+    const save = {
+      schemaVersion: 11,
+      origin: { id: 'vaultDweller' },
+      trait: { id: 'vault-dweller-trait' },
+      attributesSaved: true,
+      skillsSaved: true,
+      skills: [{ name: 'SNEAK', value: 5 }],
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.attributesSaved).toBe(true);
+    expect(migrated.skillsSaved).toBe(true);
+    expect(migrated.skills[0].value).toBe(5);
+  });
+});
+
+describe('Полная цепочка от v9: стартовые атрибуты Тени', () => {
+  it('сбрасывает SPECIAL и навыки, сохраняя выбор навыков и уровень', () => {
+    const save = {
+      ...makeShadowSave([
+        attrArr('STR', 10), attrArr('END', 3), attrArr('PER', 7),
+        attrArr('AGI', 4), attrArr('INT', 9), attrArr('CHA', 10), attrArr('LCK', 5),
+      ]),
+      attributesSaved: true,
+      skillsSaved: true,
+      skills: [attrArr('SNEAK', 5), attrArr('MELEE_WEAPONS', 4)],
+      equipment: { items: [{ id: 'weapon_x' }] },
+      level: 3,
+    };
+
+    const migrated = migrateCharacterState(save);
+    const attributes = byName(migrated.attributes);
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(attributes).toMatchObject({ STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 });
+    expect(migrated.attributesSaved).toBe(false);
+    expect(migrated.skillsSaved).toBe(false);
+    expect(byName(migrated.skills)).toMatchObject({ SNEAK: 2, MELEE_WEAPONS: 0 });
+    expect(migrated.selectedSkills).toEqual(['SNEAK']);
+    expect(migrated.level).toBe(3);
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.nightkinKitPending).toBe(true);
+  });
+
+  it('не сбрасывает атрибуты не-Тени', () => {
+    const save = {
+      schemaVersion: 9,
+      origin: { id: 'vaultDweller' },
+      trait: { id: 'vault-dweller-trait' },
+      attributes: [attrArr('STR', 8), attrArr('LCK', 9)],
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(byName(migrated.attributes)).toEqual({ STR: 8, LCK: 9 });
+  });
+});
+
+describe('Полная цепочка от v10: починка повреждённых attributes', () => {
+  it('восстанавливает массив и повторно сбрасывает Тень', () => {
+    const broken = makeShadowSave({
+      0: attrArr('STR', 10),
+      1: attrArr('END', 3),
+      2: attrArr('PER', 7),
+      3: attrArr('AGI', 4),
+      4: attrArr('INT', 9),
+      5: attrArr('CHA', 10),
+      6: attrArr('LCK', 5),
+    }, 10);
+
+    const migrated = migrateCharacterState(broken);
+
+    expect(Array.isArray(migrated.attributes)).toBe(true);
+    expect(byName(migrated.attributes)).toMatchObject({ STR: 6, END: 6, INT: 4, CHA: 4 });
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
+  it('восстанавливает массив не-Тени без изменения значений', () => {
+    const broken = {
+      schemaVersion: 10,
+      origin: { id: 'vaultDweller' },
+      trait: { id: 'vault-dweller-trait' },
+      attributes: { 0: attrArr('STR', 8), 1: attrArr('LCK', 9) },
+    };
+
+    const migrated = migrateCharacterState(broken);
+
+    expect(Array.isArray(migrated.attributes)).toBe(true);
+    expect(byName(migrated.attributes)).toEqual({ STR: 8, LCK: 9 });
+  });
+
+  it('не принимает произвольный объект за массив атрибутов', () => {
+    const save = { schemaVersion: 10, origin: { id: 'shadow' }, attributes: { foo: 'bar' } };
+    expect(migrateCharacterState(save).attributes).toEqual({ foo: 'bar' });
+  });
+
+  it('не падает для Тени без атрибутов', () => {
+    const save = { schemaVersion: 9, origin: { id: 'shadow' }, trait: { id: 'shadow' } };
+    expect(migrateCharacterState(save).attributes).toBeUndefined();
+  });
+});
+
+describe('Полная цепочка от v12: канонизация сохранённого трейта Тени', () => {
+  it('переводит старые modifiers в attributes и сбрасывает распределение', () => {
+    const save = {
+      schemaVersion: 12,
+      origin: { id: 'shadow' },
+      trait: {
+        ids: ['shadow'], id: 'shadow', name: 'Тень',
+        modifiers: {
+          attributeBonus: { STR: 2, END: 2 },
+          attributeLimits: {
+            STR: { min: 6, max: 12 }, END: { min: 6, max: 12 },
+            CHA: { max: 8 }, INT: { max: 8 },
+          },
+          skillMaxValue: 4,
+          immunities: ['radiation', 'poison'],
+          effects: ['stealth_boy_addiction'],
+        },
+      },
+      attributesSaved: true,
+      skillsSaved: true,
+      attributes: [
+        attrArr('STR', 4), attrArr('END', 4), attrArr('PER', 4), attrArr('AGI', 4),
+        attrArr('INT', 4), attrArr('CHA', 4), attrArr('LCK', 4),
+      ],
+      skills: [attrArr('SNEAK', 3), attrArr('ATHLETICS', 2)],
+      equipment: { id: 'default_caps_only', items: [{ itemType: 'currency', quantity: 100 }] },
+      level: 1,
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.trait.modifiers.attributes.STR).toEqual({ baseBonus: 2, min: 6, max: 12 });
+    expect(migrated.trait.modifiers.attributeBonus).toBeUndefined();
+    expect(migrated.trait.modifiers.attributeLimits).toBeUndefined();
+    expect(migrated.trait.modifiers.skillMaxValue).toBe(4);
+    expect(byName(migrated.attributes)).toMatchObject({ STR: 6, END: 6, PER: 4 });
+    expect(migrated.attributesSaved).toBe(false);
+    expect(migrated.skillsSaved).toBe(false);
+    expect(byName(migrated.skills)).toEqual({ SNEAK: 0, ATHLETICS: 0 });
+    expect(migrated.level).toBe(1);
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.nightkinKitPending).toBe(true);
+  });
+
+  it('не сбрасывает уже канонический трейт повторно', () => {
+    const save = {
+      schemaVersion: 12,
+      origin: { id: 'shadow' },
+      trait: { id: 'shadow', modifiers: { attributes: { STR: { baseBonus: 2, min: 6, max: 12 } }, skillMaxValue: 4 } },
+      attributesSaved: true,
+      skillsSaved: true,
+      attributes: [attrArr('STR', 8)],
+      skills: [attrArr('SNEAK', 4)],
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.trait.modifiers.attributes.STR.baseBonus).toBe(2);
+    expect(migrated.attributes[0].value).toBe(8);
+    expect(migrated.attributesSaved).toBe(true);
+  });
+});
+
+describe('Миграция v13→v14: старый комплект → NIGHTKIN', () => {
+  it('заменяет стартовый капитал Тени и ставит pending-флаг', () => {
+    const save = {
+      schemaVersion: 13,
+      origin: { id: 'shadow' },
+      trait: { id: 'shadow' },
+      equipment: { id: 'default_caps_only', name: 'Стартовый капитал', items: [{ itemType: 'currency', quantity: 100 }] },
+      caps: 100,
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.equipment).toMatchObject({ id: 'nightkin', name: 'Тень', items: [] });
+    expect(migrated.nightkinKitPending).toBe(true);
+  });
+
+  it('не трогает уже новый комплект', () => {
+    const save = {
+      schemaVersion: 13,
+      origin: { id: 'shadow' },
+      equipment: { id: 'nightkin', name: 'Тень', items: [] },
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.equipment.id).toBe('nightkin');
+    expect(migrated.nightkinKitPending).toBeUndefined();
+  });
+
+  it('не трогает комплект не-Тени', () => {
+    const save = {
+      schemaVersion: 13,
+      origin: { id: 'vaultDweller' },
+      equipment: { id: 'vault_resident', name: 'Житель Убежища' },
+    };
+
+    const migrated = migrateCharacterState(save);
+
+    expect(migrated.equipment.id).toBe('vault_resident');
+    expect(migrated.nightkinKitPending).toBeUndefined();
+  });
+});
+
+===== __tests__/store/scene-risk-migration.test.js =====
+55 __tests__/store/scene-risk-migration.test.js
+import { describe, expect, it } from 'vitest';
+import { migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
+
+describe('scene-risk state migrations', () => {
+  it('adds the canonical empty state through the v14 to v16 migration chain', () => {
+    const migrated = migrateCharacterState({
+      schemaVersion: 14,
+      characterName: 'Courier',
+    });
+
+    expect(CURRENT_SCHEMA_VERSION).toBe(16);
+    expect(migrated).toMatchObject({
+      schemaVersion: 16,
+      characterName: 'Courier',
+      sceneRiskStates: {},
+    });
+  });
+
+  it('converts the v15 accumulated modifier into a one-check pending modifier', () => {
+    const migrated = migrateCharacterState({
+      schemaVersion: 15,
+      sceneRiskStates: {
+        diseaseExposure: {
+          sceneStartedAt: 1_000,
+          eventIds: ['rawFood'],
+          difficultyModifier: 1,
+        },
+      },
+    });
+
+    expect(migrated).toEqual({
+      schemaVersion: 16,
+      sceneRiskStates: {
+        diseaseExposure: {
+          sceneStartedAt: 1_000,
+          eventIds: ['rawFood'],
+          pendingDifficultyModifier: 1,
+        },
+      },
+    });
+  });
+
+  it('rejects a malformed v15 scene state instead of inventing defaults', () => {
+    expect(() => migrateCharacterState({
+      schemaVersion: 15,
+      sceneRiskStates: {
+        diseaseExposure: {
+          sceneStartedAt: 1_000,
+          eventIds: ['rawFood'],
+        },
+      },
+    })).toThrow('Invalid v15 scene-risk state');
+  });
+});
+
+===== __tests__/perks/perk-selection.test.js =====
+MISSING
+
+===== __tests__/store/perk-duplicate-migration.test.js =====
+MISSING

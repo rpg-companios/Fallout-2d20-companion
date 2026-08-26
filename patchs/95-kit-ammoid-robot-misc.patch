@@ -1,0 +1,179 @@
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 4f3960f..0517091 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -162,6 +162,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+         [tInventory('modals.addItemModal.categories.robotFrame')]: equipmentCatalog.robotFrames || [],
+         [tInventory('modals.addItemModal.categories.robotBodyParts')]: equipmentCatalog.robotBody || [],
+         [tInventory('modals.addItemModal.categories.robotModules')]: equipmentCatalog.robotModules || [],
++        [tInventory('modals.addItemModal.categories.robotMisc')]: equipmentCatalog.robotItems || [],
+       },
+     };
+   }, [locale]);
+diff --git a/data/equipment/robotparts.json b/data/equipment/robotparts.json
+index f981028..91bab9d 100644
+--- a/data/equipment/robotparts.json
++++ b/data/equipment/robotparts.json
+@@ -8,20 +8,6 @@
+       "rarity": 0,
+       "healAmount": 6
+     },
+-    {
+-      "id": "robot_item_fertilizer_bag",
+-      "itemType": "misc",
+-      "weight": 1,
+-      "cost": 0,
+-      "rarity": 0
+-    },
+-    {
+-      "id": "food_mutafruit",
+-      "itemType": "food",
+-      "weight": 0.5,
+-      "cost": 0,
+-      "rarity": 0
+-    },
+     {
+       "id": "robot_item_printer",
+       "itemType": "misc",
+@@ -100,4 +86,4 @@
+     }
+   ],
+   "robotPartsUpgrade": []
+-}
+\ No newline at end of file
++}
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index fcd61db..a21d96a 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -223,6 +223,7 @@ export async function resolveWeaponItem(item) {
+     displayName,
+     name: displayName,
+     itemType: 'weapon',
++    ammoId: weaponData.ammoId ?? item.ammoId ?? null,
+     resolvedAmmunition,
+     hasMods: weaponData.hasMods ?? false,
+   };
+diff --git a/i18n/en-EN/screens/inventory/modals/addItemModal.json b/i18n/en-EN/screens/inventory/modals/addItemModal.json
+index e89d5e2..839a534 100644
+--- a/i18n/en-EN/screens/inventory/modals/addItemModal.json
++++ b/i18n/en-EN/screens/inventory/modals/addItemModal.json
+@@ -28,7 +28,8 @@
+     "robotArmorLayer": "Armor",
+     "robotFrame": "Frame",
+     "robotBodyParts": "Robot Body Parts",
+-    "robotModules": "Robot Modules"
++    "robotModules": "Robot Modules",
++    "robotMisc": "Misc"
+   },
+   "itemTypes": {
+     "weapon": "🔫 Weapon",
+diff --git a/i18n/ru-RU/screens/inventory/modals/addItemModal.json b/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+index 086ee6d..6c86a04 100644
+--- a/i18n/ru-RU/screens/inventory/modals/addItemModal.json
++++ b/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+@@ -28,7 +28,8 @@
+     "robotArmorLayer": "Броня",
+     "robotFrame": "Привод",
+     "robotBodyParts": "Части тела роботов",
+-    "robotModules": "Модули роботов"
++    "robotModules": "Модули роботов",
++    "robotMisc": "Разное"
+   },
+   "itemTypes": {
+     "weapon": "🔫 Оружие",
+diff --git a/modules/fallout/data/food.json b/modules/fallout/data/food.json
+index 22c3511..a0ffc43 100644
+--- a/modules/fallout/data/food.json
++++ b/modules/fallout/data/food.json
+@@ -834,5 +834,14 @@
+     "irradiated": true,
+     "effectKey": "",
+     "isMeat": true
++  },
++  {
++    "id": "food_mutafruit",
++    "name": "Мутафрукт",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "isMeat": false
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/data/general_goods.json b/modules/fallout/data/general_goods.json
+index 9ffb1bc..6593f9b 100644
+--- a/modules/fallout/data/general_goods.json
++++ b/modules/fallout/data/general_goods.json
+@@ -22,5 +22,13 @@
+     "value": 50,
+     "rarity": 1,
+     "weight": 0.1
++  },
++  {
++    "id": "robot_item_fertilizer_bag",
++    "name": "Мешок удобрений",
++    "itemType": "misc",
++    "weight": 1,
++    "cost": 0,
++    "rarity": 0
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/i18n/en-EN.json b/modules/fallout/i18n/en-EN.json
+index d254bf3..c374273 100644
+--- a/modules/fallout/i18n/en-EN.json
++++ b/modules/fallout/i18n/en-EN.json
+@@ -51,6 +51,10 @@
+     {
+       "id": "CasinoGomorrahChip",
+       "name": "Gomorrah Casino Chip"
++    },
++    {
++      "id": "robot_item_fertilizer_bag",
++      "name": "Fertilizer bag"
+     }
+   ],
+   "equipmentKits": {
+@@ -587,6 +591,11 @@
+       "id": "food_dog_meat",
+       "name": "Dog Meat",
+       "effectLabel": ""
++    },
++    {
++      "id": "food_mutafruit",
++      "name": "Mutfruit",
++      "effectLabel": ""
+     }
+   ],
+   "drinks": [
+diff --git a/modules/fallout/i18n/ru-RU.json b/modules/fallout/i18n/ru-RU.json
+index bc1bf17..8f16085 100644
+--- a/modules/fallout/i18n/ru-RU.json
++++ b/modules/fallout/i18n/ru-RU.json
+@@ -51,6 +51,10 @@
+     {
+       "id": "CasinoGomorrahChip",
+       "name": "Фишка казино «Гоморра»"
++    },
++    {
++      "id": "robot_item_fertilizer_bag",
++      "name": "Мешок удобрений"
+     }
+   ],
+   "equipmentKits": {
+@@ -586,6 +590,11 @@
+     {
+       "id": "food_dog_meat",
+       "name": "Собачатина"
++    },
++    {
++      "id": "food_mutafruit",
++      "name": "Мутафрукт",
++      "effectLabel": ""
+     }
+   ],
+   "drinks": [

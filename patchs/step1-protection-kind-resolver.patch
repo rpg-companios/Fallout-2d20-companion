@@ -1,0 +1,277 @@
+diff --git a/__tests__/armor-mod-categories/unique-mods-per-category.test.js b/__tests__/armor-mod-categories/unique-mods-per-category.test.js
+index f2a63e2..5ecceff 100644
+--- a/__tests__/armor-mod-categories/unique-mods-per-category.test.js
++++ b/__tests__/armor-mod-categories/unique-mods-per-category.test.js
+@@ -9,6 +9,7 @@ import {
+   isUniqueModAllowedForArmor,
+   applyArmorMods,
+ } from '../../domain/modsEquip';
++import { getProtectionKind, PROTECTION_KINDS } from '../../domain/protectionKind';
+ 
+ // Тест читает сырые JSON-данные напрямую (без react/db), собирая минимальный
+ // «каталог» в том же виде, в каком его отдаёт i18n/equipmentCatalog.
+@@ -143,3 +144,54 @@ describe('одежда не является бронёй — моды брон
+   });
+ });
+ 
++// ПРАВИЛО ВЛАДЕЛЬЦА: вид защиты определяется только полями данных
++// (itemType/clothingType/семейство брони) — НЕ названием и НЕ слотом,
++// в котором предмет лежит. Неизвестный вид → null → модов нет.
++describe('getProtectionKind — единый определитель вида защиты', () => {
++  it('броня → armor: по itemType и по id-префиксу (старые сейвы без itemType)', () => {
++    expect(getProtectionKind({ id: 'armor_leather_chest_001', itemType: 'armor', armorCategoryKey: 'leatherArmor' }))
++      .toBe(PROTECTION_KINDS.ARMOR);
++    expect(getProtectionKind({ id: 'armor_raider_chest_001' })).toBe(PROTECTION_KINDS.ARMOR);
++    expect(getProtectionKind({ id: 'armor_vault_fullbody_001' })).toBe(PROTECTION_KINDS.ARMOR);
++  });
++
++  it('одежда → clothing: обмундирование, костюм, головной убор (реальные данные)', () => {
++    const getClothing = (id) =>
++      dataClothes.clothes.flatMap((g) => g.items).find((i) => i.id === id);
++    expect(getProtectionKind(getClothing('clothing_nomad_outfit'))).toBe(PROTECTION_KINDS.CLOTHING);
++    expect(getProtectionKind(getClothing('clothing_sturdy_clothes'))).toBe(PROTECTION_KINDS.CLOTHING);
++    expect(getProtectionKind(getClothing('headwear_gas_mask'))).toBe(PROTECTION_KINDS.CLOTHING);
++    expect(getProtectionKind({ id: 'x', itemType: 'outfit' })).toBe(PROTECTION_KINDS.CLOTHING);
++  });
++
++  it('силовая броня → powerArmor по itemType из данных (не по названию)', () => {
++    expect(getProtectionKind({ id: 'power_armor_t45_chest', itemType: 'powerArmor' }))
++      .toBe(PROTECTION_KINDS.POWER_ARMOR);
++  });
++
++  it('не защита / мусор → null', () => {
++    expect(getProtectionKind(null)).toBeNull();
++    expect(getProtectionKind({})).toBeNull();
++    expect(getProtectionKind({ id: 'chem_radaway', itemType: 'chem' })).toBeNull();
++  });
++
++  it('ПРАВИЛО: название не влияет — «силовая броня» в имени не делает предмет силовой', () => {
++    const tricky = { id: 'armor_combat_chest_001', itemType: 'armor', name: 'Силовая боевая броня' };
++    expect(getProtectionKind(tricky)).toBe(PROTECTION_KINDS.ARMOR);
++  });
++
++  it('инвариант: моды брони доступны строго тогда, когда вид = armor', () => {
++    const cases = [
++      [{ ...onePiece('leatherArmor'), itemType: 'armor' }, true],
++      [{ id: 'clothing_nomad_outfit', itemType: 'clothing', clothingType: 'outfit', protectedAreas: ['Body', 'Hand', 'Leg'] }, false],
++      [{ id: 'power_armor_t45_chest', itemType: 'powerArmor', protectedAreas: ['Body'] }, false],
++      [{ id: 'misc_junk' }, false],
++    ];
++    for (const [item, expectAvailable] of cases) {
++      const { standardMods, uniqueMods } = getAvailableArmorMods(item, catalog);
++      expect(standardMods.length + uniqueMods.length > 0, item.id).toBe(expectAvailable);
++      expect(getProtectionKind(item) === PROTECTION_KINDS.ARMOR, item.id).toBe(expectAvailable);
++    }
++  });
++});
++
+diff --git a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index a120b18..2bb9f0f 100644
+--- a/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -20,6 +20,7 @@ import { renderTextWithIcons } from './textUtils';
+ import { useLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { applyArmorMods } from '../../../domain/modsEquip';
++import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+ import { getEffectTimeText, getTimedMaxHpBonus, getTimedDamageResistanceBonus } from '../../../domain/effects';
+ import { resolveWeaponQualities, resolveWeaponDamageType } from '../../../domain/weaponDisplay';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../domain/immunities';
+@@ -730,16 +731,16 @@ const WeaponsAndArmorScreen = () => {
+     const energyDef = Math.max(Number(modifiedArmor?.energyDamageRating || 0), Number(modifiedClothing?.energyDamageRating || 0)) + (timedDR.energy || 0);
+     const radDef = Math.max(Number(modifiedArmor?.radiationDamageRating || 0), Number(modifiedClothing?.radiationDamageRating || 0)) + (timedDR.radiation || 0);
+ 
+-    // ПРАВИЛО (от владельца): одежда — НЕ броня, модов брони на одежду нет.
+-    // «Улучшить одежду» скрыта: данных модов одежды пока нет (вернём, когда появятся).
+-    // Обмундирование/костюмы, экипированные в слот брони, «Улучшить броню» не получают.
+-    const isClothingLike = (item) =>
+-      Boolean(item) && (item.itemType === 'clothing' || item.itemType === 'outfit' || Boolean(item.clothingType));
++    // ПРАВИЛО (от владельца): вид предмета решает domain/protectionKind.js,
++    // а не слот, в котором предмет лежит. Кнопку «Улучшить броню» получает
++    // только вид 'armor': одежда в слоте брони её не получает, модов брони
++    // на одежду нет. «Улучшить одежду» скрыта: данных модов одежды пока нет
++    // (вернём, когда появятся).
+     const stats = [
+       { label: tWeaponsAndArmorScreen('armor.fields.physical'), value: physDef > 0 ? physDef : tWeaponsAndArmorScreen('common.none') },
+       { label: tWeaponsAndArmorScreen('armor.fields.energy'), value: energyDef > 0 ? energyDef : tWeaponsAndArmorScreen('common.none') },
+       { label: tWeaponsAndArmorScreen('armor.fields.radiation'), value: hasRadImmunity ? '∞' : (radDef > 0 ? radDef : tWeaponsAndArmorScreen('common.none')) },
+-      ...(modifiedArmor && !isClothingLike(modifiedArmor) ? [{ label: tWeaponsAndArmorScreen('armor.fields.armorModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'armor') }] : []),
++      ...(getProtectionKind(modifiedArmor) === PROTECTION_KINDS.ARMOR ? [{ label: tWeaponsAndArmorScreen('armor.fields.armorModification'), value: '⋯', type: 'button', onPress: () => handleOpenArmorModal(slotKey, 'armor') }] : []),
+     ];
+ 
+     if (slotKey === 'body' && robotBodyUpgrade) {
+diff --git a/domain/modsEquip.js b/domain/modsEquip.js
+index 55c1660..bdb09d4 100644
+--- a/domain/modsEquip.js
++++ b/domain/modsEquip.js
+@@ -3,6 +3,7 @@
+ // Pure functions — no React, no UI dependencies.
+ 
+ import { clampRangeIndex, indexToRangeName } from './range.js';
++import { getProtectionKind, PROTECTION_KINDS, resolveArmorCategoryKey } from './protectionKind.js';
+ 
+ // ---------------------------------------------------------------------------
+ // WEAPON MODIFICATIONS
+@@ -338,35 +339,11 @@ const hasIntersection = (a = [], b = []) => a.some((x) => b.includes(x));
+ // У каждой категории брони свой набор уникальных модов (напр. только кожаной
+ // броне доступны leatherUniqueMods). Неизвестная/неопределённая категория →
+ // уникальных модов НЕТ вообще (fail-closed), а не «все моды всем».
+-const ARMOR_ID_CATEGORY_PREFIX = {
+-    armor_raider_: 'raiderArmor',
+-    armor_leather_: 'leatherArmor',
+-    armor_metal_: 'metalArmor',
+-    armor_combat_: 'combatArmor',
+-    armor_synth_: 'synthArmor',
+-    armor_vault_: 'vaultSecurityArmor',
+-};
+-
+-/**
+- * Resolves the armor category key (as in data/equipment/armor.json) for an item.
+- * 1. item.armorCategoryKey, если он известен каталогу;
+- * 2. вывод из префикса id (armor_raider_* → raiderArmor и т.д.) — для старых
+- *    сохранённых предметов без armorCategoryKey;
+- * 3. null, если категорию определить нельзя.
+- */
+-export const resolveArmorCategoryKey = (item, catalog) => {
+-    if (!item) return null;
+-    const raw = catalog?.armorRaw;
+-    const key = item.armorCategoryKey;
+-    if (key && raw && Object.prototype.hasOwnProperty.call(raw, key)) return key;
+-    const id = String(item.id || '');
+-    for (const [prefix, categoryKey] of Object.entries(ARMOR_ID_CATEGORY_PREFIX)) {
+-        if (id.startsWith(prefix) && (!raw || Object.prototype.hasOwnProperty.call(raw, categoryKey))) {
+-            return categoryKey;
+-        }
+-    }
+-    return raw && key && Object.prototype.hasOwnProperty.call(raw, key) ? key : null;
+-};
++//
++// resolveArmorCategoryKey и ARMOR_ID_CATEGORY_PREFIX перенесены в
++// domain/protectionKind.js — единый дом, отвечающий «что это за предмет
++// защиты». Здесь оставлен ре-экспорт для совместимости существующих вызовов.
++export { resolveArmorCategoryKey } from './protectionKind.js';
+ 
+ /** Category config (allowedModCategories / allowedUniqueModCategories / tiers) or null. */
+ export const getArmorCategoryConfig = (item, catalog) => {
+@@ -380,12 +357,13 @@ export const getArmorCategoryConfig = (item, catalog) => {
+  * Standard mods — универсальные (доступны всей БРОНЕ, фильтр по protectedAreas).
+  * Unique mods — ТОЛЬКО из категории данной брони; если категория неизвестна — пусто.
+  *
+- * ПРАВИЛО (от владельца): одежда (обмундирование, костюмы) — НЕ броня.
+- * Моды брони на одежду не ставятся — даже если одежда экипирована в слот брони.
++ * ПРАВИЛО (от владельца): моды брони — ТОЛЬКО броне. Вид предмета решает
++ * getProtectionKind (domain/protectionKind.js), а не слот: одежда — не броня,
++ * даже если экипирована в слот брони; неизвестный вид → модов нет.
+  */
+ export const getAvailableArmorMods = (item, catalog) => {
+     if (!item) return { standardMods: [], uniqueMods: [] };
+-    if (item.itemType === 'clothing' || item.itemType === 'outfit' || item.clothingType) {
++    if (getProtectionKind(item) !== PROTECTION_KINDS.ARMOR) {
+         return { standardMods: [], uniqueMods: [] };
+     }
+     const area = Array.isArray(item.protectedAreas) ? item.protectedAreas : [];
+@@ -451,9 +429,10 @@ export const applyArmorModToItem = (armorItem, mod) => {
+ export const applyArmorMods = (armorItem, catalog, opts = {}) => {
+     if (!armorItem) return { item: armorItem, effects: DEFAULT_EFFECTS };
+ 
+-    // ПРАВИЛО (от владельца): одежда (обмундирование, костюмы) — НЕ броня,
+-    // моды брони на одежду не действуют — в т.ч. записанные ранее из-за старого бага.
+-    if (armorItem.itemType === 'clothing' || armorItem.itemType === 'outfit' || armorItem.clothingType) {
++    // ПРАВИЛО (от владельца): не броня (одежда и прочее) — моды брони не действуют,
++    // в т.ч. записанные ранее из-за старого бага. Вид решает getProtectionKind
++    // (domain/protectionKind.js), а не слот предмета.
++    if (getProtectionKind(armorItem) !== PROTECTION_KINDS.ARMOR) {
+         return { item: armorItem, effects: DEFAULT_EFFECTS };
+     }
+ 
+diff --git a/domain/protectionKind.js b/domain/protectionKind.js
+new file mode 100644
+index 0000000..e152f76
+--- /dev/null
++++ b/domain/protectionKind.js
+@@ -0,0 +1,85 @@
++// domain/protectionKind.js
++// Единый определитель вида защитного предмета: броня / одежда / силовая броня.
++// Pure functions — no React, no UI dependencies.
++//
++// ПРАВИЛО (от владельца): вид предмета определяется ТОЛЬКО полями данных —
++// itemType, clothingType, armorCategoryKey или id-префиксом семейства брони.
++// НИКОГДА не определять вид по названию предмета или по слоту, в котором он
++// лежит: одежда может лежать в слоте брони — от этого она бронёй не становится.
++//
++// ПРАВИЛО (от владельца): неизвестный вид → null, и null означает «модов нет»
++// (fail-closed): лучше не показать моды вообще, чем разрешить всё подряд.
++
++export const PROTECTION_KINDS = Object.freeze({
++    ARMOR: 'armor',
++    CLOTHING: 'clothing',
++    POWER_ARMOR: 'powerArmor',
++});
++
++// Семейства обычной брони из data/equipment/armor.json — по префиксу id.
++// Нужно для старых сохранённых предметов без armorCategoryKey/itemType.
++// (перенесено из domain/modsEquip.js — канонический дом определения вида теперь здесь)
++const ARMOR_ID_CATEGORY_PREFIX = {
++    armor_raider_: 'raiderArmor',
++    armor_leather_: 'leatherArmor',
++    armor_metal_: 'metalArmor',
++    armor_combat_: 'combatArmor',
++    armor_synth_: 'synthArmor',
++    armor_vault_: 'vaultSecurityArmor',
++};
++
++/**
++ * Resolves the armor category key (as in data/equipment/armor.json) for an item.
++ * (перенесено из domain/modsEquip.js без изменений логики)
++ * 1. item.armorCategoryKey, если он известен каталогу;
++ * 2. вывод из префикса id (armor_raider_* → raiderArmor и т.д.) — для старых
++ *    сохранённых предметов без armorCategoryKey;
++ * 3. null, если категорию определить нельзя.
++ */
++export const resolveArmorCategoryKey = (item, catalog) => {
++    if (!item) return null;
++    const raw = catalog?.armorRaw;
++    const key = item.armorCategoryKey;
++    if (key && raw && Object.prototype.hasOwnProperty.call(raw, key)) return key;
++    const id = String(item.id || '');
++    for (const [prefix, categoryKey] of Object.entries(ARMOR_ID_CATEGORY_PREFIX)) {
++        if (id.startsWith(prefix) && (!raw || Object.prototype.hasOwnProperty.call(raw, categoryKey))) {
++            return categoryKey;
++        }
++    }
++    return raw && key && Object.prototype.hasOwnProperty.call(raw, key) ? key : null;
++};
++
++/**
++ * Вид защиты предмета: PROTECTION_KINDS.ARMOR | CLOTHING | POWER_ARMOR | null.
++ * Единственный источник правды о виде — его спрашивают UI (показывать ли
++ * кнопку модов), домен модов (какие моды доступны) и в будущем — расчёт СУ
++ * (приоритет силовой брони, когда она будет подключена).
++ */
++export const getProtectionKind = (item) => {
++    if (!item) return null;
++    const itemType = String(item.itemType || '').trim();
++
++    // Силовая броня помечена в данных как itemType: 'powerArmor'
++    // (data/equipment/powerArmor.json — пока не подключена к каталогу,
++    // но вид уже различается, чтобы логика не строилась на названиях).
++    if (itemType === PROTECTION_KINDS.POWER_ARMOR) return PROTECTION_KINDS.POWER_ARMOR;
++
++    // Одежда: обмундирование, костюмы, головные уборы.
++    if (itemType === 'clothing' || itemType === 'outfit' || item.clothingType) {
++        return PROTECTION_KINDS.CLOTHING;
++    }
++
++    // Броня: явный тип из каталога...
++    if (itemType === PROTECTION_KINDS.ARMOR) return PROTECTION_KINDS.ARMOR;
++    // ...или старый сохранённый предмет без itemType, у которого определяется
++    // семейство брони по id (старые сейвы до появления itemType)...
++    if (resolveArmorCategoryKey(item)) return PROTECTION_KINDS.ARMOR;
++    // ...или id явно заявляет «это броня» (armor_*), но семейство неизвестно:
++    // устаревший или удалённый из каталога предмет. Это всё ещё броня — ей
++    // доступны универсальные стандартные моды, а уникальных не будет
++    // (неизвестное семейство → уникальных нет, fail-closed).
++    if (String(item.id || '').startsWith('armor_')) return PROTECTION_KINDS.ARMOR;
++
++    return null;
++};

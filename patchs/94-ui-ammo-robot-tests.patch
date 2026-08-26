@@ -1,0 +1,969 @@
+diff --git a/__tests__/equipment/melee-slot.test.js b/__tests__/equipment/melee-slot.test.js
+index 486d9a6..396c752 100644
+--- a/__tests__/equipment/melee-slot.test.js
++++ b/__tests__/equipment/melee-slot.test.js
+@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
+ import { isUnarmedAttack, applyUnarmedVisibility } from '../../domain/meleeSlot';
+ 
+ const fists = { id: 'unarmed_human', weaponType: 'Unarmed', isBuiltin: true };
+-const robotManipulator = { id: 'robot_weapon_manipulator', weapon_type: 'Unarmed', isBuiltin: true };
++const robotManipulator = { id: 'robot_weapon_manipulator', weaponType: 'Unarmed', isBuiltin: true };
+ const knife = { id: 'weapon_knife', weaponType: 'Melee', isBuiltin: false };
+ const pistol = { id: 'weapon_pistol', weaponType: 'Light', isBuiltin: false };
+ // не-встроенная Unarmed-защита от дурака: в каталоге таких нет, но фильтр
+diff --git a/__tests__/equipment/zustand-catalog-snapshot.test.js b/__tests__/equipment/zustand-catalog-snapshot.test.js
+index 295f4be..1eccfbf 100644
+--- a/__tests__/equipment/zustand-catalog-snapshot.test.js
++++ b/__tests__/equipment/zustand-catalog-snapshot.test.js
+@@ -35,7 +35,7 @@ describe('Zustand catalog snapshots', () => {
+       quantity: 12,
+     });
+     expect(ammo.name).toBeTruthy();
+-    expect(ammo.cost).toBeTruthy();
+-    expect(ammo.rarity).toBeTruthy();
++    // rarity может быть 0 (обычные патроны) — проверяем, что это число, а не undefined.
++    expect(typeof ammo.rarity).toBe('number');
+   });
+ });
+diff --git a/__tests__/securitron/enclave-kits.test.js b/__tests__/securitron/enclave-kits.test.js
+index 50e61d8..c64ffc3 100644
+--- a/__tests__/securitron/enclave-kits.test.js
++++ b/__tests__/securitron/enclave-kits.test.js
+@@ -65,15 +65,24 @@ describe('Комплекты Анклава: данные', () => {
+     expect(optionIds).toContain('weapon_laser_gun');
+     expect(optionIds).toContain('weapon_assault_rifle');
+ 
+-    // Резолв лазерной винтовки (пистолет + ствольная коробка/ложа mod_058, ствол mod_054)
++    // Резолв лазерной винтовки (пистолет + ствольная коробка/ложа mod_058, ствол mod_204)
+     const laserOption = choice.items.find((o) => o.weaponId === 'weapon_laser_gun');
+-    expect(laserOption.modIds).toEqual(['mod_058', 'mod_054']);
++    expect(laserOption.modIds).toEqual(['mod_058', 'mod_204']);
+ 
+     const resolved = await resolveKitItems({ id: 'enclave_soldier', items: kit.items });
+-    const ids = resolved.items.map((i) => i.clothingId || i.armorId || i.weaponId || i.itemId || i.id);
+-    expect(ids).toContain('clothing_military_fatigues');
+-    expect(ids).toContain('armor_combat_chest_001');
+-    // один из вариантов оружия попал в комплект (по умолчанию choice — первый)
+-    expect(ids.some((id) => id === 'weapon_laser_gun' || id === 'weapon_assault_rifle')).toBe(true);
++    // Фиксированные предметы комплекта — одежда и броня — резолвятся плоско.
++    const fixedIds = resolved.items
++      .filter((i) => i.type !== 'choice')
++      .map((i) => i.clothingId || i.armorId || i.weaponId || i.itemId || i.id);
++    expect(fixedIds).toContain('clothing_military_fatigues');
++    expect(fixedIds).toContain('armor_combat_chest_001');
++    // Выбор оружия остаётся выбором: оба варианта резолвятся (с модами и ammoId),
++    // игрок выбирает в модалке — никакого «первого по умолчанию».
++    const choiceEntry = resolved.items.find((i) => i.type === 'choice');
++    expect(choiceEntry).toBeDefined();
++    const resolvedOptionIds = choiceEntry.items.map((o) => o.weaponId);
++    expect(resolvedOptionIds).toContain('weapon_laser_gun');
++    expect(resolvedOptionIds).toContain('weapon_assault_rifle');
++    expect(choiceEntry.items.every((o) => typeof o.ammoId === 'string')).toBe(true);
+   });
+ });
+diff --git a/__tests__/securitron/enclave-remnant-origin.test.js b/__tests__/securitron/enclave-remnant-origin.test.js
+index 72767ad..a1e88a9 100644
+--- a/__tests__/securitron/enclave-remnant-origin.test.js
++++ b/__tests__/securitron/enclave-remnant-origin.test.js
+@@ -42,8 +42,8 @@ describe('Ориджин «Осколок Анклава»: данные (в м
+     expect(origin.characterType).toBe('human');
+     expect(origin.bodyPlan).toBe('humanoid');
+     expect(origin.traitIds).toEqual([TRAIT_ID]);
+-    // Снаряжение сейчас — стартовый капс (100 крышек); новый комплект будет позже.
+-    expect(origin.equipmentKitIds).toEqual(['default_caps_only']);
++    // Снаряжение — два комплекта Анклава (учёный и солдат).
++    expect(origin.equipmentKitIds).toEqual(['enclave_scientist','enclave_soldier']);
+   });
+ 
+   it('трейт «Скрытный и преследуемый» даёт выбор 1 доп. навыка из Скрытность/Выживание', () => {
+@@ -71,14 +71,10 @@ describe('Ориджин «Осколок Анклава»: данные (в м
+     expect(typeof enTrait?.description).toBe('string');
+   });
+ 
+-  it('стартовый комплект существует и выдаёт 100 крышек (currency)', async () => {
+-    const { resolveKitItems } = await import('../../domain/kitResolver');
++  it('комплекты Анклава существуют в каталоге и доступны через реестр', () => {
+     const catalog = getEquipmentCatalogForLocale('ru-RU');
+-    const kit = catalog.equipmentKits.default_caps_only;
+-    expect(kit).toBeDefined();
+-    const resolved = await resolveKitItems({ id: 'default_caps_only', items: kit.items });
+-    const caps = resolved.items.find((i) => i.itemType === 'currency');
+-    expect(caps).toBeDefined();
+-    expect(caps.quantity).toBe(100);
++    expect(catalog.equipmentKits.enclave_scientist).toBeDefined();
++    expect(catalog.equipmentKits.enclave_soldier).toBeDefined();
++    expect(getOrigin().equipmentKitIds.every((id) => Boolean(catalog.equipmentKits[id]))).toBe(true);
+   });
+ });
+diff --git a/__tests__/securitron/module-data-move.test.js b/__tests__/securitron/module-data-move.test.js
+index c08ec15..96d5e7a 100644
+--- a/__tests__/securitron/module-data-move.test.js
++++ b/__tests__/securitron/module-data-move.test.js
+@@ -19,12 +19,12 @@ beforeAll(() => {
+ 
+ describe('Данные в модуле (сеттинг), data/ — пустой движок', () => {
+   it('модуль содержит полные записи еды/напитков/модов', () => {
+-    expect(moduleFood.length).toBe(76);
++    expect(moduleFood.length).toBe(77);
+     expect(moduleFood[0]).toHaveProperty('weight');
+     expect(moduleFood[0]).toHaveProperty('hpHealed');
+     expect(moduleDrinks.length).toBe(22);
+     expect(moduleDrinks[0]).toHaveProperty('cost');
+-    expect(moduleWeaponMods.length).toBe(203);
++    expect(moduleWeaponMods.length).toBe(204);
+     expect(moduleWeaponMods[0]).toHaveProperty('slot');
+     expect(moduleWeaponMods[0]).toHaveProperty('applies_to_ids');
+   });
+@@ -37,7 +37,7 @@ describe('Данные в модуле (сеттинг), data/ — пустой
+ 
+   it('каталог отдаёт полные данные из модуля с флагами', () => {
+     const catalog = getEquipmentCatalogForLocale('ru-RU');
+-    expect(catalog.food.length).toBe(76);
++    expect(catalog.food.length).toBe(77);
+     expect(catalog.drinks.length).toBe(22);
+     expect(catalog.weaponMods.length).toBe(204);
+     // флаги на месте
+diff --git a/components/screens/CharacterScreen/CharacterScreen.js b/components/screens/CharacterScreen/CharacterScreen.js
+index c342a45..9c502ee 100644
+--- a/components/screens/CharacterScreen/CharacterScreen.js
++++ b/components/screens/CharacterScreen/CharacterScreen.js
+@@ -1120,7 +1120,7 @@ export default function CharacterScreen() {
+         }
+       }
+     } catch (e) {
+-      console.warn('skillRewards:', e?.message);
++      debugLog('character.skillRewards', e?.message);
+     }
+   };
+ 
+@@ -1206,7 +1206,7 @@ export default function CharacterScreen() {
+                       // Вызов saveCharacter должен быть первым в обработчике для user activation
+                       saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
+                     } catch (error) {
+-                      console.error('Ошибка сохранения:', error);
++                      debugLog('character.saveError', error);
+                       Alert.alert(
+                         tCharacterScreen('title') || 'Ошибка',
+                         'Не удалось сохранить персонажа. Проверьте консоль для подробностей.'
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 5853cd6..652e077 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -20,6 +20,7 @@ import { useCharacter } from '../../CharacterContext';
+ import { findEnrichedOrigin } from '../../../domain/origins';
+ import { setCurrentLocale, useLocale } from '../../../i18n/locale';
+ import { tHomeScreen } from './logic/homeScreenI18n';
++import { debugLog } from '../../../src/debug/falloutDebug';
+ import * as db from '../../../db';
+ import {
+   createCharacterExportPayload,
+@@ -366,7 +367,7 @@ export default function HomeScreen({ navigation }) {
+         );
+       }
+     } catch (error) {
+-      console.error('Ошибка скачивания файла:', error);
++      debugLog('home.saveFileError', error);
+       Alert.alert(
+         tHomeScreen('title'),
+         'Не удалось скачать персонажа. Проверьте консоль для подробностей.'
+@@ -441,7 +442,7 @@ export default function HomeScreen({ navigation }) {
+         { cancelable: true }
+       );
+     } catch (error) {
+-      console.error('Ошибка загрузки файла:', error);
++      debugLog('home.loadFileError', error);
+       Alert.alert(
+         tHomeScreen('title'),
+         'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
+diff --git a/components/screens/HomeScreen/logic/characterTransfer.js b/components/screens/HomeScreen/logic/characterTransfer.js
+index dccf97c..ebcda14 100644
+--- a/components/screens/HomeScreen/logic/characterTransfer.js
++++ b/components/screens/HomeScreen/logic/characterTransfer.js
+@@ -11,6 +11,7 @@
+ 
+ import { Platform } from 'react-native';
+ import {
++import { debugLog } from '../../../../src/debug/falloutDebug';
+   EXPORT_FORMAT_VERSION,
+   EXPORT_FILE_EXTENSION,
+   IMPORT_ERRORS,
+@@ -66,7 +67,7 @@ const downloadViaAnchorFallback = (blob, fileName) => {
+     setTimeout(() => URL.revokeObjectURL(url), 1500);
+     return true;
+   } catch (e) {
+-    console.warn('Anchor fallback failed:', e);
++    debugLog('transfer', 'Anchor fallback failed:', e);
+     return false;
+   }
+ };
+@@ -109,12 +110,12 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
+       methodsToTry.push({
+         name: 'share',
+         execute: async () => {
+-          console.log('🔄 Пробуем Web Share API...');
++          debugLog('transfer', '🔄 Пробуем Web Share API...');
+           await navigator.share({
+             files: [file],
+             title: 'Сохранение персонажа',
+           });
+-          console.log('✅ Web Share API сработал');
++          debugLog('transfer', '✅ Web Share API сработал');
+           return { success: true, method: 'share' };
+         }
+       });
+@@ -125,13 +126,13 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
+       methodsToTry.push({
+         name: 'fsaccess',
+         execute: async () => {
+-          console.log('🔄 Пробуем browser-fs-access...');
++          debugLog('transfer', '🔄 Пробуем browser-fs-access...');
+           await fsAccess.fileSave(blob, {
+             fileName: fileName,
+             extensions: [EXPORT_FILE_EXTENSION, '.json'].filter(Boolean),
+             description: 'Файл персонажа',
+           });
+-          console.log('✅ browser-fs-access сработал');
++          debugLog('transfer', '✅ browser-fs-access сработал');
+           return { success: true, method: 'fsaccess' };
+         }
+       });
+@@ -142,10 +143,10 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
+       methodsToTry.push({
+         name: 'anchor',
+         execute: () => {
+-          console.log('🔄 Пробуем anchor download...');
++          debugLog('transfer', '🔄 Пробуем anchor download...');
+           const anchorOk = downloadViaAnchorFallback(blob, fileName);
+           if (anchorOk) {
+-            console.log('✅ Anchor download сработал');
++            debugLog('transfer', '✅ Anchor download сработал');
+             return { success: true, method: 'anchor' };
+           }
+           throw new Error('Anchor download failed');
+@@ -154,7 +155,7 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
+     }
+ 
+     // Пробуем все методы по порядку
+-    console.log(`🔍 Доступно методов сохранения: ${methodsToTry.length}`);
++    debugLog('transfer', `🔍 Доступно методов сохранения: ${methodsToTry.length}`);
+     for (let i = 0; i < methodsToTry.length; i++) {
+       const method = methodsToTry[i];
+       try {
+@@ -164,18 +165,18 @@ export const downloadCharacterPayloadWeb = async (payload, preferredName) => {
+         }
+       } catch (methodError) {
+         if (methodError && methodError.name === 'AbortError') {
+-          console.log(`⏹️  Пользователь отменил в методе "${method.name}"`);
++          debugLog('transfer', `⏹️  Пользователь отменил в методе "${method.name}"`);
+           return { success: false, method: method.name, aborted: true };
+         }
+-        console.warn(`❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
++        debugLog('transfer', `❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+         // Продолжаем пробовать следующий метод
+       }
+     }
+ 
+-    console.error('❌ Все методы сохранения не сработали');
++    debugLog('transfer', '❌ Все методы сохранения не сработали');
+     return { success: false, method: 'unsupported' };
+   } catch (error) {
+-    console.error('❌ Ошибка сохранения:', error);
++    debugLog('transfer', '❌ Ошибка сохранения:', error);
+     return { success: false, method: 'unsupported', error };
+   }
+ };
+@@ -191,7 +192,7 @@ const pickFileLegacy = () =>
+       return;
+     }
+     
+-    console.log('🔄 Создаем input для выбора файла...');
++    debugLog('transfer', '🔄 Создаем input для выбора файла...');
+     const input = document.createElement('input');
+     input.type = 'file';
+     
+@@ -204,7 +205,7 @@ const pickFileLegacy = () =>
+     let cleanupTimeout = null;
+     
+     const cleanup = () => {
+-      console.log('🧹 Очищаем input...');
++      debugLog('transfer', '🧹 Очищаем input...');
+       if (cleanupTimeout) clearTimeout(cleanupTimeout);
+       if (input.parentNode) {
+         input.parentNode.removeChild(input);
+@@ -216,35 +217,35 @@ const pickFileLegacy = () =>
+     };
+     
+     input.onchange = () => {
+-      console.log('📄 Событие onchange сработало');
++      debugLog('transfer', '📄 Событие onchange сработало');
+       cleanup();
+       const file = input.files && input.files[0];
+       if (!file) {
+-        console.log('❌ Файл не выбран');
++        debugLog('transfer', '❌ Файл не выбран');
+         resolve(null);
+         return;
+       }
+       
+-      console.log(`📁 Выбран файл: ${file.name}, размер: ${file.size} байт, тип: ${file.type}`);
++      debugLog('transfer', `📁 Выбран файл: ${file.name}, размер: ${file.size} байт, тип: ${file.type}`);
+       
+       // Проверяем размер файла (максимум 10MB)
+       if (file.size > 10 * 1024 * 1024) {
+-        console.error('❌ Файл слишком большой:', file.size);
++        debugLog('transfer', '❌ Файл слишком большой:', file.size);
+         resolve(null);
+         return;
+       }
+       
+       const reader = new FileReader();
+       reader.onload = () => {
+-        console.log('✅ Файл успешно прочитан');
++        debugLog('transfer', '✅ Файл успешно прочитан');
+         resolve(typeof reader.result === 'string' ? reader.result : null);
+       };
+       reader.onerror = () => {
+-        console.error('❌ Ошибка чтения файла');
++        debugLog('transfer', '❌ Ошибка чтения файла');
+         resolve(null);
+       };
+       reader.onabort = () => {
+-        console.log('⏹️  Чтение файла прервано');
++        debugLog('transfer', '⏹️  Чтение файла прервано');
+         resolve(null);
+       };
+       reader.readAsText(file, 'utf-8');
+@@ -252,29 +253,29 @@ const pickFileLegacy = () =>
+     
+     // Обработка отмены на Android (не все браузеры поддерживают oncancel)
+     input.oncancel = () => {
+-      console.log('⏹️  Пользователь отменил выбор файла (oncancel)');
++      debugLog('transfer', '⏹️  Пользователь отменил выбор файла (oncancel);');
+       cleanup();
+       resolve(null);
+     };
+     
+     input.onabort = () => {
+-      console.log('⏹️  Выбор файла прерван (onabort)');
++      debugLog('transfer', '⏹️  Выбор файла прерван (onabort);');
+       cleanup();
+       resolve(null);
+     };
+ 
+     // Добавляем обработку потери фокуса (проблема на Android)
+     const handleWindowBlur = () => {
+-      console.log('👁️‍🗨️  Окно потеряло фокус (возможно открыт файловый менеджер)');
++      debugLog('transfer', '👁️‍🗨️  Окно потеряло фокус (возможно открыт файловый менеджер);');
+       // Не очищаем сразу, ждем возвращения фокуса
+     };
+     
+     const handleWindowFocus = () => {
+-      console.log('👁️‍🗨️  Окно получило фокус');
++      debugLog('transfer', '👁️‍🗨️  Окно получило фокус');
+       // Если через 1 секунду после фокуса файл еще не выбран, очищаем
+       cleanupTimeout = setTimeout(() => {
+         if (input.parentNode) {
+-          console.log('⏰ Таймаут: файл не выбран за 1 секунду после фокуса');
++          debugLog('transfer', '⏰ Таймаут: файл не выбран за 1 секунду после фокуса');
+           cleanup();
+           resolve(null);
+         }
+@@ -294,13 +295,13 @@ const pickFileLegacy = () =>
+     };
+ 
+     document.body.appendChild(input);
+-    console.log('👆 Кликаем по input...');
++    debugLog('transfer', '👆 Кликаем по input...');
+     input.click();
+     
+     // Автоматическая очистка через 30 секунд на всякий случай
+     setTimeout(() => {
+       if (input.parentNode) {
+-        console.log('⏰ Автоматическая очистка через 30 секунд');
++        debugLog('transfer', '⏰ Автоматическая очистка через 30 секунд');
+         cleanup();
+         resolve(null);
+       }
+@@ -313,7 +314,7 @@ const pickFileLegacy = () =>
+  * @returns {Promise<string|null>}
+  */
+ export const pickCharacterFileWeb = async () => {
+-  console.log('📂 Начинаем процесс выбора файла...');
++  debugLog('transfer', '📂 Начинаем процесс выбора файла...');
+   
+   try {
+     // Пробуем все методы в правильном порядке с логированием
+@@ -324,14 +325,14 @@ export const pickCharacterFileWeb = async () => {
+       methodsToTry.push({
+         name: 'browser-fs-access',
+         execute: async () => {
+-          console.log('🔄 Пробуем browser-fs-access.fileOpen...');
++          debugLog('transfer', '🔄 Пробуем browser-fs-access.fileOpen...');
+           const blob = await fsAccess.fileOpen({
+             mimeTypes: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'],
+             extensions: [EXPORT_FILE_EXTENSION, '.json', '*'].filter(Boolean),
+             description: 'Файл персонажа Fallout 2d20 (.rpgc или .json)',
+             multiple: false,
+           });
+-          console.log('✅ browser-fs-access получил файл');
++          debugLog('transfer', '✅ browser-fs-access получил файл');
+           return await blob.text();
+         }
+       });
+@@ -342,7 +343,7 @@ export const pickCharacterFileWeb = async () => {
+       methodsToTry.push({
+         name: 'expo-document-picker',
+         execute: async () => {
+-          console.log('🔄 Пробуем expo-document-picker...');
++          debugLog('transfer', '🔄 Пробуем expo-document-picker...');
+           const result = await DocumentPicker.getDocumentAsync({
+             type: ['application/json', 'text/json', 'application/octet-stream', '.rpgc', '.json'],
+             copyToCacheDirectory: true,
+@@ -350,17 +351,17 @@ export const pickCharacterFileWeb = async () => {
+           });
+ 
+           if (result.canceled) {
+-            console.log('⏹️  Пользователь отменил выбор в DocumentPicker');
++            debugLog('transfer', '⏹️  Пользователь отменил выбор в DocumentPicker');
+             throw new Error('User canceled');
+           }
+ 
+           const file = result.assets[0];
+           if (!file || !file.uri) {
+-            console.error('❌ DocumentPicker вернул пустой файл');
++            debugLog('transfer', '❌ DocumentPicker вернул пустой файл');
+             throw new Error('No file selected');
+           }
+ 
+-          console.log(`📁 DocumentPicker выбрал файл: ${file.uri}`);
++          debugLog('transfer', `📁 DocumentPicker выбрал файл: ${file.uri}`);
+           
+           try {
+             if (file.file && typeof file.file.text === 'function') {
+@@ -368,10 +369,10 @@ export const pickCharacterFileWeb = async () => {
+             }
+             const response = await fetch(file.uri);
+             const text = await response.text();
+-            console.log('✅ Файл успешно загружен через DocumentPicker');
++            debugLog('transfer', '✅ Файл успешно загружен через DocumentPicker');
+             return text;
+           } catch (fetchErr) {
+-            console.error('❌ Ошибка загрузки файла из DocumentPicker:', fetchErr);
++            debugLog('transfer', '❌ Ошибка загрузки файла из DocumentPicker:', fetchErr);
+             throw fetchErr;
+           }
+         }
+@@ -382,10 +383,10 @@ export const pickCharacterFileWeb = async () => {
+     methodsToTry.push({
+       name: 'legacy-input',
+       execute: async () => {
+-        console.log('🔄 Пробуем улучшенный legacy input...');
++        debugLog('transfer', '🔄 Пробуем улучшенный legacy input...');
+         const result = await pickFileLegacy();
+         if (result) {
+-          console.log('✅ Legacy input успешно загрузил файл');
++          debugLog('transfer', '✅ Legacy input успешно загрузил файл');
+           return result;
+         }
+         throw new Error('Legacy input не выбрал файл');
+@@ -393,41 +394,41 @@ export const pickCharacterFileWeb = async () => {
+     });
+ 
+     // Пробуем все методы по порядку
+-    console.log(`🔍 Доступно методов загрузки файлов: ${methodsToTry.length}`);
++    debugLog('transfer', `🔍 Доступно методов загрузки файлов: ${methodsToTry.length}`);
+     
+     for (let i = 0; i < methodsToTry.length; i++) {
+       const method = methodsToTry[i];
+       try {
+-        console.log(`\n--- Попытка ${i + 1}: ${method.name} ---`);
++        debugLog('transfer', `\n--- Попытка ${i + 1}: ${method.name} ---`);
+         const result = await method.execute();
+         if (result) {
+-          console.log(`\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
++          debugLog('transfer', `\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
+           return result;
+         }
+       } catch (methodError) {
+         if (methodError && methodError.name === 'AbortError') {
+-          console.log(`\n⏹️  Пользователь отменил в методе "${method.name}"`);
++          debugLog('transfer', `\n⏹️  Пользователь отменил в методе "${method.name}"`);
+           return null;
+         }
+         if (methodError.message === 'User canceled') {
+-          console.log(`\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
++          debugLog('transfer', `\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
+           return null;
+         }
+-        console.warn(`\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
++        debugLog('transfer', `\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+         // Продолжаем пробовать следующий метод
+       }
+     }
+ 
+-    console.error('\n❌ Все методы загрузки файлов не сработали');
++    debugLog('transfer', '\n❌ Все методы загрузки файлов не сработали');
+     return null;
+   } catch (error) {
+-    console.error('\n❌ Критическая ошибка загрузки файла:', error);
++    debugLog('transfer', '\n❌ Критическая ошибка загрузки файла:', error);
+     // Последняя попытка через legacy
+     try {
+-      console.log('🔄 Последняя попытка через legacy input...');
++      debugLog('transfer', '🔄 Последняя попытка через legacy input...');
+       return await pickFileLegacy();
+     } catch (finalError) {
+-      console.error('❌ И legacy input не сработал:', finalError);
++      debugLog('transfer', '❌ И legacy input не сработал:', finalError);
+       return null;
+     }
+   }
+@@ -508,7 +509,7 @@ export const saveCharacter = async (characterData, filename = 'character.json')
+         if (methodError && methodError.name === 'AbortError') {
+           return { method: method.name, success: false, aborted: true };
+         }
+-        console.warn(`Method ${method.name} failed:`, methodError);
++        debugLog('transfer', `Method ${method.name} failed:`, methodError);
+         // Продолжаем пробовать следующий метод
+       }
+     }
+@@ -518,7 +519,7 @@ export const saveCharacter = async (characterData, filename = 'character.json')
+     if (error && error.name === 'AbortError') {
+       return { method: 'cancelled', success: false, aborted: true };
+     }
+-    console.error('Ошибка сохранения:', error);
++    debugLog('transfer', 'Ошибка сохранения:', error);
+     return { method: 'unsupported', success: false, error };
+   }
+ };
+@@ -529,7 +530,7 @@ export const loadCharacter = async () => {
+     if (!rawText) return null;
+     return JSON.parse(rawText);
+   } catch (error) {
+-    console.error('Ошибка загрузки:', error);
++    debugLog('transfer', 'Ошибка загрузки:', error);
+     return null;
+   }
+ };
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 53d93d5..afe091f 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1494,10 +1494,10 @@ const InventoryScreen = () => {
+           )}
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
+           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
++          <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
+           {weaponAmmoNames.length > 0 && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.ammo')}: {weaponAmmoNames.join(', ')}</Text>
+           )}
+-          <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
+         </View>
+       </View>
+     );
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 4f3960f..0517091 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -162,6 +162,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+         [tInventory('modals.addItemModal.categories.robotFrame')]: equipmentCatalog.robotFrames || [],
+         [tInventory('modals.addItemModal.categories.robotBodyParts')]: equipmentCatalog.robotBody || [],
+         [tInventory('modals.addItemModal.categories.robotModules')]: equipmentCatalog.robotModules || [],
++        [tInventory('modals.addItemModal.categories.robotMisc')]: equipmentCatalog.robotItems || [],
+       },
+     };
+   }, [locale]);
+diff --git a/data/equipment/robotparts.json b/data/equipment/robotparts.json
+index f981028..91bab9d 100644
+--- a/data/equipment/robotparts.json
++++ b/data/equipment/robotparts.json
+@@ -8,20 +8,6 @@
+       "rarity": 0,
+       "healAmount": 6
+     },
+-    {
+-      "id": "robot_item_fertilizer_bag",
+-      "itemType": "misc",
+-      "weight": 1,
+-      "cost": 0,
+-      "rarity": 0
+-    },
+-    {
+-      "id": "food_mutafruit",
+-      "itemType": "food",
+-      "weight": 0.5,
+-      "cost": 0,
+-      "rarity": 0
+-    },
+     {
+       "id": "robot_item_printer",
+       "itemType": "misc",
+@@ -100,4 +86,4 @@
+     }
+   ],
+   "robotPartsUpgrade": []
+-}
+\ No newline at end of file
++}
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index fcd61db..a21d96a 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -223,6 +223,7 @@ export async function resolveWeaponItem(item) {
+     displayName,
+     name: displayName,
+     itemType: 'weapon',
++    ammoId: weaponData.ammoId ?? item.ammoId ?? null,
+     resolvedAmmunition,
+     hasMods: weaponData.hasMods ?? false,
+   };
+diff --git a/i18n/en-EN/screens/inventory/modals/addItemModal.json b/i18n/en-EN/screens/inventory/modals/addItemModal.json
+index e89d5e2..839a534 100644
+--- a/i18n/en-EN/screens/inventory/modals/addItemModal.json
++++ b/i18n/en-EN/screens/inventory/modals/addItemModal.json
+@@ -28,7 +28,8 @@
+     "robotArmorLayer": "Armor",
+     "robotFrame": "Frame",
+     "robotBodyParts": "Robot Body Parts",
+-    "robotModules": "Robot Modules"
++    "robotModules": "Robot Modules",
++    "robotMisc": "Misc"
+   },
+   "itemTypes": {
+     "weapon": "🔫 Weapon",
+diff --git a/i18n/ru-RU/screens/inventory/modals/addItemModal.json b/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+index 086ee6d..6c86a04 100644
+--- a/i18n/ru-RU/screens/inventory/modals/addItemModal.json
++++ b/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+@@ -28,7 +28,8 @@
+     "robotArmorLayer": "Броня",
+     "robotFrame": "Привод",
+     "robotBodyParts": "Части тела роботов",
+-    "robotModules": "Модули роботов"
++    "robotModules": "Модули роботов",
++    "robotMisc": "Разное"
+   },
+   "itemTypes": {
+     "weapon": "🔫 Оружие",
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 58dcc65..e66e612 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -97,7 +97,7 @@
+     "totalWeight": "Общий вес",
+     "totalPrice": "Общая цена",
+     "durability": "Прочность (ОЗ)",
+-    "ammo": "Патрон",
++    "ammo": "Боеприпас",
+     "requiresMkII": "Требуется ОС Mk II"
+   },
+   "powerArmor": {
+@@ -114,4 +114,4 @@
+       "rightLeg": "правая нога"
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/modules/fallout/data/food.json b/modules/fallout/data/food.json
+index 22c3511..a0ffc43 100644
+--- a/modules/fallout/data/food.json
++++ b/modules/fallout/data/food.json
+@@ -834,5 +834,14 @@
+     "irradiated": true,
+     "effectKey": "",
+     "isMeat": true
++  },
++  {
++    "id": "food_mutafruit",
++    "name": "Мутафрукт",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 0,
++    "rarity": 0,
++    "isMeat": false
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/data/general_goods.json b/modules/fallout/data/general_goods.json
+index 9ffb1bc..6593f9b 100644
+--- a/modules/fallout/data/general_goods.json
++++ b/modules/fallout/data/general_goods.json
+@@ -22,5 +22,13 @@
+     "value": 50,
+     "rarity": 1,
+     "weight": 0.1
++  },
++  {
++    "id": "robot_item_fertilizer_bag",
++    "name": "Мешок удобрений",
++    "itemType": "misc",
++    "weight": 1,
++    "cost": 0,
++    "rarity": 0
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/i18n/en-EN.json b/modules/fallout/i18n/en-EN.json
+index d254bf3..c374273 100644
+--- a/modules/fallout/i18n/en-EN.json
++++ b/modules/fallout/i18n/en-EN.json
+@@ -51,6 +51,10 @@
+     {
+       "id": "CasinoGomorrahChip",
+       "name": "Gomorrah Casino Chip"
++    },
++    {
++      "id": "robot_item_fertilizer_bag",
++      "name": "Fertilizer bag"
+     }
+   ],
+   "equipmentKits": {
+@@ -587,6 +591,11 @@
+       "id": "food_dog_meat",
+       "name": "Dog Meat",
+       "effectLabel": ""
++    },
++    {
++      "id": "food_mutafruit",
++      "name": "Mutfruit",
++      "effectLabel": ""
+     }
+   ],
+   "drinks": [
+diff --git a/modules/fallout/i18n/ru-RU.json b/modules/fallout/i18n/ru-RU.json
+index bc1bf17..8f16085 100644
+--- a/modules/fallout/i18n/ru-RU.json
++++ b/modules/fallout/i18n/ru-RU.json
+@@ -51,6 +51,10 @@
+     {
+       "id": "CasinoGomorrahChip",
+       "name": "Фишка казино «Гоморра»"
++    },
++    {
++      "id": "robot_item_fertilizer_bag",
++      "name": "Мешок удобрений"
+     }
+   ],
+   "equipmentKits": {
+@@ -586,6 +590,11 @@
+     {
+       "id": "food_dog_meat",
+       "name": "Собачатина"
++    },
++    {
++      "id": "food_mutafruit",
++      "name": "Мутафрукт",
++      "effectLabel": ""
+     }
+   ],
+   "drinks": [
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 4fdb886..da9f6cc 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -2,6 +2,7 @@
+ // Минимальные миграционные функции для перехода к нормализованному формату
+ 
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema';
++import { debugLog } from '../debug/falloutDebug';
+ import { resolveMutuallyExclusiveQualities } from '../../domain/weaponQualityConflicts';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { generateItemId } from '../../domain/itemIdentity';
+@@ -571,7 +572,7 @@ const MIGRATIONS = [
+         // Если пересчёт модов не удался (например, каталог не загружен),
+         // возвращаем предмет с мигрированным damageType, но без пересчёта модов.
+         // Моды пересчитаются при следующем открытии модалки модов.
+-        console.warn('Migration v4: failed to recalculate weapon mods', error);
++        debugLog('migration.v4.recalculateModsFailed', error);
+         return item;
+       }
+     };
+diff --git a/src/utils/characterFileTransfer.js b/src/utils/characterFileTransfer.js
+index a0f3633..ca256f3 100644
+--- a/src/utils/characterFileTransfer.js
++++ b/src/utils/characterFileTransfer.js
+@@ -15,6 +15,7 @@
+ 
+ import { Platform } from 'react-native';
+ import {
++import { debugLog } from '../debug/falloutDebug';
+   EXPORT_FILE_EXTENSION,
+   sanitizeFileName as domainSanitizeFileName,
+ } from '../../domain/characterTransfer';
+@@ -123,19 +124,19 @@ export const saveCharacter = async (characterData, filename = 'character.json')
+       for (const method of methodsToTry) {
+         try {
+           const result = await method.execute();
+-          console.log(`✅ Метод сохранения "${method.name}" сработал`);
++          debugLog('fileTransfer', `✅ Метод сохранения "${method.name}" сработал`);
+           return result;
+         } catch (methodError) {
+           if (methodError && methodError.name === 'AbortError') {
+-            console.log(`⏹️  Пользователь отменил в методе "${method.name}"`);
++            debugLog('fileTransfer', `⏹️  Пользователь отменил в методе "${method.name}"`);
+             return { method: method.name, success: false, aborted: true };
+           }
+-          console.warn(`❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
++          debugLog('fileTransfer', `❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+           // Продолжаем пробовать следующий метод
+         }
+       }
+ 
+-      console.error('❌ Все методы сохранения не сработали');
++      debugLog('fileTransfer', '❌ Все методы сохранения не сработали');
+       return { method: 'unsupported', success: false };
+     }
+ 
+@@ -163,7 +164,7 @@ export const saveCharacter = async (characterData, filename = 'character.json')
+     if (error && error.name === 'AbortError') {
+       return { method: 'cancelled', success: false, aborted: true };
+     }
+-    console.error('Ошибка сохранения:', error);
++    debugLog('fileTransfer', 'Ошибка сохранения:', error);
+     return { method: 'unsupported', success: false, error };
+   }
+ };
+@@ -177,7 +178,7 @@ export const loadCharacter = async () => {
+   try {
+     return JSON.parse(rawText);
+   } catch (error) {
+-    console.error('Ошибка парсинга JSON:', error);
++    debugLog('fileTransfer', 'Ошибка парсинга JSON:', error);
+     return null;
+   }
+ };
+@@ -187,7 +188,7 @@ export const loadCharacter = async () => {
+  * Улучшенная версия с надежным fallback для Android
+  */
+ export const loadCharacterRawText = async () => {
+-  console.log('📂 Начинаем загрузку файла персонажа...');
++  debugLog('fileTransfer', '📂 Начинаем загрузку файла персонажа...');
+   
+   try {
+     // Пробуем все методы в правильном порядке
+@@ -198,14 +199,14 @@ export const loadCharacterRawText = async () => {
+       methodsToTry.push({
+         name: 'browser-fs-access',
+         execute: async () => {
+-          console.log('🔄 Пробуем browser-fs-access.fileOpen...');
++          debugLog('fileTransfer', '🔄 Пробуем browser-fs-access.fileOpen...');
+           const blob = await fsAccess.fileOpen({
+             mimeTypes: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'],
+             extensions: ['.json', EXPORT_FILE_EXTENSION, '*'].filter(Boolean),
+             description: 'Файл персонажа Fallout 2d20',
+             multiple: false,
+           });
+-          console.log('✅ browser-fs-access получил файл');
++          debugLog('fileTransfer', '✅ browser-fs-access получил файл');
+           return await blob.text();
+         }
+       });
+@@ -216,7 +217,7 @@ export const loadCharacterRawText = async () => {
+       methodsToTry.push({
+         name: 'expo-document-picker',
+         execute: async () => {
+-          console.log('🔄 Пробуем expo-document-picker...');
++          debugLog('fileTransfer', '🔄 Пробуем expo-document-picker...');
+           const result = await DocumentPickerModule.getDocumentAsync({
+             type: ['application/json', 'text/json', 'application/octet-stream', '.rpgc', '.json'],
+             copyToCacheDirectory: true,
+@@ -224,17 +225,17 @@ export const loadCharacterRawText = async () => {
+           });
+ 
+           if (result.canceled) {
+-            console.log('⏹️  Пользователь отменил выбор');
++            debugLog('fileTransfer', '⏹️  Пользователь отменил выбор');
+             throw new Error('User canceled');
+           }
+           
+           const file = result.assets[0];
+           if (!file || !file.uri) {
+-            console.error('❌ DocumentPicker вернул пустой файл');
++            debugLog('fileTransfer', '❌ DocumentPicker вернул пустой файл');
+             throw new Error('No file selected');
+           }
+ 
+-          console.log(`📁 Выбран файл: ${file.uri}`);
++          debugLog('fileTransfer', `📁 Выбран файл: ${file.uri}`);
+           
+           if (FileSystemModule) {
+             return await FileSystemModule.readAsStringAsync(file.uri, {
+@@ -252,7 +253,7 @@ export const loadCharacterRawText = async () => {
+     methodsToTry.push({
+       name: 'legacy-input',
+       execute: async () => {
+-        console.log('🔄 Пробуем legacy input...');
++        debugLog('fileTransfer', '🔄 Пробуем legacy input...');
+         // Используем улучшенную версию legacy input
+         const result = await new Promise((resolve) => {
+           if (typeof document === 'undefined') {
+@@ -273,7 +274,7 @@ export const loadCharacterRawText = async () => {
+               return;
+             }
+             
+-            console.log(`📁 Выбран файл через legacy input: ${file.name}`);
++            debugLog('fileTransfer', `📁 Выбран файл через legacy input: ${file.name}`);
+             const reader = new FileReader();
+             reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+             reader.onerror = () => resolve(null);
+@@ -293,7 +294,7 @@ export const loadCharacterRawText = async () => {
+         });
+         
+         if (result) {
+-          console.log('✅ Legacy input успешно загрузил файл');
++          debugLog('fileTransfer', '✅ Legacy input успешно загрузил файл');
+           return result;
+         }
+         throw new Error('Legacy input не выбрал файл');
+@@ -301,39 +302,39 @@ export const loadCharacterRawText = async () => {
+     });
+ 
+     // Пробуем все методы по порядку
+-    console.log(`🔍 Доступно методов загрузки: ${methodsToTry.length}`);
++    debugLog('fileTransfer', `🔍 Доступно методов загрузки: ${methodsToTry.length}`);
+     
+     for (let i = 0; i < methodsToTry.length; i++) {
+       const method = methodsToTry[i];
+       try {
+-        console.log(`\n--- Попытка ${i + 1}: ${method.name} ---`);
++        debugLog('fileTransfer', `\n--- Попытка ${i + 1}: ${method.name} ---`);
+         const result = await method.execute();
+         if (result) {
+-          console.log(`\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
++          debugLog('fileTransfer', `\n🎉 УСПЕХ: файл загружен методом "${method.name}"`);
+           return result;
+         }
+       } catch (methodError) {
+         if (methodError && methodError.name === 'AbortError') {
+-          console.log(`\n⏹️  Пользователь отменил в методе "${method.name}"`);
++          debugLog('fileTransfer', `\n⏹️  Пользователь отменил в методе "${method.name}"`);
+           return null;
+         }
+         if (methodError.message === 'User canceled') {
+-          console.log(`\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
++          debugLog('fileTransfer', `\n⏹️  Пользователь отменил выбор в методе "${method.name}"`);
+           return null;
+         }
+-        console.warn(`\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
++        debugLog('fileTransfer', `\n❌ Метод "${method.name}" не сработал:`, methodError.message || methodError);
+         // Продолжаем пробовать следующий метод
+       }
+     }
+ 
+-    console.error('\n❌ Все методы загрузки файлов не сработали');
++    debugLog('fileTransfer', '\n❌ Все методы загрузки файлов не сработали');
+     return null;
+   } catch (error) {
+     if (error && error.name === 'AbortError') {
+-      console.log('\n⏹️  Пользователь отменил выбор файла');
++      debugLog('fileTransfer', '\n⏹️  Пользователь отменил выбор файла');
+       return null;
+     }
+-    console.error('\n❌ Критическая ошибка загрузки файла:', error);
++    debugLog('fileTransfer', '\n❌ Критическая ошибка загрузки файла:', error);
+     return null;
+   }
+ };

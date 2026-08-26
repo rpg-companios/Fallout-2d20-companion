@@ -1,0 +1,92 @@
+{
+  "alerts": {
+    "conditionsRemovedTitle": "Condition removed",
+    "conditionsRemovedMessage": "Removed: {conditions}",
+    "addictionRollTitle": "Addiction roll",
+    "addictionRollMessage": "Rolled: {faces} — {effectCount} effect(s) out of {addictionLevel} needed.",
+    "addictionGainedTitle": "Addiction",
+    "addictionGainedMessage": "You became addicted to this chem.",
+    "addictionAvoidedTitle": "Addiction",
+    "addictionAvoidedMessage": "Addiction did not take hold.",
+    "cannotEquipItem": "This item cannot be equipped.",
+    "successTitle": "Success",
+    "appliedTitle": "Applied",
+    "effectsTitle": "Effects",
+    "noItemsTitle": "Error",
+    "noItemsMessage": "No available items to equip.",
+    "replaceWeaponTitle": "Replace weapon",
+    "replaceWeaponMessage": "Which weapon do you want to replace?",
+    "replaceEquipmentTitle": "Replace equipment",
+    "replaceEquipmentConfirm": "Equipped items will be removed to free space. Continue?",
+    "bothSlotsBusy": "Both slots are occupied. Which item should be replaced?",
+    "bothSlotsBusyPrompt": "Both slots are occupied. Replace 1 ({leftLabel}) or 2 ({rightLabel}).",
+    "applyConsumableTitle": "Use consumable",
+    "applyConsumableQuestion": "Do you want to use {itemName} on yourself or another character?",
+    "windowApplyConsumableQuestion": "Use {itemName} on yourself? Press Cancel to use it on another character.",
+    "healMessage": "Restored {healAmount} health.",
+    "appliedMessage": "Used: {itemName}.",
+    "diseaseCheckPassedTitle": "Disease check passed",
+    "diseaseCheckFailedTitle": "Disease check failed",
+    "diseaseCheckMessage": "Difficulty: {difficulty}\nd20 rolls: {rolls}\nSuccesses: {successes}",
+    "diseaseInfectedMessage": "{check}\nInfected with {diseaseName} (d20: {diseaseRoll}).",
+    "diseaseDuplicateMessage": "{check}\n{diseaseName} is already active.",
+    "diseaseImmuneMessage": "{check}\nImmunity prevents infection with {diseaseName} (d20: {diseaseRoll}).",
+    "consumableResultTitle": "Use result",
+    "positiveResultSection": "Positive result",
+    "negativeResultSection": "Negative result",
+    "diseaseCheckPassedSummary": "Disease check passed.",
+    "diseaseInfectedSummary": "Disease check failed. Infected with {diseaseName}.",
+    "diseaseDuplicateSummary": "Disease check failed. {diseaseName} is already active.",
+    "diseaseImmuneSummary": "Disease check failed. Immunity prevented infection with {diseaseName}.",
+    "conditionRemoval": {
+      "addicted": {
+        "removed": "Addiction cured.",
+        "notPresent": "No active addiction."
+      },
+      "diseased": {
+        "removed": "All diseases cured.",
+        "notPresent": "No active diseases."
+      }
+    },
+    "foundItemBonus": "{perkName}: you received + {amount} {itemType}."
+  },
+  "foundItemTypes": {
+    "ammo": "ammo"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "yes": "Yes",
+    "weapon": "Weapon",
+    "weapon1": "Weapon 1",
+    "weapon2": "Weapon 2",
+    "self": "Self",
+    "other": "Other",
+    "unequip": "↓ Unequip",
+    "equip": "↑ Equip",
+    "apply": "Use",
+    "sell": "Sell",
+    "addLoot": "Add loot",
+    "buyItems": "Buy items",
+    "repair": "Repair",
+    "contents": "Contents",
+    "collapse": "Collapse"
+  },
+  "labels": {
+    "leftArm": "Left bracer",
+    "rightArm": "Right bracer",
+    "leftLeg": "Left greave",
+    "rightLeg": "Right greave",
+    "item": "ITEM",
+    "action": "ACTION",
+    "unknownItem": "Unknown item",
+    "quantity": "Qty",
+    "price": "Price",
+    "weight": "Weight",
+    "pieces": "pcs",
+    "inventoryEmpty": "Inventory is empty",
+    "totalWeight": "Total weight",
+    "totalPrice": "Total price",
+    "durability": "Durability (HP)",
+    "ammo": "Ammo"
+  }
+}
