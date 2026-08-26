@@ -33,7 +33,7 @@ try {
   // eslint-disable-next-line global-require
   DocumentPickerModule = require('expo-document-picker');
   // eslint-disable-next-line global-require
-  FileSystemModule = require('expo-file-system');
+  FileSystemModule = require('expo-file-system/legacy');
   // eslint-disable-next-line global-require
   SharingModule = require('expo-sharing');
 } catch {

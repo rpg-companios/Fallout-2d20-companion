@@ -1,0 +1,477 @@
+[
+  {
+    "id": "mag_la_fantoma",
+    "name": "¡La Fantoma!",
+    "effectLabel": "When you succeed at a Sneak test to avoid notice, you may spend 1 AP to create a distraction somewhere within Medium range; the character who failed the opposed test to detect you heads towards the distraction."
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_01",
+    "name": "Astoundingly Awesome Tales: Attack of the Fishmen!",
+    "effectLabel": "+1 {/CD} on attacks against Mirelurks"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_02",
+    "name": "Astoundingly Awesome Tales: Rise of the Mutants!",
+    "effectLabel": "+1 {/CD} on attacks against super mutants"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_03",
+    "name": "Astoundingly Awesome Tales: Attack of the Metal Men!",
+    "effectLabel": "+2 to Physical and Energy damage resistances vs Robots"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_04",
+    "name": "Astoundingly Awesome Tales: The Mad Russian's Revenge!",
+    "effectLabel": "+2 to Poison damage resistance"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_05",
+    "name": "Astoundingly Awesome Tales: The Starlet Sniper!",
+    "effectLabel": "+1 {/CD} on attacks with Accurate weapons"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_06",
+    "name": "Astoundingly Awesome Tales: Curse of the Burned!",
+    "effectLabel": "+1 {/CD} on attacks vs Ghouls"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_07",
+    "name": "Astoundingly Awesome Tales: Giant Insects Invade!",
+    "effectLabel": "+2 to Radiation damage resistance"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_08",
+    "name": "Astoundingly Awesome Tales: Deadly Lasers!",
+    "effectLabel": "+1 {/CD} on attacks with Energy weapons"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_09",
+    "name": "Astoundingly Awesome Tales: Science Gone Mad!",
+    "effectLabel": "+2 to Energy damage resistance"
+  },
+  {
+    "id": "mag_astoundingly_awesome_tales_10",
+    "name": "Astoundingly Awesome Tales: Surrounded by the Dead!",
+    "effectLabel": "+1 {/CD} on attacks where you spend one or more Ammunition for bonus damage"
+  },
+  {
+    "id": "mag_backwoodsman_01",
+    "name": "Backwoodsman: Get Off My Lawn",
+    "effectLabel": "When you find ammo, you find +2 {/CD} more shots"
+  },
+  {
+    "id": "mag_backwoodsman_02",
+    "name": "Backwoodsman: Down Home Cookin'",
+    "effectLabel": "One item of cooked food you make and eat heals +3 HP"
+  },
+  {
+    "id": "mag_backwoodsman_03",
+    "name": "Backwoodsman: Homesteading Horror",
+    "effectLabel": "Reduce the difficulty of repairing a damaged item by 1 (min. 0)"
+  },
+  {
+    "id": "mag_backwoodsman_04",
+    "name": "Backwoodsman: Hardy as a Sasquatch",
+    "effectLabel": "Reduce difficulty of a test to resist catching a disease by 1 (min. 0)"
+  },
+  {
+    "id": "mag_backwoodsman_05",
+    "name": "Backwoodsman: Carnivorous Rabbits of Appalachia",
+    "effectLabel": "Add +2 {/CD} damage to an attack against a Mammal or Lizard"
+  },
+  {
+    "id": "mag_backwoodsman_06",
+    "name": "Backwoodsman: The Appalachia Squirrel Massacre",
+    "effectLabel": "Find twice as much meat from a butchered creature"
+  },
+  {
+    "id": "mag_backwoodsman_07",
+    "name": "Backwoodsman: Art of the Tomahawk",
+    "effectLabel": "Add +2 {/CD} damage to a Thrown weapon attack (other than an Explosive)"
+  },
+  {
+    "id": "mag_backwoodsman_08",
+    "name": "Backwoodsman: The Gunsmith of Harper's Ferry",
+    "effectLabel": "Reduce the difficulty of crafting a weapon by 1 (min. 0)"
+  },
+  {
+    "id": "mag_backwoodsman_09",
+    "name": "Backwoodsman: The Ohio River Hermit",
+    "effectLabel": "Heal +2 HP when you consume an Alcoholic drink"
+  },
+  {
+    "id": "mag_backwoodsman_10",
+    "name": "Backwoodsman: Nightmare in the Garden",
+    "effectLabel": "When scavenging from plants, gain twice as much"
+  },
+  {
+    "id": "mag_boxing_times",
+    "name": "Boxing Times",
+    "effectLabel": "Once, when you succeed at an Unarmed attack, if you spend any AP to increase the damage you dealt, you may add the Stun damage effect to your attack."
+  },
+  {
+    "id": "mag_duck_and_cover",
+    "name": "Duck and Cover!",
+    "effectLabel": "Once, when you are affected by a Blast weapon, you may choose to fall prone. If you do so, you add +3 to all damage resistances against the damage caused by that Blast."
+  },
+  {
+    "id": "mag_fixin_things",
+    "name": "Fixin' Things",
+    "effectLabel": "Once, when you attempt to repair an item, halve the amounts of the materials needed to complete the repair (round up)."
+  },
+  {
+    "id": "mag_future_weapons_today",
+    "name": "Future Weapons Today",
+    "effectLabel": "Once, when you make an attack with an Energy Weapon, you may overcharge it. Increase the damage by +2 {/CD} for that attack. The weapon cannot be used to make an attack in the turn after an overcharged attack as it cools down."
+  },
+  {
+    "id": "mag_grognak_the_barbarian_01",
+    "name": "Grognak the Barbarian: Blood on the Harp",
+    "effectLabel": "One successful melee attack you make inflicts +2 {/CD} damage"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_02",
+    "name": "Grognak the Barbarian: Cometh the Trickster",
+    "effectLabel": "Add +1 to the difficulty of another character's skill test to detect you"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_03",
+    "name": "Grognak the Barbarian: Jungle of the Bat-Babies",
+    "effectLabel": "When you suffer Poison damage, gain +3 Poison damage resistance"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_04",
+    "name": "Grognak the Barbarian: In the Bosom of the Corsair Queen",
+    "effectLabel": "One successful melee attack you make automatically inflicts a Critical Hit"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_05",
+    "name": "Grognak the Barbarian: Demon Slaves, Demon Sands",
+    "effectLabel": "One attack against Ghouls inflicts +2 {/CD} damage"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_06",
+    "name": "Grognak the Barbarian: Enter Maula: War Maiden of Mars",
+    "effectLabel": "When you make a melee attack with a Two-Handed melee weapon, gain the Piercing 1 damage effect (or +1 to any existing Piercing effect)"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_07",
+    "name": "Grognak the Barbarian: Fatherless Cur!",
+    "effectLabel": "Ignore one complication on a melee attack"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_08",
+    "name": "Grognak the Barbarian: Lost in the Snows of Lust",
+    "effectLabel": "Gain +10 Carry weight for one scene"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_09",
+    "name": "Grognak the Barbarian: The Lair of the Virgin Eaters",
+    "effectLabel": "Gain +2 Physical damage resistance against one attack"
+  },
+  {
+    "id": "mag_grognak_the_barbarian_10",
+    "name": "Grognak the Barbarian: What Sorcery is This?",
+    "effectLabel": "Gain +2 Energy damage resistance against one attack"
+  },
+  {
+    "id": "mag_guns_and_bullets_01",
+    "name": "Guns and Bullets: The Future of Hunting?",
+    "effectLabel": "One attack against Robots inflicts +2 {/CD} damage"
+  },
+  {
+    "id": "mag_guns_and_bullets_02",
+    "name": "Guns and Bullets: Lasers & Hunting: Acceptable Overkill",
+    "effectLabel": "One attack with a Laser weapon gains the Vicious damage effect if it didn't already have it"
+  },
+  {
+    "id": "mag_guns_and_bullets_03",
+    "name": "Guns and Bullets: Little Guns for Little Ladies",
+    "effectLabel": "One attack with a Small Guns weapon gains the Vicious damage effect if it didn't have it already"
+  },
+  {
+    "id": "mag_guns_and_bullets_04",
+    "name": "Guns and Bullets: Street Guns of Detroit",
+    "effectLabel": "Gain an extra 2 AP after one successful attack. This AP must be spent immediately: it cannot be saved"
+  },
+  {
+    "id": "mag_guns_and_bullets_05",
+    "name": "Guns and Bullets: Avoid Those Pesky Gun Laws!",
+    "effectLabel": "When you salvage a weapon, gain 2 AP which may only be spent to salvage additional units of materials"
+  },
+  {
+    "id": "mag_guns_and_bullets_06",
+    "name": "Guns and Bullets: The Moon: A Communist Doomsday Device?!",
+    "effectLabel": "Gain +2 to Physical or Energy damage resistance against one attack at night"
+  },
+  {
+    "id": "mag_guns_and_bullets_07",
+    "name": "Guns and Bullets: Take Aim, Army Style",
+    "effectLabel": "One aimed attack made with a weapon which lacks the Accurate quality inflicts +2 {/CD} damage"
+  },
+  {
+    "id": "mag_guns_and_bullets_08",
+    "name": "Guns and Bullets: Bear-Proofing Your Campsite",
+    "effectLabel": "One attack against Yao Guai inflicts +3 {/CD} damage"
+  },
+  {
+    "id": "mag_guns_and_bullets_09",
+    "name": "Guns and Bullets: Plasma: The Weapon of Tomorrow",
+    "effectLabel": "One attack with a Plasma weapon gains the Vicious damage effect if it didn't already have it"
+  },
+  {
+    "id": "mag_guns_and_bullets_10",
+    "name": "Guns and Bullets: Guide to Hunting Commies!",
+    "effectLabel": "One attack against an enemy with a lower level than you inflicts +2 {/CD} damage"
+  },
+  {
+    "id": "mag_live_and_love_01",
+    "name": "Live & Love: Life Long Best Friends!",
+    "effectLabel": "+1 Maximum Health Points to all party members for one scene"
+  },
+  {
+    "id": "mag_live_and_love_02",
+    "name": "Live & Love: Nuke-the-Man!",
+    "effectLabel": "+1 {/CD} damage to attacks from all party members for one scene"
+  },
+  {
+    "id": "mag_live_and_love_03",
+    "name": "Live & Love: Trim the Fat!",
+    "effectLabel": "Regain twice as many HP from fruit or vegetables eaten in one scene"
+  },
+  {
+    "id": "mag_live_and_love_04",
+    "name": "Live & Love: The Secretary Charmer",
+    "effectLabel": "At the start of one scene, add +1 AP to the group pool"
+  },
+  {
+    "id": "mag_live_and_love_05",
+    "name": "Live & Love: Talk Yourself Sober",
+    "effectLabel": "Gain 1 Luck point (lost at the end of the scene if not used) when you consume an Alcoholic drink"
+  },
+  {
+    "id": "mag_live_and_love_06",
+    "name": "Live & Love: Advice from Married Men",
+    "effectLabel": "+1 Physical damage resistance to all party members for one scene"
+  },
+  {
+    "id": "mag_live_and_love_07",
+    "name": "Live & Love: Beware the Man Handler",
+    "effectLabel": "The group AP pool may contain 1 AP more than normal for one scene"
+  },
+  {
+    "id": "mag_live_and_love_08",
+    "name": "Live & Love: An Experience to Remember",
+    "effectLabel": "Choose one other Magazine perk you have previously used but not learned; that now takes effect"
+  },
+  {
+    "id": "mag_live_and_love_09",
+    "name": "Live & Love: I Married a Robot",
+    "effectLabel": "+2 to all damage resistances against Robots for one scene"
+  },
+  {
+    "id": "mag_massachusetts_surgical_journal",
+    "name": "Massachusetts Surgical Journal",
+    "effectLabel": "Once, when you provide medical attention to another character and assist their END + Survival test to heal Injuries, you may treat your assistance die as if it had rolled a 1."
+  },
+  {
+    "id": "mag_meeting_people",
+    "name": "Meeting People",
+    "effectLabel": "Once, when you roll one or more complications on a Speech test, you may ignore those complications."
+  },
+  {
+    "id": "mag_programmers_digest",
+    "name": "Programmer's Digest",
+    "effectLabel": "Once, when you fail a Science test to hack into a computer terminal and would be locked out, you may choose not to be locked out, allowing you to make another attempt."
+  },
+  {
+    "id": "mag_tales_of_a_junktown_jerky_vendor",
+    "name": "Tales of a Junktown Jerky Vendor",
+    "effectLabel": "Once, when you succeed or fail at a Barter test to haggle on the price of a trade, you may spend 1 Luck point to shift the price 10% in your favor."
+  },
+  {
+    "id": "mag_tesla_science_magazine_01",
+    "name": "Tesla Science Magazine: Will Robots Rule the World?",
+    "effectLabel": "+2 to Physical and Energy damage resistances vs Robots"
+  },
+  {
+    "id": "mag_tesla_science_magazine_02",
+    "name": "Tesla Science Magazine: What is Plasma, anyway?",
+    "effectLabel": "+2 to Physical and Energy damage resistances vs Plasma weapons"
+  },
+  {
+    "id": "mag_tesla_science_magazine_03",
+    "name": "Tesla Science Magazine: Rocket Science for Toddlers",
+    "effectLabel": "+2 {/CD} damage inflicted by one attack with a Blast weapon"
+  },
+  {
+    "id": "mag_tesla_science_magazine_04",
+    "name": "Tesla Science Magazine: Tomorrow's Technology for Today's Super Soldiers",
+    "effectLabel": "After spending a fusion core charge, you may spend 1 Luck point: if you do so the charge is not spent"
+  },
+  {
+    "id": "mag_tesla_science_magazine_05",
+    "name": "Tesla Science Magazine: Giant Super Weapons!",
+    "effectLabel": "Once, when you fire a Gatling weapon, you consume ammunition at 8x the rate, rather than 10x"
+  },
+  {
+    "id": "mag_tesla_science_magazine_06",
+    "name": "Tesla Science Magazine: Geckos and Gamma Radiation",
+    "effectLabel": "+2 {/CD} damage inflicted on one attack against a Mutated creature"
+  },
+  {
+    "id": "mag_tesla_science_magazine_07",
+    "name": "Tesla Science Magazine: U.S. Army Goes to Space",
+    "effectLabel": "On a single attack with an Energy weapon, you inflict a Critical Hit if you inflict 3 or more damage after damage resistance (rather than the normal 5 or more damage)"
+  },
+  {
+    "id": "mag_tesla_science_magazine_08",
+    "name": "Tesla Science Magazine: 10 Number 1 Hits!!! Rock-o-bot Takes the Nation by Storm!!",
+    "effectLabel": "On a single attack with a Big Gun, you inflict a Critical Hit if you inflict 3 or more damage after damage resistance (rather than the normal 5 or more damage)"
+  },
+  {
+    "id": "mag_tesla_science_magazine_09",
+    "name": "Tesla Science Magazine: Future of Warfare?",
+    "effectLabel": "Once, when you inflict a Critical Hit, increase the total damage inflicted by +2"
+  },
+  {
+    "id": "mag_true_police_stories",
+    "name": "True Police Stories",
+    "effectLabel": "Once, when you roll the damage of an attack, you may spend a Luck point to turn up to three {/CD} to any face, rather than rolling them."
+  },
+  {
+    "id": "mag_tumblers_today_01",
+    "name": "Tumblers Today: Mysteries of the Master Key Exposed!",
+    "effectLabel": "You may re-roll 1d20 on a single Lockpicking test"
+  },
+  {
+    "id": "mag_tumblers_today_02",
+    "name": "Tumblers Today: Bobby Pins: More Effective Than Lockpicks?",
+    "effectLabel": "When using a Bobby Pin, reduce the difficulty of a Lockpicking test by a further 1 (minimum 0)"
+  },
+  {
+    "id": "mag_tumblers_today_03",
+    "name": "Tumblers Today: Confessions of a Housebreaker",
+    "effectLabel": "When scavenging or looting, spend 1 Luck to find 2+2 {/CD} Bobby Pins"
+  },
+  {
+    "id": "mag_tumblers_today_04",
+    "name": "Tumblers Today: Open Any Lock in 5 Seconds Flat",
+    "effectLabel": "When you successfully pick a lock, you may use the Reduce Time AP option without spending AP"
+  },
+  {
+    "id": "mag_tumblers_today_05",
+    "name": "Tumblers Today: Locksmith Certification Special - Pass with Flying Colors",
+    "effectLabel": "When suffer one or more complications on a Lockpicking test, spend 1 Luck point to ignore those complications"
+  },
+  {
+    "id": "mag_unstoppables_01",
+    "name": "Unstoppables: Dr. Brainwash and His Army of De-Capitalists!",
+    "effectLabel": "Spend 2 Luck points to avoid all damage from an attack from a Mutated Human (including Ghouls and super mutants)"
+  },
+  {
+    "id": "mag_unstoppables_02",
+    "name": "Unstoppables: Who Can Stop the Unstoppable Grog-Na-Rok?!",
+    "effectLabel": "Spend 3 Luck points to avoid all damage from a single attack or hazard"
+  },
+  {
+    "id": "mag_unstoppables_03",
+    "name": "Unstoppables: Commie-Kazi vs. Manta Man",
+    "effectLabel": "Spend 1 Luck point to avoid all damage from a Blast weapon"
+  },
+  {
+    "id": "mag_unstoppables_04",
+    "name": "Unstoppables: Trapped in the Dimension of the Pterror-dactyls!",
+    "effectLabel": "Spend 1 Luck point to avoid all damage from a single melee attack"
+  },
+  {
+    "id": "mag_unstoppables_05",
+    "name": "Unstoppables: Visit the Ux-Ron Galaxy!",
+    "effectLabel": "Spend 1 Luck point to avoid all Energy damage from a single attack"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_01",
+    "name": "U.S. Covert Operations Manual: FH 5-01 Whistling in the Dark",
+    "effectLabel": "If you are detected while sneaking, you add +2 to Physical damage resistance against the first attack you receive after being detected"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_02",
+    "name": "U.S. Covert Operations Manual: FH 5-02 Urban Camouflage",
+    "effectLabel": "Enemies suffer +1 difficulty on tests to detect you; this does not stack with any difficulty increases for poor light or darkness"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_03",
+    "name": "U.S. Covert Operations Manual: FH 5-03 Facepaint Fundamentals",
+    "effectLabel": "+1 to all damage resistances against attacks from Character NPCs"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_04",
+    "name": "U.S. Covert Operations Manual: FH 5-04 Not the Soldiers You're Looking For",
+    "effectLabel": "+1 {/CD} damage inflicted by attacks against Character NPCs"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_05",
+    "name": "U.S. Covert Operations Manual: FH 5-05 Who Goes There?",
+    "effectLabel": "When you spend a Luck point to re-roll a d20 on a PER test, instead count that die as if it had rolled a 1"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_06",
+    "name": "U.S. Covert Operations Manual: FH 5-06 Squeaky Floorboard, Sudden Death",
+    "effectLabel": "Once, when you suffer one or more Complications on a Sneak test, ignore the complications"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_07",
+    "name": "U.S. Covert Operations Manual: FH 5-07 Getting the Drop on the Communists",
+    "effectLabel": "Once, when an enemy aims before making an attack against you, you may cause them to lose the benefits of aiming"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_08",
+    "name": "U.S. Covert Operations Manual: FH 5-08 Bushes, Boxes, and Beehives: Camouflage Special",
+    "effectLabel": "+2 {/CD} damage inflicted by an unarmed attack or an attack made with a knife"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_09",
+    "name": "U.S. Covert Operations Manual: FH 5-09 Look Better in Black",
+    "effectLabel": "Once, when using a Stealth Boy, it lasts for one additional turn"
+  },
+  {
+    "id": "mag_us_covert_operations_manual_10",
+    "name": "U.S. Covert Operations Manual: FH 5-10 Tiptoe Through the Tulips",
+    "effectLabel": "When you spend a Luck point to re-roll a d20 on an AGI test, instead count that die as if it had rolled a 1"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_01",
+    "name": "Wasteland Survival Guide: Farming the Wastes",
+    "effectLabel": "Consuming a fruit or vegetable food item heals twice as many HP"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_02",
+    "name": "Wasteland Survival Guide: Insect Repellent Special",
+    "effectLabel": "Increase all damage resistances by +2 vs an attack from an Insect"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_03",
+    "name": "Wasteland Survival Guide: The Bright Side of Radiation Poisoning",
+    "effectLabel": "When you consume irradiated food or drink, heal additional HP equal to the roll on the {/CD}"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_04",
+    "name": "Wasteland Survival Guide: Coupon Spectacular",
+    "effectLabel": "When buying food or drink items, the price is shifted an additional 10% in your favor"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_05",
+    "name": "Wasteland Survival Guide: Water Aerobics for Ghouls",
+    "effectLabel": "Reduce the difficulty of an Athletics test to swim by 1 (min. 0)"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_06",
+    "name": "Wasteland Survival Guide: Self Defense Secrets",
+    "effectLabel": "Gain +1 defense against a melee attack"
+  },
+  {
+    "id": "mag_wasteland_survival_guide_07",
+    "name": "Wasteland Survival Guide: Hunting in the Wastes",
+    "effectLabel": "When you butcher an animal you've killed, and the amount of meat found can be increased by spending AP, you gain 1 bonus AP for that purpose (this AP is lost if not used)"
+  }
+]

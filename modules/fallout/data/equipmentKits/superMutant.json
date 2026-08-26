@@ -1,0 +1,123 @@
+{
+  "supermutant_bruiser": {
+    "items": [
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "armorId": "armor_raider_hand_001",
+            "itemType": "armor"
+          },
+          {
+            "armorId": "armor_raider_leg_001",
+            "itemType": "armor"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_pipe_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_38",
+          "quantity": {
+            "base": 3,
+            "rollType": "rollCD",
+            "rollValue": 3,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_baseball_bat",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_machete",
+            "itemType": "weapon"
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 5
+      }
+    ]
+  },
+  "supermutant_skirmisher": {
+    "items": [
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "armorId": "armor_raider_hand_001",
+            "itemType": "armor"
+          },
+          {
+            "armorId": "armor_raider_leg_001",
+            "itemType": "armor"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_pipe_bolt_action",
+        "itemType": "weapon",
+        "modIds": [
+          "mod_005"
+        ],
+        "ammo": {
+          "ammoId": "ammo_308",
+          "quantity": {
+            "base": 4,
+            "rollType": "rollCD",
+            "rollValue": 4,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_board",
+        "itemType": "weapon"
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 5
+      }
+    ]
+  }
+}

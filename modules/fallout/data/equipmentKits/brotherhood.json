@@ -1,0 +1,112 @@
+{
+  "brotherhood_initiate": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_bos_uniform",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_bos_hood",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_combat_knife",
+        "itemType": "weapon"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_laser_gun",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_energy_cell",
+              "quantity": {
+                "base": 5,
+                "rollType": "rollCD",
+                "rollValue": 5,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_10mm_pistol",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_10mm",
+              "quantity": {
+                "base": 5,
+                "rollType": "rollCD",
+                "rollValue": 5,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_holotags",
+        "itemType": "misc"
+      }
+    ]
+  },
+  "brotherhood_scribe": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_bos_scribe_armor",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_bos_scribe_hat",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_combat_knife",
+        "itemType": "weapon"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_laser_gun",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_energy_cell",
+              "quantity": {
+                "base": 3,
+                "rollType": "rollCD",
+                "rollValue": 3,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_10mm_pistol",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_10mm",
+              "quantity": {
+                "base": 3,
+                "rollType": "rollCD",
+                "rollValue": 3,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_holotags",
+        "itemType": "misc"
+      }
+    ]
+  }
+}

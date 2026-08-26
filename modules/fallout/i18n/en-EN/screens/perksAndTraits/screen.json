@@ -1,0 +1,19 @@
+{
+  "errors": {
+    "intensiveTrainingRequirements": "Perk \"Intensive Training\" can only be taken at level 2+ or after finishing character creation (distributing attributes)"
+  },
+  "perkSelected": {
+    "intensiveTrainingSuccess": "Perk \"{perkName}\" selected! You received +{bonus} attribute point. Go to the \"Character\" tab to distribute it."
+  },
+  "modal": {
+    "attributeFilters": {
+      "STR": "STR",
+      "END": "END",
+      "PER": "PER",
+      "AGI": "AGI",
+      "INT": "INT",
+      "CHA": "CHA",
+      "LCK": "LCK"
+    }
+  }
+}

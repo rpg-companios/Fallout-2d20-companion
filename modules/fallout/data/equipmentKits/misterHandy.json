@@ -1,0 +1,409 @@
+{
+  "mister_handy_assistant": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_mister_handy_eye_stalk",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_mister_handy",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_mister_handy_thruster",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_mister_handy",
+        "itemType": "robotArm",
+        "slot": "arm1"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_flamethrower",
+        "itemType": "weapon",
+        "slot": "arm2",
+        "ammo": {
+          "ammoId": "ammo_flamer_fuel",
+          "quantity": {
+            "base": 20
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_circular_saw",
+        "itemType": "weapon",
+        "slot": "arm3"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_item_repair_kit",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_boiler",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
+  "mister_handy_brave": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_mister_handy_eye_stalk",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_mister_handy",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_mister_handy_thruster",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_auto_10mm",
+        "itemType": "weapon",
+        "slot": "arm1",
+        "ammo": {
+          "ammoId": "ammo_10mm",
+          "quantity": {
+            "base": 20
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_circular_saw",
+        "itemType": "weapon",
+        "slot": "arm2"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_laser_cutter",
+        "itemType": "weapon",
+        "slot": "arm3",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 20
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_gutsy_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_recon_sensors",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
+  "mister_handy_nanny": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_mister_handy_eye_stalk",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_mister_handy",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_mister_handy_thruster",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_mister_handy",
+        "itemType": "robotArm",
+        "slot": "arm1"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_flamethrower",
+        "itemType": "weapon",
+        "slot": "arm2",
+        "ammo": {
+          "ammoId": "ammo_flamer_fuel",
+          "quantity": {
+            "base": 20
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "slot": "arm3",
+        "items": [
+          {
+            "itemId": "robot_arm_mister_handy",
+            "itemType": "robotArm",
+            "slot": "arm3"
+          },
+          {
+            "weaponId": "robot_weapon_laser_cutter",
+            "itemType": "weapon",
+            "slot": "arm3",
+            "ammo": {
+              "ammoId": "ammo_energy_cell",
+              "quantity": {
+                "base": 20
+              }
+            }
+          },
+          {
+            "weaponId": "robot_weapon_circular_saw",
+            "itemType": "weapon",
+            "slot": "arm3"
+          },
+          {
+            "weaponId": "robot_weapon_flamethrower",
+            "itemType": "weapon",
+            "slot": "arm3",
+            "ammo": {
+              "ammoId": "ammo_flamer_fuel",
+              "quantity": {
+                "base": 20
+              }
+            }
+          },
+          {
+            "weaponId": "robot_weapon_auto_10mm",
+            "itemType": "weapon",
+            "slot": "arm3",
+            "ammo": {
+              "ammoId": "ammo_10mm",
+              "quantity": {
+                "base": 20
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_behavior_analysis",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_hazard_detection",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
+  "mister_handy_medic": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_mister_handy_eye_stalk",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_mister_handy",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_mister_handy_thruster",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "choice",
+        "slot": "arm1",
+        "items": [
+          {
+            "itemId": "robot_arm_mister_handy",
+            "itemType": "robotArm",
+            "slot": "arm1"
+          },
+          {
+            "weaponId": "robot_weapon_circular_saw",
+            "itemType": "weapon",
+            "slot": "arm1"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_circular_saw",
+        "itemType": "weapon",
+        "slot": "arm2"
+      },
+      {
+        "type": "choice",
+        "slot": "arm3",
+        "items": [
+          {
+            "itemId": "robot_arm_mister_handy",
+            "itemType": "robotArm",
+            "slot": "arm3"
+          },
+          {
+            "weaponId": "robot_weapon_laser_cutter",
+            "itemType": "weapon",
+            "slot": "arm3",
+            "ammo": {
+              "ammoId": "ammo_energy_cell",
+              "quantity": {
+                "base": 20
+              }
+            }
+          },
+          {
+            "weaponId": "robot_weapon_circular_saw",
+            "itemType": "weapon",
+            "slot": "arm3"
+          },
+          {
+            "weaponId": "robot_weapon_flamethrower",
+            "itemType": "weapon",
+            "slot": "arm3",
+            "ammo": {
+              "ammoId": "ammo_flamer_fuel",
+              "quantity": {
+                "base": 20
+              }
+            }
+          },
+          {
+            "weaponId": "robot_weapon_auto_10mm",
+            "itemType": "weapon",
+            "slot": "arm3",
+            "ammo": {
+              "ammoId": "ammo_10mm",
+              "quantity": {
+                "base": 20
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_stimpak",
+        "itemType": "chem"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_diagnostics",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      }
+    ]
+  },
+  "mister_handy_farmer": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_mister_handy_eye_stalk",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_mister_handy",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_mister_handy_thruster",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_mister_handy",
+        "itemType": "robotArm",
+        "slot": "arm1"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_circular_saw",
+        "itemType": "weapon",
+        "slot": "arm2"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_laser_cutter",
+        "itemType": "weapon",
+        "slot": "arm3",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 20
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_plating_standard_body",
+        "itemType": "plating"
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_fertilizer_bag",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemId": "food_mutafruit",
+        "itemType": "food",
+        "quantity": 2
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 25
+      }
+    ]
+  }
+}

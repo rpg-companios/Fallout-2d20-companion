@@ -1,0 +1,99 @@
+{
+  "atom_missionary": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_sturdy_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_walking_cane",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_gamma_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_gamma_round",
+          "quantity": {
+            "base": 2,
+            "rollType": "rollCD",
+            "rollValue": 2,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "chem_stimpak",
+        "itemType": "chem"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 10
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      }
+    ]
+  },
+  "atom_zealot": {
+    "items": [
+      {
+        "type": "choice",
+        "items": [
+          {
+            "clothingId": "clothing_sturdy_clothes",
+            "itemType": "clothing"
+          },
+          {
+            "clothingId": "clothing_nomad_outfit",
+            "itemType": "clothing"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_gas_mask",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_machete",
+        "itemType": "weapon"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_gamma_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_gamma_round",
+          "quantity": {
+            "base": 2,
+            "rollType": "rollCD",
+            "rollValue": 2,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 2,
+          "mode": "separate"
+        }
+      }
+    ]
+  }
+}

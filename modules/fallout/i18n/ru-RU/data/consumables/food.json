@@ -1,0 +1,452 @@
+[
+  {
+    "id": "food_grilled_bloatfly",
+    "name": "Печёный дутень",
+    "effectLabel": "",
+    "description": "+2 Сопротивление урону от радиации"
+  },
+  {
+    "id": "food_blamco_mac_and_cheese",
+    "name": "Макароны с Сыром",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_bloatfly_meat",
+    "name": "Мясо Дутня",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_bloodbug_meat",
+    "name": "Мясо гнуса",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_bloodbug_steak",
+    "name": "Стейк из гнуса",
+    "effectLabel": "",
+    "description": "Максимальные ОЗ +3 до конца следующей сцены"
+  },
+  {
+    "id": "food_brahmin_meat",
+    "name": "Мясо Брамина",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_brain_fungus",
+    "name": "Мозговой гриб",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_canned_dog_food",
+    "name": "Собачьи консервы",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_carrot",
+    "name": "Морковь",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_cooked_softshell_mirelurk",
+    "name": "Приготовленный болотник с мягким панцирем",
+    "effectLabel": "",
+    "description": "Получите +1 ОД в начале следующей сцены"
+  },
+  {
+    "id": "food_corn",
+    "name": "Кукуруза",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_cram",
+    "name": "СРАМ",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_crispy_squirrel_bits",
+    "name": "Хрустящие кусочки белки",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_dandy_boy_apples",
+    "name": "Наливные Яблоки",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_deathclaw_egg",
+    "name": "Яйцо Когтя смерти",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_deathclaw_meat",
+    "name": "Мясо Когтя смерти",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_deathclaw_omelette",
+    "name": "Омлет из яиц когтя смерти",
+    "effectLabel": "",
+    "description": "Если следующая сцена - бой, восстанавливайте 1ОЗ в начале каждого хода."
+  },
+  {
+    "id": "food_deathclaw_steak",
+    "name": "Стейк из когтя смерти",
+    "effectLabel": "",
+    "description": "Можно перебросить 1d20 на все проверки на СИЛ до конца следующей сцены"
+  },
+  {
+    "id": "food_fancy_lads_snack_cakes",
+    "name": "Кексы «Весёлые ребята»",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_food_paste",
+    "name": "Пищевая паста",
+    "effectLabel": "",
+    "description": "Можно перебросить 1d20 на все проверки на ВЫН до конца следующей сцены"
+  },
+  {
+    "id": "food_gourd",
+    "name": "Тыква",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_grilled_radroach",
+    "name": "Радтаракан Гриль",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_grilled_radstag",
+    "name": "Радолень гриль",
+    "effectLabel": "",
+    "description": "Переносимый вес увеличивается на +25 до конца следующей сцены"
+  },
+  {
+    "id": "food_gum_drops",
+    "name": "Жевательные пастилки",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_iguana_bits",
+    "name": "Кусочки игуаны",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_iguana_on_a_stick",
+    "name": "Игуана на палочке",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_iguana_stew",
+    "name": "Кусочки игуаны",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_instamash",
+    "name": "Пюре быстрого приготовления",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_institute_food_packet",
+    "name": "Продуктовый набор института",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_melon",
+    "name": "Дыня",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_mirelurk_cake",
+    "name": "Пирог из болотника",
+    "effectLabel": "",
+    "description": "Можете дышать под водой до конца следующей сцены"
+  },
+  {
+    "id": "food_mirelurk_egg",
+    "name": "Яйцо Болотника",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_mirelurk_egg_omelette",
+    "name": "Омлет из яиц болотника",
+    "effectLabel": "",
+    "description": "Немедленно добавьте 2 ОД в пул группы"
+  },
+  {
+    "id": "food_mirelurk_meat",
+    "name": "Мясо Болотника",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_mirelurk_queen_steak",
+    "name": "Стейк из матки болотников",
+    "effectLabel": "",
+    "description": "Уменьшите сложность всех проверок на ВЫН на 1 до конца следующей сцены"
+  },
+  {
+    "id": "food_mole_rat_chops",
+    "name": "Отбивные из кротокрыса",
+    "effectLabel": "",
+    "description": "+1 максимум ОД в групповой пул до конца текущей сцены"
+  },
+  {
+    "id": "food_mole_rat_meat",
+    "name": "Мясо кротокрыса",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_dog_meat",
+    "name": "Собачатина",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_mutant_hound_ribs",
+    "name": "Рёбрышки гончей мутанта",
+    "effectLabel": "",
+    "description": "Лечит 2 урона от радиации"
+  },
+  {
+    "id": "food_mutant_hound_meat",
+    "name": "Мясо гончей мутанта",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_mutfruit",
+    "name": "Мутафрукт",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_dog_chops",
+    "name": "Отбивные из собачатины",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_noodle_bowl",
+    "name": "Миска лапши",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_perfectly_preserved_pie",
+    "name": "Идеально сохранившийся пирог",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_pork_and_beans",
+    "name": "Свинина с бобами",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_potato_crisps",
+    "name": "Картофельные чипсы",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_potted_meat",
+    "name": "Мясные консервы",
+    "effectLabel": "",
+    "description": "Бросьте 2 CD вместо 1 для определения урона от радиации при употреблении"
+  },
+  {
+    "id": "food_mirelurk_queen_meat",
+    "name": "Мясо матки болотников",
+    "effectLabel": "",
+    "description": "Можно перебросить 1d20 на все проверки на ВЫН до конца следующей сцены"
+  },
+  {
+    "id": "food_radroach_meat",
+    "name": "Мясо Радтаракана",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_radscorpion_egg",
+    "name": "Яйцо Радскорпиона",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_radscorpion_egg_omelette",
+    "name": "Омлет из яиц радскорпиона",
+    "effectLabel": "",
+    "description": "Излечение от всех зависимостей"
+  },
+  {
+    "id": "food_radscorpion_meat",
+    "name": "Мясо Радскорпиона",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_radscorpion_steak",
+    "name": "Стейк из радскорпиона",
+    "effectLabel": "",
+    "description": "+2 сопротивления энергоурону до конца следующей сцены"
+  },
+  {
+    "id": "food_radstag_meat",
+    "name": "Мясо Радоленя",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_radstag_stew",
+    "name": "Рагу из радоленя",
+    "effectLabel": "",
+    "description": "+3 сопротивления энергоурону до конца следующей сцены"
+  },
+  {
+    "id": "food_razorgrain",
+    "name": "Бритвозлак",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_ribeye_steak",
+    "name": "Стейк рибай",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_roasted_mirelurk_meat",
+    "name": "Печёное мясо болотника",
+    "effectLabel": "",
+    "description": "Получите +1 ОД в начале следующей сцены"
+  },
+  {
+    "id": "food_salisbury_steak",
+    "name": "Стейк солсбери",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_silt_bean",
+    "name": "Илофасоль",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_softshell_mirelurk_meat",
+    "name": "Мясо болотника с мягким панцерем",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_squirrel_bits",
+    "name": "Кусочки белки",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_squirrel_on_a_stick",
+    "name": "Шашлык из белки",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_squirrel_stew",
+    "name": "Рагу из белки",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_stingwing_fillet",
+    "name": "Филе жалокрыла",
+    "effectLabel": "",
+    "description": "Можете перебросить 1d20 на все проверки на ВОС до конца следующей сцены"
+  },
+  {
+    "id": "food_stingwing_meat",
+    "name": "Мясо жалокрыла",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_sugar_bombs",
+    "name": "Сахарные бомбочки",
+    "effectLabel": "",
+    "description": "Получите +1 ОД в начале следующей сцены"
+  },
+  {
+    "id": "food_sweet_roll",
+    "name": "Сладкий рулет",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_tarberry",
+    "name": "Смоляника",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_tato",
+    "name": "Тошка",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_vegetable_soup",
+    "name": "Овощной суп",
+    "effectLabel": "",
+    "description": "+2 сопротивления урону от радиации до конца следующей сцены"
+  },
+  {
+    "id": "food_yao_guai_meat",
+    "name": "Мясо Яо Гуая",
+    "effectLabel": "",
+    "description": ""
+  },
+  {
+    "id": "food_yao_guai_ribs",
+    "name": "Рёбрышки Яо-Гуая",
+    "effectLabel": "",
+    "description": "+2 сопротивления физическому урону до конца следующей сцены"
+  },
+  {
+    "id": "food_yao_guai_roast",
+    "name": "Жаркое из Яо-Гуая",
+    "effectLabel": "",
+    "description": "+2 CD к атакам ближнего боя до конца следующей сцены"
+  },
+  {
+    "id": "food_yum_yum_deviled_eggs",
+    "name": "Фаршированные яйца «НямНям»",
+    "effectLabel": "",
+    "description": ""
+  }
+]

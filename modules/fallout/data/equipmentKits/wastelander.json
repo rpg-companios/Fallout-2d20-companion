@@ -1,0 +1,407 @@
+{
+  "wastelander_mercenary": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_sturdy_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "armorId": "armor_leather_chest_001",
+            "itemType": "armor"
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "armor_leather_hand_001",
+                "itemType": "armor"
+              },
+              {
+                "type": "fixed",
+                "armorId": "armor_leather_leg_001",
+                "itemType": "armor"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_baseball_bat",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_tire_iron",
+            "itemType": "weapon"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_10mm_pistol",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_10mm",
+              "quantity": {
+                "base": 5,
+                "rollType": "rollCD",
+                "rollValue": 5,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_44_pistol",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_44_magnum",
+              "quantity": {
+                "base": 5,
+                "rollType": "rollCD",
+                "rollValue": 5,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_hunting_rifle",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_308",
+              "quantity": {
+                "base": 5,
+                "rollType": "rollCD",
+                "rollValue": 5,
+                "op": "+"
+              }
+            }
+          },
+          {
+            "weaponId": "weapon_pipe_gun",
+            "itemType": "weapon",
+            "ammo": {
+              "ammoId": "ammo_38",
+              "quantity": {
+                "base": 5,
+                "rollType": "rollCD",
+                "rollValue": 5,
+                "op": "+"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_settlement_job_posting",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 15
+      }
+    ]
+  },
+  "wastelander_settler": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_sturdy_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_switchblade",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_pipe_wrench",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_rolling_pin",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_knuckles",
+            "itemType": "weapon"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_pipe_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_38",
+          "quantity": {
+            "base": 3,
+            "rollType": "rollCD",
+            "rollValue": 3,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "food",
+        "roll": {
+          "rollType": "D20",
+          "count": 2,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 45
+      }
+    ]
+  },
+  "wastelander_wanderer": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_nomad_outfit",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_switchblade",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_pipe_wrench",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_rolling_pin",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_knuckles",
+            "itemType": "weapon"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_pipe_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_38",
+          "quantity": {
+            "base": 4,
+            "rollType": "rollCD",
+            "rollValue": 4,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "itemId": "chem_jet",
+            "itemType": "chem"
+          },
+          {
+            "itemId": "chem_radaway",
+            "itemType": "chem"
+          }
+        ]
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 30
+      }
+    ]
+  },
+  "wastelander_raider": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_harness",
+        "itemType": "clothing"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_chest_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "armor_raider_hand_001",
+        "itemType": "armor"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_lead_pipe",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_pool_cue",
+            "itemType": "weapon"
+          },
+          {
+            "weaponId": "weapon_tire_iron",
+            "itemType": "weapon"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_pipe_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_38",
+          "quantity": {
+            "base": 5,
+            "rollType": "rollCD",
+            "rollValue": 5,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "itemId": "chem_jet",
+            "itemType": "chem"
+          },
+          {
+            "itemId": "chem_radaway",
+            "itemType": "chem"
+          }
+        ]
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "weaponId": "weapon_molotov",
+            "itemType": "weapon"
+          },
+          {
+            "itemId": "chem_stimpak",
+            "itemType": "chem"
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 15
+      }
+    ]
+  },
+  "wastelander_trader": {
+    "items": [
+      {
+        "type": "fixed",
+        "clothingId": "clothing_sturdy_clothes",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "armorId": "armor_leather_chest_001",
+            "itemType": "armor"
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "armor_leather_hand_001",
+                "itemType": "armor"
+              },
+              {
+                "type": "fixed",
+                "armorId": "armor_leather_leg_001",
+                "itemType": "armor"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_pipe_gun",
+        "itemType": "weapon",
+        "ammo": {
+          "ammoId": "ammo_38",
+          "quantity": {
+            "base": 4,
+            "rollType": "rollCD",
+            "rollValue": 4,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "trinklet",
+        "roll": {
+          "rollType": "D20",
+          "count": 1,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "tables",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "item_pack_brahmin",
+        "itemType": "misc"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 50
+      }
+    ]
+  }
+}

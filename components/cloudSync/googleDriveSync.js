@@ -2,9 +2,14 @@ import { debugLog } from '../../src/debug/falloutDebug';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
-import { createCharacterExportPayload, parseCharacterImportPayload } from '../../domain/characterTransfer';
+import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
+import { getActiveModuleId } from '../../domain/moduleLocale';
 
-const ROOT_FOLDER_NAME = 'fallout2d20';
+// Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
+// Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
+// у этого приложения. Она предназначена именно для конфигураций и cloud-saves.
+// Внутри неё — подпапка на каждый сеттинг (модуль): fallout/, heroes/, dnd/ …
+const APP_DATA_FOLDER = 'appDataFolder';
 const SYNC_KEY = 'fallout_cloud_sync_enabled';
 const TOKEN_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -91,9 +96,15 @@ const driveFetch = async (token, url, options = {}) => {
   return response;
 };
 
-const getOrCreateRootFolder = async (token) => {
-  const q = encodeURIComponent(`mimeType='application/vnd.google-apps.folder' and trashed=false and name='${ROOT_FOLDER_NAME}'`);
-  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name,createdTime)&spaces=drive`);
+// В appDataFolder создаём/находим подпапку текущего сеттинга (модуля).
+// Каждый сеттинг читает только свою подпапку: сейв fallout не попадёт в
+// другой сеттинг и наоборот. Имя подпапки — id модуля (getActiveModuleId).
+const getModuleFolderId = async (token) => {
+  const moduleId = getActiveModuleId();
+  const q = encodeURIComponent(
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${moduleId}'`,
+  );
+  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
   const listData = await listResp.json();
   if (listData.files?.length) return listData.files[0].id;
 
@@ -101,17 +112,21 @@ const getOrCreateRootFolder = async (token) => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      name: ROOT_FOLDER_NAME,
+      name: moduleId,
       mimeType: 'application/vnd.google-apps.folder',
+      parents: [APP_DATA_FOLDER],
     }),
   });
   const created = await createResp.json();
+  if (!created.id) {
+    throw new Error('Не удалось создать подпапку сеттинга в appDataFolder');
+  }
   return created.id;
 };
 
 const listRemoteCharacterFiles = async (token, folderId) => {
   const q = encodeURIComponent(`'${folderId}' in parents and trashed=false and mimeType='application/json'`);
-  const resp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=drive&pageSize=200`);
+  const resp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=appDataFolder&pageSize=200`);
   const data = await resp.json();
   return data.files || [];
 };
@@ -147,7 +162,15 @@ const uploadCharacterFile = async ({ token, folderId, fileId, filename, payload 
   });
 };
 
-const makeRemoteFilename = (character) => `${character.id}__${character.name}.json`;
+// Имя файла в Google Drive: <id>__<имя>.json. Часть с именем персонажа
+// прогоняем через общий sanitizeFileName (мультиязычный: сохраняет кириллицу/
+// акценты/иероглифы, убирает пробелы→_ и небезопасные символы), чтобы имена в
+// облаке были такими же аккуратными, как при скачивании. id и .json сохраняются.
+const makeRemoteFilename = (character) => {
+  const safeName = sanitizeFileName(character?.name || 'character')
+    .replace(/\.rpgc$/i, '');
+  return `${character.id}__${safeName}.json`;
+};
 
 export const isCloudSyncConfigured = async () => (await AsyncStorage.getItem(SYNC_KEY)) === '1';
 
@@ -166,7 +189,7 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
 
   await loadGoogleIdentityScript();
   const token = await requestAccessToken();
-  const folderId = await getOrCreateRootFolder(token);
+  const folderId = await getModuleFolderId(token);
   const remoteFiles = await listRemoteCharacterFiles(token, folderId);
   const localList = await db.getCharactersList();
   const remoteById = new Map();
@@ -225,7 +248,7 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
   try {
     await loadGoogleIdentityScript();
     const token = await requestAccessToken();
-    const folderId = await getOrCreateRootFolder(token);
+    const folderId = await getModuleFolderId(token);
     const remoteFiles = await listRemoteCharacterFiles(token, folderId);
     const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${characterId}__`));
     const character = await db.loadCharacterById(characterId);

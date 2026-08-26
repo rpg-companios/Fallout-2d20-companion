@@ -1,0 +1,55 @@
+[
+  {
+    "id": "weaponDurabilityLossEnabled",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "survivalMode",
+    "labelKey": "settings.durabilityTitle",
+    "descriptionKey": "settings.durabilityDescription",
+    "defaultValue": false
+  },
+  {
+    "id": "weaponDurabilityLossPer10Shots",
+    "type": "number",
+    "controlSurface": "settings",
+    "sectionKey": "survivalMode",
+    "labelKey": "settings.lossTitle",
+    "descriptionKey": "settings.lossDescription",
+    "defaultValue": 1,
+    "min": 1,
+    "max": 100,
+    "dependsOn": "weaponDurabilityLossEnabled"
+  },
+  {
+    "id": "randomWeaponQualityEnabled",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "survivalMode",
+    "labelKey": "settings.qualityTitle",
+    "descriptionKey": "settings.qualityDescription",
+    "defaultValue": false,
+    "dependsOn": "weaponDurabilityLossEnabled"
+  },
+  {
+    "id": "unarmedAttackVisible",
+    "type": "boolean",
+    "controlSurface": "equipment",
+    "sectionKey": "combat",
+    "labelKey": "settings.unarmedTitle",
+    "descriptionKey": "settings.unarmedDescription",
+    "defaultValue": true
+  },
+  {
+    "id": "weaponCardsDisplayMode",
+    "type": "select",
+    "controlSurface": "equipment",
+    "sectionKey": "combat",
+    "labelKey": "settings.cardsTitle",
+    "descriptionKey": "settings.cardsDescription",
+    "defaultValue": "cards",
+    "options": [
+      { "value": "cards", "labelKey": "settings.cards.cards" },
+      { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
+    ]
+  }
+]

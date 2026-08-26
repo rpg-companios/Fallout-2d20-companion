@@ -1,0 +1,113 @@
+[
+  {
+    "id": "drink_nuka_cola",
+    "name": "Нюка-Кола",
+    "positiveEffectLabel": "+1 AP",
+    "negativeEffectLabel": "Зависимость: Нюка-Кола"
+  },
+  {
+    "id": "drink_beer",
+    "name": "Пиво",
+    "effectLabel": "itemEffects.drinks.beer"
+  },
+  {
+    "id": "drink_refreshing_beverage",
+    "name": "Освежающий напиток",
+    "effectLabel": "itemEffects.drinks.refreshingBeverage"
+  },
+  {
+    "id": "drink_bourbon",
+    "name": "Бурбон",
+    "effectLabel": "itemEffects.drinks.bourbon"
+  },
+  {
+    "id": "drink_moonshine",
+    "name": "Самогон",
+    "effectLabel": "itemEffects.drinks.moonshine"
+  },
+  {
+    "id": "drink_purified_water",
+    "name": "Очищенная вода",
+    "effectLabel": ""
+  },
+  {
+    "id": "drink_dirty_water",
+    "name": "Грязная вода",
+    "effectLabel": ""
+  },
+  {
+    "id": "drink_dirty_wastelander",
+    "name": "Грязный обитатель Пустоши",
+    "effectLabel": "itemEffects.drinks.dirtyWastelander"
+  },
+  {
+    "id": "drink_mutfruit_juice",
+    "name": "Сок из мутафрукта",
+    "effectLabel": "itemEffects.drinks.mutfruitJuice"
+  },
+  {
+    "id": "drink_tarberry_juice",
+    "name": "Сок из смоляники",
+    "effectLabel": "itemEffects.drinks.tarberryJuice"
+  },
+  {
+    "id": "drink_melon_juice",
+    "name": "Дынный сок",
+    "effectLabel": "itemEffects.drinks.melonJuice"
+  },
+  {
+    "id": "drink_potato_juice",
+    "name": "Картофельный сок",
+    "effectLabel": "itemEffects.drinks.potatoJuice"
+  },
+  {
+    "id": "drink_brahmin_milk",
+    "name": "Молоко брамина",
+    "effectLabel": "itemEffects.drinks.brahminMilk"
+  },
+  {
+    "id": "drink_nuka_cherry",
+    "name": "Вишнёвая Нюка-Кола",
+    "effectLabel": "itemEffects.drinks.nukaCherry"
+  },
+  {
+    "id": "drink_nuka_cola_quantum",
+    "name": "Квантовая Нюка-Кола",
+    "effectLabel": "itemEffects.drinks.nukaColaQuantum"
+  },
+  {
+    "id": "drink_blood_pack",
+    "name": "Пакет крови",
+    "effectLabel": ""
+  },
+  {
+    "id": "drink_glowing_blood_pack",
+    "name": "Светящийся пакет крови",
+    "effectLabel": "itemEffects.drinks.glowingBloodPack"
+  },
+  {
+    "id": "drink_rum",
+    "name": "Ром",
+    "effectLabel": "itemEffects.drinks.rum"
+  },
+  {
+    "id": "drink_irradiated_blood",
+    "name": "Облучённая кровь",
+    "effectLabel": "itemEffects.drinks.irradiatedBlood"
+  },
+  {
+    "id": "drink_wine",
+    "name": "Вино",
+    "effectLabel": "itemEffects.drinks.wine"
+  },
+  {
+    "id": "drink_vodka",
+    "name": "Водка",
+    "effectLabel": "itemEffects.drinks.vodka"
+  },
+  {
+    "id": "drink_whiskey",
+    "name": "Виски",
+    "effectLabel": "itemEffects.drinks.whiskey"
+  }
+]

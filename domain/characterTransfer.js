@@ -25,14 +25,33 @@ const safeParseJson = (raw) => {
   }
 };
 
+/**
+ * Безопасное имя файла персонажа. Мультиязычное: сохраняет буквы ЛЮБОЙ
+ * письменности (кириллица, французский, иероглифы и т.п.), цифры, `_` и `-`.
+ * Убирает только то, что ломает имя файла/URL: пробелы → `_`, а также
+ * разделители путей и «небезопасные» спецсимволы (`/ \ : * ? " < > |`, служебные
+ * управляющие коды). Раньше здесь был `[^a-z0-9_-]`, из-за чего любое русское
+ * имя схлопывалось в `character`, а файлы одинаково назывались `character.rpgc`.
+ *
+ * НЕ транслитерирует и не переводит в нижний регистр: имя сохраняет исходный
+ * вид (кириллица и верхний регистр не теряются).
+ * @param {string} name
+ * @returns {string} filename с расширением EXPORT_FILE_EXTENSION
+ */
 export const sanitizeFileName = (name) => {
-  const base = (name || 'character')
+  const input = (name || 'character').trim();
+  // Убираем управляющие коды и «path-unfriendly» символы, оставляя буквы/цифры
+  // всех алфавитов, `_`, `-`, пробел, точку.
+  const safe = input
+    // control chars + path separators + reserved
+    .replace(/[\u0000-\u001f\u007f/\\:*?"<>|\u0000-\u002f]/g, ' ')
+    // прочие опасные символы (в т.ч. технические) → пробел
+    .replace(/[^\p{L}\p{N}_\- .]/gu, ' ')
+    // склеиваем пробелы
+    .replace(/\s+/g, ' ')
     .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_-]/g, '')
-    .slice(0, 48);
-
+    .replace(/ /g, '_');
+  const base = (safe || 'character').slice(0, 60);
   return `${base || 'character'}${EXPORT_FILE_EXTENSION}`;
 };
 

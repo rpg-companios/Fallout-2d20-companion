@@ -1,0 +1,1717 @@
+[
+  {
+    "id": "food_grilled_bloatfly",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 15,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.grilledBloatfly",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_blamco_mac_and_cheese",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_bloatfly_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 2
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_bloodbug_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_bloodbug_steak",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 18,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.bloodbugSteak",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_brahmin_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 28,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_brain_fungus",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_canned_dog_food",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_carrot",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 3,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_cooked_softshell_mirelurk",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 40,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.cookedSoftshellMirelurk",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_corn",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_cram",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 25,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_crispy_squirrel_bits",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_dandy_boy_apples",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_deathclaw_egg",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 69,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_deathclaw_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 110,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_deathclaw_omelette",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 80,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 11
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.deathclawOmelette",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_deathclaw_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 130,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 14
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.deathclawSteak",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_fancy_lads_snack_cakes",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 18,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_food_paste",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 0,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.foodPaste",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_gourd",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_grilled_radroach",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_grilled_radstag",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 60,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 11
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.grilledRadstag",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_gum_drops",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_iguana_bits",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_iguana_on_a_stick",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 33,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_iguana_stew",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 21,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_instamash",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_institute_food_packet",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_melon",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_mirelurk_cake",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 35,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 12
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.mirelurkCake",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_mirelurk_egg",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 0,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_mirelurk_egg_omelette",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 30,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.mirelurkEggOmelette",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_mirelurk_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 18,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_mirelurk_queen_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 130,
+    "rarity": 5,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 14
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.mirelurkQueenSteak",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_mole_rat_chops",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.moleRatChops",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_mole_rat_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_dog_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_mutant_hound_ribs",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 12,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.mutantHoundRibs",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_mutant_hound_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_mutfruit",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 8,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_dog_chops",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 12,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_noodle_bowl",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_perfectly_preserved_pie",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_pork_and_beans",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 10,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_potato_crisps",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_potted_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 25,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 2
+    },
+    "effectKey": "itemEffects.food.pottedMeat",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_mirelurk_queen_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 22,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "itemEffects.food.mirelurkQueenMeat",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_radroach_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 3,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_radscorpion_egg",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 48,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_radscorpion_egg_omelette",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 65,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.radscorpionEggOmelette",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_radscorpion_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 55,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_radscorpion_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 65,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 12
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.radscorpionSteak",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_radstag_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 50,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_radstag_stew",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 60,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 12
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.radstagStew",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_razorgrain",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_ribeye_steak",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 40,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_roasted_mirelurk_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 40,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.roastedMirelurkMeat",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_salisbury_steak",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 5
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_silt_bean",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 6,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_softshell_mirelurk_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 22,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_squirrel_bits",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 4,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_squirrel_on_a_stick",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 15,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_squirrel_stew",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 24,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 10
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_stingwing_fillet",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 35,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 11
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.stingwingFillet",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_stingwing_meat",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 30,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 8
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_sugar_bombs",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 11,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "itemEffects.food.sugarBombs",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_sweet_roll",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 9,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  },
+  {
+    "id": "food_tarberry",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 5,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_tato",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 7,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_vegetable_soup",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 13,
+    "rarity": 2,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 7
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.vegetableSoup",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_yao_guai_meat",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 85,
+    "rarity": 3,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 9
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "rawMeat": true,
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_yao_guai_ribs",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 90,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 13
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.yaoGuaiRibs",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_yao_guai_roast",
+    "itemType": "food",
+    "weight": 1.0,
+    "cost": 110,
+    "rarity": 4,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 14
+      }
+    },
+    "irradiated": false,
+    "radiationModifier": null,
+    "effectKey": "itemEffects.food.yaoGuaiRoast",
+    "state": "cooked",
+    "preserved": false
+  },
+  {
+    "id": "food_yum_yum_deviled_eggs",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 20,
+    "rarity": 0,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 4
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "cooked",
+    "preserved": true
+  }
+]

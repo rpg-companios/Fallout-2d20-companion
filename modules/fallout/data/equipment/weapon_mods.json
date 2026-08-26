@@ -1,0 +1,5446 @@
+[
+  {
+    "modType": "weapon",
+    "id": "mod_001",
+    "slot": "Receiver",
+    "complexity": 3,
+    "perk1": "?Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 4 Uncommon x 2",
+    "cost": 30,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_submachine_gun",
+      "weapon_10mm_smg"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_002",
+    "slot": "Receiver",
+    "complexity": 4,
+    "perk1": "?Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 5 Uncommon x 3",
+    "cost": 35,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_submachine_gun",
+      "weapon_10mm_smg"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_003",
+    "slot": "Receiver",
+    "complexity": 3,
+    "perk1": "?Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 4 Uncommon x 2",
+    "cost": 27,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_hunting_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_004",
+    "slot": "Receiver",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 20,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_005",
+    "slot": "Receiver",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 25,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_006",
+    "slot": "Receiver",
+    "complexity": 5,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 35,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_007",
+    "slot": "Receiver",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 25,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_008",
+    "slot": "Receiver",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 30,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_burst"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_009",
+    "slot": "Receiver",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 20,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_gun"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_010",
+    "slot": "Receiver",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 20,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_revolver"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 4
+    },
+    "ammoOverride": "ammo_38",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_011",
+    "slot": "Receiver",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 40,
+    "weight": 4,
+    "applies_to_ids": [
+      "weapon_combat_rifle",
+      "weapon_pipe_revolver"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 7
+    },
+    "ammoOverride": "ammo_308",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_012",
+    "slot": "Receiver",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 19,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_pipe_gun"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 4
+    },
+    "ammoOverride": "ammo_45",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_013",
+    "slot": "Receiver",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 30,
+    "weight": 4,
+    "applies_to_ids": [
+      "weapon_hunting_rifle",
+      "weapon_pipe_bolt_action"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 8
+    },
+    "ammoOverride": "ammo_50_cal",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_014",
+    "slot": "Receiver",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 75,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_railway_rifle"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "rangeModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_015",
+    "slot": "Barrel",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 0,
+    "weight": -1,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_submachine_gun",
+      "weapon_pipe_bolt_action",
+      "weapon_syringer",
+      "weapon_10mm_smg"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_016",
+    "slot": "Barrel",
+    "complexity": 5,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 10,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_44_pistol"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_reliable"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_017",
+    "slot": "Barrel",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 20,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_018",
+    "slot": "Barrel",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 35,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_019",
+    "slot": "Barrel",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 36,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_reliable"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_020",
+    "slot": "Barrel",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 3,
+    "weight": -2,
+    "applies_to_ids": [
+      "weapon_double_barrel_shotgun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_close_quarters"
+      },
+      {
+        "op": "lose",
+        "id": "quality_two-handed"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_021",
+    "slot": "Barrel",
+    "complexity": 5,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 37,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_gauss_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_022",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 15,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_023",
+    "slot": "Magazine",
+    "complexity": 3,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Common",
+    "materials": "?Common x 5 Uncommon x 3",
+    "cost": -3,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_10mm_smg"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_unreliable"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_024",
+    "slot": "Magazine",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Common",
+    "materials": "?Common x 4 Uncommon x 2",
+    "cost": 8,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_10mm_smg"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_reliable"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_025",
+    "slot": "Magazine",
+    "complexity": 5,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 23,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_10mm_smg"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_026",
+    "slot": "Grip",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 6,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_10mm_pistol"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_027",
+    "slot": "Grip",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 10,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_028",
+    "slot": "Stock",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 10,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_029",
+    "slot": "Stock",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 20,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_syringer"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_030",
+    "slot": "Stock",
+    "complexity": 5,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 3,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer",
+      "weapon_10mm_smg"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_031",
+    "slot": "Capacitor",
+    "complexity": 5,
+    "perk1": "?Science! 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 40,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_gauss_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_032",
+    "slot": "Capacitor",
+    "complexity": 2,
+    "perk1": "?Science! 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "?Uncommon",
+    "materials": "?Common x 3",
+    "cost": 35,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_gauss_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_033",
+    "slot": "Sight",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 14,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer",
+      "weapon_10mm_smg"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_re-roll_hit_location"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_034",
+    "slot": "Sight",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 11,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_035",
+    "slot": "Sight",
+    "complexity": 4,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 29,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_036",
+    "slot": "Sight",
+    "complexity": 4,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 38,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_night_vision"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_037",
+    "slot": "Sight",
+    "complexity": 5,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 50,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_night_vision"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_038",
+    "slot": "Sight",
+    "complexity": 5,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 59,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_recon"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_039",
+    "slot": "Muzzle",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 10,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_bayonet"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_040",
+    "slot": "Muzzle",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_041",
+    "slot": "Muzzle",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 30,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_042",
+    "slot": "Muzzle",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 45,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_suppressed"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_043",
+    "slot": "Capacitor",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 30,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_044",
+    "slot": "Capacitor",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 35,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_045",
+    "slot": "Capacitor",
+    "complexity": 3,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 30,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_046",
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 35,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_047",
+    "slot": "Capacitor",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 4,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_laser_musket"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 1
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_048",
+    "slot": "Capacitor",
+    "complexity": 3,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 8,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_laser_musket"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 2
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_049",
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 12,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_laser_musket"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 3
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_050",
+    "slot": "Capacitor",
+    "complexity": 5,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 16,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_laser_musket"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 4
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_051",
+    "slot": "Barrel",
+    "complexity": 3,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 6,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_laser_musket"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_052",
+    "slot": "Barrel",
+    "complexity": 3,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 31,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_spread"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_053",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 24,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_054",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 26,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_055",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 30,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_056",
+    "slot": "Barrel",
+    "complexity": 5,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 35,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_plasma_gun"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 2
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_burst"
+      },
+      {
+        "op": "gain",
+        "id": "effect_spread"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_057",
+    "slot": "Grip",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 10,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_laser_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_058",
+    "slot": "Stock",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 10,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      },
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_059",
+    "slot": "Stock",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_laser_musket"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_060",
+    "slot": "Stock",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 20,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_061",
+    "slot": "Stock",
+    "complexity": 5,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 3,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_062",
+    "slot": "Sight",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 14,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_re-roll_hit_location"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_063",
+    "slot": "Sight",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 11,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_064",
+    "slot": "Sight",
+    "complexity": 4,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 29,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_065",
+    "slot": "Sight",
+    "complexity": 4,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 38,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_night_vision"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_066",
+    "slot": "Sight",
+    "complexity": 5,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 50,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_night_vision"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_067",
+    "slot": "Sight",
+    "complexity": 5,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 59,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_recon"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_068",
+    "slot": "Muzzle",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_spread"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_069",
+    "slot": "Muzzle",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 20,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_070",
+    "slot": "Muzzle",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 25,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_musket",
+      "weapon_laser_gun"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_071",
+    "slot": "Dish",
+    "complexity": 6,
+    "perk1": "Science! 4",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 72,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_gamma_gun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_072",
+    "slot": "Muzzle",
+    "complexity": 5,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 30,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_gamma_gun"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 7
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_radioactive"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_073",
+    "slot": "Muzzle",
+    "complexity": 6,
+    "perk1": "Science! 4",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 60,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_gamma_gun"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_blast"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_burst"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_074",
+    "slot": "Fuel",
+    "complexity": 3,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 59,
+    "weight": 7,
+    "applies_to_ids": [
+      "weapon_flamer"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_075",
+    "slot": "Barrel",
+    "complexity": 3,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 28,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_flamer"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_076",
+    "slot": "Tank",
+    "complexity": 3,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 28,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_flamer"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_077",
+    "slot": "Tank",
+    "complexity": 4,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 34,
+    "weight": 6,
+    "applies_to_ids": [
+      "weapon_flamer"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_078",
+    "slot": "Nozzle",
+    "complexity": 3,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 22,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_flamer"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_079",
+    "slot": "Nozzle",
+    "complexity": 4,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 47,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_flamer"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_080",
+    "slot": "Capacitor",
+    "complexity": 6,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 19,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_081",
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 57,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_082",
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 94,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_083",
+    "slot": "Capacitor",
+    "complexity": 6,
+    "perk1": "Science! 3",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 132,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_084",
+    "slot": "Barrel",
+    "complexity": 7,
+    "perk1": "Science! 4",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 8 Uncommon x 6 Rare x 4",
+    "cost": 357,
+    "weight": 10,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 3
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_085",
+    "slot": "Sight",
+    "complexity": 7,
+    "perk1": "Science! 4",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 8 Uncommon x 6 Rare x 4",
+    "cost": 169,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_086",
+    "slot": "Nozzle",
+    "complexity": 4,
+    "perk1": "",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Common",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 22,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_087",
+    "slot": "Barrel",
+    "complexity": 3,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 20,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_gatling_laser"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_088",
+    "slot": "Stock",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 40,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_gatling_laser"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_089",
+    "slot": "Sight",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 5,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_gatling_laser"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_re-roll_hit_location"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_090",
+    "slot": "Muzzle",
+    "complexity": 6,
+    "perk1": "Gun Nut 2",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 70,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_gatling_laser"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "add",
+      "value": "energy"
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_091",
+    "slot": "Muzzle",
+    "complexity": 7,
+    "perk1": "Gun Nut 3",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 8 Uncommon x 6 Rare x 4",
+    "cost": 130,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_gatling_laser"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_092",
+    "slot": "Barrel",
+    "complexity": 5,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 45,
+    "weight": 5,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_093",
+    "slot": "Barrel",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 75,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_094",
+    "slot": "Sight",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 68,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_095",
+    "slot": "Muzzle",
+    "complexity": 4,
+    "perk1": "Gun Nut 2 ",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 5,
+    "weight": 5,
+    "applies_to_ids": [
+      "weapon_minigun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_shredder"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_096",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 143,
+    "weight": 16,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_097",
+    "slot": "Barrel",
+    "complexity": 5,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 218,
+    "weight": 20,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_098",
+    "slot": "Sight",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 143,
+    "weight": 6,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_099",
+    "slot": "Sight",
+    "complexity": 6,
+    "perk1": "Gun Nut 4",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 248,
+    "weight": 6,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      },
+      {
+        "op": "gain",
+        "id": "quality_night_vision"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_100",
+    "slot": "Sight",
+    "complexity": 6,
+    "perk1": "Gun Nut 2",
+    "perk2": "Science! 2",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 7 Uncommon x 5 Rare x 3",
+    "cost": 293,
+    "weight": 7,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_targetting_computer"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_101",
+    "slot": "Muzzle",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 30,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_bayonet"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_102",
+    "slot": "Muzzle",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 60,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_missile_launcher"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_103",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 25,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_sword"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_104",
+    "slot": "Unique",
+    "complexity": 4,
+    "perk1": "Blacksmith 2",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 50,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_sword"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_105",
+    "slot": "Unique",
+    "complexity": 5,
+    "perk1": "Blacksmith 3",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 75,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_sword"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_106",
+    "slot": "Unique",
+    "complexity": 5,
+    "perk1": "Blacksmith 3",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 100,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_sword"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_stun"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_107",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 12,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_combat_knife"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_108",
+    "slot": "Unique",
+    "complexity": 4,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 18,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_combat_knife"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_sneak_attack"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_109",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 12,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_machete"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_110",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_ripper"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_disarm"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_111",
+    "slot": "Unique",
+    "complexity": 5,
+    "perk1": "Blacksmith 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 25,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_ripper"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_112",
+    "slot": "Unique",
+    "complexity": 5,
+    "perk1": "Blacksmith 3",
+    "perk2": "",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 100,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_shishkebab"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_113",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmtih 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 10,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_switchblade"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_114",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 5,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_115",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 7,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_116",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 3",
+    "cost": 7,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_117",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 10,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_118",
+    "slot": "Unique",
+    "complexity": 4,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 12,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_119",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 6,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_board"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_120",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 9,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_board"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_121",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 10,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_board"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_122",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 4,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_lead_pipe"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_123",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 11,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_lead_pipe"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_124",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 9,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_pipe_wrench"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_disarm"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_125",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 12,
+    "weight": 7,
+    "applies_to_ids": [
+      "weapon_pipe_wrench"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_126",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 13,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_pipe_wrench"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_127",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 22,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_pipe_wrench"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_128",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 2,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_pool_cue"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_129",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_pool_cue"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_130",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_rolling_pin"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_131",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_rolling_pin"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_132",
+    "slot": "Unique",
+    "complexity": 4,
+    "perk1": "Blacksmith 2",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 15,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_baton"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "damageType": "energy",
+    "effectChanges": [],
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_133",
+    "slot": "Unique",
+    "complexity": 4,
+    "perk1": "Blacksmith 2",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 30,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_baton"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "damageType": "energy",
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_stun"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_134",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 18,
+    "weight": 5,
+    "applies_to_ids": [
+      "weapon_sledgehammer"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_135",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 30,
+    "weight": 9,
+    "applies_to_ids": [
+      "weapon_sledgehammer"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_136",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 180,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_super_sledge"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_137",
+    "slot": "Unique",
+    "complexity": 5,
+    "perk1": "Blacksmith 3",
+    "perk2": "Science! 1",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+    "cost": 360,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_super_sledge"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_stun"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_138",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 12,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_tire_iron"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_139",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_walking_cane"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_140",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_walking_cane"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_141",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_boxing_glove"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_142",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 4,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_boxing_glove"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_143",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 7,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_boxing_glove"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_144",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 22,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_deathclaw_gauntlet"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_disarm"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_145",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_knuckles"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_146",
+    "slot": "Unique",
+    "complexity": 1,
+    "perk1": "",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Common",
+    "materials": "Common x 2",
+    "cost": 3,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_knuckles"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_147",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 4,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_knuckles"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_148",
+    "slot": "Unique",
+    "complexity": 2,
+    "perk1": "Blacksmith 1",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 3",
+    "cost": 5,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_knuckles"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_149",
+    "slot": "Unique",
+    "complexity": 3,
+    "perk1": "Blacksmith 2",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 4 Uncommon x 2",
+    "cost": 45,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_power_fist"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_150",
+    "slot": "Unique",
+    "complexity": 4,
+    "perk1": "Blacksmith 3",
+    "perk2": "",
+    "skill": "REPAIR",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 100,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_power_fist"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "damageTypeOverride": {
+      "op": "set",
+      "value": [
+        "energy"
+      ]
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_151",
+    "slot": "Barrel",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": "",
+    "materials": "",
+    "cost": 20,
+    "weight": null,
+    "applies_to_ids": [
+      "weapon_junk_jet"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_152",
+    "slot": "Stock",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": "",
+    "materials": "",
+    "cost": 40,
+    "weight": null,
+    "applies_to_ids": [
+      ""
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_153",
+    "slot": "Sight",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": "",
+    "materials": "",
+    "cost": 5,
+    "weight": null,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_re-roll_hit_location"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_154",
+    "slot": "Muzzle",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": "",
+    "materials": "",
+    "cost": 70,
+    "weight": null,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ],
+    "damageTypeOverride": {
+      "op": "add",
+      "value": "energy"
+    }
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_155",
+    "slot": "Muzzle",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": "",
+    "materials": "",
+    "cost": 130,
+    "weight": null,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_156",
+    "slot": "Barrel",
+    "complexity": null,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 40,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_alien_blaster"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_157",
+    "slot": "Stock",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 10,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_alien_blaster"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_two-handed"
+      },
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_158",
+    "slot": "Concentrate",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 30,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_assaultron_head_laser"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_159",
+    "slot": "Container",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 22,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_assaultron_head_laser"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_160",
+    "slot": "Container",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 40,
+    "weight": 4,
+    "applies_to_ids": [
+      "weapon_assaultron_head_laser"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_161",
+    "slot": "Magazine",
+    "complexity": null,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 21,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_mesmetron"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 3
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "ammoOverride": "ammo_fusion_cell",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_162",
+    "slot": "Capacitor",
+    "complexity": null,
+    "perk1": "Robotics Expert",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 4,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_tesla_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 3
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_163",
+    "slot": "Capacitor",
+    "complexity": null,
+    "perk1": "Robotics Expert",
+    "perk2": "Science! 1",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 8,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_tesla_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 4
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_164",
+    "slot": "Capacitor",
+    "complexity": null,
+    "perk1": "Robotics Expert",
+    "perk2": "Science! 2",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 12,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_tesla_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 5
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_165",
+    "slot": "Capacitor",
+    "complexity": null,
+    "perk1": "Robotics Expert",
+    "perk2": "Science! 3",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 16,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_tesla_rifle"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_crank_x",
+        "value": 6
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_166",
+    "slot": "Barrel",
+    "complexity": null,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 40,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_broadsider"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_167",
+    "slot": "Barrel",
+    "complexity": null,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 30,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_broadsider"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_blast"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_168",
+    "slot": "Canister",
+    "complexity": null,
+    "perk1": "Gun Nut 3",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 45,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_broadsider"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_169",
+    "slot": "Launcher",
+    "complexity": null,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 3,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_broadsider"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "ammoOverride": "ammo_40mm_grenade",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_170",
+    "slot": "Barrel",
+    "complexity": null,
+    "perk1": "Science! 2",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 40,
+    "weight": 5,
+    "applies_to_ids": [
+      "weapon_cryolator"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_unreliable"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "lose",
+        "id": "effect_stun"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_171",
+    "slot": "Magazine",
+    "complexity": null,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 21,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_cryolator"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 2
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "ammoOverride": "ammo_fusion_cell",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_172",
+    "slot": "Stock",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 45,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_cryolator"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_173",
+    "slot": "Sight",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 17,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_cryolator"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_re-roll_hit_location"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_174",
+    "slot": "Magazine",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 21,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_harpoon_gun"
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      },
+      {
+        "op": "gain",
+        "id": "effect_persistent"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_175",
+    "slot": "Magazine",
+    "complexity": null,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 15,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_harpoon_gun"
+    ],
+    "rangeModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_spread"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_176",
+    "slot": "Stock",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 45,
+    "weight": 15,
+    "applies_to_ids": [
+      "weapon_harpoon_gun"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_177",
+    "slot": "Sight",
+    "complexity": null,
+    "perk1": "",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 17,
+    "weight": 0,
+    "applies_to_ids": [
+      "weapon_harpoon_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_re-roll_hit_location"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_178",
+    "slot": "Sight",
+    "complexity": null,
+    "perk1": "Gun Nut 1",
+    "perk2": "",
+    "skill": "",
+    "rarity": null,
+    "materials": null,
+    "cost": 28,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_harpoon_gun"
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_179",
+    "slot": "Receiver",
+    "cost": 3,
+    "weight": 1,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_180",
+    "slot": "Receiver",
+    "cost": 40,
+    "weight": 1,
+    "applies_to_ids": [
+      ""
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_181",
+    "slot": "Receiver",
+    "cost": 58,
+    "weight": 2,
+    "applies_to_ids": [
+      ""
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_182",
+    "slot": "Receiver",
+    "cost": 63,
+    "weight": 2,
+    "applies_to_ids": [
+      ""
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_183",
+    "slot": "Receiver",
+    "cost": 68,
+    "weight": 3,
+    "applies_to_ids": [
+      ""
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_184",
+    "slot": "Receiver",
+    "cost": 88,
+    "weight": 4,
+    "applies_to_ids": [
+      ""
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_185",
+    "slot": "Receiver",
+    "cost": 78,
+    "weight": 3,
+    "applies_to_ids": [
+      ""
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_piercing_x",
+        "value": 1
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_186",
+    "slot": "Receiver",
+    "cost": 10,
+    "weight": -1,
+    "applies_to_ids": [
+      ""
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 3
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "ammoOverride": "ammo_9mm",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_187",
+    "slot": "Receiver",
+    "cost": 35,
+    "weight": 1,
+    "applies_to_ids": [
+      ""
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 5
+    },
+    "qualityChanges": [],
+    "ammoOverride": "ammo_357_magnum",
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_188",
+    "slot": "Barrel",
+    "cost": 35,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_plasma_mine"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_189",
+    "slot": "Barrel",
+    "cost": 135,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_m79_grenade_launcher"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_190",
+    "slot": "Barrel",
+    "cost": 45,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_m79_grenade_launcher"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_191",
+    "slot": "Receiver",
+    "cost": 135,
+    "weight": 3,
+    "applies_to_ids": [
+      "weapon_m79_grenade_launcher"
+    ],
+    "damageModifier": {
+      "op": "set",
+      "value": 4
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "ammoOverride": "ammo_25mm_grenade",
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_192",
+    "slot": "Receiver",
+    "cost": 35,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_12_7mm_pistol"
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_193",
+    "slot": "Barrel",
+    "cost": 158,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_12_7mm_pistol"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_194",
+    "slot": "Grip",
+    "cost": 90,
+    "weight": 3,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_recoil_x",
+        "value": 6
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_195",
+    "slot": "Magazine",
+    "cost": 28,
+    "weight": 2,
+    "applies_to_ids": [
+      ""
+    ],
+    "fireRateModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_unreliable"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_196",
+    "slot": "Sight",
+    "cost": 158,
+    "weight": 2,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_197",
+    "slot": "Muzzle",
+    "cost": 18,
+    "weight": 5,
+    "applies_to_ids": [
+      ""
+    ],
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_bayonet"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_198",
+    "slot": "Frame",
+    "cost": 30,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_crossbow"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "fireRateModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_199",
+    "slot": "Sight",
+    "cost": 10,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_crossbow"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_200",
+    "slot": "Sight",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_crossbow"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_accurate"
+      }
+    ],
+    "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_201",
+    "slot": "Winch",
+    "cost": 6,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_boarding_pistol"
+    ],
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_202",
+    "slot": "Winch",
+    "cost": 10,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_boarding_pistol"
+    ],
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_203",
+    "slot": "Barrel",
+    "cost": 15,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_boarding_pistol"
+    ],
+    "effectChanges": [],
+    "qualityChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_204",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Science! 1",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 24,
+    "weight": 1,
+    "applies_to_ids": [
+      "weapon_institute_laser",
+      "weapon_laser_gun",
+      "weapon_plasma_gun"
+    ],
+    "rangeModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "lose",
+        "id": "quality_close_quarters"
+      }
+    ],
+    "effectChanges": []
+  }
+]

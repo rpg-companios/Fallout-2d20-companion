@@ -13,6 +13,13 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/favicon.ico" />
     <script>
+      // Google Drive sync (components/cloudSync/googleDriveSync.js) reads this
+      // Client ID at runtime. For a static/PWA build we set it here so the same
+      // exported bundle works on every host (replit.app, na4u.ru, ...).
+      // OAuth client ID is public (used in the browser token flow); it is NOT a secret.
+      window.FALLOUT_GOOGLE_DRIVE_CLIENT_ID = '808936097288-fdmd1ds0q3n5i1rs4ssku4foqonvqfgj.apps.googleusercontent.com';
+    </script>
+    <script>
       // Store the install prompt globally so React can pick it up even if it fires
       // before the JS bundle finishes loading.
       window.__pwaInstallPrompt = null;

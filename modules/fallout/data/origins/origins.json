@@ -1,0 +1,278 @@
+[
+  {
+    "id": "brotherhood",
+    "displayNameKey": "origins.brotherhood.name",
+    "characterType": "human",
+    "image": "brotherhood_of_steel",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "brotherhood-chain-that-binds"
+    ],
+    "equipmentKitIds": [
+      "brotherhood_initiate",
+      "brotherhood_scribe"
+    ]
+  },
+  {
+    "id": "ncr",
+    "displayNameKey": "origins.ncr.name",
+    "characterType": "human",
+    "image": "ncr_citizen",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "ncr-resident"
+    ],
+    "equipmentKitIds": [
+      "ncr_infantry",
+      "ncr_caravaneer",
+      "ncr_marksman"
+    ]
+  },
+  {
+    "id": "minuteman",
+    "displayNameKey": "origins.minuteman.name",
+    "characterType": "human",
+    "image": "minuteman",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "minuteman-peoples-militia"
+    ],
+    "equipmentKitIds": [
+      "minuteman_shooter",
+      "minuteman_skirmisher"
+    ]
+  },
+  {
+    "id": "childOfAtom",
+    "displayNameKey": "origins.childOfAtom.name",
+    "characterType": "human",
+    "image": "child_of_atom",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "childofatom-radioactive-sponge"
+    ],
+    "equipmentKitIds": [
+      "atom_missionary",
+      "atom_zealot"
+    ]
+  },
+  {
+    "id": "vaultDweller",
+    "displayNameKey": "origins.vaultDweller.name",
+    "characterType": "human",
+    "image": "vault_dweller",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "vaultdweller-vault-kid"
+    ],
+    "equipmentKitIds": [
+      "vault_security",
+      "vault_resident"
+    ]
+  },
+  {
+    "id": "ghoul",
+    "displayNameKey": "origins.ghoul.name",
+    "characterType": "ghoul",
+    "image": "ghoul",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "ghoul-necrotic-posthuman"
+    ],
+    "equipmentKitIds": [
+      "wastelander_mercenary",
+      "wastelander_settler",
+      "wastelander_wanderer",
+      "wastelander_raider",
+      "wastelander_trader"
+    ]
+  },
+  {
+    "id": "survivor",
+    "displayNameKey": "origins.survivor.name",
+    "characterType": "human",
+    "image": "survivor",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "survivor-survivor"
+    ],
+    "equipmentKitIds": [
+      "wastelander_mercenary",
+      "wastelander_settler",
+      "wastelander_wanderer",
+      "wastelander_raider",
+      "wastelander_trader"
+    ]
+  },
+  {
+    "id": "superMutant",
+    "displayNameKey": "origins.superMutant.name",
+    "characterType": "mutant",
+    "image": "super_mutant",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "supermutant-forced-evolution"
+    ],
+    "equipmentKitIds": [
+      "supermutant_bruiser",
+      "supermutant_skirmisher"
+    ]
+  },
+  {
+    "id": "brotherhoodOutcast",
+    "displayNameKey": "origins.brotherhoodOutcast.name",
+    "characterType": "human",
+    "image": "brotherhood_outcast",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "brotherhoodoutcast-chain-that-breaks"
+    ],
+    "equipmentKitIds": [
+      "outcast_former_knight",
+      "outcast_former_scribe"
+    ]
+  },
+  {
+    "id": "robobrain",
+    "displayNameKey": "origins.robobrain.name",
+    "characterType": "robot",
+    "image": "robobrain",
+    "bodyPlan": "robobrain",
+    "traitIds": [
+      "robobrain-robot-with-brains"
+    ],
+    "equipmentKitIds": [
+      "robobrain_servomechanizmy",
+      "robobrain_us_army",
+      "robobrain_nonordinary"
+    ]
+  },
+  {
+    "id": "securitron",
+    "displayNameKey": "origins.securitron.name",
+    "characterType": "robot",
+    "image": "securitron",
+    "bodyPlan": "securitron",
+    "traitIds": [
+      "securitron-mark-i"
+    ],
+    "equipmentKitIds": [
+      "securitron_standard"
+    ]
+  },
+  {
+    "id": "assaultron",
+    "displayNameKey": "origins.assaultron.name",
+    "characterType": "robot",
+    "image": "assaultron",
+    "bodyPlan": "assaultron",
+    "traitIds": [
+      "assaultron-designed-for-frontline"
+    ],
+    "equipmentKitIds": [
+      "default_caps_only"
+    ]
+  },
+  {
+    "id": "misterHandy",
+    "displayNameKey": "origins.misterHandy.name",
+    "characterType": "robot",
+    "image": "mister_handy",
+    "bodyPlan": "misterHandy",
+    "traitIds": [
+      "misterhandy-robot-mr-handy"
+    ],
+    "equipmentKitIds": [
+      "mister_handy_assistant",
+      "mister_handy_brave",
+      "mister_handy_nanny",
+      "mister_handy_medic",
+      "mister_handy_farmer"
+    ]
+  },
+  {
+    "id": "protectron",
+    "displayNameKey": "origins.protectron.name",
+    "characterType": "robot",
+    "image": "protectron",
+    "bodyPlan": "protectron",
+    "traitIds": [
+      "protectron-protect-or-destroy"
+    ],
+    "equipmentKitIds": [
+      "protectron_standard",
+      "protectron_medic",
+      "protectron_firefighter",
+      "protectron_nukatron",
+      "protectron_worker",
+      "protectron_model_x"
+    ]
+  },
+  {
+    "id": "shadow",
+    "displayNameKey": "origins.shadow.name",
+    "characterType": "mutant",
+    "image": "shadow",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "shadow"
+    ],
+    "equipmentKitIds": [
+      "nightkin"
+    ]
+  },
+  {
+    "id": "synth",
+    "displayNameKey": "origins.synth.name",
+    "characterType": "cyborg",
+    "image": "synth",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "synth-more-than-human"
+    ],
+    "equipmentKitIds": [
+      "default_caps_only"
+    ]
+  },
+  {
+    "id": "tribal",
+    "displayNameKey": "origins.tribal.name",
+    "characterType": "human",
+    "image": "tribal",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "tribal-tribal"
+    ],
+    "equipmentKitIds": [
+      "default_caps_only"
+    ]
+  },
+  {
+    "id": "TreeFamilies",
+    "displayNameKey": "origins.TreeFamilies.name",
+    "characterType": "human",
+    "image": "3families",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "treefamilies-family"
+    ],
+    "equipmentKitIds": [
+      "treefamilies_chairmen",
+      "treefamilies_omerta",
+      "treefamilies_white_glove"
+    ]
+  },
+  {
+    "id": "enclaveRemnant",
+    "displayNameKey": "origins.enclaveRemnant.name",
+    "characterType": "human",
+    "bodyPlan": "humanoid",
+    "traitIds": [
+      "enclaveRemnant-hidden"
+    ],
+    "equipmentKitIds": [
+      "enclave_scientist",
+      "enclave_soldier"
+    ]
+  }
+]
