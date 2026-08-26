@@ -38,7 +38,13 @@
 // v16 — одноразовый модификатор сложности для следующей новой категории риска.
 // v17 — снять лишние ранги перков сверх catalog maxRanks; сейв перка — {id, rank}.
 // v18 — id перков: triggerRush→scrounger, slacker→dodger, bullRush→painTrain.
-export const CURRENT_SCHEMA_VERSION = 18;
+// v19 — предметы в сейве хранят только состояние экземпляра (id/quantity/
+//       equipped/locked/appliedMods/charges/…), а имя/цену/вес/статы/моды
+//       достаёт resolveItem по id (см. domain/saveSlimming.js). Обратная
+//       совместимость: старые «жирные» сейвы (v18 и ниже) при загрузке
+//       восстанавливаются (restoreSaveData), а при сохранении становятся
+//       «худыми» (slimSaveData). Миграция v18→v19 — только бамп версии.
+export const CURRENT_SCHEMA_VERSION = 19;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

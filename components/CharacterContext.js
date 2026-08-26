@@ -66,6 +66,8 @@ import {
   FUSION_CORE_ID,
 } from '../domain/powerArmor';
 import { canEquipArmor } from '../domain/equipEquip';
+import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
+import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
 import { resolveKitItems } from '../domain/kitResolver';
 import dataPowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
 import dataAmmo from '../modules/fallout/data/equipment/ammo.json';
@@ -113,16 +115,42 @@ const serializeState = (state) => ({
   schemaVersion: CURRENT_SCHEMA_VERSION,
 });
 
+// Каталог активной локали. Если построение каталога падает (дефект данных),
+// возвращаем null и ужимание/восстановление просто пропускается — сейв
+// сохраняется/грузится как есть, без поломки.
+const catalogForCurrentLocale = () => {
+  try { return getEquipmentCatalog(getCurrentModuleLocale()); }
+  catch (e) { return null; }
+};
+// Обёртки над resolveItem/findCatalogEntry: каталог активной локали, с защитой
+// от «кривого» предмета в старом сейве — при ошибке предмет остаётся как есть.
+const resolveItemInCatalog = (item, catalog) => {
+  try { return resolveItem(item, catalog); }
+  catch (e) { return item; }
+};
+const findCatalogEntryInCatalog = (id, itemType, catalog) => {
+  try { return findCatalogEntry(catalog, id, itemType); }
+  catch (e) { return null; }
+};
+
 const deserializeState = (data) => {
   // Прогоняем сохранение через миграции: если формат старый (v0), приводим к
   // текущей версии. Миграции покрывают будущие изменения формата — вместо
   // «плодящихся fallback» в loadCharacter.
   const migrated = migrateCharacterState(data);
+  // «Худые» сейвы (schemaVersion 19+) хранят только состояние экземпляра;
+  // восстанавливаем каталожные данные (имя/цену/вес/статы/моды) здесь, чтобы
+  // старые «жирные» и новые «худые» сейвы давали одинаковый рендер.
+  // Каталог строим один раз на загрузку, а не на каждый предмет.
+  const catalog = catalogForCurrentLocale();
+  const restored = catalog
+    ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
+    : migrated;
   return {
-    ...migrated,
-    origin: resolveOrigin(migrated.origin),
-    modifiedItems: new Map(Array.isArray(migrated.modifiedItems) ? migrated.modifiedItems : []),
-    schemaVersion: migrated.schemaVersion ?? LEGACY_SCHEMA_VERSION,
+    ...restored,
+    origin: resolveOrigin(restored.origin),
+    modifiedItems: new Map(Array.isArray(restored.modifiedItems) ? restored.modifiedItems : []),
+    schemaVersion: restored.schemaVersion ?? LEGACY_SCHEMA_VERSION,
   };
 };
 
@@ -719,7 +747,11 @@ export const CharacterProvider = ({ children }) => {
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         const snapshot = buildSnapshot();
-        const serialized = serializeState(mergeSnapshotWithStoreData(snapshot));
+        const merged = serializeState(mergeSnapshotWithStoreData(snapshot));
+        const saveCatalog = catalogForCurrentLocale();
+        const serialized = saveCatalog
+          ? slimSaveData(merged, { getEntry: (id, itemType) => findCatalogEntryInCatalog(id, itemType, saveCatalog) })
+          : merged;
         await db.saveCharacter(
           characterIdRef.current,
           snapshot.characterName,
@@ -751,7 +783,11 @@ export const CharacterProvider = ({ children }) => {
 
       const snapshot = buildSnapshot();
       const snapshotWithName = { ...snapshot, characterName: name };
-      const serialized = serializeState(mergeSnapshotWithStoreData(snapshotWithName));
+      const merged = serializeState(mergeSnapshotWithStoreData(snapshotWithName));
+      const saveCatalog = catalogForCurrentLocale();
+      const serialized = saveCatalog
+        ? slimSaveData(merged, { getEntry: (id, itemType) => findCatalogEntryInCatalog(id, itemType, saveCatalog) })
+        : merged;
 
       await db.saveCharacter(
         id,

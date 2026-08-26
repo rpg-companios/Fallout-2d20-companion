@@ -3,6 +3,7 @@
 
 import { tWeaponsAndArmorScreen } from '../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
 import { getBodyPlan } from './bodyplan';
+import { getRobotSlotDamageResistance } from './robotDamageResistance';
 
 /**
  * Builds the slot title, limb name, and stats array for a RobotSlot.
@@ -39,24 +40,29 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
 
   const stats = [];
 
-  // --- DR из конечности ---
-  const physDR = limb?.physicalDR ?? null;
-  const energyDR = limb?.energyDR ?? null;
-  const radDR = limb?.radDR ?? null;
+  // --- Итоговая СУ слота: конечность + совместимые защитные слои ---
+  // Раньше здесь бралась ТОЛЬКО СУ конечности, поэтому броня/обшивка/рама
+  // не влияли на карточку слота (баг «ставлю броню — статы не меняются»).
+  // Теперь считаем итог (см. domain/robotDamageResistance.js): конечность +
+  // вклад слоёв, совместимых по incompatibleLayers (броня+рама, либо обшивка).
+  const slotDR = getRobotSlotDamageResistance(slotData);
+  const physDR = slotDR.physical;
+  const energyDR = slotDR.energy;
+  const radDR = slotDR.rad;
 
   stats.push({
     label: t('armor.fields.physical'),
-    value: physDR !== null ? String(physDR) : t('common.none'),
+    value: String(physDR),
     type: 'value',
   });
   stats.push({
     label: t('armor.fields.energy'),
-    value: energyDR !== null ? String(energyDR) : t('common.none'),
+    value: String(energyDR),
     type: 'value',
   });
   stats.push({
     label: t('armor.fields.radiation'),
-    value: hasRadImmunity ? '∞' : (radDR !== null ? String(radDR) : t('common.none')),
+    value: hasRadImmunity ? '∞' : String(radDR),
     type: 'value',
   });
 
