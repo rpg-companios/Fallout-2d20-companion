@@ -629,11 +629,32 @@ export default function HomeScreen({ navigation }) {
   };
 
   const openExternalLink = async (url) => {
+    // Правило (владелец, патч 144): ВСЕ внешние/правовые ссылки открываются
+    // строго в новой вкладке (web) или системном браузере (натив). Нельзя
+    // перенаправлять текущую вкладку PWA — иначе юзер потеряет состояние
+    // приложения (несохранённые изменения персонажа, открытую модалку).
+    //
+    // - web/PWA: window.open с target=_blank + noopener (безопасность: новая
+    //   вкладка не получает window.opener, не может управлять исходной).
+    // - native: Linking.openURL — на iOS/Android открывает системный браузер
+    //   или дефолтный handler, юзер возвращается в приложение по back.
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const opened = window.open(url, '_blank', 'noopener,noreferrer');
+        if (opened) return;
+      } catch {
+        // window.open может быть заблокирован popup-blocker'ом — фолбэк ниже.
+      }
+    }
     try {
       await Linking.openURL(url);
     } catch {
+      // Крайний фолбэк: не дать ссылке пропасть. На web без popup-blocker'а
+      // window.open выше уже отработал. Здесь — последний шанс, на нативе.
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.open(url, '_blank', 'noopener');
+        // assigning to location эквивалентно «открыть в этой вкладке»,
+        // но это лучше, чем молча ничего не делать.
+        window.location.href = url;
       }
     }
   };
@@ -858,6 +879,12 @@ export default function HomeScreen({ navigation }) {
               {tHomeScreen('about.description'
               )}
             </Text>
+            <TouchableOpacity onPress={() => openExternalLink('/privacy-policy.html')}>
+              <Text style={styles.linkText}>{tHomeScreen('about.privacyPolicy')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openExternalLink('/terms-of-service.html')}>
+              <Text style={styles.linkText}>{tHomeScreen('about.termsOfService')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAboutVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
