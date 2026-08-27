@@ -259,6 +259,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textDecorationLine: 'underline',
   },
+  legalModal: {
+    width: '100%',
+    maxWidth: 600,
+    height: '85%',
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d4af37',
+    padding: 12,
+  },
+  legalIframe: {
+    flex: 1,
+    width: '100%',
+    border: 'none',
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+  },
   modalCloseButton: {
     marginTop: 12,
     alignSelf: 'flex-end',

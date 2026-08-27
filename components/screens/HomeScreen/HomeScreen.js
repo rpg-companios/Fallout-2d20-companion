@@ -193,6 +193,7 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
   const [aboutVisible, setAboutVisible] = useState(false);
+  const [legalDoc, setLegalDoc] = useState(null); // null | 'privacy' | 'terms'
   const [communityVisible, setCommunityVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
@@ -879,13 +880,36 @@ export default function HomeScreen({ navigation }) {
               {tHomeScreen('about.description'
               )}
             </Text>
-            <TouchableOpacity onPress={() => openExternalLink('/privacy-policy.html')}>
+            <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('privacy'); }}>
               <Text style={styles.linkText}>{tHomeScreen('about.privacyPolicy')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => openExternalLink('/terms-of-service.html')}>
+            <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('terms'); }}>
               <Text style={styles.linkText}>{tHomeScreen('about.termsOfService')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAboutVisible(false)}>
+              <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Правовые документы — встроенный iframe в модалке.
+          Локаль берётся из useLocale() (глобальная настройка приложения).
+          Если нужен EN для ru-юзера (или наоборот) — переключить язык в
+          настройках и открыть модалку снова. */}
+      <Modal visible={Boolean(legalDoc)} transparent animationType="slide" onRequestClose={() => setLegalDoc(null)}>
+        <View style={styles.modalBackdropCenter}>
+          <View style={styles.legalModal}>
+            {legalDoc && (
+              <iframe
+                title={legalDoc === 'privacy' ? tHomeScreen('about.privacyPolicy') : tHomeScreen('about.termsOfService')}
+                src={legalDoc === 'privacy'
+                  ? (locale === 'en-EN' ? '/privacy-policy.en.html' : '/privacy-policy.html')
+                  : (locale === 'en-EN' ? '/terms-of-service.en.html' : '/terms-of-service.html')}
+                style={styles.legalIframe}
+              />
+            )}
+            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setLegalDoc(null)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
           </View>
