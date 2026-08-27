@@ -53,6 +53,43 @@ const CONFLICTING_MOD_SLOTS = Object.freeze({
   stock: 'grip',
 });
 
+// Стабильный порядок категорий модификаций в модалке.
+// Индекс в массиве = позиция в списке сверху вниз. Неизвестные слоты
+// попадают в конец, «other» — самый последний (это catch-all для
+// нестандартных имён из БД).
+// Логика: внутреннее → внешнее (механизм → дуло).
+const WEAPON_SLOT_ORDER = Object.freeze([
+  'receiver',      // Ресивер (огнестрел) / главный узел
+  'capacitor',     // Конденсатор (энергооружие)
+  'frame',         // Рама (арбалет, см. weapon_crossbow)
+  'winch',         // Лебёдка (boarding pistol)
+  'concentrate',   // Концентрат (assaultron head laser)
+  'barrel',        // Ствол
+  'canister',      // Дуло (broadsider)
+  'dish',          // Диск (gamma gun)
+  'magazine',      // Магазин
+  'container',     // Контейнер (assaultron)
+  'launcher',      // Пусковая установка (broadsider)
+  'fuel',          // Топливо (flamer)
+  'tank',          // Бак (flamer)
+  'grip',          // Рукоять
+  'stock',         // Ложа
+  'sight',         // Прицел
+  'muzzle',        // Дульная насадка
+  'nozzle',        // Сопло (flamer)
+  'unique',        // Уникальный (ближний бой и спец-оружие)
+  'other',         // fallback
+]);
+
+const slotOrderIndex = (slot) => {
+  const i = WEAPON_SLOT_ORDER.indexOf(slot);
+  return i === -1 ? WEAPON_SLOT_ORDER.length : i;
+};
+
+// Возвращает ключи modsBySlot, отсортированные по WEAPON_SLOT_ORDER.
+const sortedSlotKeys = (bySlot) =>
+  Object.keys(bySlot).sort((a, b) => slotOrderIndex(a) - slotOrderIndex(b));
+
 const setSelectedMod = (selected, slot, mod) => {
   const next = { ...selected };
   const oppositeSlot = CONFLICTING_MOD_SLOTS[slot];
@@ -435,7 +472,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             {/* Доступные модификации */}
             <View style={styles.modificationsSection}>
               <Text style={styles.sectionTitle}>{tWeaponsAndArmorScreen('modals.availableModificationsLabel')}</Text>
-              {Object.entries(modsBySlot).map(([slot, mods]) => (
+              {sortedSlotKeys(modsBySlot).map((slot) => {
+                const mods = modsBySlot[slot] || [];
+                return (
                 <CollapsibleSection
                   key={slot}
                   title={`${tWeaponsAndArmorScreen(`weapon.modSlots.${slot}`, slot)} (${mods.length})`}
@@ -477,7 +516,8 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                     </TouchableOpacity>
                   ))}
                 </CollapsibleSection>
-              ))}
+                );
+              })}
             </View>
 
             {/* Предварительный просмотр */}
