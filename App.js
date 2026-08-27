@@ -29,7 +29,7 @@ import useAppSettingsStore, {
   selectSettingsHydrated,
 } from './src/store/appSettingsStore';
 import useSettingPackStore, {
-  selectBundledSettingActive,
+  selectActiveSettingId,
 } from './src/store/settingPackStore';
 
 const Tab = createMaterialTopTabNavigator();
@@ -52,7 +52,14 @@ function App() {
   const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
   const locale = useLocale();
   useModuleLocale();
-  const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
+  const activeSettingId = useSettingPackStore(selectActiveSettingId);
+  // Модульные экраны (Character, Equipment, Inventory, Perks) рендерятся только
+  // когда юзер **явно выбрал** активный модуль (activeSettingId !== null), а не
+  // автоматически при загрузке. См. docs/module-lifecycle-plan.md.
+  // Раньше условием был bundledSettingActive, что монтировало все экраны
+  // сразу при загрузке стора и приводило к крэшу "Cannot update a component
+  // (CharacterScreen) while rendering a different component (CharacterProvider)".
+  const moduleTabsActive = activeSettingId != null;
 
   useEffect(() => {
     if (settingsHydrated && bootEnabledForLaunch === null) {
@@ -106,7 +113,7 @@ function App() {
     <PaperProvider>
       <SafeAreaProvider>
         <CharacterProvider>
-          <NavigationContainer key={`${locale}:${bundledSettingActive ? 'fallout' : 'empty'}`}>
+          <NavigationContainer key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}>
             <View style={{ flex: 1, backgroundColor: 'white' }}>
               <ImageBackground
                 source={require('./assets/bg.png')}
@@ -155,7 +162,7 @@ function App() {
                         ),
                       }}
                     />
-                    {bundledSettingActive ? (
+                    {moduleTabsActive ? (
                       <>
                         <Tab.Screen
                           name={TAB_ROUTES.CHARACTER}

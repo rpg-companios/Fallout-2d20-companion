@@ -367,27 +367,45 @@ export const CharacterProvider = ({ children }) => {
   useEffect(() => {
     const store = useCharacterStore.getState();
 
-    // Подсев атрибутов в стор, если dict пуст, но в Context уже есть значения.
-    const dictEmpty = Object.keys(store.attributes || {}).length === 0;
-    const arrayHasValues = Array.isArray(attributes) && attributes.length > 0;
-    if (dictEmpty && arrayHasValues) {
-      store.loadFromLegacyData({ attributes });
-    }
+    // Планируем синхронизацию со стором в микротаск, чтобы она вышла
+    // за пределы commit-фазы <CharacterProvider>. Иначе set(...) стора
+    // триггерит forceStoreRerender для уже-смонтированных подписчиков
+    // (например, CharacterScreen через Tab.Navigator), что React запрещает:
+    //   "Cannot update a component (CharacterScreen) while rendering
+    //    a different component (CharacterProvider)".
+    //
+    // Микротаск выполняется ДО следующего рендера, но ПОСЛЕ commit-фазы —
+    // стор обновится до того, как React отдаст control обратно в event loop,
+    // а doчерние компоненты в первом рендере успеют безопасно подписаться.
+    // Сейвы не затрагиваются: подсев атрибутов и derivedStats — это
+    // производный кеш для UI, а не данные, которые идут в localStorage.
+    queueMicrotask(() => {
+      // re-read store inside the microtask: dependency values are captured
+      // here, so this useEffect doesn't re-fire when these are stable.
+      const current = useCharacterStore.getState();
 
-    // Прокидываем реальный контекст → корректный пересчёт derivedStats.
-    // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
-    const isRobot = isRobotCharacter({ origin, trait });
-    store.setCharacterContext({
-      trait,
-      level,
-      isRobot,
-      // Надетый каркас СБ → модификаторы атрибутов (СИЛ=set 11) в производных, §5.6.
-      equipmentState: {
-        equippedArmor,
-        equippedRobotSlots,
+      // Подсев атрибутов в стор, если dict пуст, но в Context уже есть значения.
+      const dictEmpty = Object.keys(current.attributes || {}).length === 0;
+      const arrayHasValues = Array.isArray(attributes) && attributes.length > 0;
+      if (dictEmpty && arrayHasValues) {
+        current.loadFromLegacyData({ attributes });
+      }
+
+      // Прокидываем реальный контекст → корректный пересчёт derivedStats.
+      // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
+      const isRobot = isRobotCharacter({ origin, trait });
+      current.setCharacterContext({
+        trait,
+        level,
         isRobot,
-        powerArmorFrameId: equippedPowerArmor?.frame ? equippedPowerArmor.frame.catalogId : null,
-      },
+        // Надетый каркас СБ → модификаторы атрибутов (СИЛ=set 11) в производных, §5.6.
+        equipmentState: {
+          equippedArmor,
+          equippedRobotSlots,
+          isRobot,
+          powerArmorFrameId: equippedPowerArmor?.frame ? equippedPowerArmor.frame.catalogId : null,
+        },
+      });
     });
   }, [attributes, trait, level, origin, equippedArmor, equippedRobotSlots, equippedPowerArmor]);
 
