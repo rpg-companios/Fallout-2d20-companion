@@ -1,4 +1,4 @@
-import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodyplan';
+import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs, getDefaultPlating } from './bodyplan';
 import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
 
 // domain/robotEquip.js
@@ -336,25 +336,48 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       continue;
     }
 
-    // Броня
-    if (['plating', 'armor', 'frame', 'robotArmor'].includes(itype)) {
+    // Броня — 1 предмет = 1 слот (без фолбэков, строго по данным)
+    // Рама/Обшивка/Броня применяются к конкретной конечности, не к обеим сразу.
+    // Thruster — обобщённая локация «средство передвижения»: у Мистера Помощника это thruster,
+    // у протектрона/штурмотрона — ноги, у секьюритрона — колесо. Это не фолбэк, а маппинг типов шасси.
+    if (['plating', 'armor', 'frame', 'robotArmor', 'robotFrame'].includes(itype)) {
       const armorData = item._armor ?? item;
       const location = armorData.robotLocation ?? item.robotLocation;
       const layer = armorData.layer ?? itype;
-      
-      // Простое распределение
-      for (const k of slotKeys) {
-        if (location === 'Main Body' && k === 'body') {
-          slots[k][layer] = armorData;
-        } else if (location === 'Optics' && k === 'head') {
-          slots[k][layer] = armorData;
-        } else if (location === 'Arms' && k.toLowerCase().includes('arm')) {
-          slots[k][layer] = armorData;
-        } else if ((location === 'Legs' || location === 'Wheel') && (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel')) {
-          slots[k][layer] = armorData;
-        } else if (location === 'Thruster' && (k === 'thruster' || k === 'wheel')) {
-          slots[k][layer] = armorData;
+
+      // Определяем, какие слоты подходят для этой локации
+      const isMatchingSlot = (slotKey) => {
+        if (location === 'Main Body' && slotKey === 'body') return true;
+        if (location === 'Optics' && slotKey === 'head') return true;
+        if (location === 'Arms' && slotKey.toLowerCase().includes('arm')) return true;
+        if ((location === 'Legs' || location === 'Wheel') && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
+        if (location === 'Thruster' && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
+        // Точные совпадения для новых per-slot локаций (если появятся leftArm/rightArm и т.д.)
+        if (location === slotKey) return true;
+        if (location === 'Head' && slotKey === 'head') return true;
+        if (location === 'Left Arm' && slotKey === 'leftArm') return true;
+        if (location === 'Right Arm' && slotKey === 'rightArm') return true;
+        if (location === 'Left Leg' && slotKey === 'leftLeg') return true;
+        if (location === 'Right Leg' && slotKey === 'rightLeg') return true;
+        return false;
+      };
+
+      // 1 предмет = 1 слот: ищем первый подходящий слот, где слой свободен
+      // Если указан конкретный слот в item.slot — используем его
+      let targetSlot = null;
+      if (item.slot && slotKeys.includes(item.slot) && isMatchingSlot(item.slot)) {
+        targetSlot = item.slot;
+      } else {
+        // Ищем первый свободный слот из подходящих
+        targetSlot = slotKeys.find((k) => isMatchingSlot(k) && slots[k][layer] == null) || null;
+        // Если все подходящие слоты заняты — заменяем первый подходящий (для frame/plating, которые конфликтуют)
+        if (!targetSlot) {
+          targetSlot = slotKeys.find((k) => isMatchingSlot(k)) || null;
         }
+      }
+
+      if (targetSlot && slots[targetSlot] !== undefined) {
+        slots[targetSlot][layer] = armorData;
       }
       continue;
     }
@@ -371,8 +394,9 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     }
   }
 
-  // Автозаполнение недостающих конечностей
-  const { heads = [], bodies = [], legs = [] } = robotCatalog;
+  // Автозаполнение недостающих конечностей — строго из данных bodyPlan.defaults, без фолбэков
+  // 1 предмет = 1 слот: каждый слот заполняется своей конечностью из defaults[slotKey]
+  const { heads = [], bodies = [], arms = [], legs = [] } = robotCatalog;
   const planDefaults = getDefaultLimbs(bodyPlan);
   const defaultHead = heads.find((h) => h.id === planDefaults.head)
     || heads.find((h) => h.defaultForBodyPlan === bodyPlan);
@@ -384,8 +408,34 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   for (const k of slotKeys) {
     if (slots[k].limb !== null) continue;
 
+    // Проверяем конкретный слот в defaults (например, leftArm, rightLeg и т.д.)
+    const specificDefaultId = planDefaults[k];
+    if (specificDefaultId) {
+      // Ищем в соответствующем каталоге по ID
+      let specificLimb = null;
+      if (k === 'head') {
+        specificLimb = heads.find((h) => h.id === specificDefaultId);
+      } else if (k === 'body') {
+        specificLimb = bodies.find((b) => b.id === specificDefaultId);
+      } else if (k.toLowerCase().includes('arm')) {
+        specificLimb = arms.find((a) => a.id === specificDefaultId);
+      } else if (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') {
+        specificLimb = legs.find((l) => l.id === specificDefaultId);
+      }
+      if (specificLimb) {
+        if (k.toLowerCase().includes('arm')) {
+          const limbFromArm = buildLimbFromArmEntry(specificLimb);
+          const builtinWeapons = normalizeBuiltinWeapons(limbFromArm, weaponsCatalog);
+          slots[k].limb = builtinWeapons.length > 0 ? { ...limbFromArm, builtinWeapons } : limbFromArm;
+        } else {
+          const builtinWeapons = normalizeBuiltinWeapons(specificLimb, weaponsCatalog);
+          slots[k].limb = builtinWeapons.length > 0 ? { ...specificLimb, builtinWeapons } : specificLimb;
+        }
+        continue;
+      }
+    }
+
     if (k === 'head' && defaultHead) {
-      // Resolve builtinWeaponId for the default head (e.g. robobrain mesmetron)
       const builtinWeapons = normalizeBuiltinWeapons(defaultHead, weaponsCatalog);
       const headLimb = builtinWeapons.length > 0 ? { ...defaultHead, builtinWeapons } : defaultHead;
       slots[k].limb = headLimb;
@@ -396,6 +446,32 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       defaultLeg
     ) {
       slots[k].limb = defaultLeg;
+    }
+    // Для рук, если нет specificDefaultId, но есть default для bodyPlan — не автозаполняем,
+    // так как у разных роботов разное количество рук, и defaults должны быть явными
+  }
+
+  // Автозаполнение стандартной обшивки из bodyPlan.defaultPlating — на основании данных, без обогатителя
+  // defaultPlating: { slotKey: platingId } — например, head: standard_optics, body: standard_body, leftArm: standard_arms
+  // Ставится только если в слоте нет plating/frame/armor (конфликт слоёв)
+  const defaultPlatingMap = getDefaultPlating(bodyPlan);
+  const platingCatalog = Array.isArray(robotCatalog.plating) ? robotCatalog.plating : [];
+  const framesCatalog = Array.isArray(robotCatalog.frames) ? robotCatalog.frames : [];
+  const allArmorCatalog = [...platingCatalog, ...framesCatalog];
+
+  const resolvePlatingById = (id) => {
+    if (!id) return null;
+    return allArmorCatalog.find((p) => p.id === id) || null;
+  };
+
+  for (const k of slotKeys) {
+    if (slots[k].plating || slots[k].frame || slots[k].armor) continue;
+    const defaultPlatingId = defaultPlatingMap[k];
+    if (!defaultPlatingId) continue;
+    const platingData = resolvePlatingById(defaultPlatingId);
+    if (platingData) {
+      const layer = platingData.layer || 'plating';
+      slots[k][layer] = platingData;
     }
   }
 

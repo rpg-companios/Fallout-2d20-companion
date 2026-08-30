@@ -9,13 +9,15 @@ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import styles from '../../../../../styles/EquipmentKitModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
-// Lazy-load robot catalog data
+// Lazy-load robot catalog data — на основании данных, без обогатителя
 const loadRobotCatalog = () => ({
   heads: require('../../../data/equipment/robot/robotheads.json'),
   bodies: require('../../../data/equipment/robot/robotbody.json'),
   arms: require('../../../data/equipment/robot/robotarms.json'),
   legs: require('../../../data/equipment/robot/robotlegs.json'),
   weapons: require('../../../data/equipment/robot/weapons.json'),
+  plating: require('../../../data/equipment/robot/armor_plating.json').plating || [],
+  frames: require('../../../data/equipment/robot/frames.json').frames || [],
 });
 
 const META_CATEGORY_ORDER = ['structure', 'apparel', 'weapon', 'module', 'misc'];
@@ -31,6 +33,8 @@ const STRUCTURE_SUBORDER = {
   robotLegs: 3,
   plating: 4,
   frame: 5,
+  robotFrame: 5,
+  robotArmor: 6,
 };
 
 const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
@@ -300,7 +304,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
       // (initRobotSlots) — в инвентарь их копия не нужна.
       const slotConsumedTypes = new Set([
         'robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs',
-        'plating', 'armor', 'robotArmor', 'frame', 'module',
+        'plating', 'armor', 'robotArmor', 'frame', 'robotFrame', 'module',
       ]);
       const finalItemsOnly = finalItems.filter((item) => {
         if (slotConsumedTypes.has(item.itemType)) return false;

@@ -2,6 +2,22 @@
 
 ---
 
+## Update — Assaultron equipment kits
+
+### Origin "Assaultron" (content)
+- Three equipment kits per the book (Wanderer's Guide): "US Military Model", "Assaultron Devil", "Robotic Caravan Guard" (`modules/fallout/data/equipmentKits/assaultron.json`).
+- Every kit grants the "Assaultron Head (Laser)"; the head now carries the built-in weapon `robot_weapon_assaultron_head_laser` (`builtinWeaponId`) — the head laser shows up on the Equipment screen as a weapon card with stats (5 {CD} energy, Piercing 1, energy cells).
+- "Assaultron Devil": two Construction Claws occupy the arm slots as weapon-limbs — weapon cards with stats (4 {CD} physical, Close Quarters, Breaking); plus serrated plating (body or arm+leg choice — book says one arm and one leg of player's choice, implemented as arms+legs due to Arms/Thruster location generalization), hazard detection module, 6+6 {CD} energy cells, robot repair kit, and the new "Skull Mask" headwear (`headwear_skull_mask`).
+- "US Military Model": laser gun integrated into an arm, actuated frame (body or arm+leg choice — book: one arm and one leg, in system: arms+legs) + standard plating on remaining locations, recon sensors, 8+7 {CD} energy cells, 15 caps.
+- "Robotic Caravan Guard": integrated laser gun, storage body + factory leg armor, behavior analysis module, wares (3 aid rolls and 3 trinket rolls), 14+7 {CD} energy cells, 20 caps.
+
+### Engine (robots)
+- `domain/robotEquip.js`: kit frames (`robotFrame`) now land in the slots' `frame` layer (previously they fell into inventory as dead items); the "Thruster" location of plating/frames/armor now also routes to legs/treads (protectron, assaultron, robobrain), not just thruster/wheel.
+- Kit modal: `robotFrame`/`robotArmor` belong to "Standard Structure" and are not duplicated into inventory.
+- Tests: `__tests__/robot/assaultron-kits.test.js` — kits exist and are localized, the head yields the laser with stats, claws yield weapon cards with stats, frames/plating land in layers.
+
+---
+
 ## Update — Equipment kits, Enclave Remnant, Equipment screen (patches 69–89)
 
 > Recent changes from this week. Older entries (up to 68) follow below in their usual order.
