@@ -66,7 +66,7 @@ const getOptionKey = (option, optionIndex) => {
 
 const entryToList = (entry, selectedChoices, kitId, itemIndex) => {
   if (!entry) return [];
-  
+
   // Recursively handle nested arrays
   if (Array.isArray(entry)) {
     return entry.flatMap((e, i) => entryToList(e, selectedChoices, kitId, `${itemIndex}-${i}`));

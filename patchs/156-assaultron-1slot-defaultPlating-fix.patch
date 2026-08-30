@@ -171,7 +171,7 @@ index d74d610..0f65933 100644
 @@ -62,6 +62,10 @@ export function getDefaultLimbs(planId) {
    return { ...(bodyPlansRegistry[planId]?.defaults || {}) };
  }
- 
+
 +export function getDefaultPlating(planId) {
 +  return { ...(bodyPlansRegistry[planId]?.defaultPlating || {}) };
 +}
@@ -187,12 +187,12 @@ index 6da5c50..3b4de2b 100644
 -import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodyplan';
 +import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs, getDefaultPlating } from './bodyplan';
  import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
- 
+
  // domain/robotEquip.js
 @@ -336,26 +336,49 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
        continue;
      }
- 
+
 -    // Броня
 -    if (['plating', 'armor', 'frame', 'robotArmor'].includes(itype)) {
 +    // Броня — 1 предмет = 1 слот (без фолбэков, строго по данным)
@@ -203,7 +203,7 @@ index 6da5c50..3b4de2b 100644
        const armorData = item._armor ?? item;
        const location = armorData.robotLocation ?? item.robotLocation;
        const layer = armorData.layer ?? itype;
--      
+-
 -      // Простое распределение
 -      for (const k of slotKeys) {
 -        if (location === 'Main Body' && k === 'body') {
@@ -253,11 +253,11 @@ index 6da5c50..3b4de2b 100644
 +      }
        continue;
      }
- 
+
 @@ -371,7 +394,8 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
      }
    }
- 
+
 -  // Автозаполнение недостающих конечностей
 +  // Автозаполнение недостающих конечностей — строго из данных bodyPlan.defaults, без фолбэков
 +  // 1 предмет = 1 слот: каждый слот заполняется своей конечностью из defaults[slotKey]
@@ -267,7 +267,7 @@ index 6da5c50..3b4de2b 100644
 @@ -384,8 +408,34 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
    for (const k of slotKeys) {
      if (slots[k].limb !== null) continue;
- 
+
 +    // Проверяем конкретный слот в defaults (например, leftArm, rightLeg и т.д.)
 +    const specificDefaultId = planDefaults[k];
 +    if (specificDefaultId) {
@@ -352,7 +352,7 @@ index 6da5c50..3b4de2b 100644
 +      slots[k][layer] = platingData;
      }
    }
- 
+
 diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
 index db82267..e5ce4a8 100644
 --- a/modules/fallout/data/bodyplans/bodyplans.json
@@ -803,7 +803,7 @@ index 6ea9b7f..d7ba3d1 100644
 @@ -9,7 +9,6 @@
  // ПРАВИЛО (владелец): новый комплект = новый файл (или запись в файле
  // своей фракции) + строка импорта здесь. Движок не трогается.
- 
+
 -import assaultron from './assaultron.json';
  import brotherhood from './brotherhood.json';
  import brotherhoodOutcast from './brotherhoodOutcast.json';
@@ -818,7 +818,7 @@ index 6ea9b7f..d7ba3d1 100644
  import securitron from './securitron.json';
 @@ -28,7 +28,6 @@ import wastelander from './wastelander.json';
  import treefamilies from './treefamilies.json';
- 
+
  export default {
 -  ...assaultron,
    ...brotherhood,
@@ -952,7 +952,7 @@ index 7b5286b..05f1340 100644
 @@ -9,13 +9,15 @@ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
  import styles from '../../../../../styles/EquipmentKitModal.styles';
  import { tCharacterScreen } from '../logic/characterScreenI18n';
- 
+
 -// Lazy-load robot catalog data
 +// Lazy-load robot catalog data — на основании данных, без обогатителя
  const loadRobotCatalog = () => ({
@@ -964,7 +964,7 @@ index 7b5286b..05f1340 100644
 +  plating: require('../../../data/equipment/robot/armor_plating.json').plating || [],
 +  frames: require('../../../data/equipment/robot/frames.json').frames || [],
  });
- 
+
  const META_CATEGORY_ORDER = ['structure', 'apparel', 'weapon', 'module', 'misc'];
 @@ -31,6 +33,8 @@ const STRUCTURE_SUBORDER = {
    robotLegs: 3,
@@ -973,7 +973,7 @@ index 7b5286b..05f1340 100644
 +  robotFrame: 5,
 +  robotArmor: 6,
  };
- 
+
  const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
 @@ -300,7 +304,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
        // (initRobotSlots) — в инвентарь их копия не нужна.
@@ -987,7 +987,7 @@ index 7b5286b..05f1340 100644
 @@ -350,55 +354,11 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
      onClose();
    };
- 
+
 -  // BodyPlan = обязательная стандартная конструкция робота (как CPU/RAM
 -  // у компа — без них робот не работает). То, что в bodyplans.json:defaults
 -  // для данного bodyPlan, не является выбором игрока и НЕ показывается
@@ -1032,7 +1032,7 @@ index 7b5286b..05f1340 100644
 -    const bodyPlanDefaults = isRobotCharacter(character)
 -      ? (getBodyPlan(resolveRobotBodyPlan(character))?.defaults || null)
 -      : null;
- 
+
      (kit.items || []).forEach((entry, index) => {
        if (entry?.hiddenInKitModal) return;
 -      // Скрыть limb, совпадающий с bodyPlan default (см. isDefaultLimb).
@@ -1042,7 +1042,7 @@ index 7b5286b..05f1340 100644
        if (!groups[meta]) groups[meta] = [];
 @@ -454,13 +414,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
                                          const selected = selectedChoices[choiceKey] === optionKey;
- 
+
                                          const optionLabel = option.group
 -                                          // Элементы с hiddenInKitModal не объявляются в UI (дефолтные
 -                                          // Standard Plating, автозаполняемые тела и т.п.), но
@@ -1053,5 +1053,5 @@ index 7b5286b..05f1340 100644
 -                                              .join(' + ')
 +                                          ? option.group.map((groupItem) => `${getDisplayName(groupItem)}${formatBuiltinWeaponSuffix(groupItem)}`).join(' + ')
                                            : `${getDisplayName(option)}${formatBuiltinWeaponSuffix(option)}`;
- 
+
                                          return (

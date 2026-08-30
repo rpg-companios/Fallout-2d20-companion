@@ -200,7 +200,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       } else if (itype === 'robotBody') {
         targetKey = 'body';
       } else if (itype === 'robotLeg' || itype === 'robotLegs') {
-        targetKey = slotKeys.find(k => 
+        targetKey = slotKeys.find(k =>
           k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel'
         );
       } else if (itype === 'robotArm') {
@@ -210,7 +210,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         } else if (item.slot === 'right') {
           targetKey = slotKeys.find(k => k === 'rightArm' || k === 'arm2');
         } else {
-          targetKey = slotKeys.find(k => 
+          targetKey = slotKeys.find(k =>
             k.toLowerCase().includes('arm') && slots[k].limb === null
           );
         }
