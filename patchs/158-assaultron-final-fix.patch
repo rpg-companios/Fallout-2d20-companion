@@ -1,0 +1,1152 @@
+diff --git a/domain/bodyplan.js b/domain/bodyplan.js
+index d74d610..0f65933 100644
+--- a/domain/bodyplan.js
++++ b/domain/bodyplan.js
+@@ -62,6 +62,10 @@ export function getDefaultLimbs(planId) {
+   return { ...(bodyPlansRegistry[planId]?.defaults || {}) };
+ }
+
++export function getDefaultPlating(planId) {
++  return { ...(bodyPlansRegistry[planId]?.defaultPlating || {}) };
++}
++
+ export function getBodyPlan(planId) {
+   return bodyPlansRegistry[planId] || null;
+ }
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index fa80753..aff7d9f 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -30,9 +30,6 @@ const ROLL_TABLE_TAG = {
+   chem: 'chem',
+   outcast: 'outcast',
+   oddity: 'oddity',
+-  // TODO: содержимое таблиц ammo (Random Ammunition) и junk (Random Junk)
+-  // из Core Rulebook p. 200 ещё не залито в data/loot/. Ключи зарегистрированы,
+-  // чтобы kit-объявления могли ссылаться (броски вернут [] пока таблицы пустые).
+   ammo: 'ammo',
+   junk: 'junk',
+ };
+@@ -302,8 +299,6 @@ export async function resolveNonWeaponItem(item) {
+
+   if (CURRENCY_ITEM_TYPES[item.itemType]) {
+     const name = CURRENCY_ITEM_TYPES[item.itemType]();
+-    // currency понимает quantity: { base, rollType: "rollCD", ... } — как и ammo.
+-    // Раньше здесь был только toNumber, что ломал формулу "10 + 5 CD" в NaN.
+     const quantity = (item.quantity && typeof item.quantity === 'object')
+       ? resolveRollQuantity(item.quantity)
+       : toNumber(item.quantity || 0);
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index c37c792..2a6f14e 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -1,4 +1,4 @@
+-import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs } from './bodyplan';
++import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs, getDefaultPlating } from './bodyplan';
+ import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
+
+ // domain/robotEquip.js
+@@ -57,6 +57,15 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
+     pushWeapon(byId ? { ...byId } : { id: limb.builtinWeaponId });
+   }
+
++  // Reverse lookup: weapon.builtinToHead == limb.id (e.g. assaultron head laser)
++  if (limb.id) {
++    for (const w of catalog) {
++      if (w.builtinToHead === limb.id) {
++        pushWeapon(w);
++      }
++    }
++  }
++
+   if (normalized.length === 0 && limb.builtinManipulator) {
+     pushWeapon({ ...limb, isManipulator: true });
+   }
+@@ -336,26 +345,49 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       continue;
+     }
+
+-    // Броня
+-    if (['plating', 'armor', 'frame', 'robotArmor'].includes(itype)) {
++    // Броня — 1 предмет = 1 слот (без фолбэков, строго по данным)
++    // Рама/Обшивка/Броня применяются к конкретной конечности, не к обеим сразу.
++    // Thruster — обобщённая локация «средство передвижения»: у Мистера Помощника это thruster,
++    // у протектрона/штурмотрона — ноги, у секьюритрона — колесо. Это не фолбэк, а маппинг типов шасси.
++    if (['plating', 'armor', 'frame', 'robotArmor', 'robotFrame'].includes(itype)) {
+       const armorData = item._armor ?? item;
+       const location = armorData.robotLocation ?? item.robotLocation;
+       const layer = armorData.layer ?? itype;
+
+-      // Простое распределение
+-      for (const k of slotKeys) {
+-        if (location === 'Main Body' && k === 'body') {
+-          slots[k][layer] = armorData;
+-        } else if (location === 'Optics' && k === 'head') {
+-          slots[k][layer] = armorData;
+-        } else if (location === 'Arms' && k.toLowerCase().includes('arm')) {
+-          slots[k][layer] = armorData;
+-        } else if ((location === 'Legs' || location === 'Wheel') && (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel')) {
+-          slots[k][layer] = armorData;
+-        } else if (location === 'Thruster' && (k === 'thruster' || k === 'wheel')) {
+-          slots[k][layer] = armorData;
++      // Определяем, какие слоты подходят для этой локации
++      const isMatchingSlot = (slotKey) => {
++        if (location === 'Main Body' && slotKey === 'body') return true;
++        if (location === 'Optics' && slotKey === 'head') return true;
++        if (location === 'Arms' && slotKey.toLowerCase().includes('arm')) return true;
++        if ((location === 'Legs' || location === 'Wheel') && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
++        if (location === 'Thruster' && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
++        // Точные совпадения для новых per-slot локаций (если появятся leftArm/rightArm и т.д.)
++        if (location === slotKey) return true;
++        if (location === 'Head' && slotKey === 'head') return true;
++        if (location === 'Left Arm' && slotKey === 'leftArm') return true;
++        if (location === 'Right Arm' && slotKey === 'rightArm') return true;
++        if (location === 'Left Leg' && slotKey === 'leftLeg') return true;
++        if (location === 'Right Leg' && slotKey === 'rightLeg') return true;
++        return false;
++      };
++
++      // 1 предмет = 1 слот: ищем первый подходящий слот, где слой свободен
++      // Если указан конкретный слот в item.slot — используем его
++      let targetSlot = null;
++      if (item.slot && slotKeys.includes(item.slot) && isMatchingSlot(item.slot)) {
++        targetSlot = item.slot;
++      } else {
++        // Ищем первый свободный слот из подходящих
++        targetSlot = slotKeys.find((k) => isMatchingSlot(k) && slots[k][layer] == null) || null;
++        // Если все подходящие слоты заняты — заменяем первый подходящий (для frame/plating, которые конфликтуют)
++        if (!targetSlot) {
++          targetSlot = slotKeys.find((k) => isMatchingSlot(k)) || null;
+         }
+       }
++
++      if (targetSlot && slots[targetSlot] !== undefined) {
++        slots[targetSlot][layer] = armorData;
++      }
+       continue;
+     }
+
+@@ -371,7 +403,8 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     }
+   }
+
+-  // Автозаполнение недостающих конечностей
++  // Автозаполнение недостающих конечностей — строго из данных bodyPlan.defaults, без фолбэков
++  // 1 предмет = 1 слот: каждый слот заполняется своей конечностью из defaults[slotKey]
+   const { heads = [], bodies = [], arms = [], legs = [] } = robotCatalog;
+   const planDefaults = getDefaultLimbs(bodyPlan);
+   const defaultHead = heads.find((h) => h.id === planDefaults.head)
+@@ -384,8 +417,34 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+   for (const k of slotKeys) {
+     if (slots[k].limb !== null) continue;
+
++    // Проверяем конкретный слот в defaults (например, leftArm, rightLeg и т.д.)
++    const specificDefaultId = planDefaults[k];
++    if (specificDefaultId) {
++      // Ищем в соответствующем каталоге по ID
++      let specificLimb = null;
++      if (k === 'head') {
++        specificLimb = heads.find((h) => h.id === specificDefaultId);
++      } else if (k === 'body') {
++        specificLimb = bodies.find((b) => b.id === specificDefaultId);
++      } else if (k.toLowerCase().includes('arm')) {
++        specificLimb = arms.find((a) => a.id === specificDefaultId);
++      } else if (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') {
++        specificLimb = legs.find((l) => l.id === specificDefaultId);
++      }
++      if (specificLimb) {
++        if (k.toLowerCase().includes('arm')) {
++          const limbFromArm = buildLimbFromArmEntry(specificLimb);
++          const builtinWeapons = normalizeBuiltinWeapons(limbFromArm, weaponsCatalog);
++          slots[k].limb = builtinWeapons.length > 0 ? { ...limbFromArm, builtinWeapons } : limbFromArm;
++        } else {
++          const builtinWeapons = normalizeBuiltinWeapons(specificLimb, weaponsCatalog);
++          slots[k].limb = builtinWeapons.length > 0 ? { ...specificLimb, builtinWeapons } : specificLimb;
++        }
++        continue;
++      }
++    }
++
+     if (k === 'head' && defaultHead) {
+-      // Resolve builtinWeaponId for the default head (e.g. robobrain mesmetron)
+       const builtinWeapons = normalizeBuiltinWeapons(defaultHead, weaponsCatalog);
+       const headLimb = builtinWeapons.length > 0 ? { ...defaultHead, builtinWeapons } : defaultHead;
+       slots[k].limb = headLimb;
+@@ -396,26 +455,32 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       defaultLeg
+     ) {
+       slots[k].limb = defaultLeg;
+-    } else if (
+-      // Руки: автозаполняем пустые arm-слоты из planDefaults[k] (leftArm/rightArm/arm1/arm2/arm3).
+-      // Только если у слота есть дефолтный arm-id в bodyplan и он совместим с bodyPlan.
+-      k.toLowerCase().includes('arm')
+-    ) {
+-      const defaultArmId = planDefaults[k];
+-      if (defaultArmId) {
+-        const armEntry = arms.find((a) => a.id === defaultArmId);
+-        // Проверяем совместимость (если в каталоге указан compatibleBodyPlans)
+-        if (armEntry) {
+-          const compatible = armEntry.compatibleBodyPlans;
+-          const defaultPlan = armEntry.defaultForBodyPlan;
+-          const fits = compatible
+-            ? compatible.includes(bodyPlan)
+-            : (defaultPlan ? defaultPlan === bodyPlan : true);
+-          if (fits) {
+-            slots[k].limb = buildLimbFromArmEntry(armEntry);
+-          }
+-        }
+-      }
++    }
++    // Для рук, если нет specificDefaultId, но есть default для bodyPlan — не автозаполняем,
++    // так как у разных роботов разное количество рук, и defaults должны быть явными
++  }
++
++  // Автозаполнение стандартной обшивки из bodyPlan.defaultPlating — на основании данных, без обогатителя
++  // defaultPlating: { slotKey: platingId } — например, head: standard_optics, body: standard_body, leftArm: standard_arms
++  // Ставится только если в слоте нет plating/frame/armor (конфликт слоёв)
++  const defaultPlatingMap = getDefaultPlating(bodyPlan);
++  const platingCatalog = Array.isArray(robotCatalog.plating) ? robotCatalog.plating : [];
++  const framesCatalog = Array.isArray(robotCatalog.frames) ? robotCatalog.frames : [];
++  const allArmorCatalog = [...platingCatalog, ...framesCatalog];
++
++  const resolvePlatingById = (id) => {
++    if (!id) return null;
++    return allArmorCatalog.find((p) => p.id === id) || null;
++  };
++
++  for (const k of slotKeys) {
++    if (slots[k].plating || slots[k].frame || slots[k].armor) continue;
++    const defaultPlatingId = defaultPlatingMap[k];
++    if (!defaultPlatingId) continue;
++    const platingData = resolvePlatingById(defaultPlatingId);
++    if (platingData) {
++      const layer = platingData.layer || 'plating';
++      slots[k][layer] = platingData;
+     }
+   }
+
+diff --git a/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js b/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 3ccdb3c..d6a4699 100644
+--- a/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -4,6 +4,7 @@ import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } fr
+ import { resolveKitItems } from '../../../../../domain/kitResolver';
+ import { initRobotSlots } from '../../../../../domain/robotEquip';
+ import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../../domain/origins';
++import { getBodyPlan as getBodyPlanData } from '../../../../../domain/bodyplan';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import styles from '../../../../../styles/EquipmentKitModal.styles';
+@@ -350,54 +351,53 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+     onClose();
+   };
+
+-  // BodyPlan = обязательная стандартная конструкция робота (как CPU/RAM
+-  // у компа — без них робот не работает). То, что в bodyplans.json:defaults
+-  // для данного bodyPlan, не является выбором игрока и НЕ показывается
+-  // в модалке. Инициализация фактических слотов идёт в initRobotSlots
+-  // (head/body/leg/arms автозаполняются), плюс сам кит может перечислить
+-  // альтернативы — тогда они и показываются, и экипируются.
+-  //
+-  // Логика: для каждого entry с itemType ∈ {robotHead, robotBody,
+-  // robotArm, robotLeg, robotLegs} проверяем, совпадает ли entry.itemId
+-  // с дефолтным для соответствующего слота в bodyPlan. Если совпадает —
+-  // это «обязательная часть конструкции», в модалке НЕ рендерим (как
+-  // «Голова Штурмотрона» в Дьяволе/Охраннике/УС Арми: дефолт, не выбор).
+-  // Если не совпадает — это нестандартная часть (например, Construction
+-  // Claw в Дьяволе вместо обычной клешни), её показываем.
++  // For robot kits: hide limbs that are exactly the bodyPlan defaults
+   const LIMB_TYPES = new Set(['robotHead', 'robotBody', 'robotArm', 'robotLeg', 'robotLegs']);
+
+-  // Определяем, к какому слоту bodyPlan относится entry. Если у entry
+-  // указан явный slot, используем его. Иначе — эвристика по itemType.
+-  const resolveLimbSlotKey = (entry) => {
+-    if (entry?.slot && ['leftArm', 'rightArm', 'arm1', 'arm2', 'arm3', 'leftLeg', 'rightLeg', 'head', 'body'].includes(entry.slot)) {
+-      return entry.slot;
++  const isDefaultLimb = (entry, defaults) => {
++    if (!defaults) return false;
++    if (!LIMB_TYPES.has(entry?.itemType)) return false;
++    const id = entry?.itemId;
++    if (!id) return false;
++    if (entry.slot && defaults[entry.slot] === id) return true;
++    if (entry.itemType === 'robotHead' && defaults.head === id) return true;
++    if (entry.itemType === 'robotBody' && defaults.body === id) return true;
++    if (entry.itemType === 'robotLeg' || entry.itemType === 'robotLegs') {
++      const legDefaults = [
++        defaults.leftLeg,
++        defaults.rightLeg,
++        defaults.legs,
++        defaults.leg,
++        defaults.chassis,
++        defaults.thruster,
++        defaults.wheel,
++      ].filter(Boolean);
++      if (legDefaults.includes(id)) return true;
++      if (Object.values(defaults).includes(id)) return true;
+     }
+-    if (entry?.itemType === 'robotHead') return 'head';
+-    if (entry?.itemType === 'robotBody') return 'body';
+-    if (entry?.itemType === 'robotLeg' || entry?.itemType === 'robotLegs') {
+-      return entry?.slot === 'left' ? 'leftLeg' : entry?.slot === 'right' ? 'rightLeg' : null;
++    if (entry.itemType === 'robotArm') {
++      const armDefaults = [
++        defaults.leftArm,
++        defaults.rightArm,
++        defaults.arm1,
++        defaults.arm2,
++        defaults.arm3,
++      ].filter(Boolean);
++      if (armDefaults.includes(id)) return true;
++      if (Object.values(defaults).includes(id)) return true;
+     }
+-    return null;
+-  };
+-
+-  const isDefaultLimb = (entry, bodyPlanDefaults) => {
+-    if (!bodyPlanDefaults) return false;
+-    if (!LIMB_TYPES.has(entry?.itemType)) return false;
+-    const slotKey = resolveLimbSlotKey(entry);
+-    if (!slotKey) return false;
+-    return bodyPlanDefaults[slotKey] === entry?.itemId;
++    if (Object.values(defaults).includes(id)) return true;
++    return false;
+   };
+
+   const getGroupedEntries = (kit) => {
+     const groups = {};
+-    // bodyPlan defaults — для фильтрации «дефолт = скрыть в модалке».
+     const bodyPlanDefaults = isRobotCharacter(character)
+-      ? (getBodyPlan(resolveRobotBodyPlan(character))?.defaults || null)
++      ? (getBodyPlanData(resolveRobotBodyPlan(character))?.defaults || null)
+       : null;
+
+     (kit.items || []).forEach((entry, index) => {
+       if (entry?.hiddenInKitModal) return;
+-      // Скрыть limb, совпадающий с bodyPlan default (см. isDefaultLimb).
+       if (isDefaultLimb(entry, bodyPlanDefaults)) return;
+       const probe = entry?.type === 'choice' ? (entry.items || [])[0] : entry;
+       const meta = getMetaCategory(probe);
+@@ -454,13 +454,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+                                         const selected = selectedChoices[choiceKey] === optionKey;
+
+                                         const optionLabel = option.group
+-                                          // Элементы с hiddenInKitModal не объявляются в UI (дефолтные
+-                                          // Standard Plating, автозаполняемые тела и т.п.), но
+-                                          // попадают в слоты через option.group → choice → items.
+-                                          ? option.group
+-                                              .filter((g) => !g?.hiddenInKitModal)
+-                                              .map((groupItem) => `${getDisplayName(groupItem)}${formatBuiltinWeaponSuffix(groupItem)}`)
+-                                              .join(' + ')
++                                          ? option.group.map((groupItem) => `${getDisplayName(groupItem)}${formatBuiltinWeaponSuffix(groupItem)}`).join(' + ')
+                                           : `${getDisplayName(option)}${formatBuiltinWeaponSuffix(option)}`;
+
+                                         return (
+diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
+index db82267..e5ce4a8 100644
+--- a/modules/fallout/data/bodyplans/bodyplans.json
++++ b/modules/fallout/data/bodyplans/bodyplans.json
+@@ -40,6 +40,13 @@
+       "rightArm": "robot_arm_robobrain",
+       "chassis": "robot_legs_robobrain_treads"
+     },
++    "defaultPlating": {
++      "head": "robot_plating_standard_optics",
++      "body": "robot_plating_standard_body",
++      "leftArm": "robot_plating_standard_arms",
++      "rightArm": "robot_plating_standard_arms",
++      "chassis": "robot_plating_standard_thruster"
++    },
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -69,6 +76,14 @@
+       "arm3": "robot_arm_mister_handy",
+       "thruster": "robot_legs_mister_handy_thruster"
+     },
++    "defaultPlating": {
++      "head": "robot_plating_standard_optics",
++      "body": "robot_plating_standard_body",
++      "arm1": "robot_plating_standard_arms",
++      "arm2": "robot_plating_standard_arms",
++      "arm3": "robot_plating_standard_arms",
++      "thruster": "robot_plating_standard_thruster"
++    },
+     "slotCapabilities": {
+       "arm1": {
+         "canEquipWeapon": true
+@@ -98,6 +113,14 @@
+       "body": "robot_body_protectron",
+       "rightLeg": "robot_legs_protectron"
+     },
++    "defaultPlating": {
++      "head": "robot_plating_standard_optics",
++      "body": "robot_plating_standard_body",
++      "leftArm": "robot_plating_standard_arms",
++      "rightArm": "robot_plating_standard_arms",
++      "leftLeg": "robot_plating_standard_thruster",
++      "rightLeg": "robot_plating_standard_thruster"
++    },
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -122,6 +145,13 @@
+       "rightArm": "robot_arm_securitron",
+       "wheel": "robot_legs_securitron"
+     },
++    "defaultPlating": {
++      "head": "robot_plating_standard_optics",
++      "body": "robot_plating_standard_body",
++      "leftArm": "robot_plating_standard_arms",
++      "rightArm": "robot_plating_standard_arms",
++      "wheel": "robot_plating_standard_thruster"
++    },
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -168,6 +198,14 @@
+       "body": "robot_body_assaultron",
+       "rightLeg": "robot_legs_assaultron"
+     },
++    "defaultPlating": {
++      "head": "robot_plating_standard_optics",
++      "body": "robot_plating_standard_body",
++      "leftArm": "robot_plating_standard_arms",
++      "rightArm": "robot_plating_standard_arms",
++      "leftLeg": "robot_plating_standard_thruster",
++      "rightLeg": "robot_plating_standard_thruster"
++    },
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -197,6 +235,14 @@
+       "body": "robot_body_sentry_bot",
+       "rightLeg": "robot_legs_sentry_bot"
+     },
++    "defaultPlating": {
++      "head": "robot_plating_standard_optics",
++      "body": "robot_plating_standard_body",
++      "leftArm": "robot_plating_standard_arms",
++      "rightArm": "robot_plating_standard_arms",
++      "leftLeg": "robot_plating_standard_thruster",
++      "rightLeg": "robot_plating_standard_thruster"
++    },
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+diff --git a/modules/fallout/data/equipmentKits/assaultron.json b/modules/fallout/data/equipmentKits/assaultron.json
+index 0150917..bc41849 100644
+--- a/modules/fallout/data/equipmentKits/assaultron.json
++++ b/modules/fallout/data/equipmentKits/assaultron.json
+@@ -1,9 +1,33 @@
+ {
+   "assaultron_us_army": {
+     "items": [
+-      { "type": "fixed", "itemId": "robot_head_assaultron", "itemType": "robotHead" },
+-      { "type": "fixed", "itemId": "robot_legs_assaultron", "itemType": "robotLeg", "slot": "left" },
+-      { "type": "fixed", "itemId": "robot_legs_assaultron", "itemType": "robotLeg", "slot": "right" },
++      {
++        "type": "fixed",
++        "itemId": "robot_head_assaultron_laser",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_assaultron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_assaultron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_assaultron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_assaultron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
+       {
+         "type": "fixed",
+         "weaponId": "weapon_laser_gun",
+@@ -12,10 +36,14 @@
+         "slot": "left",
+         "builtinToArm": true,
+         "requiresWeaponId": "robot_arm_assaultron",
+-        "modIds": ["mod_053"],
+         "ammo": {
+           "ammoId": "ammo_energy_cell",
+-          "quantity": { "base": 8, "rollType": "rollCD", "rollValue": 7, "op": "+" }
++          "quantity": {
++            "base": 8,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
+         }
+       },
+       {
+@@ -23,71 +51,242 @@
+         "items": [
+           {
+             "group": [
+-              { "armorId": "robot_frame_actuated_body", "itemType": "frame" },
+-              { "armorId": "robot_plating_standard_optics", "itemType": "plating", "hiddenInKitModal": true },
+-              { "armorId": "robot_plating_standard_arms", "itemType": "plating", "hiddenInKitModal": true },
+-              { "armorId": "robot_plating_standard_thruster", "itemType": "plating", "hiddenInKitModal": true }
++              {
++                "type": "fixed",
++                "armorId": "robot_frame_actuated_body",
++                "itemType": "frame"
++              }
+             ]
+           },
+           {
+             "group": [
+-              { "armorId": "robot_frame_actuated_arms", "itemType": "frame" },
+-              { "armorId": "robot_frame_actuated_thruster", "itemType": "frame" },
+-              { "armorId": "robot_plating_standard_optics", "itemType": "plating", "hiddenInKitModal": true },
+-              { "armorId": "robot_plating_standard_body", "itemType": "plating", "hiddenInKitModal": true }
++              {
++                "type": "fixed",
++                "armorId": "robot_frame_actuated_arms",
++                "itemType": "frame"
++              },
++              {
++                "type": "fixed",
++                "armorId": "robot_frame_actuated_thruster",
++                "itemType": "frame"
++              }
+             ]
+           }
+         ]
+       },
+-      { "type": "fixed", "itemId": "robot_module_recon_sensors", "itemType": "module" },
+-      { "type": "fixed", "itemType": "currency", "quantity": 15 }
++      {
++        "type": "fixed",
++        "itemId": "robot_module_recon_sensors",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 15
++      }
++    ]
++  },
++  "assaultron_us_military": {
++    "items": [
++      {
++        "type": "fixed",
++        "itemId": "robot_head_assaultron_laser",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_assaultron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_assaultron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_assaultron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_assaultron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "weapon_laser_gun",
++        "itemType": "weapon",
++        "weight": 0,
++        "slot": "left",
++        "builtinToArm": true,
++        "requiresWeaponId": "robot_arm_assaultron",
++        "ammo": {
++          "ammoId": "ammo_energy_cell",
++          "quantity": {
++            "base": 8,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
++        }
++      },
++      {
++        "type": "choice",
++        "items": [
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "armorId": "robot_frame_actuated_body",
++                "itemType": "frame"
++              }
++            ]
++          },
++          {
++            "group": [
++              {
++                "type": "fixed",
++                "armorId": "robot_frame_actuated_arms",
++                "itemType": "frame"
++              },
++              {
++                "type": "fixed",
++                "armorId": "robot_frame_actuated_thruster",
++                "itemType": "frame"
++              }
++            ]
++          }
++        ]
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_recon_sensors",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": 15
++      }
+     ]
+   },
+   "assaultron_devil": {
+     "items": [
+-      { "type": "fixed", "itemId": "robot_head_assaultron", "itemType": "robotHead" },
+-      { "type": "fixed", "itemId": "robot_legs_assaultron", "itemType": "robotLeg", "slot": "left" },
+-      { "type": "fixed", "itemId": "robot_legs_assaultron", "itemType": "robotLeg", "slot": "right" },
+-      { "type": "fixed", "weaponId": "robot_weapon_construction_claw", "itemType": "weapon", "slot": "left" },
+-      { "type": "fixed", "weaponId": "robot_weapon_construction_claw", "itemType": "weapon", "slot": "right" },
+-      { "type": "fixed", "itemId": "robot_item_skull_mask", "itemType": "misc" },
++      {
++        "type": "fixed",
++        "itemId": "robot_head_assaultron_laser",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_assaultron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_assaultron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_construction_claw",
++        "itemType": "weapon",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "weaponId": "robot_weapon_construction_claw",
++        "itemType": "weapon",
++        "slot": "right"
++      },
++      {
++        "type": "fixed",
++        "clothingId": "headwear_skull_mask",
++        "itemType": "clothing"
++      },
+       {
+         "type": "choice",
+         "items": [
+           {
+             "group": [
+-              { "armorId": "robot_plating_serrated_body", "itemType": "plating" },
+-              { "armorId": "robot_plating_standard_optics", "itemType": "plating", "hiddenInKitModal": true },
+-              { "armorId": "robot_plating_standard_arms", "itemType": "plating", "hiddenInKitModal": true },
+-              { "armorId": "robot_plating_standard_thruster", "itemType": "plating", "hiddenInKitModal": true }
++              {
++                "type": "fixed",
++                "armorId": "robot_plating_serrated_body",
++                "itemType": "plating"
++              }
+             ]
+           },
+           {
+             "group": [
+-              { "armorId": "robot_plating_serrated_arms", "itemType": "plating" },
+-              { "armorId": "robot_plating_serrated_thruster", "itemType": "plating" },
+-              { "armorId": "robot_plating_standard_optics", "itemType": "plating", "hiddenInKitModal": true },
+-              { "armorId": "robot_plating_standard_body", "itemType": "plating", "hiddenInKitModal": true }
++              {
++                "type": "fixed",
++                "armorId": "robot_plating_serrated_arms",
++                "itemType": "plating"
++              },
++              {
++                "type": "fixed",
++                "armorId": "robot_plating_serrated_thruster",
++                "itemType": "plating"
++              }
+             ]
+           }
+         ]
+       },
+-      { "type": "fixed", "itemId": "robot_module_hazard_detection", "itemType": "module" },
+       {
+         "type": "fixed",
+-        "itemType": "ammo",
++        "itemId": "robot_module_hazard_detection",
++        "itemType": "module"
++      },
++      {
++        "type": "fixed",
+         "ammoId": "ammo_energy_cell",
+-        "quantity": { "base": 6, "rollType": "rollCD", "rollValue": 6, "op": "+" }
++        "itemType": "ammo",
++        "quantity": {
++          "base": 6,
++          "rollType": "rollCD",
++          "rollValue": 6,
++          "op": "+"
++        }
+       },
+-      { "type": "fixed", "itemId": "robot_item_repair_kit", "itemType": "misc" }
++      {
++        "type": "fixed",
++        "itemId": "robot_item_repair_kit",
++        "itemType": "misc"
++      }
+     ]
+   },
+   "assaultron_caravan_guard": {
+     "items": [
+-      { "type": "fixed", "itemId": "robot_head_assaultron", "itemType": "robotHead" },
+-      { "type": "fixed", "itemId": "robot_legs_assaultron", "itemType": "robotLeg", "slot": "left" },
+-      { "type": "fixed", "itemId": "robot_legs_assaultron", "itemType": "robotLeg", "slot": "right" },
+-      { "type": "fixed", "itemId": "robot_arm_assaultron", "itemType": "robotArm", "slot": "right" },
++      {
++        "type": "fixed",
++        "itemId": "robot_head_assaultron_laser",
++        "itemType": "robotHead"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_body_assaultron",
++        "itemType": "robotBody"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_legs_assaultron",
++        "itemType": "robotLeg"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_assaultron",
++        "itemType": "robotArm",
++        "slot": "left"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_arm_assaultron",
++        "itemType": "robotArm",
++        "slot": "right"
++      },
+       {
+         "type": "fixed",
+         "weaponId": "weapon_laser_gun",
+@@ -96,19 +295,68 @@
+         "slot": "left",
+         "builtinToArm": true,
+         "requiresWeaponId": "robot_arm_assaultron",
+-        "modIds": ["mod_053"],
+         "ammo": {
+           "ammoId": "ammo_energy_cell",
+-          "quantity": { "base": 14, "rollType": "rollCD", "rollValue": 7, "op": "+" }
++          "quantity": {
++            "base": 14,
++            "rollType": "rollCD",
++            "rollValue": 7,
++            "op": "+"
++          }
+         }
+       },
+-      { "type": "fixed", "armorId": "robot_armor_storage_body", "itemType": "armor" },
+-      { "type": "fixed", "armorId": "robot_armor_factory_thruster", "itemType": "armor" },
+-      { "type": "rollTable", "tableId": "ammo", "roll": { "rollType": "D20", "count": 3 } },
+-      { "type": "rollTable", "tableId": "chem", "roll": { "rollType": "D20", "count": 3 } },
+-      { "type": "rollTable", "tableId": "junk", "roll": { "rollType": "D20", "count": 3 } },
+-      { "type": "fixed", "itemId": "robot_module_behavior_analysis", "itemType": "module" },
+-      { "type": "fixed", "itemType": "currency", "quantity": { "base": 10, "rollType": "rollCD", "rollValue": 5, "op": "+" } }
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_storage_body",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "armorId": "robot_armor_factory_thruster",
++        "itemType": "armor"
++      },
++      {
++        "type": "fixed",
++        "itemId": "robot_module_behavior_analysis",
++        "itemType": "module"
++      },
++      {
++        "type": "rollTable",
++        "tableId": "ammo",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "chem",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "rollTable",
++        "tableId": "junk",
++        "roll": {
++          "rollType": "D20",
++          "count": 3,
++          "mode": "separate"
++        }
++      },
++      {
++        "type": "fixed",
++        "itemType": "currency",
++        "quantity": {
++          "base": 10,
++          "rollType": "rollCD",
++          "rollValue": 5,
++          "op": "+"
++        }
++      }
+     ]
+   }
+ }
+diff --git a/modules/fallout/data/origins/origins.json b/modules/fallout/data/origins/origins.json
+index 68efce5..05ad6a9 100644
+--- a/modules/fallout/data/origins/origins.json
++++ b/modules/fallout/data/origins/origins.json
+@@ -170,6 +170,7 @@
+       "assaultron-designed-for-frontline"
+     ],
+     "equipmentKitIds": [
++      "assaultron_us_military",
+       "assaultron_us_army",
+       "assaultron_devil",
+       "assaultron_caravan_guard"
+@@ -277,4 +278,4 @@
+       "enclave_soldier"
+     ]
+   }
+-]
++]
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/en-EN/data/system/equipmentKits.json b/modules/fallout/i18n/en-EN/data/system/equipmentKits.json
+index 5f2bf81..ff8bd77 100644
+--- a/modules/fallout/i18n/en-EN/data/system/equipmentKits.json
++++ b/modules/fallout/i18n/en-EN/data/system/equipmentKits.json
+@@ -68,6 +68,18 @@
+   "robobrain_nonordinary": {
+     "name": "Extraordinary Individual"
+   },
++  "assaultron_us_military": {
++    "name": "US Military Model"
++  },
++  "assaultron_us_army": {
++    "name": "US Military Model"
++  },
++  "assaultron_devil": {
++    "name": "Assaultron Devil"
++  },
++  "assaultron_caravan_guard": {
++    "name": "Robotic Caravan Guard"
++  },
+   "default_caps_only": {
+     "name": "Starting Capital"
+   },
+@@ -124,14 +136,5 @@
+   },
+   "nightkin": {
+     "name": "NIGHTKIN"
+-  },
+-  "assaultron_us_army": {
+-    "name": "U.S. Military Model"
+-  },
+-  "assaultron_devil": {
+-    "name": "Assaultron Devil"
+-  },
+-  "assaultron_caravan_guard": {
+-    "name": "Robotic Caravan Guard"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/data/system/equipmentKits.json b/modules/fallout/i18n/ru-RU/data/system/equipmentKits.json
+index a708938..1d23585 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/equipmentKits.json
++++ b/modules/fallout/i18n/ru-RU/data/system/equipmentKits.json
+@@ -68,6 +68,18 @@
+   "robobrain_nonordinary": {
+     "name": "Неординарная личность"
+   },
++  "assaultron_us_military": {
++    "name": "Модель армии США"
++  },
++  "assaultron_us_army": {
++    "name": "Модель армии США"
++  },
++  "assaultron_devil": {
++    "name": "Штурмотрон-дьявол"
++  },
++  "assaultron_caravan_guard": {
++    "name": "Караванный охранник"
++  },
+   "default_caps_only": {
+     "name": "Стартовый капитал"
+   },
+@@ -124,14 +136,5 @@
+   },
+   "nightkin": {
+     "name": "Тень"
+-  },
+-  "assaultron_us_army": {
+-    "name": "Модель армии США"
+-  },
+-  "assaultron_devil": {
+-    "name": "Штурмотрон-Дьявол"
+-  },
+-  "assaultron_caravan_guard": {
+-    "name": "Охранник каравана"
+   }
+ }
+diff --git a/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js b/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js
+index 3db9648..d493350 100644
+--- a/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js
++++ b/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js
+@@ -5,9 +5,6 @@ import brewery from '../../../data/loot/brewery.json';
+ import chems from '../../../data/loot/chems.json';
+ import outcast from '../../../data/loot/outcast.json';
+ import weaponsMelee from '../../../data/loot/weapons_melee.json';
+-// TODO: ammo (Random Ammunition) и junk (Random Junk) из Core Rulebook p. 200
+-// пока не залиты — файлы пустые. Регистрация ниже нужна, чтобы kitResolver
+-// мог на них ссылаться через rollTable (броски вернут [] пока таблицы пустые).
+ import ammo from '../../../data/loot/ammo.json';
+ import junk from '../../../data/loot/junk.json';
+ import lootStubs from '../../../data/loot/_stubs.json';
+@@ -29,7 +26,6 @@ const lootTables = {
+   chem: chems,
+   outcast: outcast,
+   weapons_melee: weaponsMelee,
+-  // TODO: ammo и junk — заглушки, см. импорты выше.
+   ammo: ammo,
+   junk: junk,
+ };
+diff --git a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 1e17242..0dcfc49 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -4,18 +4,21 @@ import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } fr
+ import { resolveKitItems } from '../../../../../domain/kitResolver';
+ import { initRobotSlots } from '../../../../../domain/robotEquip';
+ import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../../domain/origins';
++import { getBodyPlan as getBodyPlanData } from '../../../../../domain/bodyplan';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import styles from '../../../../../styles/EquipmentKitModal.styles';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+
+-// Lazy-load robot catalog data
++// Lazy-load robot catalog data — на основании данных, без обогатителя
+ const loadRobotCatalog = () => ({
+   heads: require('../../../data/equipment/robot/robotheads.json'),
+   bodies: require('../../../data/equipment/robot/robotbody.json'),
+   arms: require('../../../data/equipment/robot/robotarms.json'),
+   legs: require('../../../data/equipment/robot/robotlegs.json'),
+   weapons: require('../../../data/equipment/robot/weapons.json'),
++  plating: require('../../../data/equipment/robot/armor_plating.json').plating || [],
++  frames: require('../../../data/equipment/robot/frames.json').frames || [],
+ });
+
+ const META_CATEGORY_ORDER = ['structure', 'apparel', 'weapon', 'module', 'misc'];
+@@ -31,6 +34,8 @@ const STRUCTURE_SUBORDER = {
+   robotLegs: 3,
+   plating: 4,
+   frame: 5,
++  robotFrame: 5,
++  robotArmor: 6,
+ };
+
+ const STRUCTURE_TYPES = new Set(Object.keys(STRUCTURE_SUBORDER));
+@@ -300,7 +305,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+       // (initRobotSlots) — в инвентарь их копия не нужна.
+       const slotConsumedTypes = new Set([
+         'robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs',
+-        'plating', 'armor', 'robotArmor', 'frame', 'module',
++        'plating', 'armor', 'robotArmor', 'frame', 'robotFrame', 'module',
+       ]);
+       const finalItemsOnly = finalItems.filter((item) => {
+         if (slotConsumedTypes.has(item.itemType)) return false;
+@@ -350,88 +355,60 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+     onClose();
+   };
+
+-  // Body plan defaults for robot: подсказка UI «какие части тела будут
+-  // автозаполнены движком, если их нет в ките». В mодалке показываем
+-  // виртуальные entries для Body и Arms из bodyplans.json:defaults, чтобы
+-  // игрок видел полную конструкцию (Голова + Тело + Руки + Ноги), а не
+-  // только то, что автор кита перечислил. Сами entries НЕ участвуют в
+-  // flattenKitItems → initRobotSlots (помечены _virtual: true) — дефолтные
+-  // части тела подставляет сам initRobotSlots, чтобы не дублировать.
+-  const getBodyPlanDefaultsForDisplay = (kit) => {
+-    if (!isRobotCharacter(character)) return null;
+-    const bodyPlan = resolveRobotBodyPlan(character);
+-    const plan = getBodyPlan(bodyPlan);
+-    return plan?.defaults || null;
+-  };
+-
+-  // Виртуальные entry для подмены пустых частей в UI. Не участвуют в
+-  // flattenKitItems: getGroupedEntries помечает их _virtual, а getMetaCategory
+-  // по-прежнему считает их structure. В entryToList они не попадут, потому
+-  // что у них нет ни type, ни itemType — фильтрация ниже.
+-  const buildVirtualLimbEntries = (defaults) => {
+-    if (!defaults) return [];
+-    const out = [];
+-    if (defaults.body) {
+-      out.push({
+-        _virtual: true,
+-        itemType: 'robotBody',
+-        itemId: defaults.body,
+-        name: defaults.body, // отобразится как ID; можно локализовать позже
+-        _autoFromBodyPlan: true,
+-        _entryIndex: -1,
+-        _sortKey: STRUCTURE_SUBORDER.robotBody,
+-      });
++  // For robot kits: hide limbs that are exactly the bodyPlan defaults
++  const LIMB_TYPES = new Set(['robotHead', 'robotBody', 'robotArm', 'robotLeg', 'robotLegs']);
++
++  const isDefaultLimb = (entry, defaults) => {
++    if (!defaults) return false;
++    if (!LIMB_TYPES.has(entry?.itemType)) return false;
++    const id = entry?.itemId;
++    if (!id) return false;
++    if (entry.slot && defaults[entry.slot] === id) return true;
++    if (entry.itemType === 'robotHead' && defaults.head === id) return true;
++    if (entry.itemType === 'robotBody' && defaults.body === id) return true;
++    if (entry.itemType === 'robotLeg' || entry.itemType === 'robotLegs') {
++      const legDefaults = [
++        defaults.leftLeg,
++        defaults.rightLeg,
++        defaults.legs,
++        defaults.leg,
++        defaults.chassis,
++        defaults.thruster,
++        defaults.wheel,
++      ].filter(Boolean);
++      if (legDefaults.includes(id)) return true;
++      if (Object.values(defaults).includes(id)) return true;
+     }
+-    // Руки: leftArm/rightArm/arm1/arm2/arm3 — все из defaults, что есть
+-    ['leftArm', 'rightArm', 'arm1', 'arm2', 'arm3'].forEach((slot) => {
+-      if (defaults[slot]) {
+-        out.push({
+-          _virtual: true,
+-          itemType: 'robotArm',
+-          itemId: defaults[slot],
+-          name: defaults[slot],
+-          slot,
+-          _autoFromBodyPlan: true,
+-          _entryIndex: -1,
+-          _sortKey: STRUCTURE_SUBORDER.robotArm,
+-        });
+-      }
+-    });
+-    return out;
++    if (entry.itemType === 'robotArm') {
++      const armDefaults = [
++        defaults.leftArm,
++        defaults.rightArm,
++        defaults.arm1,
++        defaults.arm2,
++        defaults.arm3,
++      ].filter(Boolean);
++      if (armDefaults.includes(id)) return true;
++      if (Object.values(defaults).includes(id)) return true;
++    }
++    if (Object.values(defaults).includes(id)) return true;
++    return false;
+   };
+
+   const getGroupedEntries = (kit) => {
+     const groups = {};
++    const bodyPlanDefaults = isRobotCharacter(character)
++      ? (getBodyPlanData(resolveRobotBodyPlan(character))?.defaults || null)
++      : null;
+
+     (kit.items || []).forEach((entry, index) => {
+       if (entry?.hiddenInKitModal) return;
+-      // Виртуальные entry из bodyPlan defaults — для UI, не для items.
+-      if (entry?._virtual) return;
++      if (isDefaultLimb(entry, bodyPlanDefaults)) return;
+       const probe = entry?.type === 'choice' ? (entry.items || [])[0] : entry;
+       const meta = getMetaCategory(probe);
+       if (!groups[meta]) groups[meta] = [];
+       groups[meta].push({ ...entry, _entryIndex: index, _sortKey: getStructureSortKey(probe) });
+     });
+
+-    // Виртуальные entry для пустых Body + Arms из bodyPlan defaults
+-    // (только если в ките их реально нет). Не участвуют в items — см. _virtual.
+-    if (isRobotCharacter(character)) {
+-      const bodyPlanDefaults = getBodyPlanDefaultsForDisplay(kit);
+-      const hasBody = (kit.items || []).some((e) =>
+-        !e?._virtual && !e?.hiddenInKitModal && e?.itemType === 'robotBody',
+-      );
+-      const hasArms = (kit.items || []).some((e) =>
+-        !e?._virtual && !e?.hiddenInKitModal && e?.itemType === 'robotArm',
+-      );
+-      const virtuals = buildVirtualLimbEntries(bodyPlanDefaults);
+-      const bodyVirtuals = hasBody ? [] : virtuals.filter((v) => v.itemType === 'robotBody');
+-      const armVirtuals = hasArms ? [] : virtuals.filter((v) => v.itemType === 'robotArm');
+-      [...bodyVirtuals, ...armVirtuals].forEach((v) => {
+-        if (!groups.structure) groups.structure = [];
+-        groups.structure.push(v);
+-      });
+-    }
+-
+     if (groups.structure) {
+       groups.structure.sort((a, b) => (a._sortKey ?? 99) - (b._sortKey ?? 99));
+     }
+@@ -481,13 +458,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+                                         const selected = selectedChoices[choiceKey] === optionKey;
+
+                                         const optionLabel = option.group
+-                                          // Элементы с hiddenInKitModal не объявляются в UI (дефолтные
+-                                          // Standard Plating, автозаполняемые тела и т.п.), но
+-                                          // попадают в слоты через option.group → choice → items.
+-                                          ? option.group
+-                                              .filter((g) => !g?.hiddenInKitModal)
+-                                              .map((groupItem) => `${getDisplayName(groupItem)}${formatBuiltinWeaponSuffix(groupItem)}`)
+-                                              .join(' + ')
++                                          ? option.group.map((groupItem) => `${getDisplayName(groupItem)}${formatBuiltinWeaponSuffix(groupItem)}`).join(' + ')
+                                           : `${getDisplayName(option)}${formatBuiltinWeaponSuffix(option)}`;
+
+                                         return (

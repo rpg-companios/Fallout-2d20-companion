@@ -4,6 +4,7 @@ import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } fr
 import { resolveKitItems } from '../../../../../domain/kitResolver';
 import { initRobotSlots } from '../../../../../domain/robotEquip';
 import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../../domain/origins';
+import { getBodyPlan as getBodyPlanData } from '../../../../../domain/bodyplan';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import styles from '../../../../../styles/EquipmentKitModal.styles';
@@ -354,11 +355,54 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     onClose();
   };
 
+  // For robot kits: hide limbs that are exactly the bodyPlan defaults
+  const LIMB_TYPES = new Set(['robotHead', 'robotBody', 'robotArm', 'robotLeg', 'robotLegs']);
+
+  const isDefaultLimb = (entry, defaults) => {
+    if (!defaults) return false;
+    if (!LIMB_TYPES.has(entry?.itemType)) return false;
+    const id = entry?.itemId;
+    if (!id) return false;
+    if (entry.slot && defaults[entry.slot] === id) return true;
+    if (entry.itemType === 'robotHead' && defaults.head === id) return true;
+    if (entry.itemType === 'robotBody' && defaults.body === id) return true;
+    if (entry.itemType === 'robotLeg' || entry.itemType === 'robotLegs') {
+      const legDefaults = [
+        defaults.leftLeg,
+        defaults.rightLeg,
+        defaults.legs,
+        defaults.leg,
+        defaults.chassis,
+        defaults.thruster,
+        defaults.wheel,
+      ].filter(Boolean);
+      if (legDefaults.includes(id)) return true;
+      if (Object.values(defaults).includes(id)) return true;
+    }
+    if (entry.itemType === 'robotArm') {
+      const armDefaults = [
+        defaults.leftArm,
+        defaults.rightArm,
+        defaults.arm1,
+        defaults.arm2,
+        defaults.arm3,
+      ].filter(Boolean);
+      if (armDefaults.includes(id)) return true;
+      if (Object.values(defaults).includes(id)) return true;
+    }
+    if (Object.values(defaults).includes(id)) return true;
+    return false;
+  };
+
   const getGroupedEntries = (kit) => {
     const groups = {};
+    const bodyPlanDefaults = isRobotCharacter(character)
+      ? (getBodyPlanData(resolveRobotBodyPlan(character))?.defaults || null)
+      : null;
 
     (kit.items || []).forEach((entry, index) => {
       if (entry?.hiddenInKitModal) return;
+      if (isDefaultLimb(entry, bodyPlanDefaults)) return;
       const probe = entry?.type === 'choice' ? (entry.items || [])[0] : entry;
       const meta = getMetaCategory(probe);
       if (!groups[meta]) groups[meta] = [];

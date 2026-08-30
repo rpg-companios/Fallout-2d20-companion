@@ -1,4 +1,91 @@
 {
+  "assaultron_us_army": {
+    "items": [
+      {
+        "type": "fixed",
+        "itemId": "robot_head_assaultron_laser",
+        "itemType": "robotHead"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_body_assaultron",
+        "itemType": "robotBody"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_legs_assaultron",
+        "itemType": "robotLeg"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_assaultron",
+        "itemType": "robotArm",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_arm_assaultron",
+        "itemType": "robotArm",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "weight": 0,
+        "slot": "left",
+        "builtinToArm": true,
+        "requiresWeaponId": "robot_arm_assaultron",
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 8,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_frame_actuated_body",
+                "itemType": "frame"
+              }
+            ]
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_frame_actuated_arms",
+                "itemType": "frame"
+              },
+              {
+                "type": "fixed",
+                "armorId": "robot_frame_actuated_thruster",
+                "itemType": "frame"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_recon_sensors",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 15
+      }
+    ]
+  },
   "assaultron_us_military": {
     "items": [
       {
@@ -235,6 +322,15 @@
       },
       {
         "type": "rollTable",
+        "tableId": "ammo",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
         "tableId": "chem",
         "roll": {
           "rollType": "D20",
@@ -244,7 +340,7 @@
       },
       {
         "type": "rollTable",
-        "tableId": "trinklet",
+        "tableId": "junk",
         "roll": {
           "rollType": "D20",
           "count": 3,
@@ -254,7 +350,12 @@
       {
         "type": "fixed",
         "itemType": "currency",
-        "quantity": 20
+        "quantity": {
+          "base": 10,
+          "rollType": "rollCD",
+          "rollValue": 5,
+          "op": "+"
+        }
       }
     ]
   }

@@ -30,6 +30,8 @@ const ROLL_TABLE_TAG = {
   chem: 'chem',
   outcast: 'outcast',
   oddity: 'oddity',
+  ammo: 'ammo',
+  junk: 'junk',
 };
 
 const MR_HANDY_BODY_ID = 'robot_body_mister_handy';
@@ -297,10 +299,13 @@ export async function resolveNonWeaponItem(item) {
 
   if (CURRENCY_ITEM_TYPES[item.itemType]) {
     const name = CURRENCY_ITEM_TYPES[item.itemType]();
+    const quantity = (item.quantity && typeof item.quantity === 'object')
+      ? resolveRollQuantity(item.quantity)
+      : toNumber(item.quantity || 0);
     return {
       ...item,
       name,
-      quantity: toNumber(item.quantity || 0),
+      quantity,
     };
   }
 

@@ -57,6 +57,15 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
     pushWeapon(byId ? { ...byId } : { id: limb.builtinWeaponId });
   }
 
+  // Reverse lookup: weapon.builtinToHead == limb.id (e.g. assaultron head laser)
+  if (limb.id) {
+    for (const w of catalog) {
+      if (w.builtinToHead === limb.id) {
+        pushWeapon(w);
+      }
+    }
+  }
+
   if (normalized.length === 0 && limb.builtinManipulator) {
     pushWeapon({ ...limb, isManipulator: true });
   }
