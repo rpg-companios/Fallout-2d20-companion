@@ -40,12 +40,17 @@ describe('комплекты снаряжения Штурмотрона', () =>
     }
   });
 
-  it('каждый комплект выдаёт голову с лазером', () => {
+  it('каждый комплект: голова с лазером — базовая модель (default), а не из кита', async () => {
+    // По решению remove_rely_defaults голова не рендерится в комплекте,
+    // а берётся из bodyPlan.defaults.head = robot_head_assaultron_laser
+    const bpModule = await import('../../modules/fallout/data/bodyplans/bodyplans.json');
+    const bp = bpModule.default || bpModule;
+    expect(bp.assaultron.defaults.head).toBe('robot_head_assaultron_laser');
     for (const kitId of ASSAULTRON_KIT_IDS) {
-      const hasLaserHead = kits[kitId].items.some(
+      const hasLaserHeadInKit = kits[kitId].items.some(
         (item) => item.itemId === 'robot_head_assaultron_laser' && item.itemType === 'robotHead',
       );
-      expect(hasLaserHead, `${kitId} не выдаёт голову с лазером`).toBe(true);
+      expect(hasLaserHeadInKit, `${kitId} не должен явно содержать голову — она базовая`).toBe(false);
     }
   });
 

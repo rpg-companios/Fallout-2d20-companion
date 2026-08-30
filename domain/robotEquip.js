@@ -154,6 +154,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   const modules = [];
   const inventoryItems = [];
   const pendingHeadBuiltinWeapons = [];
+  const pendingArmBuiltinWeapons = [];
 
   const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
 
@@ -264,36 +265,39 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         continue;
       }
 
-      // Оружие, встроенное в руку (ладонные орудия Секьюритрона): уходит ВНУТРЬ
-      // конечности (limb.builtinWeapons) — ладонь остаётся свободной, чтобы
-      // манипуляторы могли держать любое другое оружие/предметы (heldWeapon).
+      // Оружие, встроенное в руку (ладонные орудия Секьюритрона, лазер-ган Штурмотрона):
+      // уходит ВНУТРЬ конечности (limb.builtinWeapons) — ладонь остаётся свободной.
       // item.slot задаёт сторону: left → leftArm, right → rightArm.
+      // Если руки ещё нет (базовая модель ещё не заполнена из defaults), откладываем
+      // в pendingArmBuiltinWeapons — после автозаполнения конечностей прикрепим.
       if (item.builtinToArm || weaponData.builtinToArm || resolvedWeapon?.builtinToArm) {
         const direction = item.slot === 'right' ? 'right' : item.slot === 'left' ? 'left' : null;
         const targetKey = direction ? getSlotForDirection(bodyPlan, direction) : null;
+        const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
+        const fireRate = Number(base.fireRate) || 0;
+        const builtin = {
+          ...base,
+          fireRate,
+          id: weaponId,
+          weaponId,
+          name: item.displayName || weaponData.name || weaponId,
+          baseWeaponName: weaponData.name,
+          isBuiltin: true,
+          builtinToArm: true,
+          locked: true,
+          _sourceSlot: targetKey,
+          _sourceItem: item,
+        };
         if (targetKey && slots[targetKey]?.limb) {
           const limb = slots[targetKey].limb;
-          const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
-          const fireRate = Number(base.fireRate) || 0;
-          const builtin = {
-            ...base,
-            fireRate,
-            id: weaponId,
-            weaponId,
-            name: item.displayName || weaponData.name || weaponId,
-            baseWeaponName: weaponData.name,
-            isBuiltin: true,
-            builtinToArm: true,
-            locked: true,
-          };
           slots[targetKey].limb = {
             ...limb,
             builtinWeapons: [...(Array.isArray(limb.builtinWeapons) ? limb.builtinWeapons : []), builtin],
           };
           continue;
         }
-        // Нет подходящей руки — не теряем предмет, отдаём в инвентарь.
-        inventoryItems.push({ ...item, builtinToArm: true });
+        // Руки пока нет — откладываем до автозаполнения из bodyPlan.defaults
+        pendingArmBuiltinWeapons.push(builtin);
         continue;
       }
 
@@ -481,6 +485,28 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     if (platingData) {
       const layer = platingData.layer || 'plating';
       slots[k][layer] = platingData;
+    }
+  }
+
+  // Прикрепляем отложенные builtinToArm оружия после автозаполнения конечностей из defaults
+  // (базовая модель даёт руки, а лазер-ган из кита должен встать в них)
+  if (pendingArmBuiltinWeapons.length > 0) {
+    for (const builtin of pendingArmBuiltinWeapons) {
+      const targetKey = builtin._sourceSlot || getSlotForDirection(bodyPlan, 'left');
+      const sourceItem = builtin._sourceItem;
+      if (targetKey && slots[targetKey]?.limb) {
+        const limb = slots[targetKey].limb;
+        // Не дублируем если уже есть такое оружие
+        if (!Array.isArray(limb.builtinWeapons) || !limb.builtinWeapons.some((w) => w.id === builtin.id)) {
+          slots[targetKey].limb = {
+            ...limb,
+            builtinWeapons: [...(Array.isArray(limb.builtinWeapons) ? limb.builtinWeapons : []), builtin],
+          };
+        }
+      } else {
+        // Всё ещё нет руки — в инвентарь как fallback
+        inventoryItems.push({ ...(sourceItem || {}), builtinToArm: true, _weapon: builtin });
+      }
     }
   }
 
