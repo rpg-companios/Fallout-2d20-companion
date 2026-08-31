@@ -747,6 +747,37 @@ index 75e77cb..f453a54 100644
          }
        ]
      }
+diff --git a/modules/fallout/data/equipment/general_goods.json b/modules/fallout/data/equipment/general_goods.json
+index b1ed99a..208a644 100644
+--- a/modules/fallout/data/equipment/general_goods.json
++++ b/modules/fallout/data/equipment/general_goods.json
+@@ -241,12 +241,21 @@
+   },
+   {
+     "id": "robot_item_repair_kit",
+-    "itemType": "misc",
++    "itemType": "chem",
+     "subtype": "tool",
+-    "value": 0,
+-    "rarity": 0,
+-    "weight": 0,
+-    "healAmount": 6
++    "value": 50,
++    "rarity": 1,
++    "weight": 0.5,
++    "healAmount": 6,
++    "robotOnly": true,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 6
++      }
++    },
++    "positiveEffectDuration": "instant",
++    "addictionLevel": 0
+   },
+   {
+     "id": "CasinoTopsChip",
 diff --git a/modules/fallout/data/equipment/robot/robotheads.json b/modules/fallout/data/equipment/robot/robotheads.json
 index 9e68c7b..9c565d2 100644
 --- a/modules/fallout/data/equipment/robot/robotheads.json
@@ -760,10 +791,36 @@ index 9e68c7b..9c565d2 100644
      "complexity": 7,
      "perksRequired": [
 diff --git a/modules/fallout/data/equipment/robotparts.json b/modules/fallout/data/equipment/robotparts.json
-index 91bab9d..30de682 100644
+index 91bab9d..a13751a 100644
 --- a/modules/fallout/data/equipment/robotparts.json
 +++ b/modules/fallout/data/equipment/robotparts.json
-@@ -23,6 +23,13 @@
+@@ -2,11 +2,20 @@
+   "robotItems": [
+     {
+       "id": "robot_item_repair_kit",
+-      "itemType": "misc",
+-      "weight": 0,
+-      "cost": 0,
+-      "rarity": 0,
+-      "healAmount": 6
++      "itemType": "chem",
++      "weight": 0.5,
++      "cost": 50,
++      "rarity": 1,
++      "healAmount": 6,
++      "robotOnly": true,
++      "positiveEffect": {
++        "hpModifier": {
++          "op": "+",
++          "value": 6
++        }
++      },
++      "positiveEffectDuration": "instant",
++      "addictionLevel": 0
+     },
+     {
+       "id": "robot_item_printer",
+@@ -23,6 +32,13 @@
        "rarity": 4,
        "unique": true,
        "requiresOriginId": "securitron"
@@ -779,7 +836,7 @@ index 91bab9d..30de682 100644
    "robotModules": [
 diff --git a/modules/fallout/data/equipmentKits/assaultron.json b/modules/fallout/data/equipmentKits/assaultron.json
 new file mode 100644
-index 0000000..9e152e5
+index 0000000..ef1c157
 --- /dev/null
 +++ b/modules/fallout/data/equipmentKits/assaultron.json
 @@ -0,0 +1,204 @@
@@ -909,7 +966,7 @@ index 0000000..9e152e5
 +      {
 +        "type": "fixed",
 +        "itemId": "robot_item_repair_kit",
-+        "itemType": "misc"
++        "itemType": "chem"
 +      }
 +    ]
 +  },
