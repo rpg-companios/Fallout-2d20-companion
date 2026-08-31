@@ -18,6 +18,7 @@ import minuteman from './minuteman.json';
 import misterHandy from './misterHandy.json';
 import ncr from './ncr.json';
 import nightkin from './nightkin.json';
+import assaultron from './assaultron.json';
 import protectron from './protectron.json';
 import robobrain from './robobrain.json';
 import securitron from './securitron.json';
@@ -36,6 +37,7 @@ export default {
   ...misterHandy,
   ...ncr,
   ...nightkin,
+  ...assaultron,
   ...protectron,
   ...robobrain,
   ...securitron,

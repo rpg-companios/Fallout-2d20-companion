@@ -62,6 +62,10 @@ export function getDefaultLimbs(planId) {
   return { ...(bodyPlansRegistry[planId]?.defaults || {}) };
 }
 
+export function getDefaultPlating(planId) {
+  return { ...(bodyPlansRegistry[planId]?.defaultPlating || {}) };
+}
+
 export function getBodyPlan(planId) {
   return bodyPlansRegistry[planId] || null;
 }

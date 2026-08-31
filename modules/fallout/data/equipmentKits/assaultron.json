@@ -1,0 +1,204 @@
+{
+  "assaultron_us_military": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "weight": 0,
+        "slot": "left",
+        "builtinToArm": true,
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 8,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_frame_actuated_body",
+                "itemType": "frame"
+              }
+            ]
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_frame_actuated_arms",
+                "itemType": "frame"
+              },
+              {
+                "type": "fixed",
+                "armorId": "robot_frame_actuated_thruster",
+                "itemType": "frame"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_recon_sensors",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": 15
+      }
+    ]
+  },
+  "assaultron_devil": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_construction_claw",
+        "itemType": "weapon",
+        "slot": "left"
+      },
+      {
+        "type": "fixed",
+        "weaponId": "robot_weapon_construction_claw",
+        "itemType": "weapon",
+        "slot": "right"
+      },
+      {
+        "type": "fixed",
+        "clothingId": "headwear_skull_mask",
+        "itemType": "clothing"
+      },
+      {
+        "type": "choice",
+        "items": [
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_plating_serrated_body",
+                "itemType": "plating"
+              }
+            ]
+          },
+          {
+            "group": [
+              {
+                "type": "fixed",
+                "armorId": "robot_plating_serrated_arms",
+                "itemType": "plating"
+              },
+              {
+                "type": "fixed",
+                "armorId": "robot_plating_serrated_thruster",
+                "itemType": "plating"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_hazard_detection",
+        "itemType": "module"
+      },
+      {
+        "type": "fixed",
+        "ammoId": "ammo_energy_cell",
+        "itemType": "ammo",
+        "quantity": {
+          "base": 6,
+          "rollType": "rollCD",
+          "rollValue": 6,
+          "op": "+"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_item_repair_kit",
+        "itemType": "misc"
+      }
+    ]
+  },
+  "assaultron_caravan_guard": {
+    "items": [
+      {
+        "type": "fixed",
+        "weaponId": "weapon_laser_gun",
+        "itemType": "weapon",
+        "weight": 0,
+        "slot": "left",
+        "builtinToArm": true,
+        "ammo": {
+          "ammoId": "ammo_energy_cell",
+          "quantity": {
+            "base": 14,
+            "rollType": "rollCD",
+            "rollValue": 7,
+            "op": "+"
+          }
+        }
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_armor_storage_body",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "armorId": "robot_armor_factory_thruster",
+        "itemType": "armor"
+      },
+      {
+        "type": "fixed",
+        "itemId": "robot_module_behavior_analysis",
+        "itemType": "module"
+      },
+      {
+        "type": "rollTable",
+        "tableId": "ammo",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "chem",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "rollTable",
+        "tableId": "junk",
+        "roll": {
+          "rollType": "D20",
+          "count": 3,
+          "mode": "separate"
+        }
+      },
+      {
+        "type": "fixed",
+        "itemType": "currency",
+        "quantity": {
+          "base": 10,
+          "rollType": "rollCD",
+          "rollValue": 5,
+          "op": "+"
+        }
+      }
+    ]
+  }
+}

@@ -40,6 +40,13 @@
       "rightArm": "robot_arm_robobrain",
       "chassis": "robot_legs_robobrain_treads"
     },
+    "defaultPlating": {
+      "head": "robot_plating_standard_optics",
+      "body": "robot_plating_standard_body",
+      "leftArm": "robot_plating_standard_arms",
+      "rightArm": "robot_plating_standard_arms",
+      "chassis": "robot_plating_standard_thruster"
+    },
     "slotCapabilities": {
       "leftArm": {
         "canEquipWeapon": true
@@ -68,6 +75,14 @@
       "arm2": "robot_arm_mister_handy",
       "arm3": "robot_arm_mister_handy",
       "thruster": "robot_legs_mister_handy_thruster"
+    },
+    "defaultPlating": {
+      "head": "robot_plating_standard_optics",
+      "body": "robot_plating_standard_body",
+      "arm1": "robot_plating_standard_arms",
+      "arm2": "robot_plating_standard_arms",
+      "arm3": "robot_plating_standard_arms",
+      "thruster": "robot_plating_standard_thruster"
     },
     "slotCapabilities": {
       "arm1": {
@@ -98,6 +113,14 @@
       "body": "robot_body_protectron",
       "rightLeg": "robot_legs_protectron"
     },
+    "defaultPlating": {
+      "head": "robot_plating_standard_optics",
+      "body": "robot_plating_standard_body",
+      "leftArm": "robot_plating_standard_arms",
+      "rightArm": "robot_plating_standard_arms",
+      "leftLeg": "robot_plating_standard_thruster",
+      "rightLeg": "robot_plating_standard_thruster"
+    },
     "slotCapabilities": {
       "leftArm": {
         "canEquipWeapon": true
@@ -121,6 +144,13 @@
       "leftArm": "robot_arm_securitron",
       "rightArm": "robot_arm_securitron",
       "wheel": "robot_legs_securitron"
+    },
+    "defaultPlating": {
+      "head": "robot_plating_standard_optics",
+      "body": "robot_plating_standard_body",
+      "leftArm": "robot_plating_standard_arms",
+      "rightArm": "robot_plating_standard_arms",
+      "wheel": "robot_plating_standard_thruster"
     },
     "slotCapabilities": {
       "leftArm": {
@@ -162,11 +192,19 @@
     ],
     "defaults": {
       "leftArm": "robot_arm_assaultron",
-      "head": "robot_head_assaultron",
+      "head": "robot_head_assaultron_laser",
       "rightArm": "robot_arm_assaultron",
       "leftLeg": "robot_legs_assaultron",
       "body": "robot_body_assaultron",
       "rightLeg": "robot_legs_assaultron"
+    },
+    "defaultPlating": {
+      "head": "robot_plating_standard_optics",
+      "body": "robot_plating_standard_body",
+      "leftArm": "robot_plating_standard_arms",
+      "rightArm": "robot_plating_standard_arms",
+      "leftLeg": "robot_plating_standard_thruster",
+      "rightLeg": "robot_plating_standard_thruster"
     },
     "slotCapabilities": {
       "leftArm": {
@@ -196,6 +234,14 @@
       "leftLeg": "robot_legs_sentry_bot",
       "body": "robot_body_sentry_bot",
       "rightLeg": "robot_legs_sentry_bot"
+    },
+    "defaultPlating": {
+      "head": "robot_plating_standard_optics",
+      "body": "robot_plating_standard_body",
+      "leftArm": "robot_plating_standard_arms",
+      "rightArm": "robot_plating_standard_arms",
+      "leftLeg": "robot_plating_standard_thruster",
+      "rightLeg": "robot_plating_standard_thruster"
     },
     "slotCapabilities": {
       "leftArm": {

@@ -570,6 +570,23 @@
           "clothingType": "headwear",
           "allowsArmor": false,
           "canRobotWear": true
+        },
+        {
+          "id": "headwear_skull_mask",
+          "protectedAreas": [
+            "Head"
+          ],
+          "physicalDamageRating": 0,
+          "energyDamageRating": 0,
+          "radiationDamageRating": 0,
+          "weight": 0.5,
+          "cost": 10,
+          "rarity": 1,
+          "specialEffects": [],
+          "itemType": "clothing",
+          "clothingType": "headwear",
+          "allowsArmor": false,
+          "canRobotWear": true
         }
       ]
     }

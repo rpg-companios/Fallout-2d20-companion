@@ -5,6 +5,8 @@ import brewery from '../../../data/loot/brewery.json';
 import chems from '../../../data/loot/chems.json';
 import outcast from '../../../data/loot/outcast.json';
 import weaponsMelee from '../../../data/loot/weapons_melee.json';
+import ammo from '../../../data/loot/ammo.json';
+import junk from '../../../data/loot/junk.json';
 import lootStubs from '../../../data/loot/_stubs.json';
 import ruLootStubs from '../../../i18n/ru-RU/data/loot/stubs.json';
 import enLootStubs from '../../../i18n/en-EN/data/loot/stubs.json';
@@ -24,6 +26,8 @@ const lootTables = {
   chem: chems,
   outcast: outcast,
   weapons_melee: weaponsMelee,
+  ammo: ammo,
+  junk: junk,
 };
 
 export const supportedLootTags = Object.keys(lootTables);
