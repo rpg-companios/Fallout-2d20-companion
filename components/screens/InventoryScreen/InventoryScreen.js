@@ -1435,24 +1435,15 @@ const InventoryScreen = () => {
     const isRobotPowerArmorBlocked = isRobot
       && !item.isEquipped
       && (item.itemType === 'powerArmor' || isPowerArmorDomain(item) || isPowerArmorItem(item));
-    // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
+    // Для роботов: скрыть кнопку "Экипировать" для ЛЮБОГО оружия из инвентаря если нет руки с canHoldWeapons
+    // (робо-оружие как конечности экипируется как limb, а не как heldWeapon — для них кнопка остаётся)
+    // Стандартное оружие теперь разрешено если есть манипулятор (allow_standard_with_arm)
     const hideEquipButtonNoArm = isRobot
       && item.itemType === 'weapon'
       && !item.isEquipped
       && !robotHasHoldingArm
       && !isRobotLimbWeapon(item);
-    // Для роботов: скрыть кнопку экипировки стандартного оружия (только робо-оружие)
-    const isRobotStandardWeaponBlocked = isRobot
-      && !item.isEquipped
-      && item.itemType === 'weapon'
-      && !isRobotOnlyItem(item)
-      && !isRobotLimbWeapon(item)
-      && (() => {
-        try {
-          return !canEquipWeapon(item, { origin, trait }).allowed;
-        } catch { return false; }
-      })();
-    const hideEquipButton = hideEquipButtonNoArm || isRobotPowerArmorBlocked || isRobotStandardWeaponBlocked;
+    const hideEquipButton = hideEquipButtonNoArm || isRobotPowerArmorBlocked;
     // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия,
     // а также для locked-предметов (комплекты роботов — снять можно только сменой конечности).
     const hideActionButton = item.isEquipped && (

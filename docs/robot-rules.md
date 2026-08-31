@@ -27,10 +27,12 @@
 - Implementation: `equipPowerArmorPackage()` checks `canEquipArmor()`, plus `canEquipPowerArmorPiece()` should check robot flag
 
 ### Weapons
-- Robots can ONLY use robot weapons: `robot_weapon_*` or `robot_arm_*` or `isRobotWeapon=true`
-- Standard weapons blocked: `equip.error.robotCannotUseStandardWeapon`
+- Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon=true`) as limbs: always allowed for ROBOT_ONLY
+- Standard weapons (human weapons like 10mm pistol): allowed for ROBOT_ONLY ONLY if robot has arm with `canHoldWeapons=true`
+  - Without such arm: equip button hidden, alert `manipulatorRequired`
+  - With such arm: `findFreeWeaponHand()` finds first free hand, `canEquipWeaponToSlot()` checks weight/two-handed
 - Non-robots cannot use robot weapons: `equip.error.robotOnlyWeapon`
-- Implementation: `canEquipWeapon()`
+- Implementation: `canEquipWeapon()` allows standard for robots (gated by arm check in InventoryScreen), `findFreeWeaponHand()` + `canEquipWeaponToSlot()` in `domain/robotEquip.js`
 
 ## 3. Kits — Consumables Not Equipped
 - Kits resolve items via `kitResolver`, then `EquipmentKitModal` flattens and `CharacterScreen.handleSelectKit` adds to store via `addNewItem`

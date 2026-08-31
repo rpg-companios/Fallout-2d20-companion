@@ -8,7 +8,8 @@
 // IRON RULES (see docs/robot-rules.md):
 // - ROBOT_ONLY can wear ONLY robot armor (robotOnly || robotArmorType) + decorative hats
 // - ROBOT_ONLY CANNOT wear power armor, standard armor, mutant armor, standard clothing
-// - ROBOT_ONLY can use ONLY robot weapons (robot_weapon_* / robot_arm_* / isRobotWeapon)
+// - ROBOT_ONLY: robot weapons (robot_weapon_* / robot_arm_*) as limbs always allowed;
+//   standard weapons from inventory allowed ONLY if arm has canHoldWeapons=true (checked in InventoryScreen via findFreeWeaponHand)
 // - RAIDER_ONLY (mutant) can wear ONLY mutant armor (mutantOnly)
 // - Human cannot wear robot/mutant armor or robot weapons
 
@@ -98,10 +99,12 @@ export function canEquipArmor(armorItem, character) {
 /**
  * Check whether a character can equip a given weapon item.
  *
- * Rules:
- *  - Robot-only weapon + non-robot policy character -> blocked.
- *  - Standard weapon  + robot-only policy character -> blocked.
- *  - Everything else                                -> allowed.
+ * Rules (updated per owner clarification allow_standard_with_arm):
+ *  - Robot-only weapon + non-robot character -> blocked (humans cannot use robot weapons)
+ *  - Standard weapon + robot character -> ALLOWED, but actual equip via inventory
+ *    requires arm with canHoldWeapons=true (enforced in InventoryScreen, not here)
+ *    This allows Mister Handy / etc with manipulator to pick up 10mm pistol.
+ *  - Everything else -> allowed.
  */
 export function canEquipWeapon(weaponItem, character) {
   const policy = getArmorPolicy(character);
@@ -112,9 +115,8 @@ export function canEquipWeapon(weaponItem, character) {
     return { allowed: false, reason: 'equip.error.robotOnlyWeapon' };
   }
 
-  if (!isRobotWeapon && isRobotChar) {
-    return { allowed: false, reason: 'equip.error.robotCannotUseStandardWeapon' };
-  }
+  // Robots can use standard weapons if they have a holding arm — check is in InventoryScreen (findFreeWeaponHand)
+  // So we allow here, UI will hide button if no arm.
 
   return { allowed: true, reason: null };
 }

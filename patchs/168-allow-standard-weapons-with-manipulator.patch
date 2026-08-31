@@ -1,0 +1,96 @@
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index cd10a89..92f33b9 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1435,24 +1435,15 @@ const InventoryScreen = () => {
+     const isRobotPowerArmorBlocked = isRobot
+       && !item.isEquipped
+       && (item.itemType === 'powerArmor' || isPowerArmorDomain(item) || isPowerArmorItem(item));
+-    // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
++    // Для роботов: скрыть кнопку "Экипировать" для ЛЮБОГО оружия из инвентаря если нет руки с canHoldWeapons
++    // (робо-оружие как конечности экипируется как limb, а не как heldWeapon — для них кнопка остаётся)
++    // Стандартное оружие теперь разрешено если есть манипулятор (allow_standard_with_arm)
+     const hideEquipButtonNoArm = isRobot
+       && item.itemType === 'weapon'
+       && !item.isEquipped
+       && !robotHasHoldingArm
+       && !isRobotLimbWeapon(item);
+-    // Для роботов: скрыть кнопку экипировки стандартного оружия (только робо-оружие)
+-    const isRobotStandardWeaponBlocked = isRobot
+-      && !item.isEquipped
+-      && item.itemType === 'weapon'
+-      && !isRobotOnlyItem(item)
+-      && !isRobotLimbWeapon(item)
+-      && (() => {
+-        try {
+-          return !canEquipWeapon(item, { origin, trait }).allowed;
+-        } catch { return false; }
+-      })();
+-    const hideEquipButton = hideEquipButtonNoArm || isRobotPowerArmorBlocked || isRobotStandardWeaponBlocked;
++    const hideEquipButton = hideEquipButtonNoArm || isRobotPowerArmorBlocked;
+     // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия,
+     // а также для locked-предметов (комплекты роботов — снять можно только сменой конечности).
+     const hideActionButton = item.isEquipped && (
+diff --git a/docs/robot-rules.md b/docs/robot-rules.md
+index 9082e96..d9cc8dc 100644
+--- a/docs/robot-rules.md
++++ b/docs/robot-rules.md
+@@ -27,10 +27,12 @@
+ - Implementation: `equipPowerArmorPackage()` checks `canEquipArmor()`, plus `canEquipPowerArmorPiece()` should check robot flag
+ 
+ ### Weapons
+-- Robots can ONLY use robot weapons: `robot_weapon_*` or `robot_arm_*` or `isRobotWeapon=true`
+-- Standard weapons blocked: `equip.error.robotCannotUseStandardWeapon`
++- Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon=true`) as limbs: always allowed for ROBOT_ONLY
++- Standard weapons (human weapons like 10mm pistol): allowed for ROBOT_ONLY ONLY if robot has arm with `canHoldWeapons=true`
++  - Without such arm: equip button hidden, alert `manipulatorRequired`
++  - With such arm: `findFreeWeaponHand()` finds first free hand, `canEquipWeaponToSlot()` checks weight/two-handed
+ - Non-robots cannot use robot weapons: `equip.error.robotOnlyWeapon`
+-- Implementation: `canEquipWeapon()`
++- Implementation: `canEquipWeapon()` allows standard for robots (gated by arm check in InventoryScreen), `findFreeWeaponHand()` + `canEquipWeaponToSlot()` in `domain/robotEquip.js`
+ 
+ ## 3. Kits — Consumables Not Equipped
+ - Kits resolve items via `kitResolver`, then `EquipmentKitModal` flattens and `CharacterScreen.handleSelectKit` adds to store via `addNewItem`
+diff --git a/domain/equipEquip.js b/domain/equipEquip.js
+index 2416496..d100621 100644
+--- a/domain/equipEquip.js
++++ b/domain/equipEquip.js
+@@ -8,7 +8,8 @@
+ // IRON RULES (see docs/robot-rules.md):
+ // - ROBOT_ONLY can wear ONLY robot armor (robotOnly || robotArmorType) + decorative hats
+ // - ROBOT_ONLY CANNOT wear power armor, standard armor, mutant armor, standard clothing
+-// - ROBOT_ONLY can use ONLY robot weapons (robot_weapon_* / robot_arm_* / isRobotWeapon)
++// - ROBOT_ONLY: robot weapons (robot_weapon_* / robot_arm_*) as limbs always allowed;
++//   standard weapons from inventory allowed ONLY if arm has canHoldWeapons=true (checked in InventoryScreen via findFreeWeaponHand)
+ // - RAIDER_ONLY (mutant) can wear ONLY mutant armor (mutantOnly)
+ // - Human cannot wear robot/mutant armor or robot weapons
+ 
+@@ -98,10 +99,12 @@ export function canEquipArmor(armorItem, character) {
+ /**
+  * Check whether a character can equip a given weapon item.
+  *
+- * Rules:
+- *  - Robot-only weapon + non-robot policy character -> blocked.
+- *  - Standard weapon  + robot-only policy character -> blocked.
+- *  - Everything else                                -> allowed.
++ * Rules (updated per owner clarification allow_standard_with_arm):
++ *  - Robot-only weapon + non-robot character -> blocked (humans cannot use robot weapons)
++ *  - Standard weapon + robot character -> ALLOWED, but actual equip via inventory
++ *    requires arm with canHoldWeapons=true (enforced in InventoryScreen, not here)
++ *    This allows Mister Handy / etc with manipulator to pick up 10mm pistol.
++ *  - Everything else -> allowed.
+  */
+ export function canEquipWeapon(weaponItem, character) {
+   const policy = getArmorPolicy(character);
+@@ -112,9 +115,8 @@ export function canEquipWeapon(weaponItem, character) {
+     return { allowed: false, reason: 'equip.error.robotOnlyWeapon' };
+   }
+ 
+-  if (!isRobotWeapon && isRobotChar) {
+-    return { allowed: false, reason: 'equip.error.robotCannotUseStandardWeapon' };
+-  }
++  // Robots can use standard weapons if they have a holding arm — check is in InventoryScreen (findFreeWeaponHand)
++  // So we allow here, UI will hide button if no arm.
+ 
+   return { allowed: true, reason: null };
+ }
