@@ -1,6 +1,6 @@
-# Fallout 2d20 RPG Companion App
+# Positronium
 
-A mobile-focused web application built with React Native (Expo) for managing tabletop RPG characters in a Fallout 2d20 setting.
+A mobile-focused web application built with React Native (Expo) for managing tabletop RPG characters. It is a generic TTRPG character manager engine that currently ships with the **Fallout 2d20** setting pack (`modules/fallout`).
 
 ## Architecture
 

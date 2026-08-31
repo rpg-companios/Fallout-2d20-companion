@@ -2,10 +2,18 @@ import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs, getDefaultPlatin
 import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
 
 // domain/robotEquip.js
-// Pure functions for robot equipment logic.
+// Pure functions for robot equipment logic — IRON RULES (see docs/robot-rules.md).
 // No React, no UI dependencies. All reason strings are i18n keys.
 //
 // NOTE: `isRobotCharacter` moved to domain/origins.js (reads origin.characterType).
+//
+// IRON RULES summary:
+// - Arms with canHoldWeapons=true can hold weapons from inventory via findFreeWeaponHand()
+// - Arms without canHoldWeapons cannot hold weapons, only builtinWeapons
+// - Weight and two-handed checked in canEquipWeaponToSlot()
+// - Weapon equip flow: first free hand, occupiedSourceSlots tracks already held weapons
+// - Kits: only equippable types (weapon/armor/etc) get equipped=true, consumables stay in inventory
+// - BodyPlan defaults: defaultPlating may be empty {}, but ability to specify must remain
 
 // ---------------------------------------------------------------------------
 // Slot schemas

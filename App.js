@@ -33,6 +33,9 @@ import useSettingPackStore, {
 } from './src/store/settingPackStore';
 
 const Tab = createMaterialTopTabNavigator();
+// Каноническое название приложения (Google OAuth branding, PWA, заголовок вкладки).
+// Единый бренд — Positronium (движок-менеджер персонажей для настольных RPG).
+const APP_BRAND = 'Positronium';
 const TAB_ROUTES = {
   HOME: 'HomeTab',
   CHARACTER: 'CharacterTab',
@@ -60,6 +63,12 @@ function App() {
   // сразу при загрузке стора и приводило к крэшу "Cannot update a component
   // (CharacterScreen) while rendering a different component (CharacterProvider)".
   const moduleTabsActive = activeSettingId != null;
+
+  // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
+  // даже если версия @react-navigation/native не поддерживает documentTitle.
+  useEffect(() => {
+    if (typeof document !== 'undefined') document.title = APP_BRAND;
+  }, [locale, moduleTabsActive]);
 
   useEffect(() => {
     if (settingsHydrated && bootEnabledForLaunch === null) {
@@ -113,7 +122,12 @@ function App() {
     <PaperProvider>
       <SafeAreaProvider>
         <CharacterProvider>
-          <NavigationContainer key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}>
+          <NavigationContainer
+            key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}
+            // Единый бренд приложения в заголовке вкладки браузера (Google-брендинг):
+            // react-navigation иначе подставляет имя маршрута («HomeTab» и т.п.).
+            documentTitle={{ formatter: () => APP_BRAND }}
+          >
             <View style={{ flex: 1, backgroundColor: 'white' }}>
               <ImageBackground
                 source={require('./assets/bg.png')}
