@@ -1086,6 +1086,179 @@ const MIGRATIONS = [
   // приведёт к «худому» виду. Идемпотентна.
   (state) => state,
 
+  // v19 -> v20: роботы — миграция старых сейвов на новый формат (когти, части, снаряга)
+  (state) => {
+    const next = { ...state };
+    const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
+    const characterType = next.origin?.characterType;
+    const isRobotOrigin = characterType === 'robot' || [
+      'robobrain', 'misterHandy', 'protectron', 'assaultron', 'securitron', 'sentryBot'
+    ].includes(originId);
+
+    if (!isRobotOrigin) return state;
+
+    let changed = false;
+
+    // 1. Комплекты роботов: химия/еда/патроны/хлам не должны быть equipped=true (whitelist)
+    // Было: все предметы робота помечались equipped=true — баг. Теперь только equippable типы.
+    const ROBOT_EQUIPPABLE = new Set([
+      'weapon', 'armor', 'clothing', 'outfit', 'powerArmor', 'robotArmor', 'robotFrame',
+      'plating', 'frame', 'robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs',
+      'module', 'robotPart'
+    ]);
+
+    const fixEquippedList = (list) => {
+      if (!Array.isArray(list)) return list;
+      return list.map((item) => {
+        if (!item) return item;
+        if (item.equipped === true && !ROBOT_EQUIPPABLE.has(item.itemType)) {
+          changed = true;
+          return { ...item, equipped: false, locked: false };
+        }
+        return item;
+      });
+    };
+
+    if (Array.isArray(next.equipment?.items)) {
+      const fixed = fixEquippedList(next.equipment.items);
+      if (fixed !== next.equipment.items) {
+        next.equipment = { ...next.equipment, items: fixed };
+      }
+    }
+    if (Array.isArray(next.equippedWeapons)) {
+      const fixed = fixEquippedList(next.equippedWeapons);
+      if (fixed !== next.equippedWeapons) {
+        next.equippedWeapons = fixed;
+      }
+    }
+
+    // 2. Робо-слоты: когти для штурмотрона и прочие части
+    const slots = next.equippedRobotSlots;
+    if (slots && typeof slots === 'object') {
+      // BodyPlan defaults для заполнения недостающих конечностей
+      // Импортируем синхронно через require-подобный доступ к JSON (миграция чистая, но данные нужны)
+      // Используем хардкод мапы defaults для всех роботов (из bodyplans.json актуальных)
+      const BODYPLAN_DEFAULTS = {
+        robobrain: { head: 'robot_head_robobrain', body: 'robot_body_robobrain', leftArm: null, rightArm: null, leftLeg: null, rightLeg: null, thruster: 'robot_legs_robobrain' },
+        misterHandy: { head: null, body: 'robot_body_mister_handy', leftArm: 'robot_arm_mister_handy', rightArm: 'robot_arm_mister_handy', arm3: 'robot_arm_mister_handy', leftLeg: null, rightLeg: null, thruster: 'robot_legs_mister_handy' },
+        protectron: { head: 'robot_head_protectron', body: 'robot_body_protectron', leftArm: 'robot_arm_protectron', rightArm: 'robot_arm_protectron', leftLeg: 'robot_legs_protectron', rightLeg: 'robot_legs_protectron' },
+        assaultron: { head: 'robot_head_assaultron_laser', body: 'robot_body_assaultron', leftArm: 'robot_arm_assaultron', rightArm: 'robot_arm_assaultron', leftLeg: 'robot_legs_assaultron', rightLeg: 'robot_legs_assaultron' },
+        securitron: { head: 'robot_head_securitron', body: 'robot_body_securitron', leftArm: 'robot_arm_securitron_left', rightArm: 'robot_arm_securitron_right', leftLeg: null, rightLeg: null, wheel: 'robot_legs_securitron' },
+        sentryBot: { head: 'robot_head_sentry', body: 'robot_body_sentry', leftArm: 'robot_arm_sentry', rightArm: 'robot_arm_sentry', leftLeg: 'robot_legs_sentry', rightLeg: 'robot_legs_sentry' },
+      };
+
+      const bodyPlanId = next.origin?.bodyPlan || originId;
+      const defaults = BODYPLAN_DEFAULTS[bodyPlanId] || {};
+
+      for (const [slotKey, slotData] of Object.entries(slots)) {
+        if (!slotData || typeof slotData !== 'object') continue;
+
+        // a) Заполнить недостающие конечности из defaults (новые форматы)
+        if (!slotData.limb && defaults[slotKey]) {
+          const limbId = defaults[slotKey];
+          // Для assaultron — когти
+          if (bodyPlanId === 'assaultron' && (slotKey === 'leftArm' || slotKey === 'rightArm')) {
+            slots[slotKey] = {
+              ...slotData,
+              limb: {
+                id: 'robot_arm_assaultron',
+                itemType: 'robotArm',
+                builtinWeaponId: 'robot_weapon_claw',
+                canHoldWeapons: true,
+                weaponSlots: 1,
+                compatibleSlots: ['leftArm', 'rightArm'],
+                builtinWeapons: [{ id: 'robot_weapon_claw', isBuiltin: true }],
+              },
+            };
+            changed = true;
+          } else if (limbId) {
+            // Общая логика для других роботов — минимальный объект, обогатится при загрузке
+            slots[slotKey] = {
+              ...slotData,
+              limb: {
+                id: limbId,
+                itemType: slotKey === 'head' ? 'robotHead' : slotKey === 'body' ? 'robotBody' : slotKey.toLowerCase().includes('leg') || slotKey === 'wheel' || slotKey === 'thruster' ? 'robotLeg' : 'robotArm',
+              },
+            };
+            changed = true;
+          }
+        }
+
+        // b) Assaultron: руки должны иметь когти robot_weapon_claw, а не манипулятор
+        const limb = slots[slotKey]?.limb;
+        if (limb && (slotKey === 'leftArm' || slotKey === 'rightArm')) {
+          if (bodyPlanId === 'assaultron') {
+            const isOldManipulator = limb.id === 'robot_arm_assaultron' && limb.builtinWeaponId && limb.builtinWeaponId !== 'robot_weapon_claw';
+            const hasManipulatorFlag = limb.builtinManipulator === true;
+            const builtinIsManipulator = Array.isArray(limb.builtinWeapons) && limb.builtinWeapons.some(w => String(w.id || '').includes('manipulator'));
+
+            if (isOldManipulator || hasManipulatorFlag || builtinIsManipulator || !limb.builtinWeaponId) {
+              slots[slotKey] = {
+                ...slots[slotKey],
+                limb: {
+                  ...limb,
+                  id: 'robot_arm_assaultron',
+                  itemType: 'robotArm',
+                  builtinWeaponId: 'robot_weapon_claw',
+                  canHoldWeapons: true,
+                  weaponSlots: 1,
+                  compatibleSlots: ['leftArm', 'rightArm'],
+                  builtinWeapons: [{ id: 'robot_weapon_claw', isBuiltin: true }],
+                },
+              };
+              changed = true;
+            }
+          }
+        }
+
+        // c) defaultPlating теперь {} — убираем авто-обшивку standard из старых сейвов для assaultron
+        // (для других роботов standard обшивка могла быть из кита — оставляем, но для assaultron kits не дают standard)
+        if (bodyPlanId === 'assaultron' && slotData.plating && String(slotData.plating.id || '').startsWith('robot_plating_standard_')) {
+          slots[slotKey] = { ...slots[slotKey], plating: null };
+          changed = true;
+        }
+      }
+
+      // d) Убедиться что все слоты из bodyPlan существуют
+      const ALL_SLOTS = {
+        robobrain: ['head', 'body', 'thruster'],
+        misterHandy: ['body', 'leftArm', 'rightArm', 'arm3', 'thruster'],
+        protectron: ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
+        assaultron: ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
+        securitron: ['head', 'body', 'leftArm', 'rightArm', 'wheel'],
+        sentryBot: ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
+      };
+      const expectedSlots = ALL_SLOTS[bodyPlanId] || [];
+      for (const key of expectedSlots) {
+        if (!slots[key]) {
+          slots[key] = { limb: null, armor: null, plating: null, frame: null, heldWeapon: null };
+          if (defaults[key]) {
+            if (bodyPlanId === 'assaultron' && (key === 'leftArm' || key === 'rightArm')) {
+              slots[key].limb = {
+                id: 'robot_arm_assaultron',
+                itemType: 'robotArm',
+                builtinWeaponId: 'robot_weapon_claw',
+                canHoldWeapons: true,
+                weaponSlots: 1,
+                compatibleSlots: ['leftArm', 'rightArm'],
+                builtinWeapons: [{ id: 'robot_weapon_claw', isBuiltin: true }],
+              };
+            } else {
+              slots[key].limb = { id: defaults[key], itemType: 'robotArm' };
+            }
+          }
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        next.equippedRobotSlots = { ...slots };
+      }
+    }
+
+    return changed ? next : state;
+  },
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.
