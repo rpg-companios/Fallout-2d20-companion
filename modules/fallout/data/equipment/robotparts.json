@@ -1,23 +1,6 @@
 {
   "robotItems": [
     {
-      "id": "robot_item_repair_kit",
-      "itemType": "chem",
-      "weight": 0.5,
-      "cost": 50,
-      "rarity": 1,
-      "healAmount": 6,
-      "robotOnly": true,
-      "positiveEffect": {
-        "hpModifier": {
-          "op": "+",
-          "value": 6
-        }
-      },
-      "positiveEffectDuration": "instant",
-      "addictionLevel": 0
-    },
-    {
       "id": "robot_item_printer",
       "itemType": "misc",
       "weight": 0,
