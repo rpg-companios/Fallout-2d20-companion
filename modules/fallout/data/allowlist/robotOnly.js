@@ -1,12 +1,7 @@
 // modules/fallout/data/allowlist/robotOnly.js
 // Частный случай: что может носить робот (ROBOT_ONLY).
-// Просто список id и/или категорий, без выдумывания что к чему.
+// Просто список id и/или категорий: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }
 // Хочешь пиджак — добавляешь его id сюда. Бандану — сюда.
-// Мега-случай "робот в силовой броне" — через трейт/ориджин инжект в этот список (owner-only).
-
-// Вариант как хочет владелец: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }
-// Реализовано как объект где ключи — категории/id, значение true — разрешено.
-// Движок в domain/allowlist.js умеет проверять такие ключи через CATEGORY_ALIASES и прямое совпадение id/itemType.
 
 export const robotOnly = Object.freeze({
   // Категории (мапятся в движке на itemTypes/префиксы)
@@ -16,15 +11,7 @@ export const robotOnly = Object.freeze({
   robotLims: true,
   robotWeapons: true,
 
-  // Конкретные предметы (id)
-  fancyHat: true, // мапится на headwear_fancy_hat
-  casualHat: true,
-  // Будущие примеры:
-  // jacket: true, // если добавишь clothing_jacket с id jacket или маппингом
-  // bandana: true,
-  // powerArmorFrame: true, // мега-случай — разрешить силовую броню
-
-  // Прямые id для совместимости (можно добавлять напрямую)
+  // Конкретные предметы — только реальные id, без дублей (fancyHat == headwear_fancy_hat)
   headwear_casual_hat: true,
   headwear_fancy_hat: true,
   headwear_bos_scribe_hat: true,
@@ -32,8 +19,7 @@ export const robotOnly = Object.freeze({
   headwear_bos_field_scribe_hat: true,
 });
 
-// Структурированный вариант для движка (itemTypes/ids/prefixes) — генерируется из простого объекта выше
-// Но можно править напрямую этот объект, если нужен тонкий контроль.
+// Структурированный вариант для движка
 export const ROBOT_ONLY_STRUCTURED = Object.freeze({
   itemTypes: Object.freeze([
     'plating',
