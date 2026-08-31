@@ -1419,8 +1419,10 @@ export const CharacterProvider = ({ children }) => {
    * Сброс комплекта снаряжения (при смене ориджина или комплекта):
    * очищает инвентарь, награды за навыки (rewardedSkills), снаряжение, слоты
    * робота и крышки. Атрибуты/навыки и сам персонаж сохраняются.
+   * @param {object} opts - { keepSkills: boolean } — если true, не сбрасывает tagged skills и skillsSaved (смена комплекта без сброса персонажа)
    */
-  const resetKitAndRewards = useCallback(() => {
+  const resetKitAndRewards = useCallback((opts = {}) => {
+    const keepSkills = Boolean(opts.keepSkills);
     setEquipment(null);
     setEquippedWeapons([]);
     setEquippedRobotSlots(null);
@@ -1435,11 +1437,18 @@ export const CharacterProvider = ({ children }) => {
       skills: legacySkills,
       rewardedSkills: [],
     });
-    setSelectedSkills([]);
-    setExtraTaggedSkills([]);
-    setForcedSelectedSkills([]);
-    setSkillsSaved(false);
+    if (!keepSkills) {
+      setSelectedSkills([]);
+      setExtraTaggedSkills([]);
+      setForcedSelectedSkills([]);
+      setSkillsSaved(false);
+    }
   }, []);
+
+  // Сброс только комплекта без сброса навыков (для смены комплекта без сброса персонажа)
+  const resetKitOnly = useCallback(() => {
+    resetKitAndRewards({ keepSkills: true });
+  }, [resetKitAndRewards]);
 
   const value = {
     characterName, setCharacterName,
@@ -1513,6 +1522,7 @@ export const CharacterProvider = ({ children }) => {
     removeModifiedItem,
     resetCharacter,
     resetKitAndRewards,
+    resetKitOnly,
     availablePerkAttributePoints,
     addPerkAttributePoints,
     commitAttributeChanges,

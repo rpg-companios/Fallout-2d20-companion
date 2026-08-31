@@ -296,6 +296,7 @@ export default function CharacterScreen() {
     setSkillsSaved,
     resetCharacter,
     resetKitAndRewards,
+    resetKitOnly,
     availablePerkAttributePoints,
     commitAttributeChanges,
     setEquippedWeapons,
@@ -531,14 +532,11 @@ export default function CharacterScreen() {
 
   const handleSelectKit = (kit) => {
     // Новый комплект заменяет старый: очищаем снаряжение, инвентарь и награды
-    // (атрибуты/навыки сохраняются; навыки сбрасываются только при locked —
-    // см. resetKitAndRewards в confirm-флоу).
+    // (атрибуты/навыки сохраняются — игрок может сменить комплект без сброса персонажа).
     // Сброс — при ЛЮБОМ подтверждении, если комплект уже выбран (повторное
-    // «Выбрать» по тому же комплекту перевыдаёт его, а не дублирует предметы:
-    // раньше при equipment.id === kit.id сброса не было → предметы
-    // добавлялись повторно, quantity удваивался).
+    // «Выбрать» по тому же комплекту перевыдаёт его, а не дублирует предметы).
     if (equipment) {
-      resetKitAndRewards();
+      resetKitOnly();
     }
 
     // Robots vs humans:
@@ -856,8 +854,8 @@ export default function CharacterScreen() {
     }
 
     // До распределения — свободно: меняем ориджин, комплект сбрасывается
-    // (он зависит от ориджина), атрибуты/навыки не тронуты.
-    resetKitAndRewards();
+    // (он зависит от ориджина), атрибуты/навыки не тронуты — только инвентарь.
+    resetKitOnly();
     handleSelectOrigin(newOrigin);
   };
 
@@ -1280,9 +1278,9 @@ export default function CharacterScreen() {
                 // Просмотр комплектов свободен в любой момент.
                 // Если снаряжение уже выбрано и персонаж зафиксирован
                 // (атрибуты/навыки распределены) — новый комплект сбрасывает
-                // инвентарь, навыки и награды (resetKitAndRewards).
+                // только инвентарь/слоты/крышки, атрибуты/навыки остаются.
                 const applyKitReset = () => {
-                  resetKitAndRewards();
+                  resetKitOnly();
                   setIsEquipmentKitModalVisible(true);
                 };
                 // Confirm сброса — только если комплект реально выбран (есть id)

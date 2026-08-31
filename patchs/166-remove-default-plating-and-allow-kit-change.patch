@@ -1,0 +1,199 @@
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 9480400..53039fb 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1419,8 +1419,10 @@ export const CharacterProvider = ({ children }) => {
+    * Сброс комплекта снаряжения (при смене ориджина или комплекта):
+    * очищает инвентарь, награды за навыки (rewardedSkills), снаряжение, слоты
+    * робота и крышки. Атрибуты/навыки и сам персонаж сохраняются.
++   * @param {object} opts - { keepSkills: boolean } — если true, не сбрасывает tagged skills и skillsSaved (смена комплекта без сброса персонажа)
+    */
+-  const resetKitAndRewards = useCallback(() => {
++  const resetKitAndRewards = useCallback((opts = {}) => {
++    const keepSkills = Boolean(opts.keepSkills);
+     setEquipment(null);
+     setEquippedWeapons([]);
+     setEquippedRobotSlots(null);
+@@ -1435,12 +1437,19 @@ export const CharacterProvider = ({ children }) => {
+       skills: legacySkills,
+       rewardedSkills: [],
+     });
+-    setSelectedSkills([]);
+-    setExtraTaggedSkills([]);
+-    setForcedSelectedSkills([]);
+-    setSkillsSaved(false);
++    if (!keepSkills) {
++      setSelectedSkills([]);
++      setExtraTaggedSkills([]);
++      setForcedSelectedSkills([]);
++      setSkillsSaved(false);
++    }
+   }, []);
+ 
++  // Сброс только комплекта без сброса навыков (для смены комплекта без сброса персонажа)
++  const resetKitOnly = useCallback(() => {
++    resetKitAndRewards({ keepSkills: true });
++  }, [resetKitAndRewards]);
++
+   const value = {
+     characterName, setCharacterName,
+     characterId,
+@@ -1513,6 +1522,7 @@ export const CharacterProvider = ({ children }) => {
+     removeModifiedItem,
+     resetCharacter,
+     resetKitAndRewards,
++    resetKitOnly,
+     availablePerkAttributePoints,
+     addPerkAttributePoints,
+     commitAttributeChanges,
+diff --git a/fallout/screens/CharacterScreen/CharacterScreen.js b/fallout/screens/CharacterScreen/CharacterScreen.js
+index 2cc0755..f236373 100644
+--- a/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -296,6 +296,7 @@ export default function CharacterScreen() {
+     setSkillsSaved,
+     resetCharacter,
+     resetKitAndRewards,
++    resetKitOnly,
+     availablePerkAttributePoints,
+     commitAttributeChanges,
+     setEquippedWeapons,
+@@ -531,14 +532,11 @@ export default function CharacterScreen() {
+ 
+   const handleSelectKit = (kit) => {
+     // Новый комплект заменяет старый: очищаем снаряжение, инвентарь и награды
+-    // (атрибуты/навыки сохраняются; навыки сбрасываются только при locked —
+-    // см. resetKitAndRewards в confirm-флоу).
++    // (атрибуты/навыки сохраняются — игрок может сменить комплект без сброса персонажа).
+     // Сброс — при ЛЮБОМ подтверждении, если комплект уже выбран (повторное
+-    // «Выбрать» по тому же комплекту перевыдаёт его, а не дублирует предметы:
+-    // раньше при equipment.id === kit.id сброса не было → предметы
+-    // добавлялись повторно, quantity удваивался).
++    // «Выбрать» по тому же комплекту перевыдаёт его, а не дублирует предметы).
+     if (equipment) {
+-      resetKitAndRewards();
++      resetKitOnly();
+     }
+ 
+     // Robots vs humans:
+@@ -856,8 +854,8 @@ export default function CharacterScreen() {
+     }
+ 
+     // До распределения — свободно: меняем ориджин, комплект сбрасывается
+-    // (он зависит от ориджина), атрибуты/навыки не тронуты.
+-    resetKitAndRewards();
++    // (он зависит от ориджина), атрибуты/навыки не тронуты — только инвентарь.
++    resetKitOnly();
+     handleSelectOrigin(newOrigin);
+   };
+ 
+@@ -1280,9 +1278,9 @@ export default function CharacterScreen() {
+                 // Просмотр комплектов свободен в любой момент.
+                 // Если снаряжение уже выбрано и персонаж зафиксирован
+                 // (атрибуты/навыки распределены) — новый комплект сбрасывает
+-                // инвентарь, навыки и награды (resetKitAndRewards).
++                // только инвентарь/слоты/крышки, атрибуты/навыки остаются.
+                 const applyKitReset = () => {
+-                  resetKitAndRewards();
++                  resetKitOnly();
+                   setIsEquipmentKitModalVisible(true);
+                 };
+                 // Confirm сброса — только если комплект реально выбран (есть id)
+diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
+index eb95a9c..9fdb741 100644
+--- a/modules/fallout/data/bodyplans/bodyplans.json
++++ b/modules/fallout/data/bodyplans/bodyplans.json
+@@ -40,13 +40,7 @@
+       "rightArm": "robot_arm_robobrain",
+       "chassis": "robot_legs_robobrain_treads"
+     },
+-    "defaultPlating": {
+-      "head": "robot_plating_standard_optics",
+-      "body": "robot_plating_standard_body",
+-      "leftArm": "robot_plating_standard_arms",
+-      "rightArm": "robot_plating_standard_arms",
+-      "chassis": "robot_plating_standard_thruster"
+-    },
++    "defaultPlating": {},
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -76,14 +70,7 @@
+       "arm3": "robot_arm_mister_handy",
+       "thruster": "robot_legs_mister_handy_thruster"
+     },
+-    "defaultPlating": {
+-      "head": "robot_plating_standard_optics",
+-      "body": "robot_plating_standard_body",
+-      "arm1": "robot_plating_standard_arms",
+-      "arm2": "robot_plating_standard_arms",
+-      "arm3": "robot_plating_standard_arms",
+-      "thruster": "robot_plating_standard_thruster"
+-    },
++    "defaultPlating": {},
+     "slotCapabilities": {
+       "arm1": {
+         "canEquipWeapon": true
+@@ -113,14 +100,7 @@
+       "body": "robot_body_protectron",
+       "rightLeg": "robot_legs_protectron"
+     },
+-    "defaultPlating": {
+-      "head": "robot_plating_standard_optics",
+-      "body": "robot_plating_standard_body",
+-      "leftArm": "robot_plating_standard_arms",
+-      "rightArm": "robot_plating_standard_arms",
+-      "leftLeg": "robot_plating_standard_thruster",
+-      "rightLeg": "robot_plating_standard_thruster"
+-    },
++    "defaultPlating": {},
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -145,13 +125,7 @@
+       "rightArm": "robot_arm_securitron",
+       "wheel": "robot_legs_securitron"
+     },
+-    "defaultPlating": {
+-      "head": "robot_plating_standard_optics",
+-      "body": "robot_plating_standard_body",
+-      "leftArm": "robot_plating_standard_arms",
+-      "rightArm": "robot_plating_standard_arms",
+-      "wheel": "robot_plating_standard_thruster"
+-    },
++    "defaultPlating": {},
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -198,14 +172,7 @@
+       "body": "robot_body_assaultron",
+       "rightLeg": "robot_legs_assaultron"
+     },
+-    "defaultPlating": {
+-      "head": "robot_plating_standard_optics",
+-      "body": "robot_plating_standard_body",
+-      "leftArm": "robot_plating_standard_arms",
+-      "rightArm": "robot_plating_standard_arms",
+-      "leftLeg": "robot_plating_standard_thruster",
+-      "rightLeg": "robot_plating_standard_thruster"
+-    },
++    "defaultPlating": {},
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
+@@ -235,14 +202,7 @@
+       "body": "robot_body_sentry_bot",
+       "rightLeg": "robot_legs_sentry_bot"
+     },
+-    "defaultPlating": {
+-      "head": "robot_plating_standard_optics",
+-      "body": "robot_plating_standard_body",
+-      "leftArm": "robot_plating_standard_arms",
+-      "rightArm": "robot_plating_standard_arms",
+-      "leftLeg": "robot_plating_standard_thruster",
+-      "rightLeg": "robot_plating_standard_thruster"
+-    },
++    "defaultPlating": {},
+     "slotCapabilities": {
+       "leftArm": {
+         "canEquipWeapon": true
