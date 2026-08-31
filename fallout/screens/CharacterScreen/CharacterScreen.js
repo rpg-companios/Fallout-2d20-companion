@@ -566,10 +566,14 @@ export default function CharacterScreen() {
         });
         const CURRENCY_TYPES = new Set(['currency']);
         if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
+        // Роботы: экипируется только то, что может экипироваться — оружие/броня/одежда.
+        // Химия/еда/патроны/хлам не имеют ключа экипировки, не экипируются.
+        const ROBOT_EQUIPPABLE = new Set(['weapon', 'armor', 'clothing', 'outfit', 'powerArmor', 'robotArmor', 'robotFrame', 'plating', 'frame']);
+        const shouldEquip = isRobot ? ROBOT_EQUIPPABLE.has(item?.itemType) : false;
         useCharacterStore.getState().addNewItem({
           ...item,
-          equipped: isRobot ? true : false,
-          locked:   isRobot ? true : false,
+          equipped: shouldEquip,
+          locked:   shouldEquip,
         });
       });
       debugLog('kits.select.done', { itemIds: Object.keys(useCharacterStore.getState().items) });

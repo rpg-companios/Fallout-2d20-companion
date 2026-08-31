@@ -1,0 +1,33 @@
+diff --git a/fallout/screens/CharacterScreen/CharacterScreen.js b/fallout/screens/CharacterScreen/CharacterScreen.js
+index 0b42661..2cc0755 100644
+--- a/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -566,10 +566,14 @@ export default function CharacterScreen() {
+         });
+         const CURRENCY_TYPES = new Set(['currency']);
+         if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
++        // Роботы: экипируется только то, что может экипироваться — оружие/броня/одежда.
++        // Химия/еда/патроны/хлам не имеют ключа экипировки, не экипируются.
++        const ROBOT_EQUIPPABLE = new Set(['weapon', 'armor', 'clothing', 'outfit', 'powerArmor', 'robotArmor', 'robotFrame', 'plating', 'frame']);
++        const shouldEquip = isRobot ? ROBOT_EQUIPPABLE.has(item?.itemType) : false;
+         useCharacterStore.getState().addNewItem({
+           ...item,
+-          equipped: isRobot ? true : false,
+-          locked:   isRobot ? true : false,
++          equipped: shouldEquip,
++          locked:   shouldEquip,
+         });
+       });
+       debugLog('kits.select.done', { itemIds: Object.keys(useCharacterStore.getState().items) });
+diff --git a/modules/fallout/data/equipment/robot/robotarms.json b/modules/fallout/data/equipment/robot/robotarms.json
+index 3114e43..ff5492e 100644
+--- a/modules/fallout/data/equipment/robot/robotarms.json
++++ b/modules/fallout/data/equipment/robot/robotarms.json
+@@ -108,6 +108,7 @@
+     "radDR": 0,
+     "weaponSlots": 1,
+     "canHoldWeapons": true,
++    "builtinWeaponId": "robot_weapon_claw",
+     "name": "robot_arm_assaultron"
+   },
+   {
