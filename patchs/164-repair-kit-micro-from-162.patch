@@ -1,0 +1,62 @@
+diff --git a/modules/fallout/data/equipment/general_goods.json b/modules/fallout/data/equipment/general_goods.json
+index b1ed99a..208a644 100644
+--- a/modules/fallout/data/equipment/general_goods.json
++++ b/modules/fallout/data/equipment/general_goods.json
+@@ -241,12 +241,21 @@
+   },
+   {
+     "id": "robot_item_repair_kit",
+-    "itemType": "misc",
++    "itemType": "chem",
+     "subtype": "tool",
+-    "value": 0,
+-    "rarity": 0,
+-    "weight": 0,
+-    "healAmount": 6
++    "value": 50,
++    "rarity": 1,
++    "weight": 0.5,
++    "healAmount": 6,
++    "robotOnly": true,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 6
++      }
++    },
++    "positiveEffectDuration": "instant",
++    "addictionLevel": 0
+   },
+   {
+     "id": "CasinoTopsChip",
+diff --git a/modules/fallout/data/equipment/robotparts.json b/modules/fallout/data/equipment/robotparts.json
+index 30de682..5ce1c07 100644
+--- a/modules/fallout/data/equipment/robotparts.json
++++ b/modules/fallout/data/equipment/robotparts.json
+@@ -1,13 +1,5 @@
+ {
+   "robotItems": [
+-    {
+-      "id": "robot_item_repair_kit",
+-      "itemType": "misc",
+-      "weight": 0,
+-      "cost": 0,
+-      "rarity": 0,
+-      "healAmount": 6
+-    },
+     {
+       "id": "robot_item_printer",
+       "itemType": "misc",
+diff --git a/modules/fallout/data/equipmentKits/assaultron.json b/modules/fallout/data/equipmentKits/assaultron.json
+index 9e152e5..ef1c157 100644
+--- a/modules/fallout/data/equipmentKits/assaultron.json
++++ b/modules/fallout/data/equipmentKits/assaultron.json
+@@ -124,7 +124,7 @@
+       {
+         "type": "fixed",
+         "itemId": "robot_item_repair_kit",
+-        "itemType": "misc"
++        "itemType": "chem"
+       }
+     ]
+   },
