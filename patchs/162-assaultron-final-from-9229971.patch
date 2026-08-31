@@ -169,19 +169,6 @@ index 0000000..7953227
 +    expect(slots.rightLeg.plating?.id).toBe('robot_plating_standard_thruster');
 +  });
 +});
-diff --git a/apply-patch.sh b/apply-patch.sh
-index 376b4a3..d876c4d 100755
---- a/apply-patch.sh
-+++ b/apply-patch.sh
-@@ -2,7 +2,7 @@
- 
- set -euo pipefail
- 
--ARENA_BRANCH="arena/01a03f91-fallout-2d20-companion"
-+ARENA_BRANCH="arena/01a04496-fallout-2d20-companion"
- REMOTE="origin"
- 
- ROOT_DIR="$(
 diff --git a/docs/changelog.en.md b/docs/changelog.en.md
 index bdbcab9..51405d5 100644
 --- a/docs/changelog.en.md
