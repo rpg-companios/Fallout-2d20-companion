@@ -1422,14 +1422,3 @@ index c394200..0dcfc49 100644
        const probe = entry?.type === 'choice' ? (entry.items || [])[0] : entry;
        const meta = getMetaCategory(probe);
        if (!groups[meta]) groups[meta] = [];
-diff --git a/package-lock.json b/package-lock.json
-index a18e3ca..f269fe4 100644
---- a/package-lock.json
-+++ b/package-lock.json
-@@ -1,5 +1,5 @@
- {
--  "name": "Fallout-2d20-rpg-companion",
-+  "name": "Fallout-2d20-companion",
-   "lockfileVersion": 3,
-   "requires": true,
-   "packages": {
