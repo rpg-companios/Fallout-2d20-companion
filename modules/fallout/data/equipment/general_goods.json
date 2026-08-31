@@ -241,12 +241,21 @@
   },
   {
     "id": "robot_item_repair_kit",
-    "itemType": "misc",
+    "itemType": "chem",
     "subtype": "tool",
-    "value": 0,
-    "rarity": 0,
-    "weight": 0,
-    "healAmount": 6
+    "value": 50,
+    "rarity": 1,
+    "weight": 0.5,
+    "healAmount": 6,
+    "robotOnly": true,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 6
+      }
+    },
+    "positiveEffectDuration": "instant",
+    "addictionLevel": 0
   },
   {
     "id": "CasinoTopsChip",
