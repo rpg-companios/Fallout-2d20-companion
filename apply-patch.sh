@@ -96,13 +96,15 @@ echo "Проверка патча: $PATCH_NAME"
 
 if git -C "$ROOT_DIR" apply \
   --check \
-  --whitespace=error \
+  --3way \
+  --whitespace=nowarn \
   "$TEMP_PATCH"
 then
   echo "Применение патча..."
 
   git -C "$ROOT_DIR" apply \
-    --whitespace=error \
+    --3way \
+    --whitespace=nowarn \
     "$TEMP_PATCH"
 
   echo
