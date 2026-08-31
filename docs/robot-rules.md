@@ -1,38 +1,45 @@
-# Robot Equipment Rules — Iron Rules
+# Robot Equipment Rules — Iron Rules (WHITELIST PRINCIPLE)
 
 ## 1. Character Type Flag
 - Origin has `characterType` = `robot` → `ARMOR_POLICIES.ROBOT_ONLY`
+- `mutant` → `RAIDER_ONLY`, `human/ghoul/cyborg` → `STANDARD`
 - Determined via `domain/origins.js isRobotCharacter()`
 - All equip checks read this flag, no hardcoding by origin id.
 
-## 2. What Robots Can Wear (based on flag)
-### Armor
-- Only items with `robotOnly: true` OR `robotArmorType` defined
-- Standard armor blocked: `equip.error.robotCannotWearStandardArmor`
-- Mutant armor blocked
-- Implementation: `domain/equipEquip.js canEquipArmor()` — whitelist robot armor
+## 2. What Robots Can Wear — WHITELIST
+**Owner principle: robotOnly describes WHAT robot CAN wear. Forbidden = not allowed. Same for mutantOnly.**
+- If power armor not in robotOnly options, no equip flag/check for it.
+- Want robot to wear jacket? Set `jacket.robotOnly=true`. Bandana? `bandana.robotOnly=true`.
+- Mega case: robot in power armor → via trait/origin flag injected into robotOnly (owner-only unique case).
 
-### Clothing
-- Only decorative hats allowed:
-  - `headwear_casual_hat`
-  - `headwear_fancy_hat`
-  - `headwear_bos_scribe_hat`
-- All other clothing blocked: `equip.error.robotCannotWearClothing`
-- Implementation: `canEquipClothing()` + `isRobotDecorativeHat()`
+### Armor (standard armor slots `equippedArmor`)
+- Whitelist: `item.robotOnly==true || item.robotArmorType || item.canRobotWear`
+- ROBOT_ONLY: allowed ONLY if whitelist, else `robotCannotWearStandardArmor`
+- RAIDER_ONLY: allowed ONLY if `mutantOnly`, else `mutantCannotWearStandardArmor`
+- STANDARD: allowed if NOT robotOnly AND NOT mutantOnly, else `cannotWearRobotArmor` / `cannotWearMutantArmor`
+- Implementation: `canEquipArmor()` checks `isRobotAllowedItem()` / `isMutantAllowedItem()`
+
+### Clothing (standard clothing slots)
+- Whitelist: `item.robotOnly || item.canRobotWear` (canRobotWear kept for backward compat of hats)
+- No hardcoded hat list — if you want robot to wear something, mark it robotOnly.
+- Current hats with `canRobotWear=true` are allowed via whitelist, but future items should use `robotOnly`
+- Same logic for mutant: only `mutantOnly` allowed for RAIDER_ONLY
+- Implementation: `canEquipClothing()` — whitelist check
 
 ### Power Armor
-- Robots CANNOT wear power armor at all (frame or pieces)
-- Frame check: `canEquipArmor()` blocks because power armor is not robotOnly
-- Piece check: must also block if character is robot, even if frame somehow equipped
-- Implementation: `equipPowerArmorPackage()` checks `canEquipArmor()`, plus `canEquipPowerArmorPiece()` should check robot flag
+- Whitelist same as armor: ROBOT_ONLY allowed only if `powerArmorItem.robotOnly==true`
+- Currently no power armor has robotOnly, so robots cannot wear it — no equip flag.
+- If mega case needed, set `power_armor_frame.robotOnly=true` via trait/origin injection (owner-only)
+- Piece check: `canEquipPowerArmorPiece(equipped, piece, character)` checks robot flag + frame
+- Implementation: `canEquipPowerArmor()` — whitelist
 
 ### Weapons
-- Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon=true`) as limbs: always allowed for ROBOT_ONLY
-- Standard weapons (human weapons like 10mm pistol): allowed for ROBOT_ONLY ONLY if robot has arm with `canHoldWeapons=true`
+- Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon` / `robotOnly`) as limbs: always allowed for ROBOT_ONLY
+- Standard weapons from inventory (human weapons like 10mm pistol): allowed for ROBOT_ONLY ONLY if arm has `canHoldWeapons=true`
   - Without such arm: equip button hidden, alert `manipulatorRequired`
   - With such arm: `findFreeWeaponHand()` finds first free hand, `canEquipWeaponToSlot()` checks weight/two-handed
 - Non-robots cannot use robot weapons: `equip.error.robotOnlyWeapon`
-- Implementation: `canEquipWeapon()` allows standard for robots (gated by arm check in InventoryScreen), `findFreeWeaponHand()` + `canEquipWeaponToSlot()` in `domain/robotEquip.js`
+- Implementation: `canEquipWeapon()` allows robot weapons always, standard weapons allowed for robots (gated by arm check in InventoryScreen)
 
 ## 3. Kits — Consumables Not Equipped
 - Kits resolve items via `kitResolver`, then `EquipmentKitModal` flattens and `CharacterScreen.handleSelectKit` adds to store via `addNewItem`

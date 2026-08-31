@@ -120,14 +120,24 @@ export const hasFrame = (equipped) => Boolean(equipped?.frame);
 
 /**
  * Можно ли надеть часть (§5.2): нужен надетый каркас; часть с прочностью 0 не надевается.
- * Роботы не могут носить силовую броню вообще.
+ * WHITELIST: роботы могут носить силовую броню только если у предмета есть robotOnly (мега-случай через трейт/ориджин).
  * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | null.
  */
 export const canEquipPowerArmorPiece = (equipped, piece, character = null) => {
   if (!hasFrame(equipped)) return { ok: false, reason: 'needsFrame' };
   if (isPieceBroken(piece)) return { ok: false, reason: 'broken' };
   if (character && character.origin && character.origin.characterType === 'robot') {
-    return { ok: false, reason: 'robotCannotWear' };
+    // Whitelist: если у части/фрейма нет robotOnly, робот не может носить
+    const isRobotAllowed = Boolean(piece?.robotOnly || equipped?.frame?.robotOnly);
+    if (!isRobotAllowed) {
+      return { ok: false, reason: 'robotCannotWear' };
+    }
+  }
+  if (character && character.origin && character.origin.characterType === 'mutant') {
+    const isMutantAllowed = Boolean(piece?.mutantOnly || equipped?.frame?.mutantOnly);
+    if (!isMutantAllowed) {
+      return { ok: false, reason: 'mutantCannotWear' };
+    }
   }
   return { ok: true, reason: null };
 };

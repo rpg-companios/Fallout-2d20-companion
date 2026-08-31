@@ -1,0 +1,309 @@
+diff --git a/docs/robot-rules.md b/docs/robot-rules.md
+index d9cc8dc..a866dfe 100644
+--- a/docs/robot-rules.md
++++ b/docs/robot-rules.md
+@@ -1,38 +1,45 @@
+-# Robot Equipment Rules — Iron Rules
++# Robot Equipment Rules — Iron Rules (WHITELIST PRINCIPLE)
+ 
+ ## 1. Character Type Flag
+ - Origin has `characterType` = `robot` → `ARMOR_POLICIES.ROBOT_ONLY`
++- `mutant` → `RAIDER_ONLY`, `human/ghoul/cyborg` → `STANDARD`
+ - Determined via `domain/origins.js isRobotCharacter()`
+ - All equip checks read this flag, no hardcoding by origin id.
+ 
+-## 2. What Robots Can Wear (based on flag)
+-### Armor
+-- Only items with `robotOnly: true` OR `robotArmorType` defined
+-- Standard armor blocked: `equip.error.robotCannotWearStandardArmor`
+-- Mutant armor blocked
+-- Implementation: `domain/equipEquip.js canEquipArmor()` — whitelist robot armor
++## 2. What Robots Can Wear — WHITELIST
++**Owner principle: robotOnly describes WHAT robot CAN wear. Forbidden = not allowed. Same for mutantOnly.**
++- If power armor not in robotOnly options, no equip flag/check for it.
++- Want robot to wear jacket? Set `jacket.robotOnly=true`. Bandana? `bandana.robotOnly=true`.
++- Mega case: robot in power armor → via trait/origin flag injected into robotOnly (owner-only unique case).
+ 
+-### Clothing
+-- Only decorative hats allowed:
+-  - `headwear_casual_hat`
+-  - `headwear_fancy_hat`
+-  - `headwear_bos_scribe_hat`
+-- All other clothing blocked: `equip.error.robotCannotWearClothing`
+-- Implementation: `canEquipClothing()` + `isRobotDecorativeHat()`
++### Armor (standard armor slots `equippedArmor`)
++- Whitelist: `item.robotOnly==true || item.robotArmorType || item.canRobotWear`
++- ROBOT_ONLY: allowed ONLY if whitelist, else `robotCannotWearStandardArmor`
++- RAIDER_ONLY: allowed ONLY if `mutantOnly`, else `mutantCannotWearStandardArmor`
++- STANDARD: allowed if NOT robotOnly AND NOT mutantOnly, else `cannotWearRobotArmor` / `cannotWearMutantArmor`
++- Implementation: `canEquipArmor()` checks `isRobotAllowedItem()` / `isMutantAllowedItem()`
++
++### Clothing (standard clothing slots)
++- Whitelist: `item.robotOnly || item.canRobotWear` (canRobotWear kept for backward compat of hats)
++- No hardcoded hat list — if you want robot to wear something, mark it robotOnly.
++- Current hats with `canRobotWear=true` are allowed via whitelist, but future items should use `robotOnly`
++- Same logic for mutant: only `mutantOnly` allowed for RAIDER_ONLY
++- Implementation: `canEquipClothing()` — whitelist check
+ 
+ ### Power Armor
+-- Robots CANNOT wear power armor at all (frame or pieces)
+-- Frame check: `canEquipArmor()` blocks because power armor is not robotOnly
+-- Piece check: must also block if character is robot, even if frame somehow equipped
+-- Implementation: `equipPowerArmorPackage()` checks `canEquipArmor()`, plus `canEquipPowerArmorPiece()` should check robot flag
++- Whitelist same as armor: ROBOT_ONLY allowed only if `powerArmorItem.robotOnly==true`
++- Currently no power armor has robotOnly, so robots cannot wear it — no equip flag.
++- If mega case needed, set `power_armor_frame.robotOnly=true` via trait/origin injection (owner-only)
++- Piece check: `canEquipPowerArmorPiece(equipped, piece, character)` checks robot flag + frame
++- Implementation: `canEquipPowerArmor()` — whitelist
+ 
+ ### Weapons
+-- Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon=true`) as limbs: always allowed for ROBOT_ONLY
+-- Standard weapons (human weapons like 10mm pistol): allowed for ROBOT_ONLY ONLY if robot has arm with `canHoldWeapons=true`
++- Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon` / `robotOnly`) as limbs: always allowed for ROBOT_ONLY
++- Standard weapons from inventory (human weapons like 10mm pistol): allowed for ROBOT_ONLY ONLY if arm has `canHoldWeapons=true`
+   - Without such arm: equip button hidden, alert `manipulatorRequired`
+   - With such arm: `findFreeWeaponHand()` finds first free hand, `canEquipWeaponToSlot()` checks weight/two-handed
+ - Non-robots cannot use robot weapons: `equip.error.robotOnlyWeapon`
+-- Implementation: `canEquipWeapon()` allows standard for robots (gated by arm check in InventoryScreen), `findFreeWeaponHand()` + `canEquipWeaponToSlot()` in `domain/robotEquip.js`
++- Implementation: `canEquipWeapon()` allows robot weapons always, standard weapons allowed for robots (gated by arm check in InventoryScreen)
+ 
+ ## 3. Kits — Consumables Not Equipped
+ - Kits resolve items via `kitResolver`, then `EquipmentKitModal` flattens and `CharacterScreen.handleSelectKit` adds to store via `addNewItem`
+diff --git a/domain/equipEquip.js b/domain/equipEquip.js
+index d100621..af84e51 100644
+--- a/domain/equipEquip.js
++++ b/domain/equipEquip.js
+@@ -5,91 +5,89 @@
+ // Armor policy and character archetype now live in domain/origins.js
+ // (characterType drives the default policy; origin.armorPolicy overrides).
+ //
+-// IRON RULES (see docs/robot-rules.md):
+-// - ROBOT_ONLY can wear ONLY robot armor (robotOnly || robotArmorType) + decorative hats
+-// - ROBOT_ONLY CANNOT wear power armor, standard armor, mutant armor, standard clothing
+-// - ROBOT_ONLY: robot weapons (robot_weapon_* / robot_arm_*) as limbs always allowed;
+-//   standard weapons from inventory allowed ONLY if arm has canHoldWeapons=true (checked in InventoryScreen via findFreeWeaponHand)
+-// - RAIDER_ONLY (mutant) can wear ONLY mutant armor (mutantOnly)
+-// - Human cannot wear robot/mutant armor or robot weapons
++// IRON RULES (see docs/robot-rules.md) — WHITELIST PRINCIPLE (owner):
++// - robotOnly describes WHAT robot CAN wear. Forbidden = not allowed.
++// - mutantOnly describes WHAT mutant CAN wear.
++// - If power armor is not in robotOnly options, there is no equip flag/check for it.
++// - Want robot to wear jacket? Set jacket.robotOnly=true. Bandana? bandana.robotOnly=true.
++// - Mega case: robot in power armor → via trait/origin flag injected into robotOnly (owner-only unique case).
+ 
+ import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
+ import { ARMOR_POLICIES, getArmorPolicy, isRobotCharacter } from './origins';
+ 
+-/** True if the armor item is robot-specific. */
++/** True if the item is marked as robot-wearable (whitelist). */
++const isRobotAllowedItem = (item) =>
++  Boolean(
++    item?.robotOnly
++    || item?.robotArmorType
++    || item?.canRobotWear // backward compat for hats that have canRobotWear but not robotOnly yet
++  );
++
++/** True if the armor item is robot-specific (for armor slot). */
+ const isRobotArmor = (armorItem) =>
+-  Boolean(armorItem?.robotOnly || armorItem?.robotArmorType);
++  Boolean(armorItem?.robotOnly || armorItem?.robotArmorType || armorItem?.canRobotWear);
+ 
+-/** True if the armor item is mutant/raider restricted. */
++/** True if the item is mutant/raider restricted (whitelist). */
++const isMutantAllowedItem = (item) => Boolean(item?.mutantOnly);
+ const isMutantArmor = (armorItem) => Boolean(armorItem?.mutantOnly);
+ 
+ /** True if the item is power armor (frame or piece). */
+ export const isPowerArmorItem = (item) =>
+   Boolean(item?.itemType === 'powerArmor' || String(item?.id || '').startsWith('power_armor_'));
+ 
+-/** True if the weapon comes from robot weapons catalog. */
++/** True if the weapon comes from robot weapons catalog (whitelist for robots). */
+ const isRobotOnlyWeapon = (weaponItem) =>
+   Boolean(
+     weaponItem?.isRobotWeapon
++    || weaponItem?.robotOnly
+     || String(weaponItem?.id || '').startsWith('robot_weapon_')
+     || String(weaponItem?.id || '').startsWith('robot_arm_')
+   );
+ 
+ /**
+- * Robots may wear only decorative hats on top of their head.
+- * Explicitly excludes helmets/hoods/masks/caps-like protective headwear.
++ * Robots may wear only items marked robotOnly (whitelist).
++ * No hardcoded hat list — if you want robot to wear jacket/bandana, set jacket.robotOnly=true.
++ * Backward compat: canRobotWear is treated as robotOnly for existing hats.
+  */
+ const isRobotDecorativeHat = (clothingItem) => {
+-  if (clothingItem?.clothingType !== 'headwear') return false;
+-  const id = String(clothingItem?.id || '');
+-
+-  // Supported hat ids in current catalog.
+-  return id === 'headwear_casual_hat'
+-    || id === 'headwear_fancy_hat'
+-    || id === 'headwear_bos_scribe_hat';
++  // Whitelist principle: robot can wear clothing if it has robotOnly or canRobotWear
++  return Boolean(clothingItem?.robotOnly || clothingItem?.canRobotWear);
+ };
+ 
+ /**
+  * Check whether a character can equip a given armor item.
+  *
+- * Policies:
+- *  - robotOnly             -> only robot armor, NO power armor
+- *  - raiderOnly            -> only mutant-tagged armor, NO power armor
+- *  - standard              -> standard + power armor, but no robot/mutant armor
+- *
+- * Power armor is treated as standard armor for policy purposes — robots and mutants cannot wear it.
++ * WHITELIST PRINCIPLE (owner):
++ *  - ROBOT_ONLY: allowed ONLY if item.robotOnly (or robotArmorType/canRobotWear) — what is in options is allowed.
++ *    If power armor not in robotOnly, no equip flag/check for it.
++ *  - RAIDER_ONLY: allowed ONLY if item.mutantOnly
++ *  - STANDARD: allowed if NOT robotOnly AND NOT mutantOnly
+  */
+ export function canEquipArmor(armorItem, character) {
+   const policy = getArmorPolicy(character);
+-  const robotArmor = isRobotArmor(armorItem);
+-  const mutantArmor = isMutantArmor(armorItem);
+-  const powerArmor = isPowerArmorItem(armorItem);
++  const robotAllowed = isRobotAllowedItem(armorItem);
++  const mutantAllowed = isMutantAllowedItem(armorItem);
+ 
+   if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+-    // Robots cannot wear power armor at all
+-    if (powerArmor) {
+-      return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+-    }
+-    if (!robotArmor) {
++    // Whitelist: only what is marked robotOnly is allowed, everything else forbidden
++    if (!robotAllowed) {
+       return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+     }
+     return { allowed: true, reason: null };
+   }
+ 
+   if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+-    if (powerArmor) {
+-      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+-    }
+-    if (!mutantArmor) {
++    if (!mutantAllowed) {
+       return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+     }
+     return { allowed: true, reason: null };
+   }
+ 
+-  if (robotArmor) {
++  // STANDARD (human, ghoul, etc): cannot wear robot or mutant items
++  if (robotAllowed) {
+     return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+   }
+-  if (mutantArmor) {
++  if (mutantAllowed) {
+     return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
+   }
+ 
+@@ -124,30 +122,66 @@ export function canEquipWeapon(weaponItem, character) {
+ export function canEquipClothing(clothingItem, character) {
+   const policy = getArmorPolicy(character);
+   const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
++  const isMutantChar = policy === ARMOR_POLICIES.RAIDER_ONLY;
+ 
+   if (isRobotChar) {
+-    if (!isRobotDecorativeHat(clothingItem)) {
++    // Whitelist: robot can wear clothing only if it has robotOnly (or canRobotWear for backward compat)
++    // Want robot to wear jacket/bandana? Set jacket.robotOnly=true
++    if (!isRobotAllowedItem(clothingItem)) {
+       return { allowed: false, reason: 'equip.error.robotCannotWearClothing' };
+     }
+     return { allowed: true, reason: null };
+   }
+ 
++  if (isMutantChar) {
++    if (!isMutantAllowedItem(clothingItem)) {
++      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
++    }
++    return { allowed: true, reason: null };
++  }
++
++  // STANDARD: cannot wear robot/mutant clothing
++  if (isRobotAllowedItem(clothingItem)) {
++    return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
++  }
++  if (isMutantAllowedItem(clothingItem)) {
++    return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
++  }
++
+   return { allowed: true, reason: null };
+ }
+ 
+ /**
+- * Power armor equip check — explicit block for robots/mutants.
+- * Even if canEquipArmor would block, this is a dedicated check for PA flow.
++ * Power armor equip check — WHITELIST PRINCIPLE.
++ * - ROBOT_ONLY: allowed only if powerArmorItem.robotOnly (injected via trait/origin for mega case)
++ * - RAIDER_ONLY: allowed only if mutantOnly
++ * - STANDARD: allowed if not robot/mutant
+  */
+ export function canEquipPowerArmor(powerArmorItem, character) {
+   const policy = getArmorPolicy(character);
++  const robotAllowed = isRobotAllowedItem(powerArmorItem);
++  const mutantAllowed = isMutantAllowedItem(powerArmorItem);
++
+   if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+-    return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
++    if (!robotAllowed) {
++      return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
++    }
++    return { allowed: true, reason: null };
+   }
+   if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+-    return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
++    if (!mutantAllowed) {
++      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
++    }
++    return { allowed: true, reason: null };
++  }
++
++  if (robotAllowed) {
++    return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
++  }
++  if (mutantAllowed) {
++    return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
+   }
+-  // Humans: allowed (further checks like frame/piece handled elsewhere)
++
+   return { allowed: true, reason: null };
+ }
+ 
+diff --git a/domain/powerArmor.js b/domain/powerArmor.js
+index 8daf2e8..fe07691 100644
+--- a/domain/powerArmor.js
++++ b/domain/powerArmor.js
+@@ -120,14 +120,24 @@ export const hasFrame = (equipped) => Boolean(equipped?.frame);
+ 
+ /**
+  * Можно ли надеть часть (§5.2): нужен надетый каркас; часть с прочностью 0 не надевается.
+- * Роботы не могут носить силовую броню вообще.
++ * WHITELIST: роботы могут носить силовую броню только если у предмета есть robotOnly (мега-случай через трейт/ориджин).
+  * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | null.
+  */
+ export const canEquipPowerArmorPiece = (equipped, piece, character = null) => {
+   if (!hasFrame(equipped)) return { ok: false, reason: 'needsFrame' };
+   if (isPieceBroken(piece)) return { ok: false, reason: 'broken' };
+   if (character && character.origin && character.origin.characterType === 'robot') {
+-    return { ok: false, reason: 'robotCannotWear' };
++    // Whitelist: если у части/фрейма нет robotOnly, робот не может носить
++    const isRobotAllowed = Boolean(piece?.robotOnly || equipped?.frame?.robotOnly);
++    if (!isRobotAllowed) {
++      return { ok: false, reason: 'robotCannotWear' };
++    }
++  }
++  if (character && character.origin && character.origin.characterType === 'mutant') {
++    const isMutantAllowed = Boolean(piece?.mutantOnly || equipped?.frame?.mutantOnly);
++    if (!isMutantAllowed) {
++      return { ok: false, reason: 'mutantCannotWear' };
++    }
+   }
+   return { ok: true, reason: null };
+ };
