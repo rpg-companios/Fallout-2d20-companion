@@ -1,0 +1,429 @@
+diff --git a/docs/robot-rules.md b/docs/robot-rules.md
+index a866dfe..6eca8b0 100644
+--- a/docs/robot-rules.md
++++ b/docs/robot-rules.md
+@@ -4,34 +4,39 @@
+ - Origin has `characterType` = `robot` → `ARMOR_POLICIES.ROBOT_ONLY`
+ - `mutant` → `RAIDER_ONLY`, `human/ghoul/cyborg` → `STANDARD`
+ - Determined via `domain/origins.js isRobotCharacter()`
+-- All equip checks read this flag, no hardcoding by origin id.
+ 
+-## 2. What Robots Can Wear — WHITELIST
++## 2. Architecture: Domain vs Private Case
++- **Domain = engine, general rules**: `domain/allowlist.js` — `isItemInAllowlist(item, allowlist)` — поддержка слага/категории/id белого списка. Общая движковая функция.
++- **Private case = что именно может носить робот**: `modules/fallout/data/allowlist/robotOnly.js` — просто список id и/или категорий: `robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }`. Хочешь пиджак — добавляешь его id. Бандану — бандану. Мега-случай "робот в силовой броне" — через трейт/ориджин инжект в robotOnly (owner-only).
++- `domain/equipEquip.js` — применяет общее правило политики (ROBOT_ONLY/RAIDER_ONLY/STANDARD) через движок белого списка, но сами списки — вне домена.
++
++## 3. What Robots Can Wear — WHITELIST
+ **Owner principle: robotOnly describes WHAT robot CAN wear. Forbidden = not allowed. Same for mutantOnly.**
+-- If power armor not in robotOnly options, no equip flag/check for it.
+-- Want robot to wear jacket? Set `jacket.robotOnly=true`. Bandana? `bandana.robotOnly=true`.
+-- Mega case: robot in power armor → via trait/origin flag injected into robotOnly (owner-only unique case).
+ 
+-### Armor (standard armor slots `equippedArmor`)
+-- Whitelist: `item.robotOnly==true || item.robotArmorType || item.canRobotWear`
+-- ROBOT_ONLY: allowed ONLY if whitelist, else `robotCannotWearStandardArmor`
+-- RAIDER_ONLY: allowed ONLY if `mutantOnly`, else `mutantCannotWearStandardArmor`
+-- STANDARD: allowed if NOT robotOnly AND NOT mutantOnly, else `cannotWearRobotArmor` / `cannotWearMutantArmor`
+-- Implementation: `canEquipArmor()` checks `isRobotAllowedItem()` / `isMutantAllowedItem()`
++### Allowlist structure (simple, no inventing)
++```js
++robotOnly = {
++  robotArmor: true,
++  robotPlating: true,
++  robotFrame: true,
++  robotLims: true,
++  robotWeapons: true,
++  fancyHat: true,
++  headwear_casual_hat: true,
++  // jacket: true, bandana: true — просто добавить id
++}
++```
++Engine in `domain/allowlist.js` maps categories via `CATEGORY_ALIASES` (robotPlating→plating/prefix robot_plating_, etc.) and checks direct id/itemType/prefix.
+ 
+-### Clothing (standard clothing slots)
+-- Whitelist: `item.robotOnly || item.canRobotWear` (canRobotWear kept for backward compat of hats)
+-- No hardcoded hat list — if you want robot to wear something, mark it robotOnly.
+-- Current hats with `canRobotWear=true` are allowed via whitelist, but future items should use `robotOnly`
+-- Same logic for mutant: only `mutantOnly` allowed for RAIDER_ONLY
+-- Implementation: `canEquipClothing()` — whitelist check
++### Armor / Clothing / Power Armor (standard slots)
++- ROBOT_ONLY: allowed ONLY if item in robotOnly allowlist (via `isItemInAllowlist`), else `robotCannotWearStandardArmor`
++- RAIDER_ONLY: allowed ONLY if in mutantOnly allowlist
++- STANDARD: allowed if NOT in robot/mutant allowlists
++- If power armor not in robotOnly, no equip flag/check — cannot wear. Want robot in PA? Inject `powerArmorFrame` or its id into robotOnly via trait/origin.
++- Implementation: `canEquipArmor()`, `canEquipClothing()`, `canEquipPowerArmor()` in `domain/equipEquip.js` use `isRobotAllowed()` / `isMutantAllowed()` which call `isItemInAllowlist()` with private lists from `modules/fallout/data/allowlist/`
+ 
+-### Power Armor
+-- Whitelist same as armor: ROBOT_ONLY allowed only if `powerArmorItem.robotOnly==true`
+-- Currently no power armor has robotOnly, so robots cannot wear it — no equip flag.
+-- If mega case needed, set `power_armor_frame.robotOnly=true` via trait/origin injection (owner-only)
+-- Piece check: `canEquipPowerArmorPiece(equipped, piece, character)` checks robot flag + frame
+-- Implementation: `canEquipPowerArmor()` — whitelist
++### Power Armor pieces
++- `canEquipPowerArmorPiece(equipped, piece, character)` — needs frame + not broken + whitelist (if robot, piece/frame must be in robotOnly)
+ 
+ ### Weapons
+ - Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon` / `robotOnly`) as limbs: always allowed for ROBOT_ONLY
+diff --git a/domain/allowlist.js b/domain/allowlist.js
+new file mode 100644
+index 0000000..aa60506
+--- /dev/null
++++ b/domain/allowlist.js
+@@ -0,0 +1,95 @@
++// domain/allowlist.js
++// Общая движковая функция поддержки белого списка по слагу/id/категории.
++// Домен — движок, где общие правила. Частные случаи (что именно может носить робот) — вне домена.
++
++/**
++ * Проверяет входит ли предмет в allowlist.
++ * Allowlist может быть:
++ *  - массив строк: каждая строка — id, itemType или префикс (если заканчивается на '_' или содержит '*')
++ *  - объект { itemTypes: [], ids: [], prefixes: [] }
++ *  - объект-словарь { [slug]: true } где ключи — разрешённые id/категории
++ *
++ * @param {object} item - предмет с полями id, itemType, weaponId и т.д.
++ * @param {object|array} allowlist - белый список
++ * @returns {boolean}
++ */
++export function isItemInAllowlist(item, allowlist) {
++  if (!item || !allowlist) return false;
++
++  const id = String(item.id || item.weaponId || item.armorId || item.clothingId || '');
++  const itemType = String(item.itemType || '');
++
++  // Legacy override: если на самом предмете стоит robotOnly/mutantOnly/canRobotWear — считаем разрешённым
++  // Это позволяет быстро пометить предмет в данных без правки allowlist
++  if (item.robotOnly === true || item.robotArmorType || item.canRobotWear === true) return true;
++  if (item.mutantOnly === true) return true;
++
++  // Allowlist как массив
++  if (Array.isArray(allowlist)) {
++    for (const entry of allowlist) {
++      const slug = String(entry);
++      if (!slug) continue;
++      if (id === slug) return true;
++      if (itemType === slug) return true;
++      // Префикс: если entry заканчивается на '_' или содержит '*' — проверяем startsWith
++      if (slug.endsWith('_') || slug.includes('*')) {
++        const prefix = slug.replace('*', '');
++        if (id.startsWith(prefix)) return true;
++      }
++      // Поддержка категорий из примера владельца: robotArmor, robotPlating и т.д.
++      // Мапим их на реальные типы/префиксы через простую таблицу (движковая, не частная)
++      if (CATEGORY_ALIASES[slug]) {
++        const mapped = CATEGORY_ALIASES[slug];
++        if (mapped.itemTypes && mapped.itemTypes.includes(itemType)) return true;
++        if (mapped.prefixes && mapped.prefixes.some(p => id.startsWith(p))) return true;
++        if (mapped.ids && mapped.ids.includes(id)) return true;
++      }
++    }
++    return false;
++  }
++
++  // Allowlist как объект-словарь { [slug]: true }
++  if (allowlist && typeof allowlist === 'object' && !allowlist.itemTypes && !allowlist.ids && !allowlist.prefixes && !allowlist.allowedIds) {
++    // Проверяем ключи объекта как разрешённые слаги
++    for (const key of Object.keys(allowlist)) {
++      if (!allowlist[key]) continue; // false — пропускаем
++      if (id === key) return true;
++      if (itemType === key) return true;
++      if (key.endsWith('_') && id.startsWith(key)) return true;
++      if (CATEGORY_ALIASES[key]) {
++        const mapped = CATEGORY_ALIASES[key];
++        if (mapped.itemTypes && mapped.itemTypes.includes(itemType)) return true;
++        if (mapped.prefixes && mapped.prefixes.some(p => id.startsWith(p))) return true;
++      }
++    }
++    return false;
++  }
++
++  // Allowlist как структурированный объект { itemTypes, ids, prefixes, allowedIds }
++  const itemTypes = allowlist.itemTypes instanceof Set ? Array.from(allowlist.itemTypes) : (allowlist.itemTypes || []);
++  const ids = allowlist.ids instanceof Set ? Array.from(allowlist.ids) : (allowlist.allowedIds instanceof Set ? Array.from(allowlist.allowedIds) : (allowlist.ids || allowlist.allowedIds || []));
++  const prefixes = allowlist.prefixes || allowlist.idPrefixes || [];
++
++  if (itemTypes.includes(itemType)) return true;
++  if (ids.includes(id)) return true;
++  for (const prefix of prefixes) {
++    if (id.startsWith(String(prefix))) return true;
++  }
++
++  return false;
++}
++
++// Алиасы категорий из примера владельца: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat }
++// Это общая движковая таблица маппинга категорий на реальные типы/префиксы, не частный случай конкретных предметов.
++// Частный случай — какие именно id добавить в fancyHat и т.д. — в данных вне домена.
++const CATEGORY_ALIASES = Object.freeze({
++  robotArmor: { itemTypes: ['robotArmor', 'armor'], prefixes: ['robot_armor_'] },
++  robotPlating: { itemTypes: ['plating'], prefixes: ['robot_plating_'] },
++  robotFrame: { itemTypes: ['frame', 'robotFrame'], prefixes: ['robot_frame_'] },
++  robotLims: { itemTypes: ['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'robotPart'], prefixes: ['robot_head_', 'robot_body_', 'robot_legs_', 'robot_leg_', 'robot_arm_'] },
++  robotLimbs: { itemTypes: ['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'robotPart'], prefixes: ['robot_head_', 'robot_body_', 'robot_legs_', 'robot_leg_', 'robot_arm_'] },
++  robotWeapons: { itemTypes: ['weapon'], prefixes: ['robot_weapon_', 'robot_arm_'] },
++  fancyHat: { ids: ['headwear_fancy_hat'] },
++  casualHat: { ids: ['headwear_casual_hat'] },
++  // Можно расширять без правки частной логики
++});
+diff --git a/domain/equipEquip.js b/domain/equipEquip.js
+index af84e51..926955b 100644
+--- a/domain/equipEquip.js
++++ b/domain/equipEquip.js
+@@ -5,31 +5,17 @@
+ // Armor policy and character archetype now live in domain/origins.js
+ // (characterType drives the default policy; origin.armorPolicy overrides).
+ //
+-// IRON RULES (see docs/robot-rules.md) — WHITELIST PRINCIPLE (owner):
+-// - robotOnly describes WHAT robot CAN wear. Forbidden = not allowed.
+-// - mutantOnly describes WHAT mutant CAN wear.
+-// - If power armor is not in robotOnly options, there is no equip flag/check for it.
+-// - Want robot to wear jacket? Set jacket.robotOnly=true. Bandana? bandana.robotOnly=true.
+-// - Mega case: robot in power armor → via trait/origin flag injected into robotOnly (owner-only unique case).
++// Домен — движок где общие правила. Частный случай (что именно может носить робот) — вне домена.
++// - Общая движковая функция белого списка: domain/allowlist.js isItemInAllowlist()
++// - Частные списки: modules/fallout/data/allowlist/robotOnly.js, mutantOnly.js
++//   Просто список id и/или категорий: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }
+ 
+ import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
+ import { ARMOR_POLICIES, getArmorPolicy, isRobotCharacter } from './origins';
+-
+-/** True if the item is marked as robot-wearable (whitelist). */
+-const isRobotAllowedItem = (item) =>
+-  Boolean(
+-    item?.robotOnly
+-    || item?.robotArmorType
+-    || item?.canRobotWear // backward compat for hats that have canRobotWear but not robotOnly yet
+-  );
+-
+-/** True if the armor item is robot-specific (for armor slot). */
+-const isRobotArmor = (armorItem) =>
+-  Boolean(armorItem?.robotOnly || armorItem?.robotArmorType || armorItem?.canRobotWear);
+-
+-/** True if the item is mutant/raider restricted (whitelist). */
+-const isMutantAllowedItem = (item) => Boolean(item?.mutantOnly);
+-const isMutantArmor = (armorItem) => Boolean(armorItem?.mutantOnly);
++import { isItemInAllowlist } from './allowlist';
++// Частные списки — вне домена (private case), импортируются сюда для применения общего правила
++import { robotOnly as ROBOT_ONLY_DICT, ROBOT_ONLY_STRUCTURED } from '../modules/fallout/data/allowlist/robotOnly';
++import { mutantOnly as MUTANT_ONLY_DICT, MUTANT_ONLY_STRUCTURED } from '../modules/fallout/data/allowlist/mutantOnly';
+ 
+ /** True if the item is power armor (frame or piece). */
+ export const isPowerArmorItem = (item) =>
+@@ -44,32 +30,49 @@ const isRobotOnlyWeapon = (weaponItem) =>
+     || String(weaponItem?.id || '').startsWith('robot_arm_')
+   );
+ 
+-/**
+- * Robots may wear only items marked robotOnly (whitelist).
+- * No hardcoded hat list — if you want robot to wear jacket/bandana, set jacket.robotOnly=true.
+- * Backward compat: canRobotWear is treated as robotOnly for existing hats.
+- */
+-const isRobotDecorativeHat = (clothingItem) => {
+-  // Whitelist principle: robot can wear clothing if it has robotOnly or canRobotWear
+-  return Boolean(clothingItem?.robotOnly || clothingItem?.canRobotWear);
+-};
++/** Проверка: входит ли предмет в белый список роботов (частный случай через общий движок) */
++function isRobotAllowed(item, character = null) {
++  // 1. Инжект через трейт/ориджин (owner-only мега-случай): character.origin.robotOnly или trait.robotOnly
++  const injectedAllowlist = character?.origin?.robotOnly || character?.trait?.robotOnly || character?.origin?.allowlist || null;
++  if (injectedAllowlist && isItemInAllowlist(item, injectedAllowlist)) return true;
++
++  // 2. Глобальный белый список роботов (частный случай в данных)
++  if (isItemInAllowlist(item, ROBOT_ONLY_DICT)) return true;
++  if (isItemInAllowlist(item, ROBOT_ONLY_STRUCTURED)) return true;
++
++  return false;
++}
++
++function isMutantAllowed(item, character = null) {
++  const injectedAllowlist = character?.origin?.mutantOnly || character?.trait?.mutantOnly || null;
++  if (injectedAllowlist && isItemInAllowlist(item, injectedAllowlist)) return true;
++
++  if (isItemInAllowlist(item, MUTANT_ONLY_DICT)) return true;
++  if (isItemInAllowlist(item, MUTANT_ONLY_STRUCTURED)) return true;
++
++  // Legacy flag на предмете
++  if (item?.mutantOnly === true) return true;
++
++  return false;
++}
++
++/** Для совместимости — теперь через общий allowlist */
++const isRobotDecorativeHat = (clothingItem) => isRobotAllowed(clothingItem);
+ 
+ /**
+  * Check whether a character can equip a given armor item.
+  *
+  * WHITELIST PRINCIPLE (owner):
+- *  - ROBOT_ONLY: allowed ONLY if item.robotOnly (or robotArmorType/canRobotWear) — what is in options is allowed.
+- *    If power armor not in robotOnly, no equip flag/check for it.
+- *  - RAIDER_ONLY: allowed ONLY if item.mutantOnly
+- *  - STANDARD: allowed if NOT robotOnly AND NOT mutantOnly
++ *  - ROBOT_ONLY: allowed ONLY if item in robotOnly allowlist (domain/allowlist.js engine + data/allowlist/robotOnly.js private)
++ *  - RAIDER_ONLY: allowed ONLY if item in mutantOnly allowlist
++ *  - STANDARD: allowed if NOT in robot/mutant allowlists
+  */
+ export function canEquipArmor(armorItem, character) {
+   const policy = getArmorPolicy(character);
+-  const robotAllowed = isRobotAllowedItem(armorItem);
+-  const mutantAllowed = isMutantAllowedItem(armorItem);
++  const robotAllowed = isRobotAllowed(armorItem, character);
++  const mutantAllowed = isMutantAllowed(armorItem, character);
+ 
+   if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+-    // Whitelist: only what is marked robotOnly is allowed, everything else forbidden
+     if (!robotAllowed) {
+       return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+     }
+@@ -83,7 +86,6 @@ export function canEquipArmor(armorItem, character) {
+     return { allowed: true, reason: null };
+   }
+ 
+-  // STANDARD (human, ghoul, etc): cannot wear robot or mutant items
+   if (robotAllowed) {
+     return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+   }
+@@ -125,26 +127,23 @@ export function canEquipClothing(clothingItem, character) {
+   const isMutantChar = policy === ARMOR_POLICIES.RAIDER_ONLY;
+ 
+   if (isRobotChar) {
+-    // Whitelist: robot can wear clothing only if it has robotOnly (or canRobotWear for backward compat)
+-    // Want robot to wear jacket/bandana? Set jacket.robotOnly=true
+-    if (!isRobotAllowedItem(clothingItem)) {
++    if (!isRobotAllowed(clothingItem, character)) {
+       return { allowed: false, reason: 'equip.error.robotCannotWearClothing' };
+     }
+     return { allowed: true, reason: null };
+   }
+ 
+   if (isMutantChar) {
+-    if (!isMutantAllowedItem(clothingItem)) {
++    if (!isMutantAllowed(clothingItem, character)) {
+       return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+     }
+     return { allowed: true, reason: null };
+   }
+ 
+-  // STANDARD: cannot wear robot/mutant clothing
+-  if (isRobotAllowedItem(clothingItem)) {
++  if (isRobotAllowed(clothingItem, character)) {
+     return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+   }
+-  if (isMutantAllowedItem(clothingItem)) {
++  if (isMutantAllowed(clothingItem, character)) {
+     return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
+   }
+ 
+@@ -153,14 +152,12 @@ export function canEquipClothing(clothingItem, character) {
+ 
+ /**
+  * Power armor equip check — WHITELIST PRINCIPLE.
+- * - ROBOT_ONLY: allowed only if powerArmorItem.robotOnly (injected via trait/origin for mega case)
+- * - RAIDER_ONLY: allowed only if mutantOnly
+- * - STANDARD: allowed if not robot/mutant
++ * Частный список вне домена, движок — domain/allowlist.js
+  */
+ export function canEquipPowerArmor(powerArmorItem, character) {
+   const policy = getArmorPolicy(character);
+-  const robotAllowed = isRobotAllowedItem(powerArmorItem);
+-  const mutantAllowed = isMutantAllowedItem(powerArmorItem);
++  const robotAllowed = isRobotAllowed(powerArmorItem, character);
++  const mutantAllowed = isMutantAllowed(powerArmorItem, character);
+ 
+   if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+     if (!robotAllowed) {
+diff --git a/modules/fallout/data/allowlist/mutantOnly.js b/modules/fallout/data/allowlist/mutantOnly.js
+new file mode 100644
+index 0000000..16b8eaa
+--- /dev/null
++++ b/modules/fallout/data/allowlist/mutantOnly.js
+@@ -0,0 +1,14 @@
++// modules/fallout/data/allowlist/mutantOnly.js
++// Частный случай: что может носить мутант (RAIDER_ONLY / MUTANT)
++// Просто список id и/или категорий.
++
++export const mutantOnly = Object.freeze({
++  // Пока пусто, броня помечается mutantOnly в данных
++  // Добавить что-то — просто ключ: true
++});
++
++export const MUTANT_ONLY_STRUCTURED = Object.freeze({
++  itemTypes: Object.freeze([]),
++  prefixes: Object.freeze([]),
++  ids: Object.freeze([]),
++});
+diff --git a/modules/fallout/data/allowlist/robotOnly.js b/modules/fallout/data/allowlist/robotOnly.js
+new file mode 100644
+index 0000000..ef19223
+--- /dev/null
++++ b/modules/fallout/data/allowlist/robotOnly.js
+@@ -0,0 +1,68 @@
++// modules/fallout/data/allowlist/robotOnly.js
++// Частный случай: что может носить робот (ROBOT_ONLY).
++// Просто список id и/или категорий, без выдумывания что к чему.
++// Хочешь пиджак — добавляешь его id сюда. Бандану — сюда.
++// Мега-случай "робот в силовой броне" — через трейт/ориджин инжект в этот список (owner-only).
++
++// Вариант как хочет владелец: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }
++// Реализовано как объект где ключи — категории/id, значение true — разрешено.
++// Движок в domain/allowlist.js умеет проверять такие ключи через CATEGORY_ALIASES и прямое совпадение id/itemType.
++
++export const robotOnly = Object.freeze({
++  // Категории (мапятся в движке на itemTypes/префиксы)
++  robotArmor: true,
++  robotPlating: true,
++  robotFrame: true,
++  robotLims: true,
++  robotWeapons: true,
++
++  // Конкретные предметы (id)
++  fancyHat: true, // мапится на headwear_fancy_hat
++  casualHat: true,
++  // Будущие примеры:
++  // jacket: true, // если добавишь clothing_jacket с id jacket или маппингом
++  // bandana: true,
++  // powerArmorFrame: true, // мега-случай — разрешить силовую броню
++
++  // Прямые id для совместимости (можно добавлять напрямую)
++  headwear_casual_hat: true,
++  headwear_fancy_hat: true,
++  headwear_bos_scribe_hat: true,
++  headwear_bos_scribe_hat_2: true,
++  headwear_bos_field_scribe_hat: true,
++});
++
++// Структурированный вариант для движка (itemTypes/ids/prefixes) — генерируется из простого объекта выше
++// Но можно править напрямую этот объект, если нужен тонкий контроль.
++export const ROBOT_ONLY_STRUCTURED = Object.freeze({
++  itemTypes: Object.freeze([
++    'plating',
++    'frame',
++    'robotArmor',
++    'robotFrame',
++    'robotArm',
++    'robotHead',
++    'robotBody',
++    'robotLeg',
++    'robotLegs',
++    'robotPart',
++    'module',
++  ]),
++  prefixes: Object.freeze([
++    'robot_weapon_',
++    'robot_arm_',
++    'robot_plating_',
++    'robot_frame_',
++    'robot_head_',
++    'robot_body_',
++    'robot_legs_',
++    'robot_leg_',
++  ]),
++  ids: Object.freeze([
++    'headwear_casual_hat',
++    'headwear_fancy_hat',
++    'headwear_bos_scribe_hat',
++    'headwear_bos_scribe_hat_2',
++    'headwear_bos_field_scribe_hat',
++  ]),
++});

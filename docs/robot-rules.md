@@ -4,34 +4,39 @@
 - Origin has `characterType` = `robot` → `ARMOR_POLICIES.ROBOT_ONLY`
 - `mutant` → `RAIDER_ONLY`, `human/ghoul/cyborg` → `STANDARD`
 - Determined via `domain/origins.js isRobotCharacter()`
-- All equip checks read this flag, no hardcoding by origin id.
 
-## 2. What Robots Can Wear — WHITELIST
+## 2. Architecture: Domain vs Private Case
+- **Domain = engine, general rules**: `domain/allowlist.js` — `isItemInAllowlist(item, allowlist)` — поддержка слага/категории/id белого списка. Общая движковая функция.
+- **Private case = что именно может носить робот**: `modules/fallout/data/allowlist/robotOnly.js` — просто список id и/или категорий: `robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }`. Хочешь пиджак — добавляешь его id. Бандану — бандану. Мега-случай "робот в силовой броне" — через трейт/ориджин инжект в robotOnly (owner-only).
+- `domain/equipEquip.js` — применяет общее правило политики (ROBOT_ONLY/RAIDER_ONLY/STANDARD) через движок белого списка, но сами списки — вне домена.
+
+## 3. What Robots Can Wear — WHITELIST
 **Owner principle: robotOnly describes WHAT robot CAN wear. Forbidden = not allowed. Same for mutantOnly.**
-- If power armor not in robotOnly options, no equip flag/check for it.
-- Want robot to wear jacket? Set `jacket.robotOnly=true`. Bandana? `bandana.robotOnly=true`.
-- Mega case: robot in power armor → via trait/origin flag injected into robotOnly (owner-only unique case).
 
-### Armor (standard armor slots `equippedArmor`)
-- Whitelist: `item.robotOnly==true || item.robotArmorType || item.canRobotWear`
-- ROBOT_ONLY: allowed ONLY if whitelist, else `robotCannotWearStandardArmor`
-- RAIDER_ONLY: allowed ONLY if `mutantOnly`, else `mutantCannotWearStandardArmor`
-- STANDARD: allowed if NOT robotOnly AND NOT mutantOnly, else `cannotWearRobotArmor` / `cannotWearMutantArmor`
-- Implementation: `canEquipArmor()` checks `isRobotAllowedItem()` / `isMutantAllowedItem()`
+### Allowlist structure (simple, no inventing)
+```js
+robotOnly = {
+  robotArmor: true,
+  robotPlating: true,
+  robotFrame: true,
+  robotLims: true,
+  robotWeapons: true,
+  fancyHat: true,
+  headwear_casual_hat: true,
+  // jacket: true, bandana: true — просто добавить id
+}
+```
+Engine in `domain/allowlist.js` maps categories via `CATEGORY_ALIASES` (robotPlating→plating/prefix robot_plating_, etc.) and checks direct id/itemType/prefix.
 
-### Clothing (standard clothing slots)
-- Whitelist: `item.robotOnly || item.canRobotWear` (canRobotWear kept for backward compat of hats)
-- No hardcoded hat list — if you want robot to wear something, mark it robotOnly.
-- Current hats with `canRobotWear=true` are allowed via whitelist, but future items should use `robotOnly`
-- Same logic for mutant: only `mutantOnly` allowed for RAIDER_ONLY
-- Implementation: `canEquipClothing()` — whitelist check
+### Armor / Clothing / Power Armor (standard slots)
+- ROBOT_ONLY: allowed ONLY if item in robotOnly allowlist (via `isItemInAllowlist`), else `robotCannotWearStandardArmor`
+- RAIDER_ONLY: allowed ONLY if in mutantOnly allowlist
+- STANDARD: allowed if NOT in robot/mutant allowlists
+- If power armor not in robotOnly, no equip flag/check — cannot wear. Want robot in PA? Inject `powerArmorFrame` or its id into robotOnly via trait/origin.
+- Implementation: `canEquipArmor()`, `canEquipClothing()`, `canEquipPowerArmor()` in `domain/equipEquip.js` use `isRobotAllowed()` / `isMutantAllowed()` which call `isItemInAllowlist()` with private lists from `modules/fallout/data/allowlist/`
 
-### Power Armor
-- Whitelist same as armor: ROBOT_ONLY allowed only if `powerArmorItem.robotOnly==true`
-- Currently no power armor has robotOnly, so robots cannot wear it — no equip flag.
-- If mega case needed, set `power_armor_frame.robotOnly=true` via trait/origin injection (owner-only)
-- Piece check: `canEquipPowerArmorPiece(equipped, piece, character)` checks robot flag + frame
-- Implementation: `canEquipPowerArmor()` — whitelist
+### Power Armor pieces
+- `canEquipPowerArmorPiece(equipped, piece, character)` — needs frame + not broken + whitelist (if robot, piece/frame must be in robotOnly)
 
 ### Weapons
 - Robot weapons (`robot_weapon_*` / `robot_arm_*` / `isRobotWeapon` / `robotOnly`) as limbs: always allowed for ROBOT_ONLY
