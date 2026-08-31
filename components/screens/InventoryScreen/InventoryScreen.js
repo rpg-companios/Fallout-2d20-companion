@@ -33,6 +33,7 @@ import { generateStackKey } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
+import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
 import styles from '../../../styles/InventoryScreen.styles';
 import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled } from '../../../src/store/appSettingsStore';
 import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
@@ -681,7 +682,20 @@ const InventoryScreen = () => {
     const displayWeapon = weaponToEquip;
     const weaponQualities = String(displayWeapon?.qualities || '').toLowerCase();
     const isTwoHandedWeapon = ['двуруч', 'two-handed', 'two handed'].some((token) => weaponQualities.includes(token));
-    
+
+    // IRON RULES: проверка через domain/equipEquip.js
+    const weaponCheck = canEquipWeapon(displayWeapon, { origin, trait });
+    if (!weaponCheck.allowed) {
+      if (weaponCheck.reason === 'equip.error.robotOnlyWeapon') {
+        showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle'), tInventory('screen.alerts.robotOnlyWeaponMessage'));
+      } else if (weaponCheck.reason === 'equip.error.robotCannotUseStandardWeapon') {
+        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
+      } else {
+        showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle'), tInventory('screen.alerts.robotOnlyWeaponMessage'));
+      }
+      return;
+    }
+
     if (isRobot && isRobotOnlyItem(displayWeapon) && Array.isArray(robotBodyUpgrade?.allowedRobotWeaponIds)) {
       const allowedWeaponIds = robotBodyUpgrade.allowedRobotWeaponIds;
       if (displayWeapon?.id && !allowedWeaponIds.includes(displayWeapon.id)) {
@@ -691,11 +705,6 @@ const InventoryScreen = () => {
         );
         return;
       }
-    }
-
-    if (isRobotOnlyItem(displayWeapon) && !isRobot) {
-      showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle'), tInventory('screen.alerts.robotOnlyWeaponMessage'));
-      return;
     }
     if (isRobot && isRobotLimbWeapon(displayWeapon)) {
       const armDef = resolveRobotArmFromWeapon(displayWeapon);
@@ -892,16 +901,35 @@ const InventoryScreen = () => {
     // предмет не надевается. Каталог = источник истины.
     const itemToEquip = resolveLocalizedItem(itemToEquipRaw) || itemToEquipRaw;
     const currentEquipped = equippedArmor;
-    if (isRobot && !isRobotOnlyItem(itemToEquip)) {
-      const isAllowedClothing = itemToEquip.itemType === 'clothing' && itemToEquip.canRobotWear === true;
-      if (!isAllowedClothing) {
+    // IRON RULES: проверка через domain/equipEquip.js (см. docs/robot-rules.md)
+    // Роботы: только robotOnly броня + декоративные шляпы, NO power armor
+    // Мутанты: только mutantOnly броня, NO power armor
+    if (isPowerArmorItem(itemToEquip) || isPowerArmorDomain(itemToEquip)) {
+      const paCheck = canEquipPowerArmor(itemToEquip, { origin, trait });
+      if (!paCheck.allowed) {
         showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
         return;
       }
     }
-    if (isRobot && isPowerArmorItem(itemToEquip)) {
-      showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
-      return;
+    // Проверка брони/одежды через доменные функции
+    if (itemToEquip.itemType === 'armor' || itemToEquip.protectedAreas) {
+      const armorCheck = canEquipArmor(itemToEquip, { origin, trait });
+      if (!armorCheck.allowed) {
+        // Для роботов показываем специфичный алерт, для остальных — generic
+        if (isRobot) {
+          showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
+        } else {
+          showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory(`screen.alerts.${armorCheck.reason?.split('.').pop() || 'cannotEquipItem'}`) || tInventory('screen.alerts.cannotEquipItem'));
+        }
+        return;
+      }
+    }
+    if (itemToEquip.itemType === 'clothing' || itemToEquip.clothingType) {
+      const clothingCheck = canEquipClothing(itemToEquip, { origin, trait });
+      if (!clothingCheck.allowed) {
+        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
+        return;
+      }
     }
     // ПРАВИЛО (от владельца): слот экипировки определяется ВИДОМ предмета
     // (domain/equippedArmor.resolveTargetLayer): броня — в armor, одежда — в clothing.
@@ -1403,12 +1431,28 @@ const InventoryScreen = () => {
 
     // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
     const isBuiltinOrManipulator = Boolean(item?.isBuiltin || item?.isManipulator);
+    // IRON RULES: роботы не могут носить силовую броню — скрываем кнопку экипировки
+    const isRobotPowerArmorBlocked = isRobot
+      && !item.isEquipped
+      && (item.itemType === 'powerArmor' || isPowerArmorDomain(item) || isPowerArmorItem(item));
     // Для роботов: скрыть кнопку "Экипировать" если нет руки с canHoldWeapons
-    const hideEquipButton = isRobot
+    const hideEquipButtonNoArm = isRobot
       && item.itemType === 'weapon'
       && !item.isEquipped
       && !robotHasHoldingArm
       && !isRobotLimbWeapon(item);
+    // Для роботов: скрыть кнопку экипировки стандартного оружия (только робо-оружие)
+    const isRobotStandardWeaponBlocked = isRobot
+      && !item.isEquipped
+      && item.itemType === 'weapon'
+      && !isRobotOnlyItem(item)
+      && !isRobotLimbWeapon(item)
+      && (() => {
+        try {
+          return !canEquipWeapon(item, { origin, trait }).allowed;
+        } catch { return false; }
+      })();
+    const hideEquipButton = hideEquipButtonNoArm || isRobotPowerArmorBlocked || isRobotStandardWeaponBlocked;
     // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия,
     // а также для locked-предметов (комплекты роботов — снять можно только сменой конечности).
     const hideActionButton = item.isEquipped && (

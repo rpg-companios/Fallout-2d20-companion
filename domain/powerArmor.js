@@ -120,11 +120,15 @@ export const hasFrame = (equipped) => Boolean(equipped?.frame);
 
 /**
  * Можно ли надеть часть (§5.2): нужен надетый каркас; часть с прочностью 0 не надевается.
- * reason: 'needsFrame' | 'broken' | null.
+ * Роботы не могут носить силовую броню вообще.
+ * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | null.
  */
-export const canEquipPowerArmorPiece = (equipped, piece) => {
+export const canEquipPowerArmorPiece = (equipped, piece, character = null) => {
   if (!hasFrame(equipped)) return { ok: false, reason: 'needsFrame' };
   if (isPieceBroken(piece)) return { ok: false, reason: 'broken' };
+  if (character && character.origin && character.origin.characterType === 'robot') {
+    return { ok: false, reason: 'robotCannotWear' };
+  }
   return { ok: true, reason: null };
 };
 

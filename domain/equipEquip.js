@@ -1,9 +1,16 @@
 // domain/equipEquip.js
-// Pure functions for equip eligibility checks.
+// Pure functions for equip eligibility checks — IRON RULES for robots/mutants.
 // No React, no UI dependencies. All reason strings are i18n keys.
 //
 // Armor policy and character archetype now live in domain/origins.js
 // (characterType drives the default policy; origin.armorPolicy overrides).
+//
+// IRON RULES (see docs/robot-rules.md):
+// - ROBOT_ONLY can wear ONLY robot armor (robotOnly || robotArmorType) + decorative hats
+// - ROBOT_ONLY CANNOT wear power armor, standard armor, mutant armor, standard clothing
+// - ROBOT_ONLY can use ONLY robot weapons (robot_weapon_* / robot_arm_* / isRobotWeapon)
+// - RAIDER_ONLY (mutant) can wear ONLY mutant armor (mutantOnly)
+// - Human cannot wear robot/mutant armor or robot weapons
 
 import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
 import { ARMOR_POLICIES, getArmorPolicy, isRobotCharacter } from './origins';
@@ -14,6 +21,10 @@ const isRobotArmor = (armorItem) =>
 
 /** True if the armor item is mutant/raider restricted. */
 const isMutantArmor = (armorItem) => Boolean(armorItem?.mutantOnly);
+
+/** True if the item is power armor (frame or piece). */
+export const isPowerArmorItem = (item) =>
+  Boolean(item?.itemType === 'powerArmor' || String(item?.id || '').startsWith('power_armor_'));
 
 /** True if the weapon comes from robot weapons catalog. */
 const isRobotOnlyWeapon = (weaponItem) =>
@@ -41,16 +52,23 @@ const isRobotDecorativeHat = (clothingItem) => {
  * Check whether a character can equip a given armor item.
  *
  * Policies:
- *  - robotOnly             -> only robot armor
- *  - raiderOnly            -> only mutant-tagged armor
+ *  - robotOnly             -> only robot armor, NO power armor
+ *  - raiderOnly            -> only mutant-tagged armor, NO power armor
  *  - standard              -> standard + power armor, but no robot/mutant armor
+ *
+ * Power armor is treated as standard armor for policy purposes — robots and mutants cannot wear it.
  */
 export function canEquipArmor(armorItem, character) {
   const policy = getArmorPolicy(character);
   const robotArmor = isRobotArmor(armorItem);
   const mutantArmor = isMutantArmor(armorItem);
+  const powerArmor = isPowerArmorItem(armorItem);
 
   if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+    // Robots cannot wear power armor at all
+    if (powerArmor) {
+      return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+    }
     if (!robotArmor) {
       return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
     }
@@ -58,6 +76,9 @@ export function canEquipArmor(armorItem, character) {
   }
 
   if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+    if (powerArmor) {
+      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+    }
     if (!mutantArmor) {
       return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
     }
@@ -109,6 +130,22 @@ export function canEquipClothing(clothingItem, character) {
     return { allowed: true, reason: null };
   }
 
+  return { allowed: true, reason: null };
+}
+
+/**
+ * Power armor equip check — explicit block for robots/mutants.
+ * Even if canEquipArmor would block, this is a dedicated check for PA flow.
+ */
+export function canEquipPowerArmor(powerArmorItem, character) {
+  const policy = getArmorPolicy(character);
+  if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+    return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+  }
+  if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+    return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+  }
+  // Humans: allowed (further checks like frame/piece handled elsewhere)
   return { allowed: true, reason: null };
 }
 

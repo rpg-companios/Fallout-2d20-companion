@@ -567,8 +567,12 @@ export const CharacterProvider = ({ children }) => {
     };
     const candidateSlots = powerArmorSlotsFor(PA_CATALOG_BY_ID[catalogId]);
     if (candidateSlots.length === 0) return;
-    const check = canEquipPowerArmorPiece(equippedPowerArmorRef.current, piece);
+    const check = canEquipPowerArmorPiece(equippedPowerArmorRef.current, piece, { origin, trait });
     if (!check.ok) {
+      if (check.reason === 'robotCannotWear') {
+        paAlert(tPA('robotArmorOnlyTitle'), tPA('robotArmorOnlyMessage'));
+        return;
+      }
       paAlert(
         tPA('powerArmorNeedsCoreTitle'),
         tPA(check.reason === 'needsFrame' ? 'powerArmorNeedsFrameMessage' : 'powerArmorBrokenPieceMessage'),
@@ -608,7 +612,7 @@ export const CharacterProvider = ({ children }) => {
       { text: rightLabel, onPress: () => doEquip(rightSlot) },
       { text: tPAAction('cancel'), style: 'cancel' },
     ]);
-  }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem]);
+  }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem, origin, trait]);
 
   // Снять часть слота → в инвентарь своей стопкой.
   const unequipPowerArmorPieceAt = useCallback((slot) => {
