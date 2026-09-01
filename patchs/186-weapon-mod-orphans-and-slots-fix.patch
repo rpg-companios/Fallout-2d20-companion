@@ -1,0 +1,1274 @@
+diff --git a/modules/fallout/data/equipment/weapon_mod_slots.json b/modules/fallout/data/equipment/weapon_mod_slots.json
+index 89e53c6..16f4e26 100644
+--- a/modules/fallout/data/equipment/weapon_mod_slots.json
++++ b/modules/fallout/data/equipment/weapon_mod_slots.json
+@@ -67,7 +67,8 @@
+   },
+   "weapon_357_magnum_revolver": {
+     "Receiver": [
+-      "mod_009"
++      "mod_009",
++      "mod_187"
+     ],
+     "Barrel": [
+       "mod_017"
+@@ -141,10 +142,14 @@
+       "mod_008",
+       "mod_007",
+       "mod_004",
+-      "mod_009"
+-    ],
+-    "Nozzle": [
+-      "mod_078"
++      "mod_009",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_184",
++      "mod_185",
++      "mod_186",
++      "mod_005"
+     ],
+     "Grip": [
+       "mod_026"
+@@ -231,7 +236,9 @@
+       "mod_004",
+       "mod_005",
+       "mod_006",
+-      "mod_010"
++      "mod_010",
++      "mod_183",
++      "mod_187"
+     ],
+     "Barrel": [
+       "mod_017",
+@@ -258,7 +265,8 @@
+       "mod_004",
+       "mod_005",
+       "mod_011",
+-      "mod_010"
++      "mod_010",
++      "mod_183"
+     ],
+     "Barrel": [
+       "mod_017",
+@@ -289,7 +297,8 @@
+       "mod_004",
+       "mod_005",
+       "mod_006",
+-      "mod_010"
++      "mod_010",
++      "mod_183"
+     ],
+     "Barrel": [
+       "mod_017",
+@@ -313,7 +322,15 @@
+     "Receiver": [
+       "mod_004",
+       "mod_005",
+-      "mod_009"
++      "mod_009",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_183",
++      "mod_184",
++      "mod_185",
++      "mod_007",
++      "mod_008"
+     ],
+     "Barrel": [
+       "mod_017",
+@@ -342,7 +359,9 @@
+     "Receiver": [
+       "mod_004",
+       "mod_005",
+-      "mod_009"
++      "mod_009",
++      "mod_183",
++      "mod_007"
+     ],
+     "Barrel": [
+       "mod_017",
+@@ -796,7 +815,8 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_040",
+@@ -807,14 +827,19 @@
+       "mod_001",
+       "mod_002",
+       "mod_004",
+-      "mod_005"
++      "mod_005",
++      "mod_179",
++      "mod_183"
+     ],
+     "Sight": [
+-      "mod_033"
++      "mod_033",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_10mm_smg": {
+@@ -824,7 +849,8 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_040",
+@@ -835,14 +861,19 @@
+       "mod_001",
+       "mod_002",
+       "mod_004",
+-      "mod_005"
++      "mod_005",
++      "mod_179",
++      "mod_183"
+     ],
+     "Sight": [
+-      "mod_033"
++      "mod_033",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_hunting_rifle": {
+@@ -854,11 +885,13 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_039",
+-      "mod_042"
++      "mod_042",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_003",
+@@ -866,7 +899,9 @@
+       "mod_005",
+       "mod_007",
+       "mod_010",
+-      "mod_013"
++      "mod_013",
++      "mod_179",
++      "mod_183"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -874,7 +909,9 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+@@ -887,17 +924,22 @@
+       "mod_016"
+     ],
+     "Grip": [
+-      "mod_026"
++      "mod_026",
++      "mod_194"
+     ],
+     "Receiver": [
+       "mod_004",
+       "mod_005",
+-      "mod_006"
++      "mod_006",
++      "mod_179",
++      "mod_183"
+     ],
+     "Sight": [
+       "mod_033",
+       "mod_034",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ]
+   },
+   "weapon_10mm_pistol": {
+@@ -907,12 +949,14 @@
+     ],
+     "Grip": [
+       "mod_026",
+-      "mod_027"
++      "mod_027",
++      "mod_194"
+     ],
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_040",
+@@ -924,11 +968,20 @@
+       "mod_006",
+       "mod_007",
+       "mod_008",
+-      "mod_009"
++      "mod_009",
++      "mod_179",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_183",
++      "mod_184",
++      "mod_185"
+     ],
+     "Sight": [
+       "mod_033",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ]
+   },
+   "weapon_assault_rifle": {
+@@ -940,7 +993,8 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_040",
+@@ -952,7 +1006,14 @@
+       "mod_006",
+       "mod_007",
+       "mod_008",
+-      "mod_009"
++      "mod_009",
++      "mod_179",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_183",
++      "mod_184",
++      "mod_185"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -960,12 +1021,15 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_combat_rifle": {
+@@ -977,12 +1041,14 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_039",
+       "mod_040",
+-      "mod_042"
++      "mod_042",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_004",
+@@ -992,7 +1058,14 @@
+       "mod_008",
+       "mod_009",
+       "mod_010",
+-      "mod_011"
++      "mod_011",
++      "mod_179",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_183",
++      "mod_184",
++      "mod_185"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -1000,12 +1073,15 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_combat_shotgun": {
+@@ -1016,13 +1092,15 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_039",
+       "mod_040",
+       "mod_041",
+-      "mod_042"
++      "mod_042",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_004",
+@@ -1030,7 +1108,14 @@
+       "mod_006",
+       "mod_007",
+       "mod_008",
+-      "mod_009"
++      "mod_009",
++      "mod_179",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_183",
++      "mod_184",
++      "mod_185"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -1038,12 +1123,15 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_double_barrel_shotgun": {
+@@ -1061,7 +1149,9 @@
+       "mod_009"
+     ],
+     "Sight": [
+-      "mod_033"
++      "mod_033",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028"
+@@ -1081,14 +1171,17 @@
+       "mod_039",
+       "mod_040",
+       "mod_041",
+-      "mod_042"
++      "mod_042",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_004",
+       "mod_005",
+       "mod_007",
+       "mod_010",
+-      "mod_013"
++      "mod_013",
++      "mod_179",
++      "mod_183"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -1096,12 +1189,15 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_pipe_gun": {
+@@ -1116,13 +1212,15 @@
+     "Magazine": [
+       "mod_023",
+       "mod_024",
+-      "mod_025"
++      "mod_025",
++      "mod_195"
+     ],
+     "Muzzle": [
+       "mod_039",
+       "mod_040",
+       "mod_041",
+-      "mod_042"
++      "mod_042",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_004",
+@@ -1130,7 +1228,14 @@
+       "mod_007",
+       "mod_008",
+       "mod_009",
+-      "mod_012"
++      "mod_012",
++      "mod_179",
++      "mod_180",
++      "mod_181",
++      "mod_182",
++      "mod_183",
++      "mod_184",
++      "mod_185"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -1138,12 +1243,15 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_pipe_revolver": {
+@@ -1159,14 +1267,18 @@
+       "mod_039",
+       "mod_040",
+       "mod_041",
+-      "mod_042"
++      "mod_042",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_004",
+       "mod_005",
+       "mod_007",
+       "mod_010",
+-      "mod_011"
++      "mod_011",
++      "mod_179",
++      "mod_183",
++      "mod_187"
+     ],
+     "Sight": [
+       "mod_033",
+@@ -1174,12 +1286,15 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_028",
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_railway_rifle": {
+@@ -1187,7 +1302,8 @@
+       "mod_017"
+     ],
+     "Muzzle": [
+-      "mod_039"
++      "mod_039",
++      "mod_197"
+     ],
+     "Receiver": [
+       "mod_014"
+@@ -1198,10 +1314,13 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_syringer": {
+@@ -1215,11 +1334,14 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+       "mod_029",
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_gauss_rifle": {
+@@ -1239,10 +1361,13 @@
+       "mod_035",
+       "mod_036",
+       "mod_037",
+-      "mod_038"
++      "mod_038",
++      "mod_153",
++      "mod_196"
+     ],
+     "Stock": [
+-      "mod_030"
++      "mod_030",
++      "mod_152"
+     ]
+   },
+   "weapon_institute_laser": {
+@@ -1419,7 +1544,9 @@
+     ],
+     "Muzzle": [
+       "mod_090",
+-      "mod_091"
++      "mod_091",
++      "mod_154",
++      "mod_155"
+     ],
+     "Sight": [
+       "mod_089"
+@@ -1589,37 +1716,6 @@
+       "mod_151"
+     ]
+   },
+-  "": {
+-    "Grip": [
+-      "mod_194"
+-    ],
+-    "Magazine": [
+-      "mod_195"
+-    ],
+-    "Muzzle": [
+-      "mod_197",
+-      "mod_154",
+-      "mod_155"
+-    ],
+-    "Receiver": [
+-      "mod_179",
+-      "mod_180",
+-      "mod_181",
+-      "mod_182",
+-      "mod_183",
+-      "mod_184",
+-      "mod_185",
+-      "mod_186",
+-      "mod_187"
+-    ],
+-    "Sight": [
+-      "mod_196",
+-      "mod_153"
+-    ],
+-    "Stock": [
+-      "mod_152"
+-    ]
+-  },
+   "weapon_assaultron_head_laser": {
+     "Concentrate": [
+       "mod_158"
+@@ -1682,4 +1778,4 @@
+       "mod_191"
+     ]
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipment/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+index 5d989b6..47b389d 100644
+--- a/modules/fallout/data/equipment/weapon_mods.json
++++ b/modules/fallout/data/equipment/weapon_mods.json
+@@ -105,7 +105,15 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_9mm_pistol",
++      "weapon_battle_rifle",
++      "weapon_sniper_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -138,7 +146,15 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_9mm_pistol",
++      "weapon_battle_rifle",
++      "weapon_sniper_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -165,7 +181,9 @@
+       "weapon_assault_rifle",
+       "weapon_combat_rifle",
+       "weapon_combat_shotgun",
+-      "weapon_double_barrel_shotgun"
++      "weapon_double_barrel_shotgun",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -198,7 +216,13 @@
+       "weapon_combat_shotgun",
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+-      "weapon_pipe_revolver"
++      "weapon_pipe_revolver",
++      "weapon_9mm_pistol",
++      "weapon_sniper_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "qualityChanges": [],
+     "effectChanges": [
+@@ -225,7 +249,9 @@
+       "weapon_assault_rifle",
+       "weapon_combat_rifle",
+       "weapon_combat_shotgun",
+-      "weapon_pipe_gun"
++      "weapon_pipe_gun",
++      "weapon_9mm_pistol",
++      "weapon_radium_rifle"
+     ],
+     "damageModifier": {
+       "op": "-",
+@@ -266,7 +292,13 @@
+       "weapon_combat_rifle",
+       "weapon_combat_shotgun",
+       "weapon_double_barrel_shotgun",
+-      "weapon_pipe_gun"
++      "weapon_pipe_gun",
++      "weapon_9mm_pistol",
++      "weapon_357_magnum_revolver",
++      "weapon_battle_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_radium_rifle"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -315,7 +347,8 @@
+     "weight": 4,
+     "applies_to_ids": [
+       "weapon_combat_rifle",
+-      "weapon_pipe_revolver"
++      "weapon_pipe_revolver",
++      "weapon_light_machine_gun"
+     ],
+     "damageModifier": {
+       "op": "set",
+@@ -471,7 +504,13 @@
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_357_magnum_revolver",
++      "weapon_battle_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -500,7 +539,11 @@
+       "weapon_combat_shotgun",
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+-      "weapon_pipe_revolver"
++      "weapon_pipe_revolver",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -528,7 +571,8 @@
+     "applies_to_ids": [
+       "weapon_assault_rifle",
+       "weapon_combat_rifle",
+-      "weapon_hunting_rifle"
++      "weapon_hunting_rifle",
++      "weapon_light_machine_gun"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -643,7 +687,12 @@
+       "weapon_submachine_gun",
+       "weapon_combat_shotgun",
+       "weapon_pipe_gun",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_9mm_pistol",
++      "weapon_357_magnum_revolver",
++      "weapon_anti_materiel_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -677,7 +726,9 @@
+       "weapon_submachine_gun",
+       "weapon_combat_shotgun",
+       "weapon_pipe_gun",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -707,7 +758,9 @@
+       "weapon_submachine_gun",
+       "weapon_combat_shotgun",
+       "weapon_pipe_gun",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -730,7 +783,8 @@
+     "weight": null,
+     "applies_to_ids": [
+       "weapon_44_pistol",
+-      "weapon_10mm_pistol"
++      "weapon_10mm_pistol",
++      "weapon_9mm_pistol"
+     ],
+     "qualityChanges": [
+       {
+@@ -794,7 +848,11 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -828,7 +886,9 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_lever_action_rifle",
++      "weapon_radium_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -869,7 +929,10 @@
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+       "weapon_syringer",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_pump_action_shotgun",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -967,7 +1030,13 @@
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+       "weapon_syringer",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_9mm_pistol",
++      "weapon_battle_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -1000,7 +1069,12 @@
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_9mm_pistol",
++      "weapon_battle_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_lever_action_rifle",
++      "weapon_radium_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -1032,7 +1106,10 @@
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_sniper_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_lever_action_rifle"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -1068,7 +1145,10 @@
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_sniper_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_lever_action_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -1104,7 +1184,10 @@
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_sniper_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_lever_action_rifle"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -1146,7 +1229,8 @@
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+       "weapon_railway_rifle",
+-      "weapon_syringer"
++      "weapon_syringer",
++      "weapon_anti_materiel_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -1179,7 +1263,9 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_railway_rifle"
++      "weapon_railway_rifle",
++      "weapon_battle_rifle",
++      "weapon_pump_action_shotgun"
+     ],
+     "qualityChanges": [
+       {
+@@ -1210,7 +1296,9 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_pump_action_shotgun",
++      "weapon_light_machine_gun"
+     ],
+     "qualityChanges": [
+       {
+@@ -1239,7 +1327,9 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_pump_action_shotgun",
++      "weapon_light_machine_gun"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -1276,7 +1366,11 @@
+       "weapon_pipe_bolt_action",
+       "weapon_pipe_gun",
+       "weapon_pipe_revolver",
+-      "weapon_10mm_smg"
++      "weapon_10mm_smg",
++      "weapon_9mm_pistol",
++      "weapon_sniper_rifle",
++      "weapon_anti_materiel_rifle",
++      "weapon_pump_action_shotgun"
+     ],
+     "qualityChanges": [
+       {
+@@ -4257,7 +4351,17 @@
+     "cost": 40,
+     "weight": null,
+     "applies_to_ids": [
+-      ""
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_gauss_rifle",
++      "weapon_submachine_gun",
++      "weapon_combat_shotgun",
++      "weapon_pipe_bolt_action",
++      "weapon_pipe_gun",
++      "weapon_pipe_revolver",
++      "weapon_railway_rifle",
++      "weapon_syringer",
++      "weapon_10mm_smg"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -4279,7 +4383,21 @@
+     "cost": 5,
+     "weight": null,
+     "applies_to_ids": [
+-      ""
++      "weapon_44_pistol",
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_gauss_rifle",
++      "weapon_hunting_rifle",
++      "weapon_submachine_gun",
++      "weapon_combat_shotgun",
++      "weapon_double_barrel_shotgun",
++      "weapon_pipe_bolt_action",
++      "weapon_pipe_gun",
++      "weapon_pipe_revolver",
++      "weapon_railway_rifle",
++      "weapon_syringer",
++      "weapon_10mm_smg"
+     ],
+     "qualityChanges": [
+       {
+@@ -4302,7 +4420,7 @@
+     "cost": 70,
+     "weight": null,
+     "applies_to_ids": [
+-      ""
++      "weapon_gatling_laser"
+     ],
+     "qualityChanges": [],
+     "effectChanges": [
+@@ -4329,7 +4447,7 @@
+     "cost": 130,
+     "weight": null,
+     "applies_to_ids": [
+-      ""
++      "weapon_gatling_laser"
+     ],
+     "qualityChanges": [],
+     "effectChanges": [
+@@ -4933,7 +5051,17 @@
+     "cost": 3,
+     "weight": 1,
+     "applies_to_ids": [
+-      ""
++      "weapon_44_pistol",
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_hunting_rifle",
++      "weapon_submachine_gun",
++      "weapon_combat_shotgun",
++      "weapon_pipe_bolt_action",
++      "weapon_pipe_gun",
++      "weapon_pipe_revolver",
++      "weapon_10mm_smg"
+     ],
+     "qualityChanges": [],
+     "effectChanges": [
+@@ -4951,7 +5079,13 @@
+     "cost": 40,
+     "weight": 1,
+     "applies_to_ids": [
+-      ""
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_combat_shotgun",
++      "weapon_pipe_gun",
++      "weapon_9mm_pistol",
++      "weapon_radium_rifle"
+     ],
+     "damageModifier": {
+       "op": "-",
+@@ -4982,7 +5116,13 @@
+     "cost": 58,
+     "weight": 2,
+     "applies_to_ids": [
+-      ""
++      "weapon_9mm_pistol",
++      "weapon_radium_rifle",
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_combat_shotgun",
++      "weapon_pipe_gun"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -5003,7 +5143,13 @@
+     "cost": 63,
+     "weight": 2,
+     "applies_to_ids": [
+-      ""
++      "weapon_radium_rifle",
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_combat_shotgun",
++      "weapon_pipe_gun",
++      "weapon_9mm_pistol"
+     ],
+     "damageModifier": {
+       "op": "-",
+@@ -5028,7 +5174,22 @@
+     "cost": 68,
+     "weight": 3,
+     "applies_to_ids": [
+-      ""
++      "weapon_sniper_rifle",
++      "weapon_pump_action_shotgun",
++      "weapon_lever_action_rifle",
++      "weapon_light_machine_gun",
++      "weapon_radium_rifle",
++      "weapon_44_pistol",
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_hunting_rifle",
++      "weapon_submachine_gun",
++      "weapon_combat_shotgun",
++      "weapon_pipe_bolt_action",
++      "weapon_pipe_gun",
++      "weapon_pipe_revolver",
++      "weapon_10mm_smg"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -5049,7 +5210,13 @@
+     "cost": 88,
+     "weight": 4,
+     "applies_to_ids": [
+-      ""
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_combat_shotgun",
++      "weapon_pipe_gun",
++      "weapon_9mm_pistol",
++      "weapon_radium_rifle"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -5074,7 +5241,13 @@
+     "cost": 78,
+     "weight": 3,
+     "applies_to_ids": [
+-      ""
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_combat_shotgun",
++      "weapon_pipe_gun",
++      "weapon_9mm_pistol",
++      "weapon_radium_rifle"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -5101,7 +5274,7 @@
+     "cost": 10,
+     "weight": -1,
+     "applies_to_ids": [
+-      ""
++      "weapon_9mm_pistol"
+     ],
+     "damageModifier": {
+       "op": "set",
+@@ -5122,7 +5295,9 @@
+     "cost": 35,
+     "weight": 1,
+     "applies_to_ids": [
+-      ""
++      "weapon_357_magnum_revolver",
++      "weapon_lever_action_rifle",
++      "weapon_pipe_revolver"
+     ],
+     "damageModifier": {
+       "op": "set",
+@@ -5255,7 +5430,8 @@
+     "cost": 90,
+     "weight": 3,
+     "applies_to_ids": [
+-      ""
++      "weapon_44_pistol",
++      "weapon_10mm_pistol"
+     ],
+     "qualityChanges": [
+       {
+@@ -5273,7 +5449,14 @@
+     "cost": 28,
+     "weight": 2,
+     "applies_to_ids": [
+-      ""
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_hunting_rifle",
++      "weapon_submachine_gun",
++      "weapon_combat_shotgun",
++      "weapon_pipe_gun",
++      "weapon_10mm_smg"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -5294,7 +5477,21 @@
+     "cost": 158,
+     "weight": 2,
+     "applies_to_ids": [
+-      ""
++      "weapon_44_pistol",
++      "weapon_10mm_pistol",
++      "weapon_assault_rifle",
++      "weapon_combat_rifle",
++      "weapon_gauss_rifle",
++      "weapon_hunting_rifle",
++      "weapon_submachine_gun",
++      "weapon_combat_shotgun",
++      "weapon_double_barrel_shotgun",
++      "weapon_pipe_bolt_action",
++      "weapon_pipe_gun",
++      "weapon_pipe_revolver",
++      "weapon_railway_rifle",
++      "weapon_syringer",
++      "weapon_10mm_smg"
+     ],
+     "qualityChanges": [
+       {
+@@ -5311,7 +5508,13 @@
+     "cost": 18,
+     "weight": 5,
+     "applies_to_ids": [
+-      ""
++      "weapon_combat_rifle",
++      "weapon_hunting_rifle",
++      "weapon_combat_shotgun",
++      "weapon_pipe_bolt_action",
++      "weapon_pipe_gun",
++      "weapon_pipe_revolver",
++      "weapon_railway_rifle"
+     ],
+     "qualityChanges": [
+       {
+@@ -5443,4 +5646,4 @@
+     ],
+     "effectChanges": []
+   }
+-]
++]
+\ No newline at end of file
