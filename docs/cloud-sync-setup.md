@@ -15,6 +15,9 @@
 - `components/cloudSync/googleDriveSync.js` → вся логика Drive:
   - `getModuleFolderId` — ищет/создаёт подпапку сеттинга **внутри `appDataFolder`**;
   - `listRemoteCharacterFiles` / `downloadRemoteCharacter` / `uploadCharacterFile`;
+  - `requestAccessToken` — OAuth **Authorization Code + PKCE** прямо в браузере
+    (попап, без `client_secret`). Токен кэшируется в памяти на время сессии;
+    при `401` кэш сбрасывается и вход повторяется;
   - `syncAllCharactersWithCloud` — кнопка в меню (полный обмен);
   - `syncCharacterToCloudIfEnabled` — вызывается на каждом автосейве персонажа
     (`CharacterContext`), т.е. изменил персонажа → ушло в Drive.
@@ -95,12 +98,21 @@ Google-аккаунта).
    ```
    При необходимости добавь `http://localhost:8081` (Expo web dev) и
    `http://localhost:5000` (локальная сборка `serve`).
-4. Нажми **Create** → получишь Client ID вида
+4. В **Authorized redirect URIs** впиши те же **домены** (origin без слэша, как
+   в п.3) — сюда Google возвращает попап с кодом после входа:
+   ```
+   https://fallout-2-d-20-companion--handylinux.replit.app
+   https://fallout2d20-companion.na4u.ru
+   ```
+   (для localhost — `http://localhost:8081` / `http://localhost:5000`).
+5. Нажми **Create** → получишь Client ID вида
    `808936097288-....apps.googleusercontent.com`. Он уже вшит в `index.html`.
 
-> Важно: для браузерного OAuth с `initTokenClient` используется только
-> **Client ID** (не секрет). Секрет нужен только для серверного потока — тут он
-> не используется, поэтому хранить в коде Client ID безопасно.
+> Важно: приложение использует **Authorization Code + PKCE** (публичный веб-клиент,
+> без сервера). Поэтому в коде нужен только **Client ID**, а **client_secret не
+> используется** — он не вшит и не передаётся в браузере. Роль «секрета» при
+> обмене кода на токен играет `code_verifier` (PKCE). Хранить Client ID в коде
+> безопасно.
 
 ## 2. Как проверить, что работает
 
@@ -118,8 +130,10 @@ Google-аккаунта).
    (вызов `syncCharacterToCloudIfEnabled` на автосейве).
 
 Если появится `Google Drive API error (403)` — не включён Drive API или не
-добавлен scope/`Test user`. Если `401`/`origin mismatch` — неверный origin в
-Authorized JavaScript origins.
+добавлен scope/`Test user`. Если `401` — токен протух или отозван (приложение
+переавторизуется при следующей синхронизации). Если `redirect_uri mismatch` /
+`origin mismatch` — добавь origin приложения в **Authorized redirect URIs**
+(и в **Authorized JavaScript origins**).
 
 ## 3. Про имя папки
 

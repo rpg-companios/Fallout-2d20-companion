@@ -15,7 +15,49 @@ const TOKEN_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.goog
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 
+// OAuth 2.0 endpoints для Authorization Code + PKCE потока (публичный веб-клиент).
+const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/auth';
+const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+
+// Токены держим только в памяти на время сессии вкладки, чтобы не просить вход
+// повторно при каждой синхронизации. На диск / в localStorage не пишем.
 let pendingToken = null;
+let cachedToken = null;
+let cachedTokenExpiry = 0;
+
+// --- PKCE + CSRF helpers (только браузер) --------------------------------
+// code_verifier (случайная строка) -> code_challenge = base64url(SHA256(verifier)).
+// Во время обмена кода на токен роль «секрета» играет code_verifier — поэтому
+// публичному клиенту (без сервера) не нужен client_secret. См. RFC 7636.
+const toBase64Url = (bytes) => {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
+const randomUrlString = (byteLength = 32) => {
+  const arr = new Uint8Array(byteLength);
+  crypto.getRandomValues(arr);
+  return toBase64Url(arr);
+};
+
+const sha256Base64Url = async (str) => {
+  const data = new TextEncoder().encode(str);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return toBase64Url(new Uint8Array(digest));
+};
+
+// Expiry access-токена (unix ms) берём из JWT payload, чтобы не гонять
+// пользователя в попап на каждую синхронизацию.
+const readTokenExpiry = (token) => {
+  try {
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = JSON.parse(atob(payload));
+    return Number(json.exp || 0) * 1000;
+  } catch (e) {
+    return 0;
+  }
+};
 
 const getClientId = () => {
   if (typeof process !== 'undefined' && process?.env?.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID) {
@@ -29,54 +71,112 @@ const getClientId = () => {
 
 const ensureWeb = () => Platform.OS === 'web' && typeof window !== 'undefined';
 
-const loadGoogleIdentityScript = async () => {
-  if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
-  if (window.google?.accounts?.oauth2) return;
-
-  await new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-google-identity="1"]');
-    if (existing) {
-      existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', () => reject(new Error('Failed to load Google Identity script.')), { once: true });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.dataset.googleIdentity = '1';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('Failed to load Google Identity script.'));
-    document.head.appendChild(script);
-  });
-};
-
-const requestAccessToken = async () => {
+// Получение access_token для Google Drive через Authorization Code + PKCE прямо
+// в браузере. Никакого client_secret — публичный клиент, роль секрета играет
+// code_verifier. Поток: открываем попап -> Google возвращает ?code&state на наш
+// origin -> обмениваем код на токен через oauth2.googleapis.com/token.
+const authorizeWithGoogle = async () => {
   const clientId = getClientId();
   if (!clientId) {
     throw new Error('Google Drive client id is not configured. Set EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID.');
   }
-  if (pendingToken) return pendingToken;
 
-  pendingToken = new Promise((resolve, reject) => {
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: TOKEN_SCOPE,
-      prompt: 'consent',
-      callback: (resp) => {
-        if (resp?.access_token) resolve(resp.access_token);
-        else reject(new Error(resp?.error || 'Google auth failed.'));
-      },
-      error_callback: () => reject(new Error('Google auth failed.')),
-    });
+  const codeVerifier = randomUrlString(64);
+  const codeChallenge = await sha256Base64Url(codeVerifier);
+  const state = randomUrlString(32);
+  const redirectUri = window.location.origin;
 
-    tokenClient.requestAccessToken();
-  }).finally(() => {
-    pendingToken = null;
+  const authParams = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: TOKEN_SCOPE,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
+  const authUrl = `${GOOGLE_AUTH_ENDPOINT}?${authParams.toString()}`;
+
+  // Открываем попап и ждём, пока Google вернёт нас на redirectUri с ?code&state.
+  const code = await new Promise((resolve, reject) => {
+    const popup = window.open(authUrl, 'gdrive-oauth', 'width=520,height=640,resizable=yes');
+    if (!popup) {
+      reject(new Error('Google auth popup was blocked. Разрешите всплывающие окна для этого сайта и повторите.'));
+      return;
+    }
+
+    const close = () => {
+      clearInterval(pollTimer);
+      clearInterval(closedTimer);
+      try { if (!popup.closed) popup.close(); } catch (e) { /* noop */ }
+    };
+
+    const closedTimer = setInterval(() => {
+      if (popup.closed) { close(); reject(new Error('Google auth was canceled or the popup was closed.')); }
+    }, 700);
+
+    const pollTimer = setInterval(() => {
+      let href;
+      try { href = popup.location.href; } catch (e) { return; } // пока кросс-домен — ждём
+      const url = new URL(href);
+      const q = url.searchParams;
+      if (q.get('error')) {
+        close();
+        reject(new Error(`Google auth failed: ${q.get('error_description') || q.get('error')}`));
+        return;
+      }
+      if (q.get('code')) {
+        if (q.get('state') !== state) {
+          close();
+          reject(new Error('OAuth state mismatch (possible CSRF).'));
+          return;
+        }
+        close();
+        resolve(q.get('code'));
+      }
+    }, 300);
   });
 
+  // Обмен кода на токен (PKCE, без client_secret).
+  const tokenResp = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      code_verifier: codeVerifier,
+    }),
+  });
+  const tokenData = await tokenResp.json();
+  if (!tokenResp.ok) {
+    throw new Error(`Google token exchange failed: ${tokenData.error_description || tokenData.error || tokenResp.status}`);
+  }
+  return tokenData.access_token;
+};
+
+const requestAccessToken = async () => {
+  if (cachedToken && Date.now() < cachedTokenExpiry) return cachedToken;
+  if (pendingToken) return pendingToken;
+
+  pendingToken = authorizeWithGoogle()
+    .then((token) => {
+      cachedToken = token;
+      cachedTokenExpiry = readTokenExpiry(token) || (Date.now() + 3600 * 1000);
+      return token;
+    })
+    .finally(() => {
+      pendingToken = null;
+    });
+
   return pendingToken;
+};
+
+// Сбрасываем кэш токена (например, при 401), чтобы следующий вызов вошёл заново.
+export const clearCachedCloudToken = () => {
+  cachedToken = null;
+  cachedTokenExpiry = 0;
 };
 
 const driveFetch = async (token, url, options = {}) => {
@@ -89,6 +189,9 @@ const driveFetch = async (token, url, options = {}) => {
   });
 
   if (!response.ok) {
+    // Протух/отозван токен — сбрасываем кэш, чтобы следующая синхронизация
+    // вошла в Google заново.
+    if (response.status === 401) clearCachedCloudToken();
     const text = await response.text();
     throw new Error(`Google Drive API error (${response.status}): ${text}`);
   }
@@ -187,7 +290,6 @@ export const openCloudFolderInDrive = async () => {
 export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
   if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
 
-  await loadGoogleIdentityScript();
   const token = await requestAccessToken();
   const folderId = await getModuleFolderId(token);
   const remoteFiles = await listRemoteCharacterFiles(token, folderId);
@@ -246,7 +348,6 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
   if (!configured) return;
 
   try {
-    await loadGoogleIdentityScript();
     const token = await requestAccessToken();
     const folderId = await getModuleFolderId(token);
     const remoteFiles = await listRemoteCharacterFiles(token, folderId);
