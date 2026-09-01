@@ -1222,5 +1222,11 @@
     "name": "Long Barrel",
     "prefix": "Long-barreled",
     "effectDescription": "+1 Range, removes Close Quarters"
+  },
+  {
+    "id": "mod_205",
+    "name": "Incendiary Barrel",
+    "prefix": "Incendiary",
+    "effectDescription": "minus 2 {/CD} Damage, plus 2 Fire Rate, adds Burst and Spread, minus 1 range"
   }
 ]

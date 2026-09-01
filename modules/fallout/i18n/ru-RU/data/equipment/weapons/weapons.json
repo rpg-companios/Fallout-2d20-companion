@@ -1187,5 +1187,235 @@
     "name": "Меч из бампера",
     "rangeName": "Близкая",
     "flavour": "Меч, сваренный из бампера автомобиля — тяжёлый и грубый, но эффективный."
+  },
+  {
+    "id": "weapon_assaultron_blade",
+    "name": "Клинок ассаултрона",
+    "rangeName": "",
+    "flavour": "A mechanical blade fitted to an Assaultron robot's chassis, capable of delivering a piercing blow.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_assaultron_head",
+    "name": "Голова ассаултрона",
+    "rangeName": "Ближнее",
+    "flavour": "A head-mounted energy weapon that fires concentrated blasts, consuming two shots of ammunition each time it fires.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_auto_axe",
+    "name": "Автотопор",
+    "rangeName": "",
+    "flavour": "A powered industrial chainsaw re-fitted as a vicious two-handed melee weapon.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_ballistic_fist",
+    "name": "Баллистический кулак",
+    "rangeName": "",
+    "flavour": "A heavy fist-mounted weapon that fires a shotgun shell with each punch; must be reloaded between attacks.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_cattle_prod",
+    "name": "Электрострекал",
+    "rangeName": "",
+    "flavour": "A two-handed rod delivering a powerful electric stun to its target.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_chainsaw",
+    "name": "Бензопила",
+    "rangeName": "",
+    "flavour": "A two-handed motorized saw that chews through flesh and armour, ignoring the wielder's normal melee damage bonus.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_death_tambo",
+    "name": "Бубен смерти",
+    "rangeName": "",
+    "flavour": "A bladed tambourine weapon; the jingling it makes raises the complication range on sneak attacks.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_displacer_glove",
+    "name": "Перемещающая перчатка",
+    "rangeName": "",
+    "flavour": "A heavy gauntlet that delivers piercing and stunning damage in melee.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_guitar_sword",
+    "name": "Гитара-меч",
+    "rangeName": "",
+    "flavour": "A reviled instrument used as a bladed weapon; its twang raises the complication range on sneak attacks.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_mr_handy_buzz_blade",
+    "name": "Жужжащий клинок мистера Хэнди",
+    "rangeName": "",
+    "flavour": "A two-handed rotary blade attachment for a Mr Handy robot, driven by a buzz-saw mechanism.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_multi_purpose_axe",
+    "name": "Многоцелевой топор",
+    "rangeName": "",
+    "flavour": "A practical two-handed axe able to double as a cutting implement.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_proton_axe",
+    "name": "Протонный топор",
+    "rangeName": "",
+    "flavour": "An energy weapon that releases a surge of ionizing energy on impact, piercing armour.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_war_drum",
+    "name": "Боевой барабан",
+    "rangeName": "",
+    "flavour": "A heavy two-handed drum weapon; its booming sound raises the complication range on sneak attacks.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_cryo_mine",
+    "name": "Крио-мина",
+    "rangeName": "",
+    "flavour": "A placed mine that freezes the area around it in a blast of cryogenic energy.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_cryogenic_grenade",
+    "name": "Криогенная граната",
+    "rangeName": "Средняя",
+    "flavour": "A thrown grenade that freezes affected targets in a cryogenic blast.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_detonator",
+    "name": "Детонатор",
+    "rangeName": "",
+    "flavour": "A remote detonator used to trigger placed explosives from a distance as a minor action.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_dynamite",
+    "name": "Динамит",
+    "rangeName": "Средняя",
+    "flavour": "A stick of dynamite with a lit fuse, thrown and set to detonate on impact.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_dynamite_bundle",
+    "name": "Связка динамита",
+    "rangeName": "",
+    "flavour": "A bundle of dynamite sticks rigged to detonate with a delay; the Delay rating is set when placed.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_flash_bang",
+    "name": "Светошумовая граната",
+    "rangeName": "Средняя",
+    "flavour": "A thrown stun grenade that blinds and stuns those caught in its blast.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_frag_grenade_mirv",
+    "name": "Осколочная граната MIRV",
+    "rangeName": "Средняя",
+    "flavour": "A multiple-ploy grenade that scatters several explosive submunitions over the blast area.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_plastic_explosives",
+    "name": "Пластиковая взрывчатка",
+    "rangeName": "",
+    "flavour": "Malleable explosive placed on a surface, detonated remotely or by delay; the Delay rating is set when placed.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_powder_charge",
+    "name": "Пороховой заряд",
+    "rangeName": "",
+    "flavour": "A small explosive charge; may be used as a mine or converted to a delayed placed device.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
+  },
+  {
+    "id": "weapon_smoke_grenade",
+    "name": "Дымовая граната",
+    "rangeName": "Средняя",
+    "flavour": "A thrown grenade that produces a thick cloud of smoke, blocking sight and imposing +2 difficulty to tests.",
+    "stockNames": {
+      "without": "",
+      "with": ""
+    }
   }
 ]

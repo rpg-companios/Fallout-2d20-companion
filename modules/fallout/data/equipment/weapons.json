@@ -3308,5 +3308,634 @@
         "value": 1
       }
     ]
+  },
+  {
+    "id": "weapon_assaultron_blade",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 50,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Assaultron Blade",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
+  },
+  {
+    "id": "weapon_assaultron_head",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "8",
+    "cost": 500,
+    "rarity": 3,
+    "ammoId": "ammo_energy_cell",
+    "range": "C",
+    "imageName": "Assaultron Head",
+    "mainAttr": "PER",
+    "mainSkill": "ENERGY_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [],
+    "weaponType": "Energy",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
+  },
+  {
+    "id": "weapon_auto_axe",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "20",
+    "cost": 100,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Auto-Axe",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "id": "weapon_ballistic_fist",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "6",
+    "cost": 150,
+    "rarity": 4,
+    "ammoId": "ammo_shotgun_shell",
+    "range": "",
+    "imageName": "Ballistic Fist",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_slow_load"
+      }
+    ],
+    "weaponType": "Unarmed",
+    "effects": [
+      {
+        "effectId": "effect_stun"
+      },
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "id": "weapon_cattle_prod",
+    "itemType": "weapon",
+    "damage": 7,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 90,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Cattle Prod",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_stun"
+      }
+    ]
+  },
+  {
+    "id": "weapon_chainsaw",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "12",
+    "cost": 140,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Chainsaw",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "id": "weapon_death_tambo",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 40,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Death Tambo",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
+  },
+  {
+    "id": "weapon_displacer_glove",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "6",
+    "cost": 175,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Displacer Glove",
+    "mainAttr": "STR",
+    "mainSkill": "UNARMED",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Unarmed",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      },
+      {
+        "effectId": "effect_stun"
+      }
+    ]
+  },
+  {
+    "id": "weapon_guitar_sword",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "3",
+    "cost": 45,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Guitar Sword",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_parry"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
+  },
+  {
+    "id": "weapon_mr_handy_buzz_blade",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "10",
+    "cost": 50,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Mr Handy Buzz Blade",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_vicious"
+      }
+    ]
+  },
+  {
+    "id": "weapon_multi_purpose_axe",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "4",
+    "cost": 40,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Multi-Purpose Axe",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": []
+  },
+  {
+    "id": "weapon_proton_axe",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "8",
+    "cost": 175,
+    "rarity": 5,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Proton Axe",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_surge"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
+  },
+  {
+    "id": "weapon_war_drum",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "20",
+    "cost": 115,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "War Drum",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "weaponType": "Melee",
+    "effects": [
+      {
+        "effectId": "effect_stun"
+      }
+    ]
+  },
+  {
+    "id": "weapon_cryo_mine",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 50,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Cryo Mine",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [
+      {
+        "effectId": "effect_freeze"
+      }
+    ],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_cryogenic_grenade",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 50,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Cryogenic Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "energy",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [
+      {
+        "effectId": "effect_freeze"
+      }
+    ],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_detonator",
+    "itemType": "weapon",
+    "damage": 0,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 75,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Detonator",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [],
+    "weaponType": "Explosive",
+    "effects": [],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_dynamite",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 25,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Dynamite",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_dynamite_bundle",
+    "itemType": "weapon",
+    "damage": 9,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 150,
+    "rarity": 3,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Dynamite Bundle",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_blast"
+      },
+      {
+        "qualityId": "quality_delay_x"
+      },
+      {
+        "qualityId": "quality_placed"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [
+      {
+        "effectId": "effect_breaking"
+      }
+    ],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_flash_bang",
+    "itemType": "weapon",
+    "damage": 0,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 40,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Flash Bang",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_frag_grenade_mirv",
+    "itemType": "weapon",
+    "damage": 5,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 75,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Frag Grenade MIRV",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [
+      {
+        "effectId": "effect_spread"
+      }
+    ],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_plastic_explosives",
+    "itemType": "weapon",
+    "damage": 10,
+    "fireRate": 0,
+    "weight": "2",
+    "cost": 200,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Plastic Explosives",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_blast"
+      },
+      {
+        "qualityId": "quality_delay_x"
+      },
+      {
+        "qualityId": "quality_placed"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [
+      {
+        "effectId": "effect_breaking"
+      },
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_powder_charge",
+    "itemType": "weapon",
+    "damage": 4,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 25,
+    "rarity": 1,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Powder Charge",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_mine"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [],
+    "withoutMods": true
+  },
+  {
+    "id": "weapon_smoke_grenade",
+    "itemType": "weapon",
+    "damage": 0,
+    "fireRate": 0,
+    "weight": "1",
+    "cost": 40,
+    "rarity": 2,
+    "ammoId": "",
+    "range": "M",
+    "imageName": "Smoke Grenade",
+    "mainAttr": "PER",
+    "mainSkill": "EXPLOSIVES",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "qualities": [
+      {
+        "qualityId": "quality_thrown"
+      },
+      {
+        "qualityId": "quality_blast"
+      }
+    ],
+    "weaponType": "Explosive",
+    "effects": [],
+    "withoutMods": true
   }
 ]

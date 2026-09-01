@@ -67,7 +67,8 @@
   },
   "weapon_357_magnum_revolver": {
     "Receiver": [
-      "mod_009"
+      "mod_009",
+      "mod_187"
     ],
     "Barrel": [
       "mod_017"
@@ -141,10 +142,14 @@
       "mod_008",
       "mod_007",
       "mod_004",
-      "mod_009"
-    ],
-    "Nozzle": [
-      "mod_078"
+      "mod_009",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_184",
+      "mod_185",
+      "mod_186",
+      "mod_005"
     ],
     "Grip": [
       "mod_026"
@@ -231,7 +236,9 @@
       "mod_004",
       "mod_005",
       "mod_006",
-      "mod_010"
+      "mod_010",
+      "mod_183",
+      "mod_187"
     ],
     "Barrel": [
       "mod_017",
@@ -258,7 +265,8 @@
       "mod_004",
       "mod_005",
       "mod_011",
-      "mod_010"
+      "mod_010",
+      "mod_183"
     ],
     "Barrel": [
       "mod_017",
@@ -289,7 +297,8 @@
       "mod_004",
       "mod_005",
       "mod_006",
-      "mod_010"
+      "mod_010",
+      "mod_183"
     ],
     "Barrel": [
       "mod_017",
@@ -313,7 +322,15 @@
     "Receiver": [
       "mod_004",
       "mod_005",
-      "mod_009"
+      "mod_009",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_183",
+      "mod_184",
+      "mod_185",
+      "mod_007",
+      "mod_008"
     ],
     "Barrel": [
       "mod_017",
@@ -342,7 +359,9 @@
     "Receiver": [
       "mod_004",
       "mod_005",
-      "mod_009"
+      "mod_009",
+      "mod_183",
+      "mod_007"
     ],
     "Barrel": [
       "mod_017",
@@ -455,32 +474,41 @@
     ]
   },
   "weapon_arc_welder": {
-    "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+    "Capacitor": [
+      "mod_043",
+      "mod_044",
+      "mod_045",
+      "mod_046"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_051",
+      "mod_052",
+      "mod_053",
+      "mod_054",
+      "mod_055",
+      "mod_204",
+      "mod_205"
+    ],
+    "Grip": [
+      "mod_057"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_058",
+      "mod_060",
+      "mod_061"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_062",
+      "mod_063",
+      "mod_064",
+      "mod_065",
+      "mod_066",
+      "mod_067"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_068",
+      "mod_069",
+      "mod_070"
     ]
   },
   "weapon_microwave_emitter": {
@@ -796,7 +824,8 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_040",
@@ -807,14 +836,19 @@
       "mod_001",
       "mod_002",
       "mod_004",
-      "mod_005"
+      "mod_005",
+      "mod_179",
+      "mod_183"
     ],
     "Sight": [
-      "mod_033"
+      "mod_033",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_10mm_smg": {
@@ -824,7 +858,8 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_040",
@@ -835,14 +870,19 @@
       "mod_001",
       "mod_002",
       "mod_004",
-      "mod_005"
+      "mod_005",
+      "mod_179",
+      "mod_183"
     ],
     "Sight": [
-      "mod_033"
+      "mod_033",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_hunting_rifle": {
@@ -854,11 +894,13 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_039",
-      "mod_042"
+      "mod_042",
+      "mod_197"
     ],
     "Receiver": [
       "mod_003",
@@ -866,7 +908,9 @@
       "mod_005",
       "mod_007",
       "mod_010",
-      "mod_013"
+      "mod_013",
+      "mod_179",
+      "mod_183"
     ],
     "Sight": [
       "mod_033",
@@ -874,7 +918,9 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
@@ -887,17 +933,22 @@
       "mod_016"
     ],
     "Grip": [
-      "mod_026"
+      "mod_026",
+      "mod_194"
     ],
     "Receiver": [
       "mod_004",
       "mod_005",
-      "mod_006"
+      "mod_006",
+      "mod_179",
+      "mod_183"
     ],
     "Sight": [
       "mod_033",
       "mod_034",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ]
   },
   "weapon_10mm_pistol": {
@@ -907,12 +958,14 @@
     ],
     "Grip": [
       "mod_026",
-      "mod_027"
+      "mod_027",
+      "mod_194"
     ],
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_040",
@@ -924,11 +977,20 @@
       "mod_006",
       "mod_007",
       "mod_008",
-      "mod_009"
+      "mod_009",
+      "mod_179",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_183",
+      "mod_184",
+      "mod_185"
     ],
     "Sight": [
       "mod_033",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ]
   },
   "weapon_assault_rifle": {
@@ -940,7 +1002,8 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_040",
@@ -952,7 +1015,14 @@
       "mod_006",
       "mod_007",
       "mod_008",
-      "mod_009"
+      "mod_009",
+      "mod_179",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_183",
+      "mod_184",
+      "mod_185"
     ],
     "Sight": [
       "mod_033",
@@ -960,12 +1030,15 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_combat_rifle": {
@@ -977,12 +1050,14 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_039",
       "mod_040",
-      "mod_042"
+      "mod_042",
+      "mod_197"
     ],
     "Receiver": [
       "mod_004",
@@ -992,7 +1067,14 @@
       "mod_008",
       "mod_009",
       "mod_010",
-      "mod_011"
+      "mod_011",
+      "mod_179",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_183",
+      "mod_184",
+      "mod_185"
     ],
     "Sight": [
       "mod_033",
@@ -1000,12 +1082,15 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_combat_shotgun": {
@@ -1016,13 +1101,15 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_039",
       "mod_040",
       "mod_041",
-      "mod_042"
+      "mod_042",
+      "mod_197"
     ],
     "Receiver": [
       "mod_004",
@@ -1030,7 +1117,14 @@
       "mod_006",
       "mod_007",
       "mod_008",
-      "mod_009"
+      "mod_009",
+      "mod_179",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_183",
+      "mod_184",
+      "mod_185"
     ],
     "Sight": [
       "mod_033",
@@ -1038,12 +1132,15 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_double_barrel_shotgun": {
@@ -1061,7 +1158,9 @@
       "mod_009"
     ],
     "Sight": [
-      "mod_033"
+      "mod_033",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028"
@@ -1081,14 +1180,17 @@
       "mod_039",
       "mod_040",
       "mod_041",
-      "mod_042"
+      "mod_042",
+      "mod_197"
     ],
     "Receiver": [
       "mod_004",
       "mod_005",
       "mod_007",
       "mod_010",
-      "mod_013"
+      "mod_013",
+      "mod_179",
+      "mod_183"
     ],
     "Sight": [
       "mod_033",
@@ -1096,12 +1198,15 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_pipe_gun": {
@@ -1116,13 +1221,15 @@
     "Magazine": [
       "mod_023",
       "mod_024",
-      "mod_025"
+      "mod_025",
+      "mod_195"
     ],
     "Muzzle": [
       "mod_039",
       "mod_040",
       "mod_041",
-      "mod_042"
+      "mod_042",
+      "mod_197"
     ],
     "Receiver": [
       "mod_004",
@@ -1130,7 +1237,14 @@
       "mod_007",
       "mod_008",
       "mod_009",
-      "mod_012"
+      "mod_012",
+      "mod_179",
+      "mod_180",
+      "mod_181",
+      "mod_182",
+      "mod_183",
+      "mod_184",
+      "mod_185"
     ],
     "Sight": [
       "mod_033",
@@ -1138,12 +1252,15 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_pipe_revolver": {
@@ -1159,14 +1276,18 @@
       "mod_039",
       "mod_040",
       "mod_041",
-      "mod_042"
+      "mod_042",
+      "mod_197"
     ],
     "Receiver": [
       "mod_004",
       "mod_005",
       "mod_007",
       "mod_010",
-      "mod_011"
+      "mod_011",
+      "mod_179",
+      "mod_183",
+      "mod_187"
     ],
     "Sight": [
       "mod_033",
@@ -1174,12 +1295,15 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_028",
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_railway_rifle": {
@@ -1187,7 +1311,8 @@
       "mod_017"
     ],
     "Muzzle": [
-      "mod_039"
+      "mod_039",
+      "mod_197"
     ],
     "Receiver": [
       "mod_014"
@@ -1198,10 +1323,13 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_syringer": {
@@ -1215,11 +1343,14 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
       "mod_029",
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_gauss_rifle": {
@@ -1239,10 +1370,13 @@
       "mod_035",
       "mod_036",
       "mod_037",
-      "mod_038"
+      "mod_038",
+      "mod_153",
+      "mod_196"
     ],
     "Stock": [
-      "mod_030"
+      "mod_030",
+      "mod_152"
     ]
   },
   "weapon_institute_laser": {
@@ -1419,7 +1553,9 @@
     ],
     "Muzzle": [
       "mod_090",
-      "mod_091"
+      "mod_091",
+      "mod_154",
+      "mod_155"
     ],
     "Sight": [
       "mod_089"
@@ -1589,37 +1725,6 @@
       "mod_151"
     ]
   },
-  "": {
-    "Grip": [
-      "mod_194"
-    ],
-    "Magazine": [
-      "mod_195"
-    ],
-    "Muzzle": [
-      "mod_197",
-      "mod_154",
-      "mod_155"
-    ],
-    "Receiver": [
-      "mod_179",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185",
-      "mod_186",
-      "mod_187"
-    ],
-    "Sight": [
-      "mod_196",
-      "mod_153"
-    ],
-    "Stock": [
-      "mod_152"
-    ]
-  },
   "weapon_assaultron_head_laser": {
     "Concentrate": [
       "mod_158"
@@ -1680,6 +1785,15 @@
     ],
     "Receiver": [
       "mod_191"
+    ]
+  },
+  "weapon_acid_soaker": {
+    "Concentrate": [
+      "mod_158"
+    ],
+    "Container": [
+      "mod_159",
+      "mod_160"
     ]
   }
 }

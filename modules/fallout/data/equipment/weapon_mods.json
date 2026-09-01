@@ -105,7 +105,15 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_9mm_pistol",
+      "weapon_battle_rifle",
+      "weapon_sniper_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "damageModifier": {
       "op": "+",
@@ -138,7 +146,15 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_9mm_pistol",
+      "weapon_battle_rifle",
+      "weapon_sniper_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "damageModifier": {
       "op": "+",
@@ -165,7 +181,9 @@
       "weapon_assault_rifle",
       "weapon_combat_rifle",
       "weapon_combat_shotgun",
-      "weapon_double_barrel_shotgun"
+      "weapon_double_barrel_shotgun",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle"
     ],
     "damageModifier": {
       "op": "+",
@@ -198,7 +216,13 @@
       "weapon_combat_shotgun",
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
-      "weapon_pipe_revolver"
+      "weapon_pipe_revolver",
+      "weapon_9mm_pistol",
+      "weapon_sniper_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "qualityChanges": [],
     "effectChanges": [
@@ -225,7 +249,9 @@
       "weapon_assault_rifle",
       "weapon_combat_rifle",
       "weapon_combat_shotgun",
-      "weapon_pipe_gun"
+      "weapon_pipe_gun",
+      "weapon_9mm_pistol",
+      "weapon_radium_rifle"
     ],
     "damageModifier": {
       "op": "-",
@@ -266,7 +292,13 @@
       "weapon_combat_rifle",
       "weapon_combat_shotgun",
       "weapon_double_barrel_shotgun",
-      "weapon_pipe_gun"
+      "weapon_pipe_gun",
+      "weapon_9mm_pistol",
+      "weapon_357_magnum_revolver",
+      "weapon_battle_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_radium_rifle"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -315,7 +347,8 @@
     "weight": 4,
     "applies_to_ids": [
       "weapon_combat_rifle",
-      "weapon_pipe_revolver"
+      "weapon_pipe_revolver",
+      "weapon_light_machine_gun"
     ],
     "damageModifier": {
       "op": "set",
@@ -471,7 +504,13 @@
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_357_magnum_revolver",
+      "weapon_battle_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "rangeModifier": {
       "op": "+",
@@ -500,7 +539,11 @@
       "weapon_combat_shotgun",
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
-      "weapon_pipe_revolver"
+      "weapon_pipe_revolver",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -528,7 +571,8 @@
     "applies_to_ids": [
       "weapon_assault_rifle",
       "weapon_combat_rifle",
-      "weapon_hunting_rifle"
+      "weapon_hunting_rifle",
+      "weapon_light_machine_gun"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -586,7 +630,9 @@
     "cost": 37,
     "weight": null,
     "applies_to_ids": [
-      "weapon_gauss_rifle"
+      "weapon_gauss_rifle",
+      "weapon_gauss_pistol",
+      "weapon_gauss_shotgun"
     ],
     "damageModifier": {
       "op": "+",
@@ -643,7 +689,12 @@
       "weapon_submachine_gun",
       "weapon_combat_shotgun",
       "weapon_pipe_gun",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_9mm_pistol",
+      "weapon_357_magnum_revolver",
+      "weapon_anti_materiel_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -677,7 +728,9 @@
       "weapon_submachine_gun",
       "weapon_combat_shotgun",
       "weapon_pipe_gun",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "qualityChanges": [
       {
@@ -707,7 +760,9 @@
       "weapon_submachine_gun",
       "weapon_combat_shotgun",
       "weapon_pipe_gun",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -730,7 +785,8 @@
     "weight": null,
     "applies_to_ids": [
       "weapon_44_pistol",
-      "weapon_10mm_pistol"
+      "weapon_10mm_pistol",
+      "weapon_9mm_pistol"
     ],
     "qualityChanges": [
       {
@@ -794,7 +850,11 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "qualityChanges": [
       {
@@ -828,7 +888,9 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_lever_action_rifle",
+      "weapon_radium_rifle"
     ],
     "qualityChanges": [
       {
@@ -869,7 +931,10 @@
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
       "weapon_syringer",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_pump_action_shotgun",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -900,7 +965,9 @@
     "cost": 40,
     "weight": 3,
     "applies_to_ids": [
-      "weapon_gauss_rifle"
+      "weapon_gauss_rifle",
+      "weapon_gauss_pistol",
+      "weapon_gauss_shotgun"
     ],
     "damageModifier": {
       "op": "+",
@@ -927,7 +994,9 @@
     "cost": 35,
     "weight": 1,
     "applies_to_ids": [
-      "weapon_gauss_rifle"
+      "weapon_gauss_rifle",
+      "weapon_gauss_pistol",
+      "weapon_gauss_shotgun"
     ],
     "damageModifier": {
       "op": "+",
@@ -967,7 +1036,14 @@
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
       "weapon_syringer",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_9mm_pistol",
+      "weapon_battle_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle",
+      "weapon_gauss_pistol"
     ],
     "qualityChanges": [
       {
@@ -1000,7 +1076,12 @@
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_9mm_pistol",
+      "weapon_battle_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_lever_action_rifle",
+      "weapon_radium_rifle"
     ],
     "qualityChanges": [
       {
@@ -1032,7 +1113,10 @@
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_sniper_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_lever_action_rifle"
     ],
     "rangeModifier": {
       "op": "+",
@@ -1068,7 +1152,10 @@
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_sniper_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_lever_action_rifle"
     ],
     "qualityChanges": [
       {
@@ -1104,7 +1191,10 @@
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_sniper_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_lever_action_rifle"
     ],
     "rangeModifier": {
       "op": "+",
@@ -1146,7 +1236,8 @@
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
       "weapon_railway_rifle",
-      "weapon_syringer"
+      "weapon_syringer",
+      "weapon_anti_materiel_rifle"
     ],
     "qualityChanges": [
       {
@@ -1179,7 +1270,9 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_railway_rifle"
+      "weapon_railway_rifle",
+      "weapon_battle_rifle",
+      "weapon_pump_action_shotgun"
     ],
     "qualityChanges": [
       {
@@ -1210,7 +1303,9 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_pump_action_shotgun",
+      "weapon_light_machine_gun"
     ],
     "qualityChanges": [
       {
@@ -1239,7 +1334,9 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_pump_action_shotgun",
+      "weapon_light_machine_gun"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -1276,7 +1373,11 @@
       "weapon_pipe_bolt_action",
       "weapon_pipe_gun",
       "weapon_pipe_revolver",
-      "weapon_10mm_smg"
+      "weapon_10mm_smg",
+      "weapon_9mm_pistol",
+      "weapon_sniper_rifle",
+      "weapon_anti_materiel_rifle",
+      "weapon_pump_action_shotgun"
     ],
     "qualityChanges": [
       {
@@ -1301,7 +1402,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [],
     "effectChanges": [
@@ -1326,7 +1428,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "+",
@@ -1354,7 +1457,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [],
     "effectChanges": [
@@ -1379,7 +1483,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "+",
@@ -1518,7 +1623,8 @@
     "cost": 6,
     "weight": null,
     "applies_to_ids": [
-      "weapon_laser_musket"
+      "weapon_laser_musket",
+      "weapon_arc_welder"
     ],
     "rangeModifier": {
       "op": "+",
@@ -1545,7 +1651,8 @@
     "cost": 31,
     "weight": 1,
     "applies_to_ids": [
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "-",
@@ -1579,7 +1686,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "-",
@@ -1616,7 +1724,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "+",
@@ -1639,7 +1748,8 @@
     "weight": 2,
     "applies_to_ids": [
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "+",
@@ -1718,7 +1828,8 @@
     "cost": 10,
     "weight": null,
     "applies_to_ids": [
-      "weapon_laser_gun"
+      "weapon_laser_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -1749,7 +1860,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -1810,7 +1922,8 @@
     "weight": 2,
     "applies_to_ids": [
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -1846,7 +1959,8 @@
     "weight": 2,
     "applies_to_ids": [
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "rangeModifier": {
       "op": "+",
@@ -1884,7 +1998,8 @@
       "weapon_institute_laser",
       "weapon_laser_musket",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -1910,7 +2025,8 @@
       "weapon_institute_laser",
       "weapon_laser_musket",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -1936,7 +2052,8 @@
       "weapon_institute_laser",
       "weapon_laser_musket",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "rangeModifier": {
       "op": "+",
@@ -1966,7 +2083,8 @@
       "weapon_institute_laser",
       "weapon_laser_musket",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -1996,7 +2114,8 @@
       "weapon_institute_laser",
       "weapon_laser_musket",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "rangeModifier": {
       "op": "+",
@@ -2030,7 +2149,8 @@
       "weapon_institute_laser",
       "weapon_laser_musket",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "qualityChanges": [
       {
@@ -2059,7 +2179,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_musket",
-      "weapon_laser_gun"
+      "weapon_laser_gun",
+      "weapon_arc_welder"
     ],
     "damageModifier": {
       "op": "-",
@@ -2101,7 +2222,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_musket",
-      "weapon_laser_gun"
+      "weapon_laser_gun",
+      "weapon_arc_welder"
     ],
     "rangeModifier": {
       "op": "+",
@@ -2125,7 +2247,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_musket",
-      "weapon_laser_gun"
+      "weapon_laser_gun",
+      "weapon_arc_welder"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -4257,7 +4380,17 @@
     "cost": 40,
     "weight": null,
     "applies_to_ids": [
-      ""
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer",
+      "weapon_10mm_smg"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -4279,7 +4412,21 @@
     "cost": 5,
     "weight": null,
     "applies_to_ids": [
-      ""
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer",
+      "weapon_10mm_smg"
     ],
     "qualityChanges": [
       {
@@ -4302,7 +4449,7 @@
     "cost": 70,
     "weight": null,
     "applies_to_ids": [
-      ""
+      "weapon_gatling_laser"
     ],
     "qualityChanges": [],
     "effectChanges": [
@@ -4329,7 +4476,7 @@
     "cost": 130,
     "weight": null,
     "applies_to_ids": [
-      ""
+      "weapon_gatling_laser"
     ],
     "qualityChanges": [],
     "effectChanges": [
@@ -4401,7 +4548,8 @@
     "cost": 30,
     "weight": 2,
     "applies_to_ids": [
-      "weapon_assaultron_head_laser"
+      "weapon_assaultron_head_laser",
+      "weapon_acid_soaker"
     ],
     "damageModifier": {
       "op": "+",
@@ -4423,7 +4571,8 @@
     "cost": 22,
     "weight": 2,
     "applies_to_ids": [
-      "weapon_assaultron_head_laser"
+      "weapon_assaultron_head_laser",
+      "weapon_acid_soaker"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -4445,7 +4594,8 @@
     "cost": 40,
     "weight": 4,
     "applies_to_ids": [
-      "weapon_assaultron_head_laser"
+      "weapon_assaultron_head_laser",
+      "weapon_acid_soaker"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -4933,7 +5083,17 @@
     "cost": 3,
     "weight": 1,
     "applies_to_ids": [
-      ""
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
     ],
     "qualityChanges": [],
     "effectChanges": [
@@ -4951,7 +5111,13 @@
     "cost": 40,
     "weight": 1,
     "applies_to_ids": [
-      ""
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_9mm_pistol",
+      "weapon_radium_rifle"
     ],
     "damageModifier": {
       "op": "-",
@@ -4982,7 +5148,13 @@
     "cost": 58,
     "weight": 2,
     "applies_to_ids": [
-      ""
+      "weapon_9mm_pistol",
+      "weapon_radium_rifle",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -5003,7 +5175,13 @@
     "cost": 63,
     "weight": 2,
     "applies_to_ids": [
-      ""
+      "weapon_radium_rifle",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_9mm_pistol"
     ],
     "damageModifier": {
       "op": "-",
@@ -5028,7 +5206,22 @@
     "cost": 68,
     "weight": 3,
     "applies_to_ids": [
-      ""
+      "weapon_sniper_rifle",
+      "weapon_pump_action_shotgun",
+      "weapon_lever_action_rifle",
+      "weapon_light_machine_gun",
+      "weapon_radium_rifle",
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_10mm_smg"
     ],
     "damageModifier": {
       "op": "+",
@@ -5049,7 +5242,13 @@
     "cost": 88,
     "weight": 4,
     "applies_to_ids": [
-      ""
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_9mm_pistol",
+      "weapon_radium_rifle"
     ],
     "damageModifier": {
       "op": "+",
@@ -5074,7 +5273,13 @@
     "cost": 78,
     "weight": 3,
     "applies_to_ids": [
-      ""
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_9mm_pistol",
+      "weapon_radium_rifle"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -5101,7 +5306,7 @@
     "cost": 10,
     "weight": -1,
     "applies_to_ids": [
-      ""
+      "weapon_9mm_pistol"
     ],
     "damageModifier": {
       "op": "set",
@@ -5122,7 +5327,9 @@
     "cost": 35,
     "weight": 1,
     "applies_to_ids": [
-      ""
+      "weapon_357_magnum_revolver",
+      "weapon_lever_action_rifle",
+      "weapon_pipe_revolver"
     ],
     "damageModifier": {
       "op": "set",
@@ -5255,7 +5462,8 @@
     "cost": 90,
     "weight": 3,
     "applies_to_ids": [
-      ""
+      "weapon_44_pistol",
+      "weapon_10mm_pistol"
     ],
     "qualityChanges": [
       {
@@ -5273,7 +5481,14 @@
     "cost": 28,
     "weight": 2,
     "applies_to_ids": [
-      ""
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_pipe_gun",
+      "weapon_10mm_smg"
     ],
     "fireRateModifier": {
       "op": "+",
@@ -5294,7 +5509,21 @@
     "cost": 158,
     "weight": 2,
     "applies_to_ids": [
-      ""
+      "weapon_44_pistol",
+      "weapon_10mm_pistol",
+      "weapon_assault_rifle",
+      "weapon_combat_rifle",
+      "weapon_gauss_rifle",
+      "weapon_hunting_rifle",
+      "weapon_submachine_gun",
+      "weapon_combat_shotgun",
+      "weapon_double_barrel_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle",
+      "weapon_syringer",
+      "weapon_10mm_smg"
     ],
     "qualityChanges": [
       {
@@ -5311,7 +5540,13 @@
     "cost": 18,
     "weight": 5,
     "applies_to_ids": [
-      ""
+      "weapon_combat_rifle",
+      "weapon_hunting_rifle",
+      "weapon_combat_shotgun",
+      "weapon_pipe_bolt_action",
+      "weapon_pipe_gun",
+      "weapon_pipe_revolver",
+      "weapon_railway_rifle"
     ],
     "qualityChanges": [
       {
@@ -5429,7 +5664,8 @@
     "applies_to_ids": [
       "weapon_institute_laser",
       "weapon_laser_gun",
-      "weapon_plasma_gun"
+      "weapon_plasma_gun",
+      "weapon_arc_welder"
     ],
     "rangeModifier": {
       "op": "+",
@@ -5442,5 +5678,49 @@
       }
     ],
     "effectChanges": []
+  },
+  {
+    "modType": "weapon",
+    "id": "mod_205",
+    "slot": "Barrel",
+    "complexity": 4,
+    "perk1": "Gun Nut 2",
+    "perk2": "",
+    "skill": "SCIENCE",
+    "rarity": "Uncommon",
+    "materials": "Common x 5 Uncommon x 3",
+    "cost": 15,
+    "weight": 2,
+    "applies_to_ids": [
+      "weapon_arc_welder"
+    ],
+    "damageModifier": {
+      "op": "-",
+      "value": 2
+    },
+    "fireRateModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "rangeModifier": {
+      "op": "-",
+      "value": 1
+    },
+    "qualityChanges": [
+      {
+        "op": "gain",
+        "id": "quality_inaccurate"
+      }
+    ],
+    "effectChanges": [
+      {
+        "op": "gain",
+        "id": "effect_burst"
+      },
+      {
+        "op": "gain",
+        "id": "effect_spread"
+      }
+    ]
   }
 ]
