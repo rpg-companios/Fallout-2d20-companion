@@ -262,7 +262,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 5
+        "LCK": 5
       }
     },
     "effectKey": "perks.canOpener.effect",
@@ -690,7 +690,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 7
+        "LCK": 7
       },
       "excludedPerks": [
         "cautiousNature"

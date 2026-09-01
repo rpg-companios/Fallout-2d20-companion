@@ -1,7 +1,16 @@
 diff --git a/modules/fallout/data/perks/perks.json b/modules/fallout/data/perks/perks.json
-index f2f0f23..170399c 100644
+index f2f0f23..7ff9e57 100644
 --- a/modules/fallout/data/perks/perks.json
 +++ b/modules/fallout/data/perks/perks.json
+@@ -262,7 +262,7 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "CHA": 5
++        "LCK": 5
+       }
+     },
+     "effectKey": "perks.canOpener.effect",
 @@ -274,7 +274,7 @@
      "maxRanks": 1,
      "prerequisites": {
@@ -47,6 +56,15 @@ index f2f0f23..170399c 100644
        }
      },
      "effectKey": "perks.mysteriousStranger.effect",
+@@ -690,7 +690,7 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "CHA": 7
++        "LCK": 7
+       },
+       "excludedPerks": [
+         "cautiousNature"
 @@ -923,7 +923,7 @@
      "prerequisites": {
        "special": {
@@ -83,10 +101,3 @@ index f2f0f23..170399c 100644
        }
      },
      "effectKey": "perks.bloodyMess.effect",
-@@ -2282,4 +2282,4 @@
-     "effectKey": "perks.vaccinated.effect",
-     "effect": "vaccinated"
-   }
--]
-+]
-\ No newline at end of file
