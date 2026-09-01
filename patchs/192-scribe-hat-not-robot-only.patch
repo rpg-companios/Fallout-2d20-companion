@@ -1,0 +1,28 @@
+diff --git a/modules/fallout/data/allowlist/robotOnly.js b/modules/fallout/data/allowlist/robotOnly.js
+index 611535b..53df453 100644
+--- a/modules/fallout/data/allowlist/robotOnly.js
++++ b/modules/fallout/data/allowlist/robotOnly.js
+@@ -12,11 +12,11 @@ export const robotOnly = Object.freeze({
+   robotWeapons: true,
+ 
+   // Конкретные предметы — только реальные id, без дублей (fancyHat == headwear_fancy_hat)
++  // Робот носит человеческую одежду только если это явно разрешено (canRobotWear === true).
++  // Шляпа писца (headwear_bos_scribe_hat) — человеческая одежда Братства, НЕ robot-only:
++  // её нет в robotOnly и у неё нет canRobotWear, поэтому она доступна человеку.
+   headwear_casual_hat: true,
+   headwear_fancy_hat: true,
+-  headwear_bos_scribe_hat: true,
+-  headwear_bos_scribe_hat_2: true,
+-  headwear_bos_field_scribe_hat: true,
+ });
+ 
+ // Структурированный вариант для движка
+@@ -47,8 +47,5 @@ export const ROBOT_ONLY_STRUCTURED = Object.freeze({
+   ids: Object.freeze([
+     'headwear_casual_hat',
+     'headwear_fancy_hat',
+-    'headwear_bos_scribe_hat',
+-    'headwear_bos_scribe_hat_2',
+-    'headwear_bos_field_scribe_hat',
+   ]),
+ });
