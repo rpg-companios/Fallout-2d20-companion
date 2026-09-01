@@ -1,6 +1,10 @@
 {
   "generated": true,
   "files": {
+    "_index.json": {
+      "records": "obj",
+      "source": []
+    },
     "armor.json": {
       "records": 87,
       "source": [
@@ -11,6 +15,48 @@
       "records": 168,
       "source": [
         "pipboy"
+      ]
+    },
+    "focharactersheet_armor.json": {
+      "records": 145,
+      "source": [
+        "focharactersheet"
+      ]
+    },
+    "focharactersheet_armor_mods.json": {
+      "records": 76,
+      "source": [
+        "focharactersheet"
+      ]
+    },
+    "focharactersheet_consumables.json": {
+      "records": 168,
+      "source": [
+        "focharactersheet"
+      ]
+    },
+    "focharactersheet_magazines.json": {
+      "records": 105,
+      "source": [
+        "focharactersheet"
+      ]
+    },
+    "focharactersheet_perks.json": {
+      "records": 206,
+      "source": [
+        "focharactersheet"
+      ]
+    },
+    "focharactersheet_weapon_mods.json": {
+      "records": 233,
+      "source": [
+        "focharactersheet"
+      ]
+    },
+    "focharactersheet_weapons.json": {
+      "records": 134,
+      "source": [
+        "focharactersheet"
       ]
     },
     "lonestar_ammo.json": {

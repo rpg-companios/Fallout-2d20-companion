@@ -1,0 +1,632 @@
+[
+  {
+    "name_en": "¡La Fantoma!",
+    "description_en": "When you succeed at a Sneak test to avoid notice, you may spend 1 AP to create a distraction somewhere within Medium range; the character who failed the opposed test to detect you heads towards the distraction you created. If you learn this perk, you may use it once per scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Attack of the Fishmen!",
+    "description_en": "+1D6 on attacks vs Mirelurk",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Rise of the Mutant!",
+    "description_en": "+1D6 on attacks vs Super Mutants",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Attack of the Metal Men!",
+    "description_en": "+2 to Physical and Energy damage resistances vs Robots",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - The Mad Russian’s Revenge!",
+    "description_en": "+2 to Poison damage resistance",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - The Starlet Sniper!",
+    "description_en": "+1D6 on attacks with Accurate weapons",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Curse of the Burned!",
+    "description_en": "+1D6 on attacks vs Ghouls",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Giant Insects Invade!",
+    "description_en": "+2 to Radiation damage resistance",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Deadly Lasers!",
+    "description_en": "+1D6 on attacks with Energy weapons",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Science Gone Mad!",
+    "description_en": "+2 to Energy damage resistance",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Astoundingly Awesome Tales - Surrounded by the Dead!",
+    "description_en": "+1D6 on attacks where you spend one or more Ammunition for bonus damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Get Off My Lawn",
+    "description_en": "Find twice as much meat from a butchered creature",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Down Home Cookin'",
+    "description_en": "Add +2D6 damage to a Thrown weapon attack (other than an Explosive)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Homesteading Horror",
+    "description_en": "Reduce the difficulty of crafting a weapon by 1 (min. of 0)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Hardy as a Sasquatch",
+    "description_en": "When scavenging from plants, gain twice as much",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Carnivorous Rabbits of Appalachia",
+    "description_en": "Add +2D6 damage to an attack against a Mammal or Lizard",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - The Appalachia Squrriel Massacre",
+    "description_en": "One item of cooked food you make and eat heals +3 HP",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Art of the Tomahawk",
+    "description_en": "Reduce difficulty of a test to resist catching disease by 1 (min. of 0)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - The Gunsmith of Harper's Ferry",
+    "description_en": "When you find ammo, you find +2D6 more shots",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - The Ohio River Hermit",
+    "description_en": "Reduce the difficulty of repairing a damaged item by 1 (min. of 0)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Backwoodsman - Nightmare in the Garden",
+    "description_en": "Heal +2HP when you consume an Alcoholic drink",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boxing Times",
+    "description_en": "Once, when you succeed at an Unarmed attack, if you spend any AP to increase the damage you dealt, you may add the Stun damage effect to your attack. If you later learn this perk, you may use this on any successful Unarmed attack.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Duck and Cover!",
+    "description_en": "Once, when you are affected by a Blast weapon, you may choose to fall prone (p.25). If you do so, you add +3 to all damage resistances against the damage caused by that Blast. If you later learn this perk, you may use whenever you are affected by a Blast weapon by spending 1 AP",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fixin' Things",
+    "description_en": "Once, when you attempt to repair an item, halve the amounts of the materials needed to complete the repair (round up). If you later learn this perk, you may use this whenever you attempt repairs.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Future Weapons Today",
+    "description_en": "Once, when you make an attack with an Energy Weapon, you may overcharge it. Increase the damage by +2D6 for that attack. The weapon cannot be used to make an attack in the turn after an overcharged attack as it cools down. If you later learn this perk, you may overcharge an Energy Weapon once per scene.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Blood on the Harp",
+    "description_en": "One successful melee attack you make inflicts +2D6 damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Cometh the Trickster",
+    "description_en": "Add +1 to the difficulty of another character's skill test to detect you",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Jungle of the Bat-Babies",
+    "description_en": "When you suffer Poison damage, gain +3 Poison damage resistance",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - In the Boson of the Corsair Queen",
+    "description_en": "One successful melee attack you make automatically inflicts a Critical Hit",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Demon Slaves, Demon Sands",
+    "description_en": "One attack against Ghouls inflicts +2D6 damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Enter Maula: War Maiden of Mars",
+    "description_en": "When you make a melee attack with a Two-Handed melee weapon, gain the Piercing 1 damage effect (or +1 to any existing Piercing effect)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Fatherless Cur",
+    "description_en": "Ignore one complication on a melee attack",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - Lost in the Snows of Lust",
+    "description_en": "Gain +2 Physical damage resistance against one attack",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - The Lair of the Virgin Eaters",
+    "description_en": "Gain +10 Carry weight for one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak the Barbarian - What Sorcery is This?",
+    "description_en": "Gain +2 Energy damage resistance against one attack",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - The Future of Hunting?",
+    "description_en": "One attack against Robots inflicts +2D6 damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Lasers & Hunting: Acceptable Overkill",
+    "description_en": "One attack with a Laser weapon gains the Vicious damage effect if it didn't already have it",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Little Guns for Little Ladies",
+    "description_en": "One attack with a Small Guns weapon gains the Vicious damage effect if it didn't already have it",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Street Guns of Detroit",
+    "description_en": "Gain an extra 2 AP after one successful attack. This AP must be spent immediately: it cannot be saved",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Avoid Those Pesky Gun Laws!",
+    "description_en": "When you salvage a weapon, gain AP which may only be spent to salvage additional units of materials",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - The Moon: A Communist Doomsday Device!?",
+    "description_en": "Gain +2 to Physical or Energy damage resistance against one attack at night",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Take Aim, Army Style",
+    "description_en": "One aimed attack made with a weapon which lacks the Accurate quality inflicts +2D6 damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Bear-Proofing your Campsite",
+    "description_en": "One attack against Yao Guai inflicts +3D6 damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Plasma: The Weapon of Tomorrow",
+    "description_en": "One attack with a Plasma weapon gains the Vicious damage effect if it didn't already have it",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets - Guide to Hunting Commies",
+    "description_en": "One attack against an enemy with a lower leel than you inflicts +2D6 damage",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - Life Long Best Friends!",
+    "description_en": "+1 Maximum Health Points to all party members for one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - Nuke-the-Man!",
+    "description_en": "+1D6 damage to attacks from all party members for one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - Trim the Fat!",
+    "description_en": "Regain twice as many HP from fruit or vegetables eaten in one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - The Secretary Charmer",
+    "description_en": "At the start of one scene, add +1 AP to the group pool",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - Talk Yourself Sober",
+    "description_en": "Gain 1 Luck point (lost at the end of the scene if not used) when you consume an Alcoholic drink",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - Advice from Married Men",
+    "description_en": "+1 Physical damage resistance to all party members for one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - Beware the Man Handler",
+    "description_en": "The group AP pool may contain 1 AP more than normal for one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - An Experience to Remember",
+    "description_en": "Choose one other Magazine perk you have previously used but not learned; that now takes effect",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Live & Love - I Married a Robot",
+    "description_en": "+2 to all damage resistances against Robots for one scene",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Massachusetts Surgical Journal",
+    "description_en": "Once, when you provide medical attention to another character and assist their END + Survival test to heal Injuries, you may treat your assistance die as if it had rolled a 1. If you learn this perk, you may do this once per session.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Meeting People",
+    "description_en": "Once, when you roll one or more complications on a Speech test, you may ignore those complications. If you learn this perk, you may do this once per scene.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Programmer's Digest",
+    "description_en": "Once, when you fail a Science test to hack into a computer terminal and would be locked out (prevented from trying again), you may choose not to be locked out, allowing you to make another attempt. If you learn this Perk, you may do this whenever you are locked out of a computer.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tales of a Junktown Jerky Vendor",
+    "description_en": "Once, when you succeed or fail at a Barter test to haggle on the price of a trade, you may spend 1 Luck point to shift the price 10% in your favor. If you learn this Perk, you may do this on any Barter test to haggle, though you must spend one additional Luck point each extra time you use it during a session (1 for the first time, 2 for the second, 3 for the third, etc.).",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "True Police Stories",
+    "description_en": "Once, when you roll the damage of an attack, you may spend a Luck point to turn up to 3D6 to any face, rather than rolling them. If you learn this perk, you may do this once per scene.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tumblers Today - Mysteries of the Master Key Exposed!",
+    "description_en": "You may re-roll 1d20 on a single Lockpicking test",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tumblers Today - Bobby Pins: More Effective Than Lockpicks?",
+    "description_en": "When using a Bobby Pin, reduce the difficulty of a Lockpicking test by a further 1 (minimum 0)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tumblers Today - Confessions of a Housebreaker",
+    "description_en": "When scavenging or looting, spend 1 Luck to find 2+2D6 Bobby Pins",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tumblers Today - Open Any Lock in 5 Seconds Flat",
+    "description_en": "When you successfully pick a lock, you may use the Reduce Time AP option without spending AP",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tumblers Today - Locksmith Certification Special—Pass with Flying Colors",
+    "description_en": "When suffer one or more complications on a Lockpicking test, spend 1 Luck point to ignore those complications",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Unstoppables - Dr. Brainwash and His Army of De-Capitalists!",
+    "description_en": "Spend 3 Luck points to avoid all damage from a single attack or hazard",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Unstoppables - Who Can Stop the Unstoppable Grog-Na-Rok!?",
+    "description_en": "Spend 2 Luck points to avoid all damage from an attack from a Mutated Human (including Ghouls and super mutants)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Unstoppables - Commie-Kazi vs. Manta Man",
+    "description_en": "Spend 1 Luck point to avoid all damage from a Blast weapon",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Unstoppables - Trapped in the Dimension of the Pterror-dactyls!",
+    "description_en": "Spend 1 Luck point to avoid all damage from a single melee attack",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Unstoppables - Visit the Ux-Ron Galaxy!",
+    "description_en": "Spend 1 Luck point to avoid all Energy damage from a single attack",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-01 Whistling in the Dark",
+    "description_en": "If you are detected while sneaking, you add +2 to Physical damage resistance against the first attack you receive after being detected",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-02 Urban Camouflage",
+    "description_en": "Enemies suffer +1 difficulty on tests to detect you; this does not stack with any difficulty increases for poor light or darkness",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-03 Facepaint Fundamentals",
+    "description_en": "+1 to all damage resistances against attacks from Character NPCs",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-04 Not the Soldiers You're Looking For",
+    "description_en": "+1D6 damage inflicted by attacks against Character NPCs",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-05 Who Goes There?",
+    "description_en": "When you spend a Luck point to re-roll a d20 on a PER test, instead count that die as if it had rolled a 1",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-06 Squeaky Floorboard, Sudden Death",
+    "description_en": "Once, when you suffer one or more Complications on a Sneak test, ignore the complications",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-07 Getting the Drop on the Communists",
+    "description_en": "Once, when an enemy aims before making an attack against you, you may cause them to lose the benefits of aiming",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-08 Bushes, Boxes, and Beehives: Camouflage Special",
+    "description_en": "+2D6 damage inflicted by an unarmed attack or an attack made with a knife",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-09 Look Better In Black",
+    "description_en": "Once, when using a Stealth Boy, it lasts for one additional turn",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Covert Operations Manual - FH 5-10 Tiptoe Through the Tulips",
+    "description_en": "When you spend a Luck point to re-roll a d20 on an AGI test, instead count that die as if it had rolled a 1",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wasteland Survival Guide - Farming the Wastes",
+    "description_en": "Consuming a fruit or vegetable food item heals twice as many HP",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wasteland Survival Guide - Insect Repellent Special ",
+    "description_en": "Increase all damage resistances by +2 vs an attack from an Insect",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wasteland Survival Guide - The Bright Side of Radiation Poisoning",
+    "description_en": "When you consume irradiated food or drink, heal additional HP equal to the roll on the D6",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wasteland Survival Guide - Coupon Spectacular",
+    "description_en": "When buying food or drink items, the price is shifted an additional 10% in your favor",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wasteland Survival Guide - Self Defense Secrets",
+    "description_en": "Gain +1 defense against a melee attack",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wasteland Survival Guide - Hunting in the Wastes",
+    "description_en": "When you butcher an animal you’ve killed, and the amount of meat found can be increased by spending AP, you gain 1 bonus AP for that purpose (this AP is lost if not used)",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "101 Heroic Last Stands",
+    "description_en": "When you are reduced to 0 HP, all other party members and companions gain +2 to Physical and Energy damage resistance, and immediately regain 4 HP. At rank 2, increase the amount of HP regained by 2. At rank 3, increase the amount of Physical and Energy damage resistance +3 each, and increase the amount of HP regained by a further +2. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Atomic Command (Holotape)",
+    "description_en": "You’ve discovered the plans for a type of lightweight nuclear warhead (see sidebar). However, the radioactive material decays very quickly, and the device becomes useless after a matter of hours. At rank 1, each device created becomes useless 6 hours after being created. At rank 2, this increases to 12 hours. At rank 3, this increases to 24 hours. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Automatron (Holotape)",
+    "description_en": "Once per scene, if you are a robot or wearing power armor, when you are hit by an attack dealing Energy damage, you may spend a Luck point to absorb that attack. An absorbed attack deals no damage. Instead, you regain HP (if in power armor, these will be Armor HP on the location hit) equal to the number of Effects rolled on the attack’s damage roll. In addition, power armor regains one charge to its fusion core. At higher ranks, this perk may be used a number of times per scene equal to its rank. Each time you take this perk, the level requirement increases by 9.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Big Book of Science",
+    "description_en": "You’ve discovered the recipe to a potent combat stimulant, Super Chem Mk I (see sidebar) which makes you far tougher and deadlier in a fight with few drawbacks. However, the drug has a very short lifespan, and the mixture becomes useless after a matter of hours. At rank 1, each dose created becomes useless 6 hours after being created. At rank 2, this increases to 12 hours. At rank 3, this increases to 24 hours. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Chinese Army: Special Ops Training Manual",
+    "description_en": "When you succeed at a ranged sneak attack against an enemy, all attacks against that enemy until the start of your next turn inflict +1D6 damage. At rank 2, this increases to +2D6. At rank 3, this increases to +3D6. Each time you take this perk, the level requirement increases by 8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dress to Survive",
+    "description_en": "When you are wearing a full set of a single type of armor—i.e., all Sturdy Leather Armor, or all Heavy Combat Armor, or all T-51 Power Armor, on all the locations which can have a piece of that type of armor—you gain an additional +5 Poison damage resistance. At rank 2, this increases to +8. At rank 3, this increases to +10. Each time you take this perk, the level requirement increases by 7.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Duck and Cover Annual",
+    "description_en": "When you kill an enemy with a thrown explosive weapon, you may spend a Luck point to make them explode. If they explode, roll a number of D6 equal to half your explosive weapon’s damage rating (round down). For each Effect rolled, one creature within Close range of the exploding enemy (starting with the closest, GM’s discretion) suffers Physical damage equal to the total rolled on the D6. Resolve exploding enemies after you finish resolving the attack with the explosive weapon.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grognak and the Ruby Ruins (Holotape)",
+    "description_en": "When you kill an enemy with a melee weapon, you may spend a Luck point to make them explode. If they explode, roll a number of D6 equal to half your melee weapon’s damage rating (round down). For each Effect rolled, one creature within Close range of the exploding enemy (starting with the closest, GM’s discretion) suffers physical damage equal to the total rolled on the D6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guns and Bullets Annual",
+    "description_en": "When you craft ammunition, double the amount of ammunition you produce.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hot Summer Fashions",
+    "description_en": "When you are wearing a full set of a single type of armor—i.e., all Sturdy Leather Armor, or all Heavy Combat Armor, or all T-51 Power Armor, on all the locations which can have a piece of that type of armor—you gain an additional +5 Energy damage resistance, which only applies against fire (such as attacks from Flamers, or Persistent damage from incendiary attacks).",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Journal of Internal Medicine",
+    "description_en": "You’ve discovered the recipe to a potent medicine, the Survival Syringe (see sidebar) which seems like a miracle cure-all. However, the dug has a very short lifespan, and the mixture becomes useless after a matter of hours. At rank 1, each dose created becomes useless 6 hours after being created. At rank 2, this increases to 12 hours. At rank 3, this increases to 24 hours. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nikola Tesla and You",
+    "description_en": "Once per day, if you are reduced to 0 HP while wearing Power Armor, you may spend 1 Luck point to immediately be revived, regaining all your HP and half of any HP lost on your power armor.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pipfall (Holotape)",
+    "description_en": "Your Radiation damage resistance is increased by +5. You also heal 1 Radiation damage each time you heal one or more HP.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pugilism Illustrated",
+    "description_en": "When you succeed at a melee attack with an Unarmed weapon, you may spend 1 AP for the attack to be an Exploding Palm strike: when making an Exploding Palm strike, each Effect rolled causes one enemy within Close range of the target (starting with those within Reach of the initial target, excluding yourself ) to suffer 3D6 physical damage. At rank 2, the explosion damage increases to 4D6. At rank 3, this increases to 5D6. Each time you take this perk, the level requirement increases by 9.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Red Menace (Holotape)",
+    "description_en": "While you’re wearing Power Armor, you move through difficult terrain or over obstacles, reduce the AP cost to do so by 2, to a minimum of 0.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scout Handbook",
+    "description_en": "When you forage for food (using the Foraging table on p.202 of the Fallout: The Roleplaying Game Core Rulebook), you may spend 1 Luck point. If you do so, then you and your allies (including companions) immediately regain 4 HP add +2 to their Physical damage reduction until the end of the next scene.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "The Collected Adventures of Grognak the Barbarian",
+    "description_en": "At rank 1, when you succeed at a melee attack, you may spend AP to have one additional enemy within Reach also takes the attack’s full damage: the AP required is the Defense of the additional target. At rank 2, you may affect up to two additional enemies this way, spending AP for each. At rank 3, you may affect up to three additional enemies, and the AP cost to affect them is reduced by 1, to a minimum of 1. Each time you take this perk, the level requirement increases by 8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "The Pointy End: A Guide to Swords",
+    "description_en": "When you succeed at a melee attack, if you are wearing Power Armor or are a super mutant, you may spend 3 AP to break a weapon your target was wielding. The broken weapon can no longer be used until repaired. At rank 2, the cost to do this is reduced to 2 AP. At rank 3, the cost to do this is reduced to 1 AP. Each time you take this perk, the level requirement increases by 6",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "U.S. Army: 30 Handy Flamethrower Recipes",
+    "description_en": "When you kill an enemy with a ranged weapon, you may spend 1 Luck point to make them explode. If they explode, roll a number of D6 equal to half your melee weapon’s damage rating (round down). For each Effect rolled, one creature within Close range of the exploding enemy (starting with the closest, GM’s discretion) suffers Physical damage equal to the total rolled on the D6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Zeta Invaders",
+    "description_en": "When you use the Defend action, and an enemy misses you with a melee attack, you regain 2 HP and add 1 AP to the group pool. At rank 2, increase this to 3 HP and 2 AP. At rank 3, increase this to 4 HP and 3 AP. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  }
+]
