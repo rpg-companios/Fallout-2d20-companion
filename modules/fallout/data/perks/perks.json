@@ -274,7 +274,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 9
+        "LCK": 9
       }
     },
     "effectKey": "perks.betterCriticals.effect",
@@ -298,7 +298,7 @@
     "maxRanks": 3,
     "prerequisites": {
       "special": {
-        "CHA": 5
+        "LCK": 5
       },
       "level": 2,
       "levelIncreasePerRank": 4
@@ -348,7 +348,7 @@
     "prerequisites": {
       "special": {
         "PER": 6,
-        "CHA": 6
+        "LCK": 6
       }
     },
     "effectKey": "perks.demolitionExpert.effect",
@@ -427,7 +427,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 6
+        "LCK": 6
       }
     },
     "effectKey": "perks.pharmaFarmer.effect",
@@ -678,7 +678,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 7
+        "LCK": 7
       }
     },
     "effectKey": "perks.mysteriousStranger.effect",
@@ -923,7 +923,7 @@
     "prerequisites": {
       "special": {
         "PER": 6,
-        "CHA": 7
+        "LCK": 7
       },
       "level": 1,
       "levelIncreasePerRank": 4
@@ -965,7 +965,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 10
+        "LCK": 10
       },
       "level": 5
     },
@@ -979,7 +979,7 @@
     "prerequisites": {
       "special": {
         "END": 6,
-        "CHA": 6
+        "LCK": 6
       },
       "level": 1,
       "levelIncreasePerRank": 4
@@ -993,7 +993,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 6
+        "LCK": 6
       }
     },
     "effectKey": "perks.bloodyMess.effect",
