@@ -1,0 +1,3232 @@
+[
+  {
+    "ID": "armorRaiderChest",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "18",
+    "RARITY": "0",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "8",
+    "RARITY": "0",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderArm",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "6",
+    "RARITY": "0",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderSturdyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "6",
+    "COST": "33",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderSturdyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "13",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderSturdyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "8",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderHeavyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "8.5",
+    "COST": "48",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderHeavyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "5",
+    "COST": "18",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRaiderHeavyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "raiderArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "5",
+    "COST": "15",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modArmorHardened",
+      "modAnnealed",
+      "modWelded",
+      "modTempered",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherChest",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "25",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1",
+    "COST": "10",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherArm",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1",
+    "COST": "8",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherSturdyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "5",
+    "COST": "50",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherSturdyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "20",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherSturdyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "18",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherHeavyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "7.5",
+    "COST": "75",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherHeavyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "30",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLeatherHeavyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "leatherArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "28",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modBoiledLeather",
+      "modStuddedLeather",
+      "modBandedLeather",
+      "modShadowedLeather",
+      "modTreatedLeather",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "15",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalChest",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "3",
+    "COST": "40",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "15",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalArm",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "15",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalSturdyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "4",
+    "COST": "65",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalSturdyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "8",
+    "COST": "115",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalSturdyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "4",
+    "COST": "65",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalSturdyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "4",
+    "COST": "65",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalHeavyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "6",
+    "COST": "115",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalHeavyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "11.5",
+    "COST": "190",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalHeavyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "6",
+    "COST": "115",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMetalHeavyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "metalArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "6",
+    "COST": "115",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modAlloyedMetal",
+      "modPolishedMetal",
+      "modShadowedMetal",
+      "modEnamelledMetal",
+      "modPaintedMetal",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "2",
+    "COST": "25",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatChest",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "4",
+    "COST": "60",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1",
+    "COST": "25",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatArm",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1",
+    "COST": "25",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatSturdyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "105",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatSturdyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "6",
+    "COST": "140",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatSturdyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "105",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatSturdyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "105",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatHeavyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "185",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatHeavyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "8",
+    "COST": "220",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatHeavyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "185",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCombatHeavyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "combatArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "145",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modFiberglass",
+      "modShadowed",
+      "modPolymer",
+      "modReinforced",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "33",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticChest",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "75",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "30",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticArm",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "30",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticSturdyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "70",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticSturdyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "6",
+    "COST": "125",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticSturdyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "80",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticSturdyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "70",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticHeavyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "5",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "5",
+    "COST": "110",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticHeavyChest",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "5",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "8.5",
+    "COST": "175",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modDensity",
+      "modBioCommMesh",
+      "modCushioned",
+      "modPneumatic",
+      "modAsbestosLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticHeavyLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "5",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "5",
+    "COST": "130",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modShockAbsorbing",
+      "modMuffled"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSyntheticHeavyArm",
+    "TYPE": "apparel",
+    "CATEGORY": "syntheticArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "5",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "5",
+    "COST": "110",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [
+      "modLaminated",
+      "modMicrocarbon",
+      "modNanofilament",
+      "modResin",
+      "modLightweight",
+      "modPocketed",
+      "modDeepPocketed",
+      "modLeaded",
+      "modUltralight",
+      "modStreamlined",
+      "modBalanced",
+      "modCrafted",
+      "modBrawling",
+      "modStabilized"
+    ],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorVaultTecSecurityHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "vaultTecSecurity",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1",
+    "COST": "20",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorVaultTecSecurityArmor",
+    "TYPE": "apparel",
+    "CATEGORY": "vaultTecSecurity",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "4",
+    "COST": "16",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorChineseStealth",
+    "TYPE": "apparel",
+    "CATEGORY": "armor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "6",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "750",
+    "RARITY": "6",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorDivingSuit",
+    "TYPE": "apparel",
+    "CATEGORY": "armor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "9",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "4",
+    "COST": "350",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRecon",
+    "TYPE": "apparel",
+    "CATEGORY": "armor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "360",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorScoutChest",
+    "TYPE": "apparel",
+    "CATEGORY": "scoutArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "3.5",
+    "COST": "90",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorScoutArm",
+    "TYPE": "apparel",
+    "CATEGORY": "scoutArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "60",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorScoutLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "scoutArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "60",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorScoutMask",
+    "TYPE": "apparel",
+    "CATEGORY": "scoutArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "50",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMarineChest",
+    "TYPE": "apparel",
+    "CATEGORY": "marineArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "9.5",
+    "COST": "150",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMarineArm",
+    "TYPE": "apparel",
+    "CATEGORY": "marineArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "5",
+    "COST": "115",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMarineLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "marineArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "5",
+    "COST": "100",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMarineHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "marineArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "5",
+    "COST": "65",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryRecruitChest",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "3",
+    "COST": "75",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryRecruitArm",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "1",
+    "COST": "30",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryRecruitLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "1",
+    "COST": "40",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryRecruitHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1",
+    "COST": "50",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryChest",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "5.5",
+    "COST": "100",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryArm",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "2",
+    "COST": "50",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "2",
+    "COST": "70",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "75",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryCenturionChest",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "5",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso"
+    ],
+    "WEIGHT": "8",
+    "COST": "200",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryCenturionArm",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arm"
+    ],
+    "WEIGHT": "6",
+    "COST": "140",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryCenturionLeg",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "3",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "leg"
+    ],
+    "WEIGHT": "3",
+    "COST": "100",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegionaryCenturionHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "5",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "5",
+    "COST": "175",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLegatusHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "legionaryArmor",
+    "PHYSICAL_RES": "5",
+    "ENERGY_RES": "5",
+    "RADIATION_RES": "3",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "8",
+    "COST": "250",
+    "RARITY": "5",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "armor",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodSteelUniform",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "1",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "20",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCasualClothing",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "20",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBallisticWeave",
+      "modBallisticWeave2",
+      "modBallisticWeave3",
+      "modBallisticWeave4",
+      "modBallisticWeave5"
+    ],
+    "EFFECTS": [
+      "effectSpecialReroll:strength",
+      "effectSpecialReroll:agility"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHarness",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "5",
+    "RARITY": "0",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMilitaryFatigues",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "12",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBallisticWeave",
+      "modBallisticWeave2",
+      "modBallisticWeave3",
+      "modBallisticWeave4",
+      "modBallisticWeave5"
+    ],
+    "EFFECTS": [
+      "effectSpecialReroll:strength",
+      "effectSpecialReroll:agility"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorRoadLeathers",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "5",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorToughClothing",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "20",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorVaultJumpsuit",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "20",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modInsulatedLining",
+      "modTreatedLining",
+      "modResistantLining",
+      "modProtectiveLining",
+      "modShieldedLining"
+    ],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodSteelFatigues",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2",
+    "COST": "20",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodScribe",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2",
+    "COST": "20",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCage",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "3",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "16.5",
+    "COST": "110",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorDrifter",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "5",
+    "COST": "35",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorEngineer",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "15",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorFormalClothing",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "30",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modBallisticWeave",
+      "modBallisticWeave2",
+      "modBallisticWeave3",
+      "modBallisticWeave4",
+      "modBallisticWeave5"
+    ],
+    "EFFECTS": [
+      "effectSpecialReroll:charisma"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHazmatSuit",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "Infinity",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "85",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHeavyCoat",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "1",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "20",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBallisticWeave",
+      "modBallisticWeave2",
+      "modBallisticWeave3",
+      "modBallisticWeave4",
+      "modBallisticWeave5"
+    ],
+    "EFFECTS": [
+      "effectSpecialReroll:endurance"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHides",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2",
+    "COST": "13",
+    "RARITY": "0",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorLabCoat",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "10",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [
+      "modBallisticWeave",
+      "modBallisticWeave2",
+      "modBallisticWeave3",
+      "modBallisticWeave4",
+      "modBallisticWeave5"
+    ],
+    "EFFECTS": [
+      "effectSpecialReroll:intelligence"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSpike",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "8.5",
+    "COST": "65",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorUtilityCoveralls",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "12",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [
+      "effectCarryWeight:5"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorArmyHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "20",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodSteelHood",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "12",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodScribeHat",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "8",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCasualHat",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "15",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [
+      "effectIgnoreLightPenalty"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorFormalHat",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "15",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [
+      "modBallisticWeave",
+      "modBallisticWeave2",
+      "modBallisticWeave3",
+      "modBallisticWeave4",
+      "modBallisticWeave5"
+    ],
+    "EFFECTS": [
+      "effectSpecialReroll:charisma"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorGasMask",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "3",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1.5",
+    "COST": "10",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [
+      "effectGasMask"
+    ],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHardHat",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "15",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHoodOrCowl",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "1",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1",
+    "COST": "5",
+    "RARITY": "1",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSackHood",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "5",
+    "RARITY": "0",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorWeldersVisor",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "2",
+    "COST": "20",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBeerHat",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "15",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMarineTacticalHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1",
+    "COST": "25",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSpacesuitHelmet",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "85",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorMarineWetsuit",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "1",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "1",
+    "COST": "25",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorUnderarmor",
+    "TYPE": "apparel",
+    "CATEGORY": "clothing",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "0.5",
+    "COST": "30",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodArmoredBattlecoat",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "4",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "1",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "10",
+    "COST": "400",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorBrotherhoodBomberJacket",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "5",
+    "RADIATION_RES": "1",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2",
+    "COST": "40",
+    "RARITY": "3",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorCleanroom",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "6",
+    "LOCATIONS_COVERED": [
+      "head",
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "2.5",
+    "COST": "65",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHuntersPelt",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "2",
+    "ENERGY_RES": "2",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "torso",
+      "arms",
+      "legs"
+    ],
+    "WEIGHT": "7.5",
+    "COST": "50",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorHuntersHood",
+    "TYPE": "apparel",
+    "CATEGORY": "headgear",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "1",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "head"
+    ],
+    "WEIGHT": "1",
+    "COST": "15",
+    "RARITY": "2",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "armorSpacesuitCostume",
+    "TYPE": "apparel",
+    "CATEGORY": "outfit",
+    "PHYSICAL_RES": "1",
+    "ENERGY_RES": "4",
+    "RADIATION_RES": "2",
+    "LOCATIONS_COVERED": [
+      "arms",
+      "legs",
+      "torso"
+    ],
+    "WEIGHT": "4",
+    "COST": "100",
+    "RARITY": "4",
+    "AVAILABLE_MODS": [],
+    "EFFECTS": [],
+    "category_file": "clothing",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "robotPartSensors",
+    "TYPE": "apparel",
+    "CATEGORY": "robotPart",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "robotPartSensors"
+    ],
+    "EFFECTS": [],
+    "QUALITIES": [],
+    "WEIGHT": "-",
+    "COST": "-",
+    "RARITY": "-",
+    "AVAILABLE_MODS": [
+      "modRobotPlatingStandard",
+      "modRobotPlatingMisterGutsy",
+      "modRobotFactoryArmorOptics",
+      "modRobotBasePlatingOptics",
+      "modRobotKnurledPlatingOptics",
+      "modRobotPoisonousPlatingOptics",
+      "modRobotToxicPlatingOptics",
+      "modRobotActivationFrameOptics",
+      "modRobotVoltaicFrameOptics",
+      "modRobotHydraulicFrameOptics"
+    ],
+    "category_file": "robotParts",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "robotPartBody",
+    "TYPE": "apparel",
+    "CATEGORY": "robotPart",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "robotPartBody"
+    ],
+    "EFFECTS": [],
+    "QUALITIES": [],
+    "WEIGHT": "-",
+    "COST": "-",
+    "RARITY": "-",
+    "AVAILABLE_MODS": [
+      "modRobotPlatingStandard",
+      "modRobotPlatingMisterGutsy",
+      "modRobotFactoryArmorBody",
+      "modRobotFactoryStorageBody",
+      "modRobotBasePlatingBody",
+      "modRobotKnurledPlatingBody",
+      "modRobotPoisonousPlatingBody",
+      "modRobotToxicPlatingBody",
+      "modRobotActivationFrameBody",
+      "modRobotVoltaicFrameBody",
+      "modRobotHydraulicFrameBody"
+    ],
+    "category_file": "robotParts",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "robotPartArms",
+    "TYPE": "apparel",
+    "CATEGORY": "robotPart",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "robotPartArms"
+    ],
+    "EFFECTS": [],
+    "QUALITIES": [],
+    "WEIGHT": "-",
+    "COST": "-",
+    "RARITY": "-",
+    "AVAILABLE_MODS": [
+      "modRobotPlatingStandard",
+      "modRobotPlatingMisterGutsy",
+      "modRobotFactoryArmorArms",
+      "modRobotBasePlatingArms",
+      "modRobotKnurledPlatingArms",
+      "modRobotPoisonousPlatingArms",
+      "modRobotToxicPlatingArms",
+      "modRobotActivationFrameArms",
+      "modRobotVoltaicFrameArms",
+      "modRobotHydraulicFrameArms"
+    ],
+    "category_file": "robotParts",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "robotPartThrusters",
+    "TYPE": "apparel",
+    "CATEGORY": "robotPart",
+    "PHYSICAL_RES": "0",
+    "ENERGY_RES": "0",
+    "RADIATION_RES": "0",
+    "LOCATIONS_COVERED": [
+      "robotPartThrusters"
+    ],
+    "EFFECTS": [],
+    "QUALITIES": [],
+    "WEIGHT": "-",
+    "COST": "-",
+    "RARITY": "-",
+    "AVAILABLE_MODS": [
+      "modRobotPlatingStandard",
+      "modRobotPlatingMisterGutsy",
+      "modRobotFactoryArmorThrusters",
+      "modRobotBasePlatingThrusters",
+      "modRobotKnurledPlatingThrusters",
+      "modRobotPoisonousPlatingThrusters",
+      "modRobotToxicPlatingThrusters",
+      "modRobotActivationFrameThrusters",
+      "modRobotVoltaicFrameThrusters",
+      "modRobotHydraulicFrameThrusters"
+    ],
+    "category_file": "robotParts",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  }
+]

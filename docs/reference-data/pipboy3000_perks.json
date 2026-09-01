@@ -1,0 +1,1888 @@
+[
+  {
+    "ID": "perkSkilled",
+    "TIER": "10",
+    "REQUISITES": {
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAccuracy",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 9
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAquaboyGirl",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 5,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMysteriousStranger",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkIntenseTraining",
+    "TIER": "10",
+    "REQUISITES": {
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "2",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAnimalFriend",
+    "TIER": "2",
+    "REQUISITES": {
+      "charisma": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkDaringNature",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkArmorer",
+    "TIER": "4",
+    "REQUISITES": {
+      "strength": 5,
+      "intelligence": 6
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMakeshift",
+    "TIER": "1",
+    "REQUISITES": {},
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBarbarian",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 7,
+      "level": 4
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMovingTarget",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBlitz",
+    "TIER": "2",
+    "REQUISITES": {
+      "agility": 9,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCenterOfMass",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPathfinder",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 6,
+      "endurance": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGunFu",
+    "TIER": "3",
+    "REQUISITES": {
+      "agility": 10,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPickpocket",
+    "TIER": "3",
+    "REQUISITES": {
+      "perception": 8,
+      "agility": 8,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHunter",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBloodyMess",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSniper",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8,
+      "agility": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkFortuneFinder",
+    "TIER": "3",
+    "REQUISITES": {
+      "luck": 5,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkChemist",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkShotgunSurgeon",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 5,
+      "agility": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCapCollector",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLaserCommander",
+    "TIER": "2",
+    "REQUISITES": {
+      "perception": 8,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCommando",
+    "TIER": "2",
+    "REQUISITES": {
+      "agility": 8,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkComprehension",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPiercingStrike",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAwareness",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNightPerson",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBetterCriticals",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 9
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkDogmeat",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLifeGiver",
+    "TIER": "5",
+    "REQUISITES": {
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSolarPowered",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkEntomologist",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkQuickDraw",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRoboticsExpert",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 8,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkEvasive",
+    "TIER": "2",
+    "REQUISITES": {
+      "agility": 6,
+      "level": 4
+    },
+    "LEVEL_REQ_INCREASE": "6",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkDemolitionExpert",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 6,
+      "luck": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBlacksmith",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGunNut",
+    "TIER": "4",
+    "REQUISITES": {
+      "intelligence": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkInspirational",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPartyBoyGirl",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 6,
+      "charisma": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRifleman",
+    "TIER": "2",
+    "REQUISITES": {
+      "agility": 7,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNuclearPhysicist",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 9
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkConcentratedFire",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8,
+      "agility": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkChemSqueezer",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkScoundrel",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHacker",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNerdRage",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 8,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkInfiltrator",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkImprovedHealing",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMasterThief",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8,
+      "agility": 9
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHealer",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSizeMatters",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 7,
+      "agility": 6
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMedic",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSmoothTalker",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMeltdown",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 10
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSnakeFancier",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkQuickHands",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkFastMetabolism",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSteadyAim",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 8,
+      "agility": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNinja",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHeaveHo",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkParalyzingPalm",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLightStep",
+    "TIER": "1",
+    "REQUISITES": {},
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBigLeaguer",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPyromaniac",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGunslinger",
+    "TIER": "2",
+    "REQUISITES": {
+      "agility": 7,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkTerrifyingPresence",
+    "TIER": "2",
+    "REQUISITES": {
+      "strength": 6,
+      "charisma": 8,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkChemResistant",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCautiousNature",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRadResistant",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 8,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkIronFist",
+    "TIER": "2",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCanDo",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkScrapper",
+    "TIER": "2",
+    "REQUISITES": {
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRefractor",
+    "TIER": "2",
+    "REQUISITES": {
+      "perception": 6,
+      "luck": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRicochet",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 10,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAdamantiumSkeleton",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkToughness",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 6,
+      "luck": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAdrenalineRush",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkStrongBack",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 5,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "2",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkScience",
+    "TIER": "4",
+    "REQUISITES": {
+      "intelligence": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkScrounger",
+    "TIER": "3",
+    "REQUISITES": {
+      "luck": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBasher",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMisterSandman",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 9
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkTag",
+    "TIER": "1",
+    "REQUISITES": {
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGhost",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 5,
+      "agility": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSlayer",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLeadBelly",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPainTrain",
+    "TIER": "2",
+    "REQUISITES": {
+      "strength": 9,
+      "endurance": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBlackWidowLadyKiller",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGrimReaper",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkJunktownVendor",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkActionBoyGirl",
+    "TIER": "1",
+    "REQUISITES": {},
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRobotWrangler",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAmmosmith",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 7,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkAllNightLong",
+    "TIER": "1",
+    "REQUISITES": {
+      "level": 16
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBodyguards",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 8,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCommunityOrganizer",
+    "TIER": "3",
+    "REQUISITES": {
+      "charisma": 5,
+      "endurance": 5,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "3",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkContractor",
+    "TIER": "3",
+    "REQUISITES": {
+      "charisma": 5,
+      "intelligence": 5,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCovertOperator",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkEnforcer",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 9,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGreenThumb",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 4,
+      "level": 4
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGunRunner",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 6,
+      "level": 4
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHappyCamper",
+    "TIER": "2",
+    "REQUISITES": {
+      "charisma": 7,
+      "endurance": 6,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHiredHelp",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHomeDefense",
+    "TIER": "2",
+    "REQUISITES": {
+      "intelligence": 6,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHomebody",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLocalLeader",
+    "TIER": "2",
+    "REQUISITES": {
+      "charisma": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLockAndLoad",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 7,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMechanicalMenace",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 6,
+      "intelligence": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkClassFreak",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 6,
+      "intelligence": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNocturnalFortitude",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPannapictagraphist",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPharmacist",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 8,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "6",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPhotosynthetic",
+    "TIER": "2",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "10",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkQuackSurgeon",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 7,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRejuvenated",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRetribution",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 8,
+      "luck": 8,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSquadManeuvers",
+    "TIER": "2",
+    "REQUISITES": {
+      "charisma": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSuperDuper",
+    "TIER": "3",
+    "REQUISITES": {
+      "luck": 6,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkTakingOneForTheTeam",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 7,
+      "charisma": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkTinkerer",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 5,
+      "intelligence": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkTrueFriends",
+    "TIER": "2",
+    "REQUISITES": {
+      "perception": 6,
+      "charisma": 6
+    },
+    "LEVEL_REQ_INCREASE": "4",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBlocker",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGladiator",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBulletShield",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 8,
+      "level": 8
+    },
+    "LEVEL_REQ_INCREASE": "6",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkIncisor",
+    "TIER": "2",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 2
+    },
+    "LEVEL_REQ_INCREASE": "9",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMartialArtist",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPackRat",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 6,
+      "level": 4
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkScattershot",
+    "TIER": "1",
+    "REQUISITES": {
+      "strength": 7,
+      "level": 10
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSturdyFrame",
+    "TIER": "3",
+    "REQUISITES": {
+      "strength": 8,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "8",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkArcher",
+    "TIER": "3",
+    "REQUISITES": {
+      "perception": 6,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "7",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBowBeforeMe",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8,
+      "level": 4
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkButchersBounty",
+    "TIER": "3",
+    "REQUISITES": {
+      "perception": 8,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCrackShot",
+    "TIER": "2",
+    "REQUISITES": {
+      "perception": 7,
+      "level": 7
+    },
+    "LEVEL_REQ_INCREASE": "7",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkFireInTheHole",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8,
+      "level": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGlowSight",
+    "TIER": "3",
+    "REQUISITES": {
+      "perception": 8,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "8",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNightEyes",
+    "TIER": "1",
+    "REQUISITES": {
+      "perception": 8,
+      "level": 7
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkDromedary",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkCannibal",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 8,
+      "level": 10
+    },
+    "LEVEL_REQ_INCREASE": "9",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkColaNut",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 14
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkFireproof",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 7
+    },
+    "LEVEL_REQ_INCREASE": "7",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGhoulish",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 9,
+      "level": 7
+    },
+    "LEVEL_REQ_INCREASE": "8",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkIronclad",
+    "TIER": "3",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkNaturalResistance",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 10
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRadicool",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 6,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkRevenant",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 8,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSlowMetabolizer",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkThirstQuencher",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 6
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkVaccinated",
+    "TIER": "1",
+    "REQUISITES": {
+      "endurance": 7,
+      "level": 16
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBloodsucker",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 6,
+      "level": 11
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkFieldSurgeon",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 8,
+      "intelligence": 8,
+      "level": 15
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHappyGoLucky",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 9,
+      "level": 17
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkHealingHands",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 8,
+      "intelligence": 7,
+      "level": 18
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkOverlyGenerous",
+    "TIER": "1",
+    "REQUISITES": {
+      "charisma": 7,
+      "level": 12
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkResponder",
+    "TIER": "3",
+    "REQUISITES": {
+      "charisma": 8,
+      "intelligence": 7,
+      "level": 9
+    },
+    "LEVEL_REQ_INCREASE": "7",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSpiritualHealer",
+    "TIER": "3",
+    "REQUISITES": {
+      "charisma": 7,
+      "level": 6
+    },
+    "LEVEL_REQ_INCREASE": "9",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSuppressor",
+    "TIER": "3",
+    "REQUISITES": {
+      "charisma": 6,
+      "level": 10
+    },
+    "LEVEL_REQ_INCREASE": "7",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkTenderizer",
+    "TIER": "3",
+    "REQUISITES": {
+      "charisma": 7,
+      "level": 8
+    },
+    "LEVEL_REQ_INCREASE": "10",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkLicensedPlumber",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 6,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPowerPatcher",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 6,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "10",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPowerUser",
+    "TIER": "3",
+    "REQUISITES": {
+      "intelligence": 9,
+      "level": 10
+    },
+    "LEVEL_REQ_INCREASE": "10",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkStabilized",
+    "TIER": "1",
+    "REQUISITES": {
+      "intelligence": 7,
+      "level": 16
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkBornSurvivor",
+    "TIER": "3",
+    "REQUISITES": {
+      "agility": 8,
+      "level": 3
+    },
+    "LEVEL_REQ_INCREASE": "8",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkDeadManSprinting",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 7,
+      "level": 8
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkEscapeArtist",
+    "TIER": "1",
+    "REQUISITES": {
+      "agility": 8,
+      "level": 15
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkGoatLegs",
+    "TIER": "3",
+    "REQUISITES": {
+      "agility": 7,
+      "level": 7
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkModernRenegade",
+    "TIER": "3",
+    "REQUISITES": {
+      "agility": 7,
+      "level": 8
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSecretAgent",
+    "TIER": "3",
+    "REQUISITES": {
+      "agility": 9,
+      "level": 7
+    },
+    "LEVEL_REQ_INCREASE": "5",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkDryNurse",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 8,
+      "level": 13
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkJunkShield",
+    "TIER": "3",
+    "REQUISITES": {
+      "luck": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "8",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkMysteriousSavior",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 7,
+      "level": 1
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkPsychopath",
+    "TIER": "3",
+    "REQUISITES": {
+      "luck": 8,
+      "level": 11
+    },
+    "LEVEL_REQ_INCREASE": "6",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkSerendipity",
+    "TIER": "3",
+    "REQUISITES": {
+      "luck": 7,
+      "level": 5
+    },
+    "LEVEL_REQ_INCREASE": "6",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  },
+  {
+    "ID": "perkStormChaser",
+    "TIER": "1",
+    "REQUISITES": {
+      "luck": 6,
+      "level": 15
+    },
+    "LEVEL_REQ_INCREASE": "",
+    "source": "pipboy3000",
+    "sourceUrl": "https://github.com/vittoema96/vittoema96.github.io"
+  }
+]

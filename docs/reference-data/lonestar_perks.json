@@ -1,0 +1,1038 @@
+[
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Action Boy/Girl",
+    "requirements_en": {},
+    "rank": 1,
+    "description_en": "When you spend AP to take an additional major action, you do not suffer the increased skill test difficulty during your second action.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Adamantium Skeleton",
+    "requirements_en": {
+      "E": 7
+    },
+    "rank": 3,
+    "description_en": "When you suffer damage, the amount of damage needed to inflict a critical hit on you increases by your rank in this perk. At rank 1, you suffer a critical hit from 6 or more damage rather than 5 or more. Level req increases by 3 each rank.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Adrenalin Rush",
+    "requirements_en": {
+      "S": 7
+    },
+    "rank": 1,
+    "description_en": "When your health is below its maximum value, you count your STR score as 10 for all purposes when attempting a STR-based skill test or melee attack.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Animal Friend",
+    "requirements_en": {
+      "C": 6
+    },
+    "rank": 2,
+    "description_en": "At rank 1, whenever a creature NPC with the Mammal, Lizard, or Insect keyword would attack you, roll 1 CD; on any result other than an Effect, the creature chooses not to attack you, although it may still attack another character it can target. Level req increases by 3 each rank.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Aquaboy/Aquagirl",
+    "requirements_en": {
+      "E": 5
+    },
+    "rank": 2,
+    "description_en": "Water is your ally. At rank 1, you no longer take radiation damage from swimming in irradiated water, and you can hold your breath for twice as long. At rank 2, enemies add +2 to the difficulty to tests to detect you while submerged underwater. Level req increases by 3 each rank.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Armorer",
+    "requirements_en": {
+      "S": 5,
+      "I": 6
+    },
+    "rank": 4,
+    "description_en": "You can modify armor with armor mods. Each rank unlocks an additional rank of mods: rank 1 unlocks rank 1 mods, rank 2 unlocks rank 2 mods, etc. Level req increases by 4 each rank.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Awareness",
+    "requirements_en": {
+      "P": 7
+    },
+    "rank": 1,
+    "description_en": "When you take the Aim minor action at a target within Close range, you spot their weaknesses and can attack more efficiently. The next attack you make against that target gains the Piercing 1 damage effect, or improves the rating of any existing Piercing X damage effect by 1.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Barbarian",
+    "requirements_en": {
+      "S": 7
+    },
+    "rank": 1,
+    "description_en": "Your physical Damage Resistance increases on all hit locations based on your STR. You do not gain this benefit while wearing Power Armor. STR 7-8: +1 DR; STR 9-10: +2 DR; STR 11+: +3 DR. Not available to robots. Requires Level 4+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Basher",
+    "requirements_en": {
+      "S": 6
+    },
+    "rank": 1,
+    "description_en": "When you make a melee attack by bashing with your gun, your attack gains the Vicious damage effect.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Better Criticals",
+    "requirements_en": {
+      "L": 9
+    },
+    "rank": 1,
+    "description_en": "When you inflict one or more points of damage to an enemy, you may spend 1 Luck Point to automatically inflict a critical hit, causing an injury.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Big Leagues",
+    "requirements_en": {
+      "S": 8
+    },
+    "rank": 1,
+    "description_en": "When you make a melee attack with a two-handed melee weapon, the weapon gains the Vicious damage effect.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Black Widow/Lady Killer",
+    "requirements_en": {
+      "C": 6
+    },
+    "rank": 1,
+    "description_en": "When you attempt a CHA-based skill test to influence a character of the chosen gender, you may re-roll 1d20. In addition, your attacks inflict +1 additional damage against characters of the chosen gender.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Blacksmith",
+    "requirements_en": {
+      "S": 6
+    },
+    "rank": 3,
+    "description_en": "You can modify melee weapons with weapon mods. Each rank unlocks an additional rank of melee weapon mods. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Blitz",
+    "requirements_en": {
+      "A": 9
+    },
+    "rank": 2,
+    "description_en": "When you move into reach of an opponent and make a melee attack against them in one turn, you may re-roll one d20 on your attack. At rank 2, you also inflict +1 damage with that attack. Level req increases by 3 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Bloody Mess",
+    "requirements_en": {
+      "L": 6
+    },
+    "rank": 1,
+    "description_en": "When you inflict a critical hit, roll 1 CD; if you roll an Effect, you inflict one additional injury to a random location.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Can Do!",
+    "requirements_en": {
+      "L": 5
+    },
+    "rank": 1,
+    "description_en": "When you are scavenging a location that contains food, you gain 1 additional random food item, without spending AP.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Cap Collector",
+    "requirements_en": {
+      "C": 5
+    },
+    "rank": 1,
+    "description_en": "When you buy or sell items, you may increase or decrease the price of the goods being traded by 10%.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Cautious Nature",
+    "requirements_en": {
+      "P": 7
+    },
+    "rank": 1,
+    "description_en": "Whenever you attempt a skill test and you buy one or more d20s by spending Action Points, you may re-roll 1d30 on that test. You may not purchase this perk if you have Daring Nature.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Center Mass",
+    "requirements_en": {
+      "A": 7
+    },
+    "rank": 1,
+    "description_en": "When you make a ranged attack, you may choose to strike your target's Torso location (or equivalent) without increasing the difficulty of the attack. In addition, you may re-roll 1d20 when making the test for your attack.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Chem Resistant",
+    "requirements_en": {
+      "E": 7
+    },
+    "rank": 2,
+    "description_en": "At rank 1, roll one fewer CD when determining if you become addicted to chems, to a minimum of 0. At rank 2, you cannot become addicted to chems. Level req increases by 4 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Chemist",
+    "requirements_en": {
+      "I": 7
+    },
+    "rank": 1,
+    "description_en": "Chems you create last twice as long as normal. In addition, you unlock chems recipes that have this perk as a requirement.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Commando",
+    "requirements_en": {
+      "A": 8
+    },
+    "rank": 2,
+    "description_en": "When you make a ranged attack with any weapon with a Fire Rate of 3 or higher (except heavy weapons), you add +1 per rank to the weapon's damage. Level req increases by 3 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Comprehension",
+    "requirements_en": {
+      "I": 6
+    },
+    "rank": 1,
+    "description_en": "After you use the bonus gained from reading a magazine, roll 1 CD. If you roll an Effect, you may use that bonus one additional time.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Concentrated Fire",
+    "requirements_en": {
+      "P": 8,
+      "A": 6
+    },
+    "rank": 1,
+    "description_en": "When you make a ranged attack and spend ammunition to increase the damage, you may re-roll up to 3 CD for your damage roll.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Daring Nature",
+    "requirements_en": {
+      "L": 7
+    },
+    "rank": 1,
+    "description_en": "Whenever you attempt a skill test and you buy one or more d20s by giving the GM Action Points, you may re-roll 1d20 on that test. You may not purchase this perk if you have Cautious Nature.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Demolition Expert",
+    "requirements_en": {
+      "P": 6,
+      "L": 6
+    },
+    "rank": 1,
+    "description_en": "When you make an attack using a weapon with the Blast quality, the attack gains the Vicious damage effect. In addition, you unlock explosives recipes which have this perk as a requirement.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Dodger",
+    "requirements_en": {
+      "A": 6
+    },
+    "rank": 2,
+    "description_en": "At rank 1, when you take the Defend major action, you reduce the difficulty of the skill test by 1. At rank 2, the AP cost to further increase your Defense is reduced to 1 AP. Level req increases by 6 each rank. Requires Level 4+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Dogmeat",
+    "requirements_en": {
+      "C": 5
+    },
+    "rank": 1,
+    "description_en": "You have a pet dog that serves as a friend and ally. The dog has the Dogmeat profile and is treated as an allied NPC creature under your command. If your dog is slain, you either find a new dog before the next adventure, or you may trade this perk for a different one after this adventure.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Entomologist",
+    "requirements_en": {
+      "I": 7
+    },
+    "rank": 1,
+    "description_en": "When you make an attack against an NPC with the Insect keyword, your attack gains the Piercing 1 damage effect, or improves the rating of any Piercing X effect the weapon has by +1.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Fast Metabolism",
+    "requirements_en": {
+      "E": 6
+    },
+    "rank": 3,
+    "description_en": "When you regain one or more HP from any source other than rest, increase the total HP regained by +1 per rank in this perk. Level req increases by 3 each rank. Not available to robots. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Faster Healing",
+    "requirements_en": {
+      "E": 6
+    },
+    "rank": 1,
+    "description_en": "When you make an END + Survival test to heal your own injuries, the first additional d20 you buy is free. The normal maximum of 5d20 still applies. Not available to robots.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Finesse",
+    "requirements_en": {
+      "A": 9
+    },
+    "rank": 1,
+    "description_en": "Once per combat encounter, you may re-roll all the CD on a single damage roll without spending any Luck points.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Fortune Finder",
+    "requirements_en": {
+      "L": 5
+    },
+    "rank": 3,
+    "description_en": "Whenever you roll to determine how much money you find, you find more. At rank 1, you find +3 additional caps. At rank 2, +6 additional caps. At rank 3, +10 additional caps. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Ghost",
+    "requirements_en": {
+      "P": 5,
+      "A": 6
+    },
+    "rank": 1,
+    "description_en": "Whenever you attempt an AGI + Sneak test in shadows or darkness, the first additional d20 you buy is free. The normal maximum of 5d20 still applies.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Grim Reaper's Sprint",
+    "requirements_en": {
+      "L": 8
+    },
+    "rank": 1,
+    "description_en": "When you make an attack which kills one or more enemies, roll 1 CD. If you roll an Effect, add 2 AP to the group's pool.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Gun Fu",
+    "requirements_en": {
+      "A": 10
+    },
+    "rank": 3,
+    "description_en": "When you succeed at a ranged attack, you may spend 1 AP and 1 ammo to hit a second target within Close range of your initial target, who takes the same damage. At rank 2, spend 2 AP and 2 ammo to hit two additional targets. At rank 3, spend 3 AP and 3 ammo to hit three additional targets. Level req increases by 3 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Gun Nut",
+    "requirements_en": {
+      "I": 6
+    },
+    "rank": 4,
+    "description_en": "You can modify small guns and heavy weapons with weapon mods. Each rank unlocks an additional rank of weapon mods. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Gunslinger",
+    "requirements_en": {
+      "A": 7
+    },
+    "rank": 2,
+    "description_en": "When you make an attack with a one-handed ranged weapon with a Fire Rate of 2 or lower, you increase the weapon's damage by +1 per rank. In addition, you may re-roll the hit location die. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Hacker",
+    "requirements_en": {
+      "I": 8
+    },
+    "rank": 1,
+    "description_en": "The difficulty of skill tests to hack computers is decreased by 1, to a minimum of 0.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Healer",
+    "requirements_en": {
+      "I": 7
+    },
+    "rank": 3,
+    "description_en": "When you heal a patient's HP using the First Aid action, increase the amount of HP healed by +1 per rank in this perk. Level req increases by 5 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Heave Ho!",
+    "requirements_en": {
+      "S": 8
+    },
+    "rank": 1,
+    "description_en": "When you make a thrown weapon attack, you may spend 1 AP to increase the Range of the weapon by one step - from Close to Medium, or from Medium to Long.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Hunter",
+    "requirements_en": {
+      "E": 6
+    },
+    "rank": 1,
+    "description_en": "When you make an attack against an NPC with the Mammal, Lizard, or Insect keywords and the Mutated keyword, your attack gains the Vicious damage effect, if it did not already have it.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Infiltrator",
+    "requirements_en": {
+      "P": 8
+    },
+    "rank": 1,
+    "description_en": "When you attempt a Lockpick skill test to unlock a door or container, you may re-roll 1d20.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Inspirational",
+    "requirements_en": {
+      "C": 8
+    },
+    "rank": 1,
+    "description_en": "Because you lead by example, the maximum number of AP the group may save is increased by 1.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Intense Training",
+    "requirements_en": {
+      "level": 1
+    },
+    "rank": 10,
+    "description_en": "Increase any one S.P.E.C.I.A.L. attribute by 1 rank. Your S.P.E.C.I.A.L. attributes cannot be increased beyond 10 using this method. Level req increases by 2 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Iron Fist",
+    "requirements_en": {
+      "S": 6
+    },
+    "rank": 2,
+    "description_en": "At rank 1, your unarmed attacks inflict +1 damage. At rank 2, your unarmed attacks also gain the Vicious damage effect. Level req increases by 5 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Junktown Jerky Vendor",
+    "requirements_en": {
+      "C": 8
+    },
+    "rank": 1,
+    "description_en": "The difficulty of any CHA + Barter test you attempt to buy or sell goods is reduced by 1, to a minimum of 0.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Jury Rigging",
+    "requirements_en": {},
+    "rank": 1,
+    "description_en": "You can repair an item without needing to expend any components. However, the repair is temporary, and the item will break again on the next complication you suffer while using it. The complication range of all skill tests to use the item increases by 1, to the roll of a 19-20.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Laser Commander",
+    "requirements_en": {
+      "P": 8
+    },
+    "rank": 2,
+    "description_en": "When you make an attack with a ranged energy weapon, the damage is increased by +1 per rank in this perk. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Lead Belly",
+    "requirements_en": {
+      "E": 6
+    },
+    "rank": 2,
+    "description_en": "At rank 1, you may re-roll the CD to determine if you suffer radiation damage from irradiated food or drink. At rank 2, you are immune to radiation damage from consuming irradiated food or drink. Level req increases by 4 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Life Giver",
+    "requirements_en": {},
+    "rank": 5,
+    "description_en": "Increase your maximum hit points by your Endurance rank. Level req increases by 5 each rank. Requires Level 5+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Light Step",
+    "requirements_en": {},
+    "rank": 1,
+    "description_en": "When you roll to generate any complications on an Agility-based skill test, you may ignore one complication for every 1 AP spent. In addition, you may re-roll 1d20 on any AGI + Athletics test to avoid traps triggered by pressure plates or similar mechanisms.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Master Thief",
+    "requirements_en": {
+      "P": 8,
+      "A": 9
+    },
+    "rank": 1,
+    "description_en": "When you are attempting to pick a lock or pickpocket somebody, the difficulty of the opponent's skill test to detect you increases by +1.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Medic",
+    "requirements_en": {
+      "I": 8
+    },
+    "rank": 1,
+    "description_en": "When you use the First Aid action to try to treat an injury, you can re-roll 1d20.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Meltdown",
+    "requirements_en": {
+      "P": 10
+    },
+    "rank": 1,
+    "description_en": "When you kill an enemy with an energy weapon, they explode. Roll a number of CD equal to half the weapon's damage rating (round down). For each Effect rolled, one creature within Close range of the exploding enemy suffers energy damage equal to the total rolled.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Mister Sandman",
+    "requirements_en": {
+      "A": 9
+    },
+    "rank": 1,
+    "description_en": "When you make a sneak attack with a silenced or suppressed weapon, the damage is increased by +2. You cannot gain this benefit while in Power Armor.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Moving Target",
+    "requirements_en": {
+      "A": 6
+    },
+    "rank": 1,
+    "description_en": "When you take the Sprint action, your Defense increases by +1 until the start of your next turn.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Mysterious Stranger",
+    "requirements_en": {
+      "L": 7
+    },
+    "rank": 1,
+    "description_en": "At the start of a combat encounter, you may spend 1 Luck point. At any point during the scene, the GM may have the Mysterious Stranger appear, make a single ranged attack against an enemy you attacked or who attacked you, then vanish. If the Stranger does not appear, the GM must refund your Luck point.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Nerd Rage!",
+    "requirements_en": {
+      "I": 8
+    },
+    "rank": 3,
+    "description_en": "While your health is reduced to less than 1/4 of your maximum, you add +1 to your physical DR, +1 to your energy DR, and +1 to the damage of all your attacks. At rank 2 this increases to +2 DR and +2 damage. At rank 3, +3 DR and +3 damage. Level req increases by 5 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Night Person",
+    "requirements_en": {
+      "P": 7
+    },
+    "rank": 1,
+    "description_en": "You reduce any difficulty increases due to darkness by 1.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Ninja",
+    "requirements_en": {
+      "A": 8
+    },
+    "rank": 1,
+    "description_en": "When you make a sneak attack with a melee weapon or unarmed attack, the damage is increased by +2. You cannot gain this benefit while in Power Armor.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Nuclear Physicist",
+    "requirements_en": {
+      "I": 9
+    },
+    "rank": 1,
+    "description_en": "Whenever you use a weapon that inflicts radiation damage, or has the Radioactive damage effect, each Effect you roll inflicts one additional point of radiation damage. In addition, fusion cores you use have 3 additional charges.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Pain Train",
+    "requirements_en": {
+      "S": 9,
+      "E": 7
+    },
+    "rank": 2,
+    "description_en": "You may Charge as a major action if you are wearing Power Armor or are a super mutant. When you do, you move into reach of an enemy within Medium range and make a STR + Athletics test (difficulty 2). If you succeed, the enemy suffers your normal unarmed damage and is knocked prone. At rank 2, you add +1 damage and the Stun effect. Level req increases by 5 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Paralyzing Palm",
+    "requirements_en": {
+      "S": 8
+    },
+    "rank": 1,
+    "description_en": "When you make an unarmed attack and choose to strike a specific location, your attack gains the Stun damage effect.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Party Boy/Party Girl",
+    "requirements_en": {
+      "E": 6,
+      "C": 7
+    },
+    "rank": 1,
+    "description_en": "You cannot become addicted to alcoholic drinks, and whenever you drink an alcoholic drink, you heal +2 HP.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Pathfinder",
+    "requirements_en": {
+      "P": 6,
+      "E": 6
+    },
+    "rank": 1,
+    "description_en": "When travelling over long distances through the wilderness, a successful PER + Survival test (difficulty determined by the GM based on terrain) reduces the travel time by half.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Pharma Farma",
+    "requirements_en": {
+      "L": 6
+    },
+    "rank": 1,
+    "description_en": "When you are scavenging a location that contains medicine or chems, you find one additional item, randomly determined, without spending AP.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Pickpocket",
+    "requirements_en": {
+      "P": 8,
+      "A": 8
+    },
+    "rank": 3,
+    "description_en": "At rank 1, you can ignore the first complication you roll when you make an AGI + Sneak test to steal an object from someone or plant something on them. At rank 2, you may re-roll 1d20 when picking a pocket. At rank 3, you reduce the difficulty of attempts to pick a pocket by 1. Level req increases by 3 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Piercing Strike",
+    "requirements_en": {
+      "S": 7
+    },
+    "rank": 1,
+    "description_en": "Your attacks using unarmed attacks and bladed melee weapons gain the Piercing 1 damage effect, or add +1 to the rating of any Piercing X damage effect they already had.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Pyromaniac",
+    "requirements_en": {
+      "E": 6
+    },
+    "rank": 3,
+    "description_en": "The damage you deal using fire-based weapons increases by +1 per rank. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Quick Draw",
+    "requirements_en": {
+      "A": 6
+    },
+    "rank": 1,
+    "description_en": "Each turn, you may draw a single weapon or item carried on your person without using a minor action.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Quick Hands",
+    "requirements_en": {
+      "A": 8
+    },
+    "rank": 1,
+    "description_en": "You can reload firearms faster. When you make a ranged attack, you may spend 2 AP to increase the Fire Rate of your gun by +2 for that attack.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Rad Resistance",
+    "requirements_en": {
+      "E": 8
+    },
+    "rank": 2,
+    "description_en": "Your radiation Damage Resistance, to all hit locations, increases by +1 per rank in this perk. Level req increases by 4 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Refractor",
+    "requirements_en": {
+      "P": 6,
+      "L": 7
+    },
+    "rank": 2,
+    "description_en": "Your energy Damage Resistance to all hit locations increases by +1 per rank in this perk. Level req increases by 4 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Ricochet",
+    "requirements_en": {
+      "L": 10
+    },
+    "rank": 1,
+    "description_en": "If an enemy makes a ranged attack against you and rolls a complication, you may spend one Luck point to have their shot ricochet and hit them instead. Resolve the damage roll against the attacking enemy. Requires Level 5+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Rifleman",
+    "requirements_en": {
+      "A": 7
+    },
+    "rank": 2,
+    "description_en": "When you make a ranged attack with any two-handed weapon with a Fire Rate of 2 or lower (except heavy weapons), you add +1 to the weapon's damage per rank. At rank 2, you also add the Piercing 1 damage effect or add +1 to any existing Piercing X effect. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Robotics Expert",
+    "requirements_en": {
+      "I": 8
+    },
+    "rank": 3,
+    "description_en": "At rank 1, you can modify robot armor, weapon mounts, and modules with rank 1 mods. At rank 2, you gain access to rank 2 mods and the difficulty of tests to repair robots is permanently reduced by 1. At rank 3, you gain access to rank 3 mods and can reprogram robots at the GM's discretion. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Science!",
+    "requirements_en": {
+      "I": 6
+    },
+    "rank": 3,
+    "description_en": "You can modify energy weapons with weapon mods, and you can also craft certain advanced armor mods. Each rank unlocks an additional rank of mods. Level req increases by 4 each rank. Requires Level 2+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Scoundrel",
+    "requirements_en": {
+      "C": 7
+    },
+    "rank": 1,
+    "description_en": "When you make a CHA + Speech test to convince someone of a lie, you may ignore the first complication you roll.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Scrapper",
+    "requirements_en": {},
+    "rank": 2,
+    "description_en": "When you scrap an item, you can salvage uncommon component materials as well as common ones. At rank 2, you can also salvage rare materials. Level req increases by 5 each rank. Requires Level 3+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Scrounger",
+    "requirements_en": {
+      "L": 6
+    },
+    "rank": 3,
+    "description_en": "Whenever you roll to determine how much ammunition you find, you find more. At rank 1, you find +3 additional shots. At rank 2, +6 shots. At rank 3, +10 shots. The additional ammo is the same type as initially found. Level req increases by 5 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Shotgun Surgeon",
+    "requirements_en": {
+      "S": 5,
+      "A": 7
+    },
+    "rank": 1,
+    "description_en": "Your ranged attacks using shotguns gain the Piercing 1 damage effect, or add +1 to any Piercing X damage effect the weapon already had.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Skilled",
+    "requirements_en": {},
+    "rank": 10,
+    "description_en": "Add +1 rank to two skills or add +2 ranks to one skill. No skill may have more than 6 ranks. Level req increases by 3 each rank. Requires Level 3+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Size Matters",
+    "requirements_en": {
+      "E": 7,
+      "A": 6
+    },
+    "rank": 3,
+    "description_en": "When you make a ranged attack with any heavy weapon, you add +1 to the weapon's damage per rank. Level req increases by 4 each rank.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Slayer",
+    "requirements_en": {
+      "S": 8
+    },
+    "rank": 1,
+    "description_en": "When you inflict any damage with an unarmed attack or melee weapon, you may spend 1 Luck point to immediately inflict a critical hit - and therefore an injury - on the location hit.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Smooth Talker",
+    "requirements_en": {
+      "C": 6
+    },
+    "rank": 1,
+    "description_en": "When you make a Barter or Speech test as part of an opposed test, you may re-roll 1d20.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Snakeater",
+    "requirements_en": {
+      "E": 7
+    },
+    "rank": 1,
+    "description_en": "Your poison Damage Resistance increases by +2.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Sniper",
+    "requirements_en": {
+      "P": 8,
+      "A": 6
+    },
+    "rank": 1,
+    "description_en": "When you take the Aim minor action, and then make a ranged attack with a two-handed weapon with the Accurate quality, you can specify a hit location for the target without increasing the difficulty of the attack.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Solar Powered",
+    "requirements_en": {
+      "E": 7
+    },
+    "rank": 1,
+    "description_en": "For every hour you spend in direct sunlight, you heal 1 radiation damage.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Steady Aim",
+    "requirements_en": {
+      "S": 8,
+      "A": 7
+    },
+    "rank": 1,
+    "description_en": "When you take the Aim minor action, you may either re-roll 2d20 on the first attack you make this turn, or re-roll 1d20 on all attacks you make this turn.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Strong Back",
+    "requirements_en": {
+      "S": 5
+    },
+    "rank": 3,
+    "description_en": "Your maximum carry weight is increased by +25 lbs. per rank. Level req increases by 2 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Tag!",
+    "requirements_en": {},
+    "rank": 1,
+    "description_en": "You may select one additional Tag skill. Increase the skill's rank by 2, to a maximum of 6, and mark it as a Tag skill, allowing you to roll a critical success with a d20 result equal to or under the skill's rank. Requires Level 5+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Terrifying Presence",
+    "requirements_en": {
+      "S": 6,
+      "C": 8
+    },
+    "rank": 2,
+    "description_en": "When you make a Speech test to threaten or scare someone, you may re-roll 1d20. At rank 2, you may use a major action in combat to threaten an enemy within Medium range using a STR + Speech test (difficulty 2); if you succeed, the enemy must move away from you during their next turn. Level req increases by 5 each rank. Requires Level 3+.",
+    "set": "Core",
+    "source": "lonestar"
+  },
+  {
+    "sourceUrl": "https://github.com/iggyiggy127/lone-star-character-creator",
+    "name_en": "Toughness",
+    "requirements_en": {
+      "E": 6,
+      "L": 6
+    },
+    "rank": 2,
+    "description_en": "Your physical Damage Resistance to all hit locations increases by +1 per rank in this perk. Level req increases by 4 each rank. Requires Level 1+.",
+    "set": "Core",
+    "source": "lonestar"
+  }
+]
