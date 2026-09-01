@@ -82,8 +82,12 @@ Google-аккаунта).
 3. Заполни название приложения и e-mail.
 4. **Scopes**: добавь
    - `.../auth/drive.file` (манипуляции с файлами, которые создаёт приложение);
-   - `.../auth/drive.metadata.readonly` (чтение метаданных списка файлов).
+   - `.../auth/drive.appdata` (доступ к скрытой папке приложения `appDataFolder`;
+     это **non-sensitive** scope — именно он нужен для облачных сейвов в
+     `appDataFolder`).
    Оба уже запрошены в `TOKEN_SCOPE` в `googleDriveSync.js`.
+   > Не используй `.../auth/drive.metadata.readonly` — это **sensitive**-scope и
+   > именно он вызывает плашку «приложение не проверено» / «Use secure flows».
 5. Пока приложение в **Testing** режиме — добавь **Test users**: свой Google
    аккаунт (иначе авторизация отбивает «Access blocked»).
 

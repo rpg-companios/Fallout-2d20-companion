@@ -11,7 +11,7 @@ import { getActiveModuleId } from '../../domain/moduleLocale';
 // Внутри неё — подпапка на каждый сеттинг (модуль): fallout/, heroes/, dnd/ …
 const APP_DATA_FOLDER = 'appDataFolder';
 const SYNC_KEY = 'fallout_cloud_sync_enabled';
-const TOKEN_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly';
+const TOKEN_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.appdata';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 
