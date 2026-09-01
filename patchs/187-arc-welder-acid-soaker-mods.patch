@@ -1,0 +1,474 @@
+diff --git a/modules/fallout/data/equipment/weapon_mod_slots.json b/modules/fallout/data/equipment/weapon_mod_slots.json
+index 16f4e26..f2e29e4 100644
+--- a/modules/fallout/data/equipment/weapon_mod_slots.json
++++ b/modules/fallout/data/equipment/weapon_mod_slots.json
+@@ -474,32 +474,41 @@
+     ]
+   },
+   "weapon_arc_welder": {
+-    "Receiver": [
+-      "mod_004",
+-      "mod_005",
+-      "mod_009"
++    "Capacitor": [
++      "mod_043",
++      "mod_044",
++      "mod_045",
++      "mod_046"
+     ],
+     "Barrel": [
+-      "mod_017",
+-      "mod_018"
++      "mod_051",
++      "mod_052",
++      "mod_053",
++      "mod_054",
++      "mod_055",
++      "mod_204",
++      "mod_205"
++    ],
++    "Grip": [
++      "mod_057"
+     ],
+     "Stock": [
+-      "mod_028",
+-      "mod_030"
++      "mod_058",
++      "mod_060",
++      "mod_061"
+     ],
+     "Sight": [
+-      "mod_033",
+-      "mod_034",
+-      "mod_035",
+-      "mod_036",
+-      "mod_037",
+-      "mod_038"
++      "mod_062",
++      "mod_063",
++      "mod_064",
++      "mod_065",
++      "mod_066",
++      "mod_067"
+     ],
+     "Muzzle": [
+-      "mod_039",
+-      "mod_040",
+-      "mod_041",
+-      "mod_042"
++      "mod_068",
++      "mod_069",
++      "mod_070"
+     ]
+   },
+   "weapon_microwave_emitter": {
+@@ -1777,5 +1786,14 @@
+     "Receiver": [
+       "mod_191"
+     ]
++  },
++  "weapon_acid_soaker": {
++    "Concentrate": [
++      "mod_158"
++    ],
++    "Container": [
++      "mod_159",
++      "mod_160"
++    ]
+   }
+ }
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipment/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+index 47b389d..fcf8af0 100644
+--- a/modules/fallout/data/equipment/weapon_mods.json
++++ b/modules/fallout/data/equipment/weapon_mods.json
+@@ -630,7 +630,9 @@
+     "cost": 37,
+     "weight": null,
+     "applies_to_ids": [
+-      "weapon_gauss_rifle"
++      "weapon_gauss_rifle",
++      "weapon_gauss_pistol",
++      "weapon_gauss_shotgun"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -963,7 +965,9 @@
+     "cost": 40,
+     "weight": 3,
+     "applies_to_ids": [
+-      "weapon_gauss_rifle"
++      "weapon_gauss_rifle",
++      "weapon_gauss_pistol",
++      "weapon_gauss_shotgun"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -990,7 +994,9 @@
+     "cost": 35,
+     "weight": 1,
+     "applies_to_ids": [
+-      "weapon_gauss_rifle"
++      "weapon_gauss_rifle",
++      "weapon_gauss_pistol",
++      "weapon_gauss_shotgun"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -1036,7 +1042,8 @@
+       "weapon_pump_action_shotgun",
+       "weapon_lever_action_rifle",
+       "weapon_light_machine_gun",
+-      "weapon_radium_rifle"
++      "weapon_radium_rifle",
++      "weapon_gauss_pistol"
+     ],
+     "qualityChanges": [
+       {
+@@ -1395,7 +1402,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [],
+     "effectChanges": [
+@@ -1420,7 +1428,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -1448,7 +1457,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [],
+     "effectChanges": [
+@@ -1473,7 +1483,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -1612,7 +1623,8 @@
+     "cost": 6,
+     "weight": null,
+     "applies_to_ids": [
+-      "weapon_laser_musket"
++      "weapon_laser_musket",
++      "weapon_arc_welder"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -1639,7 +1651,8 @@
+     "cost": 31,
+     "weight": 1,
+     "applies_to_ids": [
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "-",
+@@ -1673,7 +1686,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "-",
+@@ -1710,7 +1724,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -1733,7 +1748,8 @@
+     "weight": 2,
+     "applies_to_ids": [
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -1812,7 +1828,8 @@
+     "cost": 10,
+     "weight": null,
+     "applies_to_ids": [
+-      "weapon_laser_gun"
++      "weapon_laser_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -1843,7 +1860,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -1904,7 +1922,8 @@
+     "weight": 2,
+     "applies_to_ids": [
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -1940,7 +1959,8 @@
+     "weight": 2,
+     "applies_to_ids": [
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -1978,7 +1998,8 @@
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -2004,7 +2025,8 @@
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -2030,7 +2052,8 @@
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -2060,7 +2083,8 @@
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -2090,7 +2114,8 @@
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -2124,7 +2149,8 @@
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "qualityChanges": [
+       {
+@@ -2153,7 +2179,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+-      "weapon_laser_gun"
++      "weapon_laser_gun",
++      "weapon_arc_welder"
+     ],
+     "damageModifier": {
+       "op": "-",
+@@ -2195,7 +2222,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+-      "weapon_laser_gun"
++      "weapon_laser_gun",
++      "weapon_arc_welder"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -2219,7 +2247,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_musket",
+-      "weapon_laser_gun"
++      "weapon_laser_gun",
++      "weapon_arc_welder"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -4519,7 +4548,8 @@
+     "cost": 30,
+     "weight": 2,
+     "applies_to_ids": [
+-      "weapon_assaultron_head_laser"
++      "weapon_assaultron_head_laser",
++      "weapon_acid_soaker"
+     ],
+     "damageModifier": {
+       "op": "+",
+@@ -4541,7 +4571,8 @@
+     "cost": 22,
+     "weight": 2,
+     "applies_to_ids": [
+-      "weapon_assaultron_head_laser"
++      "weapon_assaultron_head_laser",
++      "weapon_acid_soaker"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -4563,7 +4594,8 @@
+     "cost": 40,
+     "weight": 4,
+     "applies_to_ids": [
+-      "weapon_assaultron_head_laser"
++      "weapon_assaultron_head_laser",
++      "weapon_acid_soaker"
+     ],
+     "fireRateModifier": {
+       "op": "+",
+@@ -5632,7 +5664,8 @@
+     "applies_to_ids": [
+       "weapon_institute_laser",
+       "weapon_laser_gun",
+-      "weapon_plasma_gun"
++      "weapon_plasma_gun",
++      "weapon_arc_welder"
+     ],
+     "rangeModifier": {
+       "op": "+",
+@@ -5645,5 +5678,49 @@
+       }
+     ],
+     "effectChanges": []
++  },
++  {
++    "modType": "weapon",
++    "id": "mod_205",
++    "slot": "Barrel",
++    "complexity": 4,
++    "perk1": "Gun Nut 2",
++    "perk2": "",
++    "skill": "SCIENCE",
++    "rarity": "Uncommon",
++    "materials": "Common x 5 Uncommon x 3",
++    "cost": 15,
++    "weight": 2,
++    "applies_to_ids": [
++      "weapon_arc_welder"
++    ],
++    "damageModifier": {
++      "op": "-",
++      "value": 2
++    },
++    "fireRateModifier": {
++      "op": "+",
++      "value": 2
++    },
++    "rangeModifier": {
++      "op": "-",
++      "value": 1
++    },
++    "qualityChanges": [
++      {
++        "op": "gain",
++        "id": "quality_inaccurate"
++      }
++    ],
++    "effectChanges": [
++      {
++        "op": "gain",
++        "id": "effect_burst"
++      },
++      {
++        "op": "gain",
++        "id": "effect_spread"
++      }
++    ]
+   }
+ ]
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json b/modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json
+index 8c9b878..357ab46 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json
+@@ -1222,5 +1222,11 @@
+     "name": "Long Barrel",
+     "prefix": "Long-barreled",
+     "effectDescription": "+1 Range, removes Close Quarters"
++  },
++  {
++    "id": "mod_205",
++    "name": "Incendiary Barrel",
++    "prefix": "Incendiary",
++    "effectDescription": "minus 2 {/CD} Damage, plus 2 Fire Rate, adds Burst and Spread, minus 1 range"
+   }
+-]
++]
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json b/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json
+index b45b560..c3fc91a 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json
+@@ -1222,5 +1222,11 @@
+     "name": "Длинный ствол",
+     "prefix": "Длинноствольный",
+     "effectDescription": "+1 Дистанция, Убирает Вплотную"
++  },
++  {
++    "id": "mod_205",
++    "name": "Зажигательный ствол",
++    "prefix": "Зажигательный",
++    "effectDescription": "−2 {/CD} урона, +2 Скорострельность, добавляет «Очередь» и «Разброс», −1 дистанция"
+   }
+-]
++]
+\ No newline at end of file
