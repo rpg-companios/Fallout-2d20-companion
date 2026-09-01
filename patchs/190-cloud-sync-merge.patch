@@ -1,0 +1,28 @@
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index c7c2e5b..766667e 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -257,6 +257,23 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+   }
+ 
+   let downloadedCount = 0;
++
++  // Персонажи из облака, которых ещё нет на этом устройстве, — подтянуть
++  // (двусторонний merge: не только обновлять существующих по времени, но и
++  // привозить новых с другого устройства).
++  const localIds = new Set(localList.map((c) => c.id));
++  for (const file of remoteFiles) {
++    const maybeId = (file.name || '').split('__')[0];
++    if (!maybeId || localIds.has(maybeId)) continue;
++    const raw = await downloadRemoteCharacter(token, file.id);
++    const parsed = parseCharacterImportPayload(raw);
++    if (parsed.error) continue;
++    const imported = parsed.character;
++    const id = imported.id || imported.characterId || `char_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
++    await db.saveCharacter(id, imported.name, imported.level ?? 1, imported.originName ?? null, imported.data);
++    downloadedCount += 1;
++  }
++
+   if (outdatedLocals.length > 0) {
+     const shouldDownload = await confirmDownload(outdatedLocals);
+     if (shouldDownload) {
