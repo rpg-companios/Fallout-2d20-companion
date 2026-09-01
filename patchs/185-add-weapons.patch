@@ -1,0 +1,1155 @@
+diff --git a/modules/fallout/data/equipment/weapons.json b/modules/fallout/data/equipment/weapons.json
+index cfc0e89..eab3aef 100644
+--- a/modules/fallout/data/equipment/weapons.json
++++ b/modules/fallout/data/equipment/weapons.json
+@@ -3308,5 +3308,634 @@
+         "value": 1
+       }
+     ]
++  },
++  {
++    "id": "weapon_assaultron_blade",
++    "itemType": "weapon",
++    "damage": 4,
++    "fireRate": 0,
++    "weight": "3",
++    "cost": 50,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Assaultron Blade",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_piercing_x"
++      }
++    ]
++  },
++  {
++    "id": "weapon_assaultron_head",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "8",
++    "cost": 500,
++    "rarity": 3,
++    "ammoId": "ammo_energy_cell",
++    "range": "C",
++    "imageName": "Assaultron Head",
++    "mainAttr": "PER",
++    "mainSkill": "ENERGY_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "energy",
++    "qualities": [],
++    "weaponType": "Energy",
++    "effects": [
++      {
++        "effectId": "effect_piercing_x"
++      }
++    ]
++  },
++  {
++    "id": "weapon_auto_axe",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "20",
++    "cost": 100,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Auto-Axe",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_two-handed"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_vicious"
++      }
++    ]
++  },
++  {
++    "id": "weapon_ballistic_fist",
++    "itemType": "weapon",
++    "damage": 6,
++    "fireRate": 0,
++    "weight": "6",
++    "cost": 150,
++    "rarity": 4,
++    "ammoId": "ammo_shotgun_shell",
++    "range": "",
++    "imageName": "Ballistic Fist",
++    "mainAttr": "STR",
++    "mainSkill": "UNARMED",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_slow_load"
++      }
++    ],
++    "weaponType": "Unarmed",
++    "effects": [
++      {
++        "effectId": "effect_stun"
++      },
++      {
++        "effectId": "effect_vicious"
++      }
++    ]
++  },
++  {
++    "id": "weapon_cattle_prod",
++    "itemType": "weapon",
++    "damage": 7,
++    "fireRate": 0,
++    "weight": "3",
++    "cost": 90,
++    "rarity": 4,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Cattle Prod",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "energy",
++    "qualities": [
++      {
++        "qualityId": "quality_two-handed"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_stun"
++      }
++    ]
++  },
++  {
++    "id": "weapon_chainsaw",
++    "itemType": "weapon",
++    "damage": 6,
++    "fireRate": 0,
++    "weight": "12",
++    "cost": 140,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Chainsaw",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_two-handed"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_vicious"
++      }
++    ]
++  },
++  {
++    "id": "weapon_death_tambo",
++    "itemType": "weapon",
++    "damage": 4,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 40,
++    "rarity": 2,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Death Tambo",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_piercing_x"
++      }
++    ]
++  },
++  {
++    "id": "weapon_displacer_glove",
++    "itemType": "weapon",
++    "damage": 6,
++    "fireRate": 0,
++    "weight": "6",
++    "cost": 175,
++    "rarity": 4,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Displacer Glove",
++    "mainAttr": "STR",
++    "mainSkill": "UNARMED",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [],
++    "weaponType": "Unarmed",
++    "effects": [
++      {
++        "effectId": "effect_piercing_x"
++      },
++      {
++        "effectId": "effect_stun"
++      }
++    ]
++  },
++  {
++    "id": "weapon_guitar_sword",
++    "itemType": "weapon",
++    "damage": 4,
++    "fireRate": 0,
++    "weight": "3",
++    "cost": 45,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Guitar Sword",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_parry"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_piercing_x"
++      }
++    ]
++  },
++  {
++    "id": "weapon_mr_handy_buzz_blade",
++    "itemType": "weapon",
++    "damage": 4,
++    "fireRate": 0,
++    "weight": "10",
++    "cost": 50,
++    "rarity": 2,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Mr Handy Buzz Blade",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_two-handed"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_vicious"
++      }
++    ]
++  },
++  {
++    "id": "weapon_multi_purpose_axe",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "4",
++    "cost": 40,
++    "rarity": 2,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Multi-Purpose Axe",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_two-handed"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": []
++  },
++  {
++    "id": "weapon_proton_axe",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "8",
++    "cost": 175,
++    "rarity": 5,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Proton Axe",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "energy",
++    "qualities": [
++      {
++        "qualityId": "quality_surge"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_piercing_x"
++      }
++    ]
++  },
++  {
++    "id": "weapon_war_drum",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "20",
++    "cost": 115,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "War Drum",
++    "mainAttr": "STR",
++    "mainSkill": "MELEE_WEAPONS",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_two-handed"
++      }
++    ],
++    "weaponType": "Melee",
++    "effects": [
++      {
++        "effectId": "effect_stun"
++      }
++    ]
++  },
++  {
++    "id": "weapon_cryo_mine",
++    "itemType": "weapon",
++    "damage": 6,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 50,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Cryo Mine",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "energy",
++    "qualities": [
++      {
++        "qualityId": "quality_mine"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [
++      {
++        "effectId": "effect_freeze"
++      }
++    ],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_cryogenic_grenade",
++    "itemType": "weapon",
++    "damage": 6,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 50,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "M",
++    "imageName": "Cryogenic Grenade",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "energy",
++    "qualities": [
++      {
++        "qualityId": "quality_thrown"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [
++      {
++        "effectId": "effect_freeze"
++      }
++    ],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_detonator",
++    "itemType": "weapon",
++    "damage": 0,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 75,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Detonator",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [],
++    "weaponType": "Explosive",
++    "effects": [],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_dynamite",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 25,
++    "rarity": 2,
++    "ammoId": "",
++    "range": "M",
++    "imageName": "Dynamite",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_thrown"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_dynamite_bundle",
++    "itemType": "weapon",
++    "damage": 9,
++    "fireRate": 0,
++    "weight": "2",
++    "cost": 150,
++    "rarity": 3,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Dynamite Bundle",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_blast"
++      },
++      {
++        "qualityId": "quality_delay_x"
++      },
++      {
++        "qualityId": "quality_placed"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [
++      {
++        "effectId": "effect_breaking"
++      }
++    ],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_flash_bang",
++    "itemType": "weapon",
++    "damage": 0,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 40,
++    "rarity": 2,
++    "ammoId": "",
++    "range": "M",
++    "imageName": "Flash Bang",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_thrown"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_frag_grenade_mirv",
++    "itemType": "weapon",
++    "damage": 5,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 75,
++    "rarity": 4,
++    "ammoId": "",
++    "range": "M",
++    "imageName": "Frag Grenade MIRV",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_thrown"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [
++      {
++        "effectId": "effect_spread"
++      }
++    ],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_plastic_explosives",
++    "itemType": "weapon",
++    "damage": 10,
++    "fireRate": 0,
++    "weight": "2",
++    "cost": 200,
++    "rarity": 4,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Plastic Explosives",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_blast"
++      },
++      {
++        "qualityId": "quality_delay_x"
++      },
++      {
++        "qualityId": "quality_placed"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [
++      {
++        "effectId": "effect_breaking"
++      },
++      {
++        "effectId": "effect_piercing_x"
++      }
++    ],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_powder_charge",
++    "itemType": "weapon",
++    "damage": 4,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 25,
++    "rarity": 1,
++    "ammoId": "",
++    "range": "",
++    "imageName": "Powder Charge",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_mine"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [],
++    "withoutMods": true
++  },
++  {
++    "id": "weapon_smoke_grenade",
++    "itemType": "weapon",
++    "damage": 0,
++    "fireRate": 0,
++    "weight": "1",
++    "cost": 40,
++    "rarity": 2,
++    "ammoId": "",
++    "range": "M",
++    "imageName": "Smoke Grenade",
++    "mainAttr": "PER",
++    "mainSkill": "EXPLOSIVES",
++    "hasStockVariant": false,
++    "damageType": "physical",
++    "qualities": [
++      {
++        "qualityId": "quality_thrown"
++      },
++      {
++        "qualityId": "quality_blast"
++      }
++    ],
++    "weaponType": "Explosive",
++    "effects": [],
++    "withoutMods": true
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json b/modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json
+index 3191a87..41303fd 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json
+@@ -1187,5 +1187,235 @@
+     "name": "Bumper Sword",
+     "rangeName": "Close",
+     "flavour": "A sword welded from a car bumper — heavy and crude, but effective."
++  },
++  {
++    "id": "weapon_assaultron_blade",
++    "name": "Assaultron Blade",
++    "rangeName": "",
++    "flavour": "A mechanical blade fitted to an Assaultron robot's chassis, capable of delivering a piercing blow.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_assaultron_head",
++    "name": "Assaultron Head",
++    "rangeName": "Close",
++    "flavour": "A head-mounted energy weapon that fires concentrated blasts, consuming two shots of ammunition each time it fires.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_auto_axe",
++    "name": "Auto-Axe",
++    "rangeName": "",
++    "flavour": "A powered industrial chainsaw re-fitted as a vicious two-handed melee weapon.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_ballistic_fist",
++    "name": "Ballistic Fist",
++    "rangeName": "",
++    "flavour": "A heavy fist-mounted weapon that fires a shotgun shell with each punch; must be reloaded between attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_cattle_prod",
++    "name": "Cattle Prod",
++    "rangeName": "",
++    "flavour": "A two-handed rod delivering a powerful electric stun to its target.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_chainsaw",
++    "name": "Chainsaw",
++    "rangeName": "",
++    "flavour": "A two-handed motorized saw that chews through flesh and armour, ignoring the wielder's normal melee damage bonus.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_death_tambo",
++    "name": "Death Tambo",
++    "rangeName": "",
++    "flavour": "A bladed tambourine weapon; the jingling it makes raises the complication range on sneak attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_displacer_glove",
++    "name": "Displacer Glove",
++    "rangeName": "",
++    "flavour": "A heavy gauntlet that delivers piercing and stunning damage in melee.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_guitar_sword",
++    "name": "Guitar Sword",
++    "rangeName": "",
++    "flavour": "A reviled instrument used as a bladed weapon; its twang raises the complication range on sneak attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_mr_handy_buzz_blade",
++    "name": "Mr Handy Buzz Blade",
++    "rangeName": "",
++    "flavour": "A two-handed rotary blade attachment for a Mr Handy robot, driven by a buzz-saw mechanism.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_multi_purpose_axe",
++    "name": "Multi-Purpose Axe",
++    "rangeName": "",
++    "flavour": "A practical two-handed axe able to double as a cutting implement.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_proton_axe",
++    "name": "Proton Axe",
++    "rangeName": "",
++    "flavour": "An energy weapon that releases a surge of ionizing energy on impact, piercing armour.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_war_drum",
++    "name": "War Drum",
++    "rangeName": "",
++    "flavour": "A heavy two-handed drum weapon; its booming sound raises the complication range on sneak attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_cryo_mine",
++    "name": "Cryo Mine",
++    "rangeName": "",
++    "flavour": "A placed mine that freezes the area around it in a blast of cryogenic energy.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_cryogenic_grenade",
++    "name": "Cryogenic Grenade",
++    "rangeName": "Medium",
++    "flavour": "A thrown grenade that freezes affected targets in a cryogenic blast.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_detonator",
++    "name": "Detonator",
++    "rangeName": "",
++    "flavour": "A remote detonator used to trigger placed explosives from a distance as a minor action.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_dynamite",
++    "name": "Dynamite",
++    "rangeName": "Medium",
++    "flavour": "A stick of dynamite with a lit fuse, thrown and set to detonate on impact.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_dynamite_bundle",
++    "name": "Dynamite Bundle",
++    "rangeName": "",
++    "flavour": "A bundle of dynamite sticks rigged to detonate with a delay; the Delay rating is set when placed.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_flash_bang",
++    "name": "Flash Bang",
++    "rangeName": "Medium",
++    "flavour": "A thrown stun grenade that blinds and stuns those caught in its blast.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_frag_grenade_mirv",
++    "name": "Frag Grenade MIRV",
++    "rangeName": "Medium",
++    "flavour": "A multiple-ploy grenade that scatters several explosive submunitions over the blast area.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_plastic_explosives",
++    "name": "Plastic Explosives",
++    "rangeName": "",
++    "flavour": "Malleable explosive placed on a surface, detonated remotely or by delay; the Delay rating is set when placed.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_powder_charge",
++    "name": "Powder Charge",
++    "rangeName": "",
++    "flavour": "A small explosive charge; may be used as a mine or converted to a delayed placed device.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_smoke_grenade",
++    "name": "Smoke Grenade",
++    "rangeName": "Medium",
++    "flavour": "A thrown grenade that produces a thick cloud of smoke, blocking sight and imposing +2 difficulty to tests.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/system/qualities.json b/modules/fallout/i18n/en-EN/data/system/qualities.json
+index 716ca9f..6e63696 100644
+--- a/modules/fallout/i18n/en-EN/data/system/qualities.json
++++ b/modules/fallout/i18n/en-EN/data/system/qualities.json
+@@ -122,5 +122,13 @@
+   {
+     "id": "quality_tranq_x",
+     "name": "Tranquilizer X"
++  },
++  {
++    "id": "quality_delay_x",
++    "name": "Delay X"
++  },
++  {
++    "id": "quality_placed",
++    "name": "Placed"
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json b/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json
+index 47e63f4..1036062 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json
+@@ -1187,5 +1187,235 @@
+     "name": "Меч из бампера",
+     "rangeName": "Близкая",
+     "flavour": "Меч, сваренный из бампера автомобиля — тяжёлый и грубый, но эффективный."
++  },
++  {
++    "id": "weapon_assaultron_blade",
++    "name": "Клинок ассаултрона",
++    "rangeName": "",
++    "flavour": "A mechanical blade fitted to an Assaultron robot's chassis, capable of delivering a piercing blow.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_assaultron_head",
++    "name": "Голова ассаултрона",
++    "rangeName": "Ближнее",
++    "flavour": "A head-mounted energy weapon that fires concentrated blasts, consuming two shots of ammunition each time it fires.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_auto_axe",
++    "name": "Автотопор",
++    "rangeName": "",
++    "flavour": "A powered industrial chainsaw re-fitted as a vicious two-handed melee weapon.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_ballistic_fist",
++    "name": "Баллистический кулак",
++    "rangeName": "",
++    "flavour": "A heavy fist-mounted weapon that fires a shotgun shell with each punch; must be reloaded between attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_cattle_prod",
++    "name": "Электрострекал",
++    "rangeName": "",
++    "flavour": "A two-handed rod delivering a powerful electric stun to its target.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_chainsaw",
++    "name": "Бензопила",
++    "rangeName": "",
++    "flavour": "A two-handed motorized saw that chews through flesh and armour, ignoring the wielder's normal melee damage bonus.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_death_tambo",
++    "name": "Бубен смерти",
++    "rangeName": "",
++    "flavour": "A bladed tambourine weapon; the jingling it makes raises the complication range on sneak attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_displacer_glove",
++    "name": "Перемещающая перчатка",
++    "rangeName": "",
++    "flavour": "A heavy gauntlet that delivers piercing and stunning damage in melee.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_guitar_sword",
++    "name": "Гитара-меч",
++    "rangeName": "",
++    "flavour": "A reviled instrument used as a bladed weapon; its twang raises the complication range on sneak attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_mr_handy_buzz_blade",
++    "name": "Жужжащий клинок мистера Хэнди",
++    "rangeName": "",
++    "flavour": "A two-handed rotary blade attachment for a Mr Handy robot, driven by a buzz-saw mechanism.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_multi_purpose_axe",
++    "name": "Многоцелевой топор",
++    "rangeName": "",
++    "flavour": "A practical two-handed axe able to double as a cutting implement.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_proton_axe",
++    "name": "Протонный топор",
++    "rangeName": "",
++    "flavour": "An energy weapon that releases a surge of ionizing energy on impact, piercing armour.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_war_drum",
++    "name": "Боевой барабан",
++    "rangeName": "",
++    "flavour": "A heavy two-handed drum weapon; its booming sound raises the complication range on sneak attacks.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_cryo_mine",
++    "name": "Крио-мина",
++    "rangeName": "",
++    "flavour": "A placed mine that freezes the area around it in a blast of cryogenic energy.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_cryogenic_grenade",
++    "name": "Криогенная граната",
++    "rangeName": "Средняя",
++    "flavour": "A thrown grenade that freezes affected targets in a cryogenic blast.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_detonator",
++    "name": "Детонатор",
++    "rangeName": "",
++    "flavour": "A remote detonator used to trigger placed explosives from a distance as a minor action.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_dynamite",
++    "name": "Динамит",
++    "rangeName": "Средняя",
++    "flavour": "A stick of dynamite with a lit fuse, thrown and set to detonate on impact.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_dynamite_bundle",
++    "name": "Связка динамита",
++    "rangeName": "",
++    "flavour": "A bundle of dynamite sticks rigged to detonate with a delay; the Delay rating is set when placed.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_flash_bang",
++    "name": "Светошумовая граната",
++    "rangeName": "Средняя",
++    "flavour": "A thrown stun grenade that blinds and stuns those caught in its blast.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_frag_grenade_mirv",
++    "name": "Осколочная граната MIRV",
++    "rangeName": "Средняя",
++    "flavour": "A multiple-ploy grenade that scatters several explosive submunitions over the blast area.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_plastic_explosives",
++    "name": "Пластиковая взрывчатка",
++    "rangeName": "",
++    "flavour": "Malleable explosive placed on a surface, detonated remotely or by delay; the Delay rating is set when placed.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_powder_charge",
++    "name": "Пороховой заряд",
++    "rangeName": "",
++    "flavour": "A small explosive charge; may be used as a mine or converted to a delayed placed device.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
++  },
++  {
++    "id": "weapon_smoke_grenade",
++    "name": "Дымовая граната",
++    "rangeName": "Средняя",
++    "flavour": "A thrown grenade that produces a thick cloud of smoke, blocking sight and imposing +2 difficulty to tests.",
++    "stockNames": {
++      "without": "",
++      "with": ""
++    }
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/system/qualities.json b/modules/fallout/i18n/ru-RU/data/system/qualities.json
+index d9974a1..c1bde12 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/qualities.json
++++ b/modules/fallout/i18n/ru-RU/data/system/qualities.json
+@@ -122,5 +122,13 @@
+   {
+     "id": "quality_tranq_x",
+     "name": "Усмирение X"
++  },
++  {
++    "id": "quality_delay_x",
++    "name": "Задержка X"
++  },
++  {
++    "id": "quality_placed",
++    "name": "Закладываемое"
+   }
+ ]
