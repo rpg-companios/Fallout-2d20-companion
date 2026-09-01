@@ -50,8 +50,12 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         }
 
+        // Кэшируем ТОЛЬКО клон, а сам ответ отдаём как есть. Здесь критично
+        // взять clone() до того, как тело ответа будет прочитано (put/чтение
+        // потребляет body) — иначе будет "Response body is already used".
         if (event.request.destination !== 'document' && !isScript) {
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse.clone()));
+          const toCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, toCache)).catch(() => undefined);
         }
         return networkResponse;
       })
