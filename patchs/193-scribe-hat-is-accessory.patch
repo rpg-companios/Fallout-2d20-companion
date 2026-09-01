@@ -1,0 +1,40 @@
+diff --git a/domain/equipEquip.js b/domain/equipEquip.js
+index 926955b..238e893 100644
+--- a/domain/equipEquip.js
++++ b/domain/equipEquip.js
+@@ -59,6 +59,13 @@ function isMutantAllowed(item, character = null) {
+ /** Для совместимости — теперь через общий allowlist */
+ const isRobotDecorativeHat = (clothingItem) => isRobotAllowed(clothingItem);
+ 
++/**
++ * Головной убор — аксессуар. Робот носит его как аксессуар, а не как броню,
++ * поэтому наличие предмета в robotOnly-списке НЕ делает его робот-эксклюзивным:
++ * человеку шляпа доступна.
++ */
++const isHeadwearAccessory = (item) => item?.clothingType === 'headwear';
++
+ /**
+  * Check whether a character can equip a given armor item.
+  *
+@@ -86,7 +93,9 @@ export function canEquipArmor(armorItem, character) {
+     return { allowed: true, reason: null };
+   }
+ 
+-  if (robotAllowed) {
++  // Шляпы — аксессуар, а не броня: робот надевает её как аксессуар,
++  // поэтому robotAllowed-шляпа не блокирует человека.
++  if (robotAllowed && !isHeadwearAccessory(armorItem)) {
+     return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+   }
+   if (mutantAllowed) {
+@@ -140,7 +149,9 @@ export function canEquipClothing(clothingItem, character) {
+     return { allowed: true, reason: null };
+   }
+ 
+-  if (isRobotAllowed(clothingItem, character)) {
++  // Шляпы — аксессуар, а не броня: робот надевает её как аксессуар,
++  // поэтому robotAllowed-шляпа не блокирует человека.
++  if (isRobotAllowed(clothingItem, character) && !isHeadwearAccessory(clothingItem)) {
+     return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+   }
+   if (isMutantAllowed(clothingItem, character)) {
