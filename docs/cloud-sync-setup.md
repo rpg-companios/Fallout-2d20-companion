@@ -79,8 +79,14 @@ Google-аккаунта).
 3. Заполни название приложения и e-mail.
 4. **Scopes**: добавь
    - `.../auth/drive.file` (манипуляции с файлами, которые создаёт приложение);
-   - `.../auth/drive.metadata.readonly` (чтение метаданных списка файлов).
-   Оба уже запрошены в `TOKEN_SCOPE` в `googleDriveSync.js`.
+   - `.../auth/drive.appdata` (доступ к скрытой папке данных приложения).
+   Для текущей реализации нужен только `.../auth/drive.appdata`: все файлы
+   синхронизации находятся в `appDataFolder`, поэтому общий sensitive scope
+   `drive.metadata.readonly` не нужен и не должен быть добавлен.
+   Для этого web-приложения используется Google Identity Services Token Client:
+   PKCE для installed app и App Check для iOS здесь не применяются. Приложение
+   запрашивает токен с `prompt: ''`, поэтому после первого согласия Google может
+   переиспользовать выданный grant без повторного окна согласия.
 5. Пока приложение в **Testing** режиме — добавь **Test users**: свой Google
    аккаунт (иначе авторизация отбивает «Access blocked»).
 

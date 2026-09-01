@@ -11,11 +11,37 @@ import { getActiveModuleId } from '../../domain/moduleLocale';
 // Внутри неё — подпапка на каждый сеттинг (модуль): fallout/, heroes/, dnd/ …
 const APP_DATA_FOLDER = 'appDataFolder';
 const SYNC_KEY = 'fallout_cloud_sync_enabled';
-const TOKEN_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly';
+// appDataFolder requires the dedicated non-sensitive scope. The former
+// drive.metadata.readonly scope is sensitive and is unnecessary here because
+// every sync file lives inside the app-specific data space.
+const TOKEN_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 
 let pendingToken = null;
+let cachedAccessToken = null;
+let cachedAccessTokenExpiresAt = 0;
+
+const TOKEN_EXPIRY_SAFETY_WINDOW_MS = 60 * 1000;
+
+const createOAuthState = () => {
+  if (typeof window !== 'undefined' && window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+  return `oauth-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const clearCachedAccessToken = (token = null) => {
+  if (!token || cachedAccessToken === token) {
+    cachedAccessToken = null;
+    cachedAccessTokenExpiresAt = 0;
+  }
+};
 
 const getClientId = () => {
   if (typeof process !== 'undefined' && process?.env?.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID) {
@@ -52,21 +78,37 @@ const loadGoogleIdentityScript = async () => {
   });
 };
 
-const requestAccessToken = async () => {
+const requestAccessToken = async ({ forceRefresh = false } = {}) => {
   const clientId = getClientId();
   if (!clientId) {
     throw new Error('Google Drive client id is not configured. Set EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID.');
   }
+  if (!forceRefresh && cachedAccessToken && Date.now() < cachedAccessTokenExpiresAt - TOKEN_EXPIRY_SAFETY_WINDOW_MS) {
+    return cachedAccessToken;
+  }
   if (pendingToken) return pendingToken;
 
   pendingToken = new Promise((resolve, reject) => {
+    const state = createOAuthState();
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: TOKEN_SCOPE,
-      prompt: 'consent',
+      // Empty prompt lets Google reuse the existing grant. The previous
+      // `consent` value forced the warning and account selection on every sync.
+      prompt: '',
+      state,
       callback: (resp) => {
-        if (resp?.access_token) resolve(resp.access_token);
-        else reject(new Error(resp?.error || 'Google auth failed.'));
+        if (resp?.state && resp.state !== state) {
+          reject(new Error('Google auth state validation failed.'));
+          return;
+        }
+        if (resp?.access_token) {
+          cachedAccessToken = resp.access_token;
+          cachedAccessTokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+          resolve(resp.access_token);
+        } else {
+          reject(new Error(resp?.error || 'Google auth failed.'));
+        }
       },
       error_callback: () => reject(new Error('Google auth failed.')),
     });
@@ -90,7 +132,10 @@ const driveFetch = async (token, url, options = {}) => {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Google Drive API error (${response.status}): ${text}`);
+    const error = new Error(`Google Drive API error (${response.status}): ${text}`);
+    error.status = response.status;
+    if (response.status === 401) clearCachedAccessToken(token);
+    throw error;
   }
 
   return response;
