@@ -88,6 +88,7 @@ const requestAccessToken = async ({ forceRefresh = false } = {}) => {
   }
   if (pendingToken) return pendingToken;
 
+  debugLog('sync.token:request', { forceRefresh, origin: window.location?.origin });
   pendingToken = new Promise((resolve, reject) => {
     const state = createOAuthState();
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -103,14 +104,22 @@ const requestAccessToken = async ({ forceRefresh = false } = {}) => {
           return;
         }
         if (resp?.access_token) {
+          debugLog('sync.token:ok', { expiresIn: resp.expires_in });
           cachedAccessToken = resp.access_token;
           cachedAccessTokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
           resolve(resp.access_token);
         } else {
+          debugLog('sync.token:failed', { error: resp?.error || 'unknown' });
           reject(new Error(resp?.error || 'Google auth failed.'));
         }
       },
-      error_callback: () => reject(new Error('Google auth failed.')),
+      // Раньше причина терялась: GIS передаёт сюда объект с полем type
+      // ('popup_closed', 'popup_failed_to_open', ...) — именно он объясняет,
+      // почему окно авторизации закрылось без токена.
+      error_callback: (err) => {
+        debugLog('sync.token:error', { type: err?.type, message: err?.message });
+        reject(new Error(`Google auth failed: ${err?.type || err?.message || 'unknown'}`));
+      },
     });
 
     tokenClient.requestAccessToken();
@@ -132,6 +141,7 @@ const driveFetch = async (token, url, options = {}) => {
 
   if (!response.ok) {
     const text = await response.text();
+    debugLog('sync.api:error', { status: response.status, url: String(url).slice(0, 120), body: text.slice(0, 300) });
     const error = new Error(`Google Drive API error (${response.status}): ${text}`);
     error.status = response.status;
     if (response.status === 401) clearCachedAccessToken(token);
@@ -151,7 +161,10 @@ const getModuleFolderId = async (token) => {
   );
   const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
   const listData = await listResp.json();
-  if (listData.files?.length) return listData.files[0].id;
+  if (listData.files?.length) {
+    debugLog('sync.folder:found', { moduleId, id: listData.files[0].id });
+    return listData.files[0].id;
+  }
 
   const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
     method: 'POST',
@@ -166,6 +179,7 @@ const getModuleFolderId = async (token) => {
   if (!created.id) {
     throw new Error('Не удалось создать подпапку сеттинга в appDataFolder');
   }
+  debugLog('sync.folder:created', { moduleId, id: created.id });
   return created.id;
 };
 
@@ -173,7 +187,9 @@ const listRemoteCharacterFiles = async (token, folderId) => {
   const q = encodeURIComponent(`'${folderId}' in parents and trashed=false and mimeType='application/json'`);
   const resp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=appDataFolder&pageSize=200`);
   const data = await resp.json();
-  return data.files || [];
+  const files = data.files || [];
+  debugLog('sync.list:remote', { count: files.length, names: files.map((f) => f.name) });
+  return files;
 };
 
 const downloadRemoteCharacter = async (token, fileId) => {
@@ -200,6 +216,7 @@ const uploadCharacterFile = async ({ token, folderId, fileId, filename, payload 
     ? `${UPLOAD_API}/files/${fileId}?uploadType=multipart`
     : `${UPLOAD_API}/files?uploadType=multipart`;
 
+  debugLog('sync.upload', { filename, mode: fileId ? 'update' : 'create', bytes: payload.length });
   await driveFetch(token, endpoint, {
     method: fileId ? 'PATCH' : 'POST',
     headers: { 'Content-Type': `multipart/related; boundary=${delimiter}` },
@@ -232,11 +249,13 @@ export const openCloudFolderInDrive = async () => {
 export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
   if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
 
+  debugLog('sync.all:start', {});
   await loadGoogleIdentityScript();
   const token = await requestAccessToken();
   const folderId = await getModuleFolderId(token);
   const remoteFiles = await listRemoteCharacterFiles(token, folderId);
   const localList = await db.getCharactersList();
+  debugLog('sync.all:local', { count: localList.length });
   const remoteById = new Map();
 
   for (const file of remoteFiles) {
@@ -299,13 +318,18 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
   }
 
   await setCloudSyncConfigured(true);
+  debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
   return { uploaded: uploads.length, downloaded: downloadedCount };
 };
 
 export const syncCharacterToCloudIfEnabled = async (characterId) => {
   if (!ensureWeb()) return;
   const configured = await isCloudSyncConfigured();
-  if (!configured) return;
+  if (!configured) {
+    debugLog('sync.auto:skipped', { characterId, reason: 'not-configured' });
+    return;
+  }
+  debugLog('sync.auto:start', { characterId });
 
   try {
     await loadGoogleIdentityScript();
