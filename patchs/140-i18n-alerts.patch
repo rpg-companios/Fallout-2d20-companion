@@ -1,0 +1,79 @@
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 64323c7..f6a2952 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -572,10 +572,7 @@ export default function HomeScreen({ navigation }) {
+       }
+     } catch (error) {
+       debugLog('home.characterDownload.failed', { message: error?.message });
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        'Не удалось скачать персонажа. Проверьте консоль для подробностей.'
+-      );
++      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.unexpected'));
+     }
+   };
+ 
+@@ -647,10 +644,7 @@ export default function HomeScreen({ navigation }) {
+       );
+     } catch (error) {
+       debugLog('home.characterUpload.failed', { message: error?.message });
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
+-      );
++      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.errors.unexpected'));
+     }
+   };
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 40c647b..1511a23 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -16,14 +16,14 @@
+       "unsupportedVersion": "This export file version is not supported.",
+       "missingCharacter": "Character block is missing in the file.",
+       "missingName": "Character name is missing in the file.",
+-      "missingData": "Character data is missing in the file."
++      "missingData": "Character data is missing in the file.", "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
+     }
+   },
+   "download": {
+     "unsupported": "File save/export is available only in web version.",
+     "errors": {
+       "notFound": "Character was not found.",
+-      "failed": "Failed to save file."
++      "failed": "Failed to save file.", "unexpected": "Could not download the character. See the browser console for details."
+     }
+   },
+   "characterActions": {
+@@ -34,7 +34,7 @@
+     "copySuffix": "copy",
+     "duplicateError": "Failed to duplicate character."
+   },
+-  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u00abCancel\u00bb to download a copy manually first.",
++  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u201cCancel\u201d to download a copy manually first.",
+   "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync \u2014 try deleting again later.",
+   "language": {
+     "russian": "Ru",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index e0aeeab..6f53e77 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -16,14 +16,14 @@
+       "unsupportedVersion": "Версия файла не поддерживается.",
+       "missingCharacter": "В файле отсутствует блок персонажа.",
+       "missingName": "В файле отсутствует имя персонажа.",
+-      "missingData": "В файле отсутствуют данные персонажа."
++      "missingData": "В файле отсутствуют данные персонажа.", "unexpected": "Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл."
+     }
+   },
+   "download": {
+     "unsupported": "Загрузка/сохранение файлов поддерживается только в web-версии.",
+     "errors": {
+       "notFound": "Персонаж не найден.",
+-      "failed": "Не удалось сохранить файл."
++      "failed": "Не удалось сохранить файл.", "unexpected": "Не удалось скачать персонажа. Подробности — в консоли браузера."
+     }
+   },
+   "characterActions": {
