@@ -1,0 +1,214 @@
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 4deeca8..91b65bf 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -343,6 +343,46 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
+   return { uploaded: uploads.length, downloaded: downloadedCount };
+ };
+ 
++// Удаление персонажа в облаке. Вызывается ТОЛЬКО после явного подтверждения
++// пользователя («удалить везде»), потому что операция необратима и действует
++// на все устройства: файл в appDataFolder уносится безвозвратно.
++//
++// Возвращает { removed, reason }: removed=true, если файл реально удалён.
++// Наружу не бросает — удаление в облаке не должно отменять локальное.
++export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
++  if (!ensureWeb()) return { removed: false, reason: 'not-web' };
++
++  try {
++    const configured = await isCloudSyncConfigured();
++    if (!configured) {
++      debugLog('sync.delete:skipped', { characterId, reason: 'not-configured' });
++      return { removed: false, reason: 'not-configured' };
++    }
++
++    debugLog('sync.delete:start', { characterId });
++    await loadGoogleIdentityScript();
++    const token = await requestAccessToken();
++    const folderId = await getModuleFolderId(token);
++    const remoteFiles = await listRemoteCharacterFiles(token, folderId);
++    // Имя файла в облаке: <id>__<имя>.json — ищем по префиксу id, потому что
++    // имя персонажа могло измениться после последней выгрузки.
++    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${characterId}__`));
++
++    if (!remote) {
++      debugLog('sync.delete:absent', { characterId });
++      return { removed: false, reason: 'absent' };
++    }
++
++    await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
++    debugLog('sync.delete:done', { characterId, fileId: remote.id });
++    return { removed: true };
++  } catch (e) {
++    const message = e?.message || String(e);
++    debugLog('sync.delete:failed', { characterId, message });
++    return { removed: false, reason: 'error', message };
++  }
++};
++
+ // Вызывается фоном (без await) из CharacterContext, поэтому обязана быть
+ // полностью «незаметной»: никогда не бросать наружу — иначе получим
+ // unhandled promise rejection. Проверка флага тоже внутри try.
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 6d82ee6..64323c7 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -39,7 +39,7 @@ import {
+   pickCharacterFile,
+   IMPORT_ERRORS,
+ } from './logic/characterTransfer';
+-import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
++import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import styles from '../../../styles/HomeScreen.styles';
+@@ -436,9 +436,29 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
++  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
++  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
++  // ничего не делает». Тот же приём уже применён в InventoryScreen/
++  // CharacterContext (showAlert/paAlert).
++  const showHomeAlert = (title, message = '') => {
++    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
++      window.alert(message ? `${title}\n\n${message}` : title);
++      return;
++    }
++    if (message) Alert.alert(title, message);
++    else Alert.alert(title);
++  };
++
+   const handleDeleteFolder = (folder) => {
+     const remove = async () => {
+-      await db.deleteCharacterFolderAndCharacters(folder.id);
++      // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
++      // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
++      // следующей синхронизации (но уже без структуры каталогов).
++      const removedIds = await db.deleteCharacterFolderAndCharacters(folder.id);
++      for (const id of removedIds || []) {
++        await deleteCharacterFromCloudIfEnabled(id);
++      }
++      debugLog('folder.delete:done', { folderId: folder.id, characters: removedIds?.length || 0 });
+       if (activeFolder?.id === folder.id) setActiveFolder(null);
+       loadList();
+     };
+@@ -465,18 +485,29 @@ export default function HomeScreen({ navigation }) {
+   };
+ 
+   const handleDelete = (character) => {
++    // Удаление сквозное: локально И в облаке. Без удаления в облаке персонаж
++    // воскресал при следующей синхронизации — она не отличает «я это удалил»
++    // от «этого у меня ещё не было» (сверка идёт по наличию id локально).
++    // Поэтому текст предупреждения обязан быть прямым: операция необратима и
++    // затрагивает все устройства.
+     const confirmDelete = async () => {
++      debugLog('character.delete:start', { id: character.id });
++      const cloud = await deleteCharacterFromCloudIfEnabled(character.id);
+       await deleteCharacter(character.id);
+-      loadList();
++      debugLog('character.delete:done', { id: character.id, cloud });
++      await loadList();
++
++      // Если облачная копия осталась (сеть/авторизация отвалились), молчать
++      // нельзя: при следующем синке персонаж вернётся, и это выглядит как баг.
++      if (cloud.reason === 'error') {
++        showHomeAlert(tHomeScreen('title'), tHomeScreen('deleteCloudFailed'));
++      }
+     };
+ 
+     const confirmMessage = tHomeScreen('deleteConfirm');
+ 
+     if (Platform.OS === 'web' && typeof window !== 'undefined') {
+-      const confirmed = window.confirm(confirmMessage);
+-      if (confirmed) {
+-        confirmDelete();
+-      }
++      if (window.confirm(confirmMessage)) confirmDelete();
+       return;
+     }
+ 
+@@ -485,11 +516,11 @@ export default function HomeScreen({ navigation }) {
+       confirmMessage,
+       [
+         {
+-          text: tHomeScreen('buttons.yes') || 'Да',
++          text: tHomeScreen('buttons.deleteEverywhere'),
+           style: 'destructive',
+           onPress: confirmDelete,
+         },
+-        { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
++        { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
+       ],
+       { cancelable: false }
+     );
+@@ -623,19 +654,6 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
+-  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
+-  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
+-  // ничего не делает». Тот же приём уже применён в InventoryScreen/
+-  // CharacterContext (showAlert/paAlert).
+-  const showHomeAlert = (title, message = '') => {
+-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+-      window.alert(message ? `${title}\n\n${message}` : title);
+-      return;
+-    }
+-    if (message) Alert.alert(title, message);
+-    else Alert.alert(title);
+-  };
+-
+   const handleCloudSync = async () => {
+     setMenuVisible(false);
+     if (Platform.OS !== 'web') {
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index d5f9851..40c647b 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -34,7 +34,8 @@
+     "copySuffix": "copy",
+     "duplicateError": "Failed to duplicate character."
+   },
+-  "deleteConfirm": "Do you really want to delete this character?",
++  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u00abCancel\u00bb to download a copy manually first.",
++  "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync \u2014 try deleting again later.",
+   "language": {
+     "russian": "Ru",
+     "english": "En",
+@@ -47,7 +48,9 @@
+   "buttons": {
+     "yes": "Yes",
+     "no": "No",
+-    "ok": "Ok"
++    "ok": "Ok",
++    "deleteEverywhere": "Yes \u2014 delete everywhere",
++    "cancel": "Cancel"
+   },
+   "menu": {
+     "sync": "Cloud sync",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 1c3ab51..e0aeeab 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -34,7 +34,8 @@
+     "copySuffix": "копия",
+     "duplicateError": "Не удалось дублировать персонажа."
+   },
+-  "deleteConfirm": "Вы действительно хотите удалить этого персонажа?",
++  "deleteConfirm": "ВНИМАНИЕ: персонаж будет удалён безвозвратно, в том числе и в облаке. Нажав «Отмена» вы сможете вручную скачать копию персонажа.",
++  "deleteCloudFailed": "Персонаж удалён локально, но облачную копию удалить не удалось. Он может вернуться при следующей синхронизации — повторите удаление позже.",
+   "language": {
+     "russian": "Ru",
+     "english": "En",
+@@ -47,7 +48,9 @@
+   "buttons": {
+     "yes": "Да",
+     "no": "Нет",
+-    "ok": "Ок"
++    "ok": "Ок",
++    "deleteEverywhere": "Да — удалить везде",
++    "cancel": "Отмена"
+   },
+   "menu": {
+     "sync": "Синхронизация с облаком",
