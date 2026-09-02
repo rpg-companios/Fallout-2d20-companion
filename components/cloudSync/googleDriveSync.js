@@ -322,16 +322,20 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
   return { uploaded: uploads.length, downloaded: downloadedCount };
 };
 
+// Вызывается фоном (без await) из CharacterContext, поэтому обязана быть
+// полностью «незаметной»: никогда не бросать наружу — иначе получим
+// unhandled promise rejection. Проверка флага тоже внутри try.
 export const syncCharacterToCloudIfEnabled = async (characterId) => {
   if (!ensureWeb()) return;
-  const configured = await isCloudSyncConfigured();
-  if (!configured) {
-    debugLog('sync.auto:skipped', { characterId, reason: 'not-configured' });
-    return;
-  }
-  debugLog('sync.auto:start', { characterId });
 
   try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) {
+      debugLog('sync.auto:skipped', { characterId, reason: 'not-configured' });
+      return;
+    }
+    debugLog('sync.auto:start', { characterId });
+
     await loadGoogleIdentityScript();
     const token = await requestAccessToken();
     const folderId = await getModuleFolderId(token);
@@ -342,7 +346,8 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
     const payload = JSON.stringify(createCharacterExportPayload(character));
 
     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
+    debugLog('sync.auto:done', { characterId });
   } catch (e) {
-    debugLog('sync.cloudFailed', { message: e?.message || String(e) });
+    debugLog('sync.cloudFailed', { characterId, message: e?.message || String(e) });
   }
 };
