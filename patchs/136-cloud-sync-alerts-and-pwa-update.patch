@@ -1,0 +1,289 @@
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 766667e..68c99dc 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -88,6 +88,7 @@ const requestAccessToken = async ({ forceRefresh = false } = {}) => {
+   }
+   if (pendingToken) return pendingToken;
+ 
++  debugLog('sync.token:request', { forceRefresh, origin: window.location?.origin });
+   pendingToken = new Promise((resolve, reject) => {
+     const state = createOAuthState();
+     const tokenClient = window.google.accounts.oauth2.initTokenClient({
+@@ -103,14 +104,22 @@ const requestAccessToken = async ({ forceRefresh = false } = {}) => {
+           return;
+         }
+         if (resp?.access_token) {
++          debugLog('sync.token:ok', { expiresIn: resp.expires_in });
+           cachedAccessToken = resp.access_token;
+           cachedAccessTokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
+           resolve(resp.access_token);
+         } else {
++          debugLog('sync.token:failed', { error: resp?.error || 'unknown' });
+           reject(new Error(resp?.error || 'Google auth failed.'));
+         }
+       },
+-      error_callback: () => reject(new Error('Google auth failed.')),
++      // Раньше причина терялась: GIS передаёт сюда объект с полем type
++      // ('popup_closed', 'popup_failed_to_open', ...) — именно он объясняет,
++      // почему окно авторизации закрылось без токена.
++      error_callback: (err) => {
++        debugLog('sync.token:error', { type: err?.type, message: err?.message });
++        reject(new Error(`Google auth failed: ${err?.type || err?.message || 'unknown'}`));
++      },
+     });
+ 
+     tokenClient.requestAccessToken();
+@@ -132,6 +141,7 @@ const driveFetch = async (token, url, options = {}) => {
+ 
+   if (!response.ok) {
+     const text = await response.text();
++    debugLog('sync.api:error', { status: response.status, url: String(url).slice(0, 120), body: text.slice(0, 300) });
+     const error = new Error(`Google Drive API error (${response.status}): ${text}`);
+     error.status = response.status;
+     if (response.status === 401) clearCachedAccessToken(token);
+@@ -151,7 +161,10 @@ const getModuleFolderId = async (token) => {
+   );
+   const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
+   const listData = await listResp.json();
+-  if (listData.files?.length) return listData.files[0].id;
++  if (listData.files?.length) {
++    debugLog('sync.folder:found', { moduleId, id: listData.files[0].id });
++    return listData.files[0].id;
++  }
+ 
+   const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
+     method: 'POST',
+@@ -166,6 +179,7 @@ const getModuleFolderId = async (token) => {
+   if (!created.id) {
+     throw new Error('Не удалось создать подпапку сеттинга в appDataFolder');
+   }
++  debugLog('sync.folder:created', { moduleId, id: created.id });
+   return created.id;
+ };
+ 
+@@ -173,7 +187,9 @@ const listRemoteCharacterFiles = async (token, folderId) => {
+   const q = encodeURIComponent(`'${folderId}' in parents and trashed=false and mimeType='application/json'`);
+   const resp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=appDataFolder&pageSize=200`);
+   const data = await resp.json();
+-  return data.files || [];
++  const files = data.files || [];
++  debugLog('sync.list:remote', { count: files.length, names: files.map((f) => f.name) });
++  return files;
+ };
+ 
+ const downloadRemoteCharacter = async (token, fileId) => {
+@@ -200,6 +216,7 @@ const uploadCharacterFile = async ({ token, folderId, fileId, filename, payload
+     ? `${UPLOAD_API}/files/${fileId}?uploadType=multipart`
+     : `${UPLOAD_API}/files?uploadType=multipart`;
+ 
++  debugLog('sync.upload', { filename, mode: fileId ? 'update' : 'create', bytes: payload.length });
+   await driveFetch(token, endpoint, {
+     method: fileId ? 'PATCH' : 'POST',
+     headers: { 'Content-Type': `multipart/related; boundary=${delimiter}` },
+@@ -232,11 +249,13 @@ export const openCloudFolderInDrive = async () => {
+ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+   if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
+ 
++  debugLog('sync.all:start', {});
+   await loadGoogleIdentityScript();
+   const token = await requestAccessToken();
+   const folderId = await getModuleFolderId(token);
+   const remoteFiles = await listRemoteCharacterFiles(token, folderId);
+   const localList = await db.getCharactersList();
++  debugLog('sync.all:local', { count: localList.length });
+   const remoteById = new Map();
+ 
+   for (const file of remoteFiles) {
+@@ -299,13 +318,18 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+   }
+ 
+   await setCloudSyncConfigured(true);
++  debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
+   return { uploaded: uploads.length, downloaded: downloadedCount };
+ };
+ 
+ export const syncCharacterToCloudIfEnabled = async (characterId) => {
+   if (!ensureWeb()) return;
+   const configured = await isCloudSyncConfigured();
+-  if (!configured) return;
++  if (!configured) {
++    debugLog('sync.auto:skipped', { characterId, reason: 'not-configured' });
++    return;
++  }
++  debugLog('sync.auto:start', { characterId });
+ 
+   try {
+     await loadGoogleIdentityScript();
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index d6c04dc..f88d387 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -620,40 +620,47 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
++  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
++  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
++  // ничего не делает». Тот же приём уже применён в InventoryScreen/
++  // CharacterContext (showAlert/paAlert).
++  const showHomeAlert = (title, message = '') => {
++    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
++      window.alert(message ? `${title}\n\n${message}` : title);
++      return;
++    }
++    if (message) Alert.alert(title, message);
++    else Alert.alert(title);
++  };
++
+   const handleCloudSync = async () => {
+     setMenuVisible(false);
+     if (Platform.OS !== 'web') {
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        tHomeScreen('cloudSync.unsupported')
+-      );
++      showHomeAlert(tHomeScreen('title'), tHomeScreen('cloudSync.unsupported'));
+       return;
+     }
+ 
++    debugLog('sync.manual:start', {});
+     try {
+       const result = await syncAllCharactersWithCloud({
+         confirmDownload: async (items) => {
+-          const message = tHomeScreen(
+-            'cloudSync.remoteIsNewer',
+-            `В облаке найдены более новые версии (${items.length}). Загрузить их?`
+-          );
+-          return window.confirm(message);
++          debugLog('sync.manual:confirmDownload', { count: items.length });
++          return window.confirm(`${tHomeScreen('cloudSync.remoteIsNewer')} (${items.length})`);
+         },
+       });
++      debugLog('sync.manual:done', result);
+       await loadList();
+       await openCloudFolderInDrive();
+-      Alert.alert(
++      // tHomeScreen принимает только путь ключа (второй аргумент игнорируется),
++      // поэтому счётчики подставляем сами.
++      showHomeAlert(
+         tHomeScreen('title'),
+-        tHomeScreen(
+-          'cloudSync.success',
+-          `Синхронизация завершена. Выгружено: ${result.uploaded}, загружено: ${result.downloaded}.`
+-        )
++        `${tHomeScreen('cloudSync.success')}\n${tHomeScreen('cloudSync.uploaded')}: ${result.uploaded}\n${tHomeScreen('cloudSync.downloaded')}: ${result.downloaded}`,
+       );
+     } catch (e) {
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        tHomeScreen('cloudSync.error', `Ошибка синхронизации: ${e?.message || e}`)
+-      );
++      const reason = e?.message || String(e);
++      debugLog('sync.manual:failed', { message: reason });
++      showHomeAlert(tHomeScreen('title'), `${tHomeScreen('cloudSync.error')}\n\n${reason}`);
+     }
+   };
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index fdcef6e..e963266 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -63,6 +63,8 @@
+     "unsupported": "Cloud sync is available only in web version.",
+     "remoteIsNewer": "Newer character saves were found in cloud. Download them locally?",
+     "success": "Sync completed.",
++    "uploaded": "Uploaded",
++    "downloaded": "Downloaded",
+     "error": "Cloud sync failed."
+   },
+   "pwa": {
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 5736066..cd07a57 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -63,6 +63,8 @@
+     "unsupported": "Синхронизация с облаком доступна только в web-версии.",
+     "remoteIsNewer": "В облаке найдены более новые версии персонажей. Загрузить их локально?",
+     "success": "Синхронизация завершена.",
++    "uploaded": "Выгружено",
++    "downloaded": "Загружено",
+     "error": "Ошибка синхронизации."
+   },
+   "pwa": {
+diff --git a/src/utils/forcePwaUpdate.js b/src/utils/forcePwaUpdate.js
+index f645d84..c05ed0e 100644
+--- a/src/utils/forcePwaUpdate.js
++++ b/src/utils/forcePwaUpdate.js
+@@ -1,22 +1,56 @@
+ // src/utils/forcePwaUpdate.js
+-// Простой механизм принудительного обновления PWA
+-// (без лишних проверок — подходит для ранней стадии разработки)
++// Принудительное обновление PWA: снять service worker, вычистить Cache Storage
++// и перезагрузиться в обход HTTP-кэша.
++//
++// ВАЖНО про то, чего здесь НЕТ и не должно быть: функция НЕ трогает IndexedDB
++// и localStorage — там лежат персонажи. Очищается только Cache Storage
++// (файлы приложения: бандл, иконки, manifest).
++//
++// История дефекта: прежняя версия вызывала unregister() без await и сразу
++// window.location.reload(true). Из-за этого
++//   1) reload срабатывал до фактического снятия воркера (unregister
++//      асинхронный) — кнопку приходилось жать по несколько раз;
++//   2) Cache Storage не очищался вовсе, поэтому снятие воркера ничего не
++//      меняло: перезагрузка снова поднимала старый бандл из кэша;
++//   3) аргумент reload(true) («force reload») игнорируется современными
++//      браузерами — спецификация его убрала.
+ 
+-export const forcePwaUpdate = () => {
++import { debugLog } from '../debug/falloutDebug';
++
++export const forcePwaUpdate = async () => {
+   if (typeof window === 'undefined') return;
+ 
+-  // 1. Пытаемся unregister все Service Workers
+-  if ('serviceWorker' in navigator) {
+-    navigator.serviceWorker.getRegistrations()
+-      .then((registrations) => {
+-        registrations.forEach((registration) => {
+-          registration.unregister();
+-        });
+-      })
+-      .catch(() => {});
++  debugLog('pwa.update:start', {});
++
++  try {
++    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
++      const registrations = await navigator.serviceWorker.getRegistrations();
++      // Ждём КАЖДЫЙ unregister: без await перезагрузка обгоняет снятие.
++      await Promise.all(registrations.map((registration) => registration.unregister()));
++      debugLog('pwa.update:swUnregistered', { count: registrations.length });
++    }
++  } catch (error) {
++    debugLog('pwa.update:swFailed', { message: error?.message || String(error) });
+   }
+ 
+-  // 2. Жёсткая перезагрузка с игнорированием кэша
+-  // (true = force reload в старых браузерах)
+-  window.location.reload(true);
++  try {
++    if ('caches' in window) {
++      const keys = await caches.keys();
++      await Promise.all(keys.map((key) => caches.delete(key)));
++      debugLog('pwa.update:cachesCleared', { keys });
++    }
++  } catch (error) {
++    debugLog('pwa.update:cachesFailed', { message: error?.message || String(error) });
++  }
++
++  // reload(true) больше не работает, поэтому обходим HTTP-кэш уникальным
++  // параметром. replace(), а не assign(), чтобы не плодить записи в истории:
++  // иначе кнопка «назад» вернёт пользователя на устаревший документ.
++  try {
++    const url = new URL(window.location.href);
++    url.searchParams.set('_swr', Date.now().toString(36));
++    window.location.replace(url.toString());
++  } catch (_) {
++    window.location.reload();
++  }
+ };
