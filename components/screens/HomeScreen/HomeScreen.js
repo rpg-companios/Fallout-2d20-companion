@@ -39,7 +39,7 @@ import {
   pickCharacterFile,
   IMPORT_ERRORS,
 } from './logic/characterTransfer';
-import { openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/HomeScreen.styles';
@@ -436,9 +436,29 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
+  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
+  // ничего не делает». Тот же приём уже применён в InventoryScreen/
+  // CharacterContext (showAlert/paAlert).
+  const showHomeAlert = (title, message = '') => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(message ? `${title}\n\n${message}` : title);
+      return;
+    }
+    if (message) Alert.alert(title, message);
+    else Alert.alert(title);
+  };
+
   const handleDeleteFolder = (folder) => {
     const remove = async () => {
-      await db.deleteCharacterFolderAndCharacters(folder.id);
+      // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
+      // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
+      // следующей синхронизации (но уже без структуры каталогов).
+      const removedIds = await db.deleteCharacterFolderAndCharacters(folder.id);
+      for (const id of removedIds || []) {
+        await deleteCharacterFromCloudIfEnabled(id);
+      }
+      debugLog('folder.delete:done', { folderId: folder.id, characters: removedIds?.length || 0 });
       if (activeFolder?.id === folder.id) setActiveFolder(null);
       loadList();
     };
@@ -465,18 +485,29 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleDelete = (character) => {
+    // Удаление сквозное: локально И в облаке. Без удаления в облаке персонаж
+    // воскресал при следующей синхронизации — она не отличает «я это удалил»
+    // от «этого у меня ещё не было» (сверка идёт по наличию id локально).
+    // Поэтому текст предупреждения обязан быть прямым: операция необратима и
+    // затрагивает все устройства.
     const confirmDelete = async () => {
+      debugLog('character.delete:start', { id: character.id });
+      const cloud = await deleteCharacterFromCloudIfEnabled(character.id);
       await deleteCharacter(character.id);
-      loadList();
+      debugLog('character.delete:done', { id: character.id, cloud });
+      await loadList();
+
+      // Если облачная копия осталась (сеть/авторизация отвалились), молчать
+      // нельзя: при следующем синке персонаж вернётся, и это выглядит как баг.
+      if (cloud.reason === 'error') {
+        showHomeAlert(tHomeScreen('title'), tHomeScreen('deleteCloudFailed'));
+      }
     };
 
     const confirmMessage = tHomeScreen('deleteConfirm');
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const confirmed = window.confirm(confirmMessage);
-      if (confirmed) {
-        confirmDelete();
-      }
+      if (window.confirm(confirmMessage)) confirmDelete();
       return;
     }
 
@@ -485,11 +516,11 @@ export default function HomeScreen({ navigation }) {
       confirmMessage,
       [
         {
-          text: tHomeScreen('buttons.yes') || 'Да',
+          text: tHomeScreen('buttons.deleteEverywhere'),
           style: 'destructive',
           onPress: confirmDelete,
         },
-        { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
+        { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
       ],
       { cancelable: false }
     );
@@ -621,19 +652,6 @@ export default function HomeScreen({ navigation }) {
         'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
       );
     }
-  };
-
-  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
-  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
-  // ничего не делает». Тот же приём уже применён в InventoryScreen/
-  // CharacterContext (showAlert/paAlert).
-  const showHomeAlert = (title, message = '') => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-      window.alert(message ? `${title}\n\n${message}` : title);
-      return;
-    }
-    if (message) Alert.alert(title, message);
-    else Alert.alert(title);
   };
 
   const handleCloudSync = async () => {

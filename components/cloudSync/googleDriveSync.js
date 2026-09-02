@@ -343,6 +343,46 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
   return { uploaded: uploads.length, downloaded: downloadedCount };
 };
 
+// Удаление персонажа в облаке. Вызывается ТОЛЬКО после явного подтверждения
+// пользователя («удалить везде»), потому что операция необратима и действует
+// на все устройства: файл в appDataFolder уносится безвозвратно.
+//
+// Возвращает { removed, reason }: removed=true, если файл реально удалён.
+// Наружу не бросает — удаление в облаке не должно отменять локальное.
+export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
+  if (!ensureWeb()) return { removed: false, reason: 'not-web' };
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) {
+      debugLog('sync.delete:skipped', { characterId, reason: 'not-configured' });
+      return { removed: false, reason: 'not-configured' };
+    }
+
+    debugLog('sync.delete:start', { characterId });
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const folderId = await getModuleFolderId(token);
+    const remoteFiles = await listRemoteCharacterFiles(token, folderId);
+    // Имя файла в облаке: <id>__<имя>.json — ищем по префиксу id, потому что
+    // имя персонажа могло измениться после последней выгрузки.
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${characterId}__`));
+
+    if (!remote) {
+      debugLog('sync.delete:absent', { characterId });
+      return { removed: false, reason: 'absent' };
+    }
+
+    await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
+    debugLog('sync.delete:done', { characterId, fileId: remote.id });
+    return { removed: true };
+  } catch (e) {
+    const message = e?.message || String(e);
+    debugLog('sync.delete:failed', { characterId, message });
+    return { removed: false, reason: 'error', message };
+  }
+};
+
 // Вызывается фоном (без await) из CharacterContext, поэтому обязана быть
 // полностью «незаметной»: никогда не бросать наружу — иначе получим
 // unhandled promise rejection. Проверка флага тоже внутри try.

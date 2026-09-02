@@ -34,7 +34,8 @@
     "copySuffix": "copy",
     "duplicateError": "Failed to duplicate character."
   },
-  "deleteConfirm": "Do you really want to delete this character?",
+  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u00abCancel\u00bb to download a copy manually first.",
+  "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync \u2014 try deleting again later.",
   "language": {
     "russian": "Ru",
     "english": "En",
@@ -47,7 +48,9 @@
   "buttons": {
     "yes": "Yes",
     "no": "No",
-    "ok": "Ok"
+    "ok": "Ok",
+    "deleteEverywhere": "Yes \u2014 delete everywhere",
+    "cancel": "Cancel"
   },
   "menu": {
     "sync": "Cloud sync",
