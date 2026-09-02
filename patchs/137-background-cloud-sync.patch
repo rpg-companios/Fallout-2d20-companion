@@ -1,0 +1,85 @@
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 6a50111..e06305a 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -781,7 +781,11 @@ export const CharacterProvider = ({ children }) => {
+           snapshot.origin?.id || snapshot.origin?.name || null,
+           serialized
+         );
+-        await syncCharacterToCloudIfEnabled(characterIdRef.current);
++        // Облако — фоном, без await. Локальное сохранение уже состоялось, и
++        // задержка Google (окно OAuth, медленная сеть, отозванный доступ) не
++        // должна тормозить следующий цикл автосейва. Свои ошибки функция
++        // гасит внутри и пишет их в трассировку (sync.cloudFailed).
++        void syncCharacterToCloudIfEnabled(characterIdRef.current);
+       } catch (e) {
+       }
+     }, 500);
+@@ -819,10 +823,25 @@ export const CharacterProvider = ({ children }) => {
+         serialized
+       );
+       await db.clearCharacterRenameRequest(id);
+-      await syncCharacterToCloudIfEnabled(id);
+ 
++      // Флаг ставим СРАЗУ после записи в БД: локальное сохранение состоялось,
++      // и UI не должен ждать облако.
++      //
++      // История дефекта: раньше здесь был `await syncCharacterToCloudIfEnabled(id)`
++      // ПЕРЕД setIsSaved. Если попап Google зависал (например, под заголовком
++      // Cross-Origin-Opener-Policy: same-origin окно теряет window.opener и
++      // ничего не возвращает), промис не резолвился, и setIsSaved(true) не
++      // выполнялся. Персонаж при этом уже был в базе, но экран оставался
++      // заблокированным: disabledOverlay поверх карточки, disabled на выборе
++      // происхождения/трейта/комплекта, editable={!isSaved} на поле имени.
++      // Разблокировать удавалось только сменой таба (экран перечитывал
++      // персонажа из БД).
+       setIsSaved(true);
+       isSavedRef.current = true;
++
++      // Облако — фоном: его отказ не влияет на локальное состояние и UI.
++      void syncCharacterToCloudIfEnabled(id);
++
+       return id;
+     } catch (e) {
+       return null;
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 68c99dc..9610035 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -322,16 +322,20 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+   return { uploaded: uploads.length, downloaded: downloadedCount };
+ };
+ 
++// Вызывается фоном (без await) из CharacterContext, поэтому обязана быть
++// полностью «незаметной»: никогда не бросать наружу — иначе получим
++// unhandled promise rejection. Проверка флага тоже внутри try.
+ export const syncCharacterToCloudIfEnabled = async (characterId) => {
+   if (!ensureWeb()) return;
+-  const configured = await isCloudSyncConfigured();
+-  if (!configured) {
+-    debugLog('sync.auto:skipped', { characterId, reason: 'not-configured' });
+-    return;
+-  }
+-  debugLog('sync.auto:start', { characterId });
+ 
+   try {
++    const configured = await isCloudSyncConfigured();
++    if (!configured) {
++      debugLog('sync.auto:skipped', { characterId, reason: 'not-configured' });
++      return;
++    }
++    debugLog('sync.auto:start', { characterId });
++
+     await loadGoogleIdentityScript();
+     const token = await requestAccessToken();
+     const folderId = await getModuleFolderId(token);
+@@ -342,7 +346,8 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
+     const payload = JSON.stringify(createCharacterExportPayload(character));
+ 
+     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
++    debugLog('sync.auto:done', { characterId });
+   } catch (e) {
+-    debugLog('sync.cloudFailed', { message: e?.message || String(e) });
++    debugLog('sync.cloudFailed', { characterId, message: e?.message || String(e) });
+   }
+ };
