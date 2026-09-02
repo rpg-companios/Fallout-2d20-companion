@@ -1,0 +1,202 @@
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 9610035..4deeca8 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -246,13 +246,24 @@ export const openCloudFolderInDrive = async () => {
+   window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener');
+ };
+ 
+-export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
++// onProgress({ stage, current, total }) — необязательный колбэк для UI.
++// stage: 'auth' | 'folder' | 'list' | 'download' | 'upload' | 'done'.
++// Вызовы обёрнуты так, чтобы падение обработчика UI не роняло синхронизацию.
++export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }) => {
+   if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
+ 
++  const report = (stage, current = 0, total = 0) => {
++    debugLog('sync.progress', { stage, current, total });
++    try { onProgress?.({ stage, current, total }); } catch (_) {}
++  };
++
+   debugLog('sync.all:start', {});
++  report('auth');
+   await loadGoogleIdentityScript();
+   const token = await requestAccessToken();
++  report('folder');
+   const folderId = await getModuleFolderId(token);
++  report('list');
+   const remoteFiles = await listRemoteCharacterFiles(token, folderId);
+   const localList = await db.getCharactersList();
+   debugLog('sync.all:local', { count: localList.length });
+@@ -281,9 +292,15 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+   // (двусторонний merge: не только обновлять существующих по времени, но и
+   // привозить новых с другого устройства).
+   const localIds = new Set(localList.map((c) => c.id));
+-  for (const file of remoteFiles) {
++  const newRemoteFiles = remoteFiles.filter((file) => {
++    const maybeId = (file.name || '').split('__')[0];
++    return maybeId && !localIds.has(maybeId);
++  });
++  let downloadIndex = 0;
++  for (const file of newRemoteFiles) {
+     const maybeId = (file.name || '').split('__')[0];
+-    if (!maybeId || localIds.has(maybeId)) continue;
++    downloadIndex += 1;
++    report('download', downloadIndex, newRemoteFiles.length);
+     const raw = await downloadRemoteCharacter(token, file.id);
+     const parsed = parseCharacterImportPayload(raw);
+     if (parsed.error) continue;
+@@ -310,7 +327,10 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+     }
+   }
+ 
++  let uploadIndex = 0;
+   for (const { character, remote } of uploads) {
++    uploadIndex += 1;
++    report('upload', uploadIndex, uploads.length);
+     const full = await db.loadCharacterById(character.id);
+     if (!full) continue;
+     const payload = JSON.stringify(createCharacterExportPayload(full));
+@@ -318,6 +338,7 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+   }
+ 
+   await setCloudSyncConfigured(true);
++  report('done');
+   debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
+   return { uploaded: uploads.length, downloaded: downloadedCount };
+ };
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index f88d387..6d82ee6 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -220,6 +220,9 @@ export default function HomeScreen({ navigation }) {
+   const activeModuleId = getActiveModuleId();
+   const [loading, setLoading] = useState(true);
+   const [menuVisible, setMenuVisible] = useState(false);
++  // null = синка не идёт. Иначе { stage, current, total } — модалка-заглушка
++  // перекрывает экран, поэтому повторный запуск невозможен by design.
++  const [syncProgress, setSyncProgress] = useState(null);
+   const [aboutVisible, setAboutVisible] = useState(false);
+   const [legalDoc, setLegalDoc] = useState(null); // null | 'privacy' | 'terms'
+   const [communityVisible, setCommunityVisible] = useState(false);
+@@ -640,15 +643,22 @@ export default function HomeScreen({ navigation }) {
+       return;
+     }
+ 
++    // Защита от повторного запуска: кнопка в меню, автосинк и второй клик
++    // не должны стартовать вторую сессию поверх текущей.
++    if (syncProgress) return;
++
+     debugLog('sync.manual:start', {});
++    setSyncProgress({ stage: 'auth', current: 0, total: 0 });
+     try {
+       const result = await syncAllCharactersWithCloud({
++        onProgress: setSyncProgress,
+         confirmDownload: async (items) => {
+           debugLog('sync.manual:confirmDownload', { count: items.length });
+           return window.confirm(`${tHomeScreen('cloudSync.remoteIsNewer')} (${items.length})`);
+         },
+       });
+       debugLog('sync.manual:done', result);
++      setSyncProgress(null);
+       await loadList();
+       await openCloudFolderInDrive();
+       // tHomeScreen принимает только путь ключа (второй аргумент игнорируется),
+@@ -660,6 +670,7 @@ export default function HomeScreen({ navigation }) {
+     } catch (e) {
+       const reason = e?.message || String(e);
+       debugLog('sync.manual:failed', { message: reason });
++      setSyncProgress(null);
+       showHomeAlert(tHomeScreen('title'), `${tHomeScreen('cloudSync.error')}\n\n${reason}`);
+     }
+   };
+@@ -905,6 +916,23 @@ export default function HomeScreen({ navigation }) {
+         </Pressable>
+       </Modal>
+ 
++      {/* Заглушка процесса синхронизации. Модалка без onRequestClose-выхода:
++          закрыть её пользователь не может, что и решает исходную проблему —
++          «не хватает ощущения процесса, и можно прервать его иначе». */}
++      <Modal visible={!!syncProgress} transparent animationType="fade">
++        <View style={styles.modalBackdropCenter}>
++          <View style={styles.syncProgressModal}>
++            <ActivityIndicator size="large" color="#d4af37" />
++            <Text style={styles.syncProgressTitle}>{tHomeScreen('cloudSync.inProgress')}</Text>
++            <Text style={styles.syncProgressStage}>
++              {tHomeScreen(`cloudSync.stages.${syncProgress?.stage || 'auth'}`)}
++              {syncProgress?.total > 1 ? ` (${syncProgress.current}/${syncProgress.total})` : ''}
++            </Text>
++            <Text style={styles.syncProgressHint}>{tHomeScreen('cloudSync.doNotClose')}</Text>
++          </View>
++        </View>
++      </Modal>
++
+       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
+       <GameSettingsModal visible={gameSettingsVisible} onClose={() => setGameSettingsVisible(false)} />
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index e963266..d5f9851 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -63,6 +63,16 @@
+     "unsupported": "Cloud sync is available only in web version.",
+     "remoteIsNewer": "Newer character saves were found in cloud. Download them locally?",
+     "success": "Sync completed.",
++    "inProgress": "Syncing with Google Drive",
++    "doNotClose": "Do not close the page until it finishes",
++    "stages": {
++      "auth": "Signing in to Google\u2026",
++      "folder": "Looking up setting folder\u2026",
++      "list": "Reading cloud file list\u2026",
++      "download": "Downloading from cloud\u2026",
++      "upload": "Uploading to cloud\u2026",
++      "done": "Finishing\u2026"
++    },
+     "uploaded": "Uploaded",
+     "downloaded": "Downloaded",
+     "error": "Cloud sync failed."
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index cd07a57..1c3ab51 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -63,6 +63,16 @@
+     "unsupported": "Синхронизация с облаком доступна только в web-версии.",
+     "remoteIsNewer": "В облаке найдены более новые версии персонажей. Загрузить их локально?",
+     "success": "Синхронизация завершена.",
++    "inProgress": "Синхронизация с Google Drive",
++    "doNotClose": "Не закрывайте страницу до завершения",
++    "stages": {
++      "auth": "Авторизация в Google\u2026",
++      "folder": "Поиск папки сеттинга\u2026",
++      "list": "Чтение списка в облаке\u2026",
++      "download": "Загрузка из облака\u2026",
++      "upload": "Выгрузка в облако\u2026",
++      "done": "Завершение\u2026"
++    },
+     "uploaded": "Выгружено",
+     "downloaded": "Загружено",
+     "error": "Ошибка синхронизации."
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 235f41e..5a21550 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -237,6 +237,19 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 14,
+   },
+   menuText: { color: '#f9fafb', fontSize: 15 },
++  syncProgressModal: {
++    width: '100%',
++    maxWidth: 360,
++    backgroundColor: '#111827',
++    borderRadius: 12,
++    borderWidth: 2,
++    borderColor: '#d4af37',
++    padding: 24,
++    alignItems: 'center',
++  },
++  syncProgressTitle: { color: '#f0e68c', fontSize: 17, fontWeight: '700', marginTop: 14, textAlign: 'center' },
++  syncProgressStage: { color: '#d1d5db', fontSize: 14, marginTop: 8, textAlign: 'center' },
++  syncProgressHint: { color: '#9ca3af', fontSize: 12, marginTop: 14, textAlign: 'center', fontStyle: 'italic' },
+   modalBackdropCenter: {
+     flex: 1,
+     backgroundColor: 'rgba(0,0,0,0.55)',
