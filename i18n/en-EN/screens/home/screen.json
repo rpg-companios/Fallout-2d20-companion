@@ -16,14 +16,16 @@
       "unsupportedVersion": "This export file version is not supported.",
       "missingCharacter": "Character block is missing in the file.",
       "missingName": "Character name is missing in the file.",
-      "missingData": "Character data is missing in the file.", "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
+      "missingData": "Character data is missing in the file.",
+      "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
     }
   },
   "download": {
     "unsupported": "File save/export is available only in web version.",
     "errors": {
       "notFound": "Character was not found.",
-      "failed": "Failed to save file.", "unexpected": "Could not download the character. See the browser console for details."
+      "failed": "Failed to save file.",
+      "unexpected": "Could not download the character. See the browser console for details."
     }
   },
   "characterActions": {
@@ -34,8 +36,8 @@
     "copySuffix": "copy",
     "duplicateError": "Failed to duplicate character."
   },
-  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u201cCancel\u201d to download a copy manually first.",
-  "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync \u2014 try deleting again later.",
+  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press “Cancel” to download a copy manually first.",
+  "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync — try deleting again later.",
   "language": {
     "russian": "Ru",
     "english": "En",
@@ -49,7 +51,6 @@
     "yes": "Yes",
     "no": "No",
     "ok": "Ok",
-    "deleteEverywhere": "Yes \u2014 delete everywhere",
     "cancel": "Cancel"
   },
   "menu": {
@@ -69,12 +70,12 @@
     "inProgress": "Syncing with Google Drive",
     "doNotClose": "Do not close the page until it finishes",
     "stages": {
-      "auth": "Signing in to Google\u2026",
-      "folder": "Looking up setting folder\u2026",
-      "list": "Reading cloud file list\u2026",
-      "download": "Downloading from cloud\u2026",
-      "upload": "Uploading to cloud\u2026",
-      "done": "Finishing\u2026"
+      "auth": "Signing in to Google…",
+      "folder": "Looking up setting folder…",
+      "list": "Reading cloud file list…",
+      "download": "Downloading from cloud…",
+      "upload": "Uploading to cloud…",
+      "done": "Finishing…"
     },
     "uploaded": "Uploaded",
     "downloaded": "Downloaded",

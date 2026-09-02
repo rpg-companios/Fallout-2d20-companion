@@ -467,7 +467,10 @@ export default function HomeScreen({ navigation }) {
       if (window.confirm(message)) remove();
       return;
     }
-    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [{ text: tHomeScreen('folders.cancel'), style: 'cancel' }, { text: tHomeScreen('folders.deleteConfirm'), style: 'destructive', onPress: remove }]);
+    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [
+      { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: remove },
+      { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
+    ]);
   };
 
   const handleCreate = () => {
@@ -516,7 +519,7 @@ export default function HomeScreen({ navigation }) {
       confirmMessage,
       [
         {
-          text: tHomeScreen('buttons.deleteEverywhere'),
+          text: tHomeScreen('buttons.yes'),
           style: 'destructive',
           onPress: confirmDelete,
         },
@@ -538,26 +541,20 @@ export default function HomeScreen({ navigation }) {
       });
     } catch (error) {
       debugLog('home.duplicateCharacter.failed', { message: error?.message });
-      Alert.alert(
-        tHomeScreen('title'),
-        tHomeScreen('characterActions.duplicateError'),
-      );
+      showHomeAlert(tHomeScreen('title'), tHomeScreen('characterActions.duplicateError'));
     }
   };
 
   const handleDownload = async (character) => {
     if (false) { // cross-platform
-      Alert.alert(
-        tHomeScreen('title'),
-        tHomeScreen('download.unsupported')
-      );
+      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.unsupported'));
       return;
     }
 
     try {
       const row = await db.loadCharacterById(character.id);
       if (!row) {
-        Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
+        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
         return;
       }
 
@@ -565,10 +562,7 @@ export default function HomeScreen({ navigation }) {
       const result = await downloadCharacterPayload(payload, row.name);
       
       if (!result.success && !result.aborted) {
-        Alert.alert(
-          tHomeScreen('title'),
-          tHomeScreen('download.errors.failed') || 'Не удалось скачать персонажа. Попробуйте ещё раз или смените браузер.'
-        );
+        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.failed'));
       }
     } catch (error) {
       debugLog('home.characterDownload.failed', { message: error?.message });
@@ -578,10 +572,7 @@ export default function HomeScreen({ navigation }) {
 
   const handleUpload = async () => {
     if (false) { // cross-platform
-      Alert.alert(
-        tHomeScreen('title'),
-        tHomeScreen('upload.unsupported')
-      );
+      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.unsupported'));
       return;
     }
 
@@ -592,10 +583,7 @@ export default function HomeScreen({ navigation }) {
 
       const parsed = parseCharacterImportPayload(rawText);
       if (parsed.error) {
-        Alert.alert(
-          tHomeScreen('title'),
-          tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
-        );
+        showHomeAlert(tHomeScreen('title'), tHomeScreen(IMPORT_ERRORS[parsed.error]));
         return;
       }
 
@@ -633,12 +621,8 @@ export default function HomeScreen({ navigation }) {
         tHomeScreen('title'),
         overwriteMessage,
         [
-          { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
-          {
-            text: tHomeScreen('buttons.yes') || 'Да',
-            style: 'destructive',
-            onPress: persistImport,
-          },
+          { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: persistImport },
+          { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
         ],
         { cancelable: true }
       );
