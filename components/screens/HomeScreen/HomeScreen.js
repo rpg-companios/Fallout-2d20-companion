@@ -620,40 +620,47 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
+  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
+  // ничего не делает». Тот же приём уже применён в InventoryScreen/
+  // CharacterContext (showAlert/paAlert).
+  const showHomeAlert = (title, message = '') => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(message ? `${title}\n\n${message}` : title);
+      return;
+    }
+    if (message) Alert.alert(title, message);
+    else Alert.alert(title);
+  };
+
   const handleCloudSync = async () => {
     setMenuVisible(false);
     if (Platform.OS !== 'web') {
-      Alert.alert(
-        tHomeScreen('title'),
-        tHomeScreen('cloudSync.unsupported')
-      );
+      showHomeAlert(tHomeScreen('title'), tHomeScreen('cloudSync.unsupported'));
       return;
     }
 
+    debugLog('sync.manual:start', {});
     try {
       const result = await syncAllCharactersWithCloud({
         confirmDownload: async (items) => {
-          const message = tHomeScreen(
-            'cloudSync.remoteIsNewer',
-            `В облаке найдены более новые версии (${items.length}). Загрузить их?`
-          );
-          return window.confirm(message);
+          debugLog('sync.manual:confirmDownload', { count: items.length });
+          return window.confirm(`${tHomeScreen('cloudSync.remoteIsNewer')} (${items.length})`);
         },
       });
+      debugLog('sync.manual:done', result);
       await loadList();
       await openCloudFolderInDrive();
-      Alert.alert(
+      // tHomeScreen принимает только путь ключа (второй аргумент игнорируется),
+      // поэтому счётчики подставляем сами.
+      showHomeAlert(
         tHomeScreen('title'),
-        tHomeScreen(
-          'cloudSync.success',
-          `Синхронизация завершена. Выгружено: ${result.uploaded}, загружено: ${result.downloaded}.`
-        )
+        `${tHomeScreen('cloudSync.success')}\n${tHomeScreen('cloudSync.uploaded')}: ${result.uploaded}\n${tHomeScreen('cloudSync.downloaded')}: ${result.downloaded}`,
       );
     } catch (e) {
-      Alert.alert(
-        tHomeScreen('title'),
-        tHomeScreen('cloudSync.error', `Ошибка синхронизации: ${e?.message || e}`)
-      );
+      const reason = e?.message || String(e);
+      debugLog('sync.manual:failed', { message: reason });
+      showHomeAlert(tHomeScreen('title'), `${tHomeScreen('cloudSync.error')}\n\n${reason}`);
     }
   };
 

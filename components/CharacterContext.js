@@ -781,7 +781,11 @@ export const CharacterProvider = ({ children }) => {
           snapshot.origin?.id || snapshot.origin?.name || null,
           serialized
         );
-        await syncCharacterToCloudIfEnabled(characterIdRef.current);
+        // Облако — фоном, без await. Локальное сохранение уже состоялось, и
+        // задержка Google (окно OAuth, медленная сеть, отозванный доступ) не
+        // должна тормозить следующий цикл автосейва. Свои ошибки функция
+        // гасит внутри и пишет их в трассировку (sync.cloudFailed).
+        void syncCharacterToCloudIfEnabled(characterIdRef.current);
       } catch (e) {
       }
     }, 500);
@@ -819,10 +823,25 @@ export const CharacterProvider = ({ children }) => {
         serialized
       );
       await db.clearCharacterRenameRequest(id);
-      await syncCharacterToCloudIfEnabled(id);
 
+      // Флаг ставим СРАЗУ после записи в БД: локальное сохранение состоялось,
+      // и UI не должен ждать облако.
+      //
+      // История дефекта: раньше здесь был `await syncCharacterToCloudIfEnabled(id)`
+      // ПЕРЕД setIsSaved. Если попап Google зависал (например, под заголовком
+      // Cross-Origin-Opener-Policy: same-origin окно теряет window.opener и
+      // ничего не возвращает), промис не резолвился, и setIsSaved(true) не
+      // выполнялся. Персонаж при этом уже был в базе, но экран оставался
+      // заблокированным: disabledOverlay поверх карточки, disabled на выборе
+      // происхождения/трейта/комплекта, editable={!isSaved} на поле имени.
+      // Разблокировать удавалось только сменой таба (экран перечитывал
+      // персонажа из БД).
       setIsSaved(true);
       isSavedRef.current = true;
+
+      // Облако — фоном: его отказ не влияет на локальное состояние и UI.
+      void syncCharacterToCloudIfEnabled(id);
+
       return id;
     } catch (e) {
       return null;
