@@ -208,7 +208,9 @@ const styles = StyleSheet.create({
   folderHeaderCount: { color: '#d1d5db', marginTop: 2 },
   rootDropZone: { marginTop: 10, padding: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#d4af37', borderRadius: 6 },
   rootDropText: { color: '#f0e68c', textAlign: 'center' },
-  moveHint: { color: '#f0e68c', textAlign: 'center', marginHorizontal: 16, marginBottom: 8 },
+  // Absolute so that showing the hint does not reflow the grid mid-drag,
+  // which would move the cards and the measured drop targets under the finger.
+  moveHint: { position: 'absolute', top: 0, left: 16, right: 16, zIndex: 50, color: '#f0e68c', textAlign: 'center', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6, backgroundColor: 'rgba(17,24,39,0.9)' },
   dragPreview: { position: 'absolute', zIndex: 100, width: 108, padding: 8, borderRadius: 8, backgroundColor: '#111827', borderWidth: 2, borderColor: '#d4af37', opacity: 1 },
   dragPreviewText: { color: '#f0e68c', textAlign: 'center', fontWeight: '700' },
   modalBackdrop: {

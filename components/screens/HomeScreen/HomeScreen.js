@@ -107,17 +107,45 @@ const CharacterCell = ({
   // which Touchable's touch callbacks do not guarantee on web and native.
   const callbacks = useRef({});
   callbacks.current = { character, onDragStart, onDragMove, onDragEnd };
+  // Track the last known pointer position: on release/terminate the gesture can
+  // report moveX/moveY as 0 when no move was registered in that cycle.
+  const lastPoint = useRef({ pageX: 0, pageY: 0 });
+  const dragging = useRef(false);
   const panResponder = useRef(PanResponder.create({
+    // Capture variants keep the parent TouchableOpacity/ScrollView from taking
+    // the touch before the handle gets it.
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (_event, gesture) => callbacks.current.onDragStart({ pageX: gesture.x0, pageY: gesture.y0 }, callbacks.current.character),
-    onPanResponderMove: (_event, gesture) => callbacks.current.onDragMove({ pageX: gesture.moveX, pageY: gesture.moveY }),
-    onPanResponderRelease: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
-    onPanResponderTerminate: (_event, gesture) => callbacks.current.onDragEnd({ pageX: gesture.moveX, pageY: gesture.moveY }),
+    // Never hand the gesture over to the enclosing ScrollView: otherwise the
+    // first vertical movement terminates the drag and the handle immediately
+    // re-grabs the finger, which makes the card jitter.
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+    onPanResponderGrant: (_event, gesture) => {
+      dragging.current = true;
+      lastPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
+      callbacks.current.onDragStart({ pageX: gesture.x0, pageY: gesture.y0 }, callbacks.current.character);
+    },
+    onPanResponderMove: (_event, gesture) => {
+      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+      lastPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
+      callbacks.current.onDragMove(lastPoint.current);
+    },
+    onPanResponderRelease: () => {
+      callbacks.current.onDragEnd(lastPoint.current);
+      // Let the synthetic press that follows the release be swallowed.
+      setTimeout(() => { dragging.current = false; }, 0);
+    },
+    onPanResponderTerminate: () => {
+      callbacks.current.onDragEnd(lastPoint.current);
+      setTimeout(() => { dragging.current = false; }, 0);
+    },
   })).current;
 
   return (
-    <TouchableOpacity style={styles.characterCell} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
       <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
       <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
       {deleteActionPlacement === 'card' && (
@@ -750,10 +778,11 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
       {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
-      {movingCharacterId && !activeFolder && <Text style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
+      {movingCharacterId && !activeFolder && <Text pointerEvents="none" style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        scrollEnabled={!drag}
       >
         {loading ? (
           <ActivityIndicator size="large" color="#d4af37" style={styles.loader} />
