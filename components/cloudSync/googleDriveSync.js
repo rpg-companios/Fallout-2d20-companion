@@ -246,13 +246,24 @@ export const openCloudFolderInDrive = async () => {
   window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener');
 };
 
-export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
+// onProgress({ stage, current, total }) — необязательный колбэк для UI.
+// stage: 'auth' | 'folder' | 'list' | 'download' | 'upload' | 'done'.
+// Вызовы обёрнуты так, чтобы падение обработчика UI не роняло синхронизацию.
+export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }) => {
   if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
 
+  const report = (stage, current = 0, total = 0) => {
+    debugLog('sync.progress', { stage, current, total });
+    try { onProgress?.({ stage, current, total }); } catch (_) {}
+  };
+
   debugLog('sync.all:start', {});
+  report('auth');
   await loadGoogleIdentityScript();
   const token = await requestAccessToken();
+  report('folder');
   const folderId = await getModuleFolderId(token);
+  report('list');
   const remoteFiles = await listRemoteCharacterFiles(token, folderId);
   const localList = await db.getCharactersList();
   debugLog('sync.all:local', { count: localList.length });
@@ -281,9 +292,15 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
   // (двусторонний merge: не только обновлять существующих по времени, но и
   // привозить новых с другого устройства).
   const localIds = new Set(localList.map((c) => c.id));
-  for (const file of remoteFiles) {
+  const newRemoteFiles = remoteFiles.filter((file) => {
     const maybeId = (file.name || '').split('__')[0];
-    if (!maybeId || localIds.has(maybeId)) continue;
+    return maybeId && !localIds.has(maybeId);
+  });
+  let downloadIndex = 0;
+  for (const file of newRemoteFiles) {
+    const maybeId = (file.name || '').split('__')[0];
+    downloadIndex += 1;
+    report('download', downloadIndex, newRemoteFiles.length);
     const raw = await downloadRemoteCharacter(token, file.id);
     const parsed = parseCharacterImportPayload(raw);
     if (parsed.error) continue;
@@ -310,7 +327,10 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
     }
   }
 
+  let uploadIndex = 0;
   for (const { character, remote } of uploads) {
+    uploadIndex += 1;
+    report('upload', uploadIndex, uploads.length);
     const full = await db.loadCharacterById(character.id);
     if (!full) continue;
     const payload = JSON.stringify(createCharacterExportPayload(full));
@@ -318,6 +338,7 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload }) => {
   }
 
   await setCloudSyncConfigured(true);
+  report('done');
   debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
   return { uploaded: uploads.length, downloaded: downloadedCount };
 };
