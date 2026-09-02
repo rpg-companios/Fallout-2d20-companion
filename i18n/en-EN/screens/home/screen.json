@@ -16,14 +16,14 @@
       "unsupportedVersion": "This export file version is not supported.",
       "missingCharacter": "Character block is missing in the file.",
       "missingName": "Character name is missing in the file.",
-      "missingData": "Character data is missing in the file."
+      "missingData": "Character data is missing in the file.", "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
     }
   },
   "download": {
     "unsupported": "File save/export is available only in web version.",
     "errors": {
       "notFound": "Character was not found.",
-      "failed": "Failed to save file."
+      "failed": "Failed to save file.", "unexpected": "Could not download the character. See the browser console for details."
     }
   },
   "characterActions": {
@@ -34,7 +34,7 @@
     "copySuffix": "copy",
     "duplicateError": "Failed to duplicate character."
   },
-  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u00abCancel\u00bb to download a copy manually first.",
+  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u201cCancel\u201d to download a copy manually first.",
   "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync \u2014 try deleting again later.",
   "language": {
     "russian": "Ru",

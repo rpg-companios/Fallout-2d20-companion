@@ -572,10 +572,7 @@ export default function HomeScreen({ navigation }) {
       }
     } catch (error) {
       debugLog('home.characterDownload.failed', { message: error?.message });
-      Alert.alert(
-        tHomeScreen('title'),
-        'Не удалось скачать персонажа. Проверьте консоль для подробностей.'
-      );
+      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.unexpected'));
     }
   };
 
@@ -647,10 +644,7 @@ export default function HomeScreen({ navigation }) {
       );
     } catch (error) {
       debugLog('home.characterUpload.failed', { message: error?.message });
-      Alert.alert(
-        tHomeScreen('title'),
-        'Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл.'
-      );
+      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.errors.unexpected'));
     }
   };
 
