@@ -1,0 +1,4360 @@
+[
+  {
+    "name_en": "Brotherhood of Steel Uniform",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 1
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 20,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Casual Clothing",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 20,
+    "rarity": 1,
+    "special": "Wearing casual clothing allows you to re-roll a single d20 on one STR or AGI based skill test you make each scene, as the clothing is easy to move in.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Harness",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 1,
+    "cost": 5,
+    "rarity": 0,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Military Fatigues",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 0,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 3,
+    "cost": 12,
+    "rarity": 1,
+    "special": "Wearing military fatigues allows you to re-roll a single d20 on one STR or AGI based skill test you make each scene, as the fatigues are easy to move in.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Road Leathers",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 1,
+    "cost": 5,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tough Clothing",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 3,
+    "cost": 20,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vault Jumpsuit",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 0,
+      "energy": 1,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 1,
+    "cost": 20,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Insulated Lining",
+          "Treated Lining",
+          "Resistant Lining",
+          "Protective Lining",
+          "Shielded Lining"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brotherhood of Steel Fatigues",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 4,
+    "cost": 20,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brotherhood Scribe's Armor",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 2,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 4,
+    "cost": 20,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cage Armor",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 33,
+    "cost": 110,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Drifter Outfit",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 10,
+    "cost": 35,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Engineer's Armor",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 15,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Formal Clothing",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 30,
+    "rarity": 2,
+    "special": "Wearing formal clothing allows you to re-roll a single d20 on one CHA-based skill test you make each scene, as the clothing helps you make a good first impression.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hazmat Suit",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 9999
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 5,
+    "cost": 85,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Coat",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 1
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 20,
+    "rarity": 1,
+    "special": "Wearing a heavy coat allows you to re-roll a single d20 on one END-based skill test you make each scene, as it helps protect you from harsh conditions.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hides",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 4,
+    "cost": 13,
+    "rarity": 0,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lab Coat",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 10,
+    "rarity": 1,
+    "special": "Between the utility of the design, and simply feeling smarter while wearing one, a lab coat allows you to re-roll a single d20 on one INT based skill test you make each scene.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spike Armor",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 17,
+    "cost": 65,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Utility Coveralls",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 2,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 12,
+    "rarity": 1,
+    "special": "Utility Coveralls increase the wearer’s maximum carry weight by +5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Army Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 3,
+    "cost": 20,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brotherhood of Steel Hood",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 0,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 12,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brotherhood Scribe's Hat",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 0,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 8,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Casual Hat",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "rarity": 1,
+    "special": "A character wearing a casual hat ignores any difficulty increases caused by extremely bright light.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Formal Hat",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "rarity": 2,
+    "special": "Wearing a formal hat allows you to re-roll a single d20 on one CHA-based skill test you make each scene, as it helps you make a good first impression.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gas Mask",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 3
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 3,
+    "cost": 10,
+    "rarity": 2,
+    "special": "Wearing the gas mask provides +3 Poison damage resistance against any airborne or gaseous poisons and prevents the wearer from being affected by any effects relating to gas or dust. Add +1 to the difficulty of all Speech tests while wearing a gas mask, as it muffles your speech.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hard Hat",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hood",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 1
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 5,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cowl",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 1
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 5,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sack Hood",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 2
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 5,
+    "rarity": 0,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Welder's Visor",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 4,
+    "cost": 20,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Raider Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 7,
+    "cost": 18,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Torso)",
+          "Tempered (Torso)",
+          "Hardened (Torso)",
+          "Buttressed (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Raider Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 3,
+    "cost": 8,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Limbs)",
+          "Tempered (Limbs)",
+          "Hardened (Limbs)",
+          "Buttressed (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Raider Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 3,
+    "cost": 6,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Limbs)",
+          "Tempered (Limbs)",
+          "Hardened (Limbs)",
+          "Buttressed (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Raider Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 12,
+    "cost": 33,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Torso)",
+          "Tempered (Torso)",
+          "Hardened (Torso)",
+          "Buttressed (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Raider Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 7,
+    "cost": 13,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Limbs)",
+          "Tempered (Limbs)",
+          "Hardened (Limbs)",
+          "Buttressed (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Raider Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 7,
+    "cost": 8,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Limbs)",
+          "Tempered (Limbs)",
+          "Hardened (Limbs)",
+          "Buttressed (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Raider Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 17,
+    "cost": 48,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Torso)",
+          "Tempered (Torso)",
+          "Hardened (Torso)",
+          "Buttressed (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Raider Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 10,
+    "cost": 18,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Limbs)",
+          "Tempered (Limbs)",
+          "Hardened (Limbs)",
+          "Buttressed (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Raider Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 10,
+    "cost": 15,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Limbs)",
+          "Tempered (Limbs)",
+          "Hardened (Limbs)",
+          "Buttressed (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Leather Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 5,
+    "cost": 25,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Torso)",
+          "Girded Leather (Torso)",
+          "Treated Leather (Torso)",
+          "Shadowed Leather (Torso)",
+          "Studded Leather (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Leather Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 2,
+    "cost": 10,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Limbs)",
+          "Girded Leather (Limbs)",
+          "Treated Leather (Limbs)",
+          "Shadowed Leather (Limbs)",
+          "Studded Leather (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Leather Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 2,
+    "cost": 8,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Limbs)",
+          "Girded Leather (Limbs)",
+          "Treated Leather (Limbs)",
+          "Shadowed Leather (Limbs)",
+          "Studded Leather (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Leather Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 10,
+    "cost": 50,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Torso)",
+          "Girded Leather (Torso)",
+          "Treated Leather (Torso)",
+          "Shadowed Leather (Torso)",
+          "Studded Leather (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Leather Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 5,
+    "cost": 20,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Limbs)",
+          "Girded Leather (Limbs)",
+          "Treated Leather (Limbs)",
+          "Shadowed Leather (Limbs)",
+          "Studded Leather (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Leather Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 5,
+    "cost": 18,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Limbs)",
+          "Girded Leather (Limbs)",
+          "Treated Leather (Limbs)",
+          "Shadowed Leather (Limbs)",
+          "Studded Leather (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Leather Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 15,
+    "cost": 75,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Torso)",
+          "Girded Leather (Torso)",
+          "Treated Leather (Torso)",
+          "Shadowed Leather (Torso)",
+          "Studded Leather (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Leather Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 7,
+    "cost": 30,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Limbs)",
+          "Girded Leather (Limbs)",
+          "Treated Leather (Limbs)",
+          "Shadowed Leather (Limbs)",
+          "Studded Leather (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Leather Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 7,
+    "cost": 28,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Boiled Leather (Limbs)",
+          "Girded Leather (Limbs)",
+          "Treated Leather (Limbs)",
+          "Shadowed Leather (Limbs)",
+          "Studded Leather (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Metal Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 3,
+    "cost": 15,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Metal Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 6,
+    "cost": 40,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Torso)",
+          "Enameled Metal (Torso)",
+          "Shadowed Metal (Torso)",
+          "Alloyed Metal (Torso)",
+          "Polished Metal (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Metal Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 3,
+    "cost": 15,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Metal Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 3,
+    "cost": 15,
+    "rarity": 1,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Metal Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 8,
+    "cost": 65,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Metal Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 16,
+    "cost": 115,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Torso)",
+          "Enameled Metal (Torso)",
+          "Shadowed Metal (Torso)",
+          "Alloyed Metal (Torso)",
+          "Polished Metal (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Metal Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 8,
+    "cost": 65,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Metal Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 8,
+    "cost": 65,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Metal Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 12,
+    "cost": 115,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Metal Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 23,
+    "cost": 190,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Torso)",
+          "Enameled Metal (Torso)",
+          "Shadowed Metal (Torso)",
+          "Alloyed Metal (Torso)",
+          "Polished Metal (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Metal Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 12,
+    "cost": 115,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Metal Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 12,
+    "cost": 115,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Limbs)",
+          "Enameled Metal (Limbs)",
+          "Shadowed Metal (Limbs)",
+          "Alloyed Metal (Limbs)",
+          "Polished Metal (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 4,
+    "cost": 25,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 8,
+    "cost": 60,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Torso)",
+          "Shadowed (Torso)",
+          "Fiberglass (Torso)",
+          "Polymer (Torso)",
+          "Plated (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 2,
+    "cost": 25,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 2,
+    "cost": 25,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Combat Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 5,
+    "cost": 105,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 12,
+    "cost": 140,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Torso)",
+          "Shadowed (Torso)",
+          "Fiberglass (Torso)",
+          "Polymer (Torso)",
+          "Plated (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Combat Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 5,
+    "cost": 105,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Combat Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 5,
+    "cost": 105,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Combat Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 7,
+    "cost": 185,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Combat Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 16,
+    "cost": 220,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Torso)",
+          "Shadowed (Torso)",
+          "Fiberglass (Torso)",
+          "Polymer (Torso)",
+          "Plated (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Combat Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 7,
+    "cost": 185,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Combat Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 7,
+    "cost": 145,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Limbs)",
+          "Shadowed (Limbs)",
+          "Fiberglass (Limbs)",
+          "Polymer (Limbs)",
+          "Plated (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Synth Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 3,
+    "cost": 33,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Synth Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 7,
+    "cost": 75,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Torso)",
+          "Resin (Torso)",
+          "Microcarbon (Torso)",
+          "Nanofilament (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Synth Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 3,
+    "cost": 30,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Synth Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 3,
+    "cost": 30,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Synth Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 7,
+    "cost": 70,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Synth Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 12,
+    "cost": 125,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Torso)",
+          "Resin (Torso)",
+          "Microcarbon (Torso)",
+          "Nanofilament (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Synth Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 7,
+    "cost": 80,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Synth Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 7,
+    "cost": 70,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Synth Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 4,
+      "energy": 5,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 10,
+    "cost": 110,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Synth Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 5,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 17,
+    "cost": 175,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Torso)",
+          "Resin (Torso)",
+          "Microcarbon (Torso)",
+          "Nanofilament (Torso)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Torso)",
+          "Pocketed (Torso)",
+          "Deep Pocketed (Torso)",
+          "Lead Lined (Torso)",
+          "Ultra-Light Build (Torso)",
+          "Padded",
+          "Asbestos Lining",
+          "Dense",
+          "BioCommMesh",
+          "Pneumatic"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Synth Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 5,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 10,
+    "cost": 130,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Cushioned",
+          "Muffled"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Synth Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 5,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 10,
+    "cost": 110,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Laminated (Limbs)",
+          "Resin (Limbs)",
+          "Microcarbon (Limbs)",
+          "Nanofilament (Limbs)"
+        ]
+      },
+      {
+        "type": "Upgrade",
+        "mods": [
+          "Lighter Build (Limbs)",
+          "Pocketed (Limbs)",
+          "Deep Pocketed (Limbs)",
+          "Lead Lined (Limbs)",
+          "Ultra-Light Build (Limbs)",
+          "Brawling",
+          "Braced",
+          "Stabilized",
+          "Aerodynamic",
+          "Weighted"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vault-Tec Security Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 20,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vault-Tec Security Armor",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 0,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 8,
+    "cost": 16,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Standard Plating",
+    "type_en": "robot-base",
+    "DR": {
+      "physical": 2,
+      "energy": 0
+    },
+    "locations": [
+      "optics",
+      "arm_1",
+      "arm_2",
+      "arm_3",
+      "main_body",
+      "thruster"
+    ],
+    "weight": 0,
+    "cost": 0,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mister Gutsy Plating",
+    "type_en": "robot-base",
+    "DR": {
+      "physical": 2,
+      "energy": 2
+    },
+    "locations": [
+      "optics",
+      "arm_1",
+      "arm_2",
+      "arm_3",
+      "main_body",
+      "thruster"
+    ],
+    "weight": 10,
+    "cost": 0,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Factory Armor",
+    "type_en": "robot",
+    "DR": {
+      "physical": 1,
+      "energy": 1
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": 0,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Factory Storage Armor",
+    "type_en": "robot",
+    "DR": {
+      "physical": 1,
+      "energy": 1
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": -20,
+    "cost": 25,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Primal Plate",
+    "type_en": "robot",
+    "DR": {
+      "physical": 2,
+      "energy": 0
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": 10,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Serrated Plate",
+    "type_en": "robot",
+    "DR": {
+      "physical": 2,
+      "energy": 0
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": 10,
+    "cost": 15,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Noxious Plate",
+    "type_en": "robot",
+    "DR": {
+      "physical": 2,
+      "energy": 0
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": 10,
+    "cost": 15,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Actuated Frame",
+    "type_en": "robot",
+    "DR": {
+      "physical": 1,
+      "energy": 1
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": -10,
+    "cost": 15,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Voltaic Frame",
+    "type_en": "robot",
+    "DR": {
+      "physical": 2,
+      "energy": 2
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": -10,
+    "cost": 20,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hydraulic Frame",
+    "type_en": "robot",
+    "DR": {
+      "physical": 3,
+      "energy": 3
+    },
+    "locations": [
+      "any"
+    ],
+    "weight": -5,
+    "cost": 30,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beer Hat",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "rarity": 2,
+    "special": "Outside of combat, you may fill the beer hat with one beverage of your choice. During combat, you may consume that beverage as a minor action rather than a major action.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Marine Tactical Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 2
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 25,
+    "rarity": 3,
+    "special": "While this mask is worn with a Marine Wetsuit, the wearer can breathe underwater.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spacesuit Helmet",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 1,
+      "energy": 4,
+      "radiation": 2
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 5,
+    "cost": 85,
+    "rarity": 3,
+    "special": "When this helmet is worn with the Spacesuit Costume, you can breathe underwater or in any other place where the atmosphere isn’t breathable).",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Marine Wetsuit",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 1
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 2,
+    "cost": 25,
+    "rarity": 3,
+    "special": "While this suit is worn, the character does not suffer from exposure to cold weather when swimming in cold water.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Underarmor Suit",
+    "type_en": "clothing",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 1,
+    "cost": 30,
+    "rarity": 2,
+    "special": "Wearing an underarmor suit allows you to reroll 1d20 on one STR or PER based test you attempt each scene.",
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Treated Lining (Underarmor Suit)",
+          "Resistant Lining (Underarmor Suit)",
+          "Protective Lining (Underarmor Suit)",
+          "Shielded Lining (Underarmor Suit)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brotherhood of Steel Armored Battlecoat",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 4,
+      "energy": 1,
+      "radiation": 1
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 20,
+    "cost": 400,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brotherhood of Steel Bomber Jacket",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 2,
+      "energy": 5,
+      "radiation": 1
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 4,
+    "cost": 40,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Ballistic Weave",
+          "Ballistic Weave Mk II",
+          "Ballistic Weave Mk III",
+          "Ballistic Weave Mk IV",
+          "Ballistic Weave Mk V"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cleanroom Suit",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 6
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 5,
+    "cost": 65,
+    "rarity": 2,
+    "special": "The protective environment the suit creates allows you to re-roll 1d20 on all END based tests while you’re wearing it. It provides no protection while the hood is down or if the mask has been removed.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hunter's Pelt Outfit",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 15,
+    "cost": 50,
+    "rarity": 2,
+    "shadowed": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hunter's Hood",
+    "type_en": "headgear",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 15,
+    "rarity": 2,
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spacesuit Costume",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 4,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg"
+    ],
+    "weight": 8,
+    "cost": 100,
+    "rarity": 3,
+    "special": "When this costume is worn with the Spacesuit Helmet, you can breathe underwater or in any other place where the atmosphere isn’t breathable.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nuka-Girl Rocketsuit",
+    "type_en": "outfit",
+    "DR": {
+      "physical": 1,
+      "energy": 4,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 8,
+    "cost": 100,
+    "rarity": 3,
+    "special": "Wearing this costume allows you to reroll 1d20 on one CHA-based test you make each scene, as it helps make a good first impression. The sealable “space helmet” built into the costume allows you to breathe underwater or in any other place where the atmosphere isn’t breathable",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Chinese Stealth Armor",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 6
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 5,
+    "cost": 750,
+    "rarity": 6,
+    "special": "While wearing this armor, you may reroll 1d20 on any Sneak test. In addition, you may activate its stealth field by taking the Interact minor action. While active, this field renders you and your equipment almost invisible. Enemies add +2 to the difficulty of all tests to spot you; they may still hear you or notice your presence in other ways. In addition, even if you have been detected, while invisible, your defense is increased by +2. Making an attack disrupts the stealth field, shutting it down until you can reactivate it.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Diving Suit",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 9
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 8,
+    "cost": 350,
+    "rarity": 3,
+    "special": "While wearing this armor, you may breathe underwater (or in other inhospitable atmospheres) and are immune to any damage inflicted by extreme pressure underwater, as well as any exposure to cold caused by cold water.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Recruit Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 6,
+    "cost": 75,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Recruit Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 2,
+    "cost": 30,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Recruit Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 2,
+    "cost": 40,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Recruit Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 50,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 11,
+    "cost": 100,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 1,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 4,
+    "cost": 50,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 4,
+    "cost": 70,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 5,
+    "cost": 75,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Centurion Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 5,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 16,
+    "cost": 200,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Centurion Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 12,
+    "cost": 140,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Centurion Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 6,
+    "cost": 100,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legionary Centurion Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 5,
+      "energy": 4,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 10,
+    "cost": 175,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Legatus Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 5,
+      "energy": 5,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 10,
+    "cost": 175,
+    "rarity": 5,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Legion)",
+          "Shadowed (Legion)",
+          "Treated (Legion)",
+          "Studded (Legion)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Marine Armor Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 2
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 19,
+    "cost": 150,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Welded (Marine)",
+          "Tempered (Marine)",
+          "Hardened (Marine)",
+          "Buttressed (Marine)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recon Armor",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 2
+    },
+    "locations": [
+      "left_arm",
+      "right_arm",
+      "torso",
+      "left_leg",
+      "right_leg",
+      "head"
+    ],
+    "weight": 3,
+    "cost": 360,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scout Armor Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 2
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 7,
+    "cost": 150,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Scout)",
+          "Shadowed (Scout)",
+          "Fiberglass (Scout)",
+          "Polymer (Scout)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scout Armor Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 2
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 3,
+    "cost": 60,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Scout)",
+          "Shadowed (Scout)",
+          "Fiberglass (Scout)",
+          "Polymer (Scout)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scout Armor Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 2
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 3,
+    "cost": 60,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Scout)",
+          "Shadowed (Scout)",
+          "Fiberglass (Scout)",
+          "Polymer (Scout)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scout Armor Mask",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 2,
+      "radiation": 2
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 1,
+    "cost": 50,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Reinforced (Scout)",
+          "Shadowed (Scout)",
+          "Fiberglass (Scout)",
+          "Polymer (Scout)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robot Armor Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 8,
+    "cost": 25,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robot Armor Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 4,
+    "cost": 10,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robot Armor Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 4,
+    "cost": 10,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robot Armor Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 4,
+    "cost": 10,
+    "rarity": 2,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Robot Armor Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 16,
+    "cost": 100,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Robot Armor Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 8,
+    "cost": 60,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Robot Armor Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 8,
+    "cost": 60,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Robot Armor Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 8,
+    "cost": 60,
+    "rarity": 3,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Robot Armor Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 25,
+    "cost": 175,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Robot Armor Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 13,
+    "cost": 110,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Robot Armor Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 13,
+    "cost": 110,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Robot Armor Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 4,
+      "energy": 3,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 13,
+    "cost": 110,
+    "rarity": 4,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Painted Metal (Robot)",
+          "Shadowed Metal (Robot)",
+          "Enameled Metal (Robot)",
+          "Alloyed Metal (Robot)",
+          "Polished Metal (Robot)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wood Armor Chest Piece",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "torso"
+    ],
+    "weight": 4,
+    "cost": 25,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Shrouded (Wood)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wood Armor Arm",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "arms"
+    ],
+    "weight": 2,
+    "cost": 10,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Shrouded (Wood)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wood Armor Leg",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "legs"
+    ],
+    "weight": 2,
+    "cost": 10,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Shrouded (Wood)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Wood Armor Helmet",
+    "type_en": "armor",
+    "DR": {
+      "physical": 1,
+      "energy": 0,
+      "radiation": 0
+    },
+    "locations": [
+      "head"
+    ],
+    "weight": 2,
+    "cost": 10,
+    "rarity": 0,
+    "mods": [
+      {
+        "type": "Material",
+        "mods": [
+          "Shrouded (Wood)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  }
+]

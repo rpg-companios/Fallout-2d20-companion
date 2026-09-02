@@ -1,0 +1,1188 @@
+[
+  {
+    "name_en": "Welded (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Welded (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 6,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tempered (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 6,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tempered (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 12,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hardened (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 9,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hardened (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 18,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Buttressed (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 3,
+    "cost": 12,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Buttressed (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 6,
+    "cost": 24,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boiled Leather (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boiled Leather (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Girded Leather (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Girded Leather (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 20,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Treated Leather (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Treated Leather (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shadowed Leather (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 20,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shadowed Leather (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 40,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Studded Leather (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 25,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Studded Leather (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 50,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Painted Metal (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Painted Metal (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 20,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Enameled Metal (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 20,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Enameled Metal (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 40,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shadowed Metal (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 25,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shadowed Metal (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 50,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Alloyed Metal (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 3,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Alloyed Metal (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 6,
+    "cost": 60,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Polished Metal (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 40,
+    "perkreqs": [
+      "Armorer Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Polished Metal (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 8,
+    "cost": 80,
+    "perkreqs": [
+      "Armorer Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Reinforced (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 15,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Reinforced (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 30,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shadowed (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shadowed (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "shadowed": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fiberglass (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fiberglass (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 60,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Polymer (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 45,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Polymer (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 90,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Laminated (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Laminated (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 1,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Resin (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 10,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Resin (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 20,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Microcarbon (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 15,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Microcarbon (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nanofilament (Limbs)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 3,
+    "cost": 20,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nanofilament (Torso)",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 6,
+    "cost": 40,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lighter Build (Limbs)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": -1,
+    "cost": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lighter Build (Torso)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": -2,
+    "cost": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pocketed (Limbs)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 1,
+    "carryWeight": 10,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pocketed (Torso)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 2,
+    "carryWeight": 10,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Deep Pocketed (Limbs)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 5,
+    "carryWeight": 20,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Deep Pocketed (Torso)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 10,
+    "carryWeight": 20,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lead Lined (Limbs)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 3
+    },
+    "weight": 2,
+    "cost": 5,
+    "perkreqs": [
+      "Armorer Rank 4",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lead Lined (Torso)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 3
+    },
+    "weight": 4,
+    "cost": 10,
+    "perkreqs": [
+      "Armorer Rank 4",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ultra-Light Build (Limbs)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": -3,
+    "cost": 7,
+    "perkreqs": [
+      "Armorer Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ultra-Light Build (Torso)",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": -6,
+    "cost": 14,
+    "perkreqs": [
+      "Armorer Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Padded",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 1,
+    "special": "+2 to all damage resistances against Blast weapons",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Asbestos Lining",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 3,
+    "special": "Ignore Energy Damage from the Persistent damage effect",
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dense",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 4,
+    "cost": 7,
+    "special": "+4 to all damage resistances against Blast weapons",
+    "perkreqs": [
+      "Armorer Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "BioCommMesh",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 9,
+    "special": "Chems last twice as long",
+    "perkreqs": [
+      "Armorer Rank 4",
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pneumatic",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 2,
+    "cost": 9,
+    "special": "Stun damage effects require 2+ Effects to be rolled to affect you",
+    "perkreqs": [
+      "Armorer Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brawling",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 1,
+    "special": "Unarmed attacks inflict +1D6 damage",
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Braced",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 1,
+    "special": "+2 to all damage resistances against Melee attacks",
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stabilized",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 1,
+    "special": "When you aim and make a ranged attack, +1D6 to the attack's damage",
+    "perkreqs": [
+      "Armorer Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Aerodynamic",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 1,
+    "special": "May spend up to 4 AP on bonus damage for melee attacks",
+    "perkreqs": [
+      "Armorer Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Weighted",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 1,
+    "cost": 3,
+    "special": "Melee and Unarmed attacks gain Piercing 1",
+    "perkreqs": [
+      "Armorer Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cushioned",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 1,
+    "special": "+2 to Physical damage resistances against falling damage",
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Muffled",
+    "type_en": "Upgrade",
+    "DR": {
+      "physical": 0,
+      "energy": 0,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 2,
+    "special": "Re-Roll 1d20 on Stealth tests",
+    "perkreqs": [
+      "Armorer Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ballistic Weave",
+    "type_en": "Material",
+    "DR": {
+      "physical": 2,
+      "energy": 2,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 20,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ballistic Weave Mk II",
+    "type_en": "Material",
+    "DR": {
+      "physical": 3,
+      "energy": 3,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ballistic Weave Mk III",
+    "type_en": "Material",
+    "DR": {
+      "physical": 4,
+      "energy": 4,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 40,
+    "perkreqs": [
+      "Armorer Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ballistic Weave Mk IV",
+    "type_en": "Material",
+    "DR": {
+      "physical": 5,
+      "energy": 5,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 50,
+    "perkreqs": [
+      "Armorer Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ballistic Weave Mk V",
+    "type_en": "Material",
+    "DR": {
+      "physical": 6,
+      "energy": 6,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 60,
+    "perkreqs": [
+      "Armorer Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Insulated Lining",
+    "type_en": "Material",
+    "DR": {
+      "physical": 0,
+      "energy": 1,
+      "radiation": 0
+    },
+    "weight": 0,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Treated Lining",
+    "type_en": "Material",
+    "DR": {
+      "physical": 0,
+      "energy": 1,
+      "radiation": 1
+    },
+    "weight": 1,
+    "cost": 20,
+    "perkreqs": [
+      "Armorer Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Resistant Lining",
+    "type_en": "Material",
+    "DR": {
+      "physical": 0,
+      "energy": 2,
+      "radiation": 1
+    },
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Armorer Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Protective Lining",
+    "type_en": "Material",
+    "DR": {
+      "physical": 0,
+      "energy": 2,
+      "radiation": 2
+    },
+    "weight": 1,
+    "cost": 40,
+    "perkreqs": [
+      "Armorer Rank 4",
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shielded Lining",
+    "type_en": "Material",
+    "DR": {
+      "physical": 0,
+      "energy": 3,
+      "radiation": 3
+    },
+    "weight": 1,
+    "cost": 50,
+    "perkreqs": [
+      "Armorer Rank 4",
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  }
+]

@@ -1,0 +1,3340 @@
+[
+  {
+    "name_en": "Hardened Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Hardened",
+    "damage": 1,
+    "cost": 20,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Powerful Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Powerful",
+    "damage": 3,
+    "weight": 1,
+    "cost": 25,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Advanced Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Advanced",
+    "damage": 3,
+    "fire_rate": 1,
+    "weight": 2,
+    "cost": 35,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Calibrated Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Calibrated",
+    "effects": [
+      "Vicious"
+    ],
+    "cost": 25,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Automatic Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Auto",
+    "damage": -1,
+    "fire_rate": 2,
+    "effects": [
+      "Burst"
+    ],
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hair Trigger Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Hair Trigger",
+    "fire_rate": 1,
+    "cost": 25,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".38 Receiver",
+    "area_en": "Receiver",
+    "prefix_en": ".38",
+    "damage_set": 4,
+    "ammunition": ".38",
+    "weight": 3,
+    "cost": 20,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".308 Receiver",
+    "area_en": "Receiver",
+    "prefix_en": ".308",
+    "damage_set": 7,
+    "ammunition": ".308",
+    "weight": 4,
+    "cost": 40,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".45 Receiver",
+    "area_en": "Receiver",
+    "prefix_en": ".45",
+    "damage_set": 4,
+    "fire_rate": 1,
+    "ammunition": ".45",
+    "weight": 2,
+    "cost": 19,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".50 Receiver",
+    "area_en": "Receiver",
+    "prefix_en": ".50",
+    "damage_set": 8,
+    "effects": [
+      "Vicious"
+    ],
+    "ammunition": ".50",
+    "weight": 4,
+    "cost": 30,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Automatic Piston Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Automatic",
+    "fire_rate": 2,
+    "range": -1,
+    "weight": 2,
+    "cost": 75,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Snubnose Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Snub-nosed",
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": -1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bull Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Bull Barrel",
+    "qualities": [
+      "Reliable"
+    ],
+    "cost": 10,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Small Guns)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "range": 1,
+    "weight": 1,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ported Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Ported",
+    "range": 1,
+    "fire_rate": 1,
+    "weight": 1,
+    "cost": 35,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vented Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Vented",
+    "range": 1,
+    "fire_rate": 1,
+    "qualities": [
+      "Reliable"
+    ],
+    "weight": 1,
+    "cost": 36,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sawed-Off Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Sawed-Off",
+    "remove_qualities": [
+      "Two-Handed"
+    ],
+    "qualities": [
+      "Close Quarters"
+    ],
+    "weight": -2,
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shielded Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Shielded",
+    "damage": 1,
+    "cost": 37,
+    "perkreqs": [
+      "Gun Nut Rank 3",
+      "Repair"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Finned Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Finned",
+    "damage": 1,
+    "range": 1,
+    "weight": 2,
+    "cost": 15,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Full Capacitors",
+    "area_en": "Capacitor",
+    "prefix_en": "High Capacity",
+    "effects": [
+      "Vicious"
+    ],
+    "cost": 37,
+    "perkreqs": [
+      "Gun Nut Rank 3",
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Capacitor Boosting Coil",
+    "area_en": "Capacitor",
+    "prefix_en": "Maximum Capacity",
+    "damage": 1,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 2,
+    "cost": 82,
+    "perkreqs": [
+      "Gun Nut Rank 4",
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Large Magazine",
+    "area_en": "Magazine",
+    "prefix_en": "High Capacity",
+    "fire_rate": 1,
+    "qualities": [
+      "Unreliable"
+    ],
+    "weight": 1,
+    "cost": 8,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Quick-Eject Magazine",
+    "area_en": "Magazine",
+    "prefix_en": "Quick",
+    "qualities": [
+      "Reliable"
+    ],
+    "cost": 8,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Large Quick-Eject Magazine",
+    "area_en": "Magazine",
+    "prefix_en": "Quick High Capacity",
+    "fire_rate": 1,
+    "weight": 1,
+    "cost": 23,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Comfort Grip",
+    "area_en": "Grip",
+    "prefix_en": "Comfort",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "cost": 6,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sharpshooter's Grip",
+    "area_en": "Grip",
+    "prefix_en": "Sharpshooter's",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 10,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Full Stock (Small Guns)",
+    "area_en": "Stock",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "qualities": [
+      "Two-Handed"
+    ],
+    "weight": 1,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Marksman's Stock (Small Guns)",
+    "area_en": "Stock",
+    "prefix_en": "Marksman's",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "qualities": [
+      "Two-Handed",
+      "Accurate"
+    ],
+    "weight": 2,
+    "cost": 20,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recoil Compensating Stock (Small Guns)",
+    "area_en": "Stock",
+    "prefix_en": "Recoil Compensated",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "qualities": [
+      "Two-Handed"
+    ],
+    "fire_rate": 1,
+    "weight": 2,
+    "cost": 3,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Reflex Sight",
+    "area_en": "Sight",
+    "prefix_en": "Tactical",
+    "special": "May re-roll hit location die",
+    "cost": 14,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Short Scope",
+    "area_en": "Sight",
+    "prefix_en": "Scoped",
+    "qualities": [
+      "Accurate"
+    ],
+    "weight": 1,
+    "cost": 11,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Scope",
+    "area_en": "Sight",
+    "prefix_en": "Scoped",
+    "qualities": [
+      "Accurate"
+    ],
+    "range": 1,
+    "weight": 1,
+    "cost": 29,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Short Night Vision Scope",
+    "area_en": "Sight",
+    "prefix_en": "Night Vision",
+    "qualities": [
+      "Accurate",
+      "Night Vision"
+    ],
+    "weight": 1,
+    "cost": 38,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Night Vision Scope",
+    "area_en": "Sight",
+    "prefix_en": "Night Vision",
+    "qualities": [
+      "Accurate",
+      "Night Vision"
+    ],
+    "range": 1,
+    "weight": 1,
+    "cost": 50,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recon Scope",
+    "area_en": "Sight",
+    "prefix_en": "Recon",
+    "qualities": [
+      "Accurate",
+      "Recon"
+    ],
+    "weight": 1,
+    "cost": 59,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bayonet",
+    "area_en": "Muzzle",
+    "prefix_en": "Bayoneted",
+    "special": "You may use your bayoneted weapon as a melee weapon, with a range of R and 4D6 Physical damage with Piercing 1.",
+    "weight": 2,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Compensator",
+    "area_en": "Muzzle",
+    "prefix_en": "Compensated",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Muzzle Break",
+    "area_en": "Muzzle",
+    "prefix_en": "Muzzled",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "fire_rate": 1,
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Suppressor",
+    "area_en": "Muzzle",
+    "prefix_en": "Suppressed",
+    "qualities": [
+      "Suppressed"
+    ],
+    "weight": 2,
+    "cost": 45,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Three-Crank Capacitor",
+    "area_en": "Capacitor",
+    "prefix_en": "Three-Crank",
+    "damage": 1,
+    "special": "Laser Musket consumes 3 shots per attack.",
+    "cost": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Four-Crank Capacitor",
+    "area_en": "Capacitor",
+    "prefix_en": "Four-Crank",
+    "damage": 2,
+    "special": "Laser Musket consumes 4 shots per attack.",
+    "weight": 1,
+    "cost": 8,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Five-Crank Capacitor",
+    "area_en": "Capacitor",
+    "prefix_en": "Five-Crank",
+    "damage": 3,
+    "special": "Laser Musket consumes 5 shots per attack.",
+    "weight": 1,
+    "cost": 12,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Six-Crank Capacitor",
+    "area_en": "Capacitor",
+    "prefix_en": "Six-Crank",
+    "damage": 4,
+    "special": "Laser Musket consumes 6 shots per attack.",
+    "weight": 2,
+    "cost": 16,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Deep Dish",
+    "area_en": "Dish",
+    "prefix_en": "Long",
+    "damage": 1,
+    "range": 1,
+    "weight": 2,
+    "cost": 72,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electric Signal Carrier Antennae",
+    "area_en": "Muzzle",
+    "prefix_en": "Electrified",
+    "damage_set": 7,
+    "damage_type": "Energy",
+    "effects": [
+      "Radioactive"
+    ],
+    "cost": 30,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Signal Repeater",
+    "area_en": "Muzzle",
+    "prefix_en": "Automatic",
+    "fire_rate": 2,
+    "effects": [
+      "Burst"
+    ],
+    "remove_qualities": [
+      "Blast"
+    ],
+    "cost": 60,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beta Wave Tuner (Energy Weapons)",
+    "area_en": "Capacitor",
+    "prefix_en": "Incendiary",
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 30,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boosted Capacitor (Energy Weapons)",
+    "area_en": "Capacitor",
+    "prefix_en": "Boosted",
+    "damage": 1,
+    "fire_rate": -1,
+    "cost": 30,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Photon Exciter (Energy Weapons)",
+    "area_en": "Capacitor",
+    "prefix_en": "Excited",
+    "effects": [
+      "Vicious"
+    ],
+    "cost": 30,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Photon Agitator (Energy Weapons)",
+    "area_en": "Capacitor",
+    "prefix_en": "Agitated",
+    "damage": 1,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 1,
+    "cost": 35,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bracketed Short Barrel",
+    "area_en": "Barrel",
+    "cost": 6,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Energy Weapons)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "range": 1,
+    "weight": 2,
+    "cost": 20,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Splitter Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Scattergun",
+    "damage": -1,
+    "effects": [
+      "Spread"
+    ],
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 31,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Automatic Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Automatic",
+    "damage": -1,
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "range": 1,
+    "fire_rate": 1,
+    "weight": 1,
+    "cost": 24,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bracketed Long Barrel",
+    "area_en": "Barrel",
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "range": 1,
+    "weight": 2,
+    "cost": 25,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Improved Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Improved",
+    "damage": 1,
+    "weight": 1,
+    "cost": 26,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sniper Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Sniper",
+    "damage": 2,
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "range": 1,
+    "fire_rate": -1,
+    "weight": 2,
+    "cost": 30,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Flamer Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Thrower",
+    "damage": -2,
+    "fire_rate": 2,
+    "effects": [
+      "Burst",
+      "Spread"
+    ],
+    "range": -1,
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 35,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Standard Stock",
+    "area_en": "Stock",
+    "qualities": [
+      "Two-Handed"
+    ],
+    "remove_qualities": [
+      "Inaccurate",
+      "Close Quarters"
+    ],
+    "weight": 1,
+    "cost": 10,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Full Stock (Energy Weapons)",
+    "area_en": "Stock",
+    "qualities": [
+      "Two-Handed"
+    ],
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Marksman's Stock (Energy Weapons)",
+    "area_en": "Stock",
+    "prefix_en": "Marksman's",
+    "qualities": [
+      "Two-Handed",
+      "Accurate"
+    ],
+    "remove_qualities": [
+      "Close Quarters",
+      "Inaccurate"
+    ],
+    "weight": 2,
+    "cost": 20,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recoil Compensating Stock (Energy Weapons)",
+    "area_en": "Stock",
+    "prefix_en": "Recoil Compensated",
+    "qualities": [
+      "Two-Handed"
+    ],
+    "remove_qualities": [
+      "Inaccurate",
+      "Close Quarters"
+    ],
+    "fire_rate": 1,
+    "weight": 2,
+    "cost": 3,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beam Splitter",
+    "area_en": "Muzzle",
+    "prefix_en": "Scattered",
+    "damage": -1,
+    "effects": [
+      "Spread"
+    ],
+    "fire_rate": -1,
+    "range": -1,
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beam Focuser (Energy Weapons)",
+    "area_en": "Muzzle",
+    "prefix_en": "Focused",
+    "range": 1,
+    "weight": 1,
+    "cost": 20,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gyro Compensating Lens",
+    "area_en": "Muzzle",
+    "prefix_en": "Targeting",
+    "fire_rate": 1,
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 25,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Napalm Fuel (Flamer)",
+    "area_en": "Fuel",
+    "prefix_en": "Napalmer",
+    "damage": 1,
+    "weight": 7,
+    "cost": 59,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Flamer)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 2,
+    "cost": 28,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Large Tank (Flamer)",
+    "area_en": "Tank",
+    "prefix_en": "High Capacity",
+    "fire_rate": 1,
+    "weight": 3,
+    "cost": 28,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Huge Tank (Flamer)",
+    "area_en": "Tank",
+    "prefix_en": "Max Capacity",
+    "fire_rate": 2,
+    "weight": 6,
+    "cost": 38,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Compression Nozzle (Flamer)",
+    "area_en": "Nozzle",
+    "prefix_en": "Compressed",
+    "damage": 1,
+    "cost": 22,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vaporization Nozzle (Flamer)",
+    "area_en": "Nozzle",
+    "prefix_en": "Vaporizing",
+    "damage": 1,
+    "effects": [
+      "Vicious"
+    ],
+    "cost": 47,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Photon Exciter (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Excited",
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 1,
+    "cost": 19,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beta Wave Tuner (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Incendiary",
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 1,
+    "cost": 57,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boosted Capacitor (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Boosted",
+    "damage": 1,
+    "weight": 1,
+    "cost": 94,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Photon Agitator (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Agitated",
+    "damage": 1,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 3,
+    "cost": 132,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Charging Barrels (Gatling Laser)",
+    "area_en": "Barrel",
+    "prefix_en": "Charging",
+    "damage": 4,
+    "fire_rate": -3,
+    "range": 1,
+    "weight": 10,
+    "cost": 357,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Reflex Sight (Gatling Laser)",
+    "area_en": "Sight",
+    "prefix_en": "Tactical",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 169,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beam Focuser (Gatling Laser)",
+    "area_en": "Nozzle",
+    "prefix_en": "Focused",
+    "effects": [
+      "Piercing 1"
+    ],
+    "range": 1,
+    "cost": 22,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Junk Jet)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "range": 1,
+    "weight": 2,
+    "cost": 20,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recoil Compensating Stock (Junk Jet)",
+    "area_en": "Stock",
+    "prefix_en": "Recoil Compensated",
+    "fire_rate": 1,
+    "weight": 2,
+    "cost": 40,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gunner Sight (Junk Jet)",
+    "area_en": "Sight",
+    "prefix_en": "Tactical",
+    "special": "May re-roll hit location die",
+    "weight": 1,
+    "cost": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electrification Module (Junk Jet)",
+    "area_en": "Muzzle",
+    "prefix_en": "Electrified",
+    "effects": [
+      "Vicious"
+    ],
+    "damage_type": "Energy",
+    "weight": 1,
+    "cost": "70",
+    "perkreqs": [
+      "Gun Nut Rank 3",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ignition Module (Junk Jet)",
+    "area_en": "Muzzle",
+    "prefix_en": "Flaming",
+    "effects": [
+      "Persistent"
+    ],
+    "damage_type": "Energy",
+    "weight": 1,
+    "cost": 130,
+    "perkreqs": [
+      "Gun Nut Rank 3",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Accelerated Barrel (Minigun)",
+    "area_en": "Barrel",
+    "prefix_en": "High-Speed",
+    "damage": 1,
+    "fire_rate": 1,
+    "range": -1,
+    "weight": 5,
+    "cost": 45,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tri-Barrel (Minigun)",
+    "area_en": "Barrel",
+    "prefix_en": "High-Powered",
+    "damage": 2,
+    "fire_rate": -2,
+    "weight": 3,
+    "cost": 75,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gunner Sight (Minigun)",
+    "area_en": "Sight",
+    "prefix_en": "Tactical",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 68,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shredder (Minigun)",
+    "area_en": "Muzzle",
+    "prefix_en": "Bayoneted Shredding",
+    "special": "You may use your bayoneted weapon as a melee weapon, with Physical damage equal to your Minigun's fire rate.",
+    "weight": 5,
+    "cost": 5,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Triple Barrel (Missile Launcher)",
+    "area_en": "Barrel",
+    "prefix_en": "Triple Barrel",
+    "fire_rate": 1,
+    "weight": 16,
+    "cost": 143,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Quad Barrel (Missile Launcher)",
+    "area_en": "Barrel",
+    "prefix_en": "Quad Barrel",
+    "fire_rate": 2,
+    "weight": 20,
+    "cost": 218,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scope (Missile Launcher)",
+    "area_en": "Sight",
+    "prefix_en": "Scoped",
+    "qualities": [
+      "Accurate"
+    ],
+    "weight": 6,
+    "cost": 143,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Night Vision Scope (Missile Launcher)",
+    "area_en": "Sight",
+    "prefix_en": "Night-Vision",
+    "qualities": [
+      "Accurate",
+      "Night Vision"
+    ],
+    "weight": 6,
+    "cost": 248,
+    "perkreqs": [
+      "Gun Nut Rank 4",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Targeting Computer (Missile Launcher)",
+    "area_en": "Sight",
+    "prefix_en": "Targeting",
+    "special": "When you Aim at a target with the Missile Launcher, the target does not benefit from being in cover, and the bonus for aiming applies to the next attack on any subsequent turn during the scene.",
+    "weight": 7,
+    "cost": 293,
+    "perkreqs": [
+      "Gun Nut Rank 2",
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bayonet (Missile Launcher)",
+    "area_en": "Muzzle",
+    "prefix_en": "Bayoneted Shredding",
+    "special": "You may use your bayoneted weapon as a melee weapon, with 4D6 Piercing 1 Physical damage.",
+    "weight": 1,
+    "cost": 30,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stabilizer (Missile Launcher)",
+    "area_en": "Muzzle",
+    "prefix_en": "Muzzled",
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 2,
+    "cost": 60,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Serrated Blade (Sword)",
+    "area_en": "Sword",
+    "prefix_en": "Serrated",
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 25,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electrified Blade (Sword)",
+    "area_en": "Sword",
+    "prefix_en": "Electrified",
+    "damage": 1,
+    "damage_type": "Energy",
+    "cost": 50,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electrified Serrated Blade (Sword)",
+    "area_en": "Sword",
+    "prefix_en": "Electrified Serrated",
+    "damage": 1,
+    "damage_type": "Energy",
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 75,
+    "perkreqs": [
+      "Blacksmith Rank 3",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stun Pack (Sword)",
+    "area_en": "Sword",
+    "prefix_en": "Stunning",
+    "damage": 2,
+    "damage_type": "Energy",
+    "effects": [
+      "Stun"
+    ],
+    "cost": 100,
+    "perkreqs": [
+      "Blacksmith Rank 3",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Serrated Blade (Combat Knife)",
+    "area_en": "Combat Knife",
+    "prefix_en": "Serrated",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 12,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stealth Blade (Combat Knife)",
+    "area_en": "Combat Knife",
+    "prefix_en": "Stealth",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "special": "Combat Knife does +1D6 damage on Sneak Attacks.",
+    "cost": 18,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Serrated Blade (Machete)",
+    "area_en": "Machete",
+    "prefix_en": "Serrated",
+    "damage": 2,
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 12,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Curved Blade (Ripper)",
+    "area_en": "Ripper",
+    "prefix_en": "Curved",
+    "damage": 1,
+    "special": "On a successful attack with the Ripper, spend 2AP to disarm opponent, knocking one held weapon away.",
+    "weight": 1,
+    "cost": 15,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Extended Blade (Ripper)",
+    "area_en": "Ripper",
+    "prefix_en": "Extended",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 3,
+    "cost": 25,
+    "perkreqs": [
+      "Blacksmith Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Extra Flame Jets (Shishkebab)",
+    "area_en": "Shishkebab",
+    "prefix_en": "Searing",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 1,
+    "cost": 100,
+    "perkreqs": [
+      "Blacksmith Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Serrated Blade (Switchblade)",
+    "area_en": "Switchblade",
+    "prefix_en": "Serrated",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 10,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Barbed (Baseball Bat)",
+    "area_en": "Baseball Bat",
+    "prefix_en": "Barbed",
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Baseball Bat)",
+    "area_en": "Baseball Bat",
+    "prefix_en": "Spiked",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 1,
+    "cost": 7,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sharp (Baseball Bat)",
+    "area_en": "Baseball Bat",
+    "prefix_en": "Sharp",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 1,
+    "cost": 7,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Chain-Wrapped (Baseball Bat)",
+    "area_en": "Baseball Bat",
+    "prefix_en": "Chain-Wrapped",
+    "damage": 2,
+    "weight": 1,
+    "cost": 10,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bladed (Baseball Bat)",
+    "area_en": "Baseball Bat",
+    "prefix_en": "Bladed",
+    "damage": 2,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 2,
+    "cost": 12,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Board)",
+    "area_en": "Board",
+    "prefix_en": "Spiked",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 1,
+    "cost": 6,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Puncturing (Board)",
+    "area_en": "Board",
+    "prefix_en": "Puncturing",
+    "damage": 2,
+    "weight": 1,
+    "cost": 9,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bladed (Board)",
+    "area_en": "Board",
+    "prefix_en": "Bladed",
+    "damage": 2,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 2,
+    "cost": 10,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Lead Pipe)",
+    "area_en": "Lead Pipe",
+    "prefix_en": "Spiked",
+    "damage": 1,
+    "effects": [
+      "Piercing"
+    ],
+    "weight": 1,
+    "cost": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy (Lead Pipe)",
+    "area_en": "Lead Pipe",
+    "prefix_en": "Heavy",
+    "damage": 2,
+    "weight": 2,
+    "cost": 11,
+    "perkreqs": "Blacksmith Rank 2",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hooked (Pipe Wrench)",
+    "area_en": "Pipe Wrench",
+    "prefix_en": "Hooked",
+    "damage": 1,
+    "special": "On a successful attack with the Pipe Wrench, spend 2AP to disarm opponent, knocking one held weapon away.",
+    "cost": 9,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy (Pipe Wrench)",
+    "area_en": "Pipe Wrench",
+    "prefix_en": "Weighted",
+    "damage": 2,
+    "weight": 7,
+    "cost": 12,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Puncturing (Pipe Wrench)",
+    "area_en": "Pipe Wrench",
+    "prefix_en": "Puncturing",
+    "damage": 2,
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 1,
+    "cost": 13,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Extra Heavy (Pipe Wrench)",
+    "area_en": "Pipe Wrench",
+    "prefix_en": "Heavy",
+    "damage": 3,
+    "weight": 2,
+    "cost": 22,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Barbed (Pool Cue)",
+    "area_en": "Pool Cue",
+    "prefix_en": "Barbed",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sharp (Pool Cue)",
+    "area_en": "Pool Cue",
+    "prefix_en": "Sharp",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Rolling Pin)",
+    "area_en": "Rolling Pin",
+    "prefix_en": "Barbed",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sharp (Rolling Pin)",
+    "area_en": "Rolling Pin",
+    "prefix_en": "Sharp",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electrified (Baton)",
+    "area_en": "Baton",
+    "prefix_en": "Shock",
+    "damage": 2,
+    "damage_type": "Energy",
+    "cost": 15,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stun Pack (Baton)",
+    "area_en": "Baton",
+    "prefix_en": "Stun",
+    "damage": 3,
+    "effects": [
+      "Stun"
+    ],
+    "damage_type": "Energy",
+    "cost": 30,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Puncturing (Sledgehammer)",
+    "area_en": "Sledgehammer",
+    "prefix_en": "Puncturing",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 5,
+    "cost": 18,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy (Sledgehammer)",
+    "area_en": "Sledgehammer",
+    "prefix_en": "Heavy",
+    "damage": 2,
+    "weight": 9,
+    "cost": 30,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heating Coil (Super Sledge)",
+    "area_en": "Super Sledge",
+    "prefix_en": "Heated",
+    "damage": 1,
+    "damage_type": "Energy",
+    "cost": 180,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stun Pack (Super Sledge)",
+    "area_en": "Super Sledge",
+    "prefix_en": "Stunning",
+    "damage": 2,
+    "effects": [
+      "Stun"
+    ],
+    "damage_type": "Energy",
+    "cost": 360,
+    "perkreqs": [
+      "Blacksmith Rank 3",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bladed (Tire Iron)",
+    "area_en": "Tire Iron",
+    "prefix_en": "Bladed",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 1,
+    "cost": 12,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Barbed (Walking Cane)",
+    "area_en": "Walking Cane",
+    "prefix_en": "Barbed",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Walking Cane)",
+    "area_en": "Walking Cane",
+    "prefix_en": "Spiked",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Boxing Glove)",
+    "area_en": "Boxing Glove",
+    "prefix_en": "Spiked",
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Puncturing (Boxing Glove)",
+    "area_en": "Boxing Glove",
+    "prefix_en": "Puncturing",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 4,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lead Lining (Boxing Glove)",
+    "area_en": "Boxing Glove",
+    "prefix_en": "Lead-lined",
+    "damage": 2,
+    "weight": 1,
+    "cost": 7,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Extra Claw (Deathclaw Gauntlet)",
+    "area_en": "Deathclaw Gauntlet",
+    "prefix_en": "Large",
+    "damage": 1,
+    "special": "On a successful attack with the Deathclaw Gauntlet, spend 2AP to disarm opponent, knocking one held weapon away.",
+    "weight": 2,
+    "cost": 22,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sharp (Knuckles)",
+    "area_en": "Knuckles",
+    "prefix_en": "Sharp",
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiked (Knuckles)",
+    "area_en": "Knuckles",
+    "prefix_en": "Spiked",
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Puncturing (Knuckles)",
+    "area_en": "Knuckles",
+    "prefix_en": "Puncturing",
+    "damage": 1,
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 4,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bladed (Knuckles)",
+    "area_en": "Knuckles",
+    "prefix_en": "Bladed",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 5,
+    "perkreqs": [
+      "Blacksmith Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Puncturing (Power Fist)",
+    "area_en": "Power Fist",
+    "prefix_en": "Puncturing",
+    "damage": 2,
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 1,
+    "cost": 45,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heating Coil (Power Fist)",
+    "area_en": "Power Fist",
+    "prefix_en": "Heated",
+    "damage": 2,
+    "damage_type": "Energy",
+    "cost": 100,
+    "perkreqs": [
+      "Blacksmith Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Capacitor Mk III",
+    "area_en": "Capacitor",
+    "prefix_en": "Mk III",
+    "damage": 1,
+    "special": "Assaultron Head consumes 3 shots of ammunition each time it fires.",
+    "cost": 4,
+    "perkreqs": [
+      "Robotics Expert"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Capacitor Mk IV",
+    "area_en": "Capacitor",
+    "prefix_en": "Mk IV",
+    "damage": 2,
+    "special": "Assaultron Head consumes 4 shots of ammunition each time it fires.",
+    "cost": 8,
+    "weight": 1,
+    "perkreqs": [
+      "Robotics Expert",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Capacitor Mk V",
+    "area_en": "Capacitor",
+    "prefix_en": "Mk V",
+    "damage": 3,
+    "special": "Assaultron Head consumes 5 shots of ammunition each time it fires.",
+    "cost": 12,
+    "weight": 1,
+    "perkreqs": [
+      "Robotics Expert",
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Capacitor Mk VI",
+    "area_en": "Capacitor",
+    "prefix_en": "Mk VI",
+    "damage": 4,
+    "special": "Assaultron Head consumes 6 shots of ammunition each time it fires.",
+    "cost": 16,
+    "weight": 2,
+    "perkreqs": [
+      "Robotics Expert",
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Barrel (.50 Cal)",
+    "area_en": "Barrel",
+    "effects": [
+      "Vicious"
+    ],
+    "damage": 1,
+    "weight": 3,
+    "cost": 35,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Barrel (Auto Grenade Launcher)",
+    "area_en": "Barrel",
+    "effects": [
+      "Vicious"
+    ],
+    "damage": 1,
+    "weight": 3,
+    "cost": 135,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Auto Grenade Launcher)",
+    "area_en": "Barrel",
+    "range": 1,
+    "weight": 2,
+    "cost": 45,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "25mm Grenade Receiver (Auto Grenade Launcher)",
+    "area_en": "Receiver",
+    "damage_set": 4,
+    "fire_rate": 2,
+    "ammunition": "25mm Grenade",
+    "weight": -3,
+    "cost": 135,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Speedy Receiver (Gatling Gun)",
+    "area_en": "Receiver",
+    "fire_rate": 2,
+    "weight": 1,
+    "cost": 35,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Gatling Gun)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "range": 1,
+    "weight": 2,
+    "cost": 158,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Comfort Grip (Gatling Gun)",
+    "area_en": "Grip",
+    "prefix_en": "Comfort Grip",
+    "remove_qualities": [
+      "Recoil 6"
+    ],
+    "weight": 3,
+    "cost": 90,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Extra-Large Magazine (Gatling Gun)",
+    "area_en": "Magazine",
+    "fire_rate": 1,
+    "qualities": [
+      "Unreliable"
+    ],
+    "weight": 2,
+    "cost": 28,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Front Sight Ring (Gatling Gun)",
+    "area_en": "Sight",
+    "prefix_en": "Sighted",
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 2,
+    "cost": 158,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Large Bayonet (Gatling Gun)",
+    "area_en": "Muzzle",
+    "prefix_en": "Bayoneted",
+    "weight": 5,
+    "cost": 18,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "special": "The Large Bayonet can be used as a melee weapon. When used as a melee weapon, the Large Bayonet deals 5D6 Piercing 1 damage and has a reach of R.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ported Barrel (Gatling Plasma)",
+    "area_en": "Barrel",
+    "prefix_en": "Ported",
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 6,
+    "cost": 81,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Comfort Grip (Gatling Plasma)",
+    "area_en": "Grip",
+    "prefix_en": "Comfort Grip",
+    "remove_qualities": [
+      "Recoil 6"
+    ],
+    "weight": 3,
+    "cost": 90,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Reflex Sight (Gatling Plasma)",
+    "area_en": "Sight",
+    "prefix_en": "Sighted",
+    "weight": 2,
+    "cost": 50,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "special": "May re-roll hit location die",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beam Splitter (Gatling Plasma)",
+    "area_en": "Nozzle",
+    "prefix_en": "Scattered",
+    "effects": [
+      "Spread"
+    ],
+    "weight": 3,
+    "cost": 20,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Beam Focuser (Gatling Plasma)",
+    "area_en": "Nozzle",
+    "prefix_en": "Focused",
+    "range": 1,
+    "weight": 4,
+    "cost": 41,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tri-Barrel (Gauss Minigun)",
+    "area_en": "Barrel",
+    "prefix_en": "Triple Barrel",
+    "fire_rate": 1,
+    "weight": 4,
+    "cost": 91,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Penta-Barrel (Gauss Minigun)",
+    "area_en": "Barrel",
+    "prefix_en": "Penta Barrel",
+    "damage": -1,
+    "range": -1,
+    "fire_rate": 2,
+    "weight": 12,
+    "cost": 182,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tesla Coil Capacitor (Gauss Minigun)",
+    "area_en": "Tesla Coil",
+    "prefix_en": "Tesla Capacitor",
+    "damage_type": "Energy",
+    "weight": 8,
+    "cost": 91,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tesla Coil Dynamo (Gauss Minigun)",
+    "area_en": "Tesla Coil",
+    "prefix_en": "Tesla Dynamo",
+    "damage_type": "Energy",
+    "fire_rate": 1,
+    "weight": 12,
+    "cost": 136,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gunner Sight (Gauss Minigun)",
+    "area_en": "Sight",
+    "prefix_en": "Tactical",
+    "weight": 1,
+    "cost": 5,
+    "special": "May re-roll hit location die",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Calibrated Capacitor (Plasma Caster)",
+    "area_en": "Capacitor",
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 3,
+    "cost": 140,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pulse Capacitor (Plasma Caster)",
+    "area_en": "Capacitor",
+    "prefix_en": "Pulse",
+    "effects": [
+      "Surge"
+    ],
+    "weight": 3,
+    "cost": 70,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "High Speed Electrode (Plasma Caster)",
+    "area_en": "Capacitor",
+    "prefix_en": "Rapid",
+    "fire_rate": 1,
+    "weight": 3,
+    "cost": 105,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Plasma Caster)",
+    "area_en": "Barrel",
+    "range": 1,
+    "weight": 5,
+    "cost": 128,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Compound Frame (Bow)",
+    "area_en": "Frame",
+    "prefix_en": "Compound",
+    "damage": 1,
+    "fire_rate": -1,
+    "remove_qualities": [
+      "Recoil 6"
+    ],
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Iron Sights (Bow)",
+    "area_en": "Sight",
+    "range": 1,
+    "weight": 1,
+    "cost": 10,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Glow Sights (Bow)",
+    "area_en": "Sight",
+    "prefix_en": "Glow-Sighted",
+    "range": 1,
+    "qualities": [
+      "Accurate"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Iron Sights (Crossbow)",
+    "area_en": "Sight",
+    "range": 1,
+    "weight": 1,
+    "cost": 10,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Glow Sights (Crossbow)",
+    "area_en": "Sight",
+    "prefix_en": "Glow-Sighted",
+    "range": 1,
+    "qualities": [
+      "Accurate"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Frame (Crossbow)",
+    "area_en": "Frame",
+    "prefix_en": "Heavy",
+    "damage": 1,
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Repeating Frame (Crossbow)",
+    "area_en": "Frame",
+    "prefix_en": "Repeating",
+    "fire_rate": 1,
+    "remove_qualities": [
+      "Slow Load"
+    ],
+    "weight": 2,
+    "cost": 75,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Multiple Launch Frame (Crossbow)",
+    "area_en": "Frame",
+    "prefix_en": "Peppered",
+    "damage": -1,
+    "qualities": [
+      "Ammo-Hungry 3"
+    ],
+    "effects": [
+      "Spread"
+    ],
+    "weight": 4,
+    "cost": 60,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electrified Blade (Assaultron Blade)",
+    "area_en": "Assaultron Blade",
+    "prefix_en": "Electrified",
+    "damage": 1,
+    "damage_type": "Energy",
+    "cost": 50,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Electrified (Auto Axe)",
+    "area_en": "Auto Axe",
+    "prefix_en": "Electrified",
+    "damage": 1,
+    "damage_type": "Energy",
+    "cost": 50,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Burning (Auto Axe)",
+    "area_en": "Auto Axe",
+    "prefix_en": "Burning",
+    "damage_type": "Energy",
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 50,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Poisoned (Auto Axe)",
+    "area_en": "Auto Axe",
+    "prefix_en": "Toxic",
+    "effects": [
+      "Persistent"
+    ],
+    "cost": 50,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Turbo (Auto Axe)",
+    "area_en": "Auto Axe",
+    "prefix_en": "Turbo",
+    "weight": 2,
+    "cost": 50,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Science! Rank 1"
+    ],
+    "special": "Each AP spent for extra damage adds +2D6 instead of +1D6",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dual Bar (Chainsaw)",
+    "area_en": "Chainsaw",
+    "prefix_en": "Dual",
+    "damage": 2,
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Blacksmith Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bow Bar (Chainsaw)",
+    "area_en": "Chainsaw",
+    "prefix_en": "Bow Bar",
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 2,
+    "cost": 45,
+    "perkreqs": [
+      "Blacksmith Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Bow Bar (Chainsaw)",
+    "area_en": "Chainsaw",
+    "prefix_en": "Long Bow Bar",
+    "effects": [
+      "Piercing 1"
+    ],
+    "weight": 3,
+    "cost": 60,
+    "perkreqs": [
+      "Blacksmith Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Flamer (Chainsaw)",
+    "area_en": "Chainsaw",
+    "prefix_en": "Flamer",
+    "damage_type": "Energy",
+    "damage": 1,
+    "weight": 1,
+    "cost": 30,
+    "perkreqs": [
+      "Blacksmith Rank 3",
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Armor Piercing Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Armor Piercing",
+    "effects": [
+      "Piercing 1"
+    ],
+    "cost": 3,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Armor Piercing Automatic Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "AP Auto",
+    "damage": -1,
+    "fire_rate": 2,
+    "effects": [
+      "Piercing 1"
+    ],
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 40,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hardened Automatic Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Hardened Auto",
+    "fire_rate": 2,
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 2,
+    "cost": 58,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rapid Automatic Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Rapid",
+    "damage": -1,
+    "fire_rate": 3,
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 2,
+    "cost": 63,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Calibrated Powerful Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Calibrated Powerful",
+    "damage": 2,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 3,
+    "cost": 68,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Powerful Automatic Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Powerful Auto",
+    "fire_rate": 2,
+    "damage": 1,
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 4,
+    "cost": 88,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hardened Piercing Auto Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "Hardened AP Auto",
+    "fire_rate": 2,
+    "effects": [
+      "Piercing 1"
+    ],
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 3,
+    "cost": 78,
+    "perkreqs": [
+      "Gun Nut Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "9mm Receiver",
+    "area_en": "Receiver",
+    "prefix_en": "9mm",
+    "damage_set": 3,
+    "ammunition": "9mm",
+    "fire_rate": 1,
+    "weight": -1,
+    "cost": -10,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".357 Receiver",
+    "area_en": "Receiver",
+    "prefix_en": ".357",
+    "damage_set": 5,
+    "effects": [
+      "Vicious"
+    ],
+    "ammunition": ".357 Magnum",
+    "weight": 1,
+    "cost": 35,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gamma Wave Emitter",
+    "area_en": "Capacitor",
+    "prefix_en": "Fiery",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 1,
+    "cost": 14,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Maximized Capacitor",
+    "area_en": "Capacitor",
+    "prefix_en": "Maximized",
+    "damage": 2,
+    "weight": 1,
+    "cost": 17,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boosted Photon Agitator",
+    "area_en": "Capacitor",
+    "prefix_en": "Boosted Agitated",
+    "damage": 2,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 1,
+    "cost": 20,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boosted Gamma Wave Emitter",
+    "area_en": "Capacitor",
+    "prefix_en": "Boosted Fiery",
+    "damage": 2,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 1,
+    "cost": 23,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Overcharged Capacitor",
+    "area_en": "Capacitor",
+    "prefix_en": "Overcharged",
+    "damage": 3,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 1,
+    "cost": 42,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Improved Long Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Improved Long",
+    "damage": 1,
+    "range": 1,
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Improved Automatic Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Improved Automatic",
+    "effects": [
+      "Burst"
+    ],
+    "qualities": [
+      "Inaccurate"
+    ],
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "fire_rate": 1,
+    "range": 1,
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Improved Sniper Barrel",
+    "area_en": "Barrel",
+    "prefix_en": "Improved Charging",
+    "damage": 3,
+    "range": 1,
+    "fire_rate": -1,
+    "remove_qualities": [
+      "Close Quarters"
+    ],
+    "weight": 1,
+    "cost": 21,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Improved Splitter",
+    "area_en": "Barrel",
+    "prefix_en": "Improved Scattergun",
+    "effects": [
+      "Spread"
+    ],
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 25,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Amplified Beam Splitter",
+    "area_en": "Muzzle",
+    "prefix_en": "Improved Scattered",
+    "fire_rate": -1,
+    "range": -1,
+    "effects": [
+      "Spread"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fine-Tuned Beam Splitter",
+    "area_en": "Muzzle",
+    "prefix_en": "Improved Focused",
+    "range": 1,
+    "qualities": [
+      "Accurate"
+    ],
+    "weight": 1,
+    "cost": 18,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Quantum Gyro Compensating Lens",
+    "area_en": "Muzzle",
+    "prefix_en": "Improved Targeting",
+    "fire_rate": 2,
+    "remove_qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 21,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gamma Wave Emitter (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Fiery",
+    "damage": 1,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 3,
+    "cost": 169,
+    "perkreqs": [
+      "Science! Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Maximized Capacitor (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Maximized",
+    "damage": 2,
+    "weight": 3,
+    "cost": 207,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boosted Photon Agitator (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Boosted Agitated",
+    "damage": 2,
+    "effects": [
+      "Vicious"
+    ],
+    "weight": 5,
+    "cost": 244,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boosted Gamma Wave Emitter (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Boosted Fiery",
+    "damage": 2,
+    "effects": [
+      "Persistent"
+    ],
+    "weight": 5,
+    "cost": 282,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Overcharged Capacitor (Gatling Laser)",
+    "area_en": "Capacitor",
+    "prefix_en": "Overcharged",
+    "damage": 3,
+    "weight": 5,
+    "cost": 319,
+    "perkreqs": [
+      "Science! Rank 4"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (M79 Grenade Launcher)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "range": 1,
+    "weight": 2,
+    "cost": 40,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Caustic",
+    "area_en": "Concentrate",
+    "prefix_en": "Caustic",
+    "damage": 1,
+    "weight": 2,
+    "cost": 30,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Large Ampoule",
+    "area_en": "Container",
+    "prefix_en": "High Capacity",
+    "fire_rate": 1,
+    "weight": 2,
+    "cost": 22,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Large Vial",
+    "area_en": "Container",
+    "prefix_en": "Maximum Capacity",
+    "fire_rate": 3,
+    "weight": 4,
+    "cost": 40,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fusion Magazine",
+    "area_en": "Magazine",
+    "prefix_en": "Converted",
+    "damage_set": 3,
+    "fire_rate": -1,
+    "ammunition": "Fusion Cell",
+    "cost": 21,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Long Barrel (Broadsider)",
+    "area_en": "Barrel",
+    "prefix_en": "Long",
+    "range": 1,
+    "weight": 2,
+    "cost": 40,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Light Barrel (Broadsider)",
+    "area_en": "Barrel",
+    "prefix_en": "Fluted",
+    "damage": 2,
+    "remove_qualities": [
+      "Blast"
+    ],
+    "weight": 2,
+    "cost": 40,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Multi Shot Canister (Broadsider)",
+    "area_en": "Canister",
+    "prefix_en": "Repeating",
+    "fire_rate": 1,
+    "qualities": [
+      "Inaccurate"
+    ],
+    "weight": 1,
+    "cost": 45,
+    "perkreqs": [
+      "Gun Nut Rank 3"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "M79 Launcher (Broadsider)",
+    "area_en": "Canister",
+    "prefix_en": "Converted",
+    "range": 1,
+    "ammunition": "40mm Grenade",
+    "cost": 3,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Crystallizing Barrel (Cryolator)",
+    "area_en": "Barrel",
+    "prefix_en": "Crystallized",
+    "damage": 2,
+    "range": 1,
+    "fire_rate": -1,
+    "remove_effects": [
+      "Stun"
+    ],
+    "remove_qualities": [
+      "Unreliable"
+    ],
+    "weight": 5,
+    "cost": 40,
+    "perkreqs": [
+      "Science! Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fusion Magazine (Cryolator)",
+    "area_en": "Magazine",
+    "prefix_en": "Converted",
+    "damage_set": 2,
+    "fire_rate": -1,
+    "ammunition": "Fusion Cell",
+    "cost": 21,
+    "perkreqs": [
+      "Science! Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recoil Compensating Stock (Cryolator)",
+    "area_en": "Stock",
+    "prefix_en": "Recoil Compensating",
+    "fire_rate": 1,
+    "weight": 2,
+    "cost": 45,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Reflex Sight (Cryolator)",
+    "area_en": "Sight",
+    "prefix_en": "Reflex",
+    "cost": 17,
+    "special": "May re-roll hit location die",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Barbed Harpoon (Harpoon Gun)",
+    "area_en": "Magazine",
+    "prefix_en": "Barbed",
+    "effects": [
+      "Vicious",
+      "Persistent"
+    ],
+    "cost": 21,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Flechette Darts (Harpoon Gun)",
+    "area_en": "Magazine",
+    "prefix_en": "Tiny",
+    "effects": [
+      "Spread"
+    ],
+    "range": -1,
+    "cost": 15,
+    "perkreqs": [
+      "Gun Nut Rank 2"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Recoil Compensating Stock (Harpoon Gun)",
+    "area_en": "Stock",
+    "prefix_en": "Recoil Compensating",
+    "fire_rate": 1,
+    "weight": 15,
+    "cost": 45,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gunner Sight (Harpoon Gun)",
+    "area_en": "Sight",
+    "prefix_en": "Tactical",
+    "cost": 17,
+    "special": "May re-roll hit location die",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Short Scope (Harpoon Gun)",
+    "area_en": "Sight",
+    "prefix_en": "Scoped",
+    "qualities": [
+      "Accurate"
+    ],
+    "weight": 1,
+    "cost": 28,
+    "perkreqs": [
+      "Gun Nut Rank 1"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shock Mod (Claw)",
+    "area_en": "Claw",
+    "prefix_en": "Shock",
+    "damage_type": "Energy",
+    "damage": 2,
+    "cost": 15,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Robotics Expert"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stun Mod (Claw)",
+    "area_en": "Claw",
+    "prefix_en": "Stun",
+    "damage_type": "Energy",
+    "effects": [
+      "Stun"
+    ],
+    "damage": 3,
+    "cost": 30,
+    "perkreqs": [
+      "Blacksmith Rank 2",
+      "Robotics Expert"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  }
+]

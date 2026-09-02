@@ -1,0 +1,4646 @@
+[
+  {
+    "name_en": ".44 Pistol",
+    "ammunition": ".44 Magnum",
+    "weapon_type_en": "Small Guns",
+    "damage": 6,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters"
+    ],
+    "weight": 4,
+    "cost": 99,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Snubnose Barrel",
+          "Bull Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Comfort Grip"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Short Scope",
+          "Reflex Sight",
+          "Recon Scope"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "10mm Pistol",
+    "ammunition": "10mm",
+    "weapon_type_en": "Small Guns",
+    "damage": 4,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Reliable"
+    ],
+    "weight": 4,
+    "cost": 50,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Automatic Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          "Armor Piercing Receiver",
+          "Armor Piercing Automatic Receiver",
+          "Hardened Automatic Receiver",
+          "Rapid Automatic Receiver",
+          "Calibrated Powerful Receiver",
+          "Powerful Automatic Receiver",
+          "Hardened Piercing Auto Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Comfort Grip",
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Compensator",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Flare Gun",
+    "ammunition": "Flare",
+    "weapon_type_en": "Small Guns",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Reliable"
+    ],
+    "weight": 2,
+    "cost": 50,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Assault Rifle",
+    "ammunition": "5.56mm Rifle",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 13,
+    "cost": 144,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Automatic Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          "Armor Piercing Receiver",
+          "Armor Piercing Automatic Receiver",
+          "Hardened Automatic Receiver",
+          "Rapid Automatic Receiver",
+          "Calibrated Powerful Receiver",
+          "Powerful Automatic Receiver",
+          "Hardened Piercing Auto Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Vented Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Compensator",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Rifle",
+    "ammunition": ".45",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 11,
+    "cost": 117,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Automatic Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          ".38 Receiver",
+          ".308 Receiver",
+          "Armor Piercing Receiver",
+          "Armor Piercing Automatic Receiver",
+          "Hardened Automatic Receiver",
+          "Rapid Automatic Receiver",
+          "Calibrated Powerful Receiver",
+          "Powerful Automatic Receiver",
+          "Hardened Piercing Auto Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Vented Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Compensator",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gauss Rifle",
+    "ammunition": "2mm EC",
+    "weapon_type_en": "Small Guns",
+    "damage": 10,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 3,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 16,
+    "cost": 228,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Shielded Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Capacitors",
+        "mods": [
+          "Full Capacitors",
+          "Capacitor Boosting Coil"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hunting Rifle",
+    "ammunition": ".308",
+    "weapon_type_en": "Small Guns",
+    "damage": 6,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 10,
+    "cost": 55,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hair Trigger Receiver",
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          ".38 Receiver",
+          ".50 Receiver",
+          "Armor Piercing Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Vented Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Submachine Gun",
+    "ammunition": ".45",
+    "weapon_type_en": "Small Guns",
+    "damage": 3,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 3,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 12,
+    "cost": 109,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hardened Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Armor Piercing Receiver",
+          "9mm Receiver"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Shotgun",
+    "ammunition": "Shotgun Shells",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 11,
+    "cost": 87,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Automatic Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          "Hardened Automatic Receiver",
+          "Rapid Automatic Receiver",
+          "Calibrated Powerful Receiver",
+          "Powerful Automatic Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Double-Barrel Shotgun",
+    "ammunition": "Shotgun Shells",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Spread",
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 9,
+    "cost": 30,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hardened Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Sawed-Off Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Muzzle Brake"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pipe Bolt-Action",
+    "ammunition": ".308",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 1,
+    "qualities_en": [
+      "Unreliable"
+    ],
+    "weight": 3,
+    "cost": 30,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          ".38 Receiver",
+          ".50 Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Finned Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pipe Gun",
+    "ammunition": ".38",
+    "weapon_type_en": "Small Guns",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Unreliable"
+    ],
+    "weight": 2,
+    "cost": 30,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Automatic Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          ".45 Receiver",
+          "Armor Piercing Receiver",
+          "Armor Piercing Automatic Receiver",
+          "Hardened Automatic Receiver",
+          "Rapid Automatic Receiver",
+          "Calibrated Powerful Receiver",
+          "Powerful Automatic Receiver",
+          "Hardened Piercing Auto Receiver",
+          "9mm Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Finned Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pipe Revolver",
+    "ammunition": ".45",
+    "weapon_type_en": "Small Guns",
+    "damage": 4,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Unreliable"
+    ],
+    "weight": 4,
+    "cost": 25,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          ".38 Receiver",
+          ".308 Receiver",
+          "Calibrated Powerful Receiver",
+          ".357 Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Finned Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Railway Rifle",
+    "ammunition": "Railway Spike",
+    "weapon_type_en": "Small Guns",
+    "damage": 10,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Debilitating",
+      "Two-Handed",
+      "Unreliable"
+    ],
+    "weight": 14,
+    "cost": 290,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Automatic Piston Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Syringer",
+    "ammunition": "Syringer Ammo",
+    "weapon_type_en": "Small Guns",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 6,
+    "cost": 132,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Institute Laser",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 3,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 3,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Inaccurate"
+    ],
+    "weight": 4,
+    "cost": 50,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Photon Exciter (Energy Weapons)",
+          "Beta Wave Tuner (Energy Weapons)",
+          "Boosted Capacitor (Energy Weapons)",
+          "Photon Agitator (Energy Weapons)",
+          "Gamma Wave Emitter",
+          "Maximized Capacitor",
+          "Boosted Photon Agitator",
+          "Boosted Gamma Wave Emitter",
+          "Overcharged Capacitor"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Energy Weapons)",
+          "Automatic Barrel",
+          "Improved Barrel",
+          "Improved Long Barrel",
+          "Improved Automatic Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Standard Stock"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Beam Splitter",
+          "Beam Focuser (Energy Weapons)",
+          "Gyro Compensating Lens",
+          "Amplified Beam Splitter",
+          "Fine-Tuned Beam Splitter",
+          "Quantum Gyro Compensating Lens"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Laser Musket",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 13,
+    "cost": 57,
+    "rarity": 1,
+    "special": "Firing a laser musket consumes two shots of ammunition each time it is fired. Each capacitor mod for the laser musket increases both damage and number of shots consumed. You may reduce the number of shots consumed, reducing the damage by -1D6 for each shot consumed fewer than normal (to a minimum of 4D6 damage and 1 shot consumed).",
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Three-Crank Capacitor",
+          "Four-Crank Capacitor",
+          "Five-Crank Capacitor",
+          "Six-Crank Capacitor"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Energy Weapons)",
+          "Bracketed Short Barrel",
+          "Bracketed Long Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Energy Weapons)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Beam Splitter",
+          "Beam Focuser (Energy Weapons)",
+          "Gyro Compensating Lens"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Laser Gun",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters"
+    ],
+    "weight": 4,
+    "cost": 69,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Photon Exciter (Energy Weapons)",
+          "Beta Wave Tuner (Energy Weapons)",
+          "Boosted Capacitor (Energy Weapons)",
+          "Photon Agitator (Energy Weapons)",
+          "Gamma Wave Emitter",
+          "Maximized Capacitor",
+          "Boosted Photon Agitator",
+          "Boosted Gamma Wave Emitter",
+          "Overcharged Capacitor"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Energy Weapons)",
+          "Automatic Barrel",
+          "Sniper Barrel",
+          "Improved Barrel",
+          "Improved Long Barrel",
+          "Improved Automatic Barrel",
+          "Improved Sniper Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Standard Stock",
+          "Marksman's Stock (Energy Weapons)",
+          "Recoil Compensating Stock (Energy Weapons)"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Beam Splitter",
+          "Beam Focuser (Energy Weapons)",
+          "Gyro Compensating Lens",
+          "Amplified Beam Splitter",
+          "Fine-Tuned Beam Splitter",
+          "Quantum Gyro Compensating Lens"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Plasma Gun",
+    "ammunition": "Plasma Cartridge",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 6,
+    "effects_en": [],
+    "damage_type_en": "Physical/Energy",
+    "fire_rate": 1,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters"
+    ],
+    "weight": 4,
+    "cost": 123,
+    "rarity": 3,
+    "special": "Plasma guns inflict both Physical and Energy damage. Roll damage as normal, and then reduce the total by whichever of the target’s damage resistances is lower out of Physical or Energy. Any Persistent damage effects (applied by weapon mods) inflict Energy damage.",
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Photon Exciter (Energy Weapons)",
+          "Beta Wave Tuner (Energy Weapons)",
+          "Boosted Capacitor (Energy Weapons)",
+          "Photon Agitator (Energy Weapons)",
+          "Gamma Wave Emitter",
+          "Maximized Capacitor",
+          "Boosted Photon Agitator",
+          "Boosted Gamma Wave Emitter",
+          "Overcharged Capacitor"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Splitter Barrel",
+          "Automatic Barrel",
+          "Sniper Barrel",
+          "Flamer Barrel",
+          "Improved Barrel",
+          "Improved Long Barrel",
+          "Improved Automatic Barrel",
+          "Improved Sniper Barrel",
+          "Improved Splitter"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Standard Stock",
+          "Marksman's Stock (Energy Weapons)",
+          "Recoil Compensating Stock (Energy Weapons)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gamma Gun",
+    "ammunition": "Gamma Rounds",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 3,
+    "effects_en": [
+      "Piercing 1",
+      "Stun"
+    ],
+    "damage_type_en": "Radiation",
+    "fire_rate": 1,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Inaccurate"
+    ],
+    "weight": 3,
+    "cost": 156,
+    "rarity": 5,
+    "mods": [
+      {
+        "area": "Dish",
+        "mods": [
+          "Deep Dish"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Electric Signal Carrier Antennae",
+          "Signal Repeater"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fat Man",
+    "ammunition": "Mini-Nuke",
+    "weapon_type_en": "Big Guns",
+    "damage": 21,
+    "effects_en": [
+      "Breaking",
+      "Radioactive",
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 31,
+    "cost": 512,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Flamer",
+    "ammunition": "Flamer Fuel",
+    "weapon_type_en": "Big Guns",
+    "damage": 3,
+    "effects_en": [
+      "Burst",
+      "Persistent",
+      "Spread"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 4,
+    "range": 1,
+    "qualities_en": [
+      "Debilitating",
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 16,
+    "cost": 137,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Fuel",
+        "mods": [
+          "Napalm Fuel (Flamer)"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Flamer)"
+        ]
+      },
+      {
+        "area": "Tank",
+        "mods": [
+          "Large Tank (Flamer)",
+          "Huge Tank (Flamer)"
+        ]
+      },
+      {
+        "area": "Nozzle",
+        "mods": [
+          "Compression Nozzle (Flamer)",
+          "Vaporization (Flamer)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gatling Laser",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Big Guns",
+    "damage": 3,
+    "effects_en": [
+      "Burst",
+      "Piercing 1"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 6,
+    "range": 2,
+    "qualities_en": [
+      "Gatling",
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 19,
+    "cost": 804,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Photon Exciter (Gatling Laser)",
+          "Beta Wave Tuner (Gatling Laser)",
+          "Boosted Capacitor (Gatling Laser)",
+          "Photon Agitator (Gatling Laser)",
+          "Gamma Wave Emitter (Gatling Laser)",
+          "Maximized Capacitor (Gatling Laser)",
+          "Boosted Photon Agitator (Gatling Laser)",
+          "Boosted Gamma Wave Emitter (Gatling Laser)",
+          "Overcharged Capacitor (Gatling Laser)"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Charging Barrels (Gatling Laser)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Relex Sight (Gatling Laser)"
+        ]
+      },
+      {
+        "area": "Nozzle",
+        "mods": [
+          "Beam Focuser (Gatling Laser)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Incinerator",
+    "ammunition": "Flamer Fuel",
+    "weapon_type_en": "Big Guns",
+    "damage": 5,
+    "effects_en": [
+      "Burst",
+      "Persistent",
+      "Spread"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 3,
+    "range": 2,
+    "qualities_en": [
+      "Debilitating",
+      "Two-Handed"
+    ],
+    "weight": 20,
+    "cost": 350,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Junk Jet",
+    "ammunition": "Junk",
+    "weapon_type_en": "Big Guns",
+    "damage": 6,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 30,
+    "cost": 285,
+    "rarity": 3,
+    "special": "When you fire the Junk Jet, choose any item you are currently carrying; that item is fired by the gun. Choose one additional item for each additional shot of ammunition spent by the attack. Items must be small enough to be held in one hand and loaded into the hopper. At the end of the scene, you may roll 1D6 for each item fired from the Junk Jet; on an Effect, that item survived the attack and can be reclaimed.",
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Junk Jet)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Recoil Compensating Stock (Junk Jet)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Gunner Sight (Junk Jet)"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Electrification Module (Junk Jet)",
+          "Ignition Module (Junk Jet)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Minigun",
+    "ammunition": "5mm",
+    "weapon_type_en": "Big Guns",
+    "damage": 3,
+    "effects_en": [
+      "Burst",
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 5,
+    "range": 2,
+    "qualities_en": [
+      "Gatling",
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 27,
+    "cost": 382,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Accelerated Barrel (Minigun)",
+          "Tri-Barrel (Minigun)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Gunner Sight (Minigun)"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Shredder (Minigun)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Missile Launcher",
+    "ammunition": "Missile",
+    "weapon_type_en": "Big Guns",
+    "damage": 11,
+    "effects_en": [
+      "Burst",
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 3,
+    "qualities_en": [
+      "Blast",
+      "Two-Handed"
+    ],
+    "weight": 21,
+    "cost": 314,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Triple Barrel (Missile Launcher)",
+          "Quad Barrel (Missile Launcher)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Scope (Missile Launcher)",
+          "Night Vision Scope (Missile Launcher)",
+          "Targeting Computer (Missile Launcher)"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet (Missile Launcher)",
+          "Stabilizer (Missile Launcher)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sword",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Parry"
+    ],
+    "weight": 3,
+    "cost": 50,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Sword",
+        "mods": [
+          "Serrated Blade (Sword)",
+          "Electrified Blade (Sword)",
+          "Electrified Serrated Blade (Sword)",
+          "Stun Pack (Sword)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Combat Knife",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 1,
+    "cost": 25,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Combat Knife",
+        "mods": [
+          "Serrated Blade (Combat Knife)",
+          "Stealth Blade (Combat Knife)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Machete",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 2,
+    "cost": 25,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Machete",
+        "mods": [
+          "Serrated Blade (Machete)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ripper",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 6,
+    "cost": 50,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Ripper",
+        "mods": [
+          "Curved Blade (Ripper)",
+          "Extended Blade (Ripper)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shishkebab",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Energy",
+    "range": 0,
+    "qualities_en": [
+      "Parry"
+    ],
+    "weight": 3,
+    "cost": 200,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Shishkebab",
+        "mods": [
+          "Extra Flame Jets (Shishkebab)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Switchblade",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 2,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Concealed"
+    ],
+    "weight": 1,
+    "cost": 20,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Switchblade",
+        "mods": [
+          "Serrated Blade (Switchblade)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Baseball Bat",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 3,
+    "cost": 25,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Baseball Bat",
+        "mods": [
+          "Barbed (Baseball Bat)",
+          "Spiked (Baseball Bat)",
+          "Sharp (Baseball Bat)",
+          "Chain-Wrapped (Baseball Bat)",
+          "Bladed (Baseball Bat)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Aluminum Baseball Bat",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 2,
+    "cost": 32,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Baseball Bat",
+        "mods": [
+          "Barbed (Baseball Bat)",
+          "Spiked (Baseball Bat)",
+          "Sharp (Baseball Bat)",
+          "Chain-Wrapped (Baseball Bat)",
+          "Bladed (Baseball Bat)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Board",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 3,
+    "cost": 20,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Board",
+        "mods": [
+          "Spiked (Board)",
+          "Puncturing (Board)",
+          "Bladed (Board)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lead Pipe",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 3,
+    "cost": 15,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Lead Pipe",
+        "mods": [
+          "Spiked (Lead Pipe)",
+          "Heavy (Lead Pipe)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pipe Wrench",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 2,
+    "cost": 30,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Pipe Wrench",
+        "mods": [
+          "Hooked (Pipe Wrench)",
+          "Heavy (Pipe Wrench)",
+          "Puncturing (Pipe Wrench)",
+          "Extra Heavy (Pipe Wrench)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pool Cue",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 1,
+    "cost": 10,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Pool Cue",
+        "mods": [
+          "Barbed (Pool Cue)",
+          "Sharp (Pool Cue)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rolling Pin",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 1,
+    "cost": 10,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Rolling Pin",
+        "mods": [
+          "Spiked (Rolling Pin)",
+          "Sharp (Rolling Pin)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Baton",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 2,
+    "cost": 15,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Baton",
+        "mods": [
+          "Electrified (Baton)",
+          "Stun Pack (Baton)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sledgehammer",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 12,
+    "cost": 40,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Sledgehammer",
+        "mods": [
+          "Puncturing (Sledgehammer)",
+          "Heavy (Sledghammer)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Super Sledge",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 20,
+    "cost": 180,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Super Sledge",
+        "mods": [
+          "Heating Coil (Super Sledge)",
+          "Stun Pack (Super Sledge)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tire Iron",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 2,
+    "cost": 25,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Tire Iron",
+        "mods": [
+          "Bladed (Tire Iron)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Walking Cane",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 2,
+    "cost": 10,
+    "rarity": 0,
+    "mods": [
+      {
+        "area": "Walking Cane",
+        "mods": [
+          "Barbed (Walking Cane)",
+          "Spiked (Walking Cane)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Boxing Glove",
+    "weapon_type_en": "Unarmed",
+    "damage": 3,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 1,
+    "cost": 10,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Boxing Glove",
+        "mods": [
+          "Spiked (Boxing Glove)",
+          "Puncturing (Boxing Glove)",
+          "Lead Lining (Boxing Glove)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Deathclaw Gauntlet",
+    "weapon_type_en": "Unarmed",
+    "damage": 5,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 10,
+    "cost": 75,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Deathclaw Gauntlet",
+        "mods": [
+          "Extra Claw (Deathclaw Gauntlet)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Knuckles",
+    "weapon_type_en": "Unarmed",
+    "damage": 3,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [
+      "Concealed"
+    ],
+    "weight": 1,
+    "cost": 10,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Knuckles",
+        "mods": [
+          "Sharp (Knuckles)",
+          "Spiked (Knuckles)",
+          "Puncturing (Knuckles)",
+          "Bladed (Knuckles)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Power Fist",
+    "weapon_type_en": "Unarmed",
+    "damage": 3,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Physical",
+    "range": 0,
+    "qualities_en": [],
+    "weight": 4,
+    "cost": 100,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Power Fist",
+        "mods": [
+          "Puncturing (Power Fist)",
+          "Heating Coil (Power Fist)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Throwing Knife",
+    "weapon_type_en": "Throwing",
+    "damage": 3,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 1,
+    "qualities_en": [
+      "Concealed",
+      "Suppressed",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 10,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tomahawk",
+    "weapon_type_en": "Throwing",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 1,
+    "qualities_en": [
+      "Suppressed",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 15,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Javelin",
+    "weapon_type_en": "Throwing",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "range": 2,
+    "qualities_en": [
+      "Suppressed",
+      "Thrown"
+    ],
+    "weight": 4,
+    "cost": 10,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Baseball Grenade",
+    "weapon_type_en": "Explosives",
+    "damage": 5,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 40,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Frag Grenade",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 50,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Molotov Cocktail",
+    "weapon_type_en": "Explosives",
+    "damage": 4,
+    "effects_en": [
+      "Persistent"
+    ],
+    "damage_type_en": "Energy",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 20,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nuka Grenade",
+    "weapon_type_en": "Explosives",
+    "damage": 9,
+    "effects_en": [
+      "Breaking",
+      "Radioactive",
+      "Vicious"
+    ],
+    "damage_type_en": "Energy",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 100,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Plasma Grenade",
+    "weapon_type_en": "Explosives",
+    "damage": 9,
+    "effects_en": [],
+    "damage_type_en": "Energy",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 135,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pulse Grenade",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Energy",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 100,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bottlecap Mine",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 1,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 75,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Frag Mine",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [],
+    "damage_type_en": "Physical",
+    "range": 1,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 50,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nuke Mine",
+    "weapon_type_en": "Explosives",
+    "damage": 9,
+    "effects_en": [
+      "Breaking",
+      "Radioactive",
+      "Vicious"
+    ],
+    "damage_type_en": "Energy",
+    "range": 1,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 100,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Plasma Mine",
+    "weapon_type_en": "Explosives",
+    "damage": 9,
+    "effects_en": [],
+    "damage_type_en": "Energy",
+    "range": 1,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 135,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pulse Mine",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Energy",
+    "range": 1,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 100,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".357 Magnum Revolver",
+    "ammunition": ".357 Magnum",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Reliable"
+    ],
+    "weight": 2,
+    "cost": 110,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hair Trigger Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "12.7mm Pistol",
+    "ammunition": "12.7mm",
+    "weapon_type_en": "Small Guns",
+    "damage": 6,
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Recoil 7"
+    ],
+    "weight": 4,
+    "cost": 400,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          "Armor Piercing Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Comfort Grip",
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "12.7mm SMG",
+    "ammunition": "12.7mm",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "damage_type_en": "Physical",
+    "fire_rate": 3,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate",
+      "Recoil 7",
+      "Two-Handed"
+    ],
+    "weight": 5,
+    "cost": 510,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Armor Piercing Receiver"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "25mm Grenade APW",
+    "ammunition": "25mm Grenade",
+    "weapon_type_en": "Small Guns",
+    "damage": 4,
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 3,
+    "qualities_en": [
+      "Blast",
+      "Two-Handed"
+    ],
+    "weight": 8,
+    "cost": 420,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hair Trigger Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "9mm Pistol",
+    "ammunition": "9mm",
+    "weapon_type_en": "Small Guns",
+    "damage": 3,
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Concealed",
+      "Reliable"
+    ],
+    "weight": 2,
+    "cost": 50,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Automatic Receiver",
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Hair Trigger Receiver",
+          "Hardened Automatic Receiver"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Comfort Grip"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Anti-Materiel Rifle",
+    "ammunition": ".50",
+    "weapon_type_en": "Small Guns",
+    "damage": 8,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 3,
+    "qualities_en": [
+      "Reliable",
+      "Two-Handed",
+      "Recoil 8"
+    ],
+    "weight": 20,
+    "cost": 560,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Hair Trigger Receiver"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope",
+          "Recon Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Battle Rifle",
+    "ammunition": ".308",
+    "weapon_type_en": "Small Guns",
+    "damage": 7,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 2,
+    "qualities_en": [
+      "Reliable",
+      "Two-Handed"
+    ],
+    "weight": 10,
+    "cost": 150,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Hair Trigger Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Black Powder Blunderbuss",
+    "ammunition": ".50 Ball",
+    "weapon_type_en": "Small Guns",
+    "damage": 7,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Inaccurate",
+      "Recoil 7",
+      "Slow Load"
+    ],
+    "weight": 3,
+    "cost": 90,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Black Powder Pistol",
+    "ammunition": ".50 Ball",
+    "weapon_type_en": "Small Guns",
+    "damage": 7,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 1,
+    "qualities_en": [
+      "Recoil 7",
+      "Slow Load"
+    ],
+    "weight": 3,
+    "cost": 60,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Black Powder Rifle",
+    "ammunition": ".50 Ball",
+    "weapon_type_en": "Small Guns",
+    "damage": 8,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Recoil 7",
+      "Slow Load"
+    ],
+    "weight": 6,
+    "cost": 60,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gauss Pistol",
+    "ammunition": "2mm EC",
+    "weapon_type_en": "Small Guns",
+    "damage": 8,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 2,
+    "weight": 6,
+    "cost": 334,
+    "rarity": 5,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Shielded Barrel"
+        ]
+      },
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Full Capacitors",
+          "Capacitor Boosting Coil"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gauss Shotgun",
+    "ammunition": "2mm EC",
+    "weapon_type_en": "Small Guns",
+    "damage": 7,
+    "effects_en": [
+      "Piercing 1",
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 1,
+    "qualities_en": [
+      "Ammo-Hungry 10",
+      "Two-Handed"
+    ],
+    "weight": 14,
+    "cost": 400,
+    "rarity": 5,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Shielded Barrel"
+        ]
+      },
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Full Capacitors",
+          "Capacitor Boosting Coil"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lever-Action Rifle",
+    "ammunition": ".308",
+    "weapon_type_en": "Small Guns",
+    "damage": 7,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "weight": 9,
+    "cost": 201,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          "Calibrated Powerful Receiver",
+          ".357 Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Light Machine Gun",
+    "ammunition": "5.56mm",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 4,
+    "range": 2,
+    "qualities_en": [
+      "Inaccurate",
+      "Recoil 8",
+      "Two-Handed"
+    ],
+    "weight": 15,
+    "cost": 150,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          ".308 Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel",
+          "Vented Barrel"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Compensator",
+          "Muzzle Brake"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pump-Action Shotgun",
+    "ammunition": "Shotgun Shells",
+    "weapon_type_en": "Small Guns",
+    "damage": 5,
+    "effects_en": [
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 1,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 11,
+    "cost": 70,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hair Trigger Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Advanced Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Bayonet",
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Radium Rifle",
+    "ammunition": ".45",
+    "weapon_type_en": "Small Guns",
+    "damage": 4,
+    "effects_en": [
+      "Radioactive"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 3,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 11,
+    "cost": 110,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Automatic Receiver",
+          "Hair Trigger Receiver",
+          "Powerful Receiver",
+          "Hardened Automatic Receiver",
+          "Rapid Automatic Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Small Guns)",
+          "Ported Barrel"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)",
+          "Marksman's Stock (Small Guns)",
+          "Recoil Compensating Stock (Small Guns)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Large Magazine",
+          "Quick-Eject Magazine",
+          "Large Quick-Eject Magazine"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope",
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Compensator",
+          "Muzzle Brake",
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sniper Rifle",
+    "ammunition": ".308",
+    "weapon_type_en": "Small Guns",
+    "damage": 7,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 3,
+    "qualities_en": [
+      "Accurate",
+      "Two-Handed"
+    ],
+    "weight": 10,
+    "cost": 300,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Calibrated Receiver",
+          "Hardened Receiver",
+          "Powerful Receiver",
+          "Calibrated Powerful Receiver"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Long Scope",
+          "Short Night Vision Scope",
+          "Long Night Vision Scope"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Suppressor"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Alien Atomizer",
+    "ammunition": "Alien Power Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 3,
+    "range": 1,
+    "qualities_en": [
+      "Close Quarters",
+      "Reliable"
+    ],
+    "weight": 3,
+    "cost": 1536,
+    "rarity": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Alien Disintegrator",
+    "ammunition": "Alien Power Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 8,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 2,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed",
+      "Reliable"
+    ],
+    "weight": 7,
+    "cost": 921,
+    "rarity": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Arc Welder",
+    "ammunition": "2mm EC",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 3,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 4,
+    "range": 1,
+    "qualities_en": [
+      "Surge",
+      "Two-Handed"
+    ],
+    "weight": 15,
+    "cost": 370,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Assaultron Head",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 1,
+    "weight": 8,
+    "cost": 500,
+    "rarity": 3,
+    "special": "Firing an Assaultron Head consumes two shots of ammunition each time it fires. Each capacitor mod for the Assaultron Head increases both damage and number of shots consumed. You may reduce the number of shots consumed, reducing the damage by -1D6 for each shot consumed fewer than normal (for a minimum of 4 damage and 1 shot consumed).",
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Capacitor Mk III",
+          "Capacitor Mk IV",
+          "Capacitor Mk V",
+          "Capacitor Mk VI"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Microwave Emitter",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Persistent",
+      "Piercing 3"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 1,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 8,
+    "cost": 500,
+    "rarity": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tesla Rifle",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Energy Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Arc"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 2,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 8,
+    "cost": 180,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Automatic Barrel",
+          "Splitter Barrel",
+          "Improved Barrel",
+          "Amplified Beam Splitter",
+          "Fine-Tuned Beam Focuser",
+          "Quantum Gyro Compensating Lens"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": ".50 Cal Machine Gun",
+    "ammunition": ".50",
+    "weapon_type_en": "Big Guns",
+    "damage": 7,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 3,
+    "range": 2,
+    "qualities_en": [
+      "Two-Handed",
+      "Recoil 9"
+    ],
+    "weight": 31,
+    "cost": 350,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Heavy Barrel (.50 Cal)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Auto Grenade Launcher",
+    "ammunition": "40mm Grenade",
+    "weapon_type_en": "Big Guns",
+    "damage": 6,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 3,
+    "qualities_en": [
+      "Bombard",
+      "Inaccurate"
+    ],
+    "weight": 30,
+    "cost": 350,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Heavy Barrel (Auto Grenade Launcher)",
+          "Long Barrel (Auto Grenade Launcher)"
+        ]
+      },
+      {
+        "area": "Receiver",
+        "mods": [
+          "25mm Grenade Receiver"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Drone Cannon",
+    "ammunition": "Alien Power Module",
+    "weapon_type_en": "Big Guns",
+    "damage": 8,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Ammo-Hungry 20",
+      "Blast",
+      "Inaccurate",
+      "Slow Load"
+    ],
+    "weight": 18,
+    "cost": 600,
+    "rarity": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gatling Gun",
+    "ammunition": "5mm",
+    "weapon_type_en": "Big Guns",
+    "damage": 3,
+    "effects_en": [
+      "Burst",
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 3,
+    "range": 2,
+    "qualities_en": [
+      "Gatling",
+      "Accurate",
+      "Recoil 6",
+      "Two-Handed"
+    ],
+    "weight": 20,
+    "cost": 350,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Receiver",
+        "mods": [
+          "Speedy Receiver (Gatling Gun)"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Gatling Gun)"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Comfort Grip (Gatling Gun)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Extra-Large Magazine (Gatling Gun)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Front Sight Ring (Gatling Gun)"
+        ]
+      },
+      {
+        "area": "Muzzle",
+        "mods": [
+          "Large Bayonet (Gatling Gun)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gatling Plasma",
+    "ammunition": "Plasma Cartridge",
+    "weapon_type_en": "Big Guns",
+    "damage": 4,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Physical/Energy",
+    "fire_rate": 4,
+    "range": 2,
+    "qualities_en": [
+      "Gatling",
+      "Accurate",
+      "Two-Handed"
+    ],
+    "weight": 24,
+    "cost": 1000,
+    "rarity": 4,
+    "special": "Plasma weapons inflict both Physical and Energy damage. Roll damage as normal, and then reduce the total by whichever of the target’s damage resistances is lower out of Physical or Energy.",
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Ported Barrel (Gatling Plasma)"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Comfort Grip (Gatling Plasma)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight (Gatling Plasma)"
+        ]
+      },
+      {
+        "area": "Nozzle",
+        "mods": [
+          "Beam Splitter (Gatling Plasma)",
+          "Beam Focuser (Gatling Plasma)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gauss Minigun",
+    "ammunition": "2mm EC",
+    "weapon_type_en": "Big Guns",
+    "damage": 6,
+    "effects_en": [
+      "Burst",
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 3,
+    "range": 3,
+    "qualities_en": [
+      "Gatling",
+      "Two-Handed"
+    ],
+    "weight": 38,
+    "cost": 912,
+    "rarity": 6,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Tri-Barrel (Gauss Minigun)",
+          "Penta-Barrel (Gauss Minigun)"
+        ]
+      },
+      {
+        "area": "Tesla Coil",
+        "mods": [
+          "Tesla Coil Capacitor (Gauss Minigun)",
+          "Tesla Coil Dynamo (Gauss Minigun)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Gunner Sight (Gauss Minigun)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Plasma Caster",
+    "ammunition": "Plasma Cartridge",
+    "weapon_type_en": "Big Guns",
+    "damage": 8,
+    "effects_en": [
+      "Burst"
+    ],
+    "damage_type_en": "Physical/Energy",
+    "fire_rate": 3,
+    "range": 2,
+    "qualities_en": [
+      "Inaccurate",
+      "Recoil 8",
+      "Two-Handed"
+    ],
+    "weight": 30,
+    "cost": 700,
+    "rarity": 5,
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Calibrated Capacitor (Plasma Caster)",
+          "Pulse Capacitor (Plasma Caster)",
+          "High Speed Electrode (Plasma Caster)"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Plasma Caster)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tesla Cannon",
+    "ammunition": "Fusion Cell",
+    "weapon_type_en": "Big Guns",
+    "damage": 8,
+    "effects_en": [
+      "Arc",
+      "Piercing 2"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 3,
+    "qualities_en": [
+      "Accurate",
+      "Ammo-Hungry 5",
+      "Surge",
+      "Two-Handed"
+    ],
+    "weight": 24,
+    "cost": 870,
+    "rarity": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bow",
+    "ammunition": "Arrow",
+    "weapon_type_en": "Athletics",
+    "damage": 3,
+    "damage_type_en": "Physical",
+    "fire_rate": 2,
+    "range": 2,
+    "qualities_en": [
+      "Suppressed",
+      "Recoil 6",
+      "Two-Handed"
+    ],
+    "weight": 3,
+    "cost": 44,
+    "rarity": 1,
+    "mods": [
+      {
+        "area": "Frame",
+        "mods": [
+          "Compound Frame (Bow)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Iron Sights (Bow)",
+          "Glow Sights (Bow)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Crossbow",
+    "ammunition": "Crossbow Bolt",
+    "weapon_type_en": "Athletics",
+    "damage": 5,
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Suppressed",
+      "Two-Handed",
+      "Slow Load"
+    ],
+    "weight": 3,
+    "cost": 44,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Sight",
+        "mods": [
+          "Iron Sights (Crossbow)",
+          "Glow Sights (Crossbow)"
+        ]
+      },
+      {
+        "area": "Frame",
+        "mods": [
+          "Heavy Frame (Crossbow)",
+          "Repeating Frame (Crossbow)",
+          "Multiple Launch Frame (Crossbow)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Assaultron Blade",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "weight": 3,
+    "cost": 50,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Assaultron Blade",
+        "mods": [
+          "Electrified Blade (Assaultron Blade)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Auto-Axe",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 20,
+    "cost": 100,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Auto-Axe",
+        "mods": [
+          "Electrified (Auto-Axe)",
+          "Burning (Auto-Axe)",
+          "Poisoned (Auto-Axe)",
+          "Turbo (Auto-Axe)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ballistic Fist",
+    "ammunition": "Shotgun Shells",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Stun",
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Slow Load"
+    ],
+    "weight": 6,
+    "cost": 150,
+    "rarity": 4,
+    "special": "This melee weapon requires ammunition, expending one shotgun shell with each attack. Due to the Slow Load quality, it must be reloaded as a minor action before it can be used again: without a shotgun shell, a ballistic fist simply makes a normal unarmed attack.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bumper Sword",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Recoil 7",
+      "Two-Handed"
+    ],
+    "weight": 12,
+    "cost": 125,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cattle Prod",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 7,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 0,
+    "weight": 3,
+    "cost": 90,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Chainsaw",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 12,
+    "cost": 140,
+    "rarity": 3,
+    "special": "A Chainsaw does not benefit from the wielder’s normal melee damage bonus.",
+    "mods": [
+      {
+        "area": "Chainsaw",
+        "mods": [
+          "Dual Bar (Chainsaw)",
+          "Bow Bar (Chainsaw)",
+          "Long Bow Bar (Chainsaw)",
+          "Flamer (Chainsaw)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Death Tambo",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "weight": 1,
+    "cost": 40,
+    "rarity": 2,
+    "special": "When used to make a sneak attack, a Death Tambo increases the complication range by 1, due to the jingling sound it makes.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Displacer Glove",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 6,
+    "effects_en": [
+      "Piercing 1",
+      "Stun"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "weight": 6,
+    "cost": 175,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Guitar Sword",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Parry"
+    ],
+    "weight": 3,
+    "cost": 45,
+    "rarity": 3,
+    "special": "When used to make a sneak attack, a Guitar Sword increases the complication range by 1, due to the sound it makes.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mr Handy Buzz Blade",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 4,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 10,
+    "cost": 50,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Multi-Purpose Axe",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 4,
+    "cost": 40,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Proton Axe",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Surge"
+    ],
+    "weight": 8,
+    "cost": 175,
+    "rarity": 5,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "War Drum",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 5,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Two-Handed"
+    ],
+    "weight": 20,
+    "cost": 115,
+    "rarity": 3,
+    "special": "When used to make a sneak attack, a War Drum increases the complication range by 1, due to the sound it makes.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cryogenic Grenade",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [
+      "Freeze"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 50,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cryo Mine",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [
+      "Freeze"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 50,
+    "rarity": 3,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Detonator",
+    "weapon_type_en": "Explosives",
+    "fire_rate": 0,
+    "range": 0,
+    "weight": 1,
+    "cost": 75,
+    "rarity": 3,
+    "special": "When a Placed explosive is being placed, if you have a Detonator, you may choose to have the explosive triggered remotely. This removes the Delay (X) Trait and means that you may detonate that explosive device as a minor action at any point during the scene, so long as you are within Long range of the explosive. You may attempt to have multiple explosives set to detonate using the same detonator, but the difficulty of the PER + Explosives test to set the explosives increases by +1 for each subsequent bomb linked to the detonator. When the detonator is used, all linked explosives detonate at the same time.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dynamite",
+    "weapon_type_en": "Explosives",
+    "damage": 5,
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 25,
+    "rarity": 2,
+    "special": "Single sticks of dynamite are assumed to have a short fuse, which will detonate the same turn they’relit (and thrown), functioning like a normal grenade. A character may prepare longer fuses for dynamite, requiring a PER + Explosives test with a difficulty of 1: success means you prepare one stick of dynamite with a longer fuse, plus one additional stick per AP spent. Long-fuse dynamite has the Delay (X) quality, with a rating set at the time the longer fuses are prepared. Dynamite bundles have the Delay (X) quality, with the rating set when the bomb is placed.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dynamite Bundle",
+    "weapon_type_en": "Explosives",
+    "damage": 9,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Blast",
+      "Delay (X)",
+      "Placed"
+    ],
+    "weight": 2,
+    "cost": 150,
+    "rarity": 3,
+    "special": "Single sticks of dynamite are assumed to have a short fuse, which will detonate the same turn they’relit (and thrown), functioning like a normal grenade. A character may prepare longer fuses for dynamite, requiring a PER + Explosives test with a difficulty of 1: success means you prepare one stick of dynamite with a longer fuse, plus one additional stick per AP spent. Long-fuse dynamite has the Delay (X) quality, with a rating set at the time the longer fuses are prepared. Dynamite bundles have the Delay (X) quality, with the rating set when the bomb is placed.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Flash Bang",
+    "weapon_type_en": "Explosives",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 40,
+    "rarity": 2,
+    "special": "If a flash bang hits, any character caught within the blast of a Flash Bang is stunned, as per the Stun damage effect. If the grenade misses, there is no effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Frag Grenade MIRV",
+    "weapon_type_en": "Explosives",
+    "damage": 5,
+    "effects_en": [
+      "Spread"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 75,
+    "rarity": 4,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Plastic Explosives",
+    "weapon_type_en": "Explosives",
+    "damage": 10,
+    "effects_en": [
+      "Breaking",
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Blast",
+      "Placed",
+      "Delay (X)"
+    ],
+    "weight": 2,
+    "cost": 200,
+    "rarity": 4,
+    "special": "The rating of the Delay (X) quality is set when the bomb is placed.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Powder Charge",
+    "weapon_type_en": "Explosives",
+    "damage": 4,
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 0,
+    "qualities_en": [
+      "Blast",
+      "Mine"
+    ],
+    "weight": 1,
+    "cost": 25,
+    "rarity": 1,
+    "special": "A Powder Charge may replace its Mine quality with the Delay (X) and Placed qualities, requiring only a few minutes of work and a PER + Explosives test with a difficulty of 1. The rating of the Delay quality is chosen when the bomb is placed.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Smoke Grenade",
+    "weapon_type_en": "Explosives",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "cost": 40,
+    "rarity": 2,
+    "special": "When a smoke grenade detonates, it generates a cloud of smoke which fills the affected zone. Characters cannot see while within the cloud, nor can they see into or through the cloud from outside it, adding +2 difficulty to all attacks and PER-based tests made by or against anyone within the cloud. The cloud dissipates over time; at the end of each round roll 1D6, plus +1D6 for each round the cloud has persisted: if one or more Effects are rolled, the cloud has dispersed enough to no longer have an effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lightweight Mini-Nuke",
+    "weapon_type_en": "Explosives",
+    "damage": 6,
+    "effects_en": [
+      "Radioactive"
+    ],
+    "damage_type_en": "Physical",
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Thrown"
+    ],
+    "weight": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "M79 Grenade Launcher",
+    "weapon_type_en": "Small Guns",
+    "ammunition": "40mm Grenade",
+    "damage": 6,
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 3,
+    "qualities_en": [
+      "Blast",
+      "Inaccurate",
+      "Slow Load",
+      "Two-Handed"
+    ],
+    "weight": 6,
+    "cost": 300,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (M79 Grenade Launcher)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Full Stock (Small Guns)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Smoke Claw",
+    "weapon_type_en": "Small Guns",
+    "ammunition": "Gas Grenade",
+    "damage": 4,
+    "effects_en": [
+      "Persistent"
+    ],
+    "damage_type_en": "Poison",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Inaccurate"
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Acid Soaker",
+    "weapon_type_en": "Energy Weapons",
+    "ammunition": "Acid Concentrate",
+    "damage": 3,
+    "effects_en": [
+      "Persistent",
+      "Breaking"
+    ],
+    "damage_type_en": "Poison",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Debilitating",
+      "Inaccurate"
+    ],
+    "weight": 3,
+    "cost": 125,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Concentrate",
+        "mods": [
+          "Caustic"
+        ]
+      },
+      {
+        "area": "Container",
+        "mods": [
+          "Large Ampoule",
+          "Large Vial"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Alien Blaster",
+    "weapon_type_en": "Energy Weapons",
+    "ammunition": "Alien Blaster Round",
+    "damage": 5,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Poison",
+    "fire_rate": 2,
+    "range": 1,
+    "qualities_en": [
+      "Debilitating",
+      "Inaccurate"
+    ],
+    "weight": 3,
+    "cost": 125,
+    "rarity": 3,
+    "mods": [
+      {
+        "area": "Magazine",
+        "mods": [
+          "Fusion Magazine"
+        ]
+      },
+      {
+        "area": "Barrel",
+        "mods": [
+          "Bracketed Short Barrel",
+          "Long Barrel (Energy Weapons)",
+          "Automatic Barrel",
+          "Bracketed Long Barrel",
+          "Improved Barrel",
+          "Sniper Barrel"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Standard Stock",
+          "Marksman's Stock (Energy Weapons)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight",
+          "Short Scope"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cryojet",
+    "weapon_type_en": "Energy Weapons",
+    "ammunition": "Cryo Cell",
+    "damage": 3,
+    "effects_en": [
+      "Burst",
+      "Freeze"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 3,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate"
+    ],
+    "weight": 8,
+    "cost": 261,
+    "rarity": 4,
+    "special": "Cryojets are integrated into the arms of robots and therefore can’t be used as a handheld weapon.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mesmetron",
+    "weapon_type_en": "Energy Weapons",
+    "ammunition": "Gamma Rounds",
+    "damage": 3,
+    "effects_en": [
+      "Stun"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 1,
+    "range": 2,
+    "weight": 2,
+    "cost": 120,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Capacitor",
+        "mods": [
+          "Beta Wave Tuner (Energy Weapons)"
+        ]
+      },
+      {
+        "area": "Grip",
+        "mods": [
+          "Sharpshooter's Grip"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Broadsider",
+    "weapon_type_en": "Big Guns",
+    "ammunition": "Cannonball",
+    "damage": 10,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Blast",
+      "Two-Handed"
+    ],
+    "weight": 16,
+    "cost": 140,
+    "rarity": 5,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Long Barrel (Broadsider)",
+          "Light Barrel (Broadsider)"
+        ]
+      },
+      {
+        "area": "Canister",
+        "mods": [
+          "Multi Shot Canister (Broadsider)",
+          "M79 Launcher (Broadsider)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cryolator",
+    "weapon_type_en": "Big Guns",
+    "ammunition": "Cryo Cell",
+    "damage": 4,
+    "effects_en": [
+      "Burst",
+      "Freeze",
+      "Spread"
+    ],
+    "damage_type_en": "Energy",
+    "fire_rate": 4,
+    "range": 1,
+    "qualities_en": [
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 14,
+    "cost": 300,
+    "rarity": 4,
+    "mods": [
+      {
+        "area": "Barrel",
+        "mods": [
+          "Crystallizing Barrel (Cryolator)"
+        ]
+      },
+      {
+        "area": "Magazine",
+        "mods": [
+          "Fusion Magazine (Cryolator)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Recoil Compensating Stock (Cryolator)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Reflex Sight (Cryolator)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Harpoon Gun",
+    "weapon_type_en": "Big Guns",
+    "ammunition": "Harpoon",
+    "damage": 12,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "fire_rate": 0,
+    "range": 2,
+    "qualities_en": [
+      "Debilitating",
+      "Inaccurate",
+      "Two-Handed"
+    ],
+    "weight": 16,
+    "cost": 120,
+    "rarity": 5,
+    "mods": [
+      {
+        "area": "Magazine",
+        "mods": [
+          "Barbed Harpoon (Harpoon Gun)",
+          "Flechette Darts (Harpoon Gun)"
+        ]
+      },
+      {
+        "area": "Stock",
+        "mods": [
+          "Recoil Compensating Stock (Harpoon Gun)"
+        ]
+      },
+      {
+        "area": "Sight",
+        "mods": [
+          "Gunner Sight (Harpoon Gun)",
+          "Short Scope (Harpoon Gun)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Buzz Saw",
+    "weapon_type_en": "Melee Weapons",
+    "damage": 3,
+    "effects_en": [
+      "Piercing 1"
+    ],
+    "damage_type_en": "Physical",
+    "weight": 3,
+    "cost": 25,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Claw",
+    "weapon_type_en": "Unarmed",
+    "damage": 3,
+    "damage_type_en": "Physical",
+    "weight": 3,
+    "cost": 25,
+    "rarity": 2,
+    "mods": [
+      {
+        "area": "Claw",
+        "mods": [
+          "Shock Mod (Claw)",
+          "Stun Mod (Claw)"
+        ]
+      }
+    ],
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Construction Claw",
+    "weapon_type_en": "Unarmed",
+    "damage": 4,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "weight": 2,
+    "cost": 25,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Drill",
+    "weapon_type_en": "Unarmed",
+    "damage": 5,
+    "effects_en": [
+      "Vicious"
+    ],
+    "damage_type_en": "Physical",
+    "qualities_en": [
+      "Debilitating"
+    ],
+    "weight": 20,
+    "cost": 50,
+    "rarity": 1,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vice Grip",
+    "weapon_type_en": "Unarmed",
+    "damage": 4,
+    "effects_en": [
+      "Breaking"
+    ],
+    "damage_type_en": "Physical",
+    "weight": 15,
+    "cost": 30,
+    "rarity": 2,
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  }
+]
