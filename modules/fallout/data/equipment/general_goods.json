@@ -241,13 +241,12 @@
   },
   {
     "id": "robot_item_repair_kit",
-    "itemType": "chem",
+    "itemType": "robotConsumable",
     "subtype": "tool",
     "value": 50,
     "rarity": 1,
     "weight": 0.5,
     "healAmount": 6,
-    "robotOnly": true,
     "positiveEffect": {
       "hpModifier": {
         "op": "+",

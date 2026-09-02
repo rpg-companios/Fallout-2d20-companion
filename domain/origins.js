@@ -6,7 +6,10 @@
 //
 // Per docs/schema/01-origins.md (zustand-robot branch):
 //  - characterType ∈ {human, mutant, robot, cyborg, ghoul}
-//  - armorPolicy defaults from characterType; origin.armorPolicy overrides only when different
+//  - Профиль экипировки/использования теперь задаётся fitProfile
+//    (см. domain/itemfit.js + domain/itemfitRules.js + модульные данные
+//    modules/fallout/data/origins/fitProfiles.json). Прежняя цепочка
+//    armorPolicy → getArmorPolicy → canEquip* удалена.
 //  - No type-derived immunities (user decision: immunities are explicit lists per origin/trait)
 //
 import { getOrigins, getOriginI18n } from './registry';
@@ -24,22 +27,6 @@ export const CHARACTER_TYPES = Object.freeze({
   ROBOT: 'robot',
   CYBORG: 'cyborg',
   GHOUL: 'ghoul',
-});
-
-export const ARMOR_POLICIES = Object.freeze({
-  STANDARD: 'standard',
-  RAIDER_ONLY: 'raiderOnly',
-  ROBOT_ONLY: 'robotOnly',
-});
-
-// Per-characterType default armor policy.
-// Origin can override via origin.armorPolicy (rare; shadow doesn't anymore).
-const DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE = Object.freeze({
-  [CHARACTER_TYPES.HUMAN]:  ARMOR_POLICIES.STANDARD,
-  [CHARACTER_TYPES.MUTANT]: ARMOR_POLICIES.RAIDER_ONLY,
-  [CHARACTER_TYPES.ROBOT]:  ARMOR_POLICIES.ROBOT_ONLY,
-  [CHARACTER_TYPES.GHOUL]:  ARMOR_POLICIES.STANDARD,
-  [CHARACTER_TYPES.CYBORG]: ARMOR_POLICIES.STANDARD,
 });
 
 const ORIGIN_DICTIONARIES = { 'ru-RU': getOriginI18n('ru-RU'), 'en-EN': getOriginI18n('en-EN') };
@@ -62,17 +49,6 @@ export const isMutantCharacter = (character) => getCharacterType(character) === 
 export const isRobotCharacter  = (character) => getCharacterType(character) === CHARACTER_TYPES.ROBOT;
 export const isCyborgCharacter = (character) => getCharacterType(character) === CHARACTER_TYPES.CYBORG;
 export const isGhoulCharacter  = (character) => getCharacterType(character) === CHARACTER_TYPES.GHOUL;
-
-/**
- * Returns armor policy for a character.
- * Priority: origin.armorPolicy (if present) → characterType default.
- */
-export function getArmorPolicy(character) {
-  const override = character?.origin?.armorPolicy;
-  if (override) return override;
-  return DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE[getCharacterType(character)]
-    ?? ARMOR_POLICIES.STANDARD;
-}
 
 /**
  * Returns the body plan.
@@ -174,7 +150,6 @@ export function loadEnrichedOrigins() {
       equipmentKitIds: origin.equipmentKitIds || [],
       equipmentKits,
       bodyPlan: origin.bodyPlan ?? null,
-      armorPolicy: origin.armorPolicy ?? null,
     };
   });
 }

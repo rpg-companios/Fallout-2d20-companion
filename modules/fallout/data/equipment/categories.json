@@ -1,0 +1,87 @@
+{
+  "//": "Справочник категорий (данные сеттинга). Механика — в domain/itemfit.js. Матчеры построены на реальных данных (id/idRoot/itemType), без пер-предметных тегов.",
+  "robotEquipment": {
+    "any": [
+      {
+        "item": "robot_armor_*"
+      },
+      {
+        "item": "robot_plating_*"
+      },
+      {
+        "item": "robot_frame_*"
+      },
+      {
+        "item": "robot_body_*"
+      },
+      {
+        "item": "robot_head_*"
+      },
+      {
+        "item": "robot_arm_*"
+      },
+      {
+        "item": "robot_legs_*"
+      },
+      {
+        "item": "robot_weapon_*"
+      }
+    ]
+  },
+  "robotArmor": {
+    "any": [
+      {
+        "item": "robot_armor_*"
+      },
+      {
+        "item": "robot_plating_*"
+      },
+      {
+        "item": "robot_frame_*"
+      }
+    ]
+  },
+  "robotWeapon": {
+    "any": [
+      {
+        "item": "robot_weapon_*"
+      },
+      {
+        "item": "robot_arm_*"
+      }
+    ]
+  },
+  "robotConsumable": {
+    "itemType": "robotConsumable"
+  },
+  "humanArmor": {
+    "itemType": [
+      "armor",
+      "powerArmor"
+    ]
+  },
+  "raiderArmor": {
+    "item": "armor_raider_*"
+  },
+  "consumable": {
+    "itemType": [
+      "food",
+      "drinks",
+      "chem"
+    ]
+  },
+  "humanClothing": {
+    "itemType": "clothing"
+  },
+  "weapon_ranged": {
+    "weaponType": [
+      "Light",
+      "Heavy",
+      "Explosive",
+      "Energy"
+    ]
+  },
+  "powerArmor": {
+    "itemType": "powerArmor"
+  }
+}

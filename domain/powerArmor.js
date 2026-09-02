@@ -9,6 +9,7 @@
 
 import { rollByType } from './diceRollsLogic';
 import { getCanonicalAttributeKey } from './characterCreation';
+import { isItemAllowed, ACTIONS } from './itemfitRules';
 
 // Расход зарядов Ядерного блока каркасом, зарядов в час. Временное значение (§3.3 плана).
 export const PA_CORE_DRAIN_PER_HOUR = 5;
@@ -120,23 +121,19 @@ export const hasFrame = (equipped) => Boolean(equipped?.frame);
 
 /**
  * Можно ли надеть часть (§5.2): нужен надетый каркас; часть с прочностью 0 не надевается.
- * WHITELIST: роботы могут носить силовую броню только если у предмета есть robotOnly (мега-случай через трейт/ориджин).
- * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | null.
+ * Архетипная проверка теперь идёт через fitProfile (domain/itemfitRules.isItemAllowed):
+ * роботы и мутанты не могут носить силовую броню (запрет powerArmor в fitProfile).
+ * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | 'mutantCannotWear' | null.
  */
 export const canEquipPowerArmorPiece = (equipped, piece, character = null) => {
   if (!hasFrame(equipped)) return { ok: false, reason: 'needsFrame' };
   if (isPieceBroken(piece)) return { ok: false, reason: 'broken' };
-  if (character && character.origin && character.origin.characterType === 'robot') {
-    // Whitelist: если у части/фрейма нет robotOnly, робот не может носить
-    const isRobotAllowed = Boolean(piece?.robotOnly || equipped?.frame?.robotOnly);
-    if (!isRobotAllowed) {
-      return { ok: false, reason: 'robotCannotWear' };
-    }
-  }
-  if (character && character.origin && character.origin.characterType === 'mutant') {
-    const isMutantAllowed = Boolean(piece?.mutantOnly || equipped?.frame?.mutantOnly);
-    if (!isMutantAllowed) {
-      return { ok: false, reason: 'mutantCannotWear' };
+
+  const type = character?.origin?.characterType;
+  if (type === 'robot' || type === 'mutant') {
+    const allowed = isItemAllowed(piece, ACTIONS.EQUIP, character);
+    if (!allowed) {
+      return { ok: false, reason: type === 'robot' ? 'robotCannotWear' : 'mutantCannotWear' };
     }
   }
   return { ok: true, reason: null };

@@ -1,0 +1,120 @@
+{
+  "//": "Профили fitProfile по characterType (данные сеттинга). Механика — domain/itemfit.js. Ключи: allow/forbidden/bypassAllow/bypassForbidden; ветки: equip / consume.self / consume.other. Отсутствующая ветка = разрешено всё. Заменяет цепочку origins.armorPolicy → canEquip*/allowlist. ghoul отсутствует → профиль {} → разрешено всё.",
+  "human": {
+    "equip": {
+      "allow": [],
+      "forbidden": [
+        {
+          "category": "robotEquipment"
+        }
+      ]
+    },
+    "consume": {
+      "self": {
+        "allow": [],
+        "forbidden": [
+          {
+            "category": "robotConsumable"
+          }
+        ]
+      },
+      "other": {}
+    }
+  },
+  "mutant": {
+    "equip": {
+      "allow": [],
+      "forbidden": [
+        {
+          "category": "robotEquipment"
+        },
+        {
+          "category": "humanArmor"
+        },
+        {
+          "category": "powerArmor"
+        }
+      ],
+      "bypassAllow": [
+        {
+          "category": "raiderArmor"
+        }
+      ]
+    },
+    "consume": {
+      "self": {
+        "forbidden": [
+          {
+            "category": "robotConsumable"
+          }
+        ]
+      },
+      "other": {}
+    }
+  },
+  "robot": {
+    "equip": {
+      "allow": [],
+      "forbidden": [
+        {
+          "category": "humanArmor"
+        },
+        {
+          "category": "humanClothing"
+        },
+        {
+          "category": "powerArmor"
+        }
+      ],
+      "bypassAllow": [
+        {
+          "category": "robotArmor"
+        },
+        {
+          "item": "headwear_casual_hat"
+        },
+        {
+          "item": "headwear_fancy_hat"
+        }
+      ]
+    },
+    "consume": {
+      "self": {
+        "forbidden": [
+          {
+            "category": "consumable"
+          }
+        ],
+        "bypassAllow": [
+          {
+            "category": "robotConsumable"
+          }
+        ]
+      },
+      "other": {}
+    }
+  },
+  "cyborg": {
+    "equip": {
+      "allow": [],
+      "forbidden": [
+        {
+          "category": "robotEquipment"
+        }
+      ]
+    },
+    "consume": {
+      "self": {
+        "forbidden": [
+          {
+            "category": "consumable"
+          },
+          {
+            "category": "robotConsumable"
+          }
+        ]
+      },
+      "other": {}
+    }
+  }
+}

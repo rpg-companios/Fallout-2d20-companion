@@ -13,6 +13,8 @@
 import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
 
 import moduleOrigins from '../modules/fallout/data/origins/origins.json';
+import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
+import moduleCategories from '../modules/fallout/data/equipment/categories.json';
 import moduleTraits from '../modules/fallout/data/traits/traits.json';
 import modulePerks from '../modules/fallout/data/perks/perks.json';
 import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
@@ -64,6 +66,22 @@ const requireModuleLocale = (locale) => {
  */
 export function getOrigins() {
   return moduleOrigins;
+}
+
+/**
+ * Профили fitProfile по characterType (данные сеттинга). Заменяет
+ * цепочку origins.armorPolicy → canEquip → allowlist.
+ */
+export function getFitProfileData() {
+  return moduleFitProfiles;
+}
+
+/**
+ * Справочник категорий предметов (данные сеттинга). Категории используются
+ * матчерами fitProfile и соответствуют наборам данных (поля/id данных).
+ */
+export function getCategories() {
+  return moduleCategories;
 }
 
 /**

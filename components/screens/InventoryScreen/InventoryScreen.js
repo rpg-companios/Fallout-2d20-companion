@@ -32,6 +32,7 @@ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { generateStackKey } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
+import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
 import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
 import styles from '../../../styles/InventoryScreen.styles';
@@ -165,6 +166,9 @@ const InventoryScreen = () => {
   // isRobot читается из origin.characterType (domain/origins.js). Объявлен ДО
   // equippedWeaponsForDisplay, который его использует (иначе TDZ при рендере).
   const isRobot = isRobotCharacter({ origin, trait });
+  // Персонаж для правил fitProfile (характерType + origin). Профиль берётся из
+  // characterType (или origin.fitProfile — полный override).
+  const fitCharacter = { origin, trait };
 
   const equippedWeaponsForDisplay = useMemo(() => {
     const fromStore = storeEquippedWeapons.map(flattenItemParams);
@@ -261,7 +265,7 @@ const InventoryScreen = () => {
     if (itemType === 'weapon') return '🔫';
     if (itemType === 'armor') return '🛡️';
     if (itemType === 'clothing' || itemType === 'outfit') return '👕';
-    if (itemType === 'chem' || itemType === 'chems') return '💊';
+    if (itemType === 'chem' || itemType === 'chems' || itemType === 'robotConsumable') return '💊';
     if (itemType === 'drinks') return '🥤';
     if (itemType === 'food') return '🍖';
     if (itemType === 'magazine') return '📖';
@@ -389,7 +393,7 @@ const InventoryScreen = () => {
     });
 
     const applyToSelf = () => {
-      if (isRobot) {
+      if (!canConsumeOnSelf(consumableItem, fitCharacter)) {
         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
         return;
       }
@@ -436,6 +440,10 @@ const InventoryScreen = () => {
     };
 
     const applyToOther = () => {
+      if (!canConsumeOnOther(consumableItem, fitCharacter)) {
+        showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
+        return;
+      }
       const report = buildConsumableResultReport({ itemName });
       showAlert(report.title, report.message);
       handleRemoveItem(consumableItem, 1);
@@ -1416,7 +1424,11 @@ const InventoryScreen = () => {
     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
     const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
-    const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
+    const isConsumable =
+      item.itemType === 'chem' || item.itemType === 'chems'
+      || item.itemType === 'drinks' || item.itemType === 'food'
+      || item.itemType === 'robotConsumable'
+      || item.healAmount != null;
 
     // Нерабочее встроенное оружие (ракетница/гранатомёт до ОС Mk II): строка
     // помечается, пока драйвер не применён (флаг mk2Installed).
@@ -1521,7 +1533,9 @@ const InventoryScreen = () => {
               </TouchableOpacity>
           )}
 
-          {isConsumable && !item.isEquipped && !isRobot && (
+          {isConsumable && !item.isEquipped
+            && (canConsumeOnSelf(localizedDisplayItem, fitCharacter)
+                || canConsumeOnOther(localizedDisplayItem, fitCharacter)) && (
               <TouchableOpacity 
                   style={[styles.actionButton, styles.applyButton]} 
                   onPress={() => handleApplyConsumable(localizedDisplayItem)}>

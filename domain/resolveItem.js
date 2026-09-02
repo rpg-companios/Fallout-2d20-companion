@@ -89,6 +89,14 @@ export const findCatalogEntry = (catalog, id, itemType) => {
         || search(catalog.robotHeads)
         || search(catalog.robotPlating)
         || search(catalog.robotFrames);
+    case 'robotConsumable':
+      // Робо-расходники (ремкомплект и будущие): владелец задаёт их в
+      // general_goods.json с itemType "robotConsumable" → каталог generalGoods.
+      // Ищем по всем возможным контейнерам, чтобы новый расходник не потерял
+      // обогащения (имя/вес/цену/эффект), где бы он ни лежал.
+      return search(catalog.generalGoods)
+        || search(catalog.robotItems)
+        || search(catalog.robotModules);
     case 'misc':
     default: {
       const misc = flattenMisc(catalog.miscellaneous);
