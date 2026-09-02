@@ -1,0 +1,217 @@
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index f6a2952..8e8608f 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -467,7 +467,10 @@ export default function HomeScreen({ navigation }) {
+       if (window.confirm(message)) remove();
+       return;
+     }
+-    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [{ text: tHomeScreen('folders.cancel'), style: 'cancel' }, { text: tHomeScreen('folders.deleteConfirm'), style: 'destructive', onPress: remove }]);
++    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [
++      { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: remove },
++      { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
++    ]);
+   };
+ 
+   const handleCreate = () => {
+@@ -516,7 +519,7 @@ export default function HomeScreen({ navigation }) {
+       confirmMessage,
+       [
+         {
+-          text: tHomeScreen('buttons.deleteEverywhere'),
++          text: tHomeScreen('buttons.yes'),
+           style: 'destructive',
+           onPress: confirmDelete,
+         },
+@@ -538,26 +541,20 @@ export default function HomeScreen({ navigation }) {
+       });
+     } catch (error) {
+       debugLog('home.duplicateCharacter.failed', { message: error?.message });
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        tHomeScreen('characterActions.duplicateError'),
+-      );
++      showHomeAlert(tHomeScreen('title'), tHomeScreen('characterActions.duplicateError'));
+     }
+   };
+ 
+   const handleDownload = async (character) => {
+     if (false) { // cross-platform
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        tHomeScreen('download.unsupported')
+-      );
++      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.unsupported'));
+       return;
+     }
+ 
+     try {
+       const row = await db.loadCharacterById(character.id);
+       if (!row) {
+-        Alert.alert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
++        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
+         return;
+       }
+ 
+@@ -565,10 +562,7 @@ export default function HomeScreen({ navigation }) {
+       const result = await downloadCharacterPayload(payload, row.name);
+       
+       if (!result.success && !result.aborted) {
+-        Alert.alert(
+-          tHomeScreen('title'),
+-          tHomeScreen('download.errors.failed') || 'Не удалось скачать персонажа. Попробуйте ещё раз или смените браузер.'
+-        );
++        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.failed'));
+       }
+     } catch (error) {
+       debugLog('home.characterDownload.failed', { message: error?.message });
+@@ -578,10 +572,7 @@ export default function HomeScreen({ navigation }) {
+ 
+   const handleUpload = async () => {
+     if (false) { // cross-platform
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        tHomeScreen('upload.unsupported')
+-      );
++      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.unsupported'));
+       return;
+     }
+ 
+@@ -592,10 +583,7 @@ export default function HomeScreen({ navigation }) {
+ 
+       const parsed = parseCharacterImportPayload(rawText);
+       if (parsed.error) {
+-        Alert.alert(
+-          tHomeScreen('title'),
+-          tHomeScreen(IMPORT_ERRORS[parsed.error], tHomeScreen('upload.errors.default'))
+-        );
++        showHomeAlert(tHomeScreen('title'), tHomeScreen(IMPORT_ERRORS[parsed.error]));
+         return;
+       }
+ 
+@@ -633,12 +621,8 @@ export default function HomeScreen({ navigation }) {
+         tHomeScreen('title'),
+         overwriteMessage,
+         [
+-          { text: tHomeScreen('buttons.no') || 'Нет', style: 'cancel' },
+-          {
+-            text: tHomeScreen('buttons.yes') || 'Да',
+-            style: 'destructive',
+-            onPress: persistImport,
+-          },
++          { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: persistImport },
++          { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
+         ],
+         { cancelable: true }
+       );
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 1511a23..f55104f 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -16,14 +16,16 @@
+       "unsupportedVersion": "This export file version is not supported.",
+       "missingCharacter": "Character block is missing in the file.",
+       "missingName": "Character name is missing in the file.",
+-      "missingData": "Character data is missing in the file.", "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
++      "missingData": "Character data is missing in the file.",
++      "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
+     }
+   },
+   "download": {
+     "unsupported": "File save/export is available only in web version.",
+     "errors": {
+       "notFound": "Character was not found.",
+-      "failed": "Failed to save file.", "unexpected": "Could not download the character. See the browser console for details."
++      "failed": "Failed to save file.",
++      "unexpected": "Could not download the character. See the browser console for details."
+     }
+   },
+   "characterActions": {
+@@ -34,8 +36,8 @@
+     "copySuffix": "copy",
+     "duplicateError": "Failed to duplicate character."
+   },
+-  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press \u201cCancel\u201d to download a copy manually first.",
+-  "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync \u2014 try deleting again later.",
++  "deleteConfirm": "WARNING: the character will be deleted permanently, including the cloud copy. Press “Cancel” to download a copy manually first.",
++  "deleteCloudFailed": "The character was deleted locally, but the cloud copy could not be removed. It may reappear on the next sync — try deleting again later.",
+   "language": {
+     "russian": "Ru",
+     "english": "En",
+@@ -49,7 +51,6 @@
+     "yes": "Yes",
+     "no": "No",
+     "ok": "Ok",
+-    "deleteEverywhere": "Yes \u2014 delete everywhere",
+     "cancel": "Cancel"
+   },
+   "menu": {
+@@ -69,12 +70,12 @@
+     "inProgress": "Syncing with Google Drive",
+     "doNotClose": "Do not close the page until it finishes",
+     "stages": {
+-      "auth": "Signing in to Google\u2026",
+-      "folder": "Looking up setting folder\u2026",
+-      "list": "Reading cloud file list\u2026",
+-      "download": "Downloading from cloud\u2026",
+-      "upload": "Uploading to cloud\u2026",
+-      "done": "Finishing\u2026"
++      "auth": "Signing in to Google…",
++      "folder": "Looking up setting folder…",
++      "list": "Reading cloud file list…",
++      "download": "Downloading from cloud…",
++      "upload": "Uploading to cloud…",
++      "done": "Finishing…"
+     },
+     "uploaded": "Uploaded",
+     "downloaded": "Downloaded",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 6f53e77..ef683be 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -16,14 +16,16 @@
+       "unsupportedVersion": "Версия файла не поддерживается.",
+       "missingCharacter": "В файле отсутствует блок персонажа.",
+       "missingName": "В файле отсутствует имя персонажа.",
+-      "missingData": "В файле отсутствуют данные персонажа.", "unexpected": "Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл."
++      "missingData": "В файле отсутствуют данные персонажа.",
++      "unexpected": "Не удалось загрузить файл персонажа. Проверьте, что выбран корректный .json/.rpgc файл."
+     }
+   },
+   "download": {
+     "unsupported": "Загрузка/сохранение файлов поддерживается только в web-версии.",
+     "errors": {
+       "notFound": "Персонаж не найден.",
+-      "failed": "Не удалось сохранить файл.", "unexpected": "Не удалось скачать персонажа. Подробности — в консоли браузера."
++      "failed": "Не удалось сохранить файл.",
++      "unexpected": "Не удалось скачать персонажа. Подробности — в консоли браузера."
+     }
+   },
+   "characterActions": {
+@@ -49,7 +51,6 @@
+     "yes": "Да",
+     "no": "Нет",
+     "ok": "Ок",
+-    "deleteEverywhere": "Да — удалить везде",
+     "cancel": "Отмена"
+   },
+   "menu": {
+@@ -69,12 +70,12 @@
+     "inProgress": "Синхронизация с Google Drive",
+     "doNotClose": "Не закрывайте страницу до завершения",
+     "stages": {
+-      "auth": "Авторизация в Google\u2026",
+-      "folder": "Поиск папки сеттинга\u2026",
+-      "list": "Чтение списка в облаке\u2026",
+-      "download": "Загрузка из облака\u2026",
+-      "upload": "Выгрузка в облако\u2026",
+-      "done": "Завершение\u2026"
++      "auth": "Авторизация в Google…",
++      "folder": "Поиск папки сеттинга…",
++      "list": "Чтение списка в облаке…",
++      "download": "Загрузка из облака…",
++      "upload": "Выгрузка в облако…",
++      "done": "Завершение…"
+     },
+     "uploaded": "Выгружено",
+     "downloaded": "Загружено",
