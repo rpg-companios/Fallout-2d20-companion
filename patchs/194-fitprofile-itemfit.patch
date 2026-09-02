@@ -1,0 +1,1323 @@
+diff --git a/__tests__/itemfit/itemfit.test.js b/__tests__/itemfit/itemfit.test.js
+new file mode 100644
+index 0000000..77d9e4c
+--- /dev/null
++++ b/__tests__/itemfit/itemfit.test.js
+@@ -0,0 +1,174 @@
++import { describe, expect, it } from 'vitest';
++import {
++  ACTIONS,
++  classifyItemAccess,
++  getBranch,
++} from '../../domain/itemfit';
++
++// Справочник категорий как в данных сеттинга (модуль), чтобы тест не зависел от реестра.
++const CATEGORIES = {
++  robotEquipment: {
++    any: [
++      { item: 'robot_armor_*' },
++      { item: 'robot_plating_*' },
++      { item: 'robot_frame_*' },
++      { item: 'robot_body_*' },
++      { item: 'robot_head_*' },
++      { item: 'robot_arm_*' },
++      { item: 'robot_legs_*' },
++      { item: 'robot_weapon_*' },
++    ],
++  },
++  robotArmor: {
++    any: [
++      { item: 'robot_armor_*' },
++      { item: 'robot_plating_*' },
++      { item: 'robot_frame_*' },
++    ],
++  },
++  robotConsumable: { itemType: 'robotConsumable' },
++  humanArmor: { itemType: ['armor', 'powerArmor'] },
++  powerArmor: { itemType: 'powerArmor' },
++  humanClothing: { itemType: 'clothing' },
++  raiderArmor: { item: 'armor_raider_*' },
++  consumable: { itemType: ['food', 'drinks', 'chem'] },
++};
++
++// Профили как в fitProfiles.json.
++const PROFILES = {
++  human: {
++    equip: { allow: [], forbidden: [{ category: 'robotEquipment' }] },
++    consume: {
++      self: { allow: [], forbidden: [{ category: 'robotConsumable' }] },
++      other: {},
++    },
++  },
++  mutant: {
++    equip: {
++      allow: [],
++      forbidden: [
++        { category: 'robotEquipment' },
++        { category: 'humanArmor' },
++        { category: 'powerArmor' },
++      ],
++      bypassAllow: [{ category: 'raiderArmor' }],
++    },
++    consume: {
++      self: { forbidden: [{ category: 'robotConsumable' }] },
++      other: {},
++    },
++  },
++  robot: {
++    equip: {
++      allow: [],
++      forbidden: [
++        { category: 'humanArmor' },
++        { category: 'humanClothing' },
++        { category: 'powerArmor' },
++      ],
++      bypassAllow: [
++        { category: 'robotArmor' },
++        { item: 'headwear_casual_hat' },
++        { item: 'headwear_fancy_hat' },
++      ],
++    },
++    consume: {
++      self: { forbidden: [{ category: 'consumable' }], bypassAllow: [{ category: 'robotConsumable' }] },
++      other: {},
++    },
++  },
++  cyborg: {
++    equip: { allow: [], forbidden: [{ category: 'robotEquipment' }] },
++    consume: {
++      self: { forbidden: [{ category: 'consumable' }, { category: 'robotConsumable' }] },
++      other: {},
++    },
++  },
++};
++
++const classify = (type, item, action = ACTIONS.EQUIP) =>
++  classifyItemAccess(item, action, PROFILES[type] || {}, CATEGORIES);
++
++const item = (id, itemType, extra = {}) => ({ id, itemType, ...extra });
++
++describe('itemfit classification', () => {
++  it('приоритет: bypassAllow перекрывает forbidden (мутант-рейдерская броня)', () => {
++    expect(classify('mutant', item('armor_raider_chest_001', 'armor')).status).toBe('allowed');
++    expect(classify('mutant', item('armor_leather_chest_001', 'armor')).status).toBe('denied');
++  });
++
++  it('мутанту нельзя силовую броню', () => {
++    expect(classify('mutant', item('power_armor_raider_chest', 'powerArmor')).status).toBe('denied');
++  });
++
++  it('человек: всё можно, кроме робо-предметов', () => {
++    expect(classify('human', item('armor_leather_chest_001', 'armor')).status).toBe('allowed');
++    expect(classify('human', item('weapon_10mm_pistol', 'weapon')).status).toBe('allowed');
++    expect(classify('human', item('robot_arm_001', 'robotArm')).status).toBe('denied');
++    expect(classify('human', item('robot_weapon_manipulator', 'weapon')).status).toBe('denied');
++  });
++
++  it('человек не употребит ремкомплект на себя', () => {
++    expect(classify('human', item('robot_item_repair_kit', 'robotConsumable', { healAmount: 6 }), ACTIONS.CONSUME_SELF).status).toBe('denied');
++    expect(classify('human', item('food_bloatfly_meat', 'food'), ACTIONS.CONSUME_SELF).status).toBe('allowed');
++  });
++
++  it('робот: робо-броня и две шляпы можно, человеческая броня/одежда нельзя', () => {
++    expect(classify('robot', item('robot_plating_standard_body', 'misc')).status).toBe('allowed');
++    expect(classify('robot', item('armor_leather_chest_001', 'armor')).status).toBe('denied');
++    expect(classify('robot', item('headwear_casual_hat', 'clothing')).status).toBe('allowed');
++    expect(classify('robot', item('headwear_fancy_hat', 'clothing')).status).toBe('allowed');
++    expect(classify('robot', item('headwear_military_helmet', 'clothing')).status).toBe('denied');
++    expect(classify('robot', item('clothing_casual_clothes', 'clothing')).status).toBe('denied');
++  });
++
++  it('робот: не употребляет еду/воду/хим на себя, но ремкомплект — можно', () => {
++    expect(classify('robot', item('food_bloatfly_meat', 'food'), ACTIONS.CONSUME_SELF).status).toBe('denied');
++    expect(classify('robot', item('drink_nuka_cola', 'drinks'), ACTIONS.CONSUME_SELF).status).toBe('denied');
++    expect(classify('robot', item('robot_item_repair_kit', 'robotConsumable', { healAmount: 6 }), ACTIONS.CONSUME_SELF).status).toBe('allowed');
++  });
++
++  it('киборг: экипировка как человек, но ничего на себя', () => {
++    expect(classify('cyborg', item('armor_leather_chest_001', 'armor')).status).toBe('allowed');
++    expect(classify('cyborg', item('robot_arm_001', 'robotArm')).status).toBe('denied');
++    expect(classify('cyborg', item('food_bloatfly_meat', 'food'), ACTIONS.CONSUME_SELF).status).toBe('denied');
++    expect(classify('cyborg', item('robot_item_repair_kit', 'robotConsumable', { healAmount: 6 }), ACTIONS.CONSUME_SELF).status).toBe('denied');
++  });
++
++  it('силовая броня: мутанту и роботу нельзя (явная категория powerArmor), человеку — можно', () => {
++    expect(classify('mutant', item('power_armor_raider_chest', 'powerArmor')).status).toBe('denied');
++    expect(classify('robot', item('power_armor_raider_chest', 'powerArmor')).status).toBe('denied');
++    expect(classify('human', item('power_armor_raider_chest', 'powerArmor')).status).toBe('allowed');
++  });
++
++  it('гуль = как человек (нет профиля → {} → разрешено всё)', () => {
++    expect(classify('ghoul', item('armor_leather_chest_001', 'armor')).status).toBe('allowed');
++    expect(classify('ghoul', item('weapon_10mm_pistol', 'weapon')).status).toBe('allowed');
++    expect(classify('ghoul', item('food_bloatfly_meat', 'food'), ACTIONS.CONSUME_SELF).status).toBe('allowed');
++  });
++
++  it('конфликт: bypassAllow ∩ bypassForbidden', () => {
++    const profile = {
++      equip: {
++        allow: [],
++        forbidden: [{ itemType: 'armor' }],
++        bypassAllow: [{ item: 'armor_raider_chest_001' }],
++        bypassForbidden: [{ item: 'armor_raider_chest_001' }],
++      },
++    };
++    const res = classifyItemAccess(item('armor_raider_chest_001', 'armor'), ACTIONS.EQUIP, profile, CATEGORIES);
++    expect(res.status).toBe('conflict');
++  });
++
++  it('getBranch возвращает нужную ветку', () => {
++    const profile = { equip: { allow: [] }, consume: { self: { allow: ['x'] }, other: {} } };
++    expect(getBranch(profile, ACTIONS.EQUIP)).toEqual({ allow: [] });
++    expect(getBranch(profile, ACTIONS.CONSUME_SELF)).toEqual({ allow: ['x'] });
++    expect(getBranch({}, ACTIONS.CONSUME_SELF)).toEqual({});
++  });
++
++  it('категория с несколькими префиксами через any', () => {
++    expect(classify('robot', item('robot_armor_factory_body', 'armor')).status).toBe('allowed');
++    expect(classify('robot', item('headwear_casual_hat', 'clothing')).status).toBe('allowed');
++  });
++});
+diff --git a/__tests__/saves/resolve-item-robotconsumable.test.js b/__tests__/saves/resolve-item-robotconsumable.test.js
+new file mode 100644
+index 0000000..58abba8
+--- /dev/null
++++ b/__tests__/saves/resolve-item-robotconsumable.test.js
+@@ -0,0 +1,29 @@
++import { describe, it, expect } from 'vitest';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog.js';
++import { findCatalogEntry, resolveItem } from '../../domain/resolveItem.js';
++
++const catalog = getEquipmentCatalog('ru-RU');
++
++describe('resolveItem: robotConsumable', () => {
++  it('findCatalogEntry находит ремкомплект по itemType robotConsumable', () => {
++    const entry = findCatalogEntry(catalog, 'robot_item_repair_kit', 'robotConsumable');
++    expect(entry).toBeTruthy();
++    expect(entry.itemType).toBe('robotConsumable');
++  });
++
++  it('resolveItem обогащает новый ремкомплект (robotConsumable) каталожными полями', () => {
++    const instance = { id: 'K1', weaponId: 'robot_item_repair_kit', itemType: 'robotConsumable', healAmount: 6 };
++    const res = resolveItem(instance, catalog);
++    expect(res).toBeTruthy();
++    expect(res.itemType).toBe('robotConsumable');
++    // Каталожные поля подтянулись (не undefined) — значит не потеряно имя/вес/цена.
++    expect(res.name).toBeTruthy();
++  });
++
++  it('старый инстанс ремкомплекта (itemType chem) не ломается и сохраняет state-поля', () => {
++    const instance = { id: 'K1', weaponId: 'robot_item_repair_kit', itemType: 'chem', robotOnly: true, healAmount: 6 };
++    const res = resolveItem(instance, catalog);
++    expect(res).toBeTruthy();
++    expect(res.healAmount).toBe(6);
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 92f33b9..2029e1d 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -32,6 +32,7 @@ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { generateStackKey } from '../../../domain/itemIdentity';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
++import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
+ import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
+ import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+@@ -165,6 +166,9 @@ const InventoryScreen = () => {
+   // isRobot читается из origin.characterType (domain/origins.js). Объявлен ДО
+   // equippedWeaponsForDisplay, который его использует (иначе TDZ при рендере).
+   const isRobot = isRobotCharacter({ origin, trait });
++  // Персонаж для правил fitProfile (характерType + origin). Профиль берётся из
++  // characterType (или origin.fitProfile — полный override).
++  const fitCharacter = { origin, trait };
+ 
+   const equippedWeaponsForDisplay = useMemo(() => {
+     const fromStore = storeEquippedWeapons.map(flattenItemParams);
+@@ -261,7 +265,7 @@ const InventoryScreen = () => {
+     if (itemType === 'weapon') return '🔫';
+     if (itemType === 'armor') return '🛡️';
+     if (itemType === 'clothing' || itemType === 'outfit') return '👕';
+-    if (itemType === 'chem' || itemType === 'chems') return '💊';
++    if (itemType === 'chem' || itemType === 'chems' || itemType === 'robotConsumable') return '💊';
+     if (itemType === 'drinks') return '🥤';
+     if (itemType === 'food') return '🍖';
+     if (itemType === 'magazine') return '📖';
+@@ -389,7 +393,7 @@ const InventoryScreen = () => {
+     });
+ 
+     const applyToSelf = () => {
+-      if (isRobot) {
++      if (!canConsumeOnSelf(consumableItem, fitCharacter)) {
+         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
+         return;
+       }
+@@ -436,6 +440,10 @@ const InventoryScreen = () => {
+     };
+ 
+     const applyToOther = () => {
++      if (!canConsumeOnOther(consumableItem, fitCharacter)) {
++        showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
++        return;
++      }
+       const report = buildConsumableResultReport({ itemName });
+       showAlert(report.title, report.message);
+       handleRemoveItem(consumableItem, 1);
+@@ -1416,7 +1424,11 @@ const InventoryScreen = () => {
+     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
+     const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
+     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
+-    const isConsumable = item.itemType === 'chem' || item.itemType === 'chems' || item.itemType === 'drinks' || item.itemType === 'food';
++    const isConsumable =
++      item.itemType === 'chem' || item.itemType === 'chems'
++      || item.itemType === 'drinks' || item.itemType === 'food'
++      || item.itemType === 'robotConsumable'
++      || item.healAmount != null;
+ 
+     // Нерабочее встроенное оружие (ракетница/гранатомёт до ОС Mk II): строка
+     // помечается, пока драйвер не применён (флаг mk2Installed).
+@@ -1521,7 +1533,9 @@ const InventoryScreen = () => {
+               </TouchableOpacity>
+           )}
+ 
+-          {isConsumable && !item.isEquipped && !isRobot && (
++          {isConsumable && !item.isEquipped
++            && (canConsumeOnSelf(localizedDisplayItem, fitCharacter)
++                || canConsumeOnOther(localizedDisplayItem, fitCharacter)) && (
+               <TouchableOpacity 
+                   style={[styles.actionButton, styles.applyButton]} 
+                   onPress={() => handleApplyConsumable(localizedDisplayItem)}>
+diff --git a/domain/allowlist.js b/domain/allowlist.js
+deleted file mode 100644
+index aa60506..0000000
+--- a/domain/allowlist.js
++++ /dev/null
+@@ -1,95 +0,0 @@
+-// domain/allowlist.js
+-// Общая движковая функция поддержки белого списка по слагу/id/категории.
+-// Домен — движок, где общие правила. Частные случаи (что именно может носить робот) — вне домена.
+-
+-/**
+- * Проверяет входит ли предмет в allowlist.
+- * Allowlist может быть:
+- *  - массив строк: каждая строка — id, itemType или префикс (если заканчивается на '_' или содержит '*')
+- *  - объект { itemTypes: [], ids: [], prefixes: [] }
+- *  - объект-словарь { [slug]: true } где ключи — разрешённые id/категории
+- *
+- * @param {object} item - предмет с полями id, itemType, weaponId и т.д.
+- * @param {object|array} allowlist - белый список
+- * @returns {boolean}
+- */
+-export function isItemInAllowlist(item, allowlist) {
+-  if (!item || !allowlist) return false;
+-
+-  const id = String(item.id || item.weaponId || item.armorId || item.clothingId || '');
+-  const itemType = String(item.itemType || '');
+-
+-  // Legacy override: если на самом предмете стоит robotOnly/mutantOnly/canRobotWear — считаем разрешённым
+-  // Это позволяет быстро пометить предмет в данных без правки allowlist
+-  if (item.robotOnly === true || item.robotArmorType || item.canRobotWear === true) return true;
+-  if (item.mutantOnly === true) return true;
+-
+-  // Allowlist как массив
+-  if (Array.isArray(allowlist)) {
+-    for (const entry of allowlist) {
+-      const slug = String(entry);
+-      if (!slug) continue;
+-      if (id === slug) return true;
+-      if (itemType === slug) return true;
+-      // Префикс: если entry заканчивается на '_' или содержит '*' — проверяем startsWith
+-      if (slug.endsWith('_') || slug.includes('*')) {
+-        const prefix = slug.replace('*', '');
+-        if (id.startsWith(prefix)) return true;
+-      }
+-      // Поддержка категорий из примера владельца: robotArmor, robotPlating и т.д.
+-      // Мапим их на реальные типы/префиксы через простую таблицу (движковая, не частная)
+-      if (CATEGORY_ALIASES[slug]) {
+-        const mapped = CATEGORY_ALIASES[slug];
+-        if (mapped.itemTypes && mapped.itemTypes.includes(itemType)) return true;
+-        if (mapped.prefixes && mapped.prefixes.some(p => id.startsWith(p))) return true;
+-        if (mapped.ids && mapped.ids.includes(id)) return true;
+-      }
+-    }
+-    return false;
+-  }
+-
+-  // Allowlist как объект-словарь { [slug]: true }
+-  if (allowlist && typeof allowlist === 'object' && !allowlist.itemTypes && !allowlist.ids && !allowlist.prefixes && !allowlist.allowedIds) {
+-    // Проверяем ключи объекта как разрешённые слаги
+-    for (const key of Object.keys(allowlist)) {
+-      if (!allowlist[key]) continue; // false — пропускаем
+-      if (id === key) return true;
+-      if (itemType === key) return true;
+-      if (key.endsWith('_') && id.startsWith(key)) return true;
+-      if (CATEGORY_ALIASES[key]) {
+-        const mapped = CATEGORY_ALIASES[key];
+-        if (mapped.itemTypes && mapped.itemTypes.includes(itemType)) return true;
+-        if (mapped.prefixes && mapped.prefixes.some(p => id.startsWith(p))) return true;
+-      }
+-    }
+-    return false;
+-  }
+-
+-  // Allowlist как структурированный объект { itemTypes, ids, prefixes, allowedIds }
+-  const itemTypes = allowlist.itemTypes instanceof Set ? Array.from(allowlist.itemTypes) : (allowlist.itemTypes || []);
+-  const ids = allowlist.ids instanceof Set ? Array.from(allowlist.ids) : (allowlist.allowedIds instanceof Set ? Array.from(allowlist.allowedIds) : (allowlist.ids || allowlist.allowedIds || []));
+-  const prefixes = allowlist.prefixes || allowlist.idPrefixes || [];
+-
+-  if (itemTypes.includes(itemType)) return true;
+-  if (ids.includes(id)) return true;
+-  for (const prefix of prefixes) {
+-    if (id.startsWith(String(prefix))) return true;
+-  }
+-
+-  return false;
+-}
+-
+-// Алиасы категорий из примера владельца: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat }
+-// Это общая движковая таблица маппинга категорий на реальные типы/префиксы, не частный случай конкретных предметов.
+-// Частный случай — какие именно id добавить в fancyHat и т.д. — в данных вне домена.
+-const CATEGORY_ALIASES = Object.freeze({
+-  robotArmor: { itemTypes: ['robotArmor', 'armor'], prefixes: ['robot_armor_'] },
+-  robotPlating: { itemTypes: ['plating'], prefixes: ['robot_plating_'] },
+-  robotFrame: { itemTypes: ['frame', 'robotFrame'], prefixes: ['robot_frame_'] },
+-  robotLims: { itemTypes: ['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'robotPart'], prefixes: ['robot_head_', 'robot_body_', 'robot_legs_', 'robot_leg_', 'robot_arm_'] },
+-  robotLimbs: { itemTypes: ['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs', 'robotPart'], prefixes: ['robot_head_', 'robot_body_', 'robot_legs_', 'robot_leg_', 'robot_arm_'] },
+-  robotWeapons: { itemTypes: ['weapon'], prefixes: ['robot_weapon_', 'robot_arm_'] },
+-  fancyHat: { ids: ['headwear_fancy_hat'] },
+-  casualHat: { ids: ['headwear_casual_hat'] },
+-  // Можно расширять без правки частной логики
+-});
+diff --git a/domain/equipEquip.js b/domain/equipEquip.js
+index 926955b..30c5741 100644
+--- a/domain/equipEquip.js
++++ b/domain/equipEquip.js
+@@ -1,185 +1,75 @@
+ // domain/equipEquip.js
+-// Pure functions for equip eligibility checks — IRON RULES for robots/mutants.
++// Pure functions for equip eligibility checks.
+ // No React, no UI dependencies. All reason strings are i18n keys.
+ //
+-// Armor policy and character archetype now live in domain/origins.js
+-// (characterType drives the default policy; origin.armorPolicy overrides).
++// Политика определяется фичи-профилем (fitProfile) на characterType/origin
++// (см. domain/itemfit.js + domain/itemfitRules.js). Прежняя цепочка
++// origins.armorPolicy → getArmorPolicy → canEquip* → allowlist УДАЛЕНА:
++//   - domain/allowlist.js (isItemInAllowlist) не используется;
++//   - modules/fallout/data/allowlist/robotOnly.js / mutantOnly.js не используются.
+ //
+-// Домен — движок где общие правила. Частный случай (что именно может носить робот) — вне домена.
+-// - Общая движковая функция белого списка: domain/allowlist.js isItemInAllowlist()
+-// - Частные списки: modules/fallout/data/allowlist/robotOnly.js, mutantOnly.js
+-//   Просто список id и/или категорий: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }
++// Эти функции сохранены как УДОБНЫЕ ОБЁРТКИ над isItemAllowed(item, action,
++// character), чтобы не менять публичный API вызывающих (InventoryScreen,
++// CharacterContext). «Наличие руки» у робота для оружия проверяется отдельно в
++// слот/body-plan слое (domain/robotEquip.js) — здесь только статичный вопрос.
+ 
+ import { getAttributeValue, getEquipmentCarryWeightModifier } from './characterCreation';
+-import { ARMOR_POLICIES, getArmorPolicy, isRobotCharacter } from './origins';
+-import { isItemInAllowlist } from './allowlist';
+-// Частные списки — вне домена (private case), импортируются сюда для применения общего правила
+-import { robotOnly as ROBOT_ONLY_DICT, ROBOT_ONLY_STRUCTURED } from '../modules/fallout/data/allowlist/robotOnly';
+-import { mutantOnly as MUTANT_ONLY_DICT, MUTANT_ONLY_STRUCTURED } from '../modules/fallout/data/allowlist/mutantOnly';
++import { isRobotCharacter } from './origins';
++import { isItemAllowed, ACTIONS } from './itemfitRules';
+ 
+ /** True if the item is power armor (frame or piece). */
+ export const isPowerArmorItem = (item) =>
+   Boolean(item?.itemType === 'powerArmor' || String(item?.id || '').startsWith('power_armor_'));
+ 
+-/** True if the weapon comes from robot weapons catalog (whitelist for robots). */
+-const isRobotOnlyWeapon = (weaponItem) =>
+-  Boolean(
+-    weaponItem?.isRobotWeapon
+-    || weaponItem?.robotOnly
+-    || String(weaponItem?.id || '').startsWith('robot_weapon_')
+-    || String(weaponItem?.id || '').startsWith('robot_arm_')
+-  );
+-
+-/** Проверка: входит ли предмет в белый список роботов (частный случай через общий движок) */
+-function isRobotAllowed(item, character = null) {
+-  // 1. Инжект через трейт/ориджин (owner-only мега-случай): character.origin.robotOnly или trait.robotOnly
+-  const injectedAllowlist = character?.origin?.robotOnly || character?.trait?.robotOnly || character?.origin?.allowlist || null;
+-  if (injectedAllowlist && isItemInAllowlist(item, injectedAllowlist)) return true;
+-
+-  // 2. Глобальный белый список роботов (частный случай в данных)
+-  if (isItemInAllowlist(item, ROBOT_ONLY_DICT)) return true;
+-  if (isItemInAllowlist(item, ROBOT_ONLY_STRUCTURED)) return true;
+-
+-  return false;
+-}
+-
+-function isMutantAllowed(item, character = null) {
+-  const injectedAllowlist = character?.origin?.mutantOnly || character?.trait?.mutantOnly || null;
+-  if (injectedAllowlist && isItemInAllowlist(item, injectedAllowlist)) return true;
+-
+-  if (isItemInAllowlist(item, MUTANT_ONLY_DICT)) return true;
+-  if (isItemInAllowlist(item, MUTANT_ONLY_STRUCTURED)) return true;
+-
+-  // Legacy flag на предмете
+-  if (item?.mutantOnly === true) return true;
+-
+-  return false;
+-}
+-
+-/** Для совместимости — теперь через общий allowlist */
+-const isRobotDecorativeHat = (clothingItem) => isRobotAllowed(clothingItem);
++/** Причина запрета для алерта (различаем роботов и остальных архетипов). */
++const denyReason = (character, reasonIfRobot, reasonElse) =>
++  isRobotCharacter(character) ? reasonIfRobot : reasonElse;
+ 
+ /**
+  * Check whether a character can equip a given armor item.
+- *
+- * WHITELIST PRINCIPLE (owner):
+- *  - ROBOT_ONLY: allowed ONLY if item in robotOnly allowlist (domain/allowlist.js engine + data/allowlist/robotOnly.js private)
+- *  - RAIDER_ONLY: allowed ONLY if item in mutantOnly allowlist
+- *  - STANDARD: allowed if NOT in robot/mutant allowlists
+  */
+ export function canEquipArmor(armorItem, character) {
+-  const policy = getArmorPolicy(character);
+-  const robotAllowed = isRobotAllowed(armorItem, character);
+-  const mutantAllowed = isMutantAllowed(armorItem, character);
+-
+-  if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+-    if (!robotAllowed) {
+-      return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+-    }
++  if (isItemAllowed(armorItem, ACTIONS.EQUIP, character)) {
+     return { allowed: true, reason: null };
+   }
+-
+-  if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+-    if (!mutantAllowed) {
+-      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+-    }
+-    return { allowed: true, reason: null };
+-  }
+-
+-  if (robotAllowed) {
+-    return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+-  }
+-  if (mutantAllowed) {
+-    return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
+-  }
+-
+-  return { allowed: true, reason: null };
++  return {
++    allowed: false,
++    reason: denyReason(character, 'equip.error.robotCannotWearStandardArmor', 'equip.error.mutantCannotWearStandardArmor'),
++  };
+ }
+ 
+ /**
+  * Check whether a character can equip a given weapon item.
+- *
+- * Rules (updated per owner clarification allow_standard_with_arm):
+- *  - Robot-only weapon + non-robot character -> blocked (humans cannot use robot weapons)
+- *  - Standard weapon + robot character -> ALLOWED, but actual equip via inventory
+- *    requires arm with canHoldWeapons=true (enforced in InventoryScreen, not here)
+- *    This allows Mister Handy / etc with manipulator to pick up 10mm pistol.
+- *  - Everything else -> allowed.
++ * Роботы могут использовать стандартное оружие при наличии руки (проверка в
++ * InventoryScreen/findFreeWeaponHand) — здесь статично разрешаем; запрет — если
++ * предмет вообще не подходит архетипу (например, человеку — робо-оружие).
+  */
+ export function canEquipWeapon(weaponItem, character) {
+-  const policy = getArmorPolicy(character);
+-  const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
+-  const isRobotWeapon = isRobotOnlyWeapon(weaponItem);
+-
+-  if (isRobotWeapon && !isRobotChar) {
+-    return { allowed: false, reason: 'equip.error.robotOnlyWeapon' };
++  if (isItemAllowed(weaponItem, ACTIONS.EQUIP, character)) {
++    return { allowed: true, reason: null };
+   }
+-
+-  // Robots can use standard weapons if they have a holding arm — check is in InventoryScreen (findFreeWeaponHand)
+-  // So we allow here, UI will hide button if no arm.
+-
+-  return { allowed: true, reason: null };
++  return { allowed: false, reason: denyReason(character, 'equip.error.robotCannotUseStandardWeapon', 'equip.error.robotOnlyWeapon') };
+ }
+ 
+ export function canEquipClothing(clothingItem, character) {
+-  const policy = getArmorPolicy(character);
+-  const isRobotChar = policy === ARMOR_POLICIES.ROBOT_ONLY;
+-  const isMutantChar = policy === ARMOR_POLICIES.RAIDER_ONLY;
+-
+-  if (isRobotChar) {
+-    if (!isRobotAllowed(clothingItem, character)) {
+-      return { allowed: false, reason: 'equip.error.robotCannotWearClothing' };
+-    }
++  if (isItemAllowed(clothingItem, ACTIONS.EQUIP, character)) {
+     return { allowed: true, reason: null };
+   }
+-
+-  if (isMutantChar) {
+-    if (!isMutantAllowed(clothingItem, character)) {
+-      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+-    }
+-    return { allowed: true, reason: null };
+-  }
+-
+-  if (isRobotAllowed(clothingItem, character)) {
+-    return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+-  }
+-  if (isMutantAllowed(clothingItem, character)) {
+-    return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
+-  }
+-
+-  return { allowed: true, reason: null };
++  return { allowed: false, reason: 'equip.error.robotCannotWearClothing' };
+ }
+ 
+ /**
+- * Power armor equip check — WHITELIST PRINCIPLE.
+- * Частный список вне домена, движок — domain/allowlist.js
++ * Power armor equip check — через fitProfile (силовая броня — itemType
++ * 'powerArmor', входит в категорию humanArmor; мутантам/роботам запрещена).
+  */
+ export function canEquipPowerArmor(powerArmorItem, character) {
+-  const policy = getArmorPolicy(character);
+-  const robotAllowed = isRobotAllowed(powerArmorItem, character);
+-  const mutantAllowed = isMutantAllowed(powerArmorItem, character);
+-
+-  if (policy === ARMOR_POLICIES.ROBOT_ONLY) {
+-    if (!robotAllowed) {
+-      return { allowed: false, reason: 'equip.error.robotCannotWearStandardArmor' };
+-    }
+-    return { allowed: true, reason: null };
+-  }
+-  if (policy === ARMOR_POLICIES.RAIDER_ONLY) {
+-    if (!mutantAllowed) {
+-      return { allowed: false, reason: 'equip.error.mutantCannotWearStandardArmor' };
+-    }
++  if (isItemAllowed(powerArmorItem, ACTIONS.EQUIP, character)) {
+     return { allowed: true, reason: null };
+   }
+-
+-  if (robotAllowed) {
+-    return { allowed: false, reason: 'equip.error.cannotWearRobotArmor' };
+-  }
+-  if (mutantAllowed) {
+-    return { allowed: false, reason: 'equip.error.cannotWearMutantArmor' };
+-  }
+-
+-  return { allowed: true, reason: null };
++  return {
++    allowed: false,
++    reason: denyReason(character, 'equip.error.robotCannotWearStandardArmor', 'equip.error.mutantCannotWearStandardArmor'),
++  };
+ }
+ 
+ export function filterAvailableArmor(allArmor, character) {
+diff --git a/domain/itemfit.js b/domain/itemfit.js
+new file mode 100644
+index 0000000..aba5abe
+--- /dev/null
++++ b/domain/itemfit.js
+@@ -0,0 +1,124 @@
++// domain/itemfit.js
++// Механика ограничения предметов по архетипу (fitProfile) и по действию.
++// ЧИСТЫЕ ФУНКЦИИ: никаких данных сеттинга, никакого React/RN.
++// Данные (fitProfile, справочник категорий) передаются аргументами.
++//
++// Заменяет цепочку origins.armorPolicy → getArmorPolicy → canEquipArmor/
++// canEquipWeapon/canEquipClothing (+ allowlist на origin/main).
++//
++// Модель:
++//   fitProfile = {
++//     equip:        { allow, forbidden, bypassAllow, bypassForbidden },
++//     consume: { self: {...}, other: {...} }
++//   }
++//   Профиль {} (или отсутствие ветки) = «по умолчанию разрешено всё».
++//
++// Действие (action):
++//   'equip'         — носить/держать (броня, одежда, оружие, конечность)
++//   'consume.self'  — использовать предмет на себе
++//   'consume.other' — применить на другом
++// Всё прочее (лут/покупка/продажа/передача/мода) НЕ ограничивается fitProfile.
++
++export const ACTIONS = Object.freeze({
++  EQUIP: 'equip',
++  CONSUME_SELF: 'consume.self',
++  CONSUME_OTHER: 'consume.other',
++});
++
++/**
++ * Возвращает ветку профиля для действия.
++ * 'equip' -> profile.equip; 'consume.self'/'consume.other' -> profile.consume.*.
++ */
++export function getBranch(profile = {}, action = ACTIONS.EQUIP) {
++  if (action === ACTIONS.EQUIP) return profile.equip ?? {};
++  if (action === ACTIONS.CONSUME_SELF) return profile.consume?.self ?? {};
++  if (action === ACTIONS.CONSUME_OTHER) return profile.consume?.other ?? {};
++  return {};
++}
++
++const ruleValue = (rule, key) => {
++  const v = rule?.[key];
++  return Array.isArray(v) ? v : [];
++};
++
++// Сопоставление item с ОДНИМ матчером. Все ключи матчера = И (AND).
++function matchMatcher(item, matcher, categories) {
++  if (!matcher || typeof matcher !== 'object') return false;
++  for (const [key, expected] of Object.entries(matcher)) {
++    if (expected === undefined) continue;
++
++    if (key === 'category') {
++      const def = categories?.[expected];
++      if (!def || !matchMatcher(item, def, categories)) return false;
++      continue;
++    }
++    if (key === 'any') {
++      if (!Array.isArray(expected)) return false;
++      if (!expected.some((m) => matchMatcher(item, m, categories))) return false;
++      continue;
++    }
++    if (key === 'not') {
++      if (matchMatcher(item, expected, categories)) return false;
++      continue;
++    }
++    if (key === 'item') {
++      const id = String(item?.id ?? '');
++      const pattern = String(expected);
++      if (pattern.endsWith('*')) {
++        if (!id.startsWith(pattern.slice(0, -1))) return false;
++      } else if (id !== pattern) {
++        return false;
++      }
++      continue;
++    }
++    if (key === 'idRoot') {
++      if (!String(item?.id ?? '').startsWith(String(expected))) return false;
++      continue;
++    }
++
++    // Обычное поле предмета.
++    const actual = item?.[key];
++    if (Array.isArray(expected)) {
++      if (!expected.includes(actual)) return false;
++    } else if (expected === true) {
++      if (!actual) return false;
++    } else if (expected === false) {
++      if (actual) return false;
++    } else if (actual !== expected) {
++      return false;
++    }
++  }
++  return true;
++}
++
++// Сопоставление item со СПИСКОМ матчеров. Пустой список = false.
++// Разные элементы = ИЛИ (OR).
++function matchList(list, item, categories) {
++  if (!Array.isArray(list) || list.length === 0) return false;
++  return list.some((m) => matchMatcher(item, m, categories));
++}
++
++/**
++ * Классификация доступа предмета по действию.
++ * @returns {{status:'allowed'|'denied'|'conflict', layer:string}}
++ */
++export function classifyItemAccess(item, action, profile = {}, categories = {}) {
++  const branch = getBranch(profile, action);
++  const bf = matchList(ruleValue(branch, 'bypassForbidden'), item, categories);
++  const ba = matchList(ruleValue(branch, 'bypassAllow'), item, categories);
++  const allowArr = ruleValue(branch, 'allow');
++  const allowExplicit = allowArr.length > 0;
++  const am = allowExplicit && matchList(allowArr, item, categories);
++  const fm = matchList(ruleValue(branch, 'forbidden'), item, categories);
++
++  // Конфликты: где разрешающее и запрещающее правила одной силы пересеклись.
++  if (bf && ba) return { status: 'conflict', layer: 'bypass' };
++  if (am && fm) return { status: 'conflict', layer: 'allow∩forbidden' };
++
++  // Детерминированный приоритет.
++  if (bf) return { status: 'denied', layer: 'bypassForbidden' };
++  if (ba) return { status: 'allowed', layer: 'bypassAllow' };
++  if (allowExplicit && !am) return { status: 'denied', layer: 'not-in-allow' };
++  if (fm) return { status: 'denied', layer: 'forbidden' };
++  return { status: 'allowed', layer: 'default' };
++}
+diff --git a/domain/itemfitRules.js b/domain/itemfitRules.js
+new file mode 100644
+index 0000000..27f9f2b
+--- /dev/null
++++ b/domain/itemfitRules.js
+@@ -0,0 +1,58 @@
++// domain/itemfitRules.js
++// Связка чистой механики (domain/itemfit.js) с данными сеттинга:
++//   - профили fitProfile по characterType   — modules/fallout/data/origins/fitProfiles.json
++//   - справочник категорий                  — modules/fallout/data/equipment/categories.json
++// Читает их через реестр (единственная точка доступа к данным движка).
++//
++// Публичный API:
++//   getFitProfile(character)         -> fitProfile (origin.fitProfile ?? type.fitProfile ?? {})
++//   isItemAllowed(item, action, character)   -> boolean
++//   classifyItemAccess(item, action, character) -> {status, layer}
++//   getItemConflict(item, action, character) -> layer|null
++//   canConsumeOnSelf(item, character)        -> boolean
++//   canConsumeOnOther(item, character)       -> boolean
++
++import { getFitProfileData, getCategories } from './registry';
++import {
++  ACTIONS,
++  classifyItemAccess as classifyPure,
++  getBranch,
++} from './itemfit';
++
++/**
++ * Профиль для персонажа:
++ *   origin.fitProfile (полный override) ?? fitProfile по characterType ?? {}
++ */
++export function getFitProfile(character) {
++  const origin = character?.origin || {};
++  if (origin.fitProfile) return origin.fitProfile;
++  const type = origin.characterType || 'human';
++  return getFitProfileData()[type] ?? {};
++}
++
++/** Полный доступ (слой + статус). */
++export function classifyItemAccess(item, action = ACTIONS.EQUIP, character) {
++  return classifyPure(item, action, getFitProfile(character), getCategories());
++}
++
++/** Бул: разрешено ли действие над предметом. */
++export function isItemAllowed(item, action = ACTIONS.EQUIP, character) {
++  return classifyItemAccess(item, action, character).status === 'allowed';
++}
++
++/** Слой конфликта, либо null, если конфликта нет. Для алерта. */
++export function getItemConflict(item, action = ACTIONS.EQUIP, character) {
++  const result = classifyItemAccess(item, action, character);
++  return result.status === 'conflict' ? result.layer : null;
++}
++
++export function canConsumeOnSelf(item, character) {
++  return isItemAllowed(item, ACTIONS.CONSUME_SELF, character);
++}
++
++export function canConsumeOnOther(item, character) {
++  return isItemAllowed(item, ACTIONS.CONSUME_OTHER, character);
++}
++
++// Re-export вспомогательного для удобства (если понадобится ветка напрямую).
++export { getBranch, ACTIONS };
+diff --git a/domain/origins.js b/domain/origins.js
+index 1fc5bc8..820f107 100644
+--- a/domain/origins.js
++++ b/domain/origins.js
+@@ -6,7 +6,10 @@
+ //
+ // Per docs/schema/01-origins.md (zustand-robot branch):
+ //  - characterType ∈ {human, mutant, robot, cyborg, ghoul}
+-//  - armorPolicy defaults from characterType; origin.armorPolicy overrides only when different
++//  - Профиль экипировки/использования теперь задаётся fitProfile
++//    (см. domain/itemfit.js + domain/itemfitRules.js + модульные данные
++//    modules/fallout/data/origins/fitProfiles.json). Прежняя цепочка
++//    armorPolicy → getArmorPolicy → canEquip* удалена.
+ //  - No type-derived immunities (user decision: immunities are explicit lists per origin/trait)
+ //
+ import { getOrigins, getOriginI18n } from './registry';
+@@ -26,22 +29,6 @@ export const CHARACTER_TYPES = Object.freeze({
+   GHOUL: 'ghoul',
+ });
+ 
+-export const ARMOR_POLICIES = Object.freeze({
+-  STANDARD: 'standard',
+-  RAIDER_ONLY: 'raiderOnly',
+-  ROBOT_ONLY: 'robotOnly',
+-});
+-
+-// Per-characterType default armor policy.
+-// Origin can override via origin.armorPolicy (rare; shadow doesn't anymore).
+-const DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE = Object.freeze({
+-  [CHARACTER_TYPES.HUMAN]:  ARMOR_POLICIES.STANDARD,
+-  [CHARACTER_TYPES.MUTANT]: ARMOR_POLICIES.RAIDER_ONLY,
+-  [CHARACTER_TYPES.ROBOT]:  ARMOR_POLICIES.ROBOT_ONLY,
+-  [CHARACTER_TYPES.GHOUL]:  ARMOR_POLICIES.STANDARD,
+-  [CHARACTER_TYPES.CYBORG]: ARMOR_POLICIES.STANDARD,
+-});
+-
+ const ORIGIN_DICTIONARIES = { 'ru-RU': getOriginI18n('ru-RU'), 'en-EN': getOriginI18n('en-EN') };
+ 
+ // ---------------------------------------------------------------------------
+@@ -63,17 +50,6 @@ export const isRobotCharacter  = (character) => getCharacterType(character) ===
+ export const isCyborgCharacter = (character) => getCharacterType(character) === CHARACTER_TYPES.CYBORG;
+ export const isGhoulCharacter  = (character) => getCharacterType(character) === CHARACTER_TYPES.GHOUL;
+ 
+-/**
+- * Returns armor policy for a character.
+- * Priority: origin.armorPolicy (if present) → characterType default.
+- */
+-export function getArmorPolicy(character) {
+-  const override = character?.origin?.armorPolicy;
+-  if (override) return override;
+-  return DEFAULT_ARMOR_POLICY_BY_CHARACTER_TYPE[getCharacterType(character)]
+-    ?? ARMOR_POLICIES.STANDARD;
+-}
+-
+ /**
+  * Returns the body plan.
+  * - For robot origins: origin.bodyPlan (mandatory in data).
+@@ -174,7 +150,6 @@ export function loadEnrichedOrigins() {
+       equipmentKitIds: origin.equipmentKitIds || [],
+       equipmentKits,
+       bodyPlan: origin.bodyPlan ?? null,
+-      armorPolicy: origin.armorPolicy ?? null,
+     };
+   });
+ }
+diff --git a/domain/powerArmor.js b/domain/powerArmor.js
+index fe07691..533679f 100644
+--- a/domain/powerArmor.js
++++ b/domain/powerArmor.js
+@@ -9,6 +9,7 @@
+ 
+ import { rollByType } from './diceRollsLogic';
+ import { getCanonicalAttributeKey } from './characterCreation';
++import { isItemAllowed, ACTIONS } from './itemfitRules';
+ 
+ // Расход зарядов Ядерного блока каркасом, зарядов в час. Временное значение (§3.3 плана).
+ export const PA_CORE_DRAIN_PER_HOUR = 5;
+@@ -120,23 +121,19 @@ export const hasFrame = (equipped) => Boolean(equipped?.frame);
+ 
+ /**
+  * Можно ли надеть часть (§5.2): нужен надетый каркас; часть с прочностью 0 не надевается.
+- * WHITELIST: роботы могут носить силовую броню только если у предмета есть robotOnly (мега-случай через трейт/ориджин).
+- * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | null.
++ * Архетипная проверка теперь идёт через fitProfile (domain/itemfitRules.isItemAllowed):
++ * роботы и мутанты не могут носить силовую броню (запрет powerArmor в fitProfile).
++ * reason: 'needsFrame' | 'broken' | 'robotCannotWear' | 'mutantCannotWear' | null.
+  */
+ export const canEquipPowerArmorPiece = (equipped, piece, character = null) => {
+   if (!hasFrame(equipped)) return { ok: false, reason: 'needsFrame' };
+   if (isPieceBroken(piece)) return { ok: false, reason: 'broken' };
+-  if (character && character.origin && character.origin.characterType === 'robot') {
+-    // Whitelist: если у части/фрейма нет robotOnly, робот не может носить
+-    const isRobotAllowed = Boolean(piece?.robotOnly || equipped?.frame?.robotOnly);
+-    if (!isRobotAllowed) {
+-      return { ok: false, reason: 'robotCannotWear' };
+-    }
+-  }
+-  if (character && character.origin && character.origin.characterType === 'mutant') {
+-    const isMutantAllowed = Boolean(piece?.mutantOnly || equipped?.frame?.mutantOnly);
+-    if (!isMutantAllowed) {
+-      return { ok: false, reason: 'mutantCannotWear' };
++
++  const type = character?.origin?.characterType;
++  if (type === 'robot' || type === 'mutant') {
++    const allowed = isItemAllowed(piece, ACTIONS.EQUIP, character);
++    if (!allowed) {
++      return { ok: false, reason: type === 'robot' ? 'robotCannotWear' : 'mutantCannotWear' };
+     }
+   }
+   return { ok: true, reason: null };
+diff --git a/domain/registry.js b/domain/registry.js
+index 48d77ca..91fea36 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -13,6 +13,8 @@
+ import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
+ 
+ import moduleOrigins from '../modules/fallout/data/origins/origins.json';
++import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
++import moduleCategories from '../modules/fallout/data/equipment/categories.json';
+ import moduleTraits from '../modules/fallout/data/traits/traits.json';
+ import modulePerks from '../modules/fallout/data/perks/perks.json';
+ import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+@@ -66,6 +68,22 @@ export function getOrigins() {
+   return moduleOrigins;
+ }
+ 
++/**
++ * Профили fitProfile по characterType (данные сеттинга). Заменяет
++ * цепочку origins.armorPolicy → canEquip → allowlist.
++ */
++export function getFitProfileData() {
++  return moduleFitProfiles;
++}
++
++/**
++ * Справочник категорий предметов (данные сеттинга). Категории используются
++ * матчерами fitProfile и соответствуют наборам данных (поля/id данных).
++ */
++export function getCategories() {
++  return moduleCategories;
++}
++
+ /**
+  * Все трейты: база + модуль.
+  */
+diff --git a/domain/resolveItem.js b/domain/resolveItem.js
+index e8504f0..b955c21 100644
+--- a/domain/resolveItem.js
++++ b/domain/resolveItem.js
+@@ -89,6 +89,14 @@ export const findCatalogEntry = (catalog, id, itemType) => {
+         || search(catalog.robotHeads)
+         || search(catalog.robotPlating)
+         || search(catalog.robotFrames);
++    case 'robotConsumable':
++      // Робо-расходники (ремкомплект и будущие): владелец задаёт их в
++      // general_goods.json с itemType "robotConsumable" → каталог generalGoods.
++      // Ищем по всем возможным контейнерам, чтобы новый расходник не потерял
++      // обогащения (имя/вес/цену/эффект), где бы он ни лежал.
++      return search(catalog.generalGoods)
++        || search(catalog.robotItems)
++        || search(catalog.robotModules);
+     case 'misc':
+     default: {
+       const misc = flattenMisc(catalog.miscellaneous);
+diff --git a/modules/fallout/data/allowlist/mutantOnly.js b/modules/fallout/data/allowlist/mutantOnly.js
+deleted file mode 100644
+index 16b8eaa..0000000
+--- a/modules/fallout/data/allowlist/mutantOnly.js
++++ /dev/null
+@@ -1,14 +0,0 @@
+-// modules/fallout/data/allowlist/mutantOnly.js
+-// Частный случай: что может носить мутант (RAIDER_ONLY / MUTANT)
+-// Просто список id и/или категорий.
+-
+-export const mutantOnly = Object.freeze({
+-  // Пока пусто, броня помечается mutantOnly в данных
+-  // Добавить что-то — просто ключ: true
+-});
+-
+-export const MUTANT_ONLY_STRUCTURED = Object.freeze({
+-  itemTypes: Object.freeze([]),
+-  prefixes: Object.freeze([]),
+-  ids: Object.freeze([]),
+-});
+diff --git a/modules/fallout/data/allowlist/robotOnly.js b/modules/fallout/data/allowlist/robotOnly.js
+deleted file mode 100644
+index 611535b..0000000
+--- a/modules/fallout/data/allowlist/robotOnly.js
++++ /dev/null
+@@ -1,54 +0,0 @@
+-// modules/fallout/data/allowlist/robotOnly.js
+-// Частный случай: что может носить робот (ROBOT_ONLY).
+-// Просто список id и/или категорий: robotOnly:{ robotArmor, robotPlating, robotFrame, robotLims, robotWeapons, fancyHat, ... }
+-// Хочешь пиджак — добавляешь его id сюда. Бандану — сюда.
+-
+-export const robotOnly = Object.freeze({
+-  // Категории (мапятся в движке на itemTypes/префиксы)
+-  robotArmor: true,
+-  robotPlating: true,
+-  robotFrame: true,
+-  robotLims: true,
+-  robotWeapons: true,
+-
+-  // Конкретные предметы — только реальные id, без дублей (fancyHat == headwear_fancy_hat)
+-  headwear_casual_hat: true,
+-  headwear_fancy_hat: true,
+-  headwear_bos_scribe_hat: true,
+-  headwear_bos_scribe_hat_2: true,
+-  headwear_bos_field_scribe_hat: true,
+-});
+-
+-// Структурированный вариант для движка
+-export const ROBOT_ONLY_STRUCTURED = Object.freeze({
+-  itemTypes: Object.freeze([
+-    'plating',
+-    'frame',
+-    'robotArmor',
+-    'robotFrame',
+-    'robotArm',
+-    'robotHead',
+-    'robotBody',
+-    'robotLeg',
+-    'robotLegs',
+-    'robotPart',
+-    'module',
+-  ]),
+-  prefixes: Object.freeze([
+-    'robot_weapon_',
+-    'robot_arm_',
+-    'robot_plating_',
+-    'robot_frame_',
+-    'robot_head_',
+-    'robot_body_',
+-    'robot_legs_',
+-    'robot_leg_',
+-  ]),
+-  ids: Object.freeze([
+-    'headwear_casual_hat',
+-    'headwear_fancy_hat',
+-    'headwear_bos_scribe_hat',
+-    'headwear_bos_scribe_hat_2',
+-    'headwear_bos_field_scribe_hat',
+-  ]),
+-});
+diff --git a/modules/fallout/data/equipment/categories.json b/modules/fallout/data/equipment/categories.json
+new file mode 100644
+index 0000000..c2ed6ae
+--- /dev/null
++++ b/modules/fallout/data/equipment/categories.json
+@@ -0,0 +1,87 @@
++{
++  "//": "Справочник категорий (данные сеттинга). Механика — в domain/itemfit.js. Матчеры построены на реальных данных (id/idRoot/itemType), без пер-предметных тегов.",
++  "robotEquipment": {
++    "any": [
++      {
++        "item": "robot_armor_*"
++      },
++      {
++        "item": "robot_plating_*"
++      },
++      {
++        "item": "robot_frame_*"
++      },
++      {
++        "item": "robot_body_*"
++      },
++      {
++        "item": "robot_head_*"
++      },
++      {
++        "item": "robot_arm_*"
++      },
++      {
++        "item": "robot_legs_*"
++      },
++      {
++        "item": "robot_weapon_*"
++      }
++    ]
++  },
++  "robotArmor": {
++    "any": [
++      {
++        "item": "robot_armor_*"
++      },
++      {
++        "item": "robot_plating_*"
++      },
++      {
++        "item": "robot_frame_*"
++      }
++    ]
++  },
++  "robotWeapon": {
++    "any": [
++      {
++        "item": "robot_weapon_*"
++      },
++      {
++        "item": "robot_arm_*"
++      }
++    ]
++  },
++  "robotConsumable": {
++    "itemType": "robotConsumable"
++  },
++  "humanArmor": {
++    "itemType": [
++      "armor",
++      "powerArmor"
++    ]
++  },
++  "raiderArmor": {
++    "item": "armor_raider_*"
++  },
++  "consumable": {
++    "itemType": [
++      "food",
++      "drinks",
++      "chem"
++    ]
++  },
++  "humanClothing": {
++    "itemType": "clothing"
++  },
++  "weapon_ranged": {
++    "weaponType": [
++      "Light",
++      "Heavy",
++      "Explosive",
++      "Energy"
++    ]
++  },
++  "powerArmor": {
++    "itemType": "powerArmor"
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipment/general_goods.json b/modules/fallout/data/equipment/general_goods.json
+index 208a644..716f720 100644
+--- a/modules/fallout/data/equipment/general_goods.json
++++ b/modules/fallout/data/equipment/general_goods.json
+@@ -241,13 +241,12 @@
+   },
+   {
+     "id": "robot_item_repair_kit",
+-    "itemType": "chem",
++    "itemType": "robotConsumable",
+     "subtype": "tool",
+     "value": 50,
+     "rarity": 1,
+     "weight": 0.5,
+     "healAmount": 6,
+-    "robotOnly": true,
+     "positiveEffect": {
+       "hpModifier": {
+         "op": "+",
+@@ -289,4 +288,4 @@
+     "cost": 0,
+     "rarity": 0
+   }
+-]
++]
+\ No newline at end of file
+diff --git a/modules/fallout/data/origins/fitProfiles.json b/modules/fallout/data/origins/fitProfiles.json
+new file mode 100644
+index 0000000..2b5ccf3
+--- /dev/null
++++ b/modules/fallout/data/origins/fitProfiles.json
+@@ -0,0 +1,120 @@
++{
++  "//": "Профили fitProfile по characterType (данные сеттинга). Механика — domain/itemfit.js. Ключи: allow/forbidden/bypassAllow/bypassForbidden; ветки: equip / consume.self / consume.other. Отсутствующая ветка = разрешено всё. Заменяет цепочку origins.armorPolicy → canEquip*/allowlist. ghoul отсутствует → профиль {} → разрешено всё.",
++  "human": {
++    "equip": {
++      "allow": [],
++      "forbidden": [
++        {
++          "category": "robotEquipment"
++        }
++      ]
++    },
++    "consume": {
++      "self": {
++        "allow": [],
++        "forbidden": [
++          {
++            "category": "robotConsumable"
++          }
++        ]
++      },
++      "other": {}
++    }
++  },
++  "mutant": {
++    "equip": {
++      "allow": [],
++      "forbidden": [
++        {
++          "category": "robotEquipment"
++        },
++        {
++          "category": "humanArmor"
++        },
++        {
++          "category": "powerArmor"
++        }
++      ],
++      "bypassAllow": [
++        {
++          "category": "raiderArmor"
++        }
++      ]
++    },
++    "consume": {
++      "self": {
++        "forbidden": [
++          {
++            "category": "robotConsumable"
++          }
++        ]
++      },
++      "other": {}
++    }
++  },
++  "robot": {
++    "equip": {
++      "allow": [],
++      "forbidden": [
++        {
++          "category": "humanArmor"
++        },
++        {
++          "category": "humanClothing"
++        },
++        {
++          "category": "powerArmor"
++        }
++      ],
++      "bypassAllow": [
++        {
++          "category": "robotArmor"
++        },
++        {
++          "item": "headwear_casual_hat"
++        },
++        {
++          "item": "headwear_fancy_hat"
++        }
++      ]
++    },
++    "consume": {
++      "self": {
++        "forbidden": [
++          {
++            "category": "consumable"
++          }
++        ],
++        "bypassAllow": [
++          {
++            "category": "robotConsumable"
++          }
++        ]
++      },
++      "other": {}
++    }
++  },
++  "cyborg": {
++    "equip": {
++      "allow": [],
++      "forbidden": [
++        {
++          "category": "robotEquipment"
++        }
++      ]
++    },
++    "consume": {
++      "self": {
++        "forbidden": [
++          {
++            "category": "consumable"
++          },
++          {
++            "category": "robotConsumable"
++          }
++        ]
++      },
++      "other": {}
++    }
++  }
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/traits/traits.json b/modules/fallout/data/traits/traits.json
+index a738727..fcbd368 100644
+--- a/modules/fallout/data/traits/traits.json
++++ b/modules/fallout/data/traits/traits.json
+@@ -63,8 +63,7 @@
+       "immunities": [
+         "radiation",
+         "poison"
+-      ],
+-      "armorConstraint": "mutantOnly"
++      ]
+     }
+   },
+   {
+@@ -584,4 +583,4 @@
+       }
+     }
+   }
+-]
++]
+\ No newline at end of file
