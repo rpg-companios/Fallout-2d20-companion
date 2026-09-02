@@ -40,20 +40,30 @@ const AppWithBoundary = () => (
 );
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const currentWorkerUrl = `${window.location.origin}/service-worker.js`;
-    navigator.serviceWorker.getRegistrations()
-      .then((registrations) => Promise.all(
-        registrations
-          .filter((registration) => registration.scope === `${window.location.origin}/`
-            && registration.active?.scriptURL !== currentWorkerUrl)
-          .map((registration) => registration.unregister())
-      ))
-      .then(() => navigator.serviceWorker.register('/service-worker.js'))
-      .catch((error) => {
-        debugLog('serviceWorker.registrationFailed', { error });
+  // Регистрируем сразу, не дожидаясь события load. Раньше ожидание означало,
+  // что первый визит проходит вообще без воркера: оболочка не попадала в кэш,
+  // и следующий холодный старт установленного PWA при слабой сети упирался
+  // в пустой кэш (белый экран).
+  const currentWorkerUrl = `${window.location.origin}/service-worker.js`;
+  navigator.serviceWorker.getRegistrations()
+    .then((registrations) => Promise.all(
+      registrations
+        .filter((registration) => registration.scope === `${window.location.origin}/`
+          && registration.active?.scriptURL !== currentWorkerUrl)
+        .map((registration) => registration.unregister())
+    ))
+    .then(() => navigator.serviceWorker.register('/service-worker.js'))
+    .then((registration) => {
+      debugLog('serviceWorker.registered', { scope: registration?.scope });
+      // Обновление воркера при возврате в приложение: установленное PWA живёт
+      // неделями без перезагрузки вкладки, иначе новая версия не доедет.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') registration.update().catch(() => {});
       });
-  });
+    })
+    .catch((error) => {
+      debugLog('serviceWorker.registrationFailed', { error: error?.message || String(error) });
+    });
 }
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
