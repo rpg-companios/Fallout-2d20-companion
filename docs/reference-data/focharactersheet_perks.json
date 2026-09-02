@@ -1,0 +1,2245 @@
+[
+  {
+    "name_en": "Action Boy/Girl",
+    "ranks": 1,
+    "description_en": "When you spend AP to take an additional major action, you do not suffer the increased skill test difficulty during your second action.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Adamantium Skeleton",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 7
+    },
+    "reqincrease": 3,
+    "description_en": "When you suffer damage, the amount of damage needed to inflict a critical hit on you increases by your rank in this perk. For example, if you have one rank in this perk, you suffer a critical hit from 6 or more damage, rather than 5 or more. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Adrenaline Rush",
+    "ranks": 1,
+    "requirements_en": {
+      "Strength": 7
+    },
+    "description_en": "When your health is below its maximum value, you count your STR score as 10 for all purposes when attempting a STR-based skill test or melee attack.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Animal Friend",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 6
+    },
+    "reqincrease": 5,
+    "description_en": "At rank 1, whenever a creature NPC with the Mammal, Lizard, or Insect keyword would attack you, roll 1D6 : on any result other than an Effect, the creature chooses not to attack you, although it may still attack another character it can target. At rank 2, you can attempt a CHA + Survival test with a difficulty of 2 as a major action. If you succeed, the animal treats you as friendly and will attack anyone who attacks you. Mighty and Legendary animals are unaffected by this perk. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Aquaboy/Aquagirl",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 5
+    },
+    "reqincrease": 3,
+    "description_en": "Water is your ally. At rank 1, you no longer take radiation damage from swimming in irradiated water, and you can hold your breath for twice as long as normal. At rank 2, enemies add +2 to the difficulty to tests to detect you while you are submerged underwater. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Armorer",
+    "ranks": 4,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 5,
+      "Intelligence": 6
+    },
+    "reqincrease": 4,
+    "description_en": "You can modify armor with armor mods. Each rank in this perk unlocks an additional rank of mods: rank 1 unlocks rank 1 mods, rank 2 unlocks rank 2 mods, etc. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Awareness",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 7
+    },
+    "description_en": "When you take the Aim minor action at a target within Close range, you spot their weaknesses and can attack more efficiently. The next attack you make against that target gains the Piercing 1 damage effect, or improves the rating of any existing Piercing X damage effect by 1.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Barbarian",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 4,
+      "Strength": 7,
+      "robot": false
+    },
+    "description_en": "Your physical Damage Resistance increases on all hit locations based on your STR. You do not gain this benefit while wearing Power Armor. STR 7–8: +1 physical DR - STR 9–10: +2 physical DR - STR 11+: +3 physical DR",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Basher",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 6
+    },
+    "description_en": "When you make a melee attack by bashing with your gun, your attack gains the Vicious damage effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Better Criticals",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 9
+    },
+    "description_en": "When you inflict one or more points of damage to an enemy, you may spend 1 Luck Point to automatically inflict a critical hit, causing an injury.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Big Leagues",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 8
+    },
+    "description_en": "When you make a melee attack with a two-handed melee weapon, the weapon gains the Vicious damage effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Black Widow/Lady Killer",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 6
+    },
+    "description_en": "The Black Widow perk affects men and masculine characters, while the Lady Killer perk affects women and feminine characters—they are otherwise identical. When you attempt a CHA based skill test to influence a character of the chosen gender, you may re-roll 1d20. In addition, your attacks inflict +1D6 additional damage against characters of the chosen gender.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Blacksmith",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Strength": 6
+    },
+    "reqincrease": 4,
+    "description_en": "You can modify melee weapons with weapon mods. Each rank in this perk unlocks an additional rank of melee weapon mods: rank 1 unlocks rank 1 mods, rank 2 unlocks rank 2 mods, and rank 3 unlocks rank 3 mods. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Blitz",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 9
+    },
+    "reqincrease": 3,
+    "description_en": "When you move into reach of an opponent and make a melee attack against them in one turn, you may re-roll one d20 on your attack. At rank 2, you also inflict +1D6 damage with that attack. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bloody Mess",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 6
+    },
+    "description_en": "When you inflict a critical hit, roll 1D6 ; if you roll an Effect, you inflict one additional injury to a random location.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Can Do!",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 5
+    },
+    "description_en": "When you are scavenging a location that contains food, you gain 1 additional random food item, without spending AP.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cap Collector",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 5
+    },
+    "description_en": "When you buy or sell items, you may increase or decrease the price of the goods being traded by 10%.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cautious Nature",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 7
+    },
+    "description_en": "Whenever you attempt a skill test, and you buy one or more d20s by spending Action Points, you may re-roll 1d20 on that test. You may not purchase this perk if you have Daring Nature.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Center Mass",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 7
+    },
+    "description_en": "When you make a ranged attack, you may choose to strike your target’s Torso location (or equivalent, for creatures that use a different location table) without increasing the difficulty of the attack. In addition, you may re-roll 1d20 when making the test for your attack.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Chem Resistant",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 7
+    },
+    "reqincrease": 4,
+    "description_en": "At rank 1, roll one fewer DC when determining if you become addicted to chems, to a minimum of 0. At rank 2, you cannot become addicted to chems. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Chemist",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 7
+    },
+    "description_en": "Chems you create last twice as long as normal. In addition, you unlock chems recipes that have this perk as a requirement.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Commando",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Agility": 8
+    },
+    "reqincrease": 3,
+    "description_en": "When you make a ranged attack with any weapon with a Fire Rate of 3 or higher (except heavy weapons), you add +1D6 per rank to the weapon’s damage. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Comprehension",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 6
+    },
+    "description_en": "After you use the bonus gained from reading a magazine, roll 1D6. If you roll an Effect, you may use that bonus one additional time.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Concentrated Fire",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 8,
+      "Agility": 6
+    },
+    "description_en": "When you make a ranged attack and spend ammunition to increase the damage, you may re-roll up to 3D6 for your damage roll.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Daring Nature",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 7
+    },
+    "description_en": "Whenever you attempt a skill test, and you buy one or more d20s by giving the gamemaster Action Points, you may re-roll 1d20 on that test. You may not purchase this perk if you have Cautious Nature.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Demolition Expert",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 6,
+      "Luck": 6
+    },
+    "description_en": "When you make an attack using a weapon with the Blast quality, the attack gains the Vicious damage effect. In addition, you unlock explosives recipes which have this perk as a requirement.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dodger",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 4,
+      "Agility": 6
+    },
+    "reqincrease": 6,
+    "description_en": "At rank 1, when you take the Defend major action, you reduce the difficulty of the skill test by 1. At rank 2, the AP cost to further increase your Defense is reduced to 1 AP. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dogmeat",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 5
+    },
+    "description_en": "You aren’t alone in the wilderness. You have a pet dog that serves as a friend and ally in dangerous times. The dog has the profile shown to the side and is treated as an allied NPC creature under your command. If you need to forage for food and water, your dog looks after themselves. If your dog is slain, then you either find a new dog before the next adventure, or you may trade this perk for a different one after this adventure.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Entomologist",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 7
+    },
+    "description_en": "When you make an attack against an NPC with the Insect keyword, your attack gains the Piercing 1 damage effect, or improves the rating of any Piercing X effect the weapon has by +1.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fast Metabolism",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 6,
+      "robot": false
+    },
+    "reqincrease": 3,
+    "description_en": "When you regain one or more HP from any source other than rest, increase the total HP regained by +1 per rank in this perk. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Faster Healing",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 6,
+      "robot": false
+    },
+    "description_en": "When you make an END + Survival test to heal your own injuries, the first additional d20 you buy is free. The normal maximum of 5d20 still applies.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Finesse",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 9
+    },
+    "description_en": "Once per combat encounter, you may re-roll all the D6 on a single damage roll without spending any Luck points.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fortune Finder",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Luck": 5
+    },
+    "reqincrease": 4,
+    "description_en": "Whenever you roll to determine how much money you find, you find more. At rank 1, you find +3D6 additional caps. At rank 2, you find +6D6 additional caps. At rank 3, you find +10D6 additional caps. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ghost",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 5,
+      "Agility": 6
+    },
+    "description_en": "Whenever you attempt an AGI + Sneak test in shadows or darkness, the first additional d20 you buy is free. The normal maximum of 5d20 still applies.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grim Reaper's Sprint",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 8
+    },
+    "description_en": "When you make an attack which kills one or more enemies, roll 1D6 . If you roll an Effect, add 2 AP to the group’s pool.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gun Fu",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 10
+    },
+    "reqincrease": 5,
+    "description_en": "When you succeed at a ranged attack, you may spend 1 AP and 1 ammo to hit a second target within Close range of your initial target. The second target takes the same damage as the initial target. At rank 2, you may spend 2 AP and 2 ammo to hit two additional targets. At rank 3, you may spend 3 AP and 3 ammo to hit three additional targets. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gun Nut",
+    "ranks": 4,
+    "requirements_en": {
+      "level": 2,
+      "Intelligence": 6
+    },
+    "reqincrease": 4,
+    "description_en": "You can modify small guns and heavy weapons with weapon mods. Each rank in this perk unlocks an additional rank of weapon mods: rank 1 unlocks rank 1 mods, rank 2 unlocks rank 2 mods, etc. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gunslinger",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Agility": 7
+    },
+    "reqincrease": 4,
+    "description_en": "When you make an attack with a one-handed ranged weapon with a Fire Rate of 2 or lower, you increase the weapon’s damage by +1D6 per rank. In addition, you may re-roll the hit location die. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hacker",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 8
+    },
+    "description_en": "The difficulty of skill tests to hack computers is decreased by 1, to a minimum of 0.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Healer",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 7
+    },
+    "reqincrease": 5,
+    "description_en": "When you heal a patient’s HP using the First Aid action, increase the amount of HP healed by +1 per rank in this perk. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heave Ho",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 8
+    },
+    "description_en": "When you make a thrown weapon attack, you may spend 1 AP to increase the Range of the weapon by one step—from Close to Medium, or from Medium to Long.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hunter",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 6
+    },
+    "description_en": "When you make an attack against an NPC with one of the Mammal, Lizard, or Insect keywords and the Mutated keyword, your attack gains the Vicious damage effect, if it did not already have that effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Infiltrator",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 8
+    },
+    "description_en": "When you attempt a Lockpick skill test to unlock a door or container, you may re-roll 1d20.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Inspirational",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 8
+    },
+    "description_en": "Because you lead by example, the maximum number of AP the group may save is increased by 1.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Intense Training",
+    "ranks": 10,
+    "requirements_en": {
+      "level": 2
+    },
+    "reqincrease": 2,
+    "description_en": "Increase any one S.P.E.C.I.A.L attribute by 1 rank. As usual, your S.P.E.C.I.A.L attributes cannot be increased beyond 10 using this method. Each time you take this perk, the level requirement increases by 2.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Iron Fist",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 6
+    },
+    "reqincrease": 5,
+    "description_en": "At rank 1, your unarmed attacks inflict +1D6 damage. At rank 2, your unarmed attacks also gain the Vicious damage effect. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Junktown Jerky Vendor",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 8
+    },
+    "description_en": "The difficulty of any CHA + Barter test you attempt to buy or sell goods is reduced by 1, to a minimum of 0.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Jury Rigging",
+    "ranks": 1,
+    "description_en": "You can repair an item without needing to expend any components. However, the repair is temporary, and the item will break again on the next complication you suffer while using it. The complication range of all skill tests to use the item increases by 1, to the roll of a 19–20.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Laser Commander",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Perception": 8
+    },
+    "reqincrease": 4,
+    "description_en": "When you make an attack with a ranged energy weapon, the damage is increased by +1D6 per rank in this perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lead Belly",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 6
+    },
+    "reqincrease": 4,
+    "description_en": "At rank 1, you may re-roll the D6 to determine if you suffer radiation damage from irradiated food or drink. At rank 2, you are immune to radiation damage from consuming irradiated food or drink. Each tim you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Life Giver",
+    "ranks": 5,
+    "requirements_en": {
+      "level": 5
+    },
+    "reqincrease": 5,
+    "description_en": "Increase your maximum health points by your Endurance rank. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Light Step",
+    "ranks": 1,
+    "description_en": "When you roll to generate any complications on an Agility-based skill test, you may ignore one complication for every 1 AP spent. In addition, you may re-roll 1d20 on any AGI + Athletics test to avoid traps triggered by pressure plates or similar mechanisms.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Master Thief",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 8,
+      "Agility": 9
+    },
+    "description_en": "When you are attempting to pick a lock or pickpocket somebody, the difficulty of the opponent’s skill test to detect you increases by +1.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Medic",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 8
+    },
+    "description_en": "When you use the First Aid action to try to treat an injury, you can re-roll 1d20.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Meltdown",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 10
+    },
+    "description_en": "When you kill an enemy with an energy weapon, they explode. Roll a number of D6 equal to half the weapon’s damage rating (round down). For each Effect rolled, one creature within Close range of the exploding enemy (starting with the closest) suffers energy damage equal to the total rolled on the D6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mister Sandman",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 9
+    },
+    "description_en": "When you make a sneak attack with a silenced or suppressed weapon, the damage is increased by +2D6 . You cannot gain this benefit while in Power Armor.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Moving Target",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 6
+    },
+    "description_en": "When you take the Sprint action, your Defense increases by +1 until the start of your next turn.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mysterious Stranger",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 7
+    },
+    "description_en": "From time to time, a Mysterious Stranger comes to your aid, with lethal results. At the start of a combat encounter, you may spend 1 Luck point. If you do so, then at any point during the scene, the GM may have the Mysterious Stranger appear, make a single ranged attack against an enemy you attacked, or who just attacked you, and then vanish. If you spend a Luck point and the Mysterious Stranger does not appear, the GM must refund the Luck point you spent. The stranger has an AGI of 10, a Small Guns skill of 6, and counts Small Guns as a Tag skill. They always roll 3d20 for attacks, rather than 2d20, and their attack—using a custom .44 Magnum revolver—inflicts 8D6 Piercing 1, Vicious physical damage. They always appear within their weapon’s ideal range. Any attempt to find where the Stranger went after their attack fails.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nerd Rage",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Intelligence": 8
+    },
+    "reqincrease": 5,
+    "description_en": "While your health is reduced to less than ¼ of your maximum, you add +1 to your physical DR, +1 to your energy DR, and +1D6 to the damage of all your attacks. At rank 2, this increases to +2 DR, and +2D6 damage. At rank 3, this increases to +3 DR and +3D6 damage. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Night Person",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 7
+    },
+    "description_en": "You reduce any difficulty increases due to darkness by 1.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ninja",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 8
+    },
+    "description_en": "When you make a sneak attack with a melee weapon or unarmed attack, the damage is increased by +2D6 . You cannot gain this benefit while in Power Armor.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nuclear Physicist",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 9
+    },
+    "description_en": "Whenever you use a weapon that inflicts radiation damage, or has the Radioactive damage effect, each Effect you roll inflicts one additional point of radiation damage. In addition, fusion cores you use have 3 additional charges.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pain Train",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Strength": 9,
+      "Endurance": 7
+    },
+    "reqincrease": 5,
+    "description_en": "You may Charge as a major action if you are wearing Power Armor or are a super mutant. This is a movement action, and you may not Move or Sprint in the same turn. When you take this action, you move into reach of an enemy within Medium range (1 zone) and make a STR + Athletics test with a difficulty of 2. If you succeed, the enemy suffers damage equal to your normal unarmed damage, and is knocked prone. At rank 2, you add +1D6 and the Stun damage effect to the damage inflicted. At the GM’s discretion, especially large or sturdy creatures cannot be knocked prone by this action. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Paralyzing Palm",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 8
+    },
+    "description_en": "When you make an unarmed attack, and choose to strike a specific location, your attack gains the Stun damage effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Party Boy/Party Girl",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 6,
+      "Charisma": 7
+    },
+    "description_en": "You cannot become addicted to alcoholic drinks, and whenever you drink an alcoholic drink, you heal +2 HP.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pathfinder",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 6,
+      "Endurance": 6
+    },
+    "description_en": "When travelling over long distances through the wilderness, a successful PER + Survival test (with a difficulty determined by the GM, based on the terrain) reduces the travel time by half.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pharma Farma",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 6
+    },
+    "description_en": "When you are scavenging a location that contains medicine or chems, you find one additional item, randomly determined, without spending AP.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pickpocket",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 8,
+      "Perception": 8
+    },
+    "reqincrease": 3,
+    "description_en": "At rank 1, you can ignore the first complication you roll when you make an AGI + Sneak test to steal an object from someone else’s person or to plant something on them. At rank 2, you can re-roll 1d20 in your dice pool when attempting to pick someone’s pocket. At rank 3, you reduce the difficulty of attempts to pick someone’s pocket by 1. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Piercing Strike",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 7
+    },
+    "description_en": "Your attacks using unarmed attacks and bladed melee weapons gain the Piercing 1 damage effect, or add +1 to the rating of any Piercing X damage effect they already had.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pyromaniac",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Endurance": 6
+    },
+    "reqincrease": 4,
+    "description_en": "The damage you deal using fire-based weapons increases by +1D6 per rank. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Quick Draw",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 6
+    },
+    "description_en": "Each turn, you may draw a single weapon or item carried on your person without using a minor action.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Quick Hands",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 8
+    },
+    "description_en": "You can reload firearms faster. When you make a ranged attack, you may spend 2 AP to increase the Fire Rate of your gun by +2 for that attack.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rad Resistance",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 8
+    },
+    "reqincrease": 4,
+    "description_en": "Your radiation Damage Resistance, to all hit locations, increases by +1 per rank in this perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Refractor",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 6,
+      "Luck": 7
+    },
+    "reqincrease": 4,
+    "description_en": "Your energy Damage Resistance to all hit locations increases by +1 per rank in this perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ricochet",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 5,
+      "Luck": 10
+    },
+    "description_en": "If an enemy makes a ranged attack against you and rolls a complication, you may spend one Luck point to have their ricochet hit them. Resolve the damage roll against the attacking enemy instead.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rifleman",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Agility": 7
+    },
+    "reqincrease": 4,
+    "description_en": "When you make a ranged attack with any two-handed weapon with a Fire Rate of 2 or lower (except heavy weapons), you add +1D6 to the weapon’s damage per rank. At rank 2, you also add the Piercing 1 damage effect, or add +1 to the rating of any Piercing X damage effect the weapon already had. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robotics Expert",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Intelligence": 8
+    },
+    "reqincrease": 4,
+    "description_en": "At rank 1, you can modify robot armor, weapon mounts, and modules with rank 1 mods. At rank 2 you gain access to rank 2 mods, and the difficulty of tests to repair robots is permanently reduced by 1. At rank 3 you gain access to rank 3 mods, and you can reprogram robots to fulfil a different function or alter their behavior at the discretion of the GM. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Science!",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Intelligence": 6
+    },
+    "reqincrease": 4,
+    "description_en": "You can modify energy weapons with weapon mods, and you can also craft certain advanced armor mods. Each rank in this perk unlocks an additional rank of mods: rank 1 unlocks rank 1 mods, rank 2 unlocks rank 2 mods, etc. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scoundrel",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 7
+    },
+    "description_en": "When you make a CHA + Speech test to convince someone of a lie, you may ignore the first complication you roll.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scrapper",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 3
+    },
+    "reqincrease": 5,
+    "description_en": "When you scrap an item, you can salvage uncommon component materials as well as common ones. At rank 2, you can also salvage rare materials. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scrounger",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 6
+    },
+    "reqincrease": 5,
+    "description_en": "Whenever you roll to determine how much ammunition you find, you find more. At rank 1, you find +3D6 additional shots. At rank 2, you find +6D6 additional shots. At rank 3, you find +10D6 additional shots. The additional ammo you find is the same as initially found, for example, if you find 10mm ammunition, this perk increases how much 10mm ammo you find. If you find multiple types of ammunition, Scrounger applies to the ammunition with the lowest rarity (GM’s choice if there is a tie). Each time you take this perk, the level requirement increases by 5",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Shotgun Surgeon",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 5,
+      "Agility": 7
+    },
+    "description_en": "Your ranged attacks using shotguns gain the Piercing 1 damage effect, or add +1 to any Piercing X damage effect the weapon already had.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Skilled",
+    "ranks": 10,
+    "requirements_en": {
+      "level": 3
+    },
+    "reqincrease": 3,
+    "description_en": "Add +1 rank to two skills or add +2 ranks to one skill. No skill may have more than 6 ranks. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Size Matters",
+    "ranks": 3,
+    "requirements_en": {
+      "Endurance": 7,
+      "Agility": 6
+    },
+    "reqincrease": 4,
+    "description_en": "When you make a ranged attack with any heavy weapon, you add +1D6 to the weapon’s damage, per rank. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Slayer",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 8
+    },
+    "description_en": "When you inflict any damage with an unarmed attack or melee weapon, you may spend 1 Luck point to immediately inflict a critical hit—and therefore an injury—on the location hit.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Smooth Talker",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 6
+    },
+    "description_en": "When you make a Barter or Speech test as part of an opposed test, you may re-roll 1d20.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Snakeater",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 7
+    },
+    "description_en": "Your poison Damage Resistance increases by +2.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sniper",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 6,
+      "Perception": 8
+    },
+    "description_en": "When you take the Aim minor action, and then make a ranged attack with a two-handed weapon with the Accurate quality, you can specify a hit location to target without increasing the difficulty of the attack.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Solar Powered",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 7
+    },
+    "description_en": "For every hour you spend in direct sunlight, you heal 1 radiation damage.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Steady Aim",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 7,
+      "Strength": 8
+    },
+    "description_en": "When you take the Aim minor action, you may either re-roll 2d20 on the first attack you make this turn, or re-roll 1d20 on all attacks you make this turn.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Strong Back",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 5
+    },
+    "reqincrease": 2,
+    "description_en": "Your maximum carry weight is increased by +25 lbs., per rank. Each time you take this perk, the level requirement increases by 2",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tag!",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 5
+    },
+    "description_en": "You may select one additional Tag skill. Increase the skill’s rank by 2, to a maximum of 6, and mark it as a Tag skill, allowing you to roll a critical success with a d20 result equal or under the skill’s rank.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Terrifying Presence",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 3,
+      "Charisma": 8,
+      "Strength": 6
+    },
+    "reqincrease": 5,
+    "description_en": "When you make a Speech test to threaten or scare someone, you may re-roll 1d20. At rank 2, you may use a major action in combat to threaten an enemy within Medium range, using a STR + Speech test with a difficulty of 2. If you succeed, that enemy must move away from you during their next turn (though they can take any other actions they wish). Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Toughness",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 6,
+      "Luck": 6
+    },
+    "reqincrease": 4,
+    "description_en": "Your physical Damage Resistance to all hit locations increases by +1 per rank in this perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Blocker",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Strength": 6
+    },
+    "reqincrease": 5,
+    "description_en": "At rank 1, when you are struck by a melee attack, count your Physical damage resistance or Energy damage resistance (according to the attack’s damage) as +1 higher. At rank 2, this extra resistance increases to +2. At rank 3, it increases to +3. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bullet Shield",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 8,
+      "Strength": 8
+    },
+    "reqincrease": 6,
+    "description_en": "When you are wielding a big gun, increase your damage resistance by +2. At rank 2, this increases to +3. At rank 3, this increases to +4. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gladiator",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Strength": 6
+    },
+    "reqincrease": 5,
+    "description_en": "When you are wielding a one-handed melee weapon, increase the weapon’s damage by +1D6. At rank 2, this increases to +2D6. At rank 3, this increases to +3D6. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Incisor",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Strength": 6
+    },
+    "reqincrease": 9,
+    "description_en": "When you are wielding a melee weapon, the weapon gains the Piercing 1 damage effect, or adds +1 to the rating of any Piercing X damage effect the weapon already had. At rank 2, this increases to Piercing 2, or adding +2 to any Piercing X damage effect the weapon already had. Each time you take this perk, the level requirement increases by 9.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lock and Load",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 7,
+      "Strength": 7
+    },
+    "reqincrease": 5,
+    "description_en": "When you are wielding a big gun with a Fire Rate of 2 or higher, the weapon’s Fire Rate is increased by +1. At rank 2, the weapon’s Fire Rate is increased by +2 instead. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Martial Artist",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 8,
+      "Strength": 6
+    },
+    "description_en": "When you make a melee attack, you may take an additional major action by spending 1 AP rather than 2 AP, so long as this additional action is also a melee attack with the same weapon or another currently equipped weapon.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pack Rat",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 4,
+      "Strength": 6
+    },
+    "description_en": "Junk items you carry count as half of their listed weight.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Scattershot",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 10,
+      "Strength": 7
+    },
+    "description_en": "When you make a ranged attack with a shotgun, you may take an additional major action by spending 1 AP rather than 2 AP, so long as this additional action is also a ranged attack with the same shotgun.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Sturdy Frame",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 5,
+      "Strength": 8
+    },
+    "reqincrease": 8,
+    "description_en": "Armor you are wearing—except for Power Armor—counts as three-quarters of its listed weight. At rank 2, armor worn counts as half its listed weight. At rank 3, armor worn counts as one-quarter its listed weight. Each time you take this perk, the level requirement increases by 8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Archer",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Perception": 6
+    },
+    "reqincrease": 7,
+    "description_en": "When you are wielding a bow or crossbow, increase the weapon’s damage by +1D6. At rank 2, this increases to +2D6. At rank 3, this increases to +3D6. Each time you take this perk, the level requirement increases by 7.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bow Before Me",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 4,
+      "Perception": 8
+    },
+    "description_en": "When you are wielding a bow or crossbow, the weapon gains the Piercing 1 damage effect, or adds +1 to the rating of any Piercing X damage effect the weapon already had.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Butcher's Bounty",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 3,
+      "Perception": 8
+    },
+    "reqincrease": 5,
+    "description_en": "When you successfully butcher a dead animal, you may roll +1D6, and find additional portions of meat (as noted in the creature’s stat block) equal to the total rolled. At rank 2, this increases to +2D6. At rank 3, this increases to 3D6. Each time you take this perk, the level requirement increases by +5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Crack Shot",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 7,
+      "Perception": 7
+    },
+    "reqincrease": 7,
+    "description_en": "When you make a ranged attack with a one-handed ranged weapon, and you aimed before the attack, the weapon’s range increases by one step (i.e., from Close to Medium, or from Medium to Long). At rank 2, the weapon also gains the Accurate quality if it didn’t possess it already. Each time you take this perk, the level requirement increases by +7.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fire in the Hole",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 8,
+      "Perception": 8
+    },
+    "description_en": "When you make a ranged attack with a thrown weapon with the Blast quality, the base difficulty of the attack is 1, rather than 2.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Glow Sight",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 3,
+      "Perception": 8
+    },
+    "reqincrease": 8,
+    "description_en": "When you make an attack against a Glowing enemy, you inflict +1D6 damage. At rank 2, this increases to +2D6. At rank 3, this increases to +3D6. Each time you take this perk, the level requirement increases by +8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Night Eyes",
+    "ranks": "1",
+    "requirements_en": {
+      "level": 7,
+      "Perception": 8
+    },
+    "description_en": "When you are trying to avoid attention or hide from an enemy, you may ignore difficulty increases to tests caused by poor lighting or darkness.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cannibal",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 10,
+      "Endurance": 8,
+      "robot": false
+    },
+    "reqincrease": 9,
+    "description_en": "You may attempt to butcher a dead human, requiring an END + Survival test with a difficulty of 0. Success yields one portion of human flesh, which you may immediately consume. To you, human flesh counts as a food item which restores 4 HP and is Irradiated (roll 1D6 and suffer 1 Radiation damage if an Effect is rolled). Consuming human flesh is regarded as abhorrent by most people and is a crime in most settlements. At rank 2, you may also butcher ghouls in this way. At rank 3, you may also butcher super mutants in this way. Each time you take this perk, the level requirement increases by +9. Super mutants may ignore the level requirement for the first rank only.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Cola Nut",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 14,
+      "Endurance": 6,
+      "robot": false
+    },
+    "description_en": "When you drink a Nuka-Cola beverage, you regain twice as many HP as normal.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dromedary",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 3,
+      "Endurance": 7,
+      "robot": false
+    },
+    "description_en": "When you drink a beverage, it moves your Thirst state back up towards quenched by one more step than normal (i.e., by two steps, or by three if you drink purified water).",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fireproof",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 7,
+      "Endurance": 6
+    },
+    "reqincrease": 7,
+    "description_en": "You gain +1 Energy damage resistance against Flamers, Molotov Cocktails, and other fire-based weapons, as well as any weapons with the Blast quality. At rank 2, this increases to +2. At rank 3, this increases to +3. Each time you take this perk, the level requirement increases by +7.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ghoulish",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 7,
+      "Endurance": 9
+    },
+    "reqincrease": 8,
+    "description_en": "Like a ghoul, your body heals when you’re exposed to radiation. You regain 1 HP for every 4 Radiation damage you suffer. At rank 2, you instead regain 1 HP for every 3 Radiation damage you suffer. At rank 3, you instead heal 1 HP for every 2 Radiation damage you suffer. Your maximum HP is still reduced by Radiation damage. Each time you take this perk, the level requirement increases by +8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ironclad",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 5,
+      "Endurance": 7
+    },
+    "reqincrease": 5,
+    "description_en": "While wearing armor (except Power Armor), add +1 to your Physical damage resistance and Energy damage resistance. At rank 2, this increases to +2. At rank 3, this increases to +3. Each time you take this perk, the level requirement increases by +5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Natural Resistance",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 10,
+      "Endurance": 7
+    },
+    "description_en": "Breathing in toxic fumes and sleeping rough on the ground no longer poses a risk for you to catch a disease.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Radicool",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Endurance": 6
+    },
+    "description_en": "When you have Radiation damage equal to one-quarter or more of your maximum HP, you may re-roll 1d20 on all STR-based tests and add +1D6 to the damage of your melee attacks. If you have Radiation damage that equals half or more of your maximum HP, these bonuses increase to re-rolling up to 2d20 on STR-based tests and adding +2D6 to melee attack damage. If you have Radiation damage equal to three-quarters of your maximum HP, you may re-roll up to 3d20 on STR-based tests and add +3D6 to melee attack damage.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Revenant",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Endurance": 8
+    },
+    "description_en": "When you are revived, increase the damage of all your attacks by +2D6 for the remainder of the scene, or until you are reduced to 0 HP again.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Slow Metabolizer",
+    "ranks": 5,
+    "requirements_en": {
+      "level": 5,
+      "Endurance": 8,
+      "robot": false
+    },
+    "description_en": "When you eat a food item, it moves your Hunger state back up towards full by one more step than normal (i.e., by two steps for uncooked food, or by three for cooked food).",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Thirst Quencher",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 6,
+      "Endurance": 7
+    },
+    "description_en": "Drinking dirty water no longer poses a risk for you to catch a disease.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vaccinated",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 16,
+      "Endurance": 7
+    },
+    "description_en": "Taking damage from the claws or bite of a mammal, lizard, or insect no longer poses a risk for you to catch a disease.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bloodsucker",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 11,
+      "Charisma": 6
+    },
+    "description_en": "Consuming a Blood Pack (including Glowing Blood Packs and Irradiated Blood) now heals twice as many HP and moves your Thirst state back up towards quenched by one step. When consuming Irradiated Blood, you now only roll 1D6 to determine Radiation damage.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Responder",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 9,
+      "Charisma": 8,
+      "Intelligence": 7
+    },
+    "reqincrease": 7,
+    "description_en": "When you succeed at a First Aid action in combat to stabilize a dying ally, you no longer need to spend 1 AP to wake them from unconsciousness. In addition, the patient heals 2 HP at the start of their next turn. At rank 2, they heal 4 HP at the start of their next two turns. At rank 3, they heal 6 HP at the start of their next three turns. Each time you take this perk, the level requirement increases by +7.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Field Surgeon",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 15,
+      "Charisma": 8,
+      "Intelligence": 8
+    },
+    "description_en": "When you use a Stimpak (including Diluted Stimpak or Super Stimpak) as part of a First Aid action, you may heal 3 HP per AP spent. When you use RadAway (including diluted RadAway) as part of a First Aid action, you may remove one additional Radiation damage per AP spent.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Happy Go Lucky",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 17,
+      "Charisma": 9
+    },
+    "description_en": "The first time in a scene when you consume an alcoholic beverage, regain 1 Luck point, up to your normal maximum number of Luck points.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Healing Hands",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 18,
+      "Charisma": 8,
+      "Intelligence": 7
+    },
+    "description_en": "When you succeed at a First Aid action in combat to stabilize a dying ally, that ally also removes Radiation damage equal to your Medicine skill rank.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Overly Generous",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Charisma": 7
+    },
+    "description_en": "When you have Radiation damage equal to or greater than one-quarter your maximum HP, your melee attacks gain the Radioactive damage effect.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Spiritual Healer",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 6,
+      "Charisma": 7
+    },
+    "reqincrease": 9,
+    "description_en": "When you succeed at a First Aid action to stabilize a dying ally, you regain 1 HP. At rank 2, you regain 2 HP, and a further 2 HP at the start of your next turn. At rank 3, you regain 3 HP, and you regain 3 HP at the start of your next two turns. Each time you take this perk, the level requirement increases by +9.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Suppressor",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 10,
+      "Charisma": 6
+    },
+    "reqincrease": 10,
+    "description_en": "When you successfully attack an enemy, you may spend 1 AP to suppress them until the end of their next turn. A suppressed enemy reduces the damage they inflict with their attacks by 1D6. At rank 2, a suppressed enemy reduces the damage they inflict by 2D6. At rank 3, a suppressed enemy reduces the damage they inflict by 3D6. Each time you take this perk, the level requirement increases by +10.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tenderizer",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 8,
+      "Charisma": 7
+    },
+    "reqincrease": 10,
+    "description_en": "When you hit an enemy with a melee or ranged attack, you may spend 1 AP to make them vulnerable until the end of their next turn. While vulnerable, any attack made against that enemy is increased by +1D6. At rank 2, a vulnerable enemy increases damage they receive by +2D6. At rank 3, a vulnerable enemy increases damage they receive by +3D6. Each time you take this Perk, the level requirement increases by +10.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Licensed Plumber",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 5,
+      "Intelligence": 6
+    },
+    "description_en": "Pipe weapons you use do not have the Unreliable quality.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Power Patcher",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 5,
+      "Intelligence": 6
+    },
+    "reqincrease": 7,
+    "description_en": "When you repair the HP of a piece of Power Armor, repair an additional 2 HP. At rank 2, this increases to 3 HP. At rank 3, this increases to 4 HP. Each time you take this perk, the level requirement increases by +7",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Power User",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 10,
+      "Intelligence": 9
+    },
+    "reqincrease": 10,
+    "description_en": "Fusion Cores you use now contain 3 additional charges. At rank 2, this increases to 6 additional charges. At rank 3, this increases to 10 additional charges. Each time you take this perk, the level requirement increases by 10.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stabilized",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 16,
+      "Intelligence": 7
+    },
+    "description_en": "When you’re wearing Power Armor, you may re-roll 1d20 on any attack made with the Big Guns skill, and any big gun you wield gains Piercing 1, or add +1 to any Piercing X damage effect the weapon already had.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Born Survivor",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 3,
+      "Agility": 8
+    },
+    "reqincrease": 8,
+    "description_en": "When you suffer damage that would reduce your HP to below one-quarter of your maximum HP, you may automatically use a Stimpak (including a Diluted Stimpak or Super Stimpak). You may do this once per scene. At rank 2, you may do this 2 times per scene. At rank 3, you may do this 3 times per scene. Each time you take this perk, the level requirement increases by 8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dead Man Sprinting",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 8,
+      "Agility": 7
+    },
+    "description_en": "When you take the Sprint action, if your current HP is below half of your maximum HP, you may spend 1 AP to move one additional zone.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Escape Artist",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 15,
+      "Agility": 8
+    },
+    "description_en": "During combat, if no enemy can see you when you start your turn, you may attempt an AGI + Sneak test to hide: the difficulty is the number of enemies within Medium range of you. Once hidden, the enemy no longer knows where you are; they may continue to search for you. In addition, enemies do not receive any bonuses to detect you if you take the Sprint action.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Evasive",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 7,
+      "Agility": 7
+    },
+    "description_en": "Your Physical damage resistance and Energy damage resistance on all hit locations increase based on your Agility. You do not gain this benefit while wearing Power Armor or while encumbered. AGI 7-8: +1 Physical damage resistance and Energy damage resistance AGI 9-10: +2 Physical damage resistance and Energy damage resistance AGI 11+: +3 Physical damage resistance and Energy damage resistance",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Goat Legs",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 7,
+      "Agility": 7
+    },
+    "reqincrease": 5,
+    "description_en": "You have +2 Physical damage resistance against falling damage. At rank 2, this increases to +4. At rank 3, this increases to +6. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Modern Renegade",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 8,
+      "Agility": 7
+    },
+    "reqincrease": 5,
+    "description_en": "When you make an attack with a one-handed ranged weapon and don’t aim, a successful attack scores one additional AP, which may not be saved. At rank 2, this increases to 2 additional AP. At rank 3, this increases to 3 additional AP. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Secret Agent",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 7,
+      "Agility": 9
+    },
+    "reqincrease": 5,
+    "description_en": "When you use a Stealth Boy, it lasts for one additional turn. At rank 2, this increases to 2 additional turns. At rank 3, this increases to 3 additional turns. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Dry Nurse",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 13,
+      "Luck": 8
+    },
+    "description_en": "When you succeed at the First Aid action in combat to stabilize a dying ally and you used a Stimpak as part of that action, roll 1D6. If you roll an Effect, the Stimpak is not used up by the action, and can be used again.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Junk Shield",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 7
+    },
+    "reqincrease": 8,
+    "description_en": "For every 5 items of Junk you are carrying, add +1 to your Physical damage resistance and Energy damage resistance. The maximum bonus to your Physical damage resistance and Energy damage resistance is equal to your rank in this perk. You do not gain this additional Physical damage resistance or Energy damage resistance while wearing Power Armor. Each time you take this perk, the level requirement increases by 8.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mysterious Savior",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 7
+    },
+    "description_en": "From time to time, a Mysterious Savior comes to your aid, with lethal results. At the start of a combat encounter, you may spend 1 Luck point. If you do so, then the first time during the scene you start dying, the GM may have the Mysterious Savior appear, revive you, and then vanish. If you spend a Luck point and the Mysterious Savior does not appear, the GM must refund the Luck point you spent. When the stranger revives you, they immediately stabilize you as if they had succeeded at a First Aid action. You are restored to consciousness, regain 4 HP, as if a Stimpak had been used on you, and are able to act again during the scene.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Psychopath",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 11,
+      "Luck": 8
+    },
+    "reqincrease": 6,
+    "description_en": "When you kill an enemy, roll a number of D6 equal to your rank in this perk. For each Effect rolled, regain 1 Luck point, up to your maximum Luck points. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Serendipity",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 5,
+      "Luck": 7
+    },
+    "reqincrease": 6,
+    "description_en": "When your current HP is below one-third of your maximum HP, whenever you are attacked, you may spend 1 Luck point before any dice are rolled to have the attack miss. You may do this a number of times per scene equal to your rank in this perk. Each time you take this perk, the level requirement increases by 6.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Storm Chaser",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 15,
+      "Luck": 6
+    },
+    "description_en": "When it is raining, or during a rad storm, you regain 1 HP at the start of each of your turns in combat. Out of combat, you regain HP equal to half your Luck score (rounded up) every hour of rain.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "All Night Long",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 16,
+      "robot": true
+    },
+    "description_en": "During nighttime hours—after sunset and before sunrise—your hunger and thirst states do not reduce. When calculating the hours of time to become more hungry or thirsty, ignore the hours of progress to moving down the Hunger States and Thirst States tables (Fallout: The Roleplaying Game Core Rulebook, p.191). Every two days you are starving, you gain 1 Fatigue, instead of every day",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Ammosmith",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Intelligence": 7
+    },
+    "reqincrease": 4,
+    "description_en": "Sometimes you have the wrong bullets for the right gun, and somehow you make it work with the materials that you have. You can craft a single piece of ammunition using materials at a weapons workbench treating its rarity as its complexity ( Fallout: The Roleplaying Game Core Rulebook, p.211). At rank 1, you can craft ammunition up to rarity 1. At rank 2, you can craft ammunition up to a rarity of 3. Additionally, you can now dismantle ammunition gaining half of the materials normally required to craft the ammunition (rounded down to a minimum of 1). At rank 3, you can craft ammunition up to a rarity of 5. When crafting ammunition, you can roll a number of D6 equal to 6 reduced by the rarity of the ammunition being crafted. Every hit rolled increases the amount of ammunition crafted by +1. For every effect rolled, double the amount of ammunition crafted. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Bodyguards",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 5,
+      "Charisma": 8
+    },
+    "description_en": "Each player character and companion (other than you) within Close range of you increases your Damage Resistance and Energy Resistance by +1.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Community Organizer",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 5,
+      "Endurance": 5
+    },
+    "description_en": "Even in the worst of days, you find a way to bring people’s spirits up and maintain a thriving settlement. For each rank of this perk, your community gains +1 Food and +1 Defense per day so long as the resource is maintained by at least one person. Additionally add +1D6 for the settlement actions Hunting and Gathering as well as Scavenging. Each time you take this perk, the level requirement increases by 3.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Contractor",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Charisma": 5,
+      "Intelligence": 5
+    },
+    "reqincrease": 4,
+    "description_en": "When building structures for your settlement, you know how to make the process faster, cheaper, and overall more efficient. At rank 1, when you start constructing something, you can reduce the number of materials required to construct something by half (to a minimum of 1 unit of each material type), decreasing the overall Happiness by 2. You can double the amount of construction time required to ignore the reduction in Happiness. At rank 2, you can have a person take a settlement action to construct an object even if they do not have the required skill. Doing so reduces the settlement’s overall Happiness by 1. If you have at least one person working on the construction object that has the skill, then you can ignore the reduction in Happiness. At rank 3, you can have a person take a settlement action to construct an object even if they do not have the required perk, but at least one person working on the object still must have the perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Covert Operator",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Agility": 8
+    },
+    "description_en": "When you make a ranged sneak attack with a small gun or energy weapon, the damage is increased by +2D6. You cannot gain this benefit while in Power Armor.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Enforcer",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Agility": 9
+    },
+    "description_en": "When you make a ranged attack with a shotgun and target a specific location, your attack gains the Debilitating quality.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Green Thumb",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 4,
+      "Intelligence": 4
+    },
+    "description_en": "When you spend time foraging and roll on the Foraging table (Fallout: The Roleplaying Game Core Rulebook, p.202), you gather 2 items, plus an additional 2 for every AP spent.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gun Runner",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 4,
+      "Agility": 6
+    },
+    "description_en": "When you take the Sprint action when you have a one-handed ranged weapon in hand, you may spend 1 AP to move one additional zone.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Happy Camper",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 3,
+      "Charisma": 7,
+      "Endurance": 6
+    },
+    "reqincrease": 4,
+    "description_en": "At rank 1, if your hunger state is full or sated, and you have set up a camp with a source of heat like a campfire, your hunger does not deteriorate. At rank 2, if your thirst state is quenched or hydrated, and you have set up a camp with a source of heat like a campfire, your thirst does not deteriorate. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Hired Help",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 7
+    },
+    "description_en": "Some wastelanders are lone wanderers—not you! You gain the ability to recruit a humanoid companion. You gain an allied NPC creature that follows your commands (Fallout: The Roleplaying Game Core Rulebook, p.338). Your companion can care for their own food and beverages, and they recover from injuries as a player character would and can benefit from healing. Options for companions for this perk can be found later in Chapter 3: Companions and Automatrons, p.62. If your companion is slain, you can recruit a new companion before the next quest, or you may trade this perk for a different one after this quest.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Home Defense",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 5,
+      "Intelligence": 6
+    },
+    "reqincrease": 5,
+    "description_en": "You can set traps to protect your property from intruders! At rank 1, you can craft traps from the Traps section, p.189. Traps have a complexity of 2 and require the components for a complexity 2 item. If you fail the INT + Repair test, your trap misfires— resolve the trap’s effect against yourself. At rank 2, when you fail the INT + Repair test to set the trap it does not misfire. Instead you succeed at cost, and the gamemaster creates a complication related to the trap (i.e., it is easier to spot, deals less damage, or otherwise doesn’t work as intended). Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Homebody",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 5,
+      "Endurance": 6
+    },
+    "reqincrease": 5,
+    "description_en": "You do not need to sleep while in a settlement you belong to recuperate. At rank 1, when you spend an hour in a settlement you belong to or manage, roll a number of D6 equal to your Endurance rank, and regain its result in HP. At rank 2, you regain an additional hit point per Effect rolled. Whenever you make an END + Survival test to recover from an injury, the difficulty is reduced to a maximum of 2 (light activity on the Injury Recovery Difficulty table, Fallout: The Roleplaying Game Core Rulebook, p.35). Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Local Leader",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 2,
+      "Charisma": 6
+    },
+    "reqincrease": 5,
+    "description_en": "You are the person that people turn to, and with that have a certain amount of influence on the development of settlements and communities. At rank 1, you can establish a supply line between two settlements you have a reputation rank of at least Friendly (3) with (see Chapter 2: Settlements, All of the Comforts of Home, p.52). To establish a supply line, you must have at least one available settler in either settlement to make the shipments. Once established, any available supplies or resources in one settlement can be made available in another settlement so long as that settlement’s Happiness is greater than the number of people in the settlement. At rank 2, you can request the construction of various stores and crafting tables in a settlement. This rank is required for a settlement to add Trading Stores, Clothing Stores, Armor Stores, Weapon Stores, Drinking Establishments, and Medical Establishments, as well as an Armor Workbench, Chemistry Station, Cooking Station, Power Armor Station, Weapons Workbench, and a Robot Workbench. Each time you take this perk, the level requirement increases by 5.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Lock and Load",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Strength": 7
+    },
+    "reqincrease": 4,
+    "description_en": "When you make attacks with a big gun with a fire rate greater than 0, its fire rate increases by 1 per rank in this perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mechanical Menace/Class Freak",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 6,
+      "Intelligence": 5
+    },
+    "description_en": "The Mechanical Menace perk affects robots, while the Class Freak perk affects mutated humans—they are otherwise identical. Whenever a creature NPC with the chosen keyword would attack you, roll 1D6. On any result other than an effect, the creature chooses not to attack you. However, it may still attack another character it can target. In addition, when you attempt a CHA based skill to influence a character with the applicable keyword, you may re-roll 1d20.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nocturnal Fortitude",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Endurance": 6,
+      "robot": false
+    },
+    "description_en": "At night, your maximum HP is increased by an amount equal to your END. When you increase your maximum HP, you gain the same amount of additional current HP. When the effect ends, your maximum HP is reduced back to normal, but your current HP remains unchanged unless it is above your maximum (in which case, it is reduced to your maximum).",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pannapictagraphist",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Luck": 5
+    },
+    "description_en": "Whenever you roll randomly to obtain a magazine from the Random Publication or the Issues tables (Fallout: The Roleplaying Game Core Rulebook, p.172–180), you may re-roll the result if your original result is a magazine or issue you have already found",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Pharmacist",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Intelligence": 8
+    },
+    "reqincrease": 6,
+    "description_en": "RadAway you administer now heals 2 additional Radiation damage. At rank 2, it heals an additional 3 Radiation damage, and at rank 3 it heals an additional 4 Radiation damage. Each time you take this perk, the level requirement increases by 6",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Photosynthetic",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 5,
+      "Endurance": 7
+    },
+    "reqincrease": 10,
+    "description_en": "When you are in direct sunlight you regenerate 1 HP every hour. At rank 2 you regenerate 2 HP every hour in direct sunlight. Each time you take this perk, the level requirement increases by 10",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Quack Surgeon",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Charisma": 7
+    },
+    "description_en": "When you attempt a First Aid action on an ally, you may use an alcoholic beverage on your patient as part of the action. The patient heals additional HP equal to the amount the beverage normally heals, if any, and allows you to heal 2 HP per AP spent. The ally also receives the benefits (and drawbacks) of consuming the beverage.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rejuvenated",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 12,
+      "Endurance": 7,
+      "robot": false
+    },
+    "description_en": "When you are full (the highest hunger state), your maximum HP increases by +2, you may re-roll 1d20 on all STR-based skill tests, and being full lasts for twice as long. When you are quenched (the highest thirst state), you may re-roll 1d20 on all END-based skill tests, you generate one free AP at the start of each of your turns in combat, and being quenched lasts twice as long.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Retribution",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 2,
+      "Luck": 8,
+      "Endurance": 8
+    },
+    "reqincrease": 5,
+    "description_en": "If you do not take damage from an attack due to your Damage Reduction (DR), recover +1 HP and add 1 AP to the group pool. This effect can only trigger once per round of combat per rank you have in this perk. Each time you take this perk, the level requirement increases by 5",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robot Wrangler",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 5
+    },
+    "description_en": "You choose to travel the wilderness with robotic company. You have a robot companion that serves as a friend and ally in the hazards of the wasteland. You gain an allied NPC creature that follows your commands ( Fallout: The Roleplaying Game Core Rulebook, p.338). They cannot recover from injuries or heal health points without receiving repairs (see Fallout: The Roleplaying Game Core Rulebook, Chapter Two: Combat, Healing Robots, p.34), but do not require food or beverages nor can they gain benefit from consuming them or using chems. Options for robot companions for this perk can be found in Chapter 3: Companions and Automatrons, p.62. If your robot is destroyed, you either attempt to repair it, find or purchase a new one before the next adventure, or you may trade this perk for a different one after this quest",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Squad Maneuvers",
+    "ranks": 2,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 7
+    },
+    "reqincrease": 1,
+    "description_en": "At rank 1, whenever you travel across the wastes at a hurried pace, you can maintain that pace for one additional hour by passing a CHA + Survival test with a difficulty of 1, and one further additional hour by spending 2 AP (for a maximum of 3 hours at a hurried pace). At rank 2, you can coordinate your allies to join you in combat. When you spend 1 AP to take an additional Move minor action, you can move an ally in the zone you end your movement in to within reach of you by spending another 1 AP.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Super Duper",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 3,
+      "Luck": 6
+    },
+    "reqincrease": 4,
+    "description_en": "Whenever you craft an item, roll 1D6. If you roll any Effects, you regain half the components you spent rounding down. Check each rarity of the components separately and regain half of each, rounding down. At rank 2, you roll 2D6. At rank 3, you roll 3D6. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Taking One For The Team",
+    "ranks": 3,
+    "requirements_en": {
+      "level": 1,
+      "Endurance": 7,
+      "Charisma": 6
+    },
+    "reqincrease": 4,
+    "description_en": "At rank 1, whenever a creature NPC would roll to damage an ally in the same zone as you, roll 1D6. On any result other than Effect, you take the damage from the attack instead. This effect can only trigger once per round of combat per rank you have in this perk. At rank 2, if you take damage from the attack after calculating damage reduction, add 1 AP to the pool for each rank you have in this perk. At rank 3, after you have taken the damage you and the ally can reroll 1d20 on the next attack you make against the target that attacked for each rank you have in this perk. Each time you take this perk, the level requirement increases by 4.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tinkerer",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Intelligence": 5,
+      "Endurance": 5
+    },
+    "description_en": "You reduce the difficulty of repairing a robot through the first aid action to the number of injuries that it has sustained, increasing the difficulty of the test by +1 if you are attempting to repair yourself. Additionally, you can tinker and clean a robot for up to an hour, increasing the maximum HP of the robot by +2 for 24 hours or until the robot sustains an injury.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "True Friends",
+    "ranks": 1,
+    "requirements_en": {
+      "level": 1,
+      "Charisma": 6,
+      "Perception": 6
+    },
+    "description_en": "Making friends is second nature for you, and more importantly the friendships that you form are stronger than most. At rank 1, when a reputation test results in decreasing your reputation with a faction or settlement, you can roll a number of D6 equal to your current reputation. If you roll at least one Effect your reputation does not change. You must increase your reputation by 1 before you can use this perk with the same faction or settlement again. At rank 2, when you perform an action that would increase the affinity with an individual, faction, or settlement you can roll a CHA + Speech test with a difficulty of 3. With a success, you can instead increase the infinity by 2. With a failure on the test, the affinity does not change. You must increase the affinity by 1 before you can use this perk with the same target.",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "The Chain That Binds",
+    "description_en": "You gain one additional Tag skill, which must be one of Energy Weapons, Science, or Repair. As a member of the Brotherhood of Steel, you are bound by the chain of command: The Chain that Binds. You must carry out the orders of your immediate superiors, and you are responsible for your subordinate siblings. If you do not carry out your duty, you are expelled from the Brotherhood and your technology will be reclaimed—by any means necessary.",
+    "origin": "Brotherhood of Steel",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Necrotic Post-Human",
+    "description_en": "You are immune to radiation damage. In fact, you’re healed by it—you regain 1 HP for every 3 points of radiation damage inflicted upon you, and if you rest in an irradiated location, you may re-roll your dice pool when checking if your injuries heal. In addition, Survival becomes a Tag skill, increasing it by 2 ranks. You age at a much-decreased rate, and you’re probably older than your unmutated companions—you may even have survived the Great War of 2077—but you’re sterile: “the first generation of ghouls is the last” as the saying goes. You may face discrimination from “smoothskins” (humans who aren’t ghouls), increasing the difficulty or complication range of Charisma tests depending on your opponent’s beliefs",
+    "origin": "Ghoul",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Forced Evolution",
+    "description_en": "Your initial Strength and Endurance attributes are increased by +2 each, and your maximum Strength and Endurance are increased to 12, but your maximum Intelligence and Charisma are both reduced to 6. You may not have more than 4 ranks in any skill. You are completely immune to radiation and poison damage. You stand over seven feet tall, and your body is bulky and muscular. Your skin is green, yellow, or grey, regardless of what color it was when you were human. You do not seem to age, but you are sterile. You can only wear armor which has been made to fit a super mutant.",
+    "origin": "Super Mutant",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mister Handy Robot",
+    "description_en": "You have 360° vision and improved sensory systems that can detect smells, chemicals, and radiation, reducing the difficulty of Perception tests that rely on sight and smell by 1. You are also immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You move by jet propulsion, hovering above the ground, unaffected by difficult terrain or obstacles. Your carry weight is 150 lbs., and it cannot be increased by your Strength or perks, but it can be increased by modified armor. You cannot recover from your own injuries or heal health points without receiving repairs (see Healing Robots, p.34). You cannot manipulate the physical world like humans do, instead you have three of the arm attachments in the Arm Attachments table, determined by your choice of equipment pack. If you select an arm that features a weapon, you also gain 20 shots of ammo for that weapon.",
+    "origin": "Mister Handy",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Vault Kid",
+    "description_en": "Your healthier start to life at the hands of trained doctors and sophisticated auto-docs means you reduce the difficulty of all END tests to resist the effects of disease. In addition, your carefully-planned upbringing means you have one additional tag skill of your choice. You may also work with the Gamemaster to determine what sort of experiment took place within your Vault. Once per quest, the GM may introduce a complication which reflects the nature of the experiment you unwittingly took part in, or introduce a complication related to your early life of isolation and confinement within the Vault. If the GM does this, you immediately regain one Luck Point.",
+    "origin": "Vault Dweller",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Educated",
+    "description_en": "You have one additional tag skill. When you fail a skill test using a skill other than a tag skill, the GM gains 1 AP.",
+    "origin": "Survivor",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Fast Shot",
+    "description_en": "If you take a second major action in combat, and use it to make a ranged attack, the additional major action only costs 1 AP, rather than 2. You cannot benefit from the Aim minor action—you’re too impatient.",
+    "origin": "Survivor",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Gifted",
+    "description_en": "Choose two S.P.E.C.I.A.L. attributes and increase them by +1 each. Your maximum number of Luck points is one fewer than your Luck attribute.",
+    "origin": "Survivor",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Heavy Handed",
+    "description_en": "Your Melee Damage bonus increases by +1D6. Your melee and unarmed attacks suffer a complication on a 19 or 20, rather than only a 20.",
+    "origin": "Survivor",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Small Frame",
+    "description_en": "You may re-roll 1d20 on all AGI tests which rely on balance or contortion. Your carry weight is 150 + (5 x STR) lbs., rather than 150 + (10 x STR) lbs.",
+    "origin": "Survivor",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Designed for the Frontline",
+    "description_en": "You are a robot, immune to disease, Radiation damage and Poison damage, but are unable to use chems or benefit from food, drink, or rest. You cannot recover from your injuries or regain health points without receiving repairs (see Fallout: The Roleplaying Game Core Rulebook, Healing Robots, p.34). Your carry weight is 150 lbs., and cannot be increased by your Strength or perks, but it can be increased by modified armor. You move by bipedal motion and can manipulate your environment using your actuated three-fingered claw-like hands. You have chain-powered limbs, built for speed and deadly efficiency in close-quarters fighting, giving you +1 DC to unarmed attacks in addition to any bonus DC on melee attacks you receive from your Strength attribute. A powerful laser is integrated into your armored head, allowing you to target foes at range with a powerful energy weapon and you have the ability to critically overload your fusion core, initiating a devasting self-destructive explosion (see Assaultron Weapons).",
+    "origin": "Assaultron",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "The Chain That Breaks",
+    "description_en": "You believe your superiors in the Brotherhood lack a vision beyond acquiring pre-War technology and that your strength as a member of this fraternity of military descendants gives you a duty to help others and pursue different goals than the dogma of the Brotherhood leadership dictates. You gain one additional Tag skill, which must be one of Energy Weapons, Science, or Repair. You gain an additional 1d20 junk (see Fallout: The Roleplaying Game Core Rulebook, p.200) and can spend 1 AP up to 3 times for 1 Uncommon material per AP spent. You can make one additional roll on the loot table without having to spend AP.",
+    "origin": "Brotherhood Outcast",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rad Sponge",
+    "description_en": "Your unusual life experience grants you an extra perk at level one. Additionally, you were given a gift by Atom, unique even amongst other members of the Church. You can resist, store, and even channel radiation through your body. Though Atom has blessed you with his glow, you must be careful. Non-believers may not understand your gift and might be frightened when they witness it. Your base Radiation damage resistance is 1 and can be increased further by armor and perks. Once per scene, when someone in Close range to you would suffer Radiation damage, you can choose to take it instead. Whenever you suffer Radiation damage (minimum of 0), gain one Radiation Point up to a maximum of 5. When you hit with a melee attack, you may spend your stored Radiation Points—for every point you spend, deal an additional 2D6 Radiation damage applied separately after inflicting the attack’s normal damage. When you sleep, you lose 1 Radiation Point.",
+    "origin": "Child of Atom",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Stealth Boy Addict",
+    "description_en": "Your initial Strength and Endurance attributes are increased by +2 each, and your maximum Strength and Endurance are increased to 12, but your maximum Intelligence and Charisma are both reduced to 8. You may not have more than 4 ranks in any skill. You are completely immune to Radiation and Poison damage. You stand over seven feet tall; your body is bulky and muscular, and your skin is blue. You do not seem to age, but you are sterile. You can only wear armor that has been made to fit a super mutant. You can become easily addicted to Stealth Boys, and its prolonged use has taken a huge toll on your psychology and mental health. Whenever you use a Stealth Boys, you roll 1D6 for each dose you’ve taken this session. If you roll any Effects, you gain the following symptoms: Stealth Boy Addiction: A failed addiction roll renders you addicted to Stealth Boys. You increase the difficulty of Perception and Intelligence tests by +2, and Charisma tests by +1 until cured.",
+    "origin": "Nightkin",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mother Wasteland",
+    "description_en": "Spend 1 Luck point to gain insight into the quest, situation, or scene as if you’d spent 3 AP to use Obtain Information 3 times. This information is often cryptic and mystical in nature. Complications make scenes involving pre-War artifacts harder to understand, limiting your use of them.",
+    "origin": "Tribal",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Nomad",
+    "description_en": "Re-roll 1d20 on Survival tests to travel, set up camp, and forage for food and water. In addition, ignore the first complication rolled when making these tests. Barter and Speech tests increase their difficulty and complication range by 1 when dealing with inhabitants of a static settlement. Science cannot be a Tag skill.",
+    "origin": "Tribal",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Rite of Passage",
+    "description_en": "The first time you spend Luck in a scene, roll 1D6. If you roll an effect you have not spent that Luck point. You view everyone who hasn’t gone through your rite of passage as lesser. You cannot assist another PC without spending 1 AP first.",
+    "origin": "Tribal",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Tools of the Old World",
+    "description_en": "You may use Survival instead of Repair or Science to repair or make use of pre-War tech. The complication range of tests involving pre-War technology (not weapons) is increased by 2",
+    "origin": "Tribal",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "The Chosen One",
+    "description_en": "The first d20 you purchase is free on tests relating to your tribe’s quest, and you can always succeed at a cost. The GM adds 2 AP to their pool when your quest comes up.",
+    "origin": "Tribal",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "United We Stand",
+    "description_en": "Trade caravan posts in your settlements attract traders every 5 days rather than 7. Settlements you establish, by any means, have a base Defense resource of 4. You gain either Energy Weapons or Small Guns as a bonus tag skill (your choice). Your Damage Resistance is increased by +1 while in cover, and you deal +1D6 damage while you and your companions are outnumbered.",
+    "origin": "Commonwealth Minuteman",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Good Natured",
+    "description_en": "Tag two of either Speech, Medicine, Repair, Science, and Barter skills. The maximum rating for the other skills listed is reduced from 6 to 4.",
+    "origin": "New California Republic",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Grunt",
+    "description_en": "+1 D6 damage with submachine guns, combat rifles, assault rifles, frag grenades, and combat knives. The complication range of tests while making an attack with big guns or energy weapons is increased by 2.",
+    "origin": "New California Republic",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Home on the Range",
+    "description_en": "Whenever you sleep by a campfire for at least 6 hours, the difficulty to recover from injuries through rest is decreased by 1. You cannot gain a well rested bonus, as described in Fallout: The Roleplaying Game Core Rulebook p.35.",
+    "origin": "New California Republic",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Trigger Discipline",
+    "description_en": "When you make ranged attacks using small guns or energy weapons you may re-roll 1d20. While you wield small guns and energy weapons, reduce their fire rate by 1.",
+    "origin": "New California Republic",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Brahmin Baron",
+    "description_en": "Each Brahmin Feed Trough provides upkeep for 3 Brahmin in each of your settlements. When you perform the Tend Crops settlement action, you gain an additional +1D6 Brahmin milk per feed trough. Roll +1d20 for determining the risk of attack to your settlement if its Food resource exceeds the settlement’s People. (see p.39)",
+    "origin": "New California Republic",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Protect or Destroy",
+    "description_en": "You were built to survive in harsh environments. Once per scene, you may reroll a test to overcome an environmental hazard and use the new result. You are also immune to disease, and Radiation and Poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover from your injuries or heal health points without receiving repairs (see Fallout: The Roleplaying Game Core Rulebook, Chapter 2: Combat, Healing Robots, p.34). Protectrons are designed for a specific purpose and contain additional mechanisms to support their programmed tasks. You cannot have more than two robot mods installed simultaneously. You may be a Fire Brigadier, Law Enforcer, Construction Worker, Medical Responder, or a model of your own invention. When making a test directly related to your model’s purpose, the first d20 you buy using Action Points costs 0. Additionally, your carry weight is 225 lbs. and cannot be increased by your Strength or perks, but it can be increased by modified armor.",
+    "origin": "Protectron",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Robobrain Robot",
+    "description_en": "You are a robot with a human brain as a central processor. You have visual sensors that can detect the visual spectrum and infrared, ignoring any difficulty increase to Perception tests in darkness. You are also immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover your own injuries or heal health points without receiving repairs (see Fallout: The Roleplaying Game Core Rulebook, p.34). You move on two continuous tracks, and have two tube-like manipulators as arms with opposable claws you can use to control tools and objects designed for humans with precision and make unarmed melee attacks. Your head has a built-in mesmetron, which you can use to make ranged attacks. Your carry weight is 150 lbs., and it cannot be increased by your Strength or perks, but it can be increased by modified armor.",
+    "origin": "Robobrain",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Mark I Securitron",
+    "description_en": "You are a robot, with the Mk I operating system designed by RobCo Industries. You have forward-facing visual sensors that can detect the visual spectrum. You are also immune to radiation and poison damage, but you cannot use chems, nor can you benefit from food, drink, or rest. You cannot recover your own injuries or heal health points without receiving repairs (see Fallout: The Roleplaying Game Core Rulebook, p.34). You move on a single tire, increasing the difficulty of skill tests to balance or remain upright by 1. Your arms are fitted with opposable claws, with which you can manipulate your environment rudimentarily and make unarmed melee attacks. The palms of your claws are outfitted with integrated weapons, as outlined in Choose Equipment, p.95. Your shoulders house missile launchers and a grenade launcher is integrated into the left arm, but they are both inoperable unless you are fitted with the Mk II operating system mod. Your carry weight is 150 lbs. It cannot be increased by your Strength or perks, but by modified armor.",
+    "origin": "Securitron",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  },
+  {
+    "name_en": "Generation 3 Synth",
+    "description_en": "Though you appear mentally and physically human, your bioengineering makes you something entirely new and, in many ways, improved. You gain one additional tag skill. You cannot suffer from starvation or dehydration and do not need sleep, but you do not gain a benefit from consuming food or beverage items. When you rest, instead of sleeping, you may engage in minor activities such as crafting, reading, or light scouting. Additionally, you are immune to Poison and Radiation damage and disease. You do not age, nor do you gain or lose weight. When interacting with NPCs who know you are a synth—unless they are sympathetic towards synths—the difficulty of CHA tests made by you or your allies increases by 2. When a complication is rolled, they either become hostile, or your Faction Reputation or Settlement Reputation decreases by 1 per complication generated due to their fear of the Institute. The Institute has given you a unique recall code—an unalterable verbal command that resets your personality and memories. When you hear the code spoken, you become incapacitated until you are retrieved and restored by the Institute.",
+    "origin": "Synth",
+    "source": "focharactersheet",
+    "sourceUrl": "https://focharactersheet.vercel.app"
+  }
+]

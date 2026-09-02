@@ -1,0 +1,1178 @@
+[
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Антибиотики",
+    "effect_ru": "Исцеляет все болезни. Мгновенно.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стимпак",
+    "effect_ru": "Исцеляет 4 ОЗ. Мгновенно. Можно колоть себе или союзнику в зоне (малое действие «Принять препарат»).",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стимпак (разбавленный)",
+    "effect_ru": "Исцеляет 2 ОЗ.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Суперстимпак",
+    "effect_ru": "Исцеляет 8 ОЗ.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Распылитель стимпака",
+    "effect_ru": "Исцеляет 4 ОЗ всем в близкой зоне.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Целебная мазь",
+    "effect_ru": "Исцеляет 2 ОЗ.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Рад-Х",
+    "effect_ru": "+6 Рад.СУ до конца сцены. Зависимости нет.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Рад-Х (разбавленный)",
+    "effect_ru": "+3 Рад.СУ до конца сцены.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Антирадин",
+    "effect_ru": "Снимает 4 очка радиации.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Антирадин (разбавленный)",
+    "effect_ru": "Снимает 2 очка радиации.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Аддиктол",
+    "effect_ru": "Снимает все зависимости. Мгновенно.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Аптечка первой помощи",
+    "effect_ru": "Набор: перевязка и препараты. Первая помощь без своей аптечки сложнее.",
+    "category_ru": "Аптечка"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Психо",
+    "effect_ru": "+2 БК ко всем атакам и +3 Физ.СУ до конца сцены. Зависимость 2.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Винт",
+    "effect_ru": "Доп. действия стоят на 1 ОД меньше до конца хода/следующего хода. Зависимость 2.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Баффаут",
+    "effect_ru": "Переброс 1d20 СИЛ и ВЫН, +3 макс. ОЗ до конца сцены. Зависимость 2.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ментаты",
+    "effect_ru": "Переброс 1d20 ВСП и ИНТ до конца сцены. Зависимость 3.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мед-Х",
+    "effect_ru": "+3 Физ.СУ до конца сцены. Зависимость 2.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Баффвинт",
+    "effect_ru": "СИЛ/ВЫН легче на 1, +4 макс. ОЗ, сразу +3 ОД, доп. действия −1 ОД. Недолго. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Бафтаты",
+    "effect_ru": "СИЛ, ВСП, ВЫН легче на 1, +4 макс. ОЗ. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Психовинт",
+    "effect_ru": "+2 БК атакам, +4 Физ.СУ, сразу +4 ОД. Недолго. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Психобафф",
+    "effect_ru": "+2 БК атакам, +4 макс. ОЗ, СИЛ и ВЫН легче на 1. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Психотаты",
+    "effect_ru": "+2 БК атакам, +2 Физ.СУ, ВСП легче на 1. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ультравинт",
+    "effect_ru": "Сразу +6 ОД, доп. действия −1 ОД. Недолго. Зав. 3.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ярость",
+    "effect_ru": "+3 Физ.СУ, +3 БК ближнему бою, +2 сложности ВСП. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Перегрузка",
+    "effect_ru": "+3 БК ко всем атакам, переброс до 3 БК урона. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Успокоин",
+    "effect_ru": "Переброс 1d20 ВСП и ЛВК, +2 БК скрытной атаке. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Шик",
+    "effect_ru": "ВСП и ИНТ легче на 1, ХАР сложнее на 1. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Глюконафт",
+    "effect_ru": "ХАР и УДЧ легче на 1, СИЛ сложнее на 1. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ягодные ментаты",
+    "effect_ru": "ИНТ легче на 2. Зав. 2 (ментаты).",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Виноградные ментаты",
+    "effect_ru": "ХАР легче на 2, переброс 1d20 Бартера. Зав. 2.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Апельсиновые ментаты",
+    "effect_ru": "ВСП легче на 2; прицеливание даёт ещё один переброс d20. Зав. 2.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Реактивное топливо",
+    "effect_ru": "+1 бесплатное ОД в начале каждого хода до конца сцены. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Слюна скито",
+    "effect_ru": "+2 макс. ОЗ до конца сцены.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "X-клетка",
+    "effect_ru": "Первый купленный d20 на всех проверках бесплатно. Зав. 1.",
+    "category_ru": "Препараты"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Пиво",
+    "effect_ru": "Алкоголь: переброс 1d20 СИЛ и ХАР, ИНТ +1 сложности. +1 крышка из бутылки.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Бурбон",
+    "effect_ru": "Алкоголь + переброс 1d20 ВЫН.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ром",
+    "effect_ru": "Алкоголь + переброс 1d20 ЛВК.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Водка",
+    "effect_ru": "Алкоголь. Лечит 2 ОЗ.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Виски",
+    "effect_ru": "Алкоголь: переброс до 2d20 СИЛ.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Вино",
+    "effect_ru": "Алкоголь. Сразу +1 ОД.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Самогон",
+    "effect_ru": "Алкоголь. +2 макс. ОЗ до конца сцены.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Грязный обитатель Пустоши",
+    "effect_ru": "Сильный алкоголь: СИЛ легче на 1, ИНТ сложнее на 2 (суммарно).",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Нюка-Кола",
+    "effect_ru": "+2 ОЗ, сразу +1 ОД. Облучена (1 БК). +1 крышка.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Вишнёвая Нюка-Кола",
+    "effect_ru": "+3 ОЗ, сразу +2 ОД. Облучена. +1 крышка.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Квантовая Нюка-Кола",
+    "effect_ru": "+10 ОЗ, сразу +5 ОД. Облучена. +1 крышка.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Очищенная вода",
+    "effect_ru": "+3 ОЗ. Не облучена.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Грязная вода",
+    "effect_ru": "+2 ОЗ. Облучена (1 БК).",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Молоко брамина",
+    "effect_ru": "+1 ОЗ, лечит 2 рад. урона.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Пакет крови",
+    "effect_ru": "+3 ОЗ.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Светящийся пакет крови",
+    "effect_ru": "+4 ОЗ, +5 Рад.СУ до конца сцены.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Облучённая кровь",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК).",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Дынный сок",
+    "effect_ru": "+3 ОЗ, лечит 1 ОЗ в начале каждого хода до конца сцены.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Сок из мутафрукта",
+    "effect_ru": "+3 ОЗ, переброс 1d20 ЛВК.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Сок из смоляники",
+    "effect_ru": "+3 ОЗ, сразу +6 ОД.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Сок из тошки",
+    "effect_ru": "+3 ОЗ, пул ОД группы +1 до конца сцены.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Освежающий напиток",
+    "effect_ru": "+11 ОЗ, лечит 10 рад., снимает все зависимости.",
+    "category_ru": "Напитки"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Печёный дутень",
+    "effect_ru": "+6 ОЗ, +2 Рад.СУ. Еда: 1 порция за сцену, не в бою.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Макароны с сыром Бламко",
+    "effect_ru": "+4 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо дутня",
+    "effect_ru": "+2 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо гнуса",
+    "effect_ru": "+7 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стейк из гнуса",
+    "effect_ru": "+10 ОЗ, +3 макс. ОЗ до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо брамина",
+    "effect_ru": "+3 ОЗ. Облучено (1 БК). Можно приготовить в стейк рибай.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мозгогриб",
+    "effect_ru": "+3 ОЗ. Облучён (1 БК). Ингредиент ментатов.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Собачьи консервы",
+    "effect_ru": "+3 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Морковь",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК). Ингредиент рецептов.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Приготовленное мясо болотника с мягким панцирем",
+    "effect_ru": "+9 ОЗ, +1 ОД в начале следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Кукуруза",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК). Ингредиент растительного крахмала.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "СРАМ",
+    "effect_ru": "+5 ОЗ. Облучён (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Хрустящие кусочки белки",
+    "effect_ru": "+6 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Наливные яблоки",
+    "effect_ru": "+3 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Яйцо когтя смерти",
+    "effect_ru": "+7 ОЗ. Облучено (1 БК). Ингредиент омлета.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо когтя смерти",
+    "effect_ru": "+9 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Омлет из яйца когтя смерти",
+    "effect_ru": "+11 ОЗ; если следующая сцена — бой, +1 ОЗ в начале хода.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стейк из когтя смерти",
+    "effect_ru": "+14 ОЗ, переброс 1d20 СИЛ до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Кексы «Весёлые ребята»",
+    "effect_ru": "+3 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Пищевая паста",
+    "effect_ru": "+7 ОЗ, переброс 1d20 ВЫН до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Тыква",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Радтаракан гриль",
+    "effect_ru": "+5 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Радолень гриль",
+    "effect_ru": "+11 ОЗ, грузоподъёмность +25 до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Жевательные пастилки",
+    "effect_ru": "+3 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Кусочки игуаны",
+    "effect_ru": "+4 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Игуана на палочке",
+    "effect_ru": "+6 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Суп из игуаны",
+    "effect_ru": "+10 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Пюре быстрого приготовления",
+    "effect_ru": "+4 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Продуктовый набор Института",
+    "effect_ru": "+5 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Дыня",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Кекс из болотника",
+    "effect_ru": "+12 ОЗ, можно дышать под водой до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Яйцо болотника",
+    "effect_ru": "+3 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Омлет из яйца болотника",
+    "effect_ru": "+7 ОЗ, сразу +2 ОД в пул группы.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо болотника",
+    "effect_ru": "+6 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стейк из матки болотников",
+    "effect_ru": "+14 ОЗ, ВЫН легче на 1 до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Кусочки кротокрыса",
+    "effect_ru": "+7 ОЗ, +1 макс. ОД в пул группы до конца сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо кротокрыса",
+    "effect_ru": "+5 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Собачатина",
+    "effect_ru": "+4 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Отбивная из гончей мутанта",
+    "effect_ru": "+8 ОЗ, лечит 2 рад. урона.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо гончей мутанта",
+    "effect_ru": "+5 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мутафрукт",
+    "effect_ru": "+3 ОЗ. Облучён (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Отбивные из собачатины",
+    "effect_ru": "+6 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Чашка с лапшой",
+    "effect_ru": "+6 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Идеально сохранившийся пирог",
+    "effect_ru": "+5 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Свинина с бобами",
+    "effect_ru": "+4 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Картофельные чипсы",
+    "effect_ru": "+3 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Консервированное мясо",
+    "effect_ru": "+6 ОЗ. Облучено: 2 БК вместо 1 на радиацию.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо матки болотников",
+    "effect_ru": "+10 ОЗ. Облучено (1 БК). Переброс 1d20 ВЫН до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо радтаракана",
+    "effect_ru": "+4 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Яйцо радскорпиона",
+    "effect_ru": "+6 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Омлет из яйца радскорпиона",
+    "effect_ru": "+9 ОЗ, снимает все зависимости.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо радскорпиона",
+    "effect_ru": "+9 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стейк из радскорпиона",
+    "effect_ru": "+12 ОЗ, +2 Энерг.СУ до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо радоленя",
+    "effect_ru": "+8 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Рагу из радоленя",
+    "effect_ru": "+12 ОЗ, +3 Энерг.СУ до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Бритвозлак",
+    "effect_ru": "+3 ОЗ. Облучён (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стейк рибай",
+    "effect_ru": "+10 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Жареное мясо болотника",
+    "effect_ru": "+8 ОЗ, +1 ОД в начале следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Солсбери стейк",
+    "effect_ru": "+5 ОЗ. Облучён (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Илофасоль",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо болотника с мягким панцирем",
+    "effect_ru": "+6 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Кусочки белки",
+    "effect_ru": "+4 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Шашлык из белки",
+    "effect_ru": "+7 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Рагу из белки",
+    "effect_ru": "+10 ОЗ.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Филе жалокрыла",
+    "effect_ru": "+11 ОЗ, переброс 1d20 ВСП до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо жалокрыла",
+    "effect_ru": "+8 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Сахарные бомбочки",
+    "effect_ru": "+4 ОЗ, +1 ОД в начале следующей сцены. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Сладкий рулет",
+    "effect_ru": "+4 ОЗ. Облучён (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Смоляника",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Тошка",
+    "effect_ru": "+3 ОЗ. Облучена (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Овощной суп",
+    "effect_ru": "+7 ОЗ, +2 Рад.СУ до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Мясо яо-гуая",
+    "effect_ru": "+9 ОЗ. Облучено (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Рёбра яо-гуая",
+    "effect_ru": "+13 ОЗ, +2 Физ.СУ до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Жаркое из яо-гуая",
+    "effect_ru": "+14 ОЗ, +2 БК ближнему бою до конца следующей сцены.",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Фаршированные яйца «Ням-ням»",
+    "effect_ru": "+4 ОЗ. Облучены (1 БК).",
+    "category_ru": "Еда"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Стелс-бой",
+    "effect_ru": "Малое действие. Скрытность: враги +2 к сложности обнаружения до конца сцены (или пока не атакуете).",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ремонтный набор",
+    "effect_ru": "Позволяет чинить оружие/броню без верстака; по правилам сцены.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Комплект ремонта роботов",
+    "effect_ru": "Чинит робота (Мистер Помощник и др.) без верстака; по правилам сцены.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Отмычки",
+    "effect_ru": "Нужны для взлома замков (ЛВК + Отмычки).",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ядерный блок",
+    "effect_ru": "Питание силовой брони. Заряды = 10 + Наука (Физик-ядерщик даёт ещё). Для гатлинг-лазера 1 заряд = 50 выстрелов.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны .38",
+    "effect_ru": "Калибр .38. При находке обычно 10+5 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны 10-мм",
+    "effect_ru": "Калибр 10-мм. Обычно 8+4 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны .308",
+    "effect_ru": "Калибр .308. Обычно 6+3 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны дробовика",
+    "effect_ru": "12 калибр. Обычно 6+3 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны .45",
+    "effect_ru": "Калибр .45. Обычно 8+4 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны .44 Магнум",
+    "effect_ru": "Калибр .44. Обычно 4+2 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны .50",
+    "effect_ru": "Калибр .50. Обычно 4+2 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны 5.56-мм",
+    "effect_ru": "Калибр 5.56. Обычно 8+4 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Патроны 5-мм",
+    "effect_ru": "Калибр 5-мм (миниган). Обычно 12+6 БК шт.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ядерная батарея",
+    "effect_ru": "Микроядерная ячейка. Обычно 14+7 БК зарядов.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Заряд плазмы",
+    "effect_ru": "Картридж плазмы. Обычно 10+5 БК.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "2-мм ЭК",
+    "effect_ru": "Электромагнитный картридж Гаусса. Обычно 6+3 БК.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Топливо для огнемёта",
+    "effect_ru": "Обычно 12+6 БК зарядов.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Гамма-патрон",
+    "effect_ru": "Батарея гамма-пушки. Обычно 4+2 БК.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Железнодорожный гвоздь",
+    "effect_ru": "Боеприпас гвоздемёта. Обычно 6+3 БК.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Шприцы",
+    "effect_ru": "Боеприпас инъекционного карабина. Эффект зависит от типа шприца.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ракета",
+    "effect_ru": "Для пусковой установки. Обычно 2+1 БК.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Ядерный минизаряд",
+    "effect_ru": "Для Толстяка. Обычно 1+1 БК. Халявщик не увеличивает.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Сигнальная ракета",
+    "effect_ru": "Для сигнального пистолета. Обычно 2+1 БК.",
+    "category_ru": "Боеприпасы"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Журнал",
+    "effect_ru": "Одноразовый бонус к навыку/проверке (как в описании выпуска). После использования — Понимание: 1 БК, эффект = ещё раз.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "¡La Fantoma!",
+    "effect_ru": "Журнал. Одноразовый бонус по выпуску (скрытность/харизма — как в книге). Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Потрясающе крутые истории",
+    "effect_ru": "Журнал. Одноразовый бонус по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Жизнь в глуши",
+    "effect_ru": "Журнал. Одноразовый бонус Выживания/природы по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Время бокса",
+    "effect_ru": "Журнал. Одноразовый бонус рукопашного боя по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "В укрытие! Ложись!",
+    "effect_ru": "Журнал. Одноразовый бонус укрытия/взрывов по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Чиним вещи",
+    "effect_ru": "Журнал. Одноразовый бонус Ремонта по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Грогнак-варвар",
+    "effect_ru": "Журнал. Одноразовый бонус ближнего боя по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Оружие будущего сегодня",
+    "effect_ru": "Журнал. Одноразовый бонус энергооружия/науки по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Пистолеты и пули",
+    "effect_ru": "Журнал. Одноразовый бонус стрелкового оружия по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Жить и любить",
+    "effect_ru": "Журнал. Одноразовый бонус общения/ХАР по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Массачусетский хирургический журнал",
+    "effect_ru": "Журнал. Одноразовый бонус Медицины по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  },
+  {
+    "source": "pipboy",
+    "sourceUrl": "https://github.com/Alexander12039409/fallout-2d20-pipboy",
+    "name_ru": "Дайджест программиста",
+    "effect_ru": "Журнал. Одноразовый бонус Науки/взлома по выпуску. Понимание: 1 БК повторить эффект.",
+    "category_ru": "Разное"
+  }
+]
