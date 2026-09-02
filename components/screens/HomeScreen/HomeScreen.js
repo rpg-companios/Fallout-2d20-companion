@@ -220,6 +220,9 @@ export default function HomeScreen({ navigation }) {
   const activeModuleId = getActiveModuleId();
   const [loading, setLoading] = useState(true);
   const [menuVisible, setMenuVisible] = useState(false);
+  // null = синка не идёт. Иначе { stage, current, total } — модалка-заглушка
+  // перекрывает экран, поэтому повторный запуск невозможен by design.
+  const [syncProgress, setSyncProgress] = useState(null);
   const [aboutVisible, setAboutVisible] = useState(false);
   const [legalDoc, setLegalDoc] = useState(null); // null | 'privacy' | 'terms'
   const [communityVisible, setCommunityVisible] = useState(false);
@@ -640,15 +643,22 @@ export default function HomeScreen({ navigation }) {
       return;
     }
 
+    // Защита от повторного запуска: кнопка в меню, автосинк и второй клик
+    // не должны стартовать вторую сессию поверх текущей.
+    if (syncProgress) return;
+
     debugLog('sync.manual:start', {});
+    setSyncProgress({ stage: 'auth', current: 0, total: 0 });
     try {
       const result = await syncAllCharactersWithCloud({
+        onProgress: setSyncProgress,
         confirmDownload: async (items) => {
           debugLog('sync.manual:confirmDownload', { count: items.length });
           return window.confirm(`${tHomeScreen('cloudSync.remoteIsNewer')} (${items.length})`);
         },
       });
       debugLog('sync.manual:done', result);
+      setSyncProgress(null);
       await loadList();
       await openCloudFolderInDrive();
       // tHomeScreen принимает только путь ключа (второй аргумент игнорируется),
@@ -660,6 +670,7 @@ export default function HomeScreen({ navigation }) {
     } catch (e) {
       const reason = e?.message || String(e);
       debugLog('sync.manual:failed', { message: reason });
+      setSyncProgress(null);
       showHomeAlert(tHomeScreen('title'), `${tHomeScreen('cloudSync.error')}\n\n${reason}`);
     }
   };
@@ -903,6 +914,23 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* Заглушка процесса синхронизации. Модалка без onRequestClose-выхода:
+          закрыть её пользователь не может, что и решает исходную проблему —
+          «не хватает ощущения процесса, и можно прервать его иначе». */}
+      <Modal visible={!!syncProgress} transparent animationType="fade">
+        <View style={styles.modalBackdropCenter}>
+          <View style={styles.syncProgressModal}>
+            <ActivityIndicator size="large" color="#d4af37" />
+            <Text style={styles.syncProgressTitle}>{tHomeScreen('cloudSync.inProgress')}</Text>
+            <Text style={styles.syncProgressStage}>
+              {tHomeScreen(`cloudSync.stages.${syncProgress?.stage || 'auth'}`)}
+              {syncProgress?.total > 1 ? ` (${syncProgress.current}/${syncProgress.total})` : ''}
+            </Text>
+            <Text style={styles.syncProgressHint}>{tHomeScreen('cloudSync.doNotClose')}</Text>
+          </View>
+        </View>
       </Modal>
 
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />

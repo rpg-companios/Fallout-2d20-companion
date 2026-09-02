@@ -63,6 +63,16 @@
     "unsupported": "Cloud sync is available only in web version.",
     "remoteIsNewer": "Newer character saves were found in cloud. Download them locally?",
     "success": "Sync completed.",
+    "inProgress": "Syncing with Google Drive",
+    "doNotClose": "Do not close the page until it finishes",
+    "stages": {
+      "auth": "Signing in to Google\u2026",
+      "folder": "Looking up setting folder\u2026",
+      "list": "Reading cloud file list\u2026",
+      "download": "Downloading from cloud\u2026",
+      "upload": "Uploading to cloud\u2026",
+      "done": "Finishing\u2026"
+    },
     "uploaded": "Uploaded",
     "downloaded": "Downloaded",
     "error": "Cloud sync failed."
