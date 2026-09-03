@@ -135,7 +135,7 @@
       "isMultiTrait": true,
       "subTraitIds": [
         "vaultdweller-vault-kid",
-        "vaultdweller-necrotic-posthuman"
+        "ghoul-necrotic-posthuman"
       ]
     }
   },
@@ -156,27 +156,6 @@
         "disease_resistance",
         "luck_restore_on_complication"
       ]
-    }
-  },
-  {
-    "id": "vaultdweller-necrotic-posthuman",
-    "originId": "vaultDweller",
-    "displayNameKey": "traits.ghoul.necroticPosthuman.name",
-    "descriptionKey": "traits.ghoul.necroticPosthuman.description",
-    "modifiers": {
-      "immunities": [
-        "radiation"
-      ],
-      "effects": [
-        "radiation_healing",
-        "slow_aging",
-        "infertility",
-        "discrimination"
-      ],
-      "forcedSkills": [
-        "SURVIVAL"
-      ],
-      "extraSkills": 1
     }
   },
   {
