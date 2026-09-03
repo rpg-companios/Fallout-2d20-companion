@@ -22,6 +22,7 @@ import { loadEnrichedOrigins } from "../../../../domain/origins";
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../../domain/traits";
 import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
 import { resolveKitItemEquipState } from "../../../../domain/kitEquip";
+import StartingPurchaseModal from "./modals/StartingPurchaseModal";
 import { rollCombatDiceEffects } from "../../../../domain/diceRollsLogic";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
@@ -285,6 +286,7 @@ export default function CharacterScreen() {
     setEffects,
     caps,
     earnCaps,
+    spendCaps,
     setCurrentHealth,
     luckPoints,
     setLuckPoints,
@@ -400,6 +402,9 @@ export default function CharacterScreen() {
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
   const [isTraitModalVisible, setIsTraitModalVisible] = useState(false);
+  const [isStartingPurchaseVisible, setIsStartingPurchaseVisible] = useState(false);
+  const [purchaseBudget, setPurchaseBudget] = useState(0);
+  const [purchaseMaxRarity, setPurchaseMaxRarity] = useState(null);
   const [isEquipmentKitModalVisible, setIsEquipmentKitModalVisible] =
     useState(false);
 
@@ -597,6 +602,24 @@ export default function CharacterScreen() {
     }
 
     setIsEquipmentKitModalVisible(false);
+
+    // Комплект «покупка снаряжения»: крышки уже начислены — сразу открываем
+    // окно покупки, чтобы игрок потратил их на старте. Остаток останется
+    // обычными крышками.
+    if (Number.isFinite(kit.purchaseMaxRarity) && (kit.caps || 0) > 0) {
+      setPurchaseBudget(kit.caps || 0);
+      setPurchaseMaxRarity(kit.purchaseMaxRarity);
+      setIsStartingPurchaseVisible(true);
+    }
+  };
+
+  // Итог стартовой покупки: предметы в инвентарь, потраченное — с крышек.
+  // Остаток трогать не нужно: крышки начислены целиком при выдаче комплекта.
+  const handleFinishStartingPurchase = ({ items, spent }) => {
+    items.forEach((item) => {
+      useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+    });
+    if (spent > 0) spendCaps(spent);
   };
 
   const handleToggleSkill = (skillName) => {
@@ -1434,6 +1457,14 @@ export default function CharacterScreen() {
           equipmentKits={equipmentKitsForModal}
           onSelectKit={handleSelectKit}
           character={{ origin, trait, level }}
+        />
+
+        <StartingPurchaseModal
+          visible={isStartingPurchaseVisible}
+          onClose={() => setIsStartingPurchaseVisible(false)}
+          budget={purchaseBudget}
+          maxRarity={purchaseMaxRarity}
+          onFinish={handleFinishStartingPurchase}
         />
 
         {/* Модальное окно для выбора черты */}
