@@ -80,11 +80,27 @@ const AlertHost = () => {
   const scope = entry.scope;
 
   const title = raw ? raw.title : substitute(translate(scope, entry.titleKey), params);
-  const message = raw ? raw.message : substitute(translate(scope, entry.messageKey), params);
+  // messageTemplate — тело диалога целиком из подстановок, без словаря
+  // (например, имя удаляемого пакета сеттинга).
+  const message = raw
+    ? raw.message
+    : entry.messageTemplate
+      ? substitute(entry.messageTemplate, params)
+      : substitute(translate(scope, entry.messageKey), params);
 
   // Состав кнопок зависит от вида диалога.
   let buttons;
-  if (entry.kind === 'choice') {
+  if (raw && Array.isArray(entry.buttons) && entry.buttons.length > 0) {
+    // showRawAlert с кнопками в формате Alert.alert: [{ text, onPress, style }].
+    // Колбэк вызывается после закрытия, значение промиса — индекс кнопки.
+    buttons = entry.buttons.map((button, index) => ({
+      key: String(index),
+      label: button.text,
+      value: index,
+      style: button.style,
+      onPress: button.onPress,
+    }));
+  } else if (entry.kind === 'choice') {
     buttons = (entry.buttons || []).map((button) => ({
       key: button.key,
       // labelParam — подпись целиком приходит из params (например, названия
@@ -141,7 +157,10 @@ const AlertHost = () => {
                   button.style === 'destructive' && styles.buttonDestructive,
                   button.style === 'cancel' && styles.buttonCancel,
                 ]}
-                onPress={() => finish(button.value)}
+                onPress={() => {
+                  finish(button.value);
+                  if (typeof button.onPress === 'function') button.onPress();
+                }}
               >
                 <Text
                   style={[

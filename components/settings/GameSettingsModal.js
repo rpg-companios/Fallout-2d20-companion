@@ -7,11 +7,11 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
-  Alert,
-} from 'react-native';
+  } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../i18n/locale';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
+import { confirmAlert } from '../alerts/alertService';
 import useSettingPackStore, {
   getVanillaCatalog,
   selectActiveSettingId,
@@ -60,17 +60,11 @@ export default function GameSettingsModal({ visible, onClose }) {
     (entry) => !installed.some((item) => item.id === entry.id),
   );
 
-  const confirmDelete = (entry) => {
-    const title = tHomeScreen('gameSetting.delete');
-    const run = () => deleteSetting(entry.id);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.confirm(`${title}: ${entry.name}`)) run();
-      return;
+  const confirmDelete = async (entry) => {
+    // Заголовок из каталога, имя пакета — подстановкой в тело диалога.
+    if (await confirmAlert('settingDelete', { name: entry.name })) {
+      deleteSetting(entry.id);
     }
-    Alert.alert(title, entry.name, [
-      { text: tHomeScreen('buttons.no'), style: 'cancel' },
-      { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: run },
-    ]);
   };
 
   const handlePickLocal = async () => {

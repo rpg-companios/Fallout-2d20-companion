@@ -39,7 +39,7 @@ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/scen
 import { isSkillTagged } from '../domain/d20Checks';
 import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
-import { showAlert as showCatalogAlert } from './alerts/alertService';
+import { showAlert as showCatalogAlert, showRawAlert } from './alerts/alertService';
 
 import { resolveBodyPlan } from '../domain/bodyplan';
 import { createEmptyEquippedArmor } from '../domain/equippedArmor';
@@ -78,7 +78,7 @@ import { INVENTORY_DICTIONARIES } from './screens/InventoryScreen/logic/inventor
 import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
 import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
 import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
@@ -205,16 +205,9 @@ const INV_LABELS_DICT = {
   'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.labels,
 };
 const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
-// Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
-// как showAlert в InventoryScreen.
-const paAlert = (title, message = '') => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-    window.alert(message ? `${title}\n\n${message}` : title);
-    return;
-  }
-  if (message) Alert.alert(title, message);
-  else Alert.alert(title);
-};
+// Алерты слоя СБ идут через общий AlertHost — одна React-модалка на вебе
+// и на нативе. Раньше здесь была своя копия развилки Platform.OS.
+const paAlert = (title, message = '') => showRawAlert({ title, message });
 // Тик таймера расхода блока (§5.3): заряд сгорает за 12 минут аптайма,
 // точность тика на порядок ниже — расход ведёт накопитель, а не тик.
 const PA_CORE_TICK_MS = 15000;

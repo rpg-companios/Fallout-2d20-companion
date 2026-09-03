@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   Platform,
   Modal,
   Linking,
@@ -40,6 +39,7 @@ import {
   IMPORT_ERRORS,
 } from './logic/characterTransfer';
 import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/HomeScreen.styles';
@@ -436,20 +436,12 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
-  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
-  // ничего не делает». Тот же приём уже применён в InventoryScreen/
-  // CharacterContext (showAlert/paAlert).
-  const showHomeAlert = (title, message = '') => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-      window.alert(message ? `${title}\n\n${message}` : title);
-      return;
-    }
-    if (message) Alert.alert(title, message);
-    else Alert.alert(title);
-  };
+  // Показ уведомления через общий AlertHost: одна и та же React-модалка на
+  // вебе и на нативе. Раньше здесь была своя копия развилки Platform.OS с
+  // window.alert — таких копий по проекту было пять.
+  const showHomeAlert = (title, message = '') => showRawAlert({ title, message });
 
-  const handleDeleteFolder = (folder) => {
+  const handleDeleteFolder = async (folder) => {
     const remove = async () => {
       // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
       // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
@@ -462,15 +454,8 @@ export default function HomeScreen({ navigation }) {
       if (activeFolder?.id === folder.id) setActiveFolder(null);
       loadList();
     };
-    const message = `${tHomeScreen('folders.deleteMessage')} ${tHomeScreen('folders.characters')}: ${folderCounts[folder.id] || 0}.`;
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.confirm(message)) remove();
-      return;
-    }
-    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [
-      { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: remove },
-      { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
-    ]);
+    const confirmed = await confirmAlert('folderDelete', { count: folderCounts[folder.id] || 0 });
+    if (confirmed) remove();
   };
 
   const handleCreate = () => {
@@ -487,7 +472,7 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleDelete = (character) => {
+  const handleDelete = async (character) => {
     // Удаление сквозное: локально И в облаке. Без удаления в облаке персонаж
     // воскресал при следующей синхронизации — она не отличает «я это удалил»
     // от «этого у меня ещё не было» (сверка идёт по наличию id локально).
@@ -503,30 +488,11 @@ export default function HomeScreen({ navigation }) {
       // Если облачная копия осталась (сеть/авторизация отвалились), молчать
       // нельзя: при следующем синке персонаж вернётся, и это выглядит как баг.
       if (cloud.reason === 'error') {
-        showHomeAlert(tHomeScreen('title'), tHomeScreen('deleteCloudFailed'));
+        await showCatalogAlert('characterDeleteCloudFailed');
       }
     };
 
-    const confirmMessage = tHomeScreen('deleteConfirm');
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if (window.confirm(confirmMessage)) confirmDelete();
-      return;
-    }
-
-    Alert.alert(
-      tHomeScreen('title'),
-      confirmMessage,
-      [
-        {
-          text: tHomeScreen('buttons.yes'),
-          style: 'destructive',
-          onPress: confirmDelete,
-        },
-        { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
-      ],
-      { cancelable: false }
-    );
+    if (await confirmAlert('characterDelete')) await confirmDelete();
   };
 
   const handleDuplicate = async (character) => {
@@ -541,20 +507,20 @@ export default function HomeScreen({ navigation }) {
       });
     } catch (error) {
       debugLog('home.duplicateCharacter.failed', { message: error?.message });
-      showHomeAlert(tHomeScreen('title'), tHomeScreen('characterActions.duplicateError'));
+      showCatalogAlert('characterDuplicateError');
     }
   };
 
   const handleDownload = async (character) => {
     if (false) { // cross-platform
-      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.unsupported'));
+      showCatalogAlert('downloadUnsupported');
       return;
     }
 
     try {
       const row = await db.loadCharacterById(character.id);
       if (!row) {
-        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
+        showCatalogAlert('downloadNotFound');
         return;
       }
 
@@ -562,17 +528,17 @@ export default function HomeScreen({ navigation }) {
       const result = await downloadCharacterPayload(payload, row.name);
       
       if (!result.success && !result.aborted) {
-        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.failed'));
+        showCatalogAlert('downloadFailed');
       }
     } catch (error) {
       debugLog('home.characterDownload.failed', { message: error?.message });
-      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.unexpected'));
+      showCatalogAlert('downloadUnexpected');
     }
   };
 
   const handleUpload = async () => {
     if (false) { // cross-platform
-      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.unsupported'));
+      showCatalogAlert('uploadUnsupported');
       return;
     }
 
@@ -607,35 +573,17 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
-
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const confirmed = window.confirm(overwriteMessage);
-        if (confirmed) {
-          await persistImport();
-        }
-        return;
-      }
-
-      Alert.alert(
-        tHomeScreen('title'),
-        overwriteMessage,
-        [
-          { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: persistImport },
-          { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
-        ],
-        { cancelable: true }
-      );
+      if (await confirmAlert('importOverwrite')) await persistImport();
     } catch (error) {
       debugLog('home.characterUpload.failed', { message: error?.message });
-      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.errors.unexpected'));
+      showCatalogAlert('uploadUnexpectedError');
     }
   };
 
   const handleCloudSync = async () => {
     setMenuVisible(false);
     if (Platform.OS !== 'web') {
-      showHomeAlert(tHomeScreen('title'), tHomeScreen('cloudSync.unsupported'));
+      showCatalogAlert('cloudSyncUnsupported');
       return;
     }
 
@@ -650,24 +598,22 @@ export default function HomeScreen({ navigation }) {
         onProgress: setSyncProgress,
         confirmDownload: async (items) => {
           debugLog('sync.manual:confirmDownload', { count: items.length });
-          return window.confirm(`${tHomeScreen('cloudSync.remoteIsNewer')} (${items.length})`);
+          return confirmAlert('cloudRemoteIsNewer', { count: items.length });
         },
       });
       debugLog('sync.manual:done', result);
       setSyncProgress(null);
       await loadList();
       await openCloudFolderInDrive();
-      // tHomeScreen принимает только путь ключа (второй аргумент игнорируется),
-      // поэтому счётчики подставляем сами.
-      showHomeAlert(
-        tHomeScreen('title'),
-        `${tHomeScreen('cloudSync.success')}\n${tHomeScreen('cloudSync.uploaded')}: ${result.uploaded}\n${tHomeScreen('cloudSync.downloaded')}: ${result.downloaded}`,
-      );
+      await showCatalogAlert('cloudSyncSuccess', {
+        uploaded: result.uploaded,
+        downloaded: result.downloaded,
+      });
     } catch (e) {
       const reason = e?.message || String(e);
       debugLog('sync.manual:failed', { message: reason });
       setSyncProgress(null);
-      showHomeAlert(tHomeScreen('title'), `${tHomeScreen('cloudSync.error')}\n\n${reason}`);
+      await showCatalogAlert('cloudSyncError', { reason });
     }
   };
 

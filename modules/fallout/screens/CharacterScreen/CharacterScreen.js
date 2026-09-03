@@ -9,12 +9,10 @@ import {
   SafeAreaView,
   StatusBar,
   Modal,
-  Alert,
-  Platform,
   TextInput,
 } from "react-native";
 import { useCharacter } from "../../../../components/CharacterContext";
-import { showAlert as showCatalogAlert } from "../../../../components/alerts/alertService";
+import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
 import useCharacterStore from "../../../../src/store/characterStore";
 import { selectActiveTimedEffects } from "../../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
@@ -411,18 +409,8 @@ export default function CharacterScreen() {
   const [tempAttributes, setTempAttributes] = useState(null);
   const [perkPointsToDistribute, setPerkPointsToDistribute] = useState(0);
 
-  const showAlert = (title, message = "") => {
-    const text = message ? `${title}\n\n${message}` : title;
-    if (Platform.OS === "web" && typeof window !== "undefined" && typeof window.alert === "function") {
-      window.alert(text);
-      return;
-    }
-    if (message) {
-      Alert.alert(title, message);
-      return;
-    }
-    Alert.alert(title);
-  };
+  // Показ через общий AlertHost — одинаково на вебе и на нативе.
+  const showAlert = (title, message = "") => showRawAlert({ title, message });
 
   const showError = (message) => {
     showAlert(tCharacterScreen("alerts.errorTitle"), message);
@@ -816,7 +804,7 @@ export default function CharacterScreen() {
   // и полным сбросом персонажа.
   const isCharacterLocked = isCharacterLockedFn(attributesSaved, skillsSaved);
 
-  const confirmOriginSelection = (newOrigin) => {
+  const confirmOriginSelection = async (newOrigin) => {
     if (!origin || newOrigin.id === origin.id) {
       handleSelectOrigin(newOrigin);
       return;
@@ -829,26 +817,7 @@ export default function CharacterScreen() {
 
     if (isCharacterLocked) {
       // После распределения — сброс всего + подтверждение.
-      if (Platform.OS === "web") {
-        if (
-          window.confirm(`${tCharacterScreen("warnings.changeOriginTitle")}\n\n${tCharacterScreen("warnings.changeOriginConfirm")}`)
-        ) {
-          applyNewOrigin();
-        }
-      } else {
-        Alert.alert(
-          tCharacterScreen("warnings.changeOriginTitle"),
-          tCharacterScreen("warnings.changeOriginConfirm"),
-          [
-            { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
-            {
-              text: tCharacterScreen("buttons.yesReset"),
-              onPress: applyNewOrigin,
-              style: "destructive",
-            },
-          ],
-        );
-      }
+      if (await confirmAlert('changeOrigin')) applyNewOrigin();
       return;
     }
 
@@ -1263,7 +1232,7 @@ export default function CharacterScreen() {
               // origin требуют requiresTraitIds, фильтр пуст). Это исключает
               // открытие пустой модалки.
               disabled={!isSaved || (!equipment?.id && equipmentKitsForModal.length === 0)}
-              onPress={() => {
+              onPress={async () => {
                 // Доступные комплекты берём из ЕДИНОГО фильтра по данным
                 // (filterKitsForCharacter) — того же, что получает модалка.
                 // Если фильтр пуст (у семьи не выбрана семья/трейт), строка
@@ -1284,27 +1253,7 @@ export default function CharacterScreen() {
                 // старый сейв) — просто открываем список: сбрасывать нечего,
                 // а выбор конкретного комплекта предложит сброс.
                 if (equipment?.id && isCharacterLocked) {
-                  if (Platform.OS === "web") {
-                    if (
-                      window.confirm(
-                        tCharacterScreen("warnings.equipmentResetOnWeb"),
-                      )
-                    ) {
-                      applyKitReset();
-                    }
-                  } else {
-                    Alert.alert(
-                        tCharacterScreen("warnings.attentionTitle"),
-                        tCharacterScreen("warnings.equipmentResetConfirm"),
-                      [
-                        { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
-                        {
-                          text: tCharacterScreen("buttons.continue"),
-                          onPress: applyKitReset,
-                        },
-                      ],
-                    );
-                  }
+                  if (await confirmAlert('equipmentReset')) applyKitReset();
                 } else {
                   // До распределения — просто открываем (смена свободна,
                   // старый комплект заменится при выборе нового).

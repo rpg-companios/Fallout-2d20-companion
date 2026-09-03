@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { showRawAlert } from '../../../alerts/alertService';
 import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
 import { useLocale } from '../../../../i18n/locale';
 
@@ -23,24 +24,27 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
     const qty = parseInt(quantity, 10);
     const unitPrice = parseFloat(pricePerItem);
     if (isNaN(qty) || qty <= 0) {
-      Alert.alert(tInventory('modals.buyItemModal.invalidQuantity'));
+      showRawAlert({ title: tInventory('modals.buyItemModal.invalidQuantity') });
       return;
     }
     if (isNaN(unitPrice) || unitPrice < 0) {
-      Alert.alert(tInventory('modals.buyItemModal.invalidPrice'));
+      showRawAlert({ title: tInventory('modals.buyItemModal.invalidPrice') });
       return;
     }
 
     const total = qty * unitPrice;
     if (caps <= 0) {
-      Alert.alert(tInventory('modals.buyItemModal.noCapsTitle'), tInventory('modals.buyItemModal.noCapsMessage'));
+      showRawAlert({
+        title: tInventory('modals.buyItemModal.noCapsTitle'),
+        message: tInventory('modals.buyItemModal.noCapsMessage'),
+      });
       return;
     }
     if (total > caps) {
-      Alert.alert(
-        tInventory('modals.buyItemModal.notEnoughCapsTitle'),
-        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total, caps })
-      );
+      showRawAlert({
+        title: tInventory('modals.buyItemModal.notEnoughCapsTitle'),
+        message: formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total, caps }),
+      });
       return;
     }
 

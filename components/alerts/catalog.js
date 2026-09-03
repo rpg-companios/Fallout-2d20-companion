@@ -47,7 +47,9 @@ export const ALERTS = {
     scope: 'home',
     kind: 'confirm',
     titleKey: 'folders.deleteTitle',
-    messageKey: 'folders.deleteMessage',
+    // Число персонажей в каталоге приходит подстановкой {count}: раньше оно
+    // приклеивалось к тексту конкатенацией прямо на месте вызова.
+    messageKey: 'folders.deleteMessageWithCount',
     destructive: true,
   },
   importOverwrite: {
@@ -73,7 +75,55 @@ export const ALERTS = {
     scope: 'home',
     kind: 'confirm',
     titleKey: 'title',
-    messageKey: 'cloudSync.remoteIsNewer',
+    messageKey: 'cloudSync.remoteIsNewerWithCount',
+  },
+  cloudSyncSuccess: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'cloudSync.successWithCounts',
+  },
+  cloudSyncError: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'cloudSync.errorWithReason',
+  },
+  characterDuplicateError: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'characterActions.duplicateError',
+  },
+  downloadUnsupported: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'download.unsupported',
+  },
+  downloadNotFound: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'download.errors.notFound',
+  },
+  downloadFailed: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'download.errors.failed',
+  },
+  downloadUnexpected: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'download.errors.unexpected',
+  },
+  uploadUnsupported: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'title',
+    messageKey: 'upload.unsupported',
   },
 
   // --- Инвентарь ------------------------------------------------------------
@@ -149,6 +199,7 @@ export const ALERTS = {
     kind: 'confirm',
     titleKey: 'warnings.changeOriginTitle',
     messageKey: 'warnings.changeOriginConfirm',
+    confirmKey: 'buttons.yesReset',
     destructive: true,
   },
   equipmentReset: {
@@ -156,18 +207,19 @@ export const ALERTS = {
     kind: 'confirm',
     titleKey: 'warnings.attentionTitle',
     messageKey: 'warnings.equipmentResetConfirm',
+    confirmKey: 'buttons.continue',
     destructive: true,
   },
 
   // --- Настройки ------------------------------------------------------------
 
-  // Удаление установленного сеттинга. Заголовок и текст берутся из словаря
-  // менеджера (home), а имя пакета приходит подстановкой {name}.
+  // Удаление установленного сеттинга. Заголовок берётся из словаря менеджера,
+  // а телом диалога служит имя пакета — оно приходит подстановкой {name}.
   settingDelete: {
     scope: 'home',
     kind: 'confirm',
     titleKey: 'gameSetting.delete',
-    messageKey: null,
+    messageTemplate: '{name}',
     destructive: true,
   },
 };

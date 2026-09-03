@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useCharacter } from '../../../../components/CharacterContext';
+import { showRawAlert } from '../../../../components/alerts/alertService';
 import { getTraitI18nById } from '../../../../domain/traits';
 import {
   applyPerkSelection,
@@ -93,17 +94,8 @@ const PerksAndTraitsScreen = () => {
     [annotatePerks, selectedPerks, replacingIndex],
   );
 
-  const showAlert = (title, message) => {
-    if (Platform.OS === 'web') {
-      window.alert(message ? `${title}\n\n${message}` : message || title);
-      return;
-    }
-    if (message) {
-      Alert.alert(title, message);
-      return;
-    }
-    Alert.alert(title);
-  };
+  // Показ через общий AlertHost — одинаково на вебе и на нативе.
+  const showAlert = (title, message) => showRawAlert({ title, message: message || '' });
 
   const toggleSpoiler = (key) => {
     setOpenSpoilers((prev) => ({ ...prev, [key]: !prev[key] }));
