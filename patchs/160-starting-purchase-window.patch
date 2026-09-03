@@ -1,0 +1,598 @@
+From 77d774e8f7345a1421b57bc337fb45f722612cb4 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 16:52:00 +0000
+Subject: [PATCH] patch 160: starting purchase window with cart, budget and finish button
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+  __tests__/counters/starting-purchase.test.js       | 118 +++++++++++++++++++
+  domain/startingPurchase.js                         | 102 +++++++++++++++++
+  i18n/en-EN/screens/character/screen.json           |   8 ++
+  i18n/ru-RU/screens/character/screen.json           |   8 ++
+  .../screens/CharacterScreen/CharacterScreen.js     |  31 +++++
+  .../modals/StartingPurchaseModal.js                | 126 +++++++++++++++++++++
+  styles/StartingPurchaseModal.styles.js             | 104 +++++++++++++++++
+  7 files changed, 497 insertions(+)
+
+diff --git a/__tests__/counters/starting-purchase.test.js b/__tests__/counters/starting-purchase.test.js
+new file mode 100644
+index 0000000..31ad7dc
+--- /dev/null
++++ b/__tests__/counters/starting-purchase.test.js
+@@ -0,0 +1,118 @@
++import { describe, it, expect } from 'vitest';
++import {
++  getItemPrice, getCartTotal, getRemaining, isWithinRarity,
++  canAfford, addToCart, changeQuantity, finishPurchase,
++} from '../../domain/startingPurchase';
++
++const pistol = { id: 'weapon_pistol', name: 'Пистолет', cost: 50, rarity: 1 };
++const armor = { id: 'armor_leather', name: 'Кожаная броня', cost: 30, rarity: 2 };
++const rare = { id: 'weapon_rare', name: 'Редкое', cost: 10, rarity: 4 };
++const free = { id: 'item_free', name: 'Хлам', cost: 0, rarity: 0 };
++
++describe('цена предмета', () => {
++  it('читает cost и price, запятую тоже', () => {
++    expect(getItemPrice({ cost: 50 })).toBe(50);
++    expect(getItemPrice({ price: 20 })).toBe(20);
++    expect(getItemPrice({ cost: '12,5' })).toBe(12.5);
++  });
++
++  it('мусор и отсутствие цены — ноль', () => {
++    expect(getItemPrice({})).toBe(0);
++    expect(getItemPrice(null)).toBe(0);
++    expect(getItemPrice({ cost: 'дорого' })).toBe(0);
++  });
++});
++
++describe('потолок редкости', () => {
++  it('пропускает предметы не выше порога', () => {
++    expect(isWithinRarity(pistol, 2)).toBe(true);
++    expect(isWithinRarity(armor, 2)).toBe(true);
++    expect(isWithinRarity(rare, 2)).toBe(false);
++  });
++
++  it('без порога проходит всё; без rarity предмет доступен', () => {
++    expect(isWithinRarity(rare, null)).toBe(true);
++    expect(isWithinRarity({ id: 'x' }, 2)).toBe(true);
++  });
++});
++
++describe('корзина', () => {
++  it('складывает одинаковые предметы в одну строку', () => {
++    let cart = addToCart([], 500, pistol, 1, 2);
++    cart = addToCart(cart, 500, pistol, 2, 2);
++    expect(cart).toHaveLength(1);
++    expect(cart[0].quantity).toBe(3);
++    expect(getCartTotal(cart)).toBe(150);
++  });
++
++  it('считает остаток бюджета', () => {
++    const cart = addToCart([], 200, pistol, 2, 2);
++    expect(getRemaining(200, cart)).toBe(100);
++  });
++
++  it('не даёт уйти в минус: покупка сверх бюджета отклоняется', () => {
++    const cart = addToCart([], 100, pistol, 3, 2);
++    expect(cart).toEqual([]);
++    expect(getRemaining(100, cart)).toBe(100);
++  });
++
++  it('не пускает предмет выше потолка редкости', () => {
++    expect(addToCart([], 500, rare, 1, 2)).toEqual([]);
++  });
++
++  it('бесплатное добавляется даже при нулевом остатке', () => {
++    const cart = addToCart([], 0, free, 1, 2);
++    expect(cart).toHaveLength(1);
++  });
++
++  it('плюс не превышает бюджет, минус убирает строку', () => {
++    let cart = addToCart([], 100, pistol, 1, 2);
++    cart = changeQuantity(cart, 100, 'weapon_pistol', 1);
++    expect(cart[0].quantity).toBe(2);
++
++    const capped = changeQuantity(cart, 100, 'weapon_pistol', 1);
++    expect(capped[0].quantity).toBe(2);
++
++    let removed = changeQuantity(cart, 100, 'weapon_pistol', -2);
++    expect(removed).toEqual([]);
++  });
++
++  it('несколько разных предметов складываются в общую сумму', () => {
++    let cart = addToCart([], 500, pistol, 1, 2);
++    cart = addToCart(cart, 500, armor, 2, 2);
++    expect(cart).toHaveLength(2);
++    expect(getCartTotal(cart)).toBe(50 + 60);
++    expect(getRemaining(500, cart)).toBe(390);
++  });
++});
++
++describe('завершение покупки', () => {
++  it('отдаёт предметы и остаток крышек', () => {
++    let cart = addToCart([], 500, pistol, 2, 2);
++    cart = addToCart(cart, 500, armor, 1, 2);
++    const result = finishPurchase(cart, 500);
++
++    expect(result.spent).toBe(130);
++    expect(result.remainingCaps).toBe(370);
++    expect(result.items).toEqual([
++      { ...pistol, quantity: 2 },
++      { ...armor, quantity: 1 },
++    ]);
++  });
++
++  it('ничего не купил — весь бюджет остаётся крышками', () => {
++    const result = finishPurchase([], 500);
++    expect(result.items).toEqual([]);
++    expect(result.remainingCaps).toBe(500);
++    expect(result.spent).toBe(0);
++  });
++
++  it('не мутирует исходную корзину', () => {
++    const cart = addToCart([], 500, pistol, 1, 2);
++    const snapshot = JSON.parse(JSON.stringify(cart));
++    addToCart(cart, 500, armor, 1, 2);
++    changeQuantity(cart, 500, 'weapon_pistol', 1);
++    finishPurchase(cart, 500);
++    expect(cart).toEqual(snapshot);
++  });
++});
+diff --git a/domain/startingPurchase.js b/domain/startingPurchase.js
+new file mode 100644
+index 0000000..ef3c00a
+--- /dev/null
++++ b/domain/startingPurchase.js
+@@ -0,0 +1,102 @@
++// domain/startingPurchase.js
++// Стартовая покупка: корзина с бюджетом. Ни React, ни данных сеттинга.
++//
++// Игрок получает сумму крышек и тратит её за один заход на предметы не выше
++// заданной редкости. Что не потрачено — остаётся обычными крышками, поэтому
++// «обязательного минимума» здесь нет: движок не заставляет покупать.
++//
++// Каунтером бюджет НЕ является: он живёт только пока открыто окно и в сейв
++// не попадает (правило 1 — производные не храним).
++
++/** Цена предмета из каталога. Разные категории зовут поле по-разному. */
++export const getItemPrice = (item) => {
++  const raw = item?.cost ?? item?.price ?? 0;
++  const num = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'));
++  return Number.isFinite(num) && num > 0 ? num : 0;
++};
++
++/** Ключ, по которому одинаковые предметы складываются в одну строку корзины. */
++export const getCartKey = (item) => (
++  item?.id || item?.weaponId || item?.armorId || item?.clothingId || item?.itemId || item?.name || null
++);
++
++/** Итоговая стоимость корзины. */
++export const getCartTotal = (cart = []) => (
++  cart.reduce((sum, line) => sum + getItemPrice(line.item) * (line.quantity || 0), 0)
++);
++
++/** Сколько крышек осталось. Не опускается ниже нуля. */
++export const getRemaining = (budget, cart = []) => (
++  Math.max(0, (Number(budget) || 0) - getCartTotal(cart))
++);
++
++/**
++ * Проходит ли предмет по потолку редкости.
++ * Запись без `rarity` считается доступной: отсутствие поля — не повод прятать.
++ */
++export const isWithinRarity = (item, maxRarity) => {
++  if (!Number.isFinite(maxRarity)) return true;
++  const rarity = Number(item?.rarity);
++  return !Number.isFinite(rarity) || rarity <= maxRarity;
++};
++
++/**
++ * Можно ли добавить `quantity` штук: хватает ли остатка и проходит ли предмет
++ * по редкости. Бесплатные предметы (цена 0) добавлять можно всегда.
++ */
++export const canAfford = (cart, budget, item, quantity = 1, maxRarity = null) => {
++  if (!item || quantity <= 0) return false;
++  if (!isWithinRarity(item, maxRarity)) return false;
++  const price = getItemPrice(item);
++  if (price === 0) return true;
++  return price * quantity <= getRemaining(budget, cart);
++};
++
++/**
++ * Добавляет предмет в корзину. Одинаковые предметы складываются в одну
++ * строку. Если денег не хватает — корзина возвращается без изменений
++ * (тот же объект), чтобы вызывающий мог это заметить.
++ */
++export const addToCart = (cart = [], budget, item, quantity = 1, maxRarity = null) => {
++  if (!canAfford(cart, budget, item, quantity, maxRarity)) return cart;
++  const key = getCartKey(item);
++  if (!key) return cart;
++
++  const index = cart.findIndex((line) => line.key === key);
++  if (index === -1) return [...cart, { key, item, quantity }];
++
++  return cart.map((line, i) => (
++    i === index ? { ...line, quantity: line.quantity + quantity } : line
++  ));
++};
++
++/**
++ * Меняет количество строки на `delta`. Ноль и ниже — строка убирается.
++ * Увеличение сверх бюджета игнорируется.
++ */
++export const changeQuantity = (cart = [], budget, key, delta) => {
++  const line = cart.find((entry) => entry.key === key);
++  if (!line) return cart;
++
++  const next = line.quantity + delta;
++  if (next <= 0) return cart.filter((entry) => entry.key !== key);
++
++  if (delta > 0) {
++    const withoutLine = cart.filter((entry) => entry.key !== key);
++    const rest = getCartTotal(withoutLine);
++    const price = getItemPrice(line.item);
++    if (price > 0 && rest + price * next > (Number(budget) || 0)) return cart;
++  }
++
++  return cart.map((entry) => (entry.key === key ? { ...entry, quantity: next } : entry));
++};
++
++/**
++ * Итог покупки: предметы для инвентаря и остаток крышек.
++ * Предметы уходят НЕ надетыми — игрок надевает сам.
++ */
++export const finishPurchase = (cart = [], budget) => ({
++  items: cart.map((line) => ({ ...line.item, quantity: line.quantity })),
++  remainingCaps: getRemaining(budget, cart),
++  spent: getCartTotal(cart),
++});
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index ccc94c2..bf698e0 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -122,6 +122,14 @@
+       "description": "Choose skills from the provided group. They will be marked as extra.",
+       "choose1": "Choose 1 skill",
+       "chooseN": "Choose {count} skills"
++    },
++    "startingPurchase": {
++      "title": "Equipment Purchase",
++      "hint": "Spend your starting caps on gear. Whatever is left stays as caps.",
++      "remaining": "Caps remaining",
++      "addItem": "Add item",
++      "empty": "Cart is empty. Tap “Add item”.",
++      "finish": "Finish"
+     }
+   },
+   "origins": {
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index 7eb5026..a69f76c 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -122,6 +122,14 @@
+       "description": "Выберите навыки из предложенной группы. Они будут отмечены как дополнительные.",
+       "choose1": "Выберите 1 навык",
+       "chooseN": "Выберите {count} навыка"
++    },
++    "startingPurchase": {
++      "title": "Покупка снаряжения",
++      "hint": "Наберите снаряжение на стартовые крышки. Что не потратите — останется крышками.",
++      "remaining": "Осталось крышек",
++      "addItem": "Добавить предмет",
++      "empty": "Корзина пуста. Нажмите «Добавить предмет».",
++      "finish": "Завершить"
+     }
+   },
+   "origins": {
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 021cf07..f079894 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -22,6 +22,7 @@ import { loadEnrichedOrigins } from "../../../../domain/origins";
+ import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../../domain/traits";
+ import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
+ import { resolveKitItemEquipState } from "../../../../domain/kitEquip";
++import StartingPurchaseModal from "./modals/StartingPurchaseModal";
+ import { rollCombatDiceEffects } from "../../../../domain/diceRollsLogic";
+ import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
+ import {
+@@ -285,6 +286,7 @@ export default function CharacterScreen() {
+     setEffects,
+     caps,
+     earnCaps,
++    spendCaps,
+     setCurrentHealth,
+     luckPoints,
+     setLuckPoints,
+@@ -400,6 +402,9 @@ export default function CharacterScreen() {
+   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
+   const [selectedOrigin, setSelectedOrigin] = useState(null);
+   const [isTraitModalVisible, setIsTraitModalVisible] = useState(false);
++  const [isStartingPurchaseVisible, setIsStartingPurchaseVisible] = useState(false);
++  const [purchaseBudget, setPurchaseBudget] = useState(0);
++  const [purchaseMaxRarity, setPurchaseMaxRarity] = useState(null);
+   const [isEquipmentKitModalVisible, setIsEquipmentKitModalVisible] =
+     useState(false);
+ 
+@@ -597,6 +602,24 @@ export default function CharacterScreen() {
+     }
+ 
+     setIsEquipmentKitModalVisible(false);
++
++    // Комплект «покупка снаряжения»: крышки уже начислены — сразу открываем
++    // окно покупки, чтобы игрок потратил их на старте. Остаток останется
++    // обычными крышками.
++    if (Number.isFinite(kit.purchaseMaxRarity) && (kit.caps || 0) > 0) {
++      setPurchaseBudget(kit.caps || 0);
++      setPurchaseMaxRarity(kit.purchaseMaxRarity);
++      setIsStartingPurchaseVisible(true);
++    }
++  };
++
++  // Итог стартовой покупки: предметы в инвентарь, потраченное — с крышек.
++  // Остаток трогать не нужно: крышки начислены целиком при выдаче комплекта.
++  const handleFinishStartingPurchase = ({ items, spent }) => {
++    items.forEach((item) => {
++      useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
++    });
++    if (spent > 0) spendCaps(spent);
+   };
+ 
+   const handleToggleSkill = (skillName) => {
+@@ -1436,6 +1459,14 @@ export default function CharacterScreen() {
+           character={{ origin, trait, level }}
+         />
+ 
++        <StartingPurchaseModal
++          visible={isStartingPurchaseVisible}
++          onClose={() => setIsStartingPurchaseVisible(false)}
++          budget={purchaseBudget}
++          maxRarity={purchaseMaxRarity}
++          onFinish={handleFinishStartingPurchase}
++        />
++
+         {/* Модальное окно для выбора черты */}
+         {TraitModalComponent && (
+           <TraitModalComponent
+diff --git a/modules/fallout/screens/CharacterScreen/modals/StartingPurchaseModal.js b/modules/fallout/screens/CharacterScreen/modals/StartingPurchaseModal.js
+new file mode 100644
+index 0000000..8076191
+--- /dev/null
++++ b/modules/fallout/screens/CharacterScreen/modals/StartingPurchaseModal.js
+@@ -0,0 +1,126 @@
++import { useState, useEffect } from 'react';
++import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
++import AddItemModal from '../../../../../components/screens/InventoryScreen/modals/AddItemModal';
++import {
++  getItemPrice, getCartTotal, getRemaining,
++  addToCart, changeQuantity, finishPurchase,
++} from '../../../../../domain/startingPurchase';
++import styles from '../../../../../styles/StartingPurchaseModal.styles';
++import { tCharacterScreen } from '../logic/characterScreenI18n';
++
++/**
++ * Стартовая покупка снаряжения.
++ *
++ * Игрок получил сумму крышек и тратит её за один заход: набирает предметы в
++ * корзину, жмёт «Завершить» — предметы уходят в инвентарь, остаток становится
++ * обычными крышками. Каталог ограничен потолком редкости комплекта.
++ *
++ * Бюджет живёт только пока открыто окно: в сейв он не попадает, отдельным
++ * кошельком не становится (см. docs/architecture/counters-storage.md, правило 1).
++ */
++const StartingPurchaseModal = ({ visible, onClose, budget = 0, maxRarity = null, onFinish }) => {
++  const [cart, setCart] = useState([]);
++  const [catalogVisible, setCatalogVisible] = useState(false);
++
++  // Новое открытие окна — новая покупка.
++  useEffect(() => {
++    if (visible) {
++      setCart([]);
++      setCatalogVisible(false);
++    }
++  }, [visible]);
++
++  const remaining = getRemaining(budget, cart);
++  const spent = getCartTotal(cart);
++
++  const handleSelectItem = (item, quantity = 1) => {
++    setCart((prev) => addToCart(prev, budget, item, quantity, maxRarity));
++    setCatalogVisible(false);
++  };
++
++  const handleFinish = () => {
++    onFinish(finishPurchase(cart, budget));
++    onClose();
++  };
++
++  return (
++    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++      <View style={styles.modalContainer}>
++        <View style={styles.modalContent}>
++          <Text style={styles.title}>{tCharacterScreen('modals.startingPurchase.title')}</Text>
++          <Text style={styles.hint}>{tCharacterScreen('modals.startingPurchase.hint')}</Text>
++
++          <View style={styles.budgetRow}>
++            <Text style={styles.budgetLabel}>{tCharacterScreen('modals.startingPurchase.remaining')}</Text>
++            <Text style={[styles.budgetValue, remaining === 0 && styles.budgetValueEmpty]}>
++              {remaining} / {budget}
++            </Text>
++          </View>
++
++          <TouchableOpacity
++            style={[styles.addButton, remaining <= 0 && styles.addButtonDisabled]}
++            onPress={() => setCatalogVisible(true)}
++          >
++            <Text style={styles.addButtonText}>
++              {tCharacterScreen('modals.startingPurchase.addItem')}
++            </Text>
++          </TouchableOpacity>
++
++          {cart.length === 0 ? (
++            <View style={styles.emptyState}>
++              <Text style={styles.emptyStateText}>
++                {tCharacterScreen('modals.startingPurchase.empty')}
++              </Text>
++            </View>
++          ) : (
++            <ScrollView style={styles.cartList}>
++              {cart.map((line) => (
++                <View key={line.key} style={styles.cartRow}>
++                  <View style={styles.cartInfo}>
++                    <Text style={styles.cartName}>{line.item.name}</Text>
++                    <Text style={styles.cartMeta}>
++                      {getItemPrice(line.item)} × {line.quantity} = {getItemPrice(line.item) * line.quantity}
++                    </Text>
++                  </View>
++                  <View style={styles.qtyControls}>
++                    <TouchableOpacity
++                      style={styles.qtyButton}
++                      onPress={() => setCart((prev) => changeQuantity(prev, budget, line.key, -1))}
++                    >
++                      <Text style={styles.qtyButtonText}>−</Text>
++                    </TouchableOpacity>
++                    <Text style={styles.qtyValue}>{line.quantity}</Text>
++                    <TouchableOpacity
++                      style={styles.qtyButton}
++                      onPress={() => setCart((prev) => changeQuantity(prev, budget, line.key, 1))}
++                    >
++                      <Text style={styles.qtyButtonText}>+</Text>
++                    </TouchableOpacity>
++                  </View>
++                </View>
++              ))}
++            </ScrollView>
++          )}
++
++          <View style={styles.footer}>
++            <TouchableOpacity style={styles.finishButton} onPress={handleFinish}>
++              <Text style={styles.finishButtonText}>
++                {tCharacterScreen('modals.startingPurchase.finish')} ({spent})
++              </Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      </View>
++
++      <AddItemModal
++        visible={catalogVisible}
++        onClose={() => setCatalogVisible(false)}
++        onSelectItem={handleSelectItem}
++        selectionMode="loot"
++        maxRarity={maxRarity}
++      />
++    </Modal>
++  );
++};
++
++export default StartingPurchaseModal;
+diff --git a/styles/StartingPurchaseModal.styles.js b/styles/StartingPurchaseModal.styles.js
+new file mode 100644
+index 0000000..361fe9e
+--- /dev/null
++++ b/styles/StartingPurchaseModal.styles.js
+@@ -0,0 +1,104 @@
++import { StyleSheet } from 'react-native';
++
++const styles = StyleSheet.create({
++  modalContainer: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++    backgroundColor: 'rgba(0, 0, 0, 0.6)',
++  },
++  modalContent: {
++    width: '92%',
++    backgroundColor: '#fff',
++    borderRadius: 15,
++    padding: 18,
++    maxHeight: '88%',
++    shadowColor: '#000',
++    shadowOffset: { width: 0, height: 2 },
++    shadowOpacity: 0.25,
++    shadowRadius: 4,
++    elevation: 5,
++  },
++  title: {
++    fontSize: 20,
++    fontWeight: 'bold',
++    textAlign: 'center',
++    color: '#333',
++    marginBottom: 4,
++  },
++  hint: {
++    fontSize: 13,
++    color: '#666',
++    textAlign: 'center',
++    marginBottom: 12,
++  },
++  budgetRow: {
++    flexDirection: 'row',
++    justifyContent: 'space-between',
++    alignItems: 'center',
++    backgroundColor: '#F1F6FA',
++    borderRadius: 10,
++    paddingVertical: 10,
++    paddingHorizontal: 12,
++    marginBottom: 12,
++  },
++  budgetLabel: { fontSize: 14, color: '#444' },
++  budgetValue: { fontSize: 18, fontWeight: '700', color: '#005A9C' },
++  budgetValueEmpty: { color: '#B03030' },
++
++  addButton: {
++    backgroundColor: '#005A9C',
++    borderRadius: 10,
++    paddingVertical: 12,
++    alignItems: 'center',
++    marginBottom: 12,
++  },
++  addButtonDisabled: { backgroundColor: '#9BB4C7' },
++  addButtonText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
++
++  cartList: { maxHeight: 260 },
++  cartRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    borderBottomWidth: 1,
++    borderBottomColor: '#eee',
++    paddingVertical: 8,
++  },
++  cartInfo: { flex: 1, paddingRight: 8 },
++  cartName: { fontSize: 15, color: '#222' },
++  cartMeta: { fontSize: 12, color: '#777', marginTop: 2 },
++  qtyControls: { flexDirection: 'row', alignItems: 'center' },
++  qtyButton: {
++    width: 30,
++    height: 30,
++    borderRadius: 15,
++    backgroundColor: '#E4EBF1',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  qtyButtonText: { fontSize: 18, fontWeight: '700', color: '#005A9C' },
++  qtyValue: { minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: '600' },
++
++  emptyState: { paddingVertical: 24, alignItems: 'center' },
++  emptyStateText: { color: '#888', fontSize: 14, textAlign: 'center' },
++
++  footer: { marginTop: 14 },
++  finishButton: {
++    backgroundColor: '#2E7D32',
++    borderRadius: 10,
++    paddingVertical: 13,
++    alignItems: 'center',
++  },
++  finishButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
++  cancelButton: {
++    backgroundColor: '#888',
++    borderRadius: 10,
++    paddingVertical: 11,
++    alignItems: 'center',
++    marginTop: 8,
++  },
++  cancelButtonText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
++});
++
++export default styles;
