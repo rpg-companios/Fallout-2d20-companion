@@ -1,0 +1,302 @@
+From 9aa473b9d6d247f315aad2bfe21f6217150f8bc1 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 09:35:23 +0000
+Subject: [PATCH] =?UTF-8?q?patch=20150:=20vault=20dweller=20trait=20choice?=
+ =?UTF-8?q?=20=E2=80=94=20vault=20kid=20or=20ghoulification?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ modules/fallout/data/origins/origins.json     |  4 +-
+ modules/fallout/data/traits/traits.json       | 36 ++++++-
+ .../i18n/en-EN/screens/character/screen.json  |  6 +-
+ .../i18n/ru-RU/screens/character/screen.json  |  6 +-
+ .../modals/traits/GenericTraitModal.js        | 98 +++++++++++++++++--
+ 5 files changed, 137 insertions(+), 13 deletions(-)
+
+diff --git a/modules/fallout/data/origins/origins.json b/modules/fallout/data/origins/origins.json
+index 77f48d3..6fec233 100644
+--- a/modules/fallout/data/origins/origins.json
++++ b/modules/fallout/data/origins/origins.json
+@@ -63,7 +63,7 @@
+     "image": "vault_dweller",
+     "bodyPlan": "humanoid",
+     "traitIds": [
+-      "vaultdweller-vault-kid"
++      "vaultdweller-origin"
+     ],
+     "equipmentKitIds": [
+       "vault_security",
+@@ -277,4 +277,4 @@
+       "enclave_soldier"
+     ]
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/data/traits/traits.json b/modules/fallout/data/traits/traits.json
+index fcbd368..4a01f45 100644
+--- a/modules/fallout/data/traits/traits.json
++++ b/modules/fallout/data/traits/traits.json
+@@ -126,6 +126,19 @@
+       ]
+     }
+   },
++  {
++    "id": "vaultdweller-origin",
++    "originId": "vaultDweller",
++    "displayNameKey": "traits.vaultDweller.vaultKid.name",
++    "descriptionKey": "traits.vaultDweller.vaultKid.description",
++    "modifiers": {
++      "isMultiTrait": true,
++      "subTraitIds": [
++        "vaultdweller-vault-kid",
++        "vaultdweller-necrotic-posthuman"
++      ]
++    }
++  },
+   {
+     "id": "vaultdweller-vault-kid",
+     "originId": "vaultDweller",
+@@ -145,6 +158,27 @@
+       ]
+     }
+   },
++  {
++    "id": "vaultdweller-necrotic-posthuman",
++    "originId": "vaultDweller",
++    "displayNameKey": "traits.ghoul.necroticPosthuman.name",
++    "descriptionKey": "traits.ghoul.necroticPosthuman.description",
++    "modifiers": {
++      "immunities": [
++        "radiation"
++      ],
++      "effects": [
++        "radiation_healing",
++        "slow_aging",
++        "infertility",
++        "discrimination"
++      ],
++      "forcedSkills": [
++        "SURVIVAL"
++      ],
++      "extraSkills": 1
++    }
++  },
+   {
+     "id": "protectron-protect-or-destroy",
+     "originId": "protectron",
+@@ -583,4 +617,4 @@
+       }
+     }
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/modules/fallout/i18n/en-EN/screens/character/screen.json b/modules/fallout/i18n/en-EN/screens/character/screen.json
+index f4318da..14be119 100644
+--- a/modules/fallout/i18n/en-EN/screens/character/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/character/screen.json
+@@ -40,7 +40,8 @@
+       "survivorTitle": "Origin Trait «Survivor»",
+       "ncrTitle": "Origin Trait «NCR Citizen»",
+       "tribalTitle": "Origin Trait «Tribal»",
+-      "treeFamiliesTitle": "Origin Trait «Strip Families»"
++      "treeFamiliesTitle": "Origin Trait «Strip Families»",
++      "vaultDwellerTitle": "Vault Dweller Origin Trait"
+     },
+     "survivor": {
+       "twoTraits": "2 traits",
+@@ -68,6 +69,9 @@
+     },
+     "limb": {
+       "upgradeLimb": "Upgrade Limb"
++    },
++    "traitPick": {
++      "hint": "Choose one trait: vault upbringing or ghoulification."
+     }
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/character/screen.json b/modules/fallout/i18n/ru-RU/screens/character/screen.json
+index 4d36785..26e82ee 100644
+--- a/modules/fallout/i18n/ru-RU/screens/character/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/character/screen.json
+@@ -40,7 +40,8 @@
+       "survivorTitle": "Черта происхождения «Выживший»",
+       "ncrTitle": "Черта происхождения «Житель НКР»",
+       "tribalTitle": "Черта происхождения «Дикарь»",
+-      "treeFamiliesTitle": "Черта происхождения «Три семьи»"
++      "treeFamiliesTitle": "Черта происхождения «Три семьи»",
++      "vaultDwellerTitle": "Черта происхождения «Житель Убежища»"
+     },
+     "survivor": {
+       "twoTraits": "2 черты",
+@@ -68,6 +69,9 @@
+     },
+     "limb": {
+       "upgradeLimb": "Модернизировать конечность"
++    },
++    "traitPick": {
++      "hint": "Выберите одну черту: жизнь в Убежище или гулификация."
+     }
+   }
+ }
+diff --git a/modules/fallout/screens/CharacterScreen/modals/traits/GenericTraitModal.js b/modules/fallout/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+index f27334e..53d196c 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/traits/GenericTraitModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/traits/GenericTraitModal.js
+@@ -10,12 +10,45 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+   const fallbackTraitId = `${actualOriginId}-trait`;
+   const traitId = origin?.traitIds?.[0] || fallbackTraitId;
+ 
+-  const canonicalTrait = useMemo(() => findTraitById(traitId), [traitId]);
+-  const { name, description } = getTraitI18nById(traitId);
++  const parentTrait = useMemo(() => findTraitById(traitId), [traitId]);
++
++  // Ориджин может предлагать выбор одной черты из нескольких: родительская
++  // запись помечена isMultiTrait и сама модификаторов не несёт, работает
++  // только как список вариантов (по образцу Выжившего и Племени).
++  const subTraitIds = parentTrait?.modifiers?.isMultiTrait
++    ? (parentTrait.modifiers.subTraitIds || [])
++    : [];
++  const isMulti = subTraitIds.length > 0;
++
++  // Какая именно черта выбрана: для обычного ориджина — единственная,
++  // для мультитрейта — та, что игрок отметил на шаге выбора.
++  const [chosenId, setChosenId] = useState(null);
++  const effectiveTraitId = isMulti ? chosenId : traitId;
++
++  const canonicalTrait = useMemo(
++    () => (effectiveTraitId ? findTraitById(effectiveTraitId) : null),
++    [effectiveTraitId],
++  );
++  const { name, description } = getTraitI18nById(effectiveTraitId || traitId);
++
++  const variants = useMemo(
++    () => subTraitIds.map((id) => ({ id, ...getTraitI18nById(id) })),
++    [subTraitIds.join('|')],
++  );
++
++  // Заголовок экрана выбора: по образцу остальных мультитрейт-модалок ключ
++  // складывается из id ориджина. Промах ключа словарь возвращает самим путём —
++  // в этом случае показываем имя ориджина, чтобы в шапке не было техстроки.
++  const multiTitleKey = `modals.origins.${actualOriginId}Title`;
++  const multiTitleValue = tCharacterScreen(multiTitleKey);
++  const multiTitle = multiTitleValue === multiTitleKey
++    ? tCharacterScreen(`origins.${actualOriginId}`)
++    : multiTitleValue;
+ 
+   const skillPickChoice = canonicalTrait?.modifiers?.skillPickChoice || null;
+ 
+-  const [step, setStep] = useState('info'); // 'info' | 'pick'
++  // 'choose' — экран выбора черты, есть только у мультитрейт-ориджинов.
++  const [step, setStep] = useState(isMulti ? 'choose' : 'info');
+   const [picks, setPicks] = useState([]);
+ 
+   const skillOptions = useMemo(() => {
+@@ -34,7 +67,8 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+   const pickCount = skillPickChoice?.count || 0;
+ 
+   const reset = () => {
+-    setStep('info');
++    setStep(isMulti ? 'choose' : 'info');
++    setChosenId(null);
+     setPicks([]);
+   };
+ 
+@@ -65,6 +99,17 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+     const baseMods = canonicalTrait?.modifiers || {};
+     let finalModifiers = { ...baseMods };
+ 
++    // Для мультитрейта наружу уходит id выбранной черты, а не родителя:
++    // именно её модификаторы и подпись должны попасть в персонажа.
++    if (isMulti) {
++      finalModifiers = {
++        ...finalModifiers,
++        selectedTraitIds: [effectiveTraitId],
++        selectedTraitNames: [name],
++        selectionMode: 'single',
++      };
++    }
++
+     if (finalPicks.length > 0) {
+       finalModifiers = {
+         ...finalModifiers,
+@@ -74,7 +119,7 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+       };
+     }
+ 
+-    onSelect(traitId, name, finalModifiers);
++    onSelect(effectiveTraitId, name, finalModifiers);
+     reset();
+     onClose?.();
+   };
+@@ -88,7 +133,37 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={handleClose}>
+       <View style={styles.modalOverlay}>
+         <View style={styles.modalContainer}>
+-          {step === 'info' ? (
++          {step === 'choose' ? (
++            <>
++              <Text style={styles.modalTitle}>{multiTitle}</Text>
++              <Text style={styles.hintText}>{tCharacterScreen('modals.traitPick.hint')}</Text>
++              <ScrollView style={{ width: '100%', maxHeight: 360 }}>
++                {variants.map((variant) => {
++                  const isSelected = chosenId === variant.id;
++                  return (
++                    <TouchableOpacity
++                      key={variant.id}
++                      style={[styles.modalButton, styles.variantOption, isSelected && styles.skillOptionSelected]}
++                      onPress={() => setChosenId(variant.id)}
++                    >
++                      <Text style={styles.buttonText}>{variant.name}</Text>
++                      {renderTextWithIcons(variant.description, styles.variantDescription)}
++                    </TouchableOpacity>
++                  );
++                })}
++              </ScrollView>
++              <TouchableOpacity
++                style={[styles.modalButton, styles.confirmButton, !chosenId && styles.disabledButton]}
++                disabled={!chosenId}
++                onPress={() => setStep('info')}
++              >
++                <Text style={styles.buttonText}>{tCharacterScreen('buttons.continue')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handleClose}>
++                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
++              </TouchableOpacity>
++            </>
++          ) : step === 'info' ? (
+             <>
+               <Text style={styles.modalTitle}>{name}</Text>
+               {renderTextWithIcons(description, styles.modalText)}
+@@ -104,8 +179,13 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
+                   {skillPickChoice ? tCharacterScreen('buttons.continue') : tCharacterScreen('buttons.ok')}
+                 </Text>
+               </TouchableOpacity>
+-              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handleClose}>
+-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
++              <TouchableOpacity
++                style={[styles.modalButton, isMulti ? styles.backButton : styles.cancelButton]}
++                onPress={isMulti ? () => setStep('choose') : handleClose}
++              >
++                <Text style={styles.buttonText}>
++                  {isMulti ? tCharacterScreen('buttons.back') : tCharacterScreen('buttons.cancel')}
++                </Text>
+               </TouchableOpacity>
+             </>
+           ) : (
+@@ -176,6 +256,8 @@ const styles = StyleSheet.create({
+   counterText: { fontSize: 14, color: '#333', marginVertical: 8, fontWeight: '600' },
+   modalButton: { padding: 12, marginVertical: 5, borderRadius: 6, alignItems: 'center', width: '100%' },
+   skillOption: { backgroundColor: '#2196F3' },
++  variantOption: { backgroundColor: '#2196F3', alignItems: 'flex-start', paddingHorizontal: 15 },
++  variantDescription: { color: 'white', fontSize: 12, marginTop: 5 },
+   skillOptionSelected: { backgroundColor: '#1976D2', borderWidth: 2, borderColor: '#fff' },
+   disabledOption: { opacity: 0.5 },
+   confirmButton: { backgroundColor: '#4CAF50', marginTop: 6 },
+-- 
+2.39.5
+
