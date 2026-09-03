@@ -1,0 +1,901 @@
+From a2f4dcf8e49bb179b0a768587332bfed175d2128 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 08:01:03 +0000
+Subject: [PATCH] patch 148: retire legacy alert wrappers, all dialogs via
+ catalog/AlertHost
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ components/CharacterContext.js                |  17 +--
+ components/alerts/AlertHost.js                |  25 ++++-
+ components/alerts/catalog.js                  |  62 +++++++++-
+ components/screens/HomeScreen/HomeScreen.js   | 106 +++++-------------
+ .../InventoryScreen/InventoryScreen.js        |  67 +++--------
+ .../InventoryScreen/modals/BuyItemModal.js    |  20 ++--
+ .../InventoryScreen/modals/CapsModal.js       |   5 +-
+ .../InventoryScreen/modals/SellItemModal.js   |   7 +-
+ components/settings/GameSettingsModal.js      |  18 +--
+ i18n/en-EN/screens/home/screen.json           |   8 +-
+ i18n/ru-RU/screens/home/screen.json           |   8 +-
+ .../CharacterScreen/CharacterScreen.js        |  65 ++---------
+ .../PerksAndTraitsScreen.js                   |  16 +--
+ 13 files changed, 176 insertions(+), 248 deletions(-)
+
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index e43231d..85b0d69 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -39,7 +39,7 @@ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/scen
+ import { isSkillTagged } from '../domain/d20Checks';
+ import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+-import { showAlert as showCatalogAlert } from './alerts/alertService';
++import { showAlert as showCatalogAlert, showRawAlert } from './alerts/alertService';
+ 
+ import { resolveBodyPlan } from '../domain/bodyplan';
+ import { createEmptyEquippedArmor } from '../domain/equippedArmor';
+@@ -78,7 +78,7 @@ import { INVENTORY_DICTIONARIES } from './screens/InventoryScreen/logic/inventor
+ import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
+ import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
+ import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
+-import { Alert, Platform } from 'react-native';
++import { Platform } from 'react-native';
+ 
+ // Zustand Store integration (Task 4.1)
+ import useCharacterStore from '../src/store/characterStore';
+@@ -205,16 +205,9 @@ const INV_LABELS_DICT = {
+   'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.labels,
+ };
+ const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
+-// Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
+-// как showAlert в InventoryScreen.
+-const paAlert = (title, message = '') => {
+-  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+-    window.alert(message ? `${title}\n\n${message}` : title);
+-    return;
+-  }
+-  if (message) Alert.alert(title, message);
+-  else Alert.alert(title);
+-};
++// Алерты слоя СБ идут через общий AlertHost — одна React-модалка на вебе
++// и на нативе. Раньше здесь была своя копия развилки Platform.OS.
++const paAlert = (title, message = '') => showRawAlert({ title, message });
+ // Тик таймера расхода блока (§5.3): заряд сгорает за 12 минут аптайма,
+ // точность тика на порядок ниже — расход ведёт накопитель, а не тик.
+ const PA_CORE_TICK_MS = 15000;
+diff --git a/components/alerts/AlertHost.js b/components/alerts/AlertHost.js
+index 0b7c5a4..6457226 100644
+--- a/components/alerts/AlertHost.js
++++ b/components/alerts/AlertHost.js
+@@ -80,11 +80,27 @@ const AlertHost = () => {
+   const scope = entry.scope;
+ 
+   const title = raw ? raw.title : substitute(translate(scope, entry.titleKey), params);
+-  const message = raw ? raw.message : substitute(translate(scope, entry.messageKey), params);
++  // messageTemplate — тело диалога целиком из подстановок, без словаря
++  // (например, имя удаляемого пакета сеттинга).
++  const message = raw
++    ? raw.message
++    : entry.messageTemplate
++      ? substitute(entry.messageTemplate, params)
++      : substitute(translate(scope, entry.messageKey), params);
+ 
+   // Состав кнопок зависит от вида диалога.
+   let buttons;
+-  if (entry.kind === 'choice') {
++  if (raw && Array.isArray(entry.buttons) && entry.buttons.length > 0) {
++    // showRawAlert с кнопками в формате Alert.alert: [{ text, onPress, style }].
++    // Колбэк вызывается после закрытия, значение промиса — индекс кнопки.
++    buttons = entry.buttons.map((button, index) => ({
++      key: String(index),
++      label: button.text,
++      value: index,
++      style: button.style,
++      onPress: button.onPress,
++    }));
++  } else if (entry.kind === 'choice') {
+     buttons = (entry.buttons || []).map((button) => ({
+       key: button.key,
+       // labelParam — подпись целиком приходит из params (например, названия
+@@ -141,7 +157,10 @@ const AlertHost = () => {
+                   button.style === 'destructive' && styles.buttonDestructive,
+                   button.style === 'cancel' && styles.buttonCancel,
+                 ]}
+-                onPress={() => finish(button.value)}
++                onPress={() => {
++                  finish(button.value);
++                  if (typeof button.onPress === 'function') button.onPress();
++                }}
+               >
+                 <Text
+                   style={[
+diff --git a/components/alerts/catalog.js b/components/alerts/catalog.js
+index 8c9a4a0..b4989ca 100644
+--- a/components/alerts/catalog.js
++++ b/components/alerts/catalog.js
+@@ -47,7 +47,9 @@ export const ALERTS = {
+     scope: 'home',
+     kind: 'confirm',
+     titleKey: 'folders.deleteTitle',
+-    messageKey: 'folders.deleteMessage',
++    // Число персонажей в каталоге приходит подстановкой {count}: раньше оно
++    // приклеивалось к тексту конкатенацией прямо на месте вызова.
++    messageKey: 'folders.deleteMessageWithCount',
+     destructive: true,
+   },
+   importOverwrite: {
+@@ -73,7 +75,55 @@ export const ALERTS = {
+     scope: 'home',
+     kind: 'confirm',
+     titleKey: 'title',
+-    messageKey: 'cloudSync.remoteIsNewer',
++    messageKey: 'cloudSync.remoteIsNewerWithCount',
++  },
++  cloudSyncSuccess: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'cloudSync.successWithCounts',
++  },
++  cloudSyncError: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'cloudSync.errorWithReason',
++  },
++  characterDuplicateError: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'characterActions.duplicateError',
++  },
++  downloadUnsupported: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'download.unsupported',
++  },
++  downloadNotFound: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'download.errors.notFound',
++  },
++  downloadFailed: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'download.errors.failed',
++  },
++  downloadUnexpected: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'download.errors.unexpected',
++  },
++  uploadUnsupported: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'upload.unsupported',
+   },
+ 
+   // --- Инвентарь ------------------------------------------------------------
+@@ -149,6 +199,7 @@ export const ALERTS = {
+     kind: 'confirm',
+     titleKey: 'warnings.changeOriginTitle',
+     messageKey: 'warnings.changeOriginConfirm',
++    confirmKey: 'buttons.yesReset',
+     destructive: true,
+   },
+   equipmentReset: {
+@@ -156,18 +207,19 @@ export const ALERTS = {
+     kind: 'confirm',
+     titleKey: 'warnings.attentionTitle',
+     messageKey: 'warnings.equipmentResetConfirm',
++    confirmKey: 'buttons.continue',
+     destructive: true,
+   },
+ 
+   // --- Настройки ------------------------------------------------------------
+ 
+-  // Удаление установленного сеттинга. Заголовок и текст берутся из словаря
+-  // менеджера (home), а имя пакета приходит подстановкой {name}.
++  // Удаление установленного сеттинга. Заголовок берётся из словаря менеджера,
++  // а телом диалога служит имя пакета — оно приходит подстановкой {name}.
+   settingDelete: {
+     scope: 'home',
+     kind: 'confirm',
+     titleKey: 'gameSetting.delete',
+-    messageKey: null,
++    messageTemplate: '{name}',
+     destructive: true,
+   },
+ };
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 8e8608f..7abe4fb 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -7,7 +7,6 @@ import {
+   TouchableOpacity,
+   Image,
+   ActivityIndicator,
+-  Alert,
+   Platform,
+   Modal,
+   Linking,
+@@ -40,6 +39,7 @@ import {
+   IMPORT_ERRORS,
+ } from './logic/characterTransfer';
+ import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
++import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import styles from '../../../styles/HomeScreen.styles';
+@@ -436,20 +436,12 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
+-  // Alert.alert на web (react-native-web) не показывает ничего — сообщение
+-  // молча теряется. Из-за этого отказ синхронизации выглядел как «кнопка
+-  // ничего не делает». Тот же приём уже применён в InventoryScreen/
+-  // CharacterContext (showAlert/paAlert).
+-  const showHomeAlert = (title, message = '') => {
+-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+-      window.alert(message ? `${title}\n\n${message}` : title);
+-      return;
+-    }
+-    if (message) Alert.alert(title, message);
+-    else Alert.alert(title);
+-  };
++  // Показ уведомления через общий AlertHost: одна и та же React-модалка на
++  // вебе и на нативе. Раньше здесь была своя копия развилки Platform.OS с
++  // window.alert — таких копий по проекту было пять.
++  const showHomeAlert = (title, message = '') => showRawAlert({ title, message });
+ 
+-  const handleDeleteFolder = (folder) => {
++  const handleDeleteFolder = async (folder) => {
+     const remove = async () => {
+       // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
+       // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
+@@ -462,15 +454,8 @@ export default function HomeScreen({ navigation }) {
+       if (activeFolder?.id === folder.id) setActiveFolder(null);
+       loadList();
+     };
+-    const message = `${tHomeScreen('folders.deleteMessage')} ${tHomeScreen('folders.characters')}: ${folderCounts[folder.id] || 0}.`;
+-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+-      if (window.confirm(message)) remove();
+-      return;
+-    }
+-    Alert.alert(tHomeScreen('folders.deleteTitle'), message, [
+-      { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: remove },
+-      { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
+-    ]);
++    const confirmed = await confirmAlert('folderDelete', { count: folderCounts[folder.id] || 0 });
++    if (confirmed) remove();
+   };
+ 
+   const handleCreate = () => {
+@@ -487,7 +472,7 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
+-  const handleDelete = (character) => {
++  const handleDelete = async (character) => {
+     // Удаление сквозное: локально И в облаке. Без удаления в облаке персонаж
+     // воскресал при следующей синхронизации — она не отличает «я это удалил»
+     // от «этого у меня ещё не было» (сверка идёт по наличию id локально).
+@@ -503,30 +488,11 @@ export default function HomeScreen({ navigation }) {
+       // Если облачная копия осталась (сеть/авторизация отвалились), молчать
+       // нельзя: при следующем синке персонаж вернётся, и это выглядит как баг.
+       if (cloud.reason === 'error') {
+-        showHomeAlert(tHomeScreen('title'), tHomeScreen('deleteCloudFailed'));
++        await showCatalogAlert('characterDeleteCloudFailed');
+       }
+     };
+ 
+-    const confirmMessage = tHomeScreen('deleteConfirm');
+-
+-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+-      if (window.confirm(confirmMessage)) confirmDelete();
+-      return;
+-    }
+-
+-    Alert.alert(
+-      tHomeScreen('title'),
+-      confirmMessage,
+-      [
+-        {
+-          text: tHomeScreen('buttons.yes'),
+-          style: 'destructive',
+-          onPress: confirmDelete,
+-        },
+-        { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
+-      ],
+-      { cancelable: false }
+-    );
++    if (await confirmAlert('characterDelete')) await confirmDelete();
+   };
+ 
+   const handleDuplicate = async (character) => {
+@@ -541,20 +507,20 @@ export default function HomeScreen({ navigation }) {
+       });
+     } catch (error) {
+       debugLog('home.duplicateCharacter.failed', { message: error?.message });
+-      showHomeAlert(tHomeScreen('title'), tHomeScreen('characterActions.duplicateError'));
++      showCatalogAlert('characterDuplicateError');
+     }
+   };
+ 
+   const handleDownload = async (character) => {
+     if (false) { // cross-platform
+-      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.unsupported'));
++      showCatalogAlert('downloadUnsupported');
+       return;
+     }
+ 
+     try {
+       const row = await db.loadCharacterById(character.id);
+       if (!row) {
+-        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.notFound'));
++        showCatalogAlert('downloadNotFound');
+         return;
+       }
+ 
+@@ -562,17 +528,17 @@ export default function HomeScreen({ navigation }) {
+       const result = await downloadCharacterPayload(payload, row.name);
+       
+       if (!result.success && !result.aborted) {
+-        showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.failed'));
++        showCatalogAlert('downloadFailed');
+       }
+     } catch (error) {
+       debugLog('home.characterDownload.failed', { message: error?.message });
+-      showHomeAlert(tHomeScreen('title'), tHomeScreen('download.errors.unexpected'));
++      showCatalogAlert('downloadUnexpected');
+     }
+   };
+ 
+   const handleUpload = async () => {
+     if (false) { // cross-platform
+-      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.unsupported'));
++      showCatalogAlert('uploadUnsupported');
+       return;
+     }
+ 
+@@ -607,35 +573,17 @@ export default function HomeScreen({ navigation }) {
+         return;
+       }
+ 
+-      const overwriteMessage = tHomeScreen('upload.overwriteConfirm');
+-
+-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+-        const confirmed = window.confirm(overwriteMessage);
+-        if (confirmed) {
+-          await persistImport();
+-        }
+-        return;
+-      }
+-
+-      Alert.alert(
+-        tHomeScreen('title'),
+-        overwriteMessage,
+-        [
+-          { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: persistImport },
+-          { text: tHomeScreen('buttons.cancel'), style: 'cancel' },
+-        ],
+-        { cancelable: true }
+-      );
++      if (await confirmAlert('importOverwrite')) await persistImport();
+     } catch (error) {
+       debugLog('home.characterUpload.failed', { message: error?.message });
+-      showHomeAlert(tHomeScreen('title'), tHomeScreen('upload.errors.unexpected'));
++      showCatalogAlert('uploadUnexpectedError');
+     }
+   };
+ 
+   const handleCloudSync = async () => {
+     setMenuVisible(false);
+     if (Platform.OS !== 'web') {
+-      showHomeAlert(tHomeScreen('title'), tHomeScreen('cloudSync.unsupported'));
++      showCatalogAlert('cloudSyncUnsupported');
+       return;
+     }
+ 
+@@ -650,24 +598,22 @@ export default function HomeScreen({ navigation }) {
+         onProgress: setSyncProgress,
+         confirmDownload: async (items) => {
+           debugLog('sync.manual:confirmDownload', { count: items.length });
+-          return window.confirm(`${tHomeScreen('cloudSync.remoteIsNewer')} (${items.length})`);
++          return confirmAlert('cloudRemoteIsNewer', { count: items.length });
+         },
+       });
+       debugLog('sync.manual:done', result);
+       setSyncProgress(null);
+       await loadList();
+       await openCloudFolderInDrive();
+-      // tHomeScreen принимает только путь ключа (второй аргумент игнорируется),
+-      // поэтому счётчики подставляем сами.
+-      showHomeAlert(
+-        tHomeScreen('title'),
+-        `${tHomeScreen('cloudSync.success')}\n${tHomeScreen('cloudSync.uploaded')}: ${result.uploaded}\n${tHomeScreen('cloudSync.downloaded')}: ${result.downloaded}`,
+-      );
++      await showCatalogAlert('cloudSyncSuccess', {
++        uploaded: result.uploaded,
++        downloaded: result.downloaded,
++      });
+     } catch (e) {
+       const reason = e?.message || String(e);
+       debugLog('sync.manual:failed', { message: reason });
+       setSyncProgress(null);
+-      showHomeAlert(tHomeScreen('title'), `${tHomeScreen('cloudSync.error')}\n\n${reason}`);
++      await showCatalogAlert('cloudSyncError', { reason });
+     }
+   };
+ 
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index f0cf4d1..fc46608 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1,5 +1,5 @@
+ import React, { useState, useMemo, useCallback } from 'react';
+-import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity, Alert, Platform } from 'react-native';
++import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+ import { useCharacter } from '../../CharacterContext';
+ import useCharacterStore from '../../../src/store/characterStore';
+ import { selectItemsByEquipped } from '../../../src/store/selectors';
+@@ -33,7 +33,7 @@ import { generateStackKey } from '../../../domain/itemIdentity';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
+-import { showAlert as showCatalogAlert } from '../../alerts/alertService';
++import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
+ import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
+ import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+@@ -185,14 +185,10 @@ const InventoryScreen = () => {
+     return [...fromStore, ...extras];
+   }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
+ 
+-  const showAlert = (title, message = '', buttons) => {
+-    const text = message ? `${title}\n\n${message}` : title;
+-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+-      window.alert(text);
+-      return;
+-    }
+-    Alert.alert(title, message, buttons);
+-  };
++  // Показ через общий AlertHost — одинаково на вебе и на нативе.
++  // Раньше здесь была локальная копия развилки Platform.OS с window.alert,
++  // из-за которой на вебе терялись все кнопки кроме первой.
++  const showAlert = (title, message = '', buttons) => showRawAlert({ title, message, buttons });
+   
+   const [isCapsModalVisible, setIsCapsModalVisible] = useState(false);
+   const [capsOperationType, setCapsOperationType] = useState('add');
+@@ -393,7 +389,7 @@ const InventoryScreen = () => {
+       positiveEffectType: typeof consumableItem?.positiveEffect,
+     });
+ 
+-    const applyToSelf = () => {
++    const applyToSelf = async () => {
+       if (!canConsumeOnSelf(consumableItem, fitCharacter)) {
+         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
+         return;
+@@ -412,32 +408,18 @@ const InventoryScreen = () => {
+         return;
+       }
+ 
+-      const title = tInventory('screen.alerts.leadBellyRerollTitle');
+-      const message = formatInventoryText(tInventory('screen.alerts.leadBellyRerollMessage'), {
++      // Выбор из каталога: 'reroll' — перебросить, 'keep'/закрытие — оставить.
++      // На вебе раньше был window.confirm, и «Отмена» там значила «оставить»
++      // только по совпадению; теперь обе платформы дают явные кнопки.
++      const choice = await showCatalogAlert('leadBellyReroll', {
+         radiationAmount: preview.receivedRadiationDamage,
+       });
+-      const applyReroll = () => {
++      if (choice === 'reroll') {
+         const rerolled = rerollConsumableRadiationRoll(consumableItem, preview.rolls);
+         finish(rerolled.requestedAmount);
+-      };
+-
+-      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
+-        if (window.confirm(`${title}\n\n${message}`)) applyReroll();
+-        else finish(preview.requestedAmount);
+-        return;
++      } else {
++        finish(preview.requestedAmount);
+       }
+-
+-      Alert.alert(title, message, [
+-        {
+-          text: tInventory('screen.alerts.leadBellyRerollKeep'),
+-          style: 'cancel',
+-          onPress: () => finish(preview.requestedAmount),
+-        },
+-        {
+-          text: tInventory('screen.alerts.leadBellyRerollConfirm'),
+-          onPress: applyReroll,
+-        },
+-      ]);
+     };
+ 
+     const applyToOther = () => {
+@@ -453,8 +435,8 @@ const InventoryScreen = () => {
+     // Три варианта на обеих платформах. Раньше на вебе диалог схлопывался
+     // в window.confirm (две кнопки), где «Отмена» на самом деле означала
+     // «применить на другого» — отменить действие было нельзя.
+-    showCatalogAlert('applyConsumable', { itemName }).then((choice) => {
+-      if (choice === 'self') applyToSelf();
++    showCatalogAlert('applyConsumable', { itemName }).then(async (choice) => {
++      if (choice === 'self') await applyToSelf();
+       else if (choice === 'other') applyToOther();
+     });
+   };
+@@ -955,7 +937,7 @@ const InventoryScreen = () => {
+       return;
+     }
+ 
+-    const executeEquip = (slotsToOccupy) => {
++    const executeEquip = async (slotsToOccupy) => {
+       // ПРАВИЛО (владелец): молчаливых падений нет. Пустой список слотов —
+       // дефект данных предмета (нет protectedAreas): сообщаем, а не no-op.
+       if (!slotsToOccupy || slotsToOccupy.length === 0) {
+@@ -1037,20 +1019,7 @@ const InventoryScreen = () => {
+       };
+ 
+       if (instancesToUnequip.size > 0) {
+-          if (typeof window !== 'undefined' && window.confirm) {
+-              if (window.confirm(tInventory('screen.alerts.replaceEquipmentConfirm'))) {
+-                  performEquip();
+-              }
+-          } else {
+-              showAlert(
+-                  tInventory('screen.alerts.replaceEquipmentTitle'),
+-                  tInventory('screen.alerts.replaceEquipmentConfirm'),
+-                  [
+-                      { text: tInventory('screen.actions.cancel'), style: "cancel" },
+-                      { text: tInventory('screen.actions.yes'), onPress: performEquip },
+-                  ]
+-              );
+-          }
++          if (await confirmAlert('replaceEquipment')) performEquip();
+       } else {
+           performEquip();
+       }
+diff --git a/components/screens/InventoryScreen/modals/BuyItemModal.js b/components/screens/InventoryScreen/modals/BuyItemModal.js
+index c62d73f..15df61c 100644
+--- a/components/screens/InventoryScreen/modals/BuyItemModal.js
++++ b/components/screens/InventoryScreen/modals/BuyItemModal.js
+@@ -1,5 +1,6 @@
+ import React, { useState, useEffect } from 'react';
+-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
++import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
++import { showRawAlert } from '../../../alerts/alertService';
+ import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
+ import { useLocale } from '../../../../i18n/locale';
+ 
+@@ -23,24 +24,27 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
+     const qty = parseInt(quantity, 10);
+     const unitPrice = parseFloat(pricePerItem);
+     if (isNaN(qty) || qty <= 0) {
+-      Alert.alert(tInventory('modals.buyItemModal.invalidQuantity'));
++      showRawAlert({ title: tInventory('modals.buyItemModal.invalidQuantity') });
+       return;
+     }
+     if (isNaN(unitPrice) || unitPrice < 0) {
+-      Alert.alert(tInventory('modals.buyItemModal.invalidPrice'));
++      showRawAlert({ title: tInventory('modals.buyItemModal.invalidPrice') });
+       return;
+     }
+ 
+     const total = qty * unitPrice;
+     if (caps <= 0) {
+-      Alert.alert(tInventory('modals.buyItemModal.noCapsTitle'), tInventory('modals.buyItemModal.noCapsMessage'));
++      showRawAlert({
++        title: tInventory('modals.buyItemModal.noCapsTitle'),
++        message: tInventory('modals.buyItemModal.noCapsMessage'),
++      });
+       return;
+     }
+     if (total > caps) {
+-      Alert.alert(
+-        tInventory('modals.buyItemModal.notEnoughCapsTitle'),
+-        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total, caps })
+-      );
++      showRawAlert({
++        title: tInventory('modals.buyItemModal.notEnoughCapsTitle'),
++        message: formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total, caps }),
++      });
+       return;
+     }
+ 
+diff --git a/components/screens/InventoryScreen/modals/CapsModal.js b/components/screens/InventoryScreen/modals/CapsModal.js
+index 76f5897..eb4e258 100644
+--- a/components/screens/InventoryScreen/modals/CapsModal.js
++++ b/components/screens/InventoryScreen/modals/CapsModal.js
+@@ -1,5 +1,6 @@
+ import React, { useState } from 'react';
+-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
++import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
++import { showRawAlert } from '../../../alerts/alertService';
+ import { tInventory } from '../logic/inventoryI18n';
+ import { useLocale } from '../../../../i18n/locale';
+ 
+@@ -14,7 +15,7 @@ const CapsModal = ({ visible, onClose, onSave, operationType }) => {
+       setAmount('');
+       onClose();
+     } else {
+-      Alert.alert(tInventory('modals.capsModal.invalidAmount'));
++      showRawAlert({ title: tInventory('modals.capsModal.invalidAmount') });
+     }
+   };
+ 
+diff --git a/components/screens/InventoryScreen/modals/SellItemModal.js b/components/screens/InventoryScreen/modals/SellItemModal.js
+index 0a5a0e9..405cdef 100644
+--- a/components/screens/InventoryScreen/modals/SellItemModal.js
++++ b/components/screens/InventoryScreen/modals/SellItemModal.js
+@@ -1,5 +1,6 @@
+ import React, { useState, useEffect } from 'react';
+-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
++import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
++import { showRawAlert } from '../../../alerts/alertService';
+ import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
+ import { useLocale } from '../../../../i18n/locale';
+ 
+@@ -21,11 +22,11 @@ const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
+     const numPrice = parseFloat(pricePerItem);
+ 
+     if (isNaN(numQuantity) || numQuantity <= 0 || numQuantity > item.quantity) {
+-      Alert.alert(formatInventoryText(tInventory('modals.sellItemModal.invalidQuantity'), { max: item.quantity }));
++      showRawAlert({ title: formatInventoryText(tInventory('modals.sellItemModal.invalidQuantity'), { max: item.quantity }) });
+       return;
+     }
+     if (isNaN(numPrice) || numPrice < 0) {
+-      Alert.alert(tInventory('modals.sellItemModal.invalidPrice'));
++      showRawAlert({ title: tInventory('modals.sellItemModal.invalidPrice') });
+       return;
+     }
+ 
+diff --git a/components/settings/GameSettingsModal.js b/components/settings/GameSettingsModal.js
+index 1c90aac..017d658 100644
+--- a/components/settings/GameSettingsModal.js
++++ b/components/settings/GameSettingsModal.js
+@@ -7,11 +7,11 @@ import {
+   ScrollView,
+   StyleSheet,
+   Platform,
+-  Alert,
+-} from 'react-native';
++  } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../i18n/locale';
+ import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
++import { confirmAlert } from '../alerts/alertService';
+ import useSettingPackStore, {
+   getVanillaCatalog,
+   selectActiveSettingId,
+@@ -60,17 +60,11 @@ export default function GameSettingsModal({ visible, onClose }) {
+     (entry) => !installed.some((item) => item.id === entry.id),
+   );
+ 
+-  const confirmDelete = (entry) => {
+-    const title = tHomeScreen('gameSetting.delete');
+-    const run = () => deleteSetting(entry.id);
+-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+-      if (window.confirm(`${title}: ${entry.name}`)) run();
+-      return;
++  const confirmDelete = async (entry) => {
++    // Заголовок из каталога, имя пакета — подстановкой в тело диалога.
++    if (await confirmAlert('settingDelete', { name: entry.name })) {
++      deleteSetting(entry.id);
+     }
+-    Alert.alert(title, entry.name, [
+-      { text: tHomeScreen('buttons.no'), style: 'cancel' },
+-      { text: tHomeScreen('buttons.yes'), style: 'destructive', onPress: run },
+-    ]);
+   };
+ 
+   const handlePickLocal = async () => {
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index f55104f..bca5fb3 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -79,7 +79,10 @@
+     },
+     "uploaded": "Uploaded",
+     "downloaded": "Downloaded",
+-    "error": "Cloud sync failed."
++    "error": "Cloud sync failed.",
++    "remoteIsNewerWithCount": "Newer versions of characters were found in the cloud ({count}). Download them locally?",
++    "successWithCounts": "Sync complete.\nUploaded: {uploaded}\nDownloaded: {downloaded}",
++    "errorWithReason": "Could not sync with the cloud.\n\n{reason}"
+   },
+   "pwa": {
+     "install": "Install App",
+@@ -126,7 +129,8 @@
+     "deleteMessage": "The folder and all characters inside it will be permanently deleted.",
+     "deleteConfirm": "Delete folder and characters",
+     "moveHint": "Hold the arrow icon, then tap a folder to move the character.",
+-    "moving": "Select a destination folder"
++    "moving": "Select a destination folder",
++    "deleteMessageWithCount": "The folder and every character inside it will be deleted permanently. Characters: {count}."
+   },
+   "subtitle": "Positronium",
+   "about": {
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index ef683be..e9cc02d 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -79,7 +79,10 @@
+     },
+     "uploaded": "Выгружено",
+     "downloaded": "Загружено",
+-    "error": "Ошибка синхронизации."
++    "error": "Ошибка синхронизации.",
++    "remoteIsNewerWithCount": "В облаке найдены более новые версии персонажей ({count}). Загрузить их локально?",
++    "successWithCounts": "Синхронизация завершена.\nОтправлено: {uploaded}\nЗагружено: {downloaded}",
++    "errorWithReason": "Не удалось синхронизироваться с облаком.\n\n{reason}"
+   },
+   "pwa": {
+     "install": "Установить приложение",
+@@ -126,7 +129,8 @@
+     "deleteMessage": "Каталог и все персонажи внутри него будут безвозвратно удалены.",
+     "deleteConfirm": "Удалить каталог и персонажей",
+     "moveHint": "Удерживайте значок стрелок, затем нажмите каталог для переноса.",
+-    "moving": "Выберите каталог назначения"
++    "moving": "Выберите каталог назначения",
++    "deleteMessageWithCount": "Каталог и все персонажи внутри него будут безвозвратно удалены. Персонажей: {count}."
+   },
+   "subtitle": "Positronium",
+   "about": {
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 5bb2343..29c00e3 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -9,12 +9,10 @@ import {
+   SafeAreaView,
+   StatusBar,
+   Modal,
+-  Alert,
+-  Platform,
+   TextInput,
+ } from "react-native";
+ import { useCharacter } from "../../../../components/CharacterContext";
+-import { showAlert as showCatalogAlert } from "../../../../components/alerts/alertService";
++import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
+ import useCharacterStore from "../../../../src/store/characterStore";
+ import { selectActiveTimedEffects } from "../../../../src/store/selectors";
+ import { useShallow } from 'zustand/react/shallow';
+@@ -411,18 +409,8 @@ export default function CharacterScreen() {
+   const [tempAttributes, setTempAttributes] = useState(null);
+   const [perkPointsToDistribute, setPerkPointsToDistribute] = useState(0);
+ 
+-  const showAlert = (title, message = "") => {
+-    const text = message ? `${title}\n\n${message}` : title;
+-    if (Platform.OS === "web" && typeof window !== "undefined" && typeof window.alert === "function") {
+-      window.alert(text);
+-      return;
+-    }
+-    if (message) {
+-      Alert.alert(title, message);
+-      return;
+-    }
+-    Alert.alert(title);
+-  };
++  // Показ через общий AlertHost — одинаково на вебе и на нативе.
++  const showAlert = (title, message = "") => showRawAlert({ title, message });
+ 
+   const showError = (message) => {
+     showAlert(tCharacterScreen("alerts.errorTitle"), message);
+@@ -816,7 +804,7 @@ export default function CharacterScreen() {
+   // и полным сбросом персонажа.
+   const isCharacterLocked = isCharacterLockedFn(attributesSaved, skillsSaved);
+ 
+-  const confirmOriginSelection = (newOrigin) => {
++  const confirmOriginSelection = async (newOrigin) => {
+     if (!origin || newOrigin.id === origin.id) {
+       handleSelectOrigin(newOrigin);
+       return;
+@@ -829,26 +817,7 @@ export default function CharacterScreen() {
+ 
+     if (isCharacterLocked) {
+       // После распределения — сброс всего + подтверждение.
+-      if (Platform.OS === "web") {
+-        if (
+-          window.confirm(`${tCharacterScreen("warnings.changeOriginTitle")}\n\n${tCharacterScreen("warnings.changeOriginConfirm")}`)
+-        ) {
+-          applyNewOrigin();
+-        }
+-      } else {
+-        Alert.alert(
+-          tCharacterScreen("warnings.changeOriginTitle"),
+-          tCharacterScreen("warnings.changeOriginConfirm"),
+-          [
+-            { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
+-            {
+-              text: tCharacterScreen("buttons.yesReset"),
+-              onPress: applyNewOrigin,
+-              style: "destructive",
+-            },
+-          ],
+-        );
+-      }
++      if (await confirmAlert('changeOrigin')) applyNewOrigin();
+       return;
+     }
+ 
+@@ -1263,7 +1232,7 @@ export default function CharacterScreen() {
+               // origin требуют requiresTraitIds, фильтр пуст). Это исключает
+               // открытие пустой модалки.
+               disabled={!isSaved || (!equipment?.id && equipmentKitsForModal.length === 0)}
+-              onPress={() => {
++              onPress={async () => {
+                 // Доступные комплекты берём из ЕДИНОГО фильтра по данным
+                 // (filterKitsForCharacter) — того же, что получает модалка.
+                 // Если фильтр пуст (у семьи не выбрана семья/трейт), строка
+@@ -1284,27 +1253,7 @@ export default function CharacterScreen() {
+                 // старый сейв) — просто открываем список: сбрасывать нечего,
+                 // а выбор конкретного комплекта предложит сброс.
+                 if (equipment?.id && isCharacterLocked) {
+-                  if (Platform.OS === "web") {
+-                    if (
+-                      window.confirm(
+-                        tCharacterScreen("warnings.equipmentResetOnWeb"),
+-                      )
+-                    ) {
+-                      applyKitReset();
+-                    }
+-                  } else {
+-                    Alert.alert(
+-                        tCharacterScreen("warnings.attentionTitle"),
+-                        tCharacterScreen("warnings.equipmentResetConfirm"),
+-                      [
+-                        { text: tCharacterScreen("buttons.cancel"), style: "cancel" },
+-                        {
+-                          text: tCharacterScreen("buttons.continue"),
+-                          onPress: applyKitReset,
+-                        },
+-                      ],
+-                    );
+-                  }
++                  if (await confirmAlert('equipmentReset')) applyKitReset();
+                 } else {
+                   // До распределения — просто открываем (смена свободна,
+                   // старый комплект заменится при выборе нового).
+diff --git a/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index afa7e62..87a0f8c 100644
+--- a/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -1,6 +1,7 @@
+ import React, { useMemo, useState } from 'react';
+-import { View, Text, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
++import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+ import { useCharacter } from '../../../../components/CharacterContext';
++import { showRawAlert } from '../../../../components/alerts/alertService';
+ import { getTraitI18nById } from '../../../../domain/traits';
+ import {
+   applyPerkSelection,
+@@ -93,17 +94,8 @@ const PerksAndTraitsScreen = () => {
+     [annotatePerks, selectedPerks, replacingIndex],
+   );
+ 
+-  const showAlert = (title, message) => {
+-    if (Platform.OS === 'web') {
+-      window.alert(message ? `${title}\n\n${message}` : message || title);
+-      return;
+-    }
+-    if (message) {
+-      Alert.alert(title, message);
+-      return;
+-    }
+-    Alert.alert(title);
+-  };
++  // Показ через общий AlertHost — одинаково на вебе и на нативе.
++  const showAlert = (title, message) => showRawAlert({ title, message: message || '' });
+ 
+   const toggleSpoiler = (key) => {
+     setOpenSpoilers((prev) => ({ ...prev, [key]: !prev[key] }));
+-- 
+2.39.5
+
