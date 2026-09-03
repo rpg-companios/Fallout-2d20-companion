@@ -277,6 +277,7 @@ if [[ -n "$LEVEL" ]]; then
 fi
 
 TODO=()
+DEFERRED=()
 SKIPPED=0
 STALE=0
 OLD=0
@@ -305,7 +306,12 @@ for name in "${QUEUE[@]}"; do
       if [[ "$name" == "$TARGET" ]]; then
         TODO+=("$name")
       else
+        # Состояние считается ДО применения цепочки, поэтому «conflict» здесь
+        # неоднозначен: патч может не вставать лишь потому, что нужный ему
+        # контекст создаёт предыдущий патч очереди. Такие откладываем и
+        # перепроверяем после каждого прохода применения.
         STALE=$((STALE + 1))
+        DEFERRED+=("$name")
       fi
       ;;
   esac
@@ -324,7 +330,14 @@ fi
 if [[ $STALE -gt 0 ]]; then
   echo "Пропущено как устаревшие: $STALE (контекст разошёлся, обычно уже в main)"
 fi
-echo "Будет применено: ${#TODO[@]}"
+# Отложенные «conflict» возвращаем в очередь по номеру: их состояние будет
+# пересчитано непосредственно перед применением, когда предыдущие патчи
+# цепочки уже лягут в дерево.
+if [[ ${#DEFERRED[@]} -gt 0 ]]; then
+  mapfile -t TODO < <(printf '%s\n' "${TODO[@]}" "${DEFERRED[@]}" | sort -V)
+fi
+
+echo "Будет применено: ${#TODO[@]} (из них перепроверяемых: ${#DEFERRED[@]})"
 for name in "${TODO[@]}"; do
   printf '  %s\n' "$name"
 done
@@ -336,6 +349,22 @@ APPLIED=()
 
 for name in "${TODO[@]}"; do
   file="$(extract_patch "$name")"
+
+  # Пересчёт состояния на актуальном дереве: предыдущие патчи очереди могли
+  # создать контекст, которого не было на момент первичной классификации.
+  case "$(patch_state "$file")" in
+    applied)
+      printf 'Пропуск: %s (уже стоит)\n' "$name"
+      continue
+      ;;
+    conflict)
+      if [[ "$name" != "$TARGET" ]]; then
+        printf 'Пропуск: %s (контекст разошёлся)\n' "$name"
+        continue
+      fi
+      ;;
+  esac
+
   printf 'Применение: %s ... ' "$name"
 
   if git -C "$ROOT_DIR" apply --whitespace=nowarn "$file" >/dev/null 2>&1; then
