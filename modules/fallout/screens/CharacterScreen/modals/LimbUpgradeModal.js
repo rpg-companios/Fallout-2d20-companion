@@ -63,7 +63,7 @@ const BODY_PLAN_ARM_SLOTS = {
  *   - limb.slots intersects with the expected arm slots for the bodyPlan (arms fallback)
  * If no limbs match any of the above, all limbs are returned (graceful fallback).
  */
-const filterByBodyPlan = (limbs, bodyPlan) => {
+const filterByBodyPlan = (limbs, bodyPlan, slotKey = null) => {
   if (!bodyPlan) return limbs;
 
   const filtered = limbs.filter((limb) => {
@@ -72,7 +72,15 @@ const filterByBodyPlan = (limbs, bodyPlan) => {
     }
     if (limb.defaultForBodyPlan === bodyPlan) return true;
     if (limb.robotBodyPlan === bodyPlan) return true;
-    // Arms fallback: check slots field intersection
+    // Основной признак в данных — compatibleSlots с именами слотов вида
+    // 'leftArm' / 'arm1'. Раньше фильтр читал несуществующее поле `slots` с
+    // человекочитаемыми 'Left Arm', не совпадал ни с чем и сваливался в
+    // fallback «показать всё» — Ассаультрону предлагались руки Мистера Хэнди,
+    // а нужные терялись среди чужих.
+    if (slotKey && Array.isArray(limb.compatibleSlots)) {
+      return limb.compatibleSlots.includes(slotKey);
+    }
+    // Legacy-форма: человекочитаемые имена слотов в поле `slots`.
     const expectedSlots = BODY_PLAN_ARM_SLOTS[bodyPlan];
     if (expectedSlots && Array.isArray(limb.slots)) {
       return limb.slots.some((s) => expectedSlots.includes(s));
@@ -153,7 +161,7 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) 
     const catalog = getLimbCatalogForSlot(equipmentCatalog, slotKey);
     const itemType = getItemTypeForSlot(slotKey);
     const byType = catalog.filter((l) => l.itemType === itemType);
-    return filterByBodyPlan(byType, bodyPlan);
+    return filterByBodyPlan(byType, bodyPlan, slotKey);
   }, [equipmentCatalog, slotKey, bodyPlan]);
 
   const handleSelect = (newLimb) => {

@@ -109,9 +109,14 @@ export function buildArmLimb(armEntry, weaponsCatalog = []) {
   const weaponStats = armEntry.builtinWeaponId
     ? list.find((w) => w.id === armEntry.builtinWeaponId) || null
     : null;
+  // Уже сохранённое состояние встроенного оружия (в т.ч. appliedMods) важнее
+  // каталожной заготовки: иначе пересборка конечности из каталога стирала
+  // применённые моды при каждой загрузке.
+  const savedBuiltin = Array.isArray(armEntry.builtinWeapons) ? armEntry.builtinWeapons : [];
+  const savedById = new Map(savedBuiltin.filter((w) => w?.id).map((w) => [w.id, w]));
   const builtinWeapons = weaponStats
-    ? [{ ...weaponStats, isBuiltin: true }]
-    : (Array.isArray(armEntry.builtinWeapons) ? armEntry.builtinWeapons : []);
+    ? [{ ...weaponStats, ...(savedById.get(weaponStats.id) || {}), isBuiltin: true }]
+    : savedBuiltin;
   return {
     ...armEntry,
     itemType: 'robotArm',

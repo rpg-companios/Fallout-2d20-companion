@@ -727,6 +727,42 @@ const WeaponsAndArmorScreen = () => {
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
+    // Встроенное оружие конечности (лазер Ассаультрона, манипулятор) лежит НЕ
+    // в heldWeapon, а внутри limb.builtinWeapons. Раньше сюда не попадала ни
+    // одна ветка: heldWeapon пуст, в сторе такого предмета нет — моды молча
+    // терялись. Пишем их в саму конечность, тогда они переживают сейв вместе
+    // с equippedRobotSlots.
+    const builtinSlotKey = selectedWeaponForModification?.sourceSlot;
+    const builtinSlot = builtinSlotKey ? equippedRobotSlots?.[builtinSlotKey] : null;
+    const builtinList = Array.isArray(builtinSlot?.limb?.builtinWeapons)
+      ? builtinSlot.limb.builtinWeapons
+      : [];
+    const isBuiltinTarget = !builtinSlot?.heldWeapon
+      && builtinList.some((w) => w?.id === selectedWeaponForModification?.id);
+
+    if (isBuiltinTarget) {
+      setEquippedRobotSlots((prev) => {
+        const slot = prev?.[builtinSlotKey];
+        const list = Array.isArray(slot?.limb?.builtinWeapons) ? slot.limb.builtinWeapons : [];
+        if (list.length === 0) return prev;
+        return {
+          ...prev,
+          [builtinSlotKey]: {
+            ...slot,
+            limb: {
+              ...slot.limb,
+              builtinWeapons: list.map((w) => (
+                w?.id === selectedWeaponForModification.id
+                  ? { ...w, ...modifiedWeapon, id: w.id, isBuiltin: true }
+                  : w
+              )),
+            },
+          },
+        };
+      });
+      return;
+    }
+
     if (selectedWeaponForModification?.sourceSlot && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon) {
       const sourceSlot = selectedWeaponForModification.sourceSlot;
       setEquippedRobotSlots((prev) => {
