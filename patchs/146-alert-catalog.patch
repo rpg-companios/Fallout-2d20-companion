@@ -1,0 +1,584 @@
+From 771c40fb12d1046c47d6a94b54168ac8595178e3 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 07:13:26 +0000
+Subject: [PATCH] patch 146: alert catalog and a single dialog host
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Adds components/alerts/: a catalog of the app's dialogs, a promise-based
+service, and one AlertHost mounted in App.js.
+
+Why: five near-identical showAlert wrappers existed (CharacterContext,
+HomeScreen, InventoryScreen, CharacterScreen, PerksAndTraitsScreen) and
+the Platform.OS === 'web' branch was spread over ~50 call sites. On web
+those branches fell back to window.confirm/prompt, which cannot show
+more than two buttons — so three-option dialogs lost an option.
+
+The host renders a normal React modal, identical on web and native, with
+any number of buttons. Domain code must not call it: pure logic returns
+an event and the screen maps it to a catalog entry.
+
+First call site converted: applying a consumable. On web its three
+options used to collapse into window.confirm where 'Cancel' actually
+meant 'apply to another character' — cancelling was impossible.
+
+Catalog holds i18n keys, not strings; all keys verified present in ru-RU
+and en-EN. Remaining call sites keep working unchanged and can be moved
+over one screen at a time.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                        |   2 +
+ components/alerts/AlertHost.js                | 202 ++++++++++++++++++
+ components/alerts/alertService.js             | 103 +++++++++
+ components/alerts/catalog.js                  | 152 +++++++++++++
+ .../InventoryScreen/InventoryScreen.js        |  27 +--
+ 5 files changed, 467 insertions(+), 19 deletions(-)
+ create mode 100644 components/alerts/AlertHost.js
+ create mode 100644 components/alerts/alertService.js
+ create mode 100644 components/alerts/catalog.js
+
+diff --git a/App.js b/App.js
+index 751ba61..723e270 100644
+--- a/App.js
++++ b/App.js
+@@ -13,6 +13,7 @@ import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+ import { Provider as PaperProvider } from 'react-native-paper';
+ import { CharacterProvider } from './components/CharacterContext';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
++import AlertHost from './components/alerts/AlertHost';
+ import { initDatabase } from './db/Database';
+ import { seedDatabase } from './db/seed';
+ import { useLocale, useModuleLocale } from './i18n/locale';
+@@ -223,6 +224,7 @@ function App() {
+           </NavigationContainer>
+           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
+           <FusionCoreChoiceModal />
++          <AlertHost />
+         </CharacterProvider>
+       </SafeAreaProvider>
+     </PaperProvider>
+diff --git a/components/alerts/AlertHost.js b/components/alerts/AlertHost.js
+new file mode 100644
+index 0000000..789b29e
+--- /dev/null
++++ b/components/alerts/AlertHost.js
+@@ -0,0 +1,202 @@
++/**
++ * AlertHost — единственное место, где диалоги реально рисуются.
++ *
++ * Монтируется один раз в App.js рядом с FusionCoreChoiceModal. Обычная
++ * React-модалка, поэтому на вебе и на нативе диалог выглядит и ведёт себя
++ * одинаково, а число кнопок ничем не ограничено — в отличие от
++ * window.confirm (ровно две) и window.prompt (ввод текста руками).
++ */
++
++import React, { useCallback, useEffect, useRef, useState } from 'react';
++import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
++import { registerAlertHost } from './alertService';
++import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
++import { useLocale } from '../../i18n/locale';
++import { tApp } from '../../i18n/appI18n';
++import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
++import tHomeScreenDict from '../../i18n/ru-RU/screens/home/screen.json';
++import tHomeScreenDictEn from '../../i18n/en-EN/screens/home/screen.json';
++import { getCurrentLocale } from '../../i18n/locale';
++
++const HOME_DICTS = { 'ru-RU': tHomeScreenDict, 'en-EN': tHomeScreenDictEn };
++
++const readPath = (dict, path) => {
++  let current = dict;
++  for (const part of String(path).split('.')) {
++    current = current?.[part];
++    if (current === undefined) return undefined;
++  }
++  return current;
++};
++
++/**
++ * Перевод по scope записи каталога. Каждый экран приложения держит свой
++ * словарь, поэтому единой t-функции нет — выбираем по scope.
++ */
++const translate = (scope, path) => {
++  if (path === undefined || path === null) return '';
++  if (scope === 'home') {
++    return readPath(HOME_DICTS[getCurrentLocale()], path) ?? path;
++  }
++  if (scope === 'inventory') return tInventory(path);
++  if (scope === 'app') return tApp(path);
++  // 'character' и прочие модульные экраны держат словари внутри модуля
++  // сеттинга; до перевода этих вызовов на каталог сюда попадает готовый
++  // текст через showRawAlert.
++  return path;
++};
++
++const substitute = (text, params) => {
++  if (!text || !params) return text || '';
++  return String(text).replace(/\{(\w+)\}/g, (match, key) =>
++    Object.hasOwn(params, key) ? String(params[key]) : match,
++  );
++};
++
++const AlertHost = () => {
++  useLocale();
++  const [request, setRequest] = useState(null);
++  const resolverRef = useRef(null);
++
++  useEffect(() => {
++    const unregister = registerAlertHost((nextRequest) =>
++      new Promise((resolve) => {
++        resolverRef.current = resolve;
++        setRequest(nextRequest);
++      }),
++    );
++    return unregister;
++  }, []);
++
++  const finish = useCallback((result) => {
++    const resolve = resolverRef.current;
++    resolverRef.current = null;
++    setRequest(null);
++    if (resolve) resolve(result);
++  }, []);
++
++  if (!request) return null;
++
++  const { entry, params, raw } = request;
++  const scope = entry.scope;
++
++  const title = raw ? raw.title : substitute(translate(scope, entry.titleKey), params);
++  const message = raw ? raw.message : substitute(translate(scope, entry.messageKey), params);
++
++  // Состав кнопок зависит от вида диалога.
++  let buttons;
++  if (entry.kind === 'choice') {
++    buttons = (entry.buttons || []).map((button) => ({
++      key: button.key,
++      label: substitute(translate(scope, button.labelKey), params),
++      value: button.value,
++      style: button.style,
++    }));
++  } else if (entry.kind === 'confirm') {
++    buttons = [
++      {
++        key: 'confirm',
++        label: translate(scope, entry.confirmKey || DEFAULT_CONFIRM_BUTTONS.confirmKey),
++        value: true,
++        style: entry.destructive ? 'destructive' : undefined,
++      },
++      {
++        key: 'cancel',
++        label: translate(scope, entry.cancelKey || DEFAULT_CONFIRM_BUTTONS.cancelKey),
++        value: false,
++        style: 'cancel',
++      },
++    ];
++  } else {
++    buttons = [{ key: 'ok', label: translate(scope, entry.okKey || 'buttons.ok'), value: undefined }];
++  }
++
++  const cancelValue = entry.kind === 'confirm' ? false : null;
++
++  return (
++    <Modal
++      visible
++      transparent
++      animationType="fade"
++      onRequestClose={() => finish(cancelValue)}
++    >
++      <View style={styles.overlay}>
++        <View style={styles.content}>
++          {!!title && <Text style={styles.title}>{title}</Text>}
++          {!!message && (
++            <ScrollView style={styles.messageScroll} contentContainerStyle={styles.messageWrap}>
++              <Text style={styles.message}>{message}</Text>
++            </ScrollView>
++          )}
++          <View style={styles.buttons}>
++            {buttons.map((button) => (
++              <TouchableOpacity
++                key={button.key}
++                style={[
++                  styles.button,
++                  button.style === 'destructive' && styles.buttonDestructive,
++                  button.style === 'cancel' && styles.buttonCancel,
++                ]}
++                onPress={() => finish(button.value)}
++              >
++                <Text
++                  style={[
++                    styles.buttonText,
++                    button.style === 'cancel' && styles.buttonTextCancel,
++                  ]}
++                >
++                  {button.label}
++                </Text>
++              </TouchableOpacity>
++            ))}
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  overlay: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++    backgroundColor: 'rgba(0, 0, 0, 0.6)',
++    paddingHorizontal: 16,
++  },
++  content: {
++    width: '100%',
++    maxWidth: 520,
++    backgroundColor: '#1f1f1f',
++    borderRadius: 10,
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    padding: 20,
++  },
++  title: {
++    fontSize: 18,
++    fontWeight: 'bold',
++    color: '#f0e68c',
++    marginBottom: 12,
++    textAlign: 'center',
++  },
++  messageScroll: { maxHeight: 260 },
++  messageWrap: { paddingBottom: 4 },
++  message: { fontSize: 15, color: '#e8e8e8', lineHeight: 21, textAlign: 'center' },
++  buttons: { marginTop: 18, gap: 8 },
++  button: {
++    paddingVertical: 12,
++    paddingHorizontal: 16,
++    borderRadius: 8,
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    alignItems: 'center',
++  },
++  buttonDestructive: { backgroundColor: '#4a1f1f', borderColor: '#e57373' },
++  buttonCancel: { backgroundColor: 'transparent', borderColor: '#777' },
++  buttonText: { fontSize: 15, fontWeight: '600', color: '#f0e68c' },
++  buttonTextCancel: { color: '#bbb' },
++});
++
++export default AlertHost;
+diff --git a/components/alerts/alertService.js b/components/alerts/alertService.js
+new file mode 100644
+index 0000000..0e7a513
+--- /dev/null
++++ b/components/alerts/alertService.js
+@@ -0,0 +1,103 @@
++/**
++ * alertService — единая точка показа диалогов.
++ *
++ * ЗАЧЕМ.
++ *   Раньше в приложении жили ПЯТЬ почти одинаковых обёрток showAlert
++ *   (CharacterContext, HomeScreen, InventoryScreen, CharacterScreen,
++ *   PerksAndTraitsScreen) и развилка `Platform.OS === 'web'` была размазана
++ *   по ~50 местам вызова. На вебе диалоги показывались браузерными
++ *   примитивами window.confirm/window.prompt, у которых ровно две кнопки,
++ *   поэтому диалоги с ТРЕМЯ вариантами (применить расходник на себя /
++ *   на другого / отмена; выбор руки для силовой брони) на вебе теряли
++ *   вариант или требовали ввести цифру руками.
++ *
++ * КАК УСТРОЕНО.
++ *   Сервис не рендерит сам: он хранит ссылку на хост-компонент
++ *   (AlertHost), смонтированный один раз в App.js. Любой код — включая
++ *   не-React модули вроде CharacterContext — вызывает showAlert() и
++ *   получает Promise с результатом. Хост рисует обычную React-модалку,
++ *   одинаковую на вебе и на нативе, с любым числом кнопок.
++ *
++ * ПОЧЕМУ PROMISE, А НЕ КОЛБЭКИ.
++ *   Alert.alert работает через onPress-колбэки, window.confirm —
++ *   синхронно возвращает boolean. Промис примиряет обе модели и
++ *   позволяет писать `if (await confirmAlert('x')) ...` в любом месте.
++ *
++ * ВАЖНО ПРО ДВИЖОК.
++ *   Доменные функции НЕ должны звать этот модуль напрямую: чистая логика
++ *   не знает про UI. Правильный путь — вернуть событие, а экран сопоставит
++ *   его с записью каталога и покажет диалог.
++ */
++
++import { ALERTS } from './catalog';
++
++let hostHandler = null;
++// Очередь запросов, пришедших до монтирования хоста (например, ранняя ошибка
++// инициализации). Без неё такой алерт потерялся бы молча.
++const pendingQueue = [];
++
++/** Вызывается AlertHost при монтировании. Возвращает функцию отписки. */
++export const registerAlertHost = (handler) => {
++  hostHandler = handler;
++  while (pendingQueue.length > 0) {
++    const { request, resolve } = pendingQueue.shift();
++    handler(request).then(resolve);
++  }
++  return () => {
++    if (hostHandler === handler) hostHandler = null;
++  };
++};
++
++/**
++ * Показать диалог из каталога.
++ *
++ * @param {string} alertId  ключ в ALERTS
++ * @param {object} params   подстановки для {placeholder} в тексте
++ * @returns {Promise<*>}    для kind:'info'    → undefined
++ *                          для kind:'confirm' → true | false
++ *                          для kind:'choice'  → value выбранной кнопки | null
++ */
++export const showAlert = (alertId, params = {}) => {
++  const entry = ALERTS[alertId];
++  if (!entry) {
++    // Промах ключа — дефект данных. Не роняем приложение, но и не молчим.
++    console.error(`[alertService] Неизвестный алерт: ${alertId}`);
++    return Promise.resolve(entry?.kind === 'confirm' ? false : null);
++  }
++
++  const request = { id: alertId, entry, params };
++
++  if (!hostHandler) {
++    return new Promise((resolve) => {
++      pendingQueue.push({ request, resolve });
++    });
++  }
++
++  return hostHandler(request);
++};
++
++/** Сахар для самого частого случая: да/нет. */
++export const confirmAlert = (alertId, params = {}) =>
++  showAlert(alertId, params).then((result) => result === true);
++
++/**
++ * Показать диалог с произвольным текстом, минуя каталог.
++ *
++ * Нужен для сообщений, текст которых приходит извне (ошибка от Google Drive,
++ * отчёт о применении расходника) и не может быть заранее записан в каталог.
++ * Для всего остального пользуйтесь showAlert с ключом.
++ */
++export const showRawAlert = ({ title, message = '', kind = 'info', buttons }) => {
++  const request = {
++    id: '__raw__',
++    entry: { kind, buttons },
++    params: {},
++    raw: { title, message },
++  };
++  if (!hostHandler) {
++    return new Promise((resolve) => {
++      pendingQueue.push({ request, resolve });
++    });
++  }
++  return hostHandler(request);
++};
+diff --git a/components/alerts/catalog.js b/components/alerts/catalog.js
+new file mode 100644
+index 0000000..d53aafe
+--- /dev/null
++++ b/components/alerts/catalog.js
+@@ -0,0 +1,152 @@
++/**
++ * catalog — реестр диалогов приложения.
++ *
++ * ПРАВИЛО: здесь лежат КЛЮЧИ i18n, а не сами строки. Иначе каталог станет
++ * третьей копией переводов и разъедется с i18n/. Тексты остаются в
++ * i18n/<locale>/screens/... и в модулях сеттинга.
++ *
++ * kind:
++ *   'info'    — одна кнопка «Ок». Результат: undefined.
++ *   'confirm' — две кнопки. Результат: true | false.
++ *               По умолчанию «Да» (первой) / «Отмена» — стандарт закреплён
++ *               патчем 141, новые confirm получают его автоматически.
++ *   'choice'  — произвольный список кнопок. Результат: value | null.
++ *               Именно ради этого вида и затевался каталог: window.confirm
++ *               на вебе физически не умеет больше двух кнопок.
++ *
++ * Поля записи:
++ *   titleKey / messageKey — пути для t-функции соответствующего экрана.
++ *   scope                 — какой словарь использовать (см. AlertHost).
++ *   destructive           — подсветить подтверждение как опасное действие.
++ *   buttons               — только для 'choice': [{ key, labelKey, value, style }].
++ */
++
++// Кнопки по умолчанию для confirm: «Да» первой, затем «Отмена».
++export const DEFAULT_CONFIRM_BUTTONS = Object.freeze({
++  confirmKey: 'buttons.yes',
++  cancelKey: 'buttons.cancel',
++});
++
++export const ALERTS = {
++  // --- Менеджер персонажей (HomeScreen) -------------------------------------
++
++  characterDelete: {
++    scope: 'home',
++    kind: 'confirm',
++    titleKey: 'title',
++    messageKey: 'deleteConfirm',
++    destructive: true,
++  },
++  characterDeleteCloudFailed: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'deleteCloudFailed',
++  },
++  folderDelete: {
++    scope: 'home',
++    kind: 'confirm',
++    titleKey: 'folders.deleteTitle',
++    messageKey: 'folders.deleteMessage',
++    destructive: true,
++  },
++  importOverwrite: {
++    scope: 'home',
++    kind: 'confirm',
++    titleKey: 'title',
++    messageKey: 'upload.overwriteConfirm',
++    destructive: true,
++  },
++  uploadUnexpectedError: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'upload.errors.unexpected',
++  },
++  cloudSyncUnsupported: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'title',
++    messageKey: 'cloudSync.unsupported',
++  },
++  cloudRemoteIsNewer: {
++    scope: 'home',
++    kind: 'confirm',
++    titleKey: 'title',
++    messageKey: 'cloudSync.remoteIsNewer',
++  },
++
++  // --- Инвентарь ------------------------------------------------------------
++
++  // Ключевой случай: ТРИ варианта. На вебе раньше схлопывался в
++  // window.confirm, где «Отмена» на самом деле означала «на другого».
++  applyConsumable: {
++    scope: 'inventory',
++    kind: 'choice',
++    titleKey: 'screen.alerts.applyConsumableTitle',
++    messageKey: 'screen.alerts.applyConsumableQuestion',
++    buttons: [
++      { key: 'self', labelKey: 'screen.actions.self', value: 'self' },
++      { key: 'other', labelKey: 'screen.actions.other', value: 'other' },
++      { key: 'cancel', labelKey: 'screen.actions.cancel', value: null, style: 'cancel' },
++    ],
++  },
++  robotCannotSelfUse: {
++    scope: 'inventory',
++    kind: 'info',
++    titleKey: 'screen.alerts.robotCannotSelfUseTitle',
++    messageKey: 'screen.alerts.robotCannotSelfUseMessage',
++  },
++  leadBellyReroll: {
++    scope: 'inventory',
++    kind: 'choice',
++    titleKey: 'screen.alerts.leadBellyRerollTitle',
++    messageKey: 'screen.alerts.leadBellyRerollMessage',
++    buttons: [
++      { key: 'reroll', labelKey: 'screen.alerts.leadBellyRerollConfirm', value: 'reroll' },
++      { key: 'keep', labelKey: 'screen.alerts.leadBellyRerollKeep', value: 'keep', style: 'cancel' },
++    ],
++  },
++  replaceEquipment: {
++    scope: 'inventory',
++    kind: 'confirm',
++    titleKey: 'screen.alerts.replaceEquipmentTitle',
++    messageKey: 'screen.alerts.replaceEquipmentConfirm',
++  },
++
++  // --- Лист персонажа -------------------------------------------------------
++
++  characterSaveFailed: {
++    scope: 'character',
++    kind: 'info',
++    titleKey: 'title',
++    // Раньше строка была захардкожена прямо в CharacterScreen.js:1225.
++    messageKey: 'errors.saveFailed',
++  },
++  changeOrigin: {
++    scope: 'character',
++    kind: 'confirm',
++    titleKey: 'warnings.changeOriginTitle',
++    messageKey: 'warnings.changeOriginConfirm',
++    destructive: true,
++  },
++  equipmentReset: {
++    scope: 'character',
++    kind: 'confirm',
++    titleKey: 'warnings.attentionTitle',
++    messageKey: 'warnings.equipmentResetConfirm',
++    destructive: true,
++  },
++
++  // --- Настройки ------------------------------------------------------------
++
++  // Удаление установленного сеттинга. Заголовок и текст берутся из словаря
++  // менеджера (home), а имя пакета приходит подстановкой {name}.
++  settingDelete: {
++    scope: 'home',
++    kind: 'confirm',
++    titleKey: 'gameSetting.delete',
++    messageKey: null,
++    destructive: true,
++  },
++};
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 2029e1d..a8cb973 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -33,6 +33,7 @@ import { generateStackKey } from '../../../domain/itemIdentity';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
++import { showAlert as showCatalogAlert } from '../../alerts/alertService';
+ import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
+ import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+@@ -449,25 +450,13 @@ const InventoryScreen = () => {
+       handleRemoveItem(consumableItem, 1);
+     };
+ 
+-    if (typeof window !== 'undefined' && window.confirm) {
+-      const applyOnSelf = window.confirm(formatInventoryText(tInventory('screen.alerts.windowApplyConsumableQuestion'), { itemName }));
+-      if (applyOnSelf) {
+-        applyToSelf();
+-      } else {
+-        applyToOther();
+-      }
+-      return;
+-    }
+-
+-    showAlert(
+-      tInventory('screen.alerts.applyConsumableTitle'),
+-      formatInventoryText(tInventory('screen.alerts.applyConsumableQuestion'), { itemName }),
+-      [
+-        { text: tInventory('screen.actions.cancel'), style: "cancel" },
+-        { text: tInventory('screen.actions.self'), onPress: applyToSelf },
+-        { text: tInventory('screen.actions.other'), onPress: applyToOther }
+-      ]
+-    );
++    // Три варианта на обеих платформах. Раньше на вебе диалог схлопывался
++    // в window.confirm (две кнопки), где «Отмена» на самом деле означала
++    // «применить на другого» — отменить действие было нельзя.
++    showCatalogAlert('applyConsumable', { itemName }).then((choice) => {
++      if (choice === 'self') applyToSelf();
++      else if (choice === 'other') applyToOther();
++    });
+   };
+   
+   const handleRemoveItem = (itemToRemove, quantity) => {
+-- 
+2.39.5
+
