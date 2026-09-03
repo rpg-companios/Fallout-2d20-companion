@@ -1,0 +1,203 @@
+From b1ef0a874233625b85946d60126df2e75e8cb8a6 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 11:08:08 +0000
+Subject: [PATCH] patch 155: caps, health and radiation go through engine
+ counters
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ components/CharacterContext.js                | 46 +++++++++++++++++--
+ .../InventoryScreen/InventoryScreen.js        | 10 ++--
+ .../CharacterScreen/CharacterScreen.js        |  7 ++-
+ .../WeaponsAndArmorScreen.js                  | 12 ++---
+ 4 files changed, 56 insertions(+), 19 deletions(-)
+
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 85b0d69..e683f7a 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -66,6 +66,7 @@ import {
+   isPowerArmorFrame,
+   FUSION_CORE_ID,
+ } from '../domain/powerArmor';
++import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
+ import { canEquipArmor } from '../domain/equipEquip';
+ import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
+ import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
+@@ -308,9 +309,43 @@ export const CharacterProvider = ({ children }) => {
+   const [caps, setCaps] = useState(0);
+   const [currentHealth, setCurrentHealth] = useState(0);
+   const [radiation, setRadiationRaw] = useState(0);
++
++  // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
++  // и в сейве лежит только текущее значение числом; потолок и нижняя граница
++  // — вычисляемые, они собираются здесь в момент операции.
++  // См. docs/architecture/counters-storage.md.
++  //
++  // Крышки: потолка нет. Правило «не ниже нуля» теперь одно на все места
++  // вызова — раньше каждый экран писал свой Math.max, и при покупке
++  // (InventoryScreen) зажим забыли, из-за чего крышки уходили в минус.
++  const capsCounter = () => createCounter({ id: 'caps', current: caps, max: null });
++  const earnCaps = (amount) => setCaps(restore(capsCounter(), amount).current);
++  const spendCaps = (amount) => setCaps(consume(capsCounter(), amount).current);
++
++  // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
++  // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
++  // не нанося урона) — это законное состояние, лечение его не снимает и,
++  // что важно, не уменьшает здоровье.
++  // maxOverride — потолок, уже уменьшенный вызывающим (экран вычитает
++  // радиацию). Без него берётся базовая формула сеттинга.
++  const healthCounter = (maxOverride) => createCounter({
++    id: 'health',
++    current: currentHealth,
++    max: maxOverride ?? calculateMaxHealth(attributes, level),
++  });
++  const healCharacter = (amount, maxOverride) =>
++    setCurrentHealth(restore(healthCounter(maxOverride), amount).current);
++  const damageCharacter = (amount) =>
++    setCurrentHealth(consume(healthCounter(), amount).current);
++
++  // Радиация: ресурс с обратным знаком — «хорошо» быть у нуля. Потолка нет,
++  // ограничение только снизу.
++  const radiationCounter = () => createCounter({ id: 'radiation', current: radiation, max: null });
++  const addRadiation = (amount) => setRadiationRaw(restore(radiationCounter(), amount).current);
++  const healRadiation = (amount) => setRadiationRaw(consume(radiationCounter(), amount).current);
+   const setRadiation = (updater) => setRadiationRaw((prev) => {
+     const next = typeof updater === 'function' ? updater(prev) : updater;
+-    return Math.max(0, next);
++    return setCounter({ id: 'radiation', current: prev, max: null, min: 0 }, next).current;
+   });
+   const [modifiedItems, setModifiedItems] = useState(new Map());
+   const [availablePerkAttributePoints, setAvailablePerkAttributePoints] = useState(0);
+@@ -1501,9 +1536,12 @@ export const CharacterProvider = ({ children }) => {
+     adjustPowerArmorDurability,
+     repairPowerArmorPieceAt,
+     repairPowerArmorStack,
+-    caps, setCaps,
+-    currentHealth, setCurrentHealth,
+-    radiation, setRadiation,
++    // Ресурсы наружу — числом, как и раньше. Менять их можно только
++    // именованными операциями: правило границ живёт в domain/counters.js,
++    // а не переписывается заново на каждом экране.
++    caps, earnCaps, spendCaps,
++    currentHealth, healCharacter, damageCharacter, setCurrentHealth,
++    radiation, setRadiation, addRadiation, healRadiation,
+     luckPoints, setLuckPoints,
+     maxLuckPoints, setMaxLuckPoints,
+     attributesSaved, setAttributesSaved,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index fc46608..8ce84b7 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -78,7 +78,7 @@ const InventoryScreen = () => {
+     equippedWeapons, setEquippedWeapons, 
+     equippedArmor, setEquippedArmor,
+     equippedRobotSlots, setEquippedRobotSlots,
+-    caps, setCaps,
++    caps, earnCaps, spendCaps,
+     applyConsumableFull,
+     previewConsumableRadiation,
+     getModifiedItem,
+@@ -370,11 +370,11 @@ const InventoryScreen = () => {
+   const handleSaveCaps = (amount) => {
+     if (capsOperationType === 'add') {
+       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
+-      setCaps((prev) => prev + amount + sumFoundItemBonus(bonusEvents));
++      earnCaps(amount + sumFoundItemBonus(bonusEvents));
+       showFoundItemBonusAlerts(bonusEvents);
+       return;
+     }
+-    setCaps((prev) => Math.max(0, prev - amount));
++    spendCaps(amount);
+   };
+ 
+   const handleApplyConsumable = (item) => {
+@@ -479,7 +479,7 @@ const InventoryScreen = () => {
+   };
+ 
+   const handleConfirmSale = (quantity, finalPrice) => {
+-    setCaps(prev => prev + finalPrice);
++    earnCaps(finalPrice);
+ 
+     const stackKey = selectedItemForSale?.stackKey || getStackKey(selectedItemForSale);
+     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
+@@ -600,7 +600,7 @@ const InventoryScreen = () => {
+ 
+   const handleConfirmBuy = (quantity, unitPrice) => {
+     const finalCost = quantity * unitPrice;
+-    setCaps((prev) => prev - finalCost);
++    spendCaps(finalCost);
+     handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
+     setIsBuyItemModalVisible(false);
+     setSelectedItemForBuy(null);
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 29c00e3..4ec84d7 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -283,7 +283,7 @@ export default function CharacterScreen() {
+     effects,
+     setEffects,
+     caps,
+-    setCaps,
++    earnCaps,
+     setCurrentHealth,
+     luckPoints,
+     setLuckPoints,
+@@ -574,7 +574,7 @@ export default function CharacterScreen() {
+     });
+     
+     // 3. Update caps
+-    setCaps((prev) => prev + (kit.caps || 0));
++    earnCaps(kit.caps || 0);
+ 
+     // 4. Robot: apply slot/weapon/module state from initRobotSlots
+     if (kit.robotSlots) {
+@@ -1098,7 +1098,7 @@ export default function CharacterScreen() {
+           const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
+           rewardItems.forEach(item => addNewItem(item));
+           // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
+-          if (rewardCaps) setCaps(prev => prev + rewardCaps);
++          if (rewardCaps) earnCaps(rewardCaps);
+           markSkillsAsRewarded(unrewardedSkills);
+         }
+       }
+@@ -1429,7 +1429,6 @@ export default function CharacterScreen() {
+           onClose={() => setIsEquipmentKitModalVisible(false)}
+           equipmentKits={equipmentKitsForModal}
+           onSelectKit={handleSelectKit}
+-          setCaps={setCaps}
+           character={{ origin, trait }}
+         />
+ 
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index e5b13a6..4cf08fa 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -62,18 +62,18 @@ import { isAmmoWeapon } from '../../../../domain/weaponDurability';
+ 
+ 
+ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
+-  const { currentHealth, setCurrentHealth } = useCharacter();
++  const { currentHealth, healCharacter, damageCharacter } = useCharacter();
++  // Радиация опускает потолок ОЗ, не нанося урона: текущее здоровье может
++  // остаться выше него. Лечение до этого потолка не поднимает и — важно —
++  // не уменьшает уже набранное. Правило живёт в domain/counters.js.
+   const displayMax = max - radiation;
+   const canDecrease = isEnabled && currentHealth > 0;
+   const canIncrease = isEnabled && currentHealth < displayMax;
+ 
+   const handleAdjustHealth = (amount) => {
+     if (!isEnabled) return;
+-    if (amount > 0) {
+-      setCurrentHealth(prev => prev >= displayMax ? prev : Math.min(displayMax, prev + amount));
+-    } else {
+-      setCurrentHealth(prev => Math.max(0, prev + amount));
+-    }
++    if (amount > 0) healCharacter(amount, displayMax);
++    else damageCharacter(-amount);
+   };
+ 
+   const healthText = isEnabled ? `${currentHealth}/${displayMax}` : '—/—';
+-- 
+2.39.5
+
