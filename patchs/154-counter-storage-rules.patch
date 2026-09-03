@@ -1,0 +1,262 @@
+From face0dc3beed30cd33f0e84c6c6997e21afb0446 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 10:53:01 +0000
+Subject: [PATCH] =?UTF-8?q?patch=20154:=20counter=20storage=20rules=20?=
+ =?UTF-8?q?=E2=80=94=20over-max=20allowed,=20restore=20never=20lowers?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/counters/counters.test.js   |  51 +++++++++++++
+ docs/architecture/counters-storage.md | 105 ++++++++++++++++++++++++++
+ domain/counters.js                    |  45 +++++++++--
+ 3 files changed, 196 insertions(+), 5 deletions(-)
+ create mode 100644 docs/architecture/counters-storage.md
+
+diff --git a/__tests__/counters/counters.test.js b/__tests__/counters/counters.test.js
+index 04bfa96..240e8e7 100644
+--- a/__tests__/counters/counters.test.js
++++ b/__tests__/counters/counters.test.js
+@@ -10,6 +10,8 @@ import {
+   isEmpty,
+   resolveMax,
+   resolveMin,
++  withMax,
++  isOverMax,
+ } from '../../domain/counters';
+ 
+ // Каунтер — движковая форма любого числового ресурса. Тесты намеренно
+@@ -101,6 +103,55 @@ describe('каунтер: мана (тот же движок, другой се
+   });
+ });
+ 
++describe('каунтер: current выше max — законное состояние (правило 2)', () => {
++  it('падение потолка не трогает текущее значение', () => {
++    // Радиация снижает максимум ОЗ, но не наносит урона.
++    const hp = createCounter({ id: 'health', current: 24, max: 24 });
++    const irradiated = withMax(hp, 20);
++    expect(irradiated.current).toBe(24);
++    expect(isOverMax(irradiated)).toBe(true);
++  });
++
++  it('restore не поднимает выше потолка даже при превышении', () => {
++    // Лечение сверх максимума невозможно, хотя текущее уже выше него.
++    const hp = withMax(createCounter({ id: 'health', current: 24, max: 24 }), 20);
++    expect(restore(hp, 10).current).toBe(24);
++  });
++
++  it('consume работает от фактического значения', () => {
++    const hp = withMax(createCounter({ id: 'health', current: 24, max: 24 }), 20);
++    expect(consume(hp, 4).current).toBe(20);
++  });
++
++  it('set с allowOverMax выдаёт сверх потолка (перк «Ядерный физик», 23/20)', () => {
++    const core = createCounter({ id: 'fusion_core', current: 20, max: 20 });
++    expect(set(core, 23).current).toBe(20);
++    expect(set(core, 23, undefined, { allowOverMax: true }).current).toBe(23);
++  });
++
++  it('нижняя граница действует и при allowOverMax', () => {
++    const core = createCounter({ id: 'fusion_core', current: 5, max: 20 });
++    expect(set(core, -10, undefined, { allowOverMax: true }).current).toBe(0);
++  });
++});
++
++describe('каунтер: ресурс внутри предмета (правило 4)', () => {
++  it('потолок берётся из каталога, current — из предмета', () => {
++    // Заряд блока живёт в предмете (charges), maxCharges — в данных каталога.
++    const catalog = { ammo_fusion_core: { maxCharges: 20 } };
++    const item = { id: 'ammo_fusion_core', charges: 12 };
++    const core = createCounter({
++      id: 'fusion_core',
++      current: item.charges,
++      max: catalog[item.id].maxCharges,
++    });
++    expect(core.current).toBe(12);
++    expect(consume(core, 5).current).toBe(7);
++    // Обратно в предмет уходит только число.
++    expect({ ...item, charges: consume(core, 5).current }.charges).toBe(7);
++  });
++});
++
+ describe('каунтер: устойчивость формы', () => {
+   const caps = createCounter({ id: 'caps', current: 350 });
+ 
+diff --git a/docs/architecture/counters-storage.md b/docs/architecture/counters-storage.md
+new file mode 100644
+index 0000000..d3ae186
+--- /dev/null
++++ b/docs/architecture/counters-storage.md
+@@ -0,0 +1,105 @@
++# Каунтеры: правила хранения (решения владельца)
++
++Дата: 2026-09-03. Дополняет `domain/counters.js` (движковая форма ресурса,
++патч 152). Здесь зафиксировано, **что и как попадает в сейв** — до того, как
++ресурсы персонажа переводятся на каунтеры.
++
++Каунтер — движковая форма любого числового ресурса: `{ id, current, max, min }`
++и три действия `consume` / `restore` / `set`. Здоровье, радиация, крышки,
++заряд ядерного блока, мана следующего мира — одна и та же вещь.
++
++---
++
++## Правило 1. В сейве только `current`
++
++**`max` и `min` не сохраняются никогда.** Потолок — производная величина:
++формула сеттинга от атрибутов, уровня, трейта, надетой брони. Хранить его
++рядом со значением значит завести второй источник правды, который разъедется
++при первой же смене атрибутов.
++
++Формула вызывается при загрузке и в момент операции. Движок знает её как
++чёрный ящик (`max` может быть числом, функцией или `null` — «потолка нет»).
++
++### Производные, которые сейчас лежат в сейве зря
++
++`maxLuckPoints`, `carryWeight`, `meleeBonus`, `initiative`, `defense`
++пишутся в снимок и читаются при загрузке (`CharacterContext`, строки ~894 и
++914–917), но тут же перезатираются пересчётом из стора (`derivedStats`,
++см. `applyDerived` и `setCharacterContext`). То есть это **мёртвый груз**:
++сейв их хранит, а следующее сохранение уже не учитывает.
++
++Решение владельца: **сохранять их не нужно.** Отдельная миграция ради чистки
++не требуется — достаточно перестать писать их в снимок; старые сейвы просто
++содержат лишние поля, которые никто не читает.
++
++## Правило 2. `current` выше `max` — законное состояние
++
++Зажимать всегда **нельзя**. `current` — быстро меняющееся значение, `max` —
++вычисляемое, и второе может опуститься ниже первого:
++
++- радиация снижает максимум ОЗ, но не трогает текущее здоровье — текущее
++  оказывается выше нового максимума;
++- перк «Ядерный физик» разово даёт заряды сверх потолка блока — 23/20
++  (`domain/perks/nuclearPhysicist.js`, `rollNewFusionCoreCharges`).
++
++Поэтому автоматического зажима при загрузке **нет**. Превышение —
++не ошибка, а результат работы модификаторов; снимается оно изменением тех же
++модификаторов, а не молчаливым усечением.
++
++Каждый случай рассматривается отдельно: где-то зажим нужен (нельзя вылечиться
++выше максимума обычным лечением — это `restore`), где-то нет (радиация
++опустила потолок — текущее ОЗ остаётся). Разделение проходит по действию:
++`restore` не поднимает выше `max`, а падение самого `max` текущее значение
++не трогает.
++
++## Правило 3. Время: «за кадром» ≠ игровое время
++
++Нужны **разные таймеры**, единого правила нет. Иначе не заходил в приложение
++10 дней — и персонаж умер от голода или разрядились все блоки, хотя в игровом
++мире прошло 10 секунд.
++
++Сейчас в коде уже сосуществуют две модели:
++
++| Ресурс | Модель | Где |
++|---|---|---|
++| Заряд ядерного блока | **от текущего значения**: копится «недотраченное» время, при загрузке отсчёт идёт заново | `coreAccumulatorMs`, `tickCoreAccumulator` |
++| Временные эффекты | **абсолютное время**: `expiresAt = Date.now() + durationMs` | `domain/effects.js` |
++| Дозы препаратов | абсолютное время, окно от `takenAt` | `CHEM_DOSE_WINDOW_MS` |
++
++Решение владельца по блоку: сохраняем текущее значение, при загрузке отсчёт
++начинается заново — это **сознательный бонус игроку** (вышел из приложения за
++10 секунд до истечения заряда — заряд остался).
++
++Правило на будущее: расход, привязанный к **реальному времени сессии**
++(износ, топливо, голод), считается от текущего значения и не тикает «за
++кадром». Эффекты, привязанные к **игровым сценам**, живут по абсолютному
++времени. Какая модель у нового ресурса — решается явно при его добавлении.
++
++## Правило 4. Не всякий ресурс принадлежит персонажу
++
++| Что | Где живёт `current` | Где живёт `max` |
++|---|---|---|
++| Здоровье, радиация, крышки, очки удачи | состояние персонажа | формула сеттинга (у крышек нет) |
++| Заряд ядерного блока | предмет: `charges` | данные каталога: `maxCharges` |
++| Прочность части силовой брони | предмет: `hpCurrent` | данные каталога |
++| Патроны и любые стопки инвентаря | предмет: `quantity` | **каунтером не являются** |
++
++Заряд блока и прочность брони — каунтеры, но их `current` хранится в самом
++предмете (`domain/saveSlimming.js` уже держит `charges` и `hpCurrent` в списке
++экземплярных полей), а потолок берётся из каталога по `id`.
++
++**Патроны каунтером не являются.** Это просто количество предметов в стопке,
++без `min`/`max`, как любая другая стопка в инвентаре. Не нужно натягивать на
++них форму каунтера.
++
++---
++
++## Итог: что попадает в сейв
++
++Сохраняем — только быстро меняющиеся текущие значения:
++`caps`, `currentHealth`, `radiation`, `luckPoints`, `charges` и `hpCurrent`
++предметов, `coreAccumulatorMs`.
++
++Не сохраняем — всё вычисляемое:
++любые `max`, `carryWeight`, `meleeBonus`, `initiative`, `defense`,
++`maxLuckPoints`.
+diff --git a/domain/counters.js b/domain/counters.js
+index 73aaa21..303e3ca 100644
+--- a/domain/counters.js
++++ b/domain/counters.js
+@@ -112,17 +112,52 @@ export const consume = (counter, amount, context) => {
+ export const restore = (counter, amount, context) => {
+   const delta = toFiniteOrNull(amount);
+   if (delta === null || delta <= 0) return counter;
+-  return { ...counter, current: clampToBounds(counter, counter.current + delta, context) };
++  const bounded = clampToBounds(counter, counter.current + delta, context);
++  // Если текущее уже выше потолка (радиация опустила максимум ОЗ), зажим по
++  // max дал бы значение МЕНЬШЕ текущего — лечение отняло бы здоровье.
++  // Восполнение никогда не уменьшает ресурс: правило 2 в
++  // docs/architecture/counters-storage.md.
++  return { ...counter, current: Math.max(counter.current, bounded) };
+ };
+ 
+ /**
+  * Поставить значение напрямую (лечение до полного, обнуление радиации),
+  * зажатое между min и max.
++ *
++ * `allowOverMax` снимает верхнюю границу для этой операции. Превышение
++ * потолка — законное состояние, а не ошибка: перк «Ядерный физик» разово
++ * выдаёт заряды сверх максимума (23/20). Нижняя граница действует всегда.
++ * См. docs/architecture/counters-storage.md, правило 2.
+  */
+-export const set = (counter, value, context) => ({
+-  ...counter,
+-  current: clampToBounds(counter, value, context),
+-});
++export const set = (counter, value, context, { allowOverMax = false } = {}) => {
++  if (!allowOverMax) {
++    return { ...counter, current: clampToBounds(counter, value, context) };
++  }
++  const num = toFiniteOrNull(value);
++  const min = resolveMin(counter);
++  return { ...counter, current: num === null ? min : Math.max(min, num) };
++};
++
++/**
++ * Опустить потолок, НЕ трогая текущее значение.
++ *
++ * Радиация снижает максимум ОЗ, но не наносит урона: текущее здоровье
++ * остаётся прежним и оказывается выше нового потолка. Это ожидаемое
++ * состояние — молча усекать его нельзя, иначе персонаж теряет здоровье
++ * от одного лишь пересчёта производных.
++ *
++ * Функция существует, чтобы такое намерение было видно в коде явно.
++ */
++export const withMax = (counter, max) => ({ ...counter, max });
++
++/**
++ * Текущее значение вышло за потолок (после падения max).
++ * Полезно UI: показать «24/20» другим цветом.
++ */
++export const isOverMax = (counter, context) => {
++  const max = resolveMax(counter, context);
++  return max !== null && counter.current > max;
++};
+ 
+ // ---------------------------------------------------------------------------
+ // Вспомогательное для UI и правил. Сюда НЕ добавляем игровые смыслы —
+-- 
+2.39.5
+
