@@ -114,13 +114,34 @@ export const ALERTS = {
     messageKey: 'screen.alerts.replaceEquipmentConfirm',
   },
 
+  // Обе парные ячейки заняты — какую заменить. Подписи сторон приходят
+  // подстановками {leftLabel}/{rightLabel}, потому что для рук это наручи,
+  // а для ног — поножи. Свободная ячейка занимается молча, без диалога.
+  //
+  // На вебе это раньше был window.prompt с вводом «1» или «2» руками:
+  // третью кнопку в браузерный примитив добавить нельзя, а ввод чего-либо
+  // кроме 1 и 2 молча ничего не делал.
+  bothSlotsBusy: {
+    scope: 'inventory',
+    kind: 'choice',
+    titleKey: 'screen.alerts.replaceEquipmentTitle',
+    messageKey: 'screen.alerts.bothSlotsBusy',
+    buttons: [
+      { key: 'left', labelParam: 'leftLabel', value: 'left' },
+      { key: 'right', labelParam: 'rightLabel', value: 'right' },
+      { key: 'cancel', labelKey: 'screen.actions.cancel', value: null, style: 'cancel' },
+    ],
+  },
+
   // --- Лист персонажа -------------------------------------------------------
 
+  // Раньше текст был захардкожен прямо в CharacterScreen.js:1225 (мимо i18n),
+  // а заголовок брался как tCharacterScreen('title') — ключа с таким именем
+  // в словаре нет, поэтому в шапке диалога буквально стояло слово «title».
   characterSaveFailed: {
     scope: 'character',
     kind: 'info',
-    titleKey: 'title',
-    // Раньше строка была захардкожена прямо в CharacterScreen.js:1225.
+    titleKey: 'alerts.errorTitle',
     messageKey: 'errors.saveFailed',
   },
   changeOrigin: {

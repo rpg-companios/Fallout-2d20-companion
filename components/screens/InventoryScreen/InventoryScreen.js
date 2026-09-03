@@ -1073,22 +1073,12 @@ const InventoryScreen = () => {
     const leftLabel = leftSlot === 'leftArm' ? tInventory('screen.labels.leftArm') : tInventory('screen.labels.leftLeg');
     const rightLabel = rightSlot === 'rightArm' ? tInventory('screen.labels.rightArm') : tInventory('screen.labels.rightLeg');
 
-    if (typeof window !== 'undefined' && window.prompt) {
-      const answer = window.prompt(formatInventoryText(tInventory('screen.alerts.bothSlotsBusyPrompt'), { leftLabel, rightLabel }), '1');
-      if (answer === '1') executeEquip([leftSlot]);
-      if (answer === '2') executeEquip([rightSlot]);
-      return;
-    }
-
-    showAlert(
-      tInventory('screen.alerts.replaceEquipmentTitle'),
-      tInventory('screen.alerts.bothSlotsBusy'),
-      [
-        { text: leftLabel, onPress: () => executeEquip([leftSlot]) },
-        { text: rightLabel, onPress: () => executeEquip([rightSlot]) },
-        { text: tInventory('screen.actions.cancel'), style: "cancel" },
-      ]
-    );
+    // Выбор стороны одинаков на вебе и на нативе. Раньше на вебе стоял
+    // window.prompt с вводом «1» или «2» руками.
+    showCatalogAlert('bothSlotsBusy', { leftLabel, rightLabel }).then((side) => {
+      if (side === 'left') executeEquip([leftSlot]);
+      else if (side === 'right') executeEquip([rightSlot]);
+    });
   };
 
   const handleUnequipArmor = (itemToUnequip) => {

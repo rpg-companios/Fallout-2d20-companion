@@ -39,6 +39,7 @@ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/scen
 import { isSkillTagged } from '../domain/d20Checks';
 import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+import { showAlert as showCatalogAlert } from './alerts/alertService';
 
 import { resolveBodyPlan } from '../domain/bodyplan';
 import { createEmptyEquippedArmor } from '../domain/equippedArmor';
@@ -196,18 +197,14 @@ const PERK_ALERTS_DICT = {
   'en-EN': enPerksAndTraitsScreen.alerts,
 };
 const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
-// Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
-// что использует обычная броня при выборе слота.
+// Лейблы инвентаря (левая/правая конечность) — те же ключи, что использует
+// обычная броня при выборе слота. Кнопка отмены теперь приходит из каталога
+// алертов, поэтому отдельный словарь действий здесь больше не нужен.
 const INV_LABELS_DICT = {
   'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.labels,
   'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.labels,
 };
-const INV_ACTIONS_DICT = {
-  'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.actions,
-  'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.actions,
-};
 const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
-const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()][key];
 // Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
 // как showAlert в InventoryScreen.
 const paAlert = (title, message = '') => {
@@ -598,20 +595,13 @@ export const CharacterProvider = ({ children }) => {
     const [leftSlot, rightSlot] = target.slots;
     const leftLabel = tPALabel(leftSlot);
     const rightLabel = tPALabel(rightSlot);
-    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-      const promptText = tPA('bothSlotsBusyPrompt')
-        .replace('{leftLabel}', leftLabel)
-        .replace('{rightLabel}', rightLabel);
-      const answer = window.prompt(promptText, '1');
-      if (answer === '1') doEquip(leftSlot);
-      else if (answer === '2') doEquip(rightSlot);
-      return;
-    }
-    Alert.alert(tPA('replaceEquipmentTitle'), tPA('bothSlotsBusy'), [
-      { text: leftLabel, onPress: () => doEquip(leftSlot) },
-      { text: rightLabel, onPress: () => doEquip(rightSlot) },
-      { text: tPAAction('cancel'), style: 'cancel' },
-    ]);
+    // Тот же диалог, что и у обычной брони (InventoryScreen): единая запись
+    // каталога, три кнопки на обеих платформах. Раньше на вебе здесь стоял
+    // window.prompt с вводом номера стороны.
+    showCatalogAlert('bothSlotsBusy', { leftLabel, rightLabel }).then((side) => {
+      if (side === 'left') doEquip(leftSlot);
+      else if (side === 'right') doEquip(rightSlot);
+    });
   }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem, origin, trait]);
 
   // Снять часть слота → в инвентарь своей стопкой.

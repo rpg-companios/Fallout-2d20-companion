@@ -14,6 +14,7 @@ import {
   TextInput,
 } from "react-native";
 import { useCharacter } from "../../../../components/CharacterContext";
+import { showAlert as showCatalogAlert } from "../../../../components/alerts/alertService";
 import useCharacterStore from "../../../../src/store/characterStore";
 import { selectActiveTimedEffects } from "../../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
@@ -1220,10 +1221,7 @@ export default function CharacterScreen() {
                       saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
                     } catch (error) {
                       debugLog('character.save.failed', { message: error?.message });
-                      Alert.alert(
-                        tCharacterScreen('title') || 'Ошибка',
-                        'Не удалось сохранить персонажа. Проверьте консоль для подробностей.'
-                      );
+                      showCatalogAlert('characterSaveFailed');
                     }
                   }}
                   disabled={false}

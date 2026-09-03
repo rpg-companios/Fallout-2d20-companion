@@ -14,6 +14,7 @@ import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
 import { useLocale } from '../../i18n/locale';
 import { tApp } from '../../i18n/appI18n';
 import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
+import { tCharacterScreen } from '../../modules/fallout/screens/CharacterScreen/logic/characterScreenI18n';
 import tHomeScreenDict from '../../i18n/ru-RU/screens/home/screen.json';
 import tHomeScreenDictEn from '../../i18n/en-EN/screens/home/screen.json';
 import { getCurrentLocale } from '../../i18n/locale';
@@ -39,10 +40,8 @@ const translate = (scope, path) => {
     return readPath(HOME_DICTS[getCurrentLocale()], path) ?? path;
   }
   if (scope === 'inventory') return tInventory(path);
+  if (scope === 'character') return tCharacterScreen(path);
   if (scope === 'app') return tApp(path);
-  // 'character' и прочие модульные экраны держат словари внутри модуля
-  // сеттинга; до перевода этих вызовов на каталог сюда попадает готовый
-  // текст через showRawAlert.
   return path;
 };
 
@@ -88,7 +87,12 @@ const AlertHost = () => {
   if (entry.kind === 'choice') {
     buttons = (entry.buttons || []).map((button) => ({
       key: button.key,
-      label: substitute(translate(scope, button.labelKey), params),
+      // labelParam — подпись целиком приходит из params (например, названия
+      // сторон «Левый наруч» / «Правый понож», которые зависят от предмета).
+      // labelKey — обычный путь в словаре.
+      label: button.labelParam
+        ? String(params?.[button.labelParam] ?? button.labelParam)
+        : substitute(translate(scope, button.labelKey), params),
       value: button.value,
       style: button.style,
     }));
