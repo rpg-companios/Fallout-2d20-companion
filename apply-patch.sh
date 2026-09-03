@@ -346,6 +346,7 @@ echo
 # --- применение --------------------------------------------------------------
 
 APPLIED=()
+RECHECK_SKIPPED=0
 
 for name in "${TODO[@]}"; do
   file="$(extract_patch "$name")"
@@ -354,12 +355,12 @@ for name in "${TODO[@]}"; do
   # создать контекст, которого не было на момент первичной классификации.
   case "$(patch_state "$file")" in
     applied)
-      printf 'Пропуск: %s (уже стоит)\n' "$name"
+      RECHECK_SKIPPED=$((RECHECK_SKIPPED + 1))
       continue
       ;;
     conflict)
       if [[ "$name" != "$TARGET" ]]; then
-        printf 'Пропуск: %s (контекст разошёлся)\n' "$name"
+        RECHECK_SKIPPED=$((RECHECK_SKIPPED + 1))
         continue
       fi
       ;;
@@ -415,6 +416,9 @@ for name in "${TODO[@]}"; do
 done
 
 echo
+if [[ $RECHECK_SKIPPED -gt 0 ]]; then
+  echo "Пропущено при перепроверке: $RECHECK_SKIPPED"
+fi
 echo "Готово. Применено патчей: ${#APPLIED[@]}"
 printf '  %s\n' "${APPLIED[@]}"
 echo
