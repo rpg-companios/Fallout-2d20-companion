@@ -1,0 +1,333 @@
+From a4d5b70c41fa320eec8e0aa00e4b7d85b3c31d79 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 09:49:48 +0000
+Subject: [PATCH] patch 152: engine counter form (consume/restore/set with
+ bounds)
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/counters/counters.test.js | 154 ++++++++++++++++++++++++++++
+ domain/counters.js                  | 150 +++++++++++++++++++++++++++
+ 2 files changed, 304 insertions(+)
+ create mode 100644 __tests__/counters/counters.test.js
+ create mode 100644 domain/counters.js
+
+diff --git a/__tests__/counters/counters.test.js b/__tests__/counters/counters.test.js
+new file mode 100644
+index 0000000..04bfa96
+--- /dev/null
++++ b/__tests__/counters/counters.test.js
+@@ -0,0 +1,154 @@
++import { describe, expect, it } from 'vitest';
++import {
++  createCounter,
++  consume,
++  restore,
++  set,
++  canConsume,
++  availableToConsume,
++  isFull,
++  isEmpty,
++  resolveMax,
++  resolveMin,
++} from '../../domain/counters';
++
++// Каунтер — движковая форма любого числового ресурса. Тесты намеренно
++// проверяют её на ресурсах РАЗНЫХ сеттингов (крышки/здоровье/радиация Fallout
++// и мана гипотетического следующего мира): если форма верна, код один и тот же.
++
++describe('каунтер: крышки (без потолка)', () => {
++  const caps = createCounter({ id: 'caps', current: 350, max: null });
++
++  it('хранит текущее значение', () => {
++    expect(caps.current).toBe(350);
++  });
++
++  it('списывает по событию сеттинга (покупка)', () => {
++    expect(consume(caps, 100).current).toBe(250);
++  });
++
++  it('не уходит ниже нуля, сколько ни списывай', () => {
++    expect(consume(caps, 999).current).toBe(0);
++  });
++
++  it('без потолка растёт неограниченно', () => {
++    expect(restore(caps, 1_000_000).current).toBe(1_000_350);
++  });
++
++  it('отвечает, хватает ли на покупку', () => {
++    expect(canConsume(caps, 350)).toBe(true);
++    expect(canConsume(caps, 351)).toBe(false);
++    expect(availableToConsume(caps)).toBe(350);
++  });
++});
++
++describe('каунтер: здоровье (потолок — формула сеттинга)', () => {
++  // Движок не знает формулы: вызывает её как чёрный ящик.
++  const healthMaxFormula = (ctx) => ctx.endurance + ctx.level;
++  const ctx = { endurance: 8, level: 2 };
++  const hp = createCounter({ id: 'health', current: 24, max: healthMaxFormula }, ctx);
++
++  it('зажимает стартовое значение по формуле', () => {
++    expect(hp.current).toBe(10);
++  });
++
++  it('урон списывает', () => {
++    expect(consume(hp, 3, ctx).current).toBe(7);
++  });
++
++  it('лечение не поднимает выше потолка', () => {
++    expect(restore(hp, 50, ctx).current).toBe(10);
++  });
++
++  it('set до полного зажат потолком', () => {
++    expect(set(hp, 999, ctx).current).toBe(10);
++  });
++
++  it('видит, что лечить нечего', () => {
++    expect(isFull(hp, ctx)).toBe(true);
++  });
++
++  it('пересчитывает потолок при смене контекста', () => {
++    expect(resolveMax(hp, { endurance: 10, level: 5 })).toBe(15);
++    expect(restore(hp, 50, { endurance: 10, level: 5 }).current).toBe(15);
++  });
++});
++
++describe('каунтер: радиация (потолок числом)', () => {
++  const rad = createCounter({ id: 'radiation', current: 0, max: 20 });
++
++  it('не превышает потолок', () => {
++    expect(restore(rad, 100).current).toBe(20);
++  });
++
++  it('не уходит в минус', () => {
++    expect(consume(rad, 5).current).toBe(0);
++    expect(isEmpty(rad)).toBe(true);
++  });
++});
++
++describe('каунтер: мана (тот же движок, другой сеттинг)', () => {
++  const manaMaxFormula = (attrs) => attrs.intelligence * 2;
++  const attrs = { intelligence: 5 };
++  const mana = createCounter({ id: 'mana', current: 8, max: manaMaxFormula }, attrs);
++
++  it('заклинание списывает ману', () => {
++    expect(consume(mana, 3, attrs).current).toBe(5);
++  });
++
++  it('отдых восполняет не выше потолка', () => {
++    expect(restore(mana, 100, attrs).current).toBe(10);
++  });
++});
++
++describe('каунтер: устойчивость формы', () => {
++  const caps = createCounter({ id: 'caps', current: 350 });
++
++  it('игнорирует отрицательные и нечисловые суммы', () => {
++    // «списать минус пять» — ошибка вызывающего, а не скрытое восполнение.
++    expect(consume(caps, -50).current).toBe(350);
++    expect(restore(caps, -50).current).toBe(350);
++    expect(consume(caps, NaN).current).toBe(350);
++    expect(restore(caps, undefined).current).toBe(350);
++  });
++
++  it('null-потолок остаётся отсутствием потолка, а не нулём', () => {
++    // Number(null) === 0: без явной проверки ресурс молча обнулялся бы.
++    expect(resolveMax({ max: null })).toBeNull();
++    expect(resolveMax({ max: undefined })).toBeNull();
++    expect(restore(createCounter({ id: 'caps', current: 10 }), 5).current).toBe(15);
++  });
++
++  it('формула, вернувшая не число, трактуется как «нет потолка»', () => {
++    expect(resolveMax({ max: () => undefined })).toBeNull();
++  });
++
++  it('нижняя граница по умолчанию 0, но может быть задана', () => {
++    expect(resolveMin({})).toBe(0);
++    const debt = createCounter({ id: 'debt', current: -5, min: -10 });
++    expect(debt.current).toBe(-5);
++    expect(consume(debt, 100).current).toBe(-10);
++  });
++
++  it('не мутирует исходный каунтер', () => {
++    const before = JSON.stringify(caps);
++    consume(caps, 10);
++    restore(caps, 10);
++    set(caps, 1);
++    expect(JSON.stringify(caps)).toBe(before);
++  });
++
++  it('сериализуем — переживает сохранение в сейв', () => {
++    const counter = createCounter({ id: 'caps', current: 5 });
++    expect(JSON.parse(JSON.stringify(counter))).toEqual({
++      id: 'caps',
++      max: null,
++      min: 0,
++      current: 5,
++    });
++  });
++
++  it('требует id ресурса', () => {
++    expect(() => createCounter({ current: 1 })).toThrow();
++  });
++});
+diff --git a/domain/counters.js b/domain/counters.js
+new file mode 100644
+index 0000000..73aaa21
+--- /dev/null
++++ b/domain/counters.js
+@@ -0,0 +1,150 @@
++// domain/counters.js
++// ДВИЖОК. Форма «каунтера» — числового ресурса персонажа — и три действия
++// над ним. Ни React, ни данных конкретного сеттинга здесь нет.
++//
++// Здоровье, радиация, крышки, патроны, заряд ядерного блока, мана следующего
++// мира — это одна и та же вещь: число с текущим значением, потолком и нижней
++// границей, которое тратится и восполняется по событию. Движок знает эту форму
++// ОДИН раз; сеттинг называет ресурсы и решает, когда их менять.
++//
++// Чего движок НЕ знает:
++//   - почему списывают (покупка, урон, заклинание) — это событие сеттинга;
++//   - как считается потолок — формула приходит от сеттинга и вызывается как
++//     чёрный ящик;
++//   - какие каунтеры существуют — список объявляет сеттинг, движок его не
++//     хранит;
++//   - обмен между каунтерами (100 меди = 1 серебро) — сознательно не делаем
++//     до явного решения владельца.
++
++/**
++ * Приводит значение к конечному числу. Возвращает null, если это не число:
++ * вызывающий сам решает, чем это для него является (обычно «нет границы»).
++ */
++const toFiniteOrNull = (value) => {
++  // null/'' /пробелы Number() молча превращает в 0 — для «нет потолка» это
++  // означало бы потолок 0 и обнуляло ресурс. Отсекаем такие значения явно.
++  if (value === null || value === undefined || value === '') return null;
++  const num = typeof value === 'number' ? value : Number(value);
++  return Number.isFinite(num) ? num : null;
++};
++
++/**
++ * Вычисляет потолок каунтера.
++ *
++ * `max` может быть:
++ *   - числом            → потолок как есть;
++ *   - функцией сеттинга → вызывается как чёрный ящик, движок не знает формулы;
++ *   - null/undefined    → потолка нет (пример: крышки).
++ *
++ * Если формула вернула не число, это трактуется как «потолка нет»: движок не
++ * додумывает за сеттинг и не роняет приложение из-за неготовой формулы.
++ *
++ * @param {object} counter
++ * @param {*} [context] аргумент формулы (атрибуты, уровень и т.п.)
++ * @returns {number|null}
++ */
++export const resolveMax = (counter, context) => {
++  const max = counter?.max;
++  if (typeof max === 'function') return toFiniteOrNull(max(context));
++  return toFiniteOrNull(max);
++};
++
++/**
++ * Нижняя граница. По умолчанию 0 — ресурс не уходит в минус.
++ */
++export const resolveMin = (counter) => {
++  const min = toFiniteOrNull(counter?.min);
++  return min === null ? 0 : min;
++};
++
++/**
++ * Зажимает значение между min и max каунтера.
++ * Если max не задан (или формула его не дала) — ограничение только снизу.
++ */
++export const clampToBounds = (counter, value, context) => {
++  const num = toFiniteOrNull(value);
++  const min = resolveMin(counter);
++  if (num === null) return min;
++  const max = resolveMax(counter, context);
++  const lowerBounded = Math.max(min, num);
++  return max === null ? lowerBounded : Math.min(max, lowerBounded);
++};
++
++/**
++ * Создаёт каунтер. Сеттинг задаёт имя ресурса и границы; текущее значение
++ * сразу приводится к границам, чтобы некорректных состояний не существовало.
++ *
++ * @param {object} spec
++ * @param {string} spec.id      имя ресурса внутри сеттинга: 'health', 'caps'
++ * @param {number} [spec.current]
++ * @param {number|function|null} [spec.max] число, формула сеттинга или null
++ * @param {number} [spec.min]   нижняя граница, по умолчанию 0
++ * @param {*} [context]         аргумент формулы потолка
++ * @returns {{id: string, current: number, max: *, min: number}}
++ */
++export const createCounter = ({ id, current = 0, max = null, min = 0 }, context) => {
++  if (!id || typeof id !== 'string') {
++    throw new Error('[counters] Каунтеру нужен строковый id ресурса');
++  }
++  const shape = { id, max, min: toFiniteOrNull(min) === null ? 0 : Number(min) };
++  return { ...shape, current: clampToBounds(shape, current, context) };
++};
++
++// ---------------------------------------------------------------------------
++// Три действия. Каждое возвращает НОВЫЙ каунтер — исходный не мутируется,
++// поэтому результат безопасно класть в состояние и сериализовать в сейв.
++// ---------------------------------------------------------------------------
++
++/**
++ * Списать `amount`. Не уходит ниже min. Отрицательный amount игнорируется:
++ * «списать минус пять» — это ошибка вызывающего, а не скрытое восполнение.
++ */
++export const consume = (counter, amount, context) => {
++  const delta = toFiniteOrNull(amount);
++  if (delta === null || delta <= 0) return counter;
++  return { ...counter, current: clampToBounds(counter, counter.current - delta, context) };
++};
++
++/**
++ * Вернуть `amount`. Не поднимается выше max (если потолок задан).
++ * Отрицательный amount игнорируется — симметрично consume.
++ */
++export const restore = (counter, amount, context) => {
++  const delta = toFiniteOrNull(amount);
++  if (delta === null || delta <= 0) return counter;
++  return { ...counter, current: clampToBounds(counter, counter.current + delta, context) };
++};
++
++/**
++ * Поставить значение напрямую (лечение до полного, обнуление радиации),
++ * зажатое между min и max.
++ */
++export const set = (counter, value, context) => ({
++  ...counter,
++  current: clampToBounds(counter, value, context),
++});
++
++// ---------------------------------------------------------------------------
++// Вспомогательное для UI и правил. Сюда НЕ добавляем игровые смыслы —
++// только вопросы к форме каунтера.
++// ---------------------------------------------------------------------------
++
++/** Сколько ещё можно списать, не упершись в min. */
++export const availableToConsume = (counter, context) =>
++  counter.current - resolveMin(counter);
++
++/** Хватает ли ресурса на списание `amount` (покупка, стоимость заклинания). */
++export const canConsume = (counter, amount, context) => {
++  const delta = toFiniteOrNull(amount);
++  if (delta === null || delta <= 0) return true;
++  return availableToConsume(counter, context) >= delta;
++};
++
++/** Каунтер на потолке: лечить до полного уже нечего. */
++export const isFull = (counter, context) => {
++  const max = resolveMax(counter, context);
++  return max !== null && counter.current >= max;
++};
++
++/** Каунтер на нижней границе: тратить больше нечего. */
++export const isEmpty = (counter, context) => counter.current <= resolveMin(counter);
+-- 
+2.39.5
+
