@@ -1,0 +1,268 @@
+From decd7a55842e5a94498d574b4782f7d207271cf1 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 07:40:53 +0000
+Subject: [PATCH] patch 147: slot choice on catalog, drop window.prompt, fix
+ hardcoded string
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Three call sites moved onto the alert catalog.
+
+Both-slots-busy now uses one catalog entry shared by regular armour
+(InventoryScreen) and power armour (CharacterContext). The logic is the
+same in both places: a free limb is used silently, and only when both are
+taken does the app ask which to replace. On web this used to be a
+window.prompt asking the player to type 1 or 2 by hand — anything else
+did nothing, silently. Now three real buttons on both platforms, with the
+side labels passed in as parameters (bracers for arms, greaves for legs).
+
+CharacterScreen save error: the message was hardcoded in Russian, so an
+English UI showed Russian text, and the title read tCharacterScreen('title')
+— a key that does not exist, so the dialog header literally said 'title'.
+Added errors.saveFailed to both locales and pointed the entry at the
+existing alerts.errorTitle.
+
+Also drops the now-unused tPAAction helper. All catalog keys verified
+present in ru-RU and en-EN; no window.prompt left in the codebase.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ components/CharacterContext.js                | 32 +++++++------------
+ components/alerts/AlertHost.js                | 12 ++++---
+ components/alerts/catalog.js                  | 25 +++++++++++++--
+ .../InventoryScreen/InventoryScreen.js        | 22 ++++---------
+ i18n/en-EN/screens/character/screen.json      |  3 +-
+ i18n/ru-RU/screens/character/screen.json      |  3 +-
+ .../CharacterScreen/CharacterScreen.js        |  6 ++--
+ 7 files changed, 54 insertions(+), 49 deletions(-)
+
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index e06305a..e43231d 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -39,6 +39,7 @@ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/scen
+ import { isSkillTagged } from '../domain/d20Checks';
+ import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
++import { showAlert as showCatalogAlert } from './alerts/alertService';
+ 
+ import { resolveBodyPlan } from '../domain/bodyplan';
+ import { createEmptyEquippedArmor } from '../domain/equippedArmor';
+@@ -196,18 +197,14 @@ const PERK_ALERTS_DICT = {
+   'en-EN': enPerksAndTraitsScreen.alerts,
+ };
+ const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
+-// Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
+-// что использует обычная броня при выборе слота.
++// Лейблы инвентаря (левая/правая конечность) — те же ключи, что использует
++// обычная броня при выборе слота. Кнопка отмены теперь приходит из каталога
++// алертов, поэтому отдельный словарь действий здесь больше не нужен.
+ const INV_LABELS_DICT = {
+   'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.labels,
+   'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.labels,
+ };
+-const INV_ACTIONS_DICT = {
+-  'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.actions,
+-  'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.actions,
+-};
+ const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
+-const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()][key];
+ // Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
+ // как showAlert в InventoryScreen.
+ const paAlert = (title, message = '') => {
+@@ -598,20 +595,13 @@ export const CharacterProvider = ({ children }) => {
+     const [leftSlot, rightSlot] = target.slots;
+     const leftLabel = tPALabel(leftSlot);
+     const rightLabel = tPALabel(rightSlot);
+-    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
+-      const promptText = tPA('bothSlotsBusyPrompt')
+-        .replace('{leftLabel}', leftLabel)
+-        .replace('{rightLabel}', rightLabel);
+-      const answer = window.prompt(promptText, '1');
+-      if (answer === '1') doEquip(leftSlot);
+-      else if (answer === '2') doEquip(rightSlot);
+-      return;
+-    }
+-    Alert.alert(tPA('replaceEquipmentTitle'), tPA('bothSlotsBusy'), [
+-      { text: leftLabel, onPress: () => doEquip(leftSlot) },
+-      { text: rightLabel, onPress: () => doEquip(rightSlot) },
+-      { text: tPAAction('cancel'), style: 'cancel' },
+-    ]);
++    // Тот же диалог, что и у обычной брони (InventoryScreen): единая запись
++    // каталога, три кнопки на обеих платформах. Раньше на вебе здесь стоял
++    // window.prompt с вводом номера стороны.
++    showCatalogAlert('bothSlotsBusy', { leftLabel, rightLabel }).then((side) => {
++      if (side === 'left') doEquip(leftSlot);
++      else if (side === 'right') doEquip(rightSlot);
++    });
+   }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem, origin, trait]);
+ 
+   // Снять часть слота → в инвентарь своей стопкой.
+diff --git a/components/alerts/AlertHost.js b/components/alerts/AlertHost.js
+index 789b29e..0b7c5a4 100644
+--- a/components/alerts/AlertHost.js
++++ b/components/alerts/AlertHost.js
+@@ -14,6 +14,7 @@ import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
+ import { useLocale } from '../../i18n/locale';
+ import { tApp } from '../../i18n/appI18n';
+ import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
++import { tCharacterScreen } from '../../modules/fallout/screens/CharacterScreen/logic/characterScreenI18n';
+ import tHomeScreenDict from '../../i18n/ru-RU/screens/home/screen.json';
+ import tHomeScreenDictEn from '../../i18n/en-EN/screens/home/screen.json';
+ import { getCurrentLocale } from '../../i18n/locale';
+@@ -39,10 +40,8 @@ const translate = (scope, path) => {
+     return readPath(HOME_DICTS[getCurrentLocale()], path) ?? path;
+   }
+   if (scope === 'inventory') return tInventory(path);
++  if (scope === 'character') return tCharacterScreen(path);
+   if (scope === 'app') return tApp(path);
+-  // 'character' и прочие модульные экраны держат словари внутри модуля
+-  // сеттинга; до перевода этих вызовов на каталог сюда попадает готовый
+-  // текст через showRawAlert.
+   return path;
+ };
+ 
+@@ -88,7 +87,12 @@ const AlertHost = () => {
+   if (entry.kind === 'choice') {
+     buttons = (entry.buttons || []).map((button) => ({
+       key: button.key,
+-      label: substitute(translate(scope, button.labelKey), params),
++      // labelParam — подпись целиком приходит из params (например, названия
++      // сторон «Левый наруч» / «Правый понож», которые зависят от предмета).
++      // labelKey — обычный путь в словаре.
++      label: button.labelParam
++        ? String(params?.[button.labelParam] ?? button.labelParam)
++        : substitute(translate(scope, button.labelKey), params),
+       value: button.value,
+       style: button.style,
+     }));
+diff --git a/components/alerts/catalog.js b/components/alerts/catalog.js
+index d53aafe..8c9a4a0 100644
+--- a/components/alerts/catalog.js
++++ b/components/alerts/catalog.js
+@@ -114,13 +114,34 @@ export const ALERTS = {
+     messageKey: 'screen.alerts.replaceEquipmentConfirm',
+   },
+ 
++  // Обе парные ячейки заняты — какую заменить. Подписи сторон приходят
++  // подстановками {leftLabel}/{rightLabel}, потому что для рук это наручи,
++  // а для ног — поножи. Свободная ячейка занимается молча, без диалога.
++  //
++  // На вебе это раньше был window.prompt с вводом «1» или «2» руками:
++  // третью кнопку в браузерный примитив добавить нельзя, а ввод чего-либо
++  // кроме 1 и 2 молча ничего не делал.
++  bothSlotsBusy: {
++    scope: 'inventory',
++    kind: 'choice',
++    titleKey: 'screen.alerts.replaceEquipmentTitle',
++    messageKey: 'screen.alerts.bothSlotsBusy',
++    buttons: [
++      { key: 'left', labelParam: 'leftLabel', value: 'left' },
++      { key: 'right', labelParam: 'rightLabel', value: 'right' },
++      { key: 'cancel', labelKey: 'screen.actions.cancel', value: null, style: 'cancel' },
++    ],
++  },
++
+   // --- Лист персонажа -------------------------------------------------------
+ 
++  // Раньше текст был захардкожен прямо в CharacterScreen.js:1225 (мимо i18n),
++  // а заголовок брался как tCharacterScreen('title') — ключа с таким именем
++  // в словаре нет, поэтому в шапке диалога буквально стояло слово «title».
+   characterSaveFailed: {
+     scope: 'character',
+     kind: 'info',
+-    titleKey: 'title',
+-    // Раньше строка была захардкожена прямо в CharacterScreen.js:1225.
++    titleKey: 'alerts.errorTitle',
+     messageKey: 'errors.saveFailed',
+   },
+   changeOrigin: {
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index a8cb973..f0cf4d1 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1073,22 +1073,12 @@ const InventoryScreen = () => {
+     const leftLabel = leftSlot === 'leftArm' ? tInventory('screen.labels.leftArm') : tInventory('screen.labels.leftLeg');
+     const rightLabel = rightSlot === 'rightArm' ? tInventory('screen.labels.rightArm') : tInventory('screen.labels.rightLeg');
+ 
+-    if (typeof window !== 'undefined' && window.prompt) {
+-      const answer = window.prompt(formatInventoryText(tInventory('screen.alerts.bothSlotsBusyPrompt'), { leftLabel, rightLabel }), '1');
+-      if (answer === '1') executeEquip([leftSlot]);
+-      if (answer === '2') executeEquip([rightSlot]);
+-      return;
+-    }
+-
+-    showAlert(
+-      tInventory('screen.alerts.replaceEquipmentTitle'),
+-      tInventory('screen.alerts.bothSlotsBusy'),
+-      [
+-        { text: leftLabel, onPress: () => executeEquip([leftSlot]) },
+-        { text: rightLabel, onPress: () => executeEquip([rightSlot]) },
+-        { text: tInventory('screen.actions.cancel'), style: "cancel" },
+-      ]
+-    );
++    // Выбор стороны одинаков на вебе и на нативе. Раньше на вебе стоял
++    // window.prompt с вводом «1» или «2» руками.
++    showCatalogAlert('bothSlotsBusy', { leftLabel, rightLabel }).then((side) => {
++      if (side === 'left') executeEquip([leftSlot]);
++      else if (side === 'right') executeEquip([rightSlot]);
++    });
+   };
+ 
+   const handleUnequipArmor = (itemToUnequip) => {
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index df0f7c7..ccc94c2 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -89,7 +89,8 @@
+     "exactBaseSkillsRequired": "You must select exactly {required} base skills. Selected: {selected}.",
+     "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
+     "maxSkillRank": "Error: maximum skill rank is {maxRank}",
+-    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it."
++    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it.",
++    "saveFailed": "Could not save the character. Please try again."
+   },
+   "modals": {
+     "origin": {
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index 6f7a5c1..7eb5026 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -89,7 +89,8 @@
+     "exactBaseSkillsRequired": "Необходимо выбрать ровно {required} основных навыка. Выбрано: {selected}.",
+     "exactExtraSkillsRequired": "Необходимо выбрать {required} дополнительных навыка от черты. Выбрано: {selected}.",
+     "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}",
+-    "cannotTagBannedSkill": "Этот навык нельзя отметить (ограничение черты). Очки вкладывать можно."
++    "cannotTagBannedSkill": "Этот навык нельзя отметить (ограничение черты). Очки вкладывать можно.",
++    "saveFailed": "Не удалось сохранить персонажа. Попробуйте ещё раз."
+   },
+   "modals": {
+     "origin": {
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 0b42661..5bb2343 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -14,6 +14,7 @@ import {
+   TextInput,
+ } from "react-native";
+ import { useCharacter } from "../../../../components/CharacterContext";
++import { showAlert as showCatalogAlert } from "../../../../components/alerts/alertService";
+ import useCharacterStore from "../../../../src/store/characterStore";
+ import { selectActiveTimedEffects } from "../../../../src/store/selectors";
+ import { useShallow } from 'zustand/react/shallow';
+@@ -1220,10 +1221,7 @@ export default function CharacterScreen() {
+                       saveCharacter(characterName.trim() || tCharacterScreen('defaultCharacterName'));
+                     } catch (error) {
+                       debugLog('character.save.failed', { message: error?.message });
+-                      Alert.alert(
+-                        tCharacterScreen('title') || 'Ошибка',
+-                        'Не удалось сохранить персонажа. Проверьте консоль для подробностей.'
+-                      );
++                      showCatalogAlert('characterSaveFailed');
+                     }
+                   }}
+                   disabled={false}
+-- 
+2.39.5
+
