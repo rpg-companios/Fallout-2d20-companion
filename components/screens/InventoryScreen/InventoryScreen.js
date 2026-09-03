@@ -79,6 +79,7 @@ const InventoryScreen = () => {
     equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
     caps, earnCaps, spendCaps,
+    equipment,
     applyConsumableFull,
     previewConsumableRadiation,
     getModifiedItem,
@@ -1667,6 +1668,7 @@ const InventoryScreen = () => {
           onClose={() => setAddItemModalVisible(false)}
           onSelectItem={handleSelectCatalogItem}
           selectionMode={itemSelectionMode}
+          maxRarity={itemSelectionMode === 'buy' ? (equipment?.purchaseMaxRarity ?? null) : null}
           rootTitleKey={itemSelectionMode === 'buy' ? 'modals.addItemModal.buyTitle' : 'modals.addItemModal.title'}
         />
         <BuyItemModal

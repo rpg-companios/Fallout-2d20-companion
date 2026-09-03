@@ -3,6 +3,7 @@ import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../
 import { resolveRandomLootByRoll } from '../modules/fallout/screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './diceRollsLogic';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+import { resolveLevelValue } from './levelBands';
 import { getUniqQualityName } from './registry';
 import { enrichWeaponItem } from './enrichItem';
 import { composeNameWithUniqQualities } from './uniqQuality';
@@ -325,7 +326,22 @@ export async function resolveNonWeaponItem(item) {
   return { ...item, name: item.name || item.itemId || unknownName };
 }
 
-async function resolveEntry(entry) {
+async function resolveEntry(entry, context = {}) {
+  // 'purchase' — крышки на покупку снаряжения. Сумма зависит от уровня
+  // (полосы из данных), поэтому считается здесь, а не лежит в JSON числом.
+  // Наружу уходит обычная валюта: сумму подхватит тот же сбор totalCaps,
+  // что и у остальных комплектов. maxRarity несём дальше — по нему экран
+  // покупки ограничит каталог.
+  if (entry.type === 'purchase') {
+    const level = Number(context.level) || 1;
+    return {
+      ...entry,
+      itemType: entry.itemType || 'currency',
+      quantity: resolveLevelValue(entry.caps, level),
+      purchaseMaxRarity: entry.maxRarity ?? null,
+    };
+  }
+
   if (entry.type === 'choice') {
     const options = await Promise.all((entry.items || []).map(async (option) => {
       if (option.group) {
@@ -342,11 +358,11 @@ async function resolveEntry(entry) {
   return entry.weaponId ? resolveWeaponItem(entry) : resolveNonWeaponItem(entry);
 }
 
-export async function resolveKitItems(kit) {
+export async function resolveKitItems(kit, context = {}) {
   debugLog('kits.resolve.start', { kitId: kit?.id, count: kit?.items?.length });
   const entries = await Promise.all((kit.items || []).map(async (entry, index) => {
     try {
-      const resolved = await resolveEntry(entry);
+      const resolved = await resolveEntry(entry, context);
       const label = resolved?.displayName || resolved?.name || resolved?.itemId || resolved?.weaponId || JSON.stringify(resolved).slice(0, 60);
       debugLog('kits.resolve.entry', { index, type: entry?.type, itemType: entry?.itemType, label });
       return resolved;

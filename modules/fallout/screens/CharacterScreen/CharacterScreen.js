@@ -21,6 +21,7 @@ import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins } from "../../../../domain/origins";
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../../domain/traits";
 import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
+import { resolveKitItemEquipState } from "../../../../domain/kitEquip";
 import { rollCombatDiceEffects } from "../../../../domain/diceRollsLogic";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
@@ -555,11 +556,11 @@ export default function CharacterScreen() {
         });
         const CURRENCY_TYPES = new Set(['currency']);
         if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
-        useCharacterStore.getState().addNewItem({
-          ...item,
-          equipped: isRobot ? true : false,
-          locked:   isRobot ? true : false,
-        });
+        // Роботу надевается только то, что занимает слот. Расходники
+        // (стимпаки, еда) слот не занимают: надетыми они висли запертыми —
+        // ни использовать, ни снять.
+        const { equipped, locked } = resolveKitItemEquipState(item, isRobot);
+        useCharacterStore.getState().addNewItem({ ...item, equipped, locked });
       });
       debugLog('kits.select.done', { itemIds: Object.keys(useCharacterStore.getState().items) });
     }
@@ -571,6 +572,9 @@ export default function CharacterScreen() {
       weight: kit.weight,
       price: kit.price,
       items: kit.items,
+      // Комплект «покупка снаряжения»: экран инвентаря по этому порогу
+      // ограничит каталог покупки.
+      purchaseMaxRarity: kit.purchaseMaxRarity ?? null,
     });
     
     // 3. Update caps
@@ -1429,7 +1433,7 @@ export default function CharacterScreen() {
           onClose={() => setIsEquipmentKitModalVisible(false)}
           equipmentKits={equipmentKitsForModal}
           onSelectKit={handleSelectKit}
-          character={{ origin, trait }}
+          character={{ origin, trait, level }}
         />
 
         {/* Модальное окно для выбора черты */}
