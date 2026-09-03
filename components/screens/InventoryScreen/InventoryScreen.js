@@ -78,7 +78,7 @@ const InventoryScreen = () => {
     equippedWeapons, setEquippedWeapons, 
     equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
-    caps, setCaps,
+    caps, earnCaps, spendCaps,
     applyConsumableFull,
     previewConsumableRadiation,
     getModifiedItem,
@@ -370,11 +370,11 @@ const InventoryScreen = () => {
   const handleSaveCaps = (amount) => {
     if (capsOperationType === 'add') {
       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
-      setCaps((prev) => prev + amount + sumFoundItemBonus(bonusEvents));
+      earnCaps(amount + sumFoundItemBonus(bonusEvents));
       showFoundItemBonusAlerts(bonusEvents);
       return;
     }
-    setCaps((prev) => Math.max(0, prev - amount));
+    spendCaps(amount);
   };
 
   const handleApplyConsumable = (item) => {
@@ -479,7 +479,7 @@ const InventoryScreen = () => {
   };
 
   const handleConfirmSale = (quantity, finalPrice) => {
-    setCaps(prev => prev + finalPrice);
+    earnCaps(finalPrice);
 
     const stackKey = selectedItemForSale?.stackKey || getStackKey(selectedItemForSale);
     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
@@ -600,7 +600,7 @@ const InventoryScreen = () => {
 
   const handleConfirmBuy = (quantity, unitPrice) => {
     const finalCost = quantity * unitPrice;
-    setCaps((prev) => prev - finalCost);
+    spendCaps(finalCost);
     handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
     setIsBuyItemModalVisible(false);
     setSelectedItemForBuy(null);

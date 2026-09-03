@@ -66,6 +66,7 @@ import {
   isPowerArmorFrame,
   FUSION_CORE_ID,
 } from '../domain/powerArmor';
+import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
 import { canEquipArmor } from '../domain/equipEquip';
 import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
 import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
@@ -308,9 +309,43 @@ export const CharacterProvider = ({ children }) => {
   const [caps, setCaps] = useState(0);
   const [currentHealth, setCurrentHealth] = useState(0);
   const [radiation, setRadiationRaw] = useState(0);
+
+  // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
+  // и в сейве лежит только текущее значение числом; потолок и нижняя граница
+  // — вычисляемые, они собираются здесь в момент операции.
+  // См. docs/architecture/counters-storage.md.
+  //
+  // Крышки: потолка нет. Правило «не ниже нуля» теперь одно на все места
+  // вызова — раньше каждый экран писал свой Math.max, и при покупке
+  // (InventoryScreen) зажим забыли, из-за чего крышки уходили в минус.
+  const capsCounter = () => createCounter({ id: 'caps', current: caps, max: null });
+  const earnCaps = (amount) => setCaps(restore(capsCounter(), amount).current);
+  const spendCaps = (amount) => setCaps(consume(capsCounter(), amount).current);
+
+  // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
+  // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
+  // не нанося урона) — это законное состояние, лечение его не снимает и,
+  // что важно, не уменьшает здоровье.
+  // maxOverride — потолок, уже уменьшенный вызывающим (экран вычитает
+  // радиацию). Без него берётся базовая формула сеттинга.
+  const healthCounter = (maxOverride) => createCounter({
+    id: 'health',
+    current: currentHealth,
+    max: maxOverride ?? calculateMaxHealth(attributes, level),
+  });
+  const healCharacter = (amount, maxOverride) =>
+    setCurrentHealth(restore(healthCounter(maxOverride), amount).current);
+  const damageCharacter = (amount) =>
+    setCurrentHealth(consume(healthCounter(), amount).current);
+
+  // Радиация: ресурс с обратным знаком — «хорошо» быть у нуля. Потолка нет,
+  // ограничение только снизу.
+  const radiationCounter = () => createCounter({ id: 'radiation', current: radiation, max: null });
+  const addRadiation = (amount) => setRadiationRaw(restore(radiationCounter(), amount).current);
+  const healRadiation = (amount) => setRadiationRaw(consume(radiationCounter(), amount).current);
   const setRadiation = (updater) => setRadiationRaw((prev) => {
     const next = typeof updater === 'function' ? updater(prev) : updater;
-    return Math.max(0, next);
+    return setCounter({ id: 'radiation', current: prev, max: null, min: 0 }, next).current;
   });
   const [modifiedItems, setModifiedItems] = useState(new Map());
   const [availablePerkAttributePoints, setAvailablePerkAttributePoints] = useState(0);
@@ -1501,9 +1536,12 @@ export const CharacterProvider = ({ children }) => {
     adjustPowerArmorDurability,
     repairPowerArmorPieceAt,
     repairPowerArmorStack,
-    caps, setCaps,
-    currentHealth, setCurrentHealth,
-    radiation, setRadiation,
+    // Ресурсы наружу — числом, как и раньше. Менять их можно только
+    // именованными операциями: правило границ живёт в domain/counters.js,
+    // а не переписывается заново на каждом экране.
+    caps, earnCaps, spendCaps,
+    currentHealth, healCharacter, damageCharacter, setCurrentHealth,
+    radiation, setRadiation, addRadiation, healRadiation,
     luckPoints, setLuckPoints,
     maxLuckPoints, setMaxLuckPoints,
     attributesSaved, setAttributesSaved,

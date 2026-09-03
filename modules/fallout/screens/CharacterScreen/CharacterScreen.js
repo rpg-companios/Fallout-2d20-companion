@@ -283,7 +283,7 @@ export default function CharacterScreen() {
     effects,
     setEffects,
     caps,
-    setCaps,
+    earnCaps,
     setCurrentHealth,
     luckPoints,
     setLuckPoints,
@@ -574,7 +574,7 @@ export default function CharacterScreen() {
     });
     
     // 3. Update caps
-    setCaps((prev) => prev + (kit.caps || 0));
+    earnCaps(kit.caps || 0);
 
     // 4. Robot: apply slot/weapon/module state from initRobotSlots
     if (kit.robotSlots) {
@@ -1098,7 +1098,7 @@ export default function CharacterScreen() {
           const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
           rewardItems.forEach(item => addNewItem(item));
           // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
-          if (rewardCaps) setCaps(prev => prev + rewardCaps);
+          if (rewardCaps) earnCaps(rewardCaps);
           markSkillsAsRewarded(unrewardedSkills);
         }
       }
@@ -1429,7 +1429,6 @@ export default function CharacterScreen() {
           onClose={() => setIsEquipmentKitModalVisible(false)}
           equipmentKits={equipmentKitsForModal}
           onSelectKit={handleSelectKit}
-          setCaps={setCaps}
           character={{ origin, trait }}
         />
 
