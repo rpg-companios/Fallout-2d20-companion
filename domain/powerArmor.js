@@ -8,6 +8,7 @@
  */
 
 import { rollByType } from './diceRollsLogic';
+import { createCounter, consume, restore } from './counters';
 import { getCanonicalAttributeKey } from './characterCreation';
 import { isItemAllowed, ACTIONS } from './itemfitRules';
 
@@ -243,7 +244,14 @@ export const tickCoreAccumulator = (runtime, elapsedMs) => {
  */
 export const drainActiveCore = (equipped, chargesConsumed) => {
   if (!chargesConsumed || !equipped.frame?.core) return { equipped, depleted: false };
-  const left = equipped.frame.core.charges - chargesConsumed;
+  // Заряд блока — каунтер, живущий в предмете: current в core.charges,
+  // потолок в данных каталога (maxCharges). Здесь важен только нижний край:
+  // перк «Ядерный физик» может выдать заряды сверх потолка (23/20), и
+  // усекать их нельзя. См. docs/architecture/counters-storage.md, правило 4.
+  const left = consume(
+    createCounter({ id: 'fusion_core', current: equipped.frame.core.charges, max: null }),
+    chargesConsumed,
+  ).current;
   if (left > 0) {
     return { equipped: { ...equipped, frame: { ...equipped.frame, core: { charges: left } } }, depleted: false };
   }
@@ -262,11 +270,18 @@ export const needsRepair = (piece, maxHp) => (piece?.hpCurrent ?? 0) < maxHp;
  */
 export const repairPowerArmorPiece = (piece, maxHp) => ({ ...piece, hpCurrent: maxHp });
 
-/** Кнопки −/+ на экране: шаг в пределах 0..maxHp, без выхода за границы. */
-export const adjustPieceHp = (piece, delta, maxHp) => ({
-  ...piece,
-  hpCurrent: Math.max(0, Math.min(maxHp, (piece?.hpCurrent ?? 0) + delta)),
-});
+/**
+ * Кнопки −/+ на экране: шаг в пределах 0..maxHp, без выхода за границы.
+ *
+ * Прочность части — каунтер в предмете: current в hpCurrent, потолок maxHp
+ * из данных каталога. Границы держит движок (domain/counters.js), а не
+ * ручной Math.max/Math.min здесь.
+ */
+export const adjustPieceHp = (piece, delta, maxHp) => {
+  const counter = createCounter({ id: 'pa_piece_hp', current: piece?.hpCurrent ?? 0, max: maxHp });
+  const next = delta >= 0 ? restore(counter, delta) : consume(counter, -delta);
+  return { ...piece, hpCurrent: next.current };
+};
 
 // ─── Подавление нижних слоёв (§5.5) ─────────────────────────────────────────
 

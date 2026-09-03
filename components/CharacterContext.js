@@ -758,14 +758,13 @@ export const CharacterProvider = ({ children }) => {
     modifiedItems,
     availablePerkAttributePoints,
     luckPoints,
-    maxLuckPoints,
     attributesSaved,
     skillsSaved,
     selectedPerks,
-    carryWeight,
-    meleeBonus,
-    initiative,
-    defense,
+    // Производные (maxLuckPoints, carryWeight, meleeBonus, initiative,
+    // defense) в сейв НЕ идут: они вычисляются при загрузке из атрибутов,
+    // уровня и трейта. Хранить их значит держать второй источник правды.
+    // См. docs/architecture/counters-storage.md, правило 1.
     conditions,
     chemDosesLog,
     sceneRiskStates,
@@ -775,8 +774,8 @@ export const CharacterProvider = ({ children }) => {
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
-    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
-    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog, sceneRiskStates,
+    luckPoints, attributesSaved, skillsSaved, selectedPerks,
+    conditions, chemDosesLog, sceneRiskStates,
   ]);
 
   // Realtime save for already persisted characters.
@@ -814,8 +813,10 @@ export const CharacterProvider = ({ children }) => {
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
-    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
-    carryWeight, meleeBonus, initiative, defense, buildSnapshot,
+    luckPoints, attributesSaved, skillsSaved, selectedPerks,
+    // Производные убраны и отсюда: они не попадают в снимок, а их пересчёт
+    // зря будил автосохранение (запись в БД + синхронизация с облаком).
+    buildSnapshot,
   ]);
 
   // Initial save triggered from CharacterScreen.
@@ -926,7 +927,11 @@ export const CharacterProvider = ({ children }) => {
       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
       setLuckPoints(data.luckPoints ?? 0);
-      setMaxLuckPoints(data.maxLuckPoints ?? 0);
+      // Максимум удачи — производная (атрибуты + трейт), а не хранимое
+      // значение: считаем его при загрузке, а не читаем из сейва. Иначе это
+      // второй источник правды, который разъезжается с формулой.
+      // См. docs/architecture/counters-storage.md, правило 1.
+      setMaxLuckPoints(getLuckPoints(data.attributes || createInitialAttributes(), loadedTrait));
       setAttributesSaved(data.attributesSaved ?? false);
       setSkillsSaved(data.skillsSaved ?? false);
       setSelectedPerks(data.selectedPerks || []);
@@ -946,10 +951,10 @@ export const CharacterProvider = ({ children }) => {
             .join('\n'),
         );
       }
-      setCarryWeight(data.carryWeight ?? 150);
-      setMeleeBonus(data.meleeBonus ?? 0);
-      setInitiative(data.initiative ?? 0);
-      setDefense(data.defense ?? 1);
+      // carryWeight/meleeBonus/initiative/defense из сейва НЕ читаем: сразу
+      // после загрузки их перетирает пересчёт derivedStats из стора (см.
+      // applyDerived ниже), так что это был мёртвый груз. Значения придут
+      // из единого источника — стора.
       setConditions(data.conditions || []);
       setChemDosesLog(
         (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS)
