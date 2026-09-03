@@ -1,0 +1,55 @@
+From 02c0f441caf3421331a0988a13bd8f4f422ea88c Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 09:40:41 +0000
+Subject: [PATCH] patch 151: reference canonical ghoul trait instead of vault
+ dweller copy
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ modules/fallout/data/traits/traits.json | 23 +----------------------
+ 1 file changed, 1 insertion(+), 22 deletions(-)
+
+diff --git a/modules/fallout/data/traits/traits.json b/modules/fallout/data/traits/traits.json
+index 4a01f45..25e29e5 100644
+--- a/modules/fallout/data/traits/traits.json
++++ b/modules/fallout/data/traits/traits.json
+@@ -135,7 +135,7 @@
+       "isMultiTrait": true,
+       "subTraitIds": [
+         "vaultdweller-vault-kid",
+-        "vaultdweller-necrotic-posthuman"
++        "ghoul-necrotic-posthuman"
+       ]
+     }
+   },
+@@ -158,27 +158,6 @@
+       ]
+     }
+   },
+-  {
+-    "id": "vaultdweller-necrotic-posthuman",
+-    "originId": "vaultDweller",
+-    "displayNameKey": "traits.ghoul.necroticPosthuman.name",
+-    "descriptionKey": "traits.ghoul.necroticPosthuman.description",
+-    "modifiers": {
+-      "immunities": [
+-        "radiation"
+-      ],
+-      "effects": [
+-        "radiation_healing",
+-        "slow_aging",
+-        "infertility",
+-        "discrimination"
+-      ],
+-      "forcedSkills": [
+-        "SURVIVAL"
+-      ],
+-      "extraSkills": 1
+-    }
+-  },
+   {
+     "id": "protectron-protect-or-destroy",
+     "originId": "protectron",
+-- 
+2.39.5
+
