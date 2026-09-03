@@ -1,0 +1,216 @@
+From 6710460d860a9e90b473b54fa95bda914c1cf4c9 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 11:15:18 +0000
+Subject: [PATCH] patch 156: drop derived stats from save, item counters via
+ engine
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/counters/item-counters.test.js | 66 ++++++++++++++++++++++++
+ components/CharacterContext.js           | 33 +++++++-----
+ domain/powerArmor.js                     | 27 +++++++---
+ 3 files changed, 106 insertions(+), 20 deletions(-)
+ create mode 100644 __tests__/counters/item-counters.test.js
+
+diff --git a/__tests__/counters/item-counters.test.js b/__tests__/counters/item-counters.test.js
+new file mode 100644
+index 0000000..34eb71a
+--- /dev/null
++++ b/__tests__/counters/item-counters.test.js
+@@ -0,0 +1,66 @@
++import { describe, expect, it } from 'vitest';
++import { drainActiveCore, adjustPieceHp, repairPowerArmorPiece } from '../../domain/powerArmor';
++
++// Правило 4 (docs/architecture/counters-storage.md): заряд ядерного блока и
++// прочность части силовой брони — каунтеры, но их current живёт в самом
++// предмете, а потолок берётся из данных каталога.
++
++describe('заряд ядерного блока: каунтер внутри предмета', () => {
++  const framed = (charges) => ({ frame: { catalogId: 'pa_frame', core: { charges } } });
++
++  it('расход списывает заряды', () => {
++    const { equipped, depleted } = drainActiveCore(framed(12), 5);
++    expect(equipped.frame.core.charges).toBe(7);
++    expect(depleted).toBe(false);
++  });
++
++  it('на нуле блок исчезает, а не уходит в минус', () => {
++    const { equipped, depleted } = drainActiveCore(framed(3), 3);
++    expect(equipped.frame.core).toBeNull();
++    expect(depleted).toBe(true);
++  });
++
++  it('расход больше остатка не даёт отрицательных зарядов', () => {
++    const { equipped, depleted } = drainActiveCore(framed(2), 99);
++    expect(equipped.frame.core).toBeNull();
++    expect(depleted).toBe(true);
++  });
++
++  it('заряды сверх потолка не усекаются («Ядерный физик», 23/20)', () => {
++    // Потолок блока 20, но перк выдал 23 — расход считается от факта.
++    const { equipped } = drainActiveCore(framed(23), 1);
++    expect(equipped.frame.core.charges).toBe(22);
++  });
++
++  it('без блока или без расхода состояние не меняется', () => {
++    expect(drainActiveCore({ frame: { core: null } }, 5).depleted).toBe(false);
++    expect(drainActiveCore(framed(10), 0).equipped.frame.core.charges).toBe(10);
++  });
++});
++
++describe('прочность части силовой брони: каунтер внутри предмета', () => {
++  const piece = (hpCurrent) => ({ catalogId: 'pa_torso', hpCurrent });
++
++  it('минус не уводит ниже нуля', () => {
++    expect(adjustPieceHp(piece(2), -5, 10).hpCurrent).toBe(0);
++  });
++
++  it('плюс не поднимает выше потолка из каталога', () => {
++    expect(adjustPieceHp(piece(9), 5, 10).hpCurrent).toBe(10);
++  });
++
++  it('шаг в пределах границ работает как обычно', () => {
++    expect(adjustPieceHp(piece(5), -1, 10).hpCurrent).toBe(4);
++    expect(adjustPieceHp(piece(5), 1, 10).hpCurrent).toBe(6);
++  });
++
++  it('починка ставит максимум из каталога', () => {
++    expect(repairPowerArmorPiece(piece(0), 10).hpCurrent).toBe(10);
++  });
++
++  it('не мутирует исходную часть', () => {
++    const original = piece(5);
++    adjustPieceHp(original, -3, 10);
++    expect(original.hpCurrent).toBe(5);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index e683f7a..a3daa55 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -758,14 +758,13 @@ export const CharacterProvider = ({ children }) => {
+     modifiedItems,
+     availablePerkAttributePoints,
+     luckPoints,
+-    maxLuckPoints,
+     attributesSaved,
+     skillsSaved,
+     selectedPerks,
+-    carryWeight,
+-    meleeBonus,
+-    initiative,
+-    defense,
++    // Производные (maxLuckPoints, carryWeight, meleeBonus, initiative,
++    // defense) в сейв НЕ идут: они вычисляются при загрузке из атрибутов,
++    // уровня и трейта. Хранить их значит держать второй источник правды.
++    // См. docs/architecture/counters-storage.md, правило 1.
+     conditions,
+     chemDosesLog,
+     sceneRiskStates,
+@@ -775,8 +774,8 @@ export const CharacterProvider = ({ children }) => {
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+-    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+-    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog, sceneRiskStates,
++    luckPoints, attributesSaved, skillsSaved, selectedPerks,
++    conditions, chemDosesLog, sceneRiskStates,
+   ]);
+ 
+   // Realtime save for already persisted characters.
+@@ -814,8 +813,10 @@ export const CharacterProvider = ({ children }) => {
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+-    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
+-    carryWeight, meleeBonus, initiative, defense, buildSnapshot,
++    luckPoints, attributesSaved, skillsSaved, selectedPerks,
++    // Производные убраны и отсюда: они не попадают в снимок, а их пересчёт
++    // зря будил автосохранение (запись в БД + синхронизация с облаком).
++    buildSnapshot,
+   ]);
+ 
+   // Initial save triggered from CharacterScreen.
+@@ -926,7 +927,11 @@ export const CharacterProvider = ({ children }) => {
+       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
+       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
+       setLuckPoints(data.luckPoints ?? 0);
+-      setMaxLuckPoints(data.maxLuckPoints ?? 0);
++      // Максимум удачи — производная (атрибуты + трейт), а не хранимое
++      // значение: считаем его при загрузке, а не читаем из сейва. Иначе это
++      // второй источник правды, который разъезжается с формулой.
++      // См. docs/architecture/counters-storage.md, правило 1.
++      setMaxLuckPoints(getLuckPoints(data.attributes || createInitialAttributes(), loadedTrait));
+       setAttributesSaved(data.attributesSaved ?? false);
+       setSkillsSaved(data.skillsSaved ?? false);
+       setSelectedPerks(data.selectedPerks || []);
+@@ -946,10 +951,10 @@ export const CharacterProvider = ({ children }) => {
+             .join('\n'),
+         );
+       }
+-      setCarryWeight(data.carryWeight ?? 150);
+-      setMeleeBonus(data.meleeBonus ?? 0);
+-      setInitiative(data.initiative ?? 0);
+-      setDefense(data.defense ?? 1);
++      // carryWeight/meleeBonus/initiative/defense из сейва НЕ читаем: сразу
++      // после загрузки их перетирает пересчёт derivedStats из стора (см.
++      // applyDerived ниже), так что это был мёртвый груз. Значения придут
++      // из единого источника — стора.
+       setConditions(data.conditions || []);
+       setChemDosesLog(
+         (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS)
+diff --git a/domain/powerArmor.js b/domain/powerArmor.js
+index 533679f..b2a913a 100644
+--- a/domain/powerArmor.js
++++ b/domain/powerArmor.js
+@@ -8,6 +8,7 @@
+  */
+ 
+ import { rollByType } from './diceRollsLogic';
++import { createCounter, consume, restore } from './counters';
+ import { getCanonicalAttributeKey } from './characterCreation';
+ import { isItemAllowed, ACTIONS } from './itemfitRules';
+ 
+@@ -243,7 +244,14 @@ export const tickCoreAccumulator = (runtime, elapsedMs) => {
+  */
+ export const drainActiveCore = (equipped, chargesConsumed) => {
+   if (!chargesConsumed || !equipped.frame?.core) return { equipped, depleted: false };
+-  const left = equipped.frame.core.charges - chargesConsumed;
++  // Заряд блока — каунтер, живущий в предмете: current в core.charges,
++  // потолок в данных каталога (maxCharges). Здесь важен только нижний край:
++  // перк «Ядерный физик» может выдать заряды сверх потолка (23/20), и
++  // усекать их нельзя. См. docs/architecture/counters-storage.md, правило 4.
++  const left = consume(
++    createCounter({ id: 'fusion_core', current: equipped.frame.core.charges, max: null }),
++    chargesConsumed,
++  ).current;
+   if (left > 0) {
+     return { equipped: { ...equipped, frame: { ...equipped.frame, core: { charges: left } } }, depleted: false };
+   }
+@@ -262,11 +270,18 @@ export const needsRepair = (piece, maxHp) => (piece?.hpCurrent ?? 0) < maxHp;
+  */
+ export const repairPowerArmorPiece = (piece, maxHp) => ({ ...piece, hpCurrent: maxHp });
+ 
+-/** Кнопки −/+ на экране: шаг в пределах 0..maxHp, без выхода за границы. */
+-export const adjustPieceHp = (piece, delta, maxHp) => ({
+-  ...piece,
+-  hpCurrent: Math.max(0, Math.min(maxHp, (piece?.hpCurrent ?? 0) + delta)),
+-});
++/**
++ * Кнопки −/+ на экране: шаг в пределах 0..maxHp, без выхода за границы.
++ *
++ * Прочность части — каунтер в предмете: current в hpCurrent, потолок maxHp
++ * из данных каталога. Границы держит движок (domain/counters.js), а не
++ * ручной Math.max/Math.min здесь.
++ */
++export const adjustPieceHp = (piece, delta, maxHp) => {
++  const counter = createCounter({ id: 'pa_piece_hp', current: piece?.hpCurrent ?? 0, max: maxHp });
++  const next = delta >= 0 ? restore(counter, delta) : consume(counter, -delta);
++  return { ...piece, hpCurrent: next.current };
++};
+ 
+ // ─── Подавление нижних слоёв (§5.5) ─────────────────────────────────────────
+ 
+-- 
+2.39.5
+
