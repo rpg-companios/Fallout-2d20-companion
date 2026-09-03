@@ -10,6 +10,8 @@ import {
   isEmpty,
   resolveMax,
   resolveMin,
+  withMax,
+  isOverMax,
 } from '../../domain/counters';
 
 // Каунтер — движковая форма любого числового ресурса. Тесты намеренно
@@ -98,6 +100,55 @@ describe('каунтер: мана (тот же движок, другой се�
 
   it('отдых восполняет не выше потолка', () => {
     expect(restore(mana, 100, attrs).current).toBe(10);
+  });
+});
+
+describe('каунтер: current выше max — законное состояние (правило 2)', () => {
+  it('падение потолка не трогает текущее значение', () => {
+    // Радиация снижает максимум ОЗ, но не наносит урона.
+    const hp = createCounter({ id: 'health', current: 24, max: 24 });
+    const irradiated = withMax(hp, 20);
+    expect(irradiated.current).toBe(24);
+    expect(isOverMax(irradiated)).toBe(true);
+  });
+
+  it('restore не поднимает выше потолка даже при превышении', () => {
+    // Лечение сверх максимума невозможно, хотя текущее уже выше него.
+    const hp = withMax(createCounter({ id: 'health', current: 24, max: 24 }), 20);
+    expect(restore(hp, 10).current).toBe(24);
+  });
+
+  it('consume работает от фактического значения', () => {
+    const hp = withMax(createCounter({ id: 'health', current: 24, max: 24 }), 20);
+    expect(consume(hp, 4).current).toBe(20);
+  });
+
+  it('set с allowOverMax выдаёт сверх потолка (перк «Ядерный физик», 23/20)', () => {
+    const core = createCounter({ id: 'fusion_core', current: 20, max: 20 });
+    expect(set(core, 23).current).toBe(20);
+    expect(set(core, 23, undefined, { allowOverMax: true }).current).toBe(23);
+  });
+
+  it('нижняя граница действует и при allowOverMax', () => {
+    const core = createCounter({ id: 'fusion_core', current: 5, max: 20 });
+    expect(set(core, -10, undefined, { allowOverMax: true }).current).toBe(0);
+  });
+});
+
+describe('каунтер: ресурс внутри предмета (правило 4)', () => {
+  it('потолок берётся из каталога, current — из предмета', () => {
+    // Заряд блока живёт в предмете (charges), maxCharges — в данных каталога.
+    const catalog = { ammo_fusion_core: { maxCharges: 20 } };
+    const item = { id: 'ammo_fusion_core', charges: 12 };
+    const core = createCounter({
+      id: 'fusion_core',
+      current: item.charges,
+      max: catalog[item.id].maxCharges,
+    });
+    expect(core.current).toBe(12);
+    expect(consume(core, 5).current).toBe(7);
+    // Обратно в предмет уходит только число.
+    expect({ ...item, charges: consume(core, 5).current }.charges).toBe(7);
   });
 });
 

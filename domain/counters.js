@@ -112,17 +112,52 @@ export const consume = (counter, amount, context) => {
 export const restore = (counter, amount, context) => {
   const delta = toFiniteOrNull(amount);
   if (delta === null || delta <= 0) return counter;
-  return { ...counter, current: clampToBounds(counter, counter.current + delta, context) };
+  const bounded = clampToBounds(counter, counter.current + delta, context);
+  // Если текущее уже выше потолка (радиация опустила максимум ОЗ), зажим по
+  // max дал бы значение МЕНЬШЕ текущего — лечение отняло бы здоровье.
+  // Восполнение никогда не уменьшает ресурс: правило 2 в
+  // docs/architecture/counters-storage.md.
+  return { ...counter, current: Math.max(counter.current, bounded) };
 };
 
 /**
  * Поставить значение напрямую (лечение до полного, обнуление радиации),
  * зажатое между min и max.
+ *
+ * `allowOverMax` снимает верхнюю границу для этой операции. Превышение
+ * потолка — законное состояние, а не ошибка: перк «Ядерный физик» разово
+ * выдаёт заряды сверх максимума (23/20). Нижняя граница действует всегда.
+ * См. docs/architecture/counters-storage.md, правило 2.
  */
-export const set = (counter, value, context) => ({
-  ...counter,
-  current: clampToBounds(counter, value, context),
-});
+export const set = (counter, value, context, { allowOverMax = false } = {}) => {
+  if (!allowOverMax) {
+    return { ...counter, current: clampToBounds(counter, value, context) };
+  }
+  const num = toFiniteOrNull(value);
+  const min = resolveMin(counter);
+  return { ...counter, current: num === null ? min : Math.max(min, num) };
+};
+
+/**
+ * Опустить потолок, НЕ трогая текущее значение.
+ *
+ * Радиация снижает максимум ОЗ, но не наносит урона: текущее здоровье
+ * остаётся прежним и оказывается выше нового потолка. Это ожидаемое
+ * состояние — молча усекать его нельзя, иначе персонаж теряет здоровье
+ * от одного лишь пересчёта производных.
+ *
+ * Функция существует, чтобы такое намерение было видно в коде явно.
+ */
+export const withMax = (counter, max) => ({ ...counter, max });
+
+/**
+ * Текущее значение вышло за потолок (после падения max).
+ * Полезно UI: показать «24/20» другим цветом.
+ */
+export const isOverMax = (counter, context) => {
+  const max = resolveMax(counter, context);
+  return max !== null && counter.current > max;
+};
 
 // ---------------------------------------------------------------------------
 // Вспомогательное для UI и правил. Сюда НЕ добавляем игровые смыслы —
