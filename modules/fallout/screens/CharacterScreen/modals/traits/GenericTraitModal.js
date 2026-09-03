@@ -10,12 +10,45 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
   const fallbackTraitId = `${actualOriginId}-trait`;
   const traitId = origin?.traitIds?.[0] || fallbackTraitId;
 
-  const canonicalTrait = useMemo(() => findTraitById(traitId), [traitId]);
-  const { name, description } = getTraitI18nById(traitId);
+  const parentTrait = useMemo(() => findTraitById(traitId), [traitId]);
+
+  // Ориджин может предлагать выбор одной черты из нескольких: родительская
+  // запись помечена isMultiTrait и сама модификаторов не несёт, работает
+  // только как список вариантов (по образцу Выжившего и Племени).
+  const subTraitIds = parentTrait?.modifiers?.isMultiTrait
+    ? (parentTrait.modifiers.subTraitIds || [])
+    : [];
+  const isMulti = subTraitIds.length > 0;
+
+  // Какая именно черта выбрана: для обычного ориджина — единственная,
+  // для мультитрейта — та, что игрок отметил на шаге выбора.
+  const [chosenId, setChosenId] = useState(null);
+  const effectiveTraitId = isMulti ? chosenId : traitId;
+
+  const canonicalTrait = useMemo(
+    () => (effectiveTraitId ? findTraitById(effectiveTraitId) : null),
+    [effectiveTraitId],
+  );
+  const { name, description } = getTraitI18nById(effectiveTraitId || traitId);
+
+  const variants = useMemo(
+    () => subTraitIds.map((id) => ({ id, ...getTraitI18nById(id) })),
+    [subTraitIds.join('|')],
+  );
+
+  // Заголовок экрана выбора: по образцу остальных мультитрейт-модалок ключ
+  // складывается из id ориджина. Промах ключа словарь возвращает самим путём —
+  // в этом случае показываем имя ориджина, чтобы в шапке не было техстроки.
+  const multiTitleKey = `modals.origins.${actualOriginId}Title`;
+  const multiTitleValue = tCharacterScreen(multiTitleKey);
+  const multiTitle = multiTitleValue === multiTitleKey
+    ? tCharacterScreen(`origins.${actualOriginId}`)
+    : multiTitleValue;
 
   const skillPickChoice = canonicalTrait?.modifiers?.skillPickChoice || null;
 
-  const [step, setStep] = useState('info'); // 'info' | 'pick'
+  // 'choose' — экран выбора черты, есть только у мультитрейт-ориджинов.
+  const [step, setStep] = useState(isMulti ? 'choose' : 'info');
   const [picks, setPicks] = useState([]);
 
   const skillOptions = useMemo(() => {
@@ -34,7 +67,8 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
   const pickCount = skillPickChoice?.count || 0;
 
   const reset = () => {
-    setStep('info');
+    setStep(isMulti ? 'choose' : 'info');
+    setChosenId(null);
     setPicks([]);
   };
 
@@ -65,6 +99,17 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
     const baseMods = canonicalTrait?.modifiers || {};
     let finalModifiers = { ...baseMods };
 
+    // Для мультитрейта наружу уходит id выбранной черты, а не родителя:
+    // именно её модификаторы и подпись должны попасть в персонажа.
+    if (isMulti) {
+      finalModifiers = {
+        ...finalModifiers,
+        selectedTraitIds: [effectiveTraitId],
+        selectedTraitNames: [name],
+        selectionMode: 'single',
+      };
+    }
+
     if (finalPicks.length > 0) {
       finalModifiers = {
         ...finalModifiers,
@@ -74,7 +119,7 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
       };
     }
 
-    onSelect(traitId, name, finalModifiers);
+    onSelect(effectiveTraitId, name, finalModifiers);
     reset();
     onClose?.();
   };
@@ -88,7 +133,37 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={handleClose}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          {step === 'info' ? (
+          {step === 'choose' ? (
+            <>
+              <Text style={styles.modalTitle}>{multiTitle}</Text>
+              <Text style={styles.hintText}>{tCharacterScreen('modals.traitPick.hint')}</Text>
+              <ScrollView style={{ width: '100%', maxHeight: 360 }}>
+                {variants.map((variant) => {
+                  const isSelected = chosenId === variant.id;
+                  return (
+                    <TouchableOpacity
+                      key={variant.id}
+                      style={[styles.modalButton, styles.variantOption, isSelected && styles.skillOptionSelected]}
+                      onPress={() => setChosenId(variant.id)}
+                    >
+                      <Text style={styles.buttonText}>{variant.name}</Text>
+                      {renderTextWithIcons(variant.description, styles.variantDescription)}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton, !chosenId && styles.disabledButton]}
+                disabled={!chosenId}
+                onPress={() => setStep('info')}
+              >
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.continue')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handleClose}>
+                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
+              </TouchableOpacity>
+            </>
+          ) : step === 'info' ? (
             <>
               <Text style={styles.modalTitle}>{name}</Text>
               {renderTextWithIcons(description, styles.modalText)}
@@ -104,8 +179,13 @@ export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originId
                   {skillPickChoice ? tCharacterScreen('buttons.continue') : tCharacterScreen('buttons.ok')}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handleClose}>
-                <Text style={styles.buttonText}>{tCharacterScreen('buttons.cancel')}</Text>
+              <TouchableOpacity
+                style={[styles.modalButton, isMulti ? styles.backButton : styles.cancelButton]}
+                onPress={isMulti ? () => setStep('choose') : handleClose}
+              >
+                <Text style={styles.buttonText}>
+                  {isMulti ? tCharacterScreen('buttons.back') : tCharacterScreen('buttons.cancel')}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -176,6 +256,8 @@ const styles = StyleSheet.create({
   counterText: { fontSize: 14, color: '#333', marginVertical: 8, fontWeight: '600' },
   modalButton: { padding: 12, marginVertical: 5, borderRadius: 6, alignItems: 'center', width: '100%' },
   skillOption: { backgroundColor: '#2196F3' },
+  variantOption: { backgroundColor: '#2196F3', alignItems: 'flex-start', paddingHorizontal: 15 },
+  variantDescription: { color: 'white', fontSize: 12, marginTop: 5 },
   skillOptionSelected: { backgroundColor: '#1976D2', borderWidth: 2, borderColor: '#fff' },
   disabledOption: { opacity: 0.5 },
   confirmButton: { backgroundColor: '#4CAF50', marginTop: 6 },
