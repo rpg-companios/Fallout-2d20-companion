@@ -1,0 +1,365 @@
+From e8437f06029eb018c60c4c1593a0d9f58ac47fd3 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 16:45:00 +0000
+Subject: [PATCH] patch 159: purchase kit flow + fix robots getting chems equipped
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+  __tests__/counters/kit-equip.test.js               | 65 ++++++++++++++++++++++
+  .../screens/InventoryScreen/InventoryScreen.js     |  2 +
+  .../screens/InventoryScreen/modals/AddItemModal.js | 33 +++++++++--
+  domain/kitEquip.js                                 | 50 +++++++++++++++++
+  domain/kitResolver.js                              | 22 +++++++-
+  .../screens/CharacterScreen/CharacterScreen.js     | 16 ++++--
+  .../CharacterScreen/modals/EquipmentKitModal.js    | 14 ++++-
+  7 files changed, 186 insertions(+), 16 deletions(-)
+
+diff --git a/__tests__/counters/kit-equip.test.js b/__tests__/counters/kit-equip.test.js
+new file mode 100644
+index 0000000..e19d4d5
+--- /dev/null
++++ b/__tests__/counters/kit-equip.test.js
+@@ -0,0 +1,65 @@
++import { describe, it, expect } from 'vitest';
++import { isEquippableKitItem, resolveKitItemEquipState } from '../../domain/kitEquip';
++
++const chem = { itemType: 'chem', itemId: 'chem_stimpak' };
++const food = { itemType: 'food', itemId: 'food_snack' };
++const ammo = { itemType: 'ammo', itemId: 'ammo_10mm' };
++const weapon = { itemType: 'weapon', id: 'weapon_pistol' };
++const armor = { itemType: 'armor', id: 'armor_leather_chest_001' };
++const clothing = { itemType: 'clothing', id: 'clothing_sturdy_clothes' };
++
++describe('isEquippableKitItem', () => {
++  it('слот занимают оружие, броня, одежда, силовая броня', () => {
++    expect(isEquippableKitItem(weapon)).toBe(true);
++    expect(isEquippableKitItem(armor)).toBe(true);
++    expect(isEquippableKitItem(clothing)).toBe(true);
++    expect(isEquippableKitItem({ itemType: 'powerArmor' })).toBe(true);
++  });
++
++  it('расходники и хлам слот не занимают', () => {
++    expect(isEquippableKitItem(chem)).toBe(false);
++    expect(isEquippableKitItem(food)).toBe(false);
++    expect(isEquippableKitItem(ammo)).toBe(false);
++    expect(isEquippableKitItem({ itemType: 'junk' })).toBe(false);
++    expect(isEquippableKitItem({ itemType: 'robotConsumable' })).toBe(false);
++  });
++
++  it('встроенные части робота считаются надеваемыми', () => {
++    expect(isEquippableKitItem({ itemType: 'misc', isBuiltin: true })).toBe(true);
++    expect(isEquippableKitItem({ itemType: 'misc', isManipulator: true })).toBe(true);
++  });
++
++  it('не падает на пустом входе', () => {
++    expect(isEquippableKitItem(null)).toBe(false);
++    expect(isEquippableKitItem(undefined)).toBe(false);
++    expect(isEquippableKitItem('строка')).toBe(false);
++  });
++});
++
++describe('resolveKitItemEquipState', () => {
++  it('БАГ: робот больше не получает стимпак надетым и запертым', () => {
++    expect(resolveKitItemEquipState(chem, true)).toEqual({ equipped: false, locked: false });
++  });
++
++  it('роботу надеваются только слотовые предметы', () => {
++    expect(resolveKitItemEquipState(weapon, true)).toEqual({ equipped: true, locked: true });
++    expect(resolveKitItemEquipState(armor, true)).toEqual({ equipped: true, locked: true });
++    expect(resolveKitItemEquipState(food, true)).toEqual({ equipped: false, locked: false });
++    expect(resolveKitItemEquipState(ammo, true)).toEqual({ equipped: false, locked: false });
++  });
++
++  it('человек не получает надетым ничего', () => {
++    for (const item of [weapon, armor, clothing, chem, food, ammo]) {
++      expect(resolveKitItemEquipState(item, false)).toEqual({ equipped: false, locked: false });
++    }
++  });
++
++  it('equipped и locked всегда согласованы: запертым может быть только надетое', () => {
++    for (const item of [weapon, armor, chem, food]) {
++      for (const isRobot of [true, false]) {
++        const { equipped, locked } = resolveKitItemEquipState(item, isRobot);
++        expect(locked).toBe(equipped);
++      }
++    }
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 8ce84b7..a80ac9b 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -79,6 +79,7 @@ const InventoryScreen = () => {
+     equippedArmor, setEquippedArmor,
+     equippedRobotSlots, setEquippedRobotSlots,
+     caps, earnCaps, spendCaps,
++    equipment,
+     applyConsumableFull,
+     previewConsumableRadiation,
+     getModifiedItem,
+@@ -1667,6 +1668,7 @@ const InventoryScreen = () => {
+           onClose={() => setAddItemModalVisible(false)}
+           onSelectItem={handleSelectCatalogItem}
+           selectionMode={itemSelectionMode}
++          maxRarity={itemSelectionMode === 'buy' ? (equipment?.purchaseMaxRarity ?? null) : null}
+           rootTitleKey={itemSelectionMode === 'buy' ? 'modals.addItemModal.buyTitle' : 'modals.addItemModal.title'}
+         />
+         <BuyItemModal
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index a925456..fdd39db 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -36,7 +36,7 @@ const mapWeaponTypeToDbValue = {
+   explosive: 'Explosive',
+ };
+ 
+-const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot' }) => {
++const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot', maxRarity = null }) => {
+   const engineLocale = useLocale();
+   const moduleLocale = useModuleLocale();
+   const [currentPath, setCurrentPath] = useState([]);
+@@ -177,10 +177,33 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     }
+   }, [visible]);
+ 
+-  const allData = useMemo(() => ({
+-    [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
+-    ...staticData,
+-  }), [engineLocale, weaponsByType, staticData]);
++  const allData = useMemo(() => {
++    const tree = {
++      [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
++      ...staticData,
++    };
++    // Комплект «покупка снаряжения» задаёт потолок редкости. Предметы выше
++    // порога прячем целиком: короче список и не дразнит тем, что купить
++    // нельзя. Записи без rarity считаем доступными — отсутствие поля не
++    // повод прятать предмет.
++    if (!Number.isFinite(maxRarity)) return tree;
++    const keep = (item) => !Number.isFinite(Number(item?.rarity)) || Number(item.rarity) <= maxRarity;
++    const prune = (node) => {
++      if (Array.isArray(node)) return node.filter(keep);
++      if (!node || typeof node !== 'object') return node;
++      const out = {};
++      for (const [key, value] of Object.entries(node)) {
++        const pruned = prune(value);
++        // Пустые ветки после отсева не показываем.
++        const isEmpty = Array.isArray(pruned)
++          ? pruned.length === 0
++          : pruned && typeof pruned === 'object' && Object.keys(pruned).length === 0;
++        if (!isEmpty) out[key] = pruned;
++      }
++      return out;
++    };
++    return prune(tree);
++  }, [engineLocale, weaponsByType, staticData, maxRarity]);
+ 
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+diff --git a/domain/kitEquip.js b/domain/kitEquip.js
+new file mode 100644
+index 0000000..ca9acae
+--- /dev/null
++++ b/domain/kitEquip.js
+@@ -0,0 +1,50 @@
++// domain/kitEquip.js
++// Правило выдачи комплекта: что вообще МОЖЕТ быть надето.
++//
++// У роботов предметы комплекта выдаются надетыми и запертыми (снять можно
++// только сменой конечности). Но «надеть» осмысленно лишь для того, что
++// занимает слот: оружие, броня, одежда, силовая броня. Стимпак, еда, патроны
++// и хлам слот не занимают — им флаг `equipped` не нужен.
++//
++// Раньше робот получал ВЕСЬ комплект как надетый, и стимпаки висели в
++// экипировке запертыми: использовать нельзя, снять нельзя.
++
++/** Типы, которые занимают слот и могут быть надеты. */
++export const EQUIPPABLE_ITEM_TYPES = new Set([
++  'weapon',
++  'armor',
++  'clothing',
++  'powerArmor',
++]);
++
++/**
++ * Может ли предмет быть надет.
++ *
++ * Роботские конечности и встроенные модули приходят со своими маркерами
++ * (`isBuiltin`, `isManipulator`, `sourceSlot`) и слот занимают — их тоже
++ * считаем надеваемыми, иначе встроенное оружие робота окажется в рюкзаке.
++ *
++ * @param {object} item
++ * @returns {boolean}
++ */
++export const isEquippableKitItem = (item) => {
++  if (!item || typeof item !== 'object') return false;
++  if (item.isBuiltin === true || item.isManipulator === true) return true;
++  return EQUIPPABLE_ITEM_TYPES.has(item.itemType);
++};
++
++/**
++ * Флаги выдачи предмета из комплекта.
++ *
++ * Человек получает всё не надетым — надевает сам. Робот получает надетым и
++ * запертым только то, что занимает слот; расходники ложатся в инвентарь
++ * обычными, чтобы ими можно было пользоваться.
++ *
++ * @param {object} item
++ * @param {boolean} isRobot
++ * @returns {{ equipped: boolean, locked: boolean }}
++ */
++export const resolveKitItemEquipState = (item, isRobot) => {
++  const equip = Boolean(isRobot) && isEquippableKitItem(item);
++  return { equipped: equip, locked: equip };
++};
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index aff7d9f..60eb312 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -3,6 +3,7 @@ import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../
+ import { resolveRandomLootByRoll } from '../modules/fallout/screens/CharacterScreen/logic/RandomLootLogic';
+ import { evaluateRollConfig } from './diceRollsLogic';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
++import { resolveLevelValue } from './levelBands';
+ import { getUniqQualityName } from './registry';
+ import { enrichWeaponItem } from './enrichItem';
+ import { composeNameWithUniqQualities } from './uniqQuality';
+@@ -325,7 +326,22 @@ export async function resolveNonWeaponItem(item) {
+   return { ...item, name: item.name || item.itemId || unknownName };
+ }
+ 
+-async function resolveEntry(entry) {
++async function resolveEntry(entry, context = {}) {
++  // 'purchase' — крышки на покупку снаряжения. Сумма зависит от уровня
++  // (полосы из данных), поэтому считается здесь, а не лежит в JSON числом.
++  // Наружу уходит обычная валюта: сумму подхватит тот же сбор totalCaps,
++  // что и у остальных комплектов. maxRarity несём дальше — по нему экран
++  // покупки ограничит каталог.
++  if (entry.type === 'purchase') {
++    const level = Number(context.level) || 1;
++    return {
++      ...entry,
++      itemType: entry.itemType || 'currency',
++      quantity: resolveLevelValue(entry.caps, level),
++      purchaseMaxRarity: entry.maxRarity ?? null,
++    };
++  }
++
+   if (entry.type === 'choice') {
+     const options = await Promise.all((entry.items || []).map(async (option) => {
+       if (option.group) {
+@@ -342,11 +358,11 @@ async function resolveEntry(entry) {
+   return entry.weaponId ? resolveWeaponItem(entry) : resolveNonWeaponItem(entry);
+ }
+ 
+-export async function resolveKitItems(kit) {
++export async function resolveKitItems(kit, context = {}) {
+   debugLog('kits.resolve.start', { kitId: kit?.id, count: kit?.items?.length });
+   const entries = await Promise.all((kit.items || []).map(async (entry, index) => {
+     try {
+-      const resolved = await resolveEntry(entry);
++      const resolved = await resolveEntry(entry, context);
+       const label = resolved?.displayName || resolved?.name || resolved?.itemId || resolved?.weaponId || JSON.stringify(resolved).slice(0, 60);
+       debugLog('kits.resolve.entry', { index, type: entry?.type, itemType: entry?.itemType, label });
+       return resolved;
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 4ec84d7..021cf07 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -21,6 +21,7 @@ import EquipmentKitModal from "./modals/EquipmentKitModal";
+ import { loadEnrichedOrigins } from "../../../../domain/origins";
+ import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../../domain/traits";
+ import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
++import { resolveKitItemEquipState } from "../../../../domain/kitEquip";
+ import { rollCombatDiceEffects } from "../../../../domain/diceRollsLogic";
+ import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
+ import {
+@@ -555,11 +556,11 @@ export default function CharacterScreen() {
+         });
+         const CURRENCY_TYPES = new Set(['currency']);
+         if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
+-        useCharacterStore.getState().addNewItem({
+-          ...item,
+-          equipped: isRobot ? true : false,
+-          locked:   isRobot ? true : false,
+-        });
++        // Роботу надевается только то, что занимает слот. Расходники
++        // (стимпаки, еда) слот не занимают: надетыми они висли запертыми —
++        // ни использовать, ни снять.
++        const { equipped, locked } = resolveKitItemEquipState(item, isRobot);
++        useCharacterStore.getState().addNewItem({ ...item, equipped, locked });
+       });
+       debugLog('kits.select.done', { itemIds: Object.keys(useCharacterStore.getState().items) });
+     }
+@@ -571,6 +572,9 @@ export default function CharacterScreen() {
+       weight: kit.weight,
+       price: kit.price,
+       items: kit.items,
++      // Комплект «покупка снаряжения»: экран инвентаря по этому порогу
++      // ограничит каталог покупки.
++      purchaseMaxRarity: kit.purchaseMaxRarity ?? null,
+     });
+     
+     // 3. Update caps
+@@ -1429,7 +1433,7 @@ export default function CharacterScreen() {
+           onClose={() => setIsEquipmentKitModalVisible(false)}
+           equipmentKits={equipmentKitsForModal}
+           onSelectKit={handleSelectKit}
+-          character={{ origin, trait }}
++          character={{ origin, trait, level }}
+         />
+ 
+         {/* Модальное окно для выбора черты */}
+diff --git a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 0dcfc49..4d36515 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -244,7 +244,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+         const resolved = await Promise.all(
+           equipmentKits.map(async (kit) => {
+             try {
+-              return await resolveKitItems(kit);
++              return await resolveKitItems(kit, { level: character?.level });
+             } catch (error) {
+               debugLog('kits.modal.failed', { kitId: kit?.id, error: error?.message || String(error) });
+               return kit;
+@@ -270,7 +270,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+     };
+ 
+     load();
+-  }, [visible, equipmentKits]);
++  }, [visible, equipmentKits, character?.level]);
+ 
+   if (!equipmentKits) return null;
+ 
+@@ -290,6 +290,12 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+     const inventoryItems = toInventoryItems(chosenEntries);
+     const { finalItems, totalCaps, weight, price } = summarizeItems(inventoryItems);
+ 
++    // Потолок редкости берём из записи 'purchase' (kitResolver положил его в
++    // purchaseMaxRarity). Обычные комплекты его не несут — там null.
++    const purchaseRarityCap = chosenEntries.reduce((acc, entry) => (
++      Number.isFinite(entry?.purchaseMaxRarity) ? entry.purchaseMaxRarity : acc
++    ), null);
++
+     const isRobot = isRobotCharacter(character);
+ 
+     if (isRobot) {
+@@ -335,6 +341,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+         weight,
+         price,
+         caps: totalCaps,
++        purchaseMaxRarity: purchaseRarityCap,
+         robotSlots: slots,
+         robotWeapons: weapons,
+         robotModules: modules,
+@@ -348,6 +355,9 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+         weight,
+         price,
+         caps: totalCaps,
++        // Потолок редкости комплекта «покупка снаряжения»: по нему экран
++        // инвентаря ограничит каталог покупки.
++        purchaseMaxRarity: purchaseRarityCap,
+         unarmedWeaponId: builtin?.id || null,
+       });
+     }
