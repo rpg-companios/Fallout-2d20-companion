@@ -1,0 +1,205 @@
+From 8b048769ba72836416a9c0929654dc617f581267 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 17:02:00 +0000
+Subject: [PATCH] patch 161: fix robot builtin weapon mods not saved, fix limb upgrade filter
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+  __tests__/robot/builtin-weapon-mods.test.js        | 79 ++++++++++++++++++++++
+  domain/robotEquip.js                               |  9 ++-
+  .../CharacterScreen/modals/LimbUpgradeModal.js     | 14 +++-
+  .../WeaponsAndArmorScreen/WeaponsAndArmorScreen.js | 36 ++++++++++
+  4 files changed, 133 insertions(+), 5 deletions(-)
+
+diff --git a/__tests__/robot/builtin-weapon-mods.test.js b/__tests__/robot/builtin-weapon-mods.test.js
+new file mode 100644
+index 0000000..22f053a
+--- /dev/null
++++ b/__tests__/robot/builtin-weapon-mods.test.js
+@@ -0,0 +1,79 @@
++import { describe, it, expect } from 'vitest';
++import { buildArmLimb, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
++import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
++
++const weaponsCatalog = [
++  { id: 'robot_weapon_assaultron_laser', name: 'Лазер', damage: 3 },
++];
++
++describe('моды встроенного оружия робота переживают пересборку конечности', () => {
++  const armEntry = {
++    id: 'robot_arm_assaultron',
++    itemType: 'robotArm',
++    builtinWeaponId: 'robot_weapon_assaultron_laser',
++  };
++
++  it('без сохранённого состояния оружие берётся из каталога', () => {
++    const limb = buildArmLimb(armEntry, weaponsCatalog);
++    expect(limb.builtinWeapons).toHaveLength(1);
++    expect(limb.builtinWeapons[0].id).toBe('robot_weapon_assaultron_laser');
++    expect(limb.builtinWeapons[0].isBuiltin).toBe(true);
++  });
++
++  it('БАГ: applied-моды больше не стираются каталожной заготовкой', () => {
++    // Конечность уже несёт применённые моды (пришла из сейва).
++    const saved = {
++      ...armEntry,
++      builtinWeapons: [{
++        id: 'robot_weapon_assaultron_laser',
++        appliedMods: { Receiver: 'mod_042' },
++        isBuiltin: true,
++      }],
++    };
++    const limb = buildArmLimb(saved, weaponsCatalog);
++    expect(limb.builtinWeapons[0].appliedMods).toEqual({ Receiver: 'mod_042' });
++    // Каталожные статы при этом подмешиваются.
++    expect(limb.builtinWeapons[0].name).toBe('Лазер');
++  });
++
++  it('моды доезжают до карточек оружия из слотов', () => {
++    const slots = {
++      rightArm: {
++        limb: buildArmLimb({
++          ...armEntry,
++          builtinWeapons: [{
++            id: 'robot_weapon_assaultron_laser',
++            appliedMods: { Receiver: 'mod_042' },
++            isBuiltin: true,
++          }],
++        }, weaponsCatalog),
++        heldWeapon: null,
++      },
++    };
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++    expect(weapons).toHaveLength(1);
++    expect(weapons[0].appliedMods).toEqual({ Receiver: 'mod_042' });
++    expect(weapons[0].sourceSlot).toBe('rightArm');
++  });
++});
++
++describe('совместимость рук по слотам (апгрейды Ассаультрона)', () => {
++  const list = Array.isArray(arms) ? arms : Object.values(arms);
++
++  it('в данных используется compatibleSlots со слотами вида leftArm', () => {
++    const withSlots = list.filter((a) => Array.isArray(a.compatibleSlots));
++    expect(withSlots.length).toBeGreaterThan(0);
++    expect(withSlots.some((a) => a.compatibleSlots.includes('leftArm'))).toBe(true);
++  });
++
++  it('поля slots с именами вида "Left Arm" в данных нет', () => {
++    // Старый фильтр искал именно его и потому не находил ничего.
++    expect(list.some((a) => Array.isArray(a.slots))).toBe(false);
++  });
++
++  it('для руки Ассаультрона отбор по слоту даёт не весь каталог', () => {
++    const forLeft = list.filter((a) => a.compatibleSlots?.includes('leftArm'));
++    expect(forLeft.length).toBeGreaterThan(0);
++    expect(forLeft.length).toBeLessThan(list.length);
++  });
++});
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 2a5ebd5..6473ac3 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -109,9 +109,14 @@ export function buildArmLimb(armEntry, weaponsCatalog = []) {
+   const weaponStats = armEntry.builtinWeaponId
+     ? list.find((w) => w.id === armEntry.builtinWeaponId) || null
+     : null;
++  // Уже сохранённое состояние встроенного оружия (в т.ч. appliedMods) важнее
++  // каталожной заготовки: иначе пересборка конечности из каталога стирала
++  // применённые моды при каждой загрузке.
++  const savedBuiltin = Array.isArray(armEntry.builtinWeapons) ? armEntry.builtinWeapons : [];
++  const savedById = new Map(savedBuiltin.filter((w) => w?.id).map((w) => [w.id, w]));
+   const builtinWeapons = weaponStats
+-    ? [{ ...weaponStats, isBuiltin: true }]
+-    : (Array.isArray(armEntry.builtinWeapons) ? armEntry.builtinWeapons : []);
++    ? [{ ...weaponStats, ...(savedById.get(weaponStats.id) || {}), isBuiltin: true }]
++    : savedBuiltin;
+   return {
+     ...armEntry,
+     itemType: 'robotArm',
+diff --git a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index 784e43a..3e0ce01 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -63,7 +63,7 @@ const BODY_PLAN_ARM_SLOTS = {
+  *   - limb.slots intersects with the expected arm slots for the bodyPlan (arms fallback)
+  * If no limbs match any of the above, all limbs are returned (graceful fallback).
+  */
+-const filterByBodyPlan = (limbs, bodyPlan) => {
++const filterByBodyPlan = (limbs, bodyPlan, slotKey = null) => {
+   if (!bodyPlan) return limbs;
+ 
+   const filtered = limbs.filter((limb) => {
+@@ -72,7 +72,15 @@ const filterByBodyPlan = (limbs, bodyPlan) => {
+     }
+     if (limb.defaultForBodyPlan === bodyPlan) return true;
+     if (limb.robotBodyPlan === bodyPlan) return true;
+-    // Arms fallback: check slots field intersection
++    // Основной признак в данных — compatibleSlots с именами слотов вида
++    // 'leftArm' / 'arm1'. Раньше фильтр читал несуществующее поле `slots` с
++    // человекочитаемыми 'Left Arm', не совпадал ни с чем и сваливался в
++    // fallback «показать всё» — Ассаультрону предлагались руки Мистера Хэнди,
++    // а нужные терялись среди чужих.
++    if (slotKey && Array.isArray(limb.compatibleSlots)) {
++      return limb.compatibleSlots.includes(slotKey);
++    }
++    // Legacy-форма: человекочитаемые имена слотов в поле `slots`.
+     const expectedSlots = BODY_PLAN_ARM_SLOTS[bodyPlan];
+     if (expectedSlots && Array.isArray(limb.slots)) {
+       return limb.slots.some((s) => expectedSlots.includes(s));
+@@ -153,7 +161,7 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose })
+     const catalog = getLimbCatalogForSlot(equipmentCatalog, slotKey);
+     const itemType = getItemTypeForSlot(slotKey);
+     const byType = catalog.filter((l) => l.itemType === itemType);
+-    return filterByBodyPlan(byType, bodyPlan);
++    return filterByBodyPlan(byType, bodyPlan, slotKey);
+   }, [equipmentCatalog, slotKey, bodyPlan]);
+ 
+   const handleSelect = (newLimb) => {
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 4cf08fa..cbcbc20 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -727,6 +727,42 @@ const WeaponsAndArmorScreen = () => {
+     const itemId = resolveStoreItemId(selectedWeaponForModification);
+     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
+ 
++    // Встроенное оружие конечности (лазер Ассаультрона, манипулятор) лежит НЕ
++    // в heldWeapon, а внутри limb.builtinWeapons. Раньше сюда не попадала ни
++    // одна ветка: heldWeapon пуст, в сторе такого предмета нет — моды молча
++    // терялись. Пишем их в саму конечность, тогда они переживают сейв вместе
++    // с equippedRobotSlots.
++    const builtinSlotKey = selectedWeaponForModification?.sourceSlot;
++    const builtinSlot = builtinSlotKey ? equippedRobotSlots?.[builtinSlotKey] : null;
++    const builtinList = Array.isArray(builtinSlot?.limb?.builtinWeapons)
++      ? builtinSlot.limb.builtinWeapons
++      : [];
++    const isBuiltinTarget = !builtinSlot?.heldWeapon
++      && builtinList.some((w) => w?.id === selectedWeaponForModification?.id);
++
++    if (isBuiltinTarget) {
++      setEquippedRobotSlots((prev) => {
++        const slot = prev?.[builtinSlotKey];
++        const list = Array.isArray(slot?.limb?.builtinWeapons) ? slot.limb.builtinWeapons : [];
++        if (list.length === 0) return prev;
++        return {
++          ...prev,
++          [builtinSlotKey]: {
++            ...slot,
++            limb: {
++              ...slot.limb,
++              builtinWeapons: list.map((w) => (
++                w?.id === selectedWeaponForModification.id
++                  ? { ...w, ...modifiedWeapon, id: w.id, isBuiltin: true }
++                  : w
++              )),
++            },
++          },
++        };
++      });
++      return;
++    }
++
+     if (selectedWeaponForModification?.sourceSlot && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon) {
+       const sourceSlot = selectedWeaponForModification.sourceSlot;
+       setEquippedRobotSlots((prev) => {
