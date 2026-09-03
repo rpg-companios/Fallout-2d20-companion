@@ -33,6 +33,7 @@ import { generateStackKey } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
+import { showAlert as showCatalogAlert } from '../../alerts/alertService';
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
 import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
 import styles from '../../../styles/InventoryScreen.styles';
@@ -449,25 +450,13 @@ const InventoryScreen = () => {
       handleRemoveItem(consumableItem, 1);
     };
 
-    if (typeof window !== 'undefined' && window.confirm) {
-      const applyOnSelf = window.confirm(formatInventoryText(tInventory('screen.alerts.windowApplyConsumableQuestion'), { itemName }));
-      if (applyOnSelf) {
-        applyToSelf();
-      } else {
-        applyToOther();
-      }
-      return;
-    }
-
-    showAlert(
-      tInventory('screen.alerts.applyConsumableTitle'),
-      formatInventoryText(tInventory('screen.alerts.applyConsumableQuestion'), { itemName }),
-      [
-        { text: tInventory('screen.actions.cancel'), style: "cancel" },
-        { text: tInventory('screen.actions.self'), onPress: applyToSelf },
-        { text: tInventory('screen.actions.other'), onPress: applyToOther }
-      ]
-    );
+    // Три варианта на обеих платформах. Раньше на вебе диалог схлопывался
+    // в window.confirm (две кнопки), где «Отмена» на самом деле означала
+    // «применить на другого» — отменить действие было нельзя.
+    showCatalogAlert('applyConsumable', { itemName }).then((choice) => {
+      if (choice === 'self') applyToSelf();
+      else if (choice === 'other') applyToOther();
+    });
   };
   
   const handleRemoveItem = (itemToRemove, quantity) => {
