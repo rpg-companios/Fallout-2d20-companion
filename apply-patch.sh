@@ -258,16 +258,23 @@ echo "Проверка состояния..."
 echo
 
 # «Уровень» дерева — самый свежий достоверно применённый патч.
-# Патчи старее уровня в цепочку не берём: если стоит 142, то 31b
-# ставить бессмысленно (его цель давно переехала, а «применяется»
-# он лишь потому, что создаёт новый файл).
+# Патчи, отставшие от уровня БОЛЬШЕ ЧЕМ НА STALE_GAP, в цепочку не берём:
+# они почти наверняка давно влиты, а «применяются» лишь потому, что
+# создают файл, который с тех пор переехал (пример: 31b при уровне 145).
+# Недавние же пропуски — обычная ситуация «забыл поставить» — ставятся.
+STALE_GAP=10
+
 LEVEL=""
+LEVEL_NUM=0
 for name in "${ALL_PATCHES[@]}"; do
   file="$(extract_patch "$name")"
   if [[ "$(patch_state "$file")" == "applied" ]]; then
     LEVEL="$(patch_number "$name")"
   fi
 done
+if [[ -n "$LEVEL" ]]; then
+  LEVEL_NUM="$(sed -E 's|^([0-9]+).*$|\1|' <<<"$LEVEL")"
+fi
 
 TODO=()
 SKIPPED=0
@@ -282,9 +289,9 @@ for name in "${QUEUE[@]}"; do
       SKIPPED=$((SKIPPED + 1))
       ;;
     pending)
+      name_num="$(sed -E 's|^([0-9]+).*$|\1|' <<<"$(patch_number "$name")")"
       if [[ -n "$LEVEL" && "$name" != "$TARGET" ]] \
-        && number_le "$(patch_number "$name")" "$LEVEL" \
-        && [[ "$(patch_number "$name")" != "$LEVEL" ]]; then
+        && (( name_num + STALE_GAP < LEVEL_NUM )); then
         OLD=$((OLD + 1))
       else
         TODO+=("$name")
