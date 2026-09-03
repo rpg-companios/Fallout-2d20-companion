@@ -1,0 +1,17 @@
+{
+  "purchase_equipment": {
+    "universal": true,
+    "items": [
+      {
+        "type": "purchase",
+        "itemType": "currency",
+        "maxRarity": 2,
+        "caps": [
+          { "upToLevel": 1, "base": 100, "perLevel": 0 },
+          { "upToLevel": 20, "base": 0, "perLevel": 100 },
+          { "base": 0, "perLevel": 100 }
+        ]
+      }
+    ]
+  }
+}

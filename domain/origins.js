@@ -130,10 +130,26 @@ export function loadOriginsData() {
  * Enriched origins for UI: id + name + image + characterType + traitIds +
  * equipmentKitIds + resolved equipmentKits (from equipmentCatalog).
  */
+/**
+ * Комплекты, помеченные в данных как `universal: true`, доступны КАЖДОМУ
+ * ориджину — существующему и будущему. Ориджин их не перечисляет: иначе при
+ * добавлении нового мира/ориджина о них пришлось бы вспоминать вручную, а
+ * забытая строка выглядела бы как «у этого ориджина такого комплекта нет».
+ *
+ * Признак живёт в данных сеттинга, движок только читает флаг.
+ */
+function getUniversalKitIds(kitGroups) {
+  return Object.keys(kitGroups).filter((kitId) => kitGroups[kitId]?.universal === true);
+}
+
 export function loadEnrichedOrigins() {
   const { equipmentKits: kitGroups } = getEquipmentCatalog();
+  const universalKitIds = getUniversalKitIds(kitGroups);
   return getOrigins().map((origin) => {
-    const kitIds = origin.equipmentKitIds || [];
+    const ownKitIds = origin.equipmentKitIds || [];
+    // Универсальные добавляем в конец и не дублируем, если ориджин уже
+    // перечислил такой комплект явно.
+    const kitIds = [...ownKitIds, ...universalKitIds.filter((id) => !ownKitIds.includes(id))];
     const equipmentKits = kitIds.map((kitId) => {
       const kit = kitGroups[kitId];
       if (!kit || !Array.isArray(kit.items)) {
@@ -147,7 +163,7 @@ export function loadEnrichedOrigins() {
       name: tOrigin(origin.id),
       image: getOriginImage(origin.id),
       traitIds: origin.traitIds || [],
-      equipmentKitIds: origin.equipmentKitIds || [],
+      equipmentKitIds: kitIds,
       equipmentKits,
       bodyPlan: origin.bodyPlan ?? null,
     };
