@@ -1,31 +1,12 @@
-From 7d7069619acf614f23e4b24d9e7c4c6eb791a638 Mon Sep 17 00:00:00 2001
-From: handylinux <8155246+handylinux@users.noreply.github.com>
-Date: Thu, 3 Sep 2026 06:11:48 +0000
+From: Arena Agent <agent@arena.ai>
 Subject: [PATCH] apply-patch.sh: chain mode, auto-detect what is missing
 
-Was: applies exactly one patch, fails if earlier ones are missing.
-Now: works out the current level of the tree and applies every
-missing patch up to the requested number, in order.
-
-- ./apply-patch.sh 144      apply 144 and anything missing before it
-- ./apply-patch.sh 144 --only   single patch, old behaviour
-- ./apply-patch.sh --status     what is installed, what is missing
-
-Falls back to --3way when a patch does not apply cleanly, and stops
-with a clear report if that leaves conflict markers.
-
-Patches whose context has drifted (long since merged into main) are
-skipped rather than blindly reapplied; so are patches older than the
-detected level, which otherwise look 'missing' merely because they
-create a file that has since moved.
-
-Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
----
- apply-patch.sh | 375 +++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 314 insertions(+), 61 deletions(-)
+Applies the requested patch plus every missing one before it, in order.
+Adds --status and --only. Falls back to --3way, skips patches whose
+context has drifted, and ignores patches far behind the tree level.
 
 diff --git a/apply-patch.sh b/apply-patch.sh
-index 43a42db..938d9d6 100755
+index 43a42db..0bf4acf 100755
 --- a/apply-patch.sh
 +++ b/apply-patch.sh
 @@ -11,16 +11,66 @@ ROOT_DIR="$(
@@ -101,13 +82,14 @@ index 43a42db..938d9d6 100755
    echo "Ошибка: некорректный номер патча: $PATCH_ID"
    exit 2
  fi
-@@ -45,89 +95,292 @@ FETCHED_COMMIT="$(
+@@ -45,89 +95,299 @@ FETCHED_COMMIT="$(
  )"
  
  echo "Загружен коммит: $FETCHED_COMMIT"
 -echo "Поиск патча №$PATCH_ID..."
 +echo
-+
+ 
+-mapfile -t PATCH_PATHS < <(
 +WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/arena-patches.XXXXXX")"
 +
 +cleanup() {
@@ -117,8 +99,7 @@ index 43a42db..938d9d6 100755
 +trap cleanup EXIT
 +
 +# --- список всех патчей в ветке, отсортированный по номеру -------------------
- 
--mapfile -t PATCH_PATHS < <(
++
 +mapfile -t ALL_PATCHES < <(
    git -C "$ROOT_DIR" ls-tree \
      -r \
@@ -207,9 +188,7 @@ index 43a42db..938d9d6 100755
 +  pending_count=0
 +  stale_count=0
 +  PENDING_LIST=()
- 
--echo "Извлечение патча:"
--echo "  $PATCH_PATH"
++
 +  for name in "${ALL_PATCHES[@]}"; do
 +    file="$(extract_patch "$name")"
 +    state="$(patch_state "$file")"
@@ -227,23 +206,25 @@ index 43a42db..938d9d6 100755
 +    esac
 +  done
  
--# Патч извлекается во временный файл.
--# Локальная папка patchs не изменяется.
--git -C "$ROOT_DIR" show \
--  "${FETCHED_COMMIT}:${PATCH_PATH}" \
--  > "$TEMP_PATCH"
+-echo "Извлечение патча:"
+-echo "  $PATCH_PATH"
 +  if [[ $pending_count -gt 0 ]]; then
 +    echo "Не хватает — будут поставлены:"
 +    printf '  [ ] %s\n' "${PENDING_LIST[@]}"
 +    echo
 +  fi
  
--if [[ ! -s "$TEMP_PATCH" ]]; then
--  echo "Ошибка: извлечённый патч пуст."
+-# Патч извлекается во временный файл.
+-# Локальная папка patchs не изменяется.
+-git -C "$ROOT_DIR" show \
+-  "${FETCHED_COMMIT}:${PATCH_PATH}" \
+-  > "$TEMP_PATCH"
 +  echo "Применено точно:      $applied_count"
 +  echo "Не хватает:           $pending_count"
 +  echo "Контекст разошёлся:   $stale_count  (как правило, давно влиты в main)"
-+
+ 
+-if [[ ! -s "$TEMP_PATCH" ]]; then
+-  echo "Ошибка: извлечённый патч пуст."
 +  if [[ $pending_count -eq 0 ]]; then
 +    echo
 +    echo "Всё актуально."
@@ -303,21 +284,38 @@ index 43a42db..938d9d6 100755
 -  echo "Патч успешно применён: $PATCH_NAME"
 -  echo "Источник: $REMOTE/$ARENA_BRANCH"
 -  echo "Коммит:   $FETCHED_COMMIT"
+-  exit 0
 +echo "Проверка состояния..."
 +echo
 +
 +# «Уровень» дерева — самый свежий достоверно применённый патч.
-+# Патчи старее уровня в цепочку не берём: если стоит 142, то 31b
-+# ставить бессмысленно (его цель давно переехала, а «применяется»
-+# он лишь потому, что создаёт новый файл).
++# Патчи, отставшие от уровня БОЛЬШЕ ЧЕМ НА STALE_GAP, в цепочку не берём:
++# они почти наверняка давно влиты, а «применяются» лишь потому, что
++# создают файл, который с тех пор переехал (пример: 31b при уровне 145).
++# Недавние же пропуски — обычная ситуация «забыл поставить» — ставятся.
++STALE_GAP=10
++
 +LEVEL=""
++LEVEL_NUM=0
 +for name in "${ALL_PATCHES[@]}"; do
 +  file="$(extract_patch "$name")"
 +  if [[ "$(patch_state "$file")" == "applied" ]]; then
 +    LEVEL="$(patch_number "$name")"
 +  fi
 +done
-+
++if [[ -n "$LEVEL" ]]; then
++  LEVEL_NUM="$(sed -E 's|^([0-9]+).*$|\1|' <<<"$LEVEL")"
+ fi
+ 
+-# Если обычная проверка не прошла, проверяем,
+-# не был ли этот патч уже применён.
+-if git -C "$ROOT_DIR" apply \
+-  --reverse \
+-  --check \
+-  "$TEMP_PATCH" >/dev/null 2>&1
+-then
+-  echo
+-  echo "Патч уже был применён: $PATCH_NAME"
 +TODO=()
 +SKIPPED=0
 +STALE=0
@@ -331,9 +329,9 @@ index 43a42db..938d9d6 100755
 +      SKIPPED=$((SKIPPED + 1))
 +      ;;
 +    pending)
++      name_num="$(sed -E 's|^([0-9]+).*$|\1|' <<<"$(patch_number "$name")")"
 +      if [[ -n "$LEVEL" && "$name" != "$TARGET" ]] \
-+        && number_le "$(patch_number "$name")" "$LEVEL" \
-+        && [[ "$(patch_number "$name")" != "$LEVEL" ]]; then
++        && (( name_num + STALE_GAP < LEVEL_NUM )); then
 +        OLD=$((OLD + 1))
 +      else
 +        TODO+=("$name")
@@ -359,20 +357,10 @@ index 43a42db..938d9d6 100755
    exit 0
  fi
  
--# Если обычная проверка не прошла, проверяем,
--# не был ли этот патч уже применён.
--if git -C "$ROOT_DIR" apply \
--  --reverse \
--  --check \
--  "$TEMP_PATCH" >/dev/null 2>&1
--then
--  echo
--  echo "Патч уже был применён: $PATCH_NAME"
--  exit 0
 +echo "Уже стоит: $SKIPPED"
 +if [[ $OLD -gt 0 ]]; then
 +  echo "Пропущено как старее уровня дерева: $OLD"
- fi
++fi
 +if [[ $STALE -gt 0 ]]; then
 +  echo "Пропущено как устаревшие: $STALE (контекст разошёлся, обычно уже в main)"
 +fi
@@ -389,7 +377,7 @@ index 43a42db..938d9d6 100755
 +for name in "${TODO[@]}"; do
 +  file="$(extract_patch "$name")"
 +  printf 'Применение: %s ... ' "$name"
- 
++
 +  if git -C "$ROOT_DIR" apply --whitespace=nowarn "$file" >/dev/null 2>&1; then
 +    echo "ок"
 +    APPLIED+=("$name")
@@ -450,6 +438,3 @@ index 43a42db..938d9d6 100755
 \ No newline at end of file
 +echo "Источник: $REMOTE/$ARENA_BRANCH"
 +echo "Коммит:   $FETCHED_COMMIT"
--- 
-2.39.5
-
