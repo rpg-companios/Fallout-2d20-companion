@@ -89,7 +89,8 @@
     "exactBaseSkillsRequired": "You must select exactly {required} base skills. Selected: {selected}.",
     "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
     "maxSkillRank": "Error: maximum skill rank is {maxRank}",
-    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it."
+    "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it.",
+    "saveFailed": "Could not save the character. Please try again."
   },
   "modals": {
     "origin": {

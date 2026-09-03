@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { showRawAlert } from '../../../alerts/alertService';
 import { tInventory } from '../logic/inventoryI18n';
 import { useLocale } from '../../../../i18n/locale';
 
@@ -14,7 +15,7 @@ const CapsModal = ({ visible, onClose, onSave, operationType }) => {
       setAmount('');
       onClose();
     } else {
-      Alert.alert(tInventory('modals.capsModal.invalidAmount'));
+      showRawAlert({ title: tInventory('modals.capsModal.invalidAmount') });
     }
   };
 

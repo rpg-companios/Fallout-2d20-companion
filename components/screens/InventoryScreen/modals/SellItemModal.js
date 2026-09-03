@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { showRawAlert } from '../../../alerts/alertService';
 import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
 import { useLocale } from '../../../../i18n/locale';
 
@@ -21,11 +22,11 @@ const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
     const numPrice = parseFloat(pricePerItem);
 
     if (isNaN(numQuantity) || numQuantity <= 0 || numQuantity > item.quantity) {
-      Alert.alert(formatInventoryText(tInventory('modals.sellItemModal.invalidQuantity'), { max: item.quantity }));
+      showRawAlert({ title: formatInventoryText(tInventory('modals.sellItemModal.invalidQuantity'), { max: item.quantity }) });
       return;
     }
     if (isNaN(numPrice) || numPrice < 0) {
-      Alert.alert(tInventory('modals.sellItemModal.invalidPrice'));
+      showRawAlert({ title: tInventory('modals.sellItemModal.invalidPrice') });
       return;
     }
 

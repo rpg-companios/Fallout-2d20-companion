@@ -39,6 +39,7 @@ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/scen
 import { isSkillTagged } from '../domain/d20Checks';
 import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+import { showAlert as showCatalogAlert, showRawAlert } from './alerts/alertService';
 
 import { resolveBodyPlan } from '../domain/bodyplan';
 import { createEmptyEquippedArmor } from '../domain/equippedArmor';
@@ -65,6 +66,7 @@ import {
   isPowerArmorFrame,
   FUSION_CORE_ID,
 } from '../domain/powerArmor';
+import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
 import { canEquipArmor } from '../domain/equipEquip';
 import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
 import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
@@ -77,7 +79,7 @@ import { INVENTORY_DICTIONARIES } from './screens/InventoryScreen/logic/inventor
 import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
 import enPerksAndTraitsScreen from '../i18n/en-EN/screens/perksAndTraits/screen.json';
 import { getConditionCatalog, getPerks, getSceneRiskRules } from '../domain/registry';
-import { Alert, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
@@ -196,28 +198,17 @@ const PERK_ALERTS_DICT = {
   'en-EN': enPerksAndTraitsScreen.alerts,
 };
 const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
-// Лейблы/действия инвентаря (левая/правая конечность, отмена) — те же ключи,
-// что использует обычная броня при выборе слота.
+// Лейблы инвентаря (левая/правая конечность) — те же ключи, что использует
+// обычная броня при выборе слота. Кнопка отмены теперь приходит из каталога
+// алертов, поэтому отдельный словарь действий здесь больше не нужен.
 const INV_LABELS_DICT = {
   'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.labels,
   'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.labels,
 };
-const INV_ACTIONS_DICT = {
-  'ru-RU': INVENTORY_DICTIONARIES['ru-RU'].screen.actions,
-  'en-EN': INVENTORY_DICTIONARIES['en-EN'].screen.actions,
-};
 const tPALabel = (key) => INV_LABELS_DICT[getCurrentLocale()][key];
-const tPAAction = (key) => INV_ACTIONS_DICT[getCurrentLocale()][key];
-// Алерты слоя СБ: в web-превью Expo Alert.alert молчит — показываем window.alert,
-// как showAlert в InventoryScreen.
-const paAlert = (title, message = '') => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-    window.alert(message ? `${title}\n\n${message}` : title);
-    return;
-  }
-  if (message) Alert.alert(title, message);
-  else Alert.alert(title);
-};
+// Алерты слоя СБ идут через общий AlertHost — одна React-модалка на вебе
+// и на нативе. Раньше здесь была своя копия развилки Platform.OS.
+const paAlert = (title, message = '') => showRawAlert({ title, message });
 // Тик таймера расхода блока (§5.3): заряд сгорает за 12 минут аптайма,
 // точность тика на порядок ниже — расход ведёт накопитель, а не тик.
 const PA_CORE_TICK_MS = 15000;
@@ -318,9 +309,43 @@ export const CharacterProvider = ({ children }) => {
   const [caps, setCaps] = useState(0);
   const [currentHealth, setCurrentHealth] = useState(0);
   const [radiation, setRadiationRaw] = useState(0);
+
+  // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
+  // и в сейве лежит только текущее значение числом; потолок и нижняя граница
+  // — вычисляемые, они собираются здесь в момент операции.
+  // См. docs/architecture/counters-storage.md.
+  //
+  // Крышки: потолка нет. Правило «не ниже нуля» теперь одно на все места
+  // вызова — раньше каждый экран писал свой Math.max, и при покупке
+  // (InventoryScreen) зажим забыли, из-за чего крышки уходили в минус.
+  const capsCounter = () => createCounter({ id: 'caps', current: caps, max: null });
+  const earnCaps = (amount) => setCaps(restore(capsCounter(), amount).current);
+  const spendCaps = (amount) => setCaps(consume(capsCounter(), amount).current);
+
+  // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
+  // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
+  // не нанося урона) — это законное состояние, лечение его не снимает и,
+  // что важно, не уменьшает здоровье.
+  // maxOverride — потолок, уже уменьшенный вызывающим (экран вычитает
+  // радиацию). Без него берётся базовая формула сеттинга.
+  const healthCounter = (maxOverride) => createCounter({
+    id: 'health',
+    current: currentHealth,
+    max: maxOverride ?? calculateMaxHealth(attributes, level),
+  });
+  const healCharacter = (amount, maxOverride) =>
+    setCurrentHealth(restore(healthCounter(maxOverride), amount).current);
+  const damageCharacter = (amount) =>
+    setCurrentHealth(consume(healthCounter(), amount).current);
+
+  // Радиация: ресурс с обратным знаком — «хорошо» быть у нуля. Потолка нет,
+  // ограничение только снизу.
+  const radiationCounter = () => createCounter({ id: 'radiation', current: radiation, max: null });
+  const addRadiation = (amount) => setRadiationRaw(restore(radiationCounter(), amount).current);
+  const healRadiation = (amount) => setRadiationRaw(consume(radiationCounter(), amount).current);
   const setRadiation = (updater) => setRadiationRaw((prev) => {
     const next = typeof updater === 'function' ? updater(prev) : updater;
-    return Math.max(0, next);
+    return setCounter({ id: 'radiation', current: prev, max: null, min: 0 }, next).current;
   });
   const [modifiedItems, setModifiedItems] = useState(new Map());
   const [availablePerkAttributePoints, setAvailablePerkAttributePoints] = useState(0);
@@ -598,20 +623,13 @@ export const CharacterProvider = ({ children }) => {
     const [leftSlot, rightSlot] = target.slots;
     const leftLabel = tPALabel(leftSlot);
     const rightLabel = tPALabel(rightSlot);
-    if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
-      const promptText = tPA('bothSlotsBusyPrompt')
-        .replace('{leftLabel}', leftLabel)
-        .replace('{rightLabel}', rightLabel);
-      const answer = window.prompt(promptText, '1');
-      if (answer === '1') doEquip(leftSlot);
-      else if (answer === '2') doEquip(rightSlot);
-      return;
-    }
-    Alert.alert(tPA('replaceEquipmentTitle'), tPA('bothSlotsBusy'), [
-      { text: leftLabel, onPress: () => doEquip(leftSlot) },
-      { text: rightLabel, onPress: () => doEquip(rightSlot) },
-      { text: tPAAction('cancel'), style: 'cancel' },
-    ]);
+    // Тот же диалог, что и у обычной брони (InventoryScreen): единая запись
+    // каталога, три кнопки на обеих платформах. Раньше на вебе здесь стоял
+    // window.prompt с вводом номера стороны.
+    showCatalogAlert('bothSlotsBusy', { leftLabel, rightLabel }).then((side) => {
+      if (side === 'left') doEquip(leftSlot);
+      else if (side === 'right') doEquip(rightSlot);
+    });
   }, [paDecrementStoreStack, paAddStackToInventory, paPieceToStackItem, origin, trait]);
 
   // Снять часть слота → в инвентарь своей стопкой.
@@ -740,14 +758,13 @@ export const CharacterProvider = ({ children }) => {
     modifiedItems,
     availablePerkAttributePoints,
     luckPoints,
-    maxLuckPoints,
     attributesSaved,
     skillsSaved,
     selectedPerks,
-    carryWeight,
-    meleeBonus,
-    initiative,
-    defense,
+    // Производные (maxLuckPoints, carryWeight, meleeBonus, initiative,
+    // defense) в сейв НЕ идут: они вычисляются при загрузке из атрибутов,
+    // уровня и трейта. Хранить их значит держать второй источник правды.
+    // См. docs/architecture/counters-storage.md, правило 1.
     conditions,
     chemDosesLog,
     sceneRiskStates,
@@ -757,8 +774,8 @@ export const CharacterProvider = ({ children }) => {
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
-    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
-    carryWeight, meleeBonus, initiative, defense, conditions, chemDosesLog, sceneRiskStates,
+    luckPoints, attributesSaved, skillsSaved, selectedPerks,
+    conditions, chemDosesLog, sceneRiskStates,
   ]);
 
   // Realtime save for already persisted characters.
@@ -796,8 +813,10 @@ export const CharacterProvider = ({ children }) => {
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
-    luckPoints, maxLuckPoints, attributesSaved, skillsSaved, selectedPerks,
-    carryWeight, meleeBonus, initiative, defense, buildSnapshot,
+    luckPoints, attributesSaved, skillsSaved, selectedPerks,
+    // Производные убраны и отсюда: они не попадают в снимок, а их пересчёт
+    // зря будил автосохранение (запись в БД + синхронизация с облаком).
+    buildSnapshot,
   ]);
 
   // Initial save triggered from CharacterScreen.
@@ -908,7 +927,11 @@ export const CharacterProvider = ({ children }) => {
       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
       setLuckPoints(data.luckPoints ?? 0);
-      setMaxLuckPoints(data.maxLuckPoints ?? 0);
+      // Максимум удачи — производная (атрибуты + трейт), а не хранимое
+      // значение: считаем его при загрузке, а не читаем из сейва. Иначе это
+      // второй источник правды, который разъезжается с формулой.
+      // См. docs/architecture/counters-storage.md, правило 1.
+      setMaxLuckPoints(getLuckPoints(data.attributes || createInitialAttributes(), loadedTrait));
       setAttributesSaved(data.attributesSaved ?? false);
       setSkillsSaved(data.skillsSaved ?? false);
       setSelectedPerks(data.selectedPerks || []);
@@ -928,10 +951,10 @@ export const CharacterProvider = ({ children }) => {
             .join('\n'),
         );
       }
-      setCarryWeight(data.carryWeight ?? 150);
-      setMeleeBonus(data.meleeBonus ?? 0);
-      setInitiative(data.initiative ?? 0);
-      setDefense(data.defense ?? 1);
+      // carryWeight/meleeBonus/initiative/defense из сейва НЕ читаем: сразу
+      // после загрузки их перетирает пересчёт derivedStats из стора (см.
+      // applyDerived ниже), так что это был мёртвый груз. Значения придут
+      // из единого источника — стора.
       setConditions(data.conditions || []);
       setChemDosesLog(
         (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS)
@@ -1518,9 +1541,12 @@ export const CharacterProvider = ({ children }) => {
     adjustPowerArmorDurability,
     repairPowerArmorPieceAt,
     repairPowerArmorStack,
-    caps, setCaps,
-    currentHealth, setCurrentHealth,
-    radiation, setRadiation,
+    // Ресурсы наружу — числом, как и раньше. Менять их можно только
+    // именованными операциями: правило границ живёт в domain/counters.js,
+    // а не переписывается заново на каждом экране.
+    caps, earnCaps, spendCaps,
+    currentHealth, healCharacter, damageCharacter, setCurrentHealth,
+    radiation, setRadiation, addRadiation, healRadiation,
     luckPoints, setLuckPoints,
     maxLuckPoints, setMaxLuckPoints,
     attributesSaved, setAttributesSaved,

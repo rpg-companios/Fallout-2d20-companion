@@ -62,18 +62,18 @@ import { isAmmoWeapon } from '../../../../domain/weaponDurability';
 
 
 const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
-  const { currentHealth, setCurrentHealth } = useCharacter();
+  const { currentHealth, healCharacter, damageCharacter } = useCharacter();
+  // Радиация опускает потолок ОЗ, не нанося урона: текущее здоровье может
+  // остаться выше него. Лечение до этого потолка не поднимает и — важно —
+  // не уменьшает уже набранное. Правило живёт в domain/counters.js.
   const displayMax = max - radiation;
   const canDecrease = isEnabled && currentHealth > 0;
   const canIncrease = isEnabled && currentHealth < displayMax;
 
   const handleAdjustHealth = (amount) => {
     if (!isEnabled) return;
-    if (amount > 0) {
-      setCurrentHealth(prev => prev >= displayMax ? prev : Math.min(displayMax, prev + amount));
-    } else {
-      setCurrentHealth(prev => Math.max(0, prev + amount));
-    }
+    if (amount > 0) healCharacter(amount, displayMax);
+    else damageCharacter(-amount);
   };
 
   const healthText = isEnabled ? `${currentHealth}/${displayMax}` : '—/—';

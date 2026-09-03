@@ -13,6 +13,7 @@ import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { CharacterProvider } from './components/CharacterContext';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+import AlertHost from './components/alerts/AlertHost';
 import { initDatabase } from './db/Database';
 import { seedDatabase } from './db/seed';
 import { useLocale, useModuleLocale } from './i18n/locale';
@@ -223,6 +224,7 @@ function App() {
           </NavigationContainer>
           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
           <FusionCoreChoiceModal />
+          <AlertHost />
         </CharacterProvider>
       </SafeAreaProvider>
     </PaperProvider>

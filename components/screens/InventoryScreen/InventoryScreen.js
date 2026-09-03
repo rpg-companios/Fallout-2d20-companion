@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
@@ -33,6 +33,7 @@ import { generateStackKey } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
+import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
 import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
 import styles from '../../../styles/InventoryScreen.styles';
@@ -77,7 +78,7 @@ const InventoryScreen = () => {
     equippedWeapons, setEquippedWeapons, 
     equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
-    caps, setCaps,
+    caps, earnCaps, spendCaps,
     applyConsumableFull,
     previewConsumableRadiation,
     getModifiedItem,
@@ -184,14 +185,10 @@ const InventoryScreen = () => {
     return [...fromStore, ...extras];
   }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
 
-  const showAlert = (title, message = '', buttons) => {
-    const text = message ? `${title}\n\n${message}` : title;
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-      window.alert(text);
-      return;
-    }
-    Alert.alert(title, message, buttons);
-  };
+  // Показ через общий AlertHost — одинаково на вебе и на нативе.
+  // Раньше здесь была локальная копия развилки Platform.OS с window.alert,
+  // из-за которой на вебе терялись все кнопки кроме первой.
+  const showAlert = (title, message = '', buttons) => showRawAlert({ title, message, buttons });
   
   const [isCapsModalVisible, setIsCapsModalVisible] = useState(false);
   const [capsOperationType, setCapsOperationType] = useState('add');
@@ -373,11 +370,11 @@ const InventoryScreen = () => {
   const handleSaveCaps = (amount) => {
     if (capsOperationType === 'add') {
       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
-      setCaps((prev) => prev + amount + sumFoundItemBonus(bonusEvents));
+      earnCaps(amount + sumFoundItemBonus(bonusEvents));
       showFoundItemBonusAlerts(bonusEvents);
       return;
     }
-    setCaps((prev) => Math.max(0, prev - amount));
+    spendCaps(amount);
   };
 
   const handleApplyConsumable = (item) => {
@@ -392,7 +389,7 @@ const InventoryScreen = () => {
       positiveEffectType: typeof consumableItem?.positiveEffect,
     });
 
-    const applyToSelf = () => {
+    const applyToSelf = async () => {
       if (!canConsumeOnSelf(consumableItem, fitCharacter)) {
         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
         return;
@@ -411,32 +408,18 @@ const InventoryScreen = () => {
         return;
       }
 
-      const title = tInventory('screen.alerts.leadBellyRerollTitle');
-      const message = formatInventoryText(tInventory('screen.alerts.leadBellyRerollMessage'), {
+      // Выбор из каталога: 'reroll' — перебросить, 'keep'/закрытие — оставить.
+      // На вебе раньше был window.confirm, и «Отмена» там значила «оставить»
+      // только по совпадению; теперь обе платформы дают явные кнопки.
+      const choice = await showCatalogAlert('leadBellyReroll', {
         radiationAmount: preview.receivedRadiationDamage,
       });
-      const applyReroll = () => {
+      if (choice === 'reroll') {
         const rerolled = rerollConsumableRadiationRoll(consumableItem, preview.rolls);
         finish(rerolled.requestedAmount);
-      };
-
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.confirm === 'function') {
-        if (window.confirm(`${title}\n\n${message}`)) applyReroll();
-        else finish(preview.requestedAmount);
-        return;
+      } else {
+        finish(preview.requestedAmount);
       }
-
-      Alert.alert(title, message, [
-        {
-          text: tInventory('screen.alerts.leadBellyRerollKeep'),
-          style: 'cancel',
-          onPress: () => finish(preview.requestedAmount),
-        },
-        {
-          text: tInventory('screen.alerts.leadBellyRerollConfirm'),
-          onPress: applyReroll,
-        },
-      ]);
     };
 
     const applyToOther = () => {
@@ -449,25 +432,13 @@ const InventoryScreen = () => {
       handleRemoveItem(consumableItem, 1);
     };
 
-    if (typeof window !== 'undefined' && window.confirm) {
-      const applyOnSelf = window.confirm(formatInventoryText(tInventory('screen.alerts.windowApplyConsumableQuestion'), { itemName }));
-      if (applyOnSelf) {
-        applyToSelf();
-      } else {
-        applyToOther();
-      }
-      return;
-    }
-
-    showAlert(
-      tInventory('screen.alerts.applyConsumableTitle'),
-      formatInventoryText(tInventory('screen.alerts.applyConsumableQuestion'), { itemName }),
-      [
-        { text: tInventory('screen.actions.cancel'), style: "cancel" },
-        { text: tInventory('screen.actions.self'), onPress: applyToSelf },
-        { text: tInventory('screen.actions.other'), onPress: applyToOther }
-      ]
-    );
+    // Три варианта на обеих платформах. Раньше на вебе диалог схлопывался
+    // в window.confirm (две кнопки), где «Отмена» на самом деле означала
+    // «применить на другого» — отменить действие было нельзя.
+    showCatalogAlert('applyConsumable', { itemName }).then(async (choice) => {
+      if (choice === 'self') await applyToSelf();
+      else if (choice === 'other') applyToOther();
+    });
   };
   
   const handleRemoveItem = (itemToRemove, quantity) => {
@@ -508,7 +479,7 @@ const InventoryScreen = () => {
   };
 
   const handleConfirmSale = (quantity, finalPrice) => {
-    setCaps(prev => prev + finalPrice);
+    earnCaps(finalPrice);
 
     const stackKey = selectedItemForSale?.stackKey || getStackKey(selectedItemForSale);
     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
@@ -629,7 +600,7 @@ const InventoryScreen = () => {
 
   const handleConfirmBuy = (quantity, unitPrice) => {
     const finalCost = quantity * unitPrice;
-    setCaps((prev) => prev - finalCost);
+    spendCaps(finalCost);
     handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
     setIsBuyItemModalVisible(false);
     setSelectedItemForBuy(null);
@@ -966,7 +937,7 @@ const InventoryScreen = () => {
       return;
     }
 
-    const executeEquip = (slotsToOccupy) => {
+    const executeEquip = async (slotsToOccupy) => {
       // ПРАВИЛО (владелец): молчаливых падений нет. Пустой список слотов —
       // дефект данных предмета (нет protectedAreas): сообщаем, а не no-op.
       if (!slotsToOccupy || slotsToOccupy.length === 0) {
@@ -1048,20 +1019,7 @@ const InventoryScreen = () => {
       };
 
       if (instancesToUnequip.size > 0) {
-          if (typeof window !== 'undefined' && window.confirm) {
-              if (window.confirm(tInventory('screen.alerts.replaceEquipmentConfirm'))) {
-                  performEquip();
-              }
-          } else {
-              showAlert(
-                  tInventory('screen.alerts.replaceEquipmentTitle'),
-                  tInventory('screen.alerts.replaceEquipmentConfirm'),
-                  [
-                      { text: tInventory('screen.actions.cancel'), style: "cancel" },
-                      { text: tInventory('screen.actions.yes'), onPress: performEquip },
-                  ]
-              );
-          }
+          if (await confirmAlert('replaceEquipment')) performEquip();
       } else {
           performEquip();
       }
@@ -1084,22 +1042,12 @@ const InventoryScreen = () => {
     const leftLabel = leftSlot === 'leftArm' ? tInventory('screen.labels.leftArm') : tInventory('screen.labels.leftLeg');
     const rightLabel = rightSlot === 'rightArm' ? tInventory('screen.labels.rightArm') : tInventory('screen.labels.rightLeg');
 
-    if (typeof window !== 'undefined' && window.prompt) {
-      const answer = window.prompt(formatInventoryText(tInventory('screen.alerts.bothSlotsBusyPrompt'), { leftLabel, rightLabel }), '1');
-      if (answer === '1') executeEquip([leftSlot]);
-      if (answer === '2') executeEquip([rightSlot]);
-      return;
-    }
-
-    showAlert(
-      tInventory('screen.alerts.replaceEquipmentTitle'),
-      tInventory('screen.alerts.bothSlotsBusy'),
-      [
-        { text: leftLabel, onPress: () => executeEquip([leftSlot]) },
-        { text: rightLabel, onPress: () => executeEquip([rightSlot]) },
-        { text: tInventory('screen.actions.cancel'), style: "cancel" },
-      ]
-    );
+    // Выбор стороны одинаков на вебе и на нативе. Раньше на вебе стоял
+    // window.prompt с вводом «1» или «2» руками.
+    showCatalogAlert('bothSlotsBusy', { leftLabel, rightLabel }).then((side) => {
+      if (side === 'left') executeEquip([leftSlot]);
+      else if (side === 'right') executeEquip([rightSlot]);
+    });
   };
 
   const handleUnequipArmor = (itemToUnequip) => {

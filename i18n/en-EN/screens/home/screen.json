@@ -79,7 +79,10 @@
     },
     "uploaded": "Uploaded",
     "downloaded": "Downloaded",
-    "error": "Cloud sync failed."
+    "error": "Cloud sync failed.",
+    "remoteIsNewerWithCount": "Newer versions of characters were found in the cloud ({count}). Download them locally?",
+    "successWithCounts": "Sync complete.\nUploaded: {uploaded}\nDownloaded: {downloaded}",
+    "errorWithReason": "Could not sync with the cloud.\n\n{reason}"
   },
   "pwa": {
     "install": "Install App",
@@ -126,7 +129,8 @@
     "deleteMessage": "The folder and all characters inside it will be permanently deleted.",
     "deleteConfirm": "Delete folder and characters",
     "moveHint": "Hold the arrow icon, then tap a folder to move the character.",
-    "moving": "Select a destination folder"
+    "moving": "Select a destination folder",
+    "deleteMessageWithCount": "The folder and every character inside it will be deleted permanently. Characters: {count}."
   },
   "subtitle": "Positronium",
   "about": {

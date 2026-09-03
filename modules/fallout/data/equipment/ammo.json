@@ -2,132 +2,158 @@
   {
     "id": "ammo_357_magnum",
     "rarity": 1,
-    "cost": 2
+    "cost": 2,
+    "weight": 0.04
   },
   {
     "id": "ammo_12_7mm",
     "rarity": 2,
-    "cost": 2
+    "cost": 2,
+    "weight": 0.08
   },
   {
     "id": "ammo_9mm",
     "rarity": 0,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.03
   },
   {
     "id": "ammo_50_ball",
     "rarity": 3,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.03
   },
   {
     "id": "ammo_25mm_grenade",
     "rarity": 4,
-    "cost": 8
+    "cost": 8,
+    "weight": 0.4
   },
   {
     "id": "ammo_40mm_grenade",
     "rarity": 4,
-    "cost": 20
+    "cost": 20,
+    "weight": 0.5
   },
   {
     "id": "ammo_alien_power_cell",
     "rarity": 5,
-    "cost": 5
+    "cost": 5,
+    "weight": 0.03
   },
   {
     "id": "ammo_alien_power_module",
     "rarity": 6,
-    "cost": 10
+    "cost": 10,
+    "weight": 0.25
   },
   {
     "id": "ammo_arrow",
     "rarity": 1,
-    "cost": 2
+    "cost": 2,
+    "weight": 0.06
   },
   {
     "id": "ammo_bolt",
     "rarity": 2,
-    "cost": 3
+    "cost": 3,
+    "weight": 0.05
   },
   {
     "id": "ammo_plasma_cartridge_alien",
     "rarity": 5,
-    "cost": 200
+    "cost": 200,
+    "weight": 0.05
   },
   {
     "id": "ammo_38",
     "rarity": 0,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.02
   },
   {
     "id": "ammo_10mm",
     "rarity": 0,
-    "cost": 2
+    "cost": 2,
+    "weight": 0.03
   },
   {
     "id": "ammo_308",
     "rarity": 1,
-    "cost": 3
+    "cost": 3,
+    "weight": 0.06
   },
   {
     "id": "ammo_flare",
     "rarity": 1,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.2
   },
   {
     "id": "ammo_shotgun_shell",
     "rarity": 1,
-    "cost": 3
+    "cost": 3,
+    "weight": 0.1
   },
   {
     "id": "ammo_45",
     "rarity": 2,
-    "cost": 3
+    "cost": 3,
+    "weight": 0.05
   },
   {
     "id": "ammo_flamer_fuel",
     "rarity": 2,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.2
   },
   {
     "id": "ammo_energy_cell",
     "rarity": 2,
-    "cost": 3
+    "cost": 3,
+    "weight": 0.03
   },
   {
     "id": "ammo_gamma_round",
     "rarity": 2,
-    "cost": 10
+    "cost": 10,
+    "weight": 0.15
   },
   {
     "id": "ammo_railway_spike",
     "rarity": 2,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.5
   },
   {
     "id": "ammo_syringe",
     "rarity": 2,
-    "cost": "Разная стоимость"
+    "cost": "Разная стоимость",
+    "weight": 0.02
   },
   {
     "id": "ammo_44_magnum",
     "rarity": 3,
-    "cost": 3
+    "cost": 3,
+    "weight": 0.05
   },
   {
     "id": "ammo_50_cal",
     "rarity": 3,
-    "cost": 4
+    "cost": 4,
+    "weight": 0.26
   },
   {
     "id": "ammo_5_56mm",
     "rarity": 3,
-    "cost": 2
+    "cost": 2,
+    "weight": 0.03
   },
   {
     "id": "ammo_5mm",
     "rarity": 3,
-    "cost": 1
+    "cost": 1,
+    "weight": 0.03
   },
   {
     "id": "ammo_fusion_core",
@@ -139,56 +165,71 @@
   {
     "id": "ammo_missile",
     "rarity": 3,
-    "cost": 25
+    "cost": 25,
+    "weight": 7.0
   },
   {
     "id": "ammo_plasma_cartridge",
     "rarity": 4,
-    "cost": 5
+    "cost": 5,
+    "weight": 0.05
   },
   {
     "id": "ammo_2mm_ec",
     "rarity": 5,
-    "cost": 10
+    "cost": 10,
+    "weight": 0.04
   },
   {
     "id": "ammo_mini_nuke",
     "rarity": 6,
-    "cost": 100
+    "cost": 100,
+    "weight": 12.0
   },
   {
-    "id": "ammo_anything"
+    "id": "ammo_anything",
+    "weight": 0
   },
   {
-    "id": "ammo_acid_concentrate"
+    "id": "ammo_acid_concentrate",
+    "weight": 0.08
   },
   {
-    "id": "ammo_cannonball"
+    "id": "ammo_cannonball",
+    "weight": 6.0
   },
   {
-    "id": "ammo_cryo_cell"
+    "id": "ammo_cryo_cell",
+    "weight": 0.05
   },
   {
-    "id": "ammo_harpoon"
+    "id": "ammo_harpoon",
+    "weight": 2.0
   },
   {
     "id": "ammo_syringe_bloodpack",
     "rarity": 2,
-    "cost": 15
+    "cost": 15,
+    "weight": 0.04
   },
   {
-    "id": "ammo_gas_grenade"
+    "id": "ammo_gas_grenade",
+    "weight": 0.6
   },
   {
-    "id": "ammo_homemade"
+    "id": "ammo_homemade",
+    "weight": 0.02
   },
   {
-    "id": "ammo_tranq_dart"
+    "id": "ammo_tranq_dart",
+    "weight": 0.02
   },
   {
-    "id": "ammo_tear_gas"
+    "id": "ammo_tear_gas",
+    "weight": 0.6
   },
   {
-    "id": "ammo_grappling_hook"
+    "id": "ammo_grappling_hook",
+    "weight": 3.0
   }
 ]

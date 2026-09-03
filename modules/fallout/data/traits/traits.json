@@ -127,6 +127,19 @@
     }
   },
   {
+    "id": "vaultdweller-origin",
+    "originId": "vaultDweller",
+    "displayNameKey": "traits.vaultDweller.vaultKid.name",
+    "descriptionKey": "traits.vaultDweller.vaultKid.description",
+    "modifiers": {
+      "isMultiTrait": true,
+      "subTraitIds": [
+        "vaultdweller-vault-kid",
+        "ghoul-necrotic-posthuman"
+      ]
+    }
+  },
+  {
     "id": "vaultdweller-vault-kid",
     "originId": "vaultDweller",
     "displayNameKey": "traits.vaultDweller.vaultKid.name",

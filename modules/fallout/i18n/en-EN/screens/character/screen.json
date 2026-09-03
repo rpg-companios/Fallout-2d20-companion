@@ -40,7 +40,8 @@
       "survivorTitle": "Origin Trait «Survivor»",
       "ncrTitle": "Origin Trait «NCR Citizen»",
       "tribalTitle": "Origin Trait «Tribal»",
-      "treeFamiliesTitle": "Origin Trait «Strip Families»"
+      "treeFamiliesTitle": "Origin Trait «Strip Families»",
+      "vaultDwellerTitle": "Vault Dweller Origin Trait"
     },
     "survivor": {
       "twoTraits": "2 traits",
@@ -68,6 +69,9 @@
     },
     "limb": {
       "upgradeLimb": "Upgrade Limb"
+    },
+    "traitPick": {
+      "hint": "Choose one trait: vault upbringing or ghoulification."
     }
   }
 }
