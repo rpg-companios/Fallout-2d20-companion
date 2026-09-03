@@ -1,78 +1,149 @@
-From 4d802108933ac8af386d5777146e490d7f0b9fc3 Mon Sep 17 00:00:00 2001
+From 50051e18a23456f071a056b9e1bd823feefb5a94 Mon Sep 17 00:00:00 2001
 From: handylinux <8155246+handylinux@users.noreply.github.com>
 Date: Thu, 3 Sep 2026 08:02:53 +0000
-Subject: [PATCH] patch 149: re-check patch state before each apply in chain
- mode
+Subject: [PATCH 1/2] patchs: add 149-chain-recheck.patch
 
 Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
 ---
- apply-patch.sh | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ patchs/149-chain-recheck.patch | 78 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+ create mode 100644 patchs/149-chain-recheck.patch
+
+diff --git a/patchs/149-chain-recheck.patch b/patchs/149-chain-recheck.patch
+new file mode 100644
+index 0000000..53b0f7d
+--- /dev/null
++++ b/patchs/149-chain-recheck.patch
+@@ -0,0 +1,78 @@
++From 4d802108933ac8af386d5777146e490d7f0b9fc3 Mon Sep 17 00:00:00 2001
++From: handylinux <8155246+handylinux@users.noreply.github.com>
++Date: Thu, 3 Sep 2026 08:02:53 +0000
++Subject: [PATCH] patch 149: re-check patch state before each apply in chain
++ mode
++
++Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
++---
++ apply-patch.sh | 31 ++++++++++++++++++++++++++++++-
++ 1 file changed, 30 insertions(+), 1 deletion(-)
++
++diff --git a/apply-patch.sh b/apply-patch.sh
++index 0bf4acf..8aae36e 100755
++--- a/apply-patch.sh
+++++ b/apply-patch.sh
++@@ -277,6 +277,7 @@ if [[ -n "$LEVEL" ]]; then
++ fi
++ 
++ TODO=()
+++DEFERRED=()
++ SKIPPED=0
++ STALE=0
++ OLD=0
++@@ -305,7 +306,12 @@ for name in "${QUEUE[@]}"; do
++       if [[ "$name" == "$TARGET" ]]; then
++         TODO+=("$name")
++       else
+++        # Состояние считается ДО применения цепочки, поэтому «conflict» здесь
+++        # неоднозначен: патч может не вставать лишь потому, что нужный ему
+++        # контекст создаёт предыдущий патч очереди. Такие откладываем и
+++        # перепроверяем после каждого прохода применения.
++         STALE=$((STALE + 1))
+++        DEFERRED+=("$name")
++       fi
++       ;;
++   esac
++@@ -324,7 +330,14 @@ fi
++ if [[ $STALE -gt 0 ]]; then
++   echo "Пропущено как устаревшие: $STALE (контекст разошёлся, обычно уже в main)"
++ fi
++-echo "Будет применено: ${#TODO[@]}"
+++# Отложенные «conflict» возвращаем в очередь по номеру: их состояние будет
+++# пересчитано непосредственно перед применением, когда предыдущие патчи
+++# цепочки уже лягут в дерево.
+++if [[ ${#DEFERRED[@]} -gt 0 ]]; then
+++  mapfile -t TODO < <(printf '%s\n' "${TODO[@]}" "${DEFERRED[@]}" | sort -V)
+++fi
+++
+++echo "Будет применено: ${#TODO[@]} (из них перепроверяемых: ${#DEFERRED[@]})"
++ for name in "${TODO[@]}"; do
++   printf '  %s\n' "$name"
++ done
++@@ -336,6 +349,22 @@ APPLIED=()
++ 
++ for name in "${TODO[@]}"; do
++   file="$(extract_patch "$name")"
+++
+++  # Пересчёт состояния на актуальном дереве: предыдущие патчи очереди могли
+++  # создать контекст, которого не было на момент первичной классификации.
+++  case "$(patch_state "$file")" in
+++    applied)
+++      printf 'Пропуск: %s (уже стоит)\n' "$name"
+++      continue
+++      ;;
+++    conflict)
+++      if [[ "$name" != "$TARGET" ]]; then
+++        printf 'Пропуск: %s (контекст разошёлся)\n' "$name"
+++        continue
+++      fi
+++      ;;
+++  esac
+++
++   printf 'Применение: %s ... ' "$name"
++ 
++   if git -C "$ROOT_DIR" apply --whitespace=nowarn "$file" >/dev/null 2>&1; then
++-- 
++2.39.5
++
+-- 
+2.39.5
+
+
+From 2457aff0f86a6c88970c7329c8cacbcd25aaf334 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 3 Sep 2026 08:03:18 +0000
+Subject: [PATCH 2/2] patch 149: quiet re-check skips
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ apply-patch.sh | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/apply-patch.sh b/apply-patch.sh
-index 0bf4acf..8aae36e 100755
+index 8aae36e..233417d 100755
 --- a/apply-patch.sh
 +++ b/apply-patch.sh
-@@ -277,6 +277,7 @@ if [[ -n "$LEVEL" ]]; then
- fi
+@@ -346,6 +346,7 @@ echo
+ # --- применение --------------------------------------------------------------
  
- TODO=()
-+DEFERRED=()
- SKIPPED=0
- STALE=0
- OLD=0
-@@ -305,7 +306,12 @@ for name in "${QUEUE[@]}"; do
-       if [[ "$name" == "$TARGET" ]]; then
-         TODO+=("$name")
-       else
-+        # Состояние считается ДО применения цепочки, поэтому «conflict» здесь
-+        # неоднозначен: патч может не вставать лишь потому, что нужный ему
-+        # контекст создаёт предыдущий патч очереди. Такие откладываем и
-+        # перепроверяем после каждого прохода применения.
-         STALE=$((STALE + 1))
-+        DEFERRED+=("$name")
-       fi
-       ;;
-   esac
-@@ -324,7 +330,14 @@ fi
- if [[ $STALE -gt 0 ]]; then
-   echo "Пропущено как устаревшие: $STALE (контекст разошёлся, обычно уже в main)"
- fi
--echo "Будет применено: ${#TODO[@]}"
-+# Отложенные «conflict» возвращаем в очередь по номеру: их состояние будет
-+# пересчитано непосредственно перед применением, когда предыдущие патчи
-+# цепочки уже лягут в дерево.
-+if [[ ${#DEFERRED[@]} -gt 0 ]]; then
-+  mapfile -t TODO < <(printf '%s\n' "${TODO[@]}" "${DEFERRED[@]}" | sort -V)
-+fi
-+
-+echo "Будет применено: ${#TODO[@]} (из них перепроверяемых: ${#DEFERRED[@]})"
- for name in "${TODO[@]}"; do
-   printf '  %s\n' "$name"
- done
-@@ -336,6 +349,22 @@ APPLIED=()
+ APPLIED=()
++RECHECK_SKIPPED=0
  
  for name in "${TODO[@]}"; do
    file="$(extract_patch "$name")"
-+
-+  # Пересчёт состояния на актуальном дереве: предыдущие патчи очереди могли
-+  # создать контекст, которого не было на момент первичной классификации.
-+  case "$(patch_state "$file")" in
-+    applied)
-+      printf 'Пропуск: %s (уже стоит)\n' "$name"
-+      continue
-+      ;;
-+    conflict)
-+      if [[ "$name" != "$TARGET" ]]; then
-+        printf 'Пропуск: %s (контекст разошёлся)\n' "$name"
-+        continue
-+      fi
-+      ;;
-+  esac
-+
-   printf 'Применение: %s ... ' "$name"
+@@ -354,12 +355,12 @@ for name in "${TODO[@]}"; do
+   # создать контекст, которого не было на момент первичной классификации.
+   case "$(patch_state "$file")" in
+     applied)
+-      printf 'Пропуск: %s (уже стоит)\n' "$name"
++      RECHECK_SKIPPED=$((RECHECK_SKIPPED + 1))
+       continue
+       ;;
+     conflict)
+       if [[ "$name" != "$TARGET" ]]; then
+-        printf 'Пропуск: %s (контекст разошёлся)\n' "$name"
++        RECHECK_SKIPPED=$((RECHECK_SKIPPED + 1))
+         continue
+       fi
+       ;;
+@@ -415,6 +416,9 @@ for name in "${TODO[@]}"; do
+ done
  
-   if git -C "$ROOT_DIR" apply --whitespace=nowarn "$file" >/dev/null 2>&1; then
+ echo
++if [[ $RECHECK_SKIPPED -gt 0 ]]; then
++  echo "Пропущено при перепроверке: $RECHECK_SKIPPED"
++fi
+ echo "Готово. Применено патчей: ${#APPLIED[@]}"
+ printf '  %s\n' "${APPLIED[@]}"
+ echo
 -- 
 2.39.5
 
