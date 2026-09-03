@@ -160,6 +160,14 @@
       "source": [
         "pipboy"
       ]
+    },
+    "ammo-found-table.json": {
+      "records": 42,
+      "source": [
+        "lonestar",
+        "derived"
+      ],
+      "note": "Объём находки боеприпаса (base+CD). 31 из lonestar_ammo.json, 11 выведено по аналогии — см. AMMO-FOUND-TABLE.md"
     }
   }
 }
