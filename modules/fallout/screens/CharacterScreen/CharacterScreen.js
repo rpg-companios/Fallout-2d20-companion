@@ -21,6 +21,8 @@ import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins } from "../../../../domain/origins";
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../../domain/traits";
 import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
+import { resolveKitItemEquipState } from "../../../../domain/kitEquip";
+import StartingPurchaseModal from "./modals/StartingPurchaseModal";
 import { rollCombatDiceEffects } from "../../../../domain/diceRollsLogic";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
@@ -284,6 +286,7 @@ export default function CharacterScreen() {
     setEffects,
     caps,
     earnCaps,
+    spendCaps,
     setCurrentHealth,
     luckPoints,
     setLuckPoints,
@@ -399,6 +402,9 @@ export default function CharacterScreen() {
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
   const [isTraitModalVisible, setIsTraitModalVisible] = useState(false);
+  const [isStartingPurchaseVisible, setIsStartingPurchaseVisible] = useState(false);
+  const [purchaseBudget, setPurchaseBudget] = useState(0);
+  const [purchaseMaxRarity, setPurchaseMaxRarity] = useState(null);
   const [isEquipmentKitModalVisible, setIsEquipmentKitModalVisible] =
     useState(false);
 
@@ -555,11 +561,11 @@ export default function CharacterScreen() {
         });
         const CURRENCY_TYPES = new Set(['currency']);
         if (CURRENCY_TYPES.has(item?.itemType) || CURRENCY_TYPES.has(item?.type)) return;
-        useCharacterStore.getState().addNewItem({
-          ...item,
-          equipped: isRobot ? true : false,
-          locked:   isRobot ? true : false,
-        });
+        // Роботу надевается только то, что занимает слот. Расходники
+        // (стимпаки, еда) слот не занимают: надетыми они висли запертыми —
+        // ни использовать, ни снять.
+        const { equipped, locked } = resolveKitItemEquipState(item, isRobot);
+        useCharacterStore.getState().addNewItem({ ...item, equipped, locked });
       });
       debugLog('kits.select.done', { itemIds: Object.keys(useCharacterStore.getState().items) });
     }
@@ -571,6 +577,9 @@ export default function CharacterScreen() {
       weight: kit.weight,
       price: kit.price,
       items: kit.items,
+      // Комплект «покупка снаряжения»: экран инвентаря по этому порогу
+      // ограничит каталог покупки.
+      purchaseMaxRarity: kit.purchaseMaxRarity ?? null,
     });
     
     // 3. Update caps
@@ -593,6 +602,24 @@ export default function CharacterScreen() {
     }
 
     setIsEquipmentKitModalVisible(false);
+
+    // Комплект «покупка снаряжения»: крышки уже начислены — сразу открываем
+    // окно покупки, чтобы игрок потратил их на старте. Остаток останется
+    // обычными крышками.
+    if (Number.isFinite(kit.purchaseMaxRarity) && (kit.caps || 0) > 0) {
+      setPurchaseBudget(kit.caps || 0);
+      setPurchaseMaxRarity(kit.purchaseMaxRarity);
+      setIsStartingPurchaseVisible(true);
+    }
+  };
+
+  // Итог стартовой покупки: предметы в инвентарь, потраченное — с крышек.
+  // Остаток трогать не нужно: крышки начислены целиком при выдаче комплекта.
+  const handleFinishStartingPurchase = ({ items, spent }) => {
+    items.forEach((item) => {
+      useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+    });
+    if (spent > 0) spendCaps(spent);
   };
 
   const handleToggleSkill = (skillName) => {
@@ -1429,7 +1456,15 @@ export default function CharacterScreen() {
           onClose={() => setIsEquipmentKitModalVisible(false)}
           equipmentKits={equipmentKitsForModal}
           onSelectKit={handleSelectKit}
-          character={{ origin, trait }}
+          character={{ origin, trait, level }}
+        />
+
+        <StartingPurchaseModal
+          visible={isStartingPurchaseVisible}
+          onClose={() => setIsStartingPurchaseVisible(false)}
+          budget={purchaseBudget}
+          maxRarity={purchaseMaxRarity}
+          onFinish={handleFinishStartingPurchase}
         />
 
         {/* Модальное окно для выбора черты */}

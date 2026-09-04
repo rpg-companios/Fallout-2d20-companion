@@ -36,7 +36,7 @@ const mapWeaponTypeToDbValue = {
   explosive: 'Explosive',
 };
 
-const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot' }) => {
+const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.addItemModal.title', selectionMode = 'loot', maxRarity = null }) => {
   const engineLocale = useLocale();
   const moduleLocale = useModuleLocale();
   const [currentPath, setCurrentPath] = useState([]);
@@ -177,10 +177,33 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     }
   }, [visible]);
 
-  const allData = useMemo(() => ({
-    [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
-    ...staticData,
-  }), [engineLocale, weaponsByType, staticData]);
+  const allData = useMemo(() => {
+    const tree = {
+      [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
+      ...staticData,
+    };
+    // Комплект «покупка снаряжения» задаёт потолок редкости. Предметы выше
+    // порога прячем целиком: короче список и не дразнит тем, что купить
+    // нельзя. Записи без rarity считаем доступными — отсутствие поля не
+    // повод прятать предмет.
+    if (!Number.isFinite(maxRarity)) return tree;
+    const keep = (item) => !Number.isFinite(Number(item?.rarity)) || Number(item.rarity) <= maxRarity;
+    const prune = (node) => {
+      if (Array.isArray(node)) return node.filter(keep);
+      if (!node || typeof node !== 'object') return node;
+      const out = {};
+      for (const [key, value] of Object.entries(node)) {
+        const pruned = prune(value);
+        // Пустые ветки после отсева не показываем.
+        const isEmpty = Array.isArray(pruned)
+          ? pruned.length === 0
+          : pruned && typeof pruned === 'object' && Object.keys(pruned).length === 0;
+        if (!isEmpty) out[key] = pruned;
+      }
+      return out;
+    };
+    return prune(tree);
+  }, [engineLocale, weaponsByType, staticData, maxRarity]);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');

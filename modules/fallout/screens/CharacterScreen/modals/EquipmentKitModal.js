@@ -244,7 +244,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         const resolved = await Promise.all(
           equipmentKits.map(async (kit) => {
             try {
-              return await resolveKitItems(kit);
+              return await resolveKitItems(kit, { level: character?.level });
             } catch (error) {
               debugLog('kits.modal.failed', { kitId: kit?.id, error: error?.message || String(error) });
               return kit;
@@ -270,7 +270,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     };
 
     load();
-  }, [visible, equipmentKits]);
+  }, [visible, equipmentKits, character?.level]);
 
   if (!equipmentKits) return null;
 
@@ -289,6 +289,12 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
     const chosenEntries = flattenKitItems(kit, selectedChoices);
     const inventoryItems = toInventoryItems(chosenEntries);
     const { finalItems, totalCaps, weight, price } = summarizeItems(inventoryItems);
+
+    // Потолок редкости берём из записи 'purchase' (kitResolver положил его в
+    // purchaseMaxRarity). Обычные комплекты его не несут — там null.
+    const purchaseRarityCap = chosenEntries.reduce((acc, entry) => (
+      Number.isFinite(entry?.purchaseMaxRarity) ? entry.purchaseMaxRarity : acc
+    ), null);
 
     const isRobot = isRobotCharacter(character);
 
@@ -335,6 +341,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         weight,
         price,
         caps: totalCaps,
+        purchaseMaxRarity: purchaseRarityCap,
         robotSlots: slots,
         robotWeapons: weapons,
         robotModules: modules,
@@ -348,6 +355,9 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
         weight,
         price,
         caps: totalCaps,
+        // Потолок редкости комплекта «покупка снаряжения»: по нему экран
+        // инвентаря ограничит каталог покупки.
+        purchaseMaxRarity: purchaseRarityCap,
         unarmedWeaponId: builtin?.id || null,
       });
     }

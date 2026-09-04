@@ -20,6 +20,7 @@ import ncr from './ncr.json';
 import nightkin from './nightkin.json';
 import assaultron from './assaultron.json';
 import protectron from './protectron.json';
+import purchase from './purchase.json';
 import robobrain from './robobrain.json';
 import securitron from './securitron.json';
 import superMutant from './superMutant.json';
@@ -39,6 +40,7 @@ export default {
   ...nightkin,
   ...assaultron,
   ...protectron,
+  ...purchase,
   ...robobrain,
   ...securitron,
   ...superMutant,
