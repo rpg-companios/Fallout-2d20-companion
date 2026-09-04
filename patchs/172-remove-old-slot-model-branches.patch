@@ -1,0 +1,1300 @@
+From 0000000000000000000000000000001788516881 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 10:14:41 +0000
+Subject: [PATCH] remove old slot model branches and feature flag
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 4, шаг 2. Исторические ветки и фича-флаг сняты: модель одна.
+
+- domain/robotSlots.js: удалён сам флаг (setNewSlotModelEnabled,
+  isNewSlotModelEnabled, ROBOT_NEW_SLOT_MODEL).
+- domain/robotEquip.js: getBuiltinWeaponsFromSlots теперь только делегирует в
+  collectAttacks; раскладка конечностей и защиты — по типу конечности из плана
+  тела; «снятие пары» при замене руки удалено; canEquipRobotArmor и
+  canReplaceLimb работают без ветвления.
+- domain/robotDamageResistance.js: активные слои и СУ считает robotSlots
+  (LAYER_ORDER/getLayerKeys удалены).
+- domain/robotSlotLogic.js: диапазоны попаданий только из getSlotHitRange.
+- LimbUpgradeModal: кандидаты только из limbOptionsForSlot.
+- Тесты: 8 проверок старого поведения удалены намеренно; набор переименован
+  в robot-slot-behaviour.test.js. 253 теста / 22 файла — зелёные.
+
+---
+ 8 files changed, 193 insertions(+), 568 deletions(-)
+
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+index 0b51572..61d2fa8 100644
+--- a/__tests__/robot/mister-handy.test.js
++++ b/__tests__/robot/mister-handy.test.js
+@@ -9,16 +9,15 @@
+ //   * движитель называется thruster (не leftLeg/rightLeg);
+ //   * голову зовут head, но это «оптика» (Optics) для брони.
+ //
+-// Тест ПАДАЕТ до рефакторинга — это и есть критерий готовности: зелёный файл
+-// означает, что этапы 1–4 выполнены. Зачем он такой, а не «проверяет новые
+-// чистые функции»: он идёт через существующие точки входа (initRobotSlots →
+-// getBuiltinWeaponsFromSlots), поэтому остаётся рабочим и во время переезда,
+-// когда новые функции ещё не подключены к коду.
++// Acceptance-критерий рефакторинга: зелёный файл означает, что этапы 1–4
++// выполнены. Идёт через существующие точки входа (initRobotSlots →
++// getBuiltinWeaponsFromSlots), а не через новые чистые функции, — так он
++// проверяет именно то, что видит игрок.
+ //
+ // Часть проверок зелёная уже сейчас — это регрессионные страховки: они должны
+ // остаться зелёными на всех этапах.
+ 
+-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import { describe, it, expect } from 'vitest';
+ 
+ import kits from '../../modules/fallout/data/equipmentKits/index.js';
+ import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
+@@ -33,7 +32,6 @@ import {
+   getBuiltinWeaponsFromSlots,
+   findFreeWeaponHand,
+ } from '../../domain/robotEquip';
+-import { setNewSlotModelEnabled } from '../../domain/robotSlots';
+ 
+ // ---------------------------------------------------------------------------
+ // Сборка предметов кита: то же, что делает kitResolver, но синхронно и без БД
+@@ -100,12 +98,6 @@ const attacksOfSlot = (slots, slotKey) =>
+ const emptyHandy = () => initRobotSlots('misterHandy', [], robotCatalog);
+ 
+ describe('Мистер Хэнди — acceptance-критерий новой модели слотов', () => {
+-  // Acceptance проверяет НОВУЮ модель, поэтому файл включает фича-флаг
+-  // на время прогона. Когда флаг станет постоянным (этап 4), эти строчки
+-  // просто уберутся, а проверки останутся.
+-  beforeEach(() => setNewSlotModelEnabled(true));
+-  afterEach(() => setNewSlotModelEnabled(null));
+-
+   // -------------------------------------------------------------------------
+   // Регрессионные страховки (зелёные сейчас, должны остаться зелёными)
+   // -------------------------------------------------------------------------
+@@ -241,18 +233,4 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+     expect(slots.arm3.plating).toBeFalsy();
+   });
+ 
+-  it('старая модель (флаг выключен) съедает вторую одинаковую руку', () => {
+-    // Фиксация причины переезда: пока включена старая модель, arm3 не даёт
+-    // отдельной карточки — дедупликация по id оружия. Тест живёт до этапа 4,
+-    // где старая ветка будет удалена вместе с флагом.
+-    setNewSlotModelEnabled(false);
+-    const { slots } = initRobotSlots(
+-      'misterHandy',
+-      resolveKit('mister_handy_nanny'),
+-      robotCatalog,
+-    );
+-    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(2);
+-  });
+ });
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-behaviour.test.js
+similarity index 65%
+rename from __tests__/robot/robot-slot-model-flag.test.js
+rename to __tests__/robot/robot-slot-behaviour.test.js
+index cf21e36..bdd5e09 100644
+--- a/__tests__/robot/robot-slot-model-flag.test.js
++++ b/__tests__/robot/robot-slot-behaviour.test.js
+@@ -1,12 +1,12 @@
+-// __tests__/robot/robot-slot-model-flag.test.js
++// __tests__/robot/robot-slot-behaviour.test.js
+ //
+-// Этап 3: первая точка использования переведена на новую модель за фича-
+-// флагом — сбор атак (getBuiltinWeaponsFromSlots → collectAttacks).
++// Поведение новой модели слотов: сбор атак, раскладка защиты, СУ, диапазоны
++// попаданий, замена и съёмность конечностей, каталог кандидатов для слота.
+ //
+-// Главное правило этапа: при ВЫКЛЮЧЕННОМ флаге поведение обязано быть
+-// прежним, без исключений. Новое поведение видно только при включённом.
++// Фич-флаг снят (этап 4): модель одна, исторических веток в коде нет, поэтому
++// «старая модель» здесь не проверяется — проверяется только текущее поведение.
+ 
+-import { describe, it, expect, afterEach } from 'vitest';
++import { describe, it, expect } from 'vitest';
+ 
+ import {
+   initRobotSlots,
+@@ -25,8 +25,6 @@ import screenI18n from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor
+ import platingCatalogJson from '../../modules/fallout/data/equipment/robot/armor_plating.json';
+ import framesCatalogJson from '../../modules/fallout/data/equipment/robot/frames.json';
+ import {
+-  setNewSlotModelEnabled,
+-  isNewSlotModelEnabled,
+   getSlotHitRange,
+   resolveHit,
+   slotForDirection,
+@@ -71,42 +69,8 @@ const handyNanny = () => initRobotSlots('misterHandy', [
+   { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+ ], robotCatalog);
+ 
+-afterEach(() => setNewSlotModelEnabled(null));
+-
+-// Этап 4: новая модель включена по умолчанию. ROBOT_NEW_SLOT_MODEL=0 —
+-// аварийный выключатель, возвращающий старую ветку до её удаления.
+-const envOff = () =>
+-  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '0';
+-
+-describe('фича-флаг новой модели', () => {
+-  it('по умолчанию включен (кроме аварийного выключателя в окружении)', () => {
+-    setNewSlotModelEnabled(null);
+-    expect(isNewSlotModelEnabled()).toBe(!envOff());
+-  });
+-
+-  it('ручной режим приоритетнее окружения и возвращается к нему', () => {
+-    setNewSlotModelEnabled(true);
+-    expect(isNewSlotModelEnabled()).toBe(true);
+-    setNewSlotModelEnabled(false);
+-    expect(isNewSlotModelEnabled()).toBe(false);
+-    setNewSlotModelEnabled(null);
+-    expect(isNewSlotModelEnabled()).toBe(!envOff());
+-  });
+-});
+-
+-describe('сбор атак: старая модель (флаг выключен)', () => {
+-  it('две одинаковые руки склеиваются в одну карточку', () => {
+-    setNewSlotModelEnabled(false);
+-    const { slots } = handyNanny();
+-    const weapons = getBuiltinWeaponsFromSlots(slots);
+-    expect(weapons).toHaveLength(2); // манипулятор + огнемёт, arm3 потерян
+-    expect(weapons.map((w) => w.id)).toContain('robot_weapon_flamethrower');
+-  });
+-});
+-
+-describe('сбор атак: новая модель (флаг включён)', () => {
++describe('сбор атак', () => {
+   it('каждая рука даёт свою карточку — arm3 не теряется', () => {
+-    setNewSlotModelEnabled(true);
+     const { slots } = handyNanny();
+     const weapons = getBuiltinWeaponsFromSlots(slots);
+ 
+@@ -117,7 +81,6 @@ describe('сбор атак: новая модель (флаг включён)',
+   });
+ 
+   it('запись сохраняет форму, которую ждут экраны и сейв', () => {
+-    setNewSlotModelEnabled(true);
+     const { slots } = handyNanny();
+     const [attack] = getBuiltinWeaponsFromSlots(slots);
+ 
+@@ -135,7 +98,6 @@ describe('сбор атак: новая модель (флаг включён)',
+   });
+ 
+   it('оружие вместо руки свою атаку даёт, ладонь — нет', () => {
+-    setNewSlotModelEnabled(true);
+     const { slots } = handyNanny();
+     // Положили пилу в ладонь слота с огнемётом: ладони у него нет.
+     slots.arm2.heldWeapon = byId(weaponsCatalog, 'robot_weapon_circular_saw');
+@@ -145,7 +107,6 @@ describe('сбор атак: новая модель (флаг включён)',
+   });
+ 
+   it('оружие в ладони настоящей руки считается', () => {
+-    setNewSlotModelEnabled(true);
+     const { slots } = handyNanny();
+     const held = byId(weaponsCatalog, 'robot_weapon_protectron_manipulator');
+     slots.arm1.heldWeapon = { ...held, name: 'Манипулятор няни', mods: [{ id: 'mod_x' }] };
+@@ -159,16 +120,14 @@ describe('сбор атак: новая модель (флаг включён)',
+   });
+ 
+   it('пустые и незаполненные слоты не дают мусора', () => {
+-    setNewSlotModelEnabled(true);
+     expect(getBuiltinWeaponsFromSlots({})).toEqual([]);
+     expect(getBuiltinWeaponsFromSlots(null)).toEqual([]);
+     expect(getBuiltinWeaponsFromSlots({ arm1: null, arm2: {} })).toEqual([]);
+   });
+ });
+ 
+-describe('регрессии под новой моделью', () => {
++describe('регрессии', () => {
+   it('лазер головы ассультрон сохраняет боевые характеристики', () => {
+-    setNewSlotModelEnabled(true);
+     const head = byId(headsCatalog, 'robot_head_assaultron_laser');
+     const { slots } = initRobotSlots('assaultron', [{ ...head }], robotCatalog);
+     const weapons = getBuiltinWeaponsFromSlots(slots);
+@@ -182,7 +141,6 @@ describe('регрессии под новой моделью', () => {
+   });
+ 
+   it('строительные когти: одинаковые руки дают две карточки', () => {
+-    setNewSlotModelEnabled(true);
+     const claw = byId(weaponsCatalog, 'robot_weapon_construction_claw');
+     const { slots } = initRobotSlots('assaultron', [
+       { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'left' },
+@@ -198,7 +156,6 @@ describe('регрессии под новой моделью', () => {
+   });
+ 
+   it('протектрон: встроенного оружия нет, ладонь считается', () => {
+-    setNewSlotModelEnabled(true);
+     const { slots } = initRobotSlots('protectron', [], robotCatalog);
+     expect(getBuiltinWeaponsFromSlots(slots)).toEqual([]);
+ 
+@@ -225,22 +182,7 @@ describe('защита: раскладка по слотам', () => {
+     { ...byId(armsCatalog, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
+   ];
+ 
+-  it('старая модель: обшивка ложится и на оружие вместо руки', () => {
+-    setNewSlotModelEnabled(false);
+-    const { slots } = initRobotSlots('misterHandy', [
+-      ...handyAssistant(),
+-      platingFor('Arms'),
+-      platingFor('Arms'),
+-      platingFor('Arms'),
+-    ], robotCatalog);
+-
+-    expect(slots.arm1.plating?.id).toBeTruthy();
+-    expect(slots.arm2.plating?.id).toBeTruthy(); // баг: защита на огнемёте
+-    expect(slots.arm3.plating?.id).toBeTruthy(); // баг: защита на пиле
+-  });
+-
+-  it('новая модель: обшивка только на настоящую конечность', () => {
+-    setNewSlotModelEnabled(true);
++  it('обшивка ложится только на настоящую конечность', () => {
+     const { slots, inventoryItems } = initRobotSlots('misterHandy', [
+       ...handyAssistant(),
+       platingFor('Arms'),
+@@ -255,15 +197,13 @@ describe('защита: раскладка по слотам', () => {
+     expect(inventoryItems.filter((i) => i.itemType === 'plating')).toHaveLength(2);
+   });
+ 
+-  it('новая модель: обшивка «Thruster» идёт в слот движителя', () => {
+-    setNewSlotModelEnabled(true);
++  it('обшивка «Thruster» идёт в слот движителя', () => {
+     const { slots } = initRobotSlots('misterHandy', [platingFor('Thruster')], robotCatalog);
+     expect(slots.thruster.plating?.id).toBeTruthy();
+     expect(slots.body.plating).toBeFalsy();
+   });
+ 
+-  it('новая модель: три обшивки «Arms» — по одной на руку', () => {
+-    setNewSlotModelEnabled(true);
++  it('три обшивки «Arms» — по одной на руку', () => {
+     const { slots } = initRobotSlots('misterHandy', [
+       platingFor('Arms'),
+       platingFor('Arms'),
+@@ -274,8 +214,7 @@ describe('защита: раскладка по слотам', () => {
+     expect(slots.arm3.plating?.id).toBeTruthy();
+   });
+ 
+-  it('новая модель: пустой Хэнди не держит защиту без конечности', () => {
+-    setNewSlotModelEnabled(true);
++  it('Хэнди без конечности защиты не держит', () => {
+     const { slots } = initRobotSlots('misterHandy', [], robotCatalog);
+     // Руки автозаполнены — защиту принимают; у движителя конечность есть.
+     expect(slots.thruster.limb?.id).toBeTruthy();
+@@ -283,21 +222,14 @@ describe('защита: раскладка по слотам', () => {
+   });
+ });
+ 
+-describe('canEquipRobotArmor под флагом', () => {
++describe('canEquipRobotArmor', () => {
+   const handySlots = () => {
+     const { slots } = initRobotSlots('misterHandy', [], robotCatalog);
+     slots.arm2.limb = { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' };
+     return slots;
+   };
+ 
+-  it('старая модель: оружие вместо руки обшивку принимает', () => {
+-    setNewSlotModelEnabled(false);
+-    const slots = handySlots();
+-    expect(canEquipRobotArmor(platingFor('Arms'), 'arm2', 'plating', slots).allowed).toBe(true);
+-  });
+-
+-  it('новая модель: оружие вместо руки обшивку не принимает', () => {
+-    setNewSlotModelEnabled(true);
++  it('оружие вместо руки обшивку не принимает', () => {
+     const slots = handySlots();
+     const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm2', 'plating', slots);
+     expect(allowed).toBe(false);
+@@ -306,8 +238,7 @@ describe('canEquipRobotArmor под флагом', () => {
+     expect(canEquipRobotArmor(platingFor('Arms'), 'arm1', 'plating', slots).allowed).toBe(true);
+   });
+ 
+-  it('новая модель: пустой слот защиты не принимает', () => {
+-    setNewSlotModelEnabled(true);
++  it('пустой слот защиты не принимает', () => {
+     const slots = handySlots();
+     slots.arm3.limb = null;
+     const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm3', 'plating', slots);
+@@ -318,14 +249,11 @@ describe('canEquipRobotArmor под флагом', () => {
+   it('конфликт слоёв ловится в обоих моделях', () => {
+     // Обшивка несовместима с рамой и бронёй (incompatibleLayers самой
+     // обшивки) — проверяем ровно то направление, которое задано данными.
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      const slots = handySlots();
+-      slots.arm1.frame = frameFor('Arms');
+-      const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm1', 'plating', slots);
+-      expect(allowed).toBe(false);
+-      expect(reason).toBe('equip.error.armorLayerIncompatible');
+-    }
++        const slots = handySlots();
++    slots.arm1.frame = frameFor('Arms');
++    const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm1', 'plating', slots);
++    expect(allowed).toBe(false);
++    expect(reason).toBe('equip.error.armorLayerIncompatible');
+   });
+ });
+ 
+@@ -346,21 +274,14 @@ describe('СУ слота: чтение состояния', () => {
+     heldWeaponId: null,
+   });
+ 
+-  it('старый вид читается одинаково в обеих моделях', () => {
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      // Рука протектрона 2/1 + обшивка рук 2/0.
+-      expect(getRobotSlotDamageResistance(oldShapeSlot()))
+-        .toEqual({ physical: 4, energy: 1, rad: 0 });
+-    }
++  it('старый вид состояния читается (объекты в layer-полях)', () => {
++        // Рука протектрона 2/1 + обшивка рук 2/0.
++    expect(getRobotSlotDamageResistance(oldShapeSlot()))
++      .toEqual({ physical: 4, energy: 1, rad: 0 });
+   });
+ 
+-  it('новый вид читает только новая модель', () => {
+-    setNewSlotModelEnabled(false);
+-    expect(getRobotSlotDamageResistance(newShapeSlot()))
+-      .toEqual({ physical: 0, energy: 0, rad: 0 });
+-
+-    setNewSlotModelEnabled(true);
++  it('новый вид состояния (content + armorLayers по id) читается', () => {
++    // Рука протектрона 2/1 + обшивка рук 2/0, записанные идентификаторами.
+     expect(getRobotSlotDamageResistance(newShapeSlot()))
+       .toEqual({ physical: 4, energy: 1, rad: 0 });
+     expect(getActiveRobotLayers(newShapeSlot()).map((l) => l.key)).toEqual(['plating']);
+@@ -376,11 +297,7 @@ describe('СУ слота: чтение состояния', () => {
+       heldWeapon: null,
+     });
+ 
+-    setNewSlotModelEnabled(false);
+-    // Старая модель считает обшивку — отсюда и живёт баг.
+-    expect(getRobotSlotDamageResistance(brokenSlot()).physical).toBeGreaterThan(0);
+-
+-    setNewSlotModelEnabled(true);
++    // Обшивка на оружии — мусор старого сейва: вклада не даёт.
+     expect(getRobotSlotDamageResistance(brokenSlot()))
+       .toEqual({ physical: 0, energy: 0, rad: 0 });
+   });
+@@ -402,7 +319,6 @@ describe('СУ слота: чтение состояния', () => {
+       heldWeapon: null,
+     });
+ 
+-    setNewSlotModelEnabled(true);
+     // Своя защита есть, вклад обшивки не считается.
+     expect(getRobotSlotDamageResistance(armedWeapon()))
+       .toEqual({ physical: 3, energy: 2, rad: 1 });
+@@ -413,18 +329,14 @@ describe('СУ слота: чтение состояния', () => {
+     })).toEqual({ physical: 0, energy: 0, rad: 0 });
+   });
+ 
+-  it('пустой слот защиты не несёт ни в одной модели', () => {
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      expect(getRobotSlotDamageResistance({})).toEqual({ physical: 0, energy: 0, rad: 0 });
+-      expect(getRobotSlotDamageResistance(null)).toEqual({ physical: 0, energy: 0, rad: 0 });
+-    }
++  it('пустой слот защиты не несёт', () => {
++        expect(getRobotSlotDamageResistance({})).toEqual({ physical: 0, energy: 0, rad: 0 });
++    expect(getRobotSlotDamageResistance(null)).toEqual({ physical: 0, energy: 0, rad: 0 });
+   });
+ });
+ 
+ describe('диапазоны попаданий в экране', () => {
+   it('getSlotHitRange — обратная сторона resolveHit', () => {
+-    setNewSlotModelEnabled(true);
+     expect(getSlotHitRange('protectron', 'leftArm')).toEqual({ from: 4, to: 7 });
+     expect(getSlotHitRange('securitron', 'wheel')).toEqual({ from: 18, to: 20 });
+     expect(getSlotHitRange('protectron', 'нетТакогоСлота')).toBeNull();
+@@ -432,7 +344,6 @@ describe('диапазоны попаданий в экране', () => {
+   });
+ 
+   it('для каждого броска 1..20 таблица ведёт в слот, который его содержит', () => {
+-    setNewSlotModelEnabled(true);
+     for (const planId of ['protectron', 'securitron']) {
+       for (let roll = 1; roll <= 20; roll += 1) {
+         const slotId = resolveHit(planId, roll);
+@@ -451,10 +362,6 @@ describe('диапазоны попаданий в экране', () => {
+     }).slotSubtitle;
+ 
+     // Протектрон: у людей leftArm — 9-11, у протектрона по плану — 4-7.
+-    setNewSlotModelEnabled(false);
+-    expect(subtitle('protectron', 'leftArm')).toBe('9-11');
+-
+-    setNewSlotModelEnabled(true);
+     expect(subtitle('protectron', 'leftArm')).toBe('4-7');
+     expect(subtitle('protectron', 'head')).toBe('1-3');
+ 
+@@ -466,7 +373,6 @@ describe('диапазоны попаданий в экране', () => {
+   });
+ 
+   it('у планов без таблицы диапазонов нет — экран берёт статику людей', () => {
+-    setNewSlotModelEnabled(true);
+     // У Хэнди hitTable пока нет: экран показывает общую подпись из i18n.
+     expect(resolveHit('misterHandy', 10)).toBeNull();
+     expect(getSlotHitRange('misterHandy', 'arm1')).toBeNull();
+@@ -475,25 +381,14 @@ describe('диапазоны попаданий в экране', () => {
+ 
+ describe('замена конечностей', () => {
+   // Протектрон: обе руки держат ОДИН И ТОТ ЖЕ объект конечности — ровно
+-  // тот случай, который старая модель считала парой.
++  // тот случай, который раньше считался парой конечностей.
+   const pairedProtectron = () => {
+     const { slots } = initRobotSlots('protectron', [], robotCatalog);
+     slots.rightArm.limb = slots.leftArm.limb;
+     return slots;
+   };
+ 
+-  it('старая модель: замена парной руки обнуляет соседа', () => {
+-    setNewSlotModelEnabled(false);
+-    const slots = pairedProtectron();
+-    const replacement = { ...byId(armsCatalog, 'robot_arm_assaultron'), itemType: 'robotArm' };
+-    const { slots: next } = applyLimbReplacement(slots, 'leftArm', replacement, weaponsCatalog);
+-
+-    expect(next.leftArm.limb?.id).toBe('robot_arm_assaultron');
+-    expect(next.rightArm.limb).toBeNull();
+-  });
+-
+-  it('новая модель: замена меняет ровно один слот', () => {
+-    setNewSlotModelEnabled(true);
++  it('замена меняет ровно один слот', () => {
+     const slots = pairedProtectron();
+     const replacement = { ...byId(armsCatalog, 'robot_arm_assaultron'), itemType: 'robotArm' };
+     const { slots: next } = applyLimbReplacement(slots, 'leftArm', replacement, weaponsCatalog);
+@@ -504,46 +399,33 @@ describe('замена конечностей', () => {
+   });
+ 
+   it('Хэнди: замена arm3 не трогает arm1 и arm2', () => {
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      const { slots } = initRobotSlots('misterHandy', [
+-        { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+-        { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+-        { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+-      ], robotCatalog);
+-      const before1 = slots.arm1.limb?.id;
+-      const before2 = slots.arm2.limb?.id;
+-
+-      const { slots: next } = applyLimbReplacement(
+-        slots,
+-        'arm3',
+-        { ...byId(armsCatalog, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
+-        weaponsCatalog,
+-      );
+-
+-      expect(next.arm3.limb?.id).toBe('robot_weapon_circular_saw');
+-      expect(next.arm1.limb?.id).toBe(before1);
+-      expect(next.arm2.limb?.id).toBe(before2);
+-    }
++        const { slots } = initRobotSlots('misterHandy', [
++      { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++    ], robotCatalog);
++    const before1 = slots.arm1.limb?.id;
++    const before2 = slots.arm2.limb?.id;
++
++    const { slots: next } = applyLimbReplacement(
++      slots,
++      'arm3',
++      { ...byId(armsCatalog, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
++      weaponsCatalog,
++    );
++
++    expect(next.arm3.limb?.id).toBe('robot_weapon_circular_saw');
++    expect(next.arm1.limb?.id).toBe(before1);
++    expect(next.arm2.limb?.id).toBe(before2);
+   });
+ 
+-  it('новая модель: защита снимается, если вместо руки ставится оружие', () => {
++  it('защита снимается, если вместо руки ставится оружие', () => {
+     const prepare = () => {
+       const { slots } = initRobotSlots('protectron', [], robotCatalog);
+       slots.leftArm.plating = platingFor('Arms');
+       return slots;
+     };
+ 
+-    setNewSlotModelEnabled(false);
+-    const oldNext = applyLimbReplacement(
+-      prepare(),
+-      'leftArm',
+-      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+-      weaponsCatalog,
+-    ).slots;
+-    expect(oldNext.leftArm.plating).toBeTruthy(); // старая модель оставляет обшивку
+-
+-    setNewSlotModelEnabled(true);
+     const next = applyLimbReplacement(
+       prepare(),
+       'leftArm',
+@@ -558,20 +440,17 @@ describe('замена конечностей', () => {
+     expect(next.rightArm.plating).toBeFalsy();
+   });
+ 
+-  it('ладень: недержащая конечность weapon в руке не держит', () => {
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      const { slots } = initRobotSlots('protectron', [], robotCatalog);
+-      slots.leftArm.heldWeapon = byId(weaponsCatalog, 'robot_weapon_protectron_manipulator');
+-
+-      const { slots: next } = applyLimbReplacement(
+-        slots,
+-        'leftArm',
+-        { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+-        weaponsCatalog,
+-      );
+-      expect(next.leftArm.heldWeapon).toBeFalsy();
+-    }
++  it('ладонь: недержащая конечность оружие не удерживает', () => {
++        const { slots } = initRobotSlots('protectron', [], robotCatalog);
++    slots.leftArm.heldWeapon = byId(weaponsCatalog, 'robot_weapon_protectron_manipulator');
++
++    const { slots: next } = applyLimbReplacement(
++      slots,
++      'leftArm',
++      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      weaponsCatalog,
++    );
++    expect(next.leftArm.heldWeapon).toBeFalsy();
+   });
+ });
+ 
+@@ -584,13 +463,7 @@ describe('съёмность слота (swappable)', () => {
+     itemType: 'robotHead',
+   };
+ 
+-  it('старая модель: голову заменить можно', () => {
+-    setNewSlotModelEnabled(false);
+-    expect(canReplaceLimb('head', newHead, character).allowed).toBe(true);
+-  });
+-
+-  it('новая модель: голова не снимается', () => {
+-    setNewSlotModelEnabled(true);
++  it('голова не снимается', () => {
+     const { allowed, reason } = canReplaceLimb('head', newHead, character);
+     expect(allowed).toBe(false);
+     expect(reason).toBe('equip.error.slotNotSwappable');
+@@ -602,25 +475,18 @@ describe('съёмность слота (swappable)', () => {
+ 
+ describe('сторона комплекта: порядок, а не имя слота', () => {
+   it('Хэнди: left→arm1, right→arm2, center→arm3', () => {
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      expect(getSlotForDirection('misterHandy', 'left')).toBe('arm1');
+-      expect(getSlotForDirection('misterHandy', 'right')).toBe('arm2');
+-      expect(getSlotForDirection('misterHandy', 'center')).toBe('arm3');
+-    }
++        expect(getSlotForDirection('misterHandy', 'left')).toBe('arm1');
++    expect(getSlotForDirection('misterHandy', 'right')).toBe('arm2');
++    expect(getSlotForDirection('misterHandy', 'center')).toBe('arm3');
+   });
+ 
+   it('протектрон: left→leftArm, right→rightArm, центра нет', () => {
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      expect(getSlotForDirection('protectron', 'left')).toBe('leftArm');
+-      expect(getSlotForDirection('protectron', 'right')).toBe('rightArm');
+-      expect(getSlotForDirection('protectron', 'center')).toBeNull();
+-    }
++        expect(getSlotForDirection('protectron', 'left')).toBe('leftArm');
++    expect(getSlotForDirection('protectron', 'right')).toBe('rightArm');
++    expect(getSlotForDirection('protectron', 'center')).toBeNull();
+   });
+ 
+   it('слот движителя ищется по типу, а не по имени', () => {
+-    setNewSlotModelEnabled(true);
+     expect(slotForDirection('misterHandy', 'left', 'mover')).toBe('thruster');
+     expect(slotForDirection('securitron', 'left', 'mover')).toBe('wheel');
+     expect(slotForDirection('robobrain', 'left', 'mover')).toBe('chassis');
+@@ -632,12 +498,9 @@ describe('сторона комплекта: порядок, а не имя сл
+       { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm', slot: 'left' },
+       { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm', slot: 'right' },
+     ];
+-    for (const value of [false, true]) {
+-      setNewSlotModelEnabled(value);
+-      const { slots } = initRobotSlots('misterHandy', kitItems(), robotCatalog);
+-      expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+-      expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
+-    }
++        const { slots } = initRobotSlots('misterHandy', kitItems(), robotCatalog);
++    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
+   });
+ });
+ 
+@@ -651,7 +514,6 @@ describe('каталог конечностей для слота', () => {
+   const ids = (list) => list.map((l) => l.id).sort();
+ 
+   it('слот руки предлагает только руки (включая оружие вместо руки)', () => {
+-    setNewSlotModelEnabled(true);
+     const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'arm1');
+     expect(options.length).toBeGreaterThan(0);
+     // Все кандидаты — конечности типа arm: и руки, и оружие-руки.
+@@ -665,36 +527,27 @@ describe('каталог конечностей для слота', () => {
+   });
+ 
+   it('слот движителя предлагает движители, а не ноги по имени', () => {
+-    setNewSlotModelEnabled(true);
+     const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'thruster');
+     expect(options.every((l) => l.itemType === 'robotLegs' || l.itemType === 'robotLeg')).toBe(true);
+     expect(ids(options)).toContain('robot_legs_mister_handy_thruster');
+   });
+ 
+   it('слот головы предлагает головы', () => {
+-    setNewSlotModelEnabled(true);
+     const options = limbOptionsForSlot(runtimeCatalog, 'protectron', 'head');
+     expect(options.length).toBeGreaterThan(0);
+     expect(options.every((l) => l.itemType === 'robotHead')).toBe(true);
+   });
+ 
+-  it('обе модели дают один и тот же набор для привычных слотов', () => {
+-    const newModel = (slot, plan) => {
+-      setNewSlotModelEnabled(true);
+-      return ids(limbOptionsForSlot(runtimeCatalog, plan, slot));
+-    };
+-    const oldModel = (slot) => {
+-      setNewSlotModelEnabled(false);
+-      const pool = slot === 'head' ? headsCatalog
+-        : slot === 'body' ? bodiesCatalog
+-          : slot.toLowerCase().includes('arm') ? armsCatalog : legsCatalog;
+-      return ids(pool);
+-    };
++  it('для привычных слотов набор совпадает с каталогом нужного типа', () => {
++    const options = (slot, plan) => ids(limbOptionsForSlot(runtimeCatalog, plan, slot));
++    const catalog = (slot) => ids(slot === 'head' ? headsCatalog
++      : slot === 'body' ? bodiesCatalog
++        : slot.toLowerCase().includes('arm') ? armsCatalog : legsCatalog);
+ 
+-    expect(newModel('leftArm', 'protectron')).toEqual(oldModel('leftArm'));
+-    expect(newModel('head', 'protectron')).toEqual(oldModel('head'));
+-    expect(newModel('body', 'protectron')).toEqual(oldModel('body'));
+-    expect(newModel('leftLeg', 'protectron')).toEqual(oldModel('leftLeg'));
+-    expect(newModel('arm3', 'misterHandy')).toEqual(oldModel('arm3'));
++    expect(options('leftArm', 'protectron')).toEqual(catalog('leftArm'));
++    expect(options('head', 'protectron')).toEqual(catalog('head'));
++    expect(options('body', 'protectron')).toEqual(catalog('body'));
++    expect(options('leftLeg', 'protectron')).toEqual(catalog('leftLeg'));
++    expect(options('arm3', 'misterHandy')).toEqual(catalog('arm3'));
+   });
+ });
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index aa263d8..4a3f07d 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -252,6 +252,9 @@
+ | `ROBOT_NEW_SLOT_MODEL=1` | из окружения: прогнать **весь** набор тестов под новой моделью |
+ | по умолчанию | **выключено** — поведение прежнее |
+ 
++> **Флаг снят патчем 172** (этап 4, шаг 2): модель одна, старых веток в коде
++> нет, переменная `ROBOT_NEW_SLOT_MODEL` больше ни на что не влияет.
++
+ Формат записи на выходе сохранён один в один (`id`, `weaponId`, `sourceSlot`,
+ `sourceLimb`, `isBuiltin`, `isManipulator`) — экраны и сейвы не меняются.
+ Служебные поля нового домена (`source`, `slotId`, `instanceKey`) наружу не
+@@ -422,18 +425,45 @@
+ | 169 | замена конечностей: один слот, защита следует за конечностью | сделано |
+ | 170 | стороны комплекта и каталог конечностей по типу, а не по имени слота | сделано |
+ 
+-**Этап 3 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
++### Этап 4, шаг 2 (патч 172): старые ветки, флаг и тесты старого поведения удалены
++
++Из кода убрано всё, что относилось к исторической модели:
++
++| Что | Где |
++|---|---|
++| сам фича-флаг (`setNewSlotModelEnabled`, `isNewSlotModelEnabled`, `ROBOT_NEW_SLOT_MODEL`) | `domain/robotSlots.js` |
++| старый обход слотов при сборе атак | `getBuiltinWeaponsFromSlots` теперь только делегирует в `collectAttacks` |
++| раскладка конечностей и защиты по имени слота | `initRobotSlots` (только по типу конечности из плана тела) |
++| «снятие пары» при замене руки | `applyLimbReplacement` |
++| старый расчётактивных слоёв и СУ (`LAYER_ORDER`, `getLayerKeys`) | `domain/robotDamageResistance.js` |
++| диапазоны попаданий из `bodyPlan.hitLocations` | `buildRobotSlotStats` (только `getSlotHitRange`) |
++| выбор кандидатов по `itemType` и имени слота | `LimbUpgradeModal` (только `limbOptionsForSlot`) |
++
++Тесты, закреплявшие старое поведение, удалены намеренно (не пропущены):
++8 штук — два про сам флаг, пять «старая модель …», один фиксировавший
++потерю `arm3`. Набор `__tests__/robot/robot-slot-model-flag.test.js`
++переименован в `robot-slot-behaviour.test.js`: флага нет, проверяется только
++текущее поведение.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 253 | **253** |
++| `ROBOT_NEW_SLOT_MODEL=0` (переменная больше ни на что не влияет) | 253 | **253** |
++
++Побочно обнаружено мёртвое поле данных: `hitLocations` в `bodyplans.json`
++(источник диапазонов до `hitTable`) больше никто не читает — кандидат на
++удаление в этапе 6.
++
++**Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-После этого этап 4 — флаг включён и старое удалено (один коммит), этап 5 —
+-миграция сейва, этап 6 — удаление мёртвых полей (`robotLocation`,
+-`builtinTo*`, `slotCapabilities`, `hitLocations`).
++Дальше: этап 5 — миграция сейва, этап 6 — удаление мёртвых полей
++(`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+-Оба acceptance-критерия Хэнди выполнены в обоих режимах (при выключенном
+-флаге — через старую ветку, при включённом — через новую).
++Оба acceptance-критерия Хэнди выполнены.
+ 
+ ---
+ 
+diff --git a/domain/robotDamageResistance.js b/domain/robotDamageResistance.js
+index cd0dc58..e930ba2 100644
+--- a/domain/robotDamageResistance.js
++++ b/domain/robotDamageResistance.js
+@@ -16,46 +16,20 @@
+ //   Итог: либо «броня + рама», либо «обшивка»; конфликтующие слои НЕ суммируются
+ //   (в легаси-сейвах возможна несовместимая комбинация — её приводим к валидной).
+ 
+-import { isNewSlotModelEnabled, activeArmorLayers, totalDR } from './robotSlots';
+-
+-/**
+- * Приоритет выбора активных защитных слоёв.
+- * armor и frame совместимы (нет incompatibleLayers), поэтому идут первыми;
+- * plating конфликтует с ними — добавляется только если armor/frame не заняты.
+- */
+-const LAYER_ORDER = ['armor', 'frame', 'plating'];
++import { activeArmorLayers, totalDR } from './robotSlots';
+ 
+ const toNumber = (value) => {
+   const n = Number(value);
+   return Number.isFinite(n) ? n : 0;
+ };
+ 
+-const getLayerKeys = (slotData) =>
+-  LAYER_ORDER.filter((key) => slotData?.[key] && typeof slotData[key] === 'object');
+-
+ /**
+- * Активные защитные слои без конфликтов.
+- * Набор строится в LAYER_ORDER; слой пропускается, если его incompatibleLayers
+- * пересекается с уже принятыми слоями.
++ * Активные защитные слои без конфликтов (читает и старое, и новое состояние
++ * слота; понимает слои, записанные идентификатором).
+  * @param {object} slotData - { armor?, plating?, frame?, limb? }
+  * @returns {{ key: string, layer: object }[]}
+  */
+-export const getActiveRobotLayers = (slotData) => {
+-  // Новая модель читает оба вида состояния слота и понимает слои,
+-  // записанные идентификатором (новый формат сейва).
+-  if (isNewSlotModelEnabled()) return activeArmorLayers(slotData);
+-
+-  const keys = getLayerKeys(slotData);
+-  const active = [];
+-  for (const key of keys) {
+-    const layer = slotData[key];
+-    const incompatible = Array.isArray(layer.incompatibleLayers) ? layer.incompatibleLayers : [];
+-    const conflicts = incompatible.some((blocked) => active.some((a) => a.key === blocked));
+-    if (conflicts) continue;
+-    active.push({ key, layer });
+-  }
+-  return active;
+-};
++export const getActiveRobotLayers = (slotData) => activeArmorLayers(slotData);
+ 
+ /**
+  * СУ конечности (limb) как числа { physical, energy, rad }.
+@@ -75,17 +49,8 @@ export const getLimbDamageResistance = (limb) => ({
+  * @returns {{ physical: number, energy: number, rad: number }}
+  */
+ export const getRobotSlotDamageResistance = (slotData) => {
+-  // Новая модель: СУ = конечность + совместимые слои, и только там, где
+-  // защита законна (нет конечности или слот занят оружием — вклада нет).
+-  if (isNewSlotModelEnabled()) return totalDR(slotData);
+-
+-  const result = getLimbDamageResistance(slotData?.limb);
+-  const active = getActiveRobotLayers(slotData);
+-  for (const { layer } of active) {
+-    const dr = layer.damageResistance || {};
+-    result.physical += toNumber(dr.physical);
+-    result.energy += toNumber(dr.energy);
+-  }
+-  // Радиация: только от конечности/иммунитета — слои радиационной СУ не несут.
+-  return result;
++  // СУ = конечность + совместимые слои, и только там, где защита законна
++  // (нет конечности или слот занят оружием — вклада нет). Радиационная СУ
++  // берётся только от конечности: слои её не несут.
++  return totalDR(slotData);
+ };
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 4218655..db0e236 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -8,7 +8,6 @@ import {
+ import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
+ import {
+   collectAttacks,
+-  isNewSlotModelEnabled,
+   slotsForLimbType,
+   slotAcceptsArmor,
+   canEquip,
+@@ -100,14 +99,8 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
+ }
+ 
+ export function getSlotForDirection(bodyPlan, direction) {
+-  // Новая модель: сторона — это порядок слота нужного типа, а не его имя.
+-  if (isNewSlotModelEnabled()) return slotForDirection(bodyPlan, direction, 'arm');
+-
+-  const slotKeys = getRobotSlotKeys(bodyPlan);
+-  if (direction === 'left') return slotKeys.find((k) => k === 'leftArm' || k === 'arm1') ?? null;
+-  if (direction === 'right') return slotKeys.find((k) => k === 'rightArm' || k === 'arm2') ?? null;
+-  if (direction === 'center') return slotKeys.find((k) => k === 'arm3') ?? null;
+-  return null;
++  // Сторона — это порядок слота нужного типа, а не его имя.
++  return slotForDirection(bodyPlan, direction, 'arm');
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -259,40 +252,19 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs'].includes(itype)) {
+       let targetKey = null;
+ 
+-      if (isNewSlotModelEnabled()) {
+-        // Новая модель: слот ищется по типу конечности из плана тела.
+-        if (itype === 'robotHead') {
+-          targetKey = slotsForLimbType(bodyPlan, 'head')[0] ?? null;
+-        } else if (itype === 'robotBody') {
+-          targetKey = slotsForLimbType(bodyPlan, 'body')[0] ?? null;
+-        } else if (itype === 'robotLeg' || itype === 'robotLegs') {
+-          targetKey = slotsForLimbType(bodyPlan, 'mover')[0] ?? null;
+-        } else if (itype === 'robotArm') {
+-          // Сторона — порядок слота; без стороны — первый свободный.
+-          const armSlots = slotsForLimbType(bodyPlan, 'arm');
+-          if (item.slot === 'left') targetKey = armSlots[0] ?? null;
+-          else if (item.slot === 'right') targetKey = armSlots[1] ?? null;
+-          else targetKey = armSlots.find(k => slots[k].limb === null) ?? null;
+-        }
+-      } else if (itype === 'robotHead') {
+-        targetKey = 'head';
++      // Слот ищется по типу конечности из плана тела, а не по имени.
++      if (itype === 'robotHead') {
++        targetKey = slotsForLimbType(bodyPlan, 'head')[0] ?? null;
+       } else if (itype === 'robotBody') {
+-        targetKey = 'body';
++        targetKey = slotsForLimbType(bodyPlan, 'body')[0] ?? null;
+       } else if (itype === 'robotLeg' || itype === 'robotLegs') {
+-        targetKey = slotKeys.find(k =>
+-          k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel'
+-        );
++        targetKey = slotsForLimbType(bodyPlan, 'mover')[0] ?? null;
+       } else if (itype === 'robotArm') {
+-        // Просто: left/right или первый свободный
+-        if (item.slot === 'left') {
+-          targetKey = slotKeys.find(k => k === 'leftArm' || k === 'arm1');
+-        } else if (item.slot === 'right') {
+-          targetKey = slotKeys.find(k => k === 'rightArm' || k === 'arm2');
+-        } else {
+-          targetKey = slotKeys.find(k =>
+-            k.toLowerCase().includes('arm') && slots[k].limb === null
+-          );
+-        }
++        // Сторона — порядок слота; без стороны — первый свободный.
++        const armSlots = slotsForLimbType(bodyPlan, 'arm');
++        if (item.slot === 'left') targetKey = armSlots[0] ?? null;
++        else if (item.slot === 'right') targetKey = armSlots[1] ?? null;
++        else targetKey = armSlots.find(k => slots[k].limb === null) ?? null;
+       }
+ 
+       if (targetKey && slots[targetKey] !== undefined) {
+@@ -427,29 +399,10 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       const location = armorData.robotLocation ?? item.robotLocation;
+       const layer = armorData.layer ?? itype;
+ 
+-      // Определяем, какие слоты подходят для этой локации
+-      const isMatchingSlot = (slotKey) => {
+-        if (location === 'Main Body' && slotKey === 'body') return true;
+-        if (location === 'Optics' && slotKey === 'head') return true;
+-        if (location === 'Arms' && slotKey.toLowerCase().includes('arm')) return true;
+-        if ((location === 'Legs' || location === 'Wheel') && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
+-        if (location === 'Thruster' && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
+-        // Точные совпадения для новых per-slot локаций (если появятся leftArm/rightArm и т.д.)
+-        if (location === slotKey) return true;
+-        if (location === 'Head' && slotKey === 'head') return true;
+-        if (location === 'Left Arm' && slotKey === 'leftArm') return true;
+-        if (location === 'Right Arm' && slotKey === 'rightArm') return true;
+-        if (location === 'Left Leg' && slotKey === 'leftLeg') return true;
+-        if (location === 'Right Leg' && slotKey === 'rightLeg') return true;
+-        return false;
+-      };
+-
+-      // Новая модель: слот ищется по ТИПУ конечности из данных плана тела,
+-      // а не по строковому совпадению имени слота с локацией. Оружие вместо
+-      // руки защиту не принимает, пустой слот — тоже.
+-      const matchingSlotKeys = isNewSlotModelEnabled()
+-        ? armorSlotsByLimbType({ slots, slotKeys, bodyPlan, armorData })
+-        : slotKeys.filter(isMatchingSlot);
++      // Слот ищется по ТИПУ конечности из данных плана тела, а не по
++      // строковому совпадению имени слота с локацией. Оружие вместо руки
++      // защиту не принимает, пустой слот — тоже.
++      const matchingSlotKeys = armorSlotsByLimbType({ slots, slotKeys, bodyPlan, armorData });
+ 
+       // 1 предмет = 1 слот: ищем первый подходящий слот, где слой свободен
+       // Если указан конкретный слот в item.slot — используем его
+@@ -457,19 +410,14 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       if (item.slot && matchingSlotKeys.includes(item.slot)) {
+         targetSlot = item.slot;
+       } else {
+-        // Ищем первый свободный слот из подходящих
++        // Ищем первый свободный слот из подходящих. Свободного слота нет —
++        // предмет уходит в инвентарь, а не стирает уже надетую защиту.
+         targetSlot = matchingSlotKeys.find((k) => slots[k][layer] == null) || null;
+-        // Если все подходящие слоты заняты — заменяем первый подходящий (для frame/plating, которые конфликтуют).
+-        // Новая модель так не делает: свободного слота нет — предмет уходит
+-        // в инвентарь, а не стирает уже надетую защиту.
+-        if (!targetSlot && !isNewSlotModelEnabled()) {
+-          targetSlot = matchingSlotKeys[0] ?? null;
+-        }
+       }
+ 
+       if (targetSlot && slots[targetSlot] !== undefined) {
+         slots[targetSlot][layer] = armorData;
+-      } else if (isNewSlotModelEnabled()) {
++      } else {
+         // Слотов, принимающих эту защиту, нет (например, все руки — оружие
+         // вместо конечностей). Предмет не пропадает: он уходит в инвентарь.
+         inventoryItems.push(item);
+@@ -604,17 +552,15 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     slots.head.limb = { ...headLimb, builtinWeapons: mergedBuiltin };
+   }
+ 
+-  // Новая модель: защита живёт только на настоящей конечности. Проверяем
+-  // инвариант после автозаполнения — слот, где осталось оружие вместо руки
+-  // или нет конечности вовсе, защиту не держит.
+-  if (isNewSlotModelEnabled()) {
+-    for (const key of slotKeys) {
+-      const slot = slots[key];
+-      if (!slot || slotAcceptsArmor(slot).allowed) continue;
+-      slot.plating = null;
+-      slot.armor = null;
+-      slot.frame = null;
+-    }
++  // Защита живёт только на настоящей конечности. Проверяем инвариант после
++  // автозаполнения — слот, где осталось оружие вместо руки или нет конечности
++  // вовсе, защиту не держит.
++  for (const key of slotKeys) {
++    const slot = slots[key];
++    if (!slot || slotAcceptsArmor(slot).allowed) continue;
++    slot.plating = null;
++    slot.armor = null;
++    slot.frame = null;
+   }
+ 
+   // Собираем оружия
+@@ -628,65 +574,18 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+ // ---------------------------------------------------------------------------
+ 
+ /**
+- * Builds the equippedWeapons array from the current robot slot state.
+- * Sources:
+- *  - limb.builtinWeapons  → встроенные оружия
+- *  - slot.heldWeapon      → оружие в руке
++ * Карточки атак персонажа-робота: встроенные атаки конечностей плюс оружие,
++ * зажатое в ладонях. Единственный источник — состояние слотов; сам список
++ * считает collectAttacks() (domain/robotSlots.js).
++ *
++ * Имя оставлено историческим: на него опираются экраны, стор и сейвы.
+  *
+  * @param {object} slots - RobotSlotsObject
++ * @param {object} options - { catalog? }
+  * @returns {object[]}
+  */
+ export function getBuiltinWeaponsFromSlots(slots, options = {}) {
+-  // Этап 3: новая модель за фича-флагом. Пока флаг выключен — путь старый,
+-  // поведение не меняется ни на йоту.
+-  if (isNewSlotModelEnabled()) return collectAttacks(slots, options);
+-
+-  if (!slots || typeof slots !== 'object') return [];
+-
+-  const weapons = [];
+-  const seenIds = new Set();
+-
+-  const pushWeapon = (weapon, slotKey, limb, extra = {}) => {
+-    if (!weapon) return;
+-    const id = weapon.id;
+-    if (id && seenIds.has(id)) return;
+-    if (id) seenIds.add(id);
+-    weapons.push({
+-      ...weapon,
+-      sourceSlot: slotKey,
+-      sourceLimb: limb?.id,
+-      ...extra,
+-    });
+-  };
+-
+-  for (const [slotKey, slotData] of Object.entries(slots)) {
+-    if (!slotData) continue;
+-    const { limb, heldWeapon } = slotData;
+-
+-    if (heldWeapon) {
+-      pushWeapon(heldWeapon, slotKey, limb);
+-      // Встроенное оружие конечности (например, манипулятор) остаётся доступным
+-      // и когда в руке зажато оружие — карточки не должны исчезать.
+-    }
+-
+-    if (Array.isArray(limb?.builtinWeapons) && limb.builtinWeapons.length > 0) {
+-      limb.builtinWeapons.forEach((weapon) => {
+-        pushWeapon(weapon, slotKey, limb, { isBuiltin: true, ...(limb._builtinWeapon ?? {}) });
+-      });
+-      continue;
+-    }
+-
+-    if (limb?.builtinWeaponId) {
+-      pushWeapon({ id: limb.builtinWeaponId }, slotKey, limb, { isBuiltin: true });
+-      continue;
+-    }
+-
+-    if (limb?.builtinManipulator) {
+-      pushWeapon({ id: limb.id }, slotKey, limb, { isManipulator: true, isBuiltin: true });
+-    }
+-  }
+-
+-  return weapons;
++  return collectAttacks(slots, options);
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -709,25 +608,9 @@ export function canEquipRobotArmor(armorItem, slotKey, layer, slots) {
+     return { allowed: false, reason: 'equip.error.invalidSlot' };
+   }
+ 
+-  // Новая модель: защиту принимает только слот с настоящей конечностью.
+-  // Пустой слот и оружие вместо руки защиты не принимают.
+-  if (isNewSlotModelEnabled()) {
+-    return slotAcceptsArmor(slotData, { item: armorItem });
+-  }
+-
+-  const incompatible = armorItem?.incompatibleLayers ?? [];
+-
+-  for (const blockedLayer of incompatible) {
+-    if (slotData[blockedLayer] != null) {
+-      return {
+-        allowed: false,
+-        reason: 'equip.error.armorLayerIncompatible',
+-      };
+-    }
+-  }
+-
+-  // Also check: if the slot already has this layer occupied, it will be replaced (allowed)
+-  return { allowed: true, reason: null };
++  // Защиту принимает только слот с настоящей конечностью. Пустой слот и
++  // оружие вместо руки защиты не принимают.
++  return slotAcceptsArmor(slotData, { item: armorItem });
+ }
+ 
+ // ---------------------------------------------------------------------------
+@@ -750,13 +633,11 @@ export function canReplaceLimb(slotKey, newLimb, character) {
+ 
+   const bodyPlan = character?.origin?.bodyPlan;
+ 
+-  // Новая модель: съёмность слота задана данными плана тела, а не именем.
++  // Съёмность слота задана данными плана тела, а не именем.
+   // Голова не снимается ни у одного плана (решение владельца).
+-  if (isNewSlotModelEnabled()) {
+-    const def = getSlotDef(bodyPlan, slotKey);
+-    if (def && def.swappable === false) {
+-      return { allowed: false, reason: 'equip.error.slotNotSwappable' };
+-    }
++  const def = getSlotDef(bodyPlan, slotKey);
++  if (def && def.swappable === false) {
++    return { allowed: false, reason: 'equip.error.slotNotSwappable' };
+   }
+ 
+   const compatiblePlans = newLimb.compatibleBodyPlans;
+@@ -817,28 +698,15 @@ export function applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog = [
+     },
+   };
+ 
+-  // Новая модель: пар конечностей нет, замена меняет РОВНО ОДИН слот.
+-  // Сбрасывать соседа за компанию — значит отбирать у игрока конечность,
+-  // которую он не трогал (для Хэнди это была бы потеря arm3).
+-  if (
+-    !isNewSlotModelEnabled()
+-    && (slotKey === 'leftArm' || slotKey === 'rightArm')
+-    && slots.leftArm && slots.rightArm
+-  ) {
+-    const siblingKey = slotKey === 'leftArm' ? 'rightArm' : 'leftArm';
+-    const oldLimb = slots[slotKey]?.limb;
+-    if (oldLimb && slots[siblingKey]?.limb === oldLimb) {
+-      updatedSlots[siblingKey] = { ...updatedSlots[siblingKey], limb: null, heldWeapon: null };
+-    }
+-  }
++  // Пар конечностей нет: замена меняет РОВНО ОДИН слот. Сбрасывать соседа
++  // за компанию — значит отбирать у игрока конечность, которую он не трогал
++  // (для Хэнди это была бы потеря arm3).
+ 
+-  // Инвариант новой модели: защита живёт только на настоящей конечности.
+-  // Поставили вместо руки огнемёт — броня, обшивка и рама снимаются.
+-  if (isNewSlotModelEnabled()) {
+-    const target = updatedSlots[slotKey];
+-    if (target && !slotAcceptsArmor(target).allowed) {
+-      updatedSlots[slotKey] = { ...target, armor: null, plating: null, frame: null };
+-    }
++  // Инвариант: защита живёт только на настоящей конечности. Поставили вместо
++  // руки огнемёт — броня, обшивка и рама снимаются.
++  const target = updatedSlots[slotKey];
++  if (target && !slotAcceptsArmor(target).allowed) {
++    updatedSlots[slotKey] = { ...target, armor: null, plating: null, frame: null };
+   }
+ 
+   const weapons = getBuiltinWeaponsFromSlots(updatedSlots);
+diff --git a/domain/robotSlotLogic.js b/domain/robotSlotLogic.js
+index b6af857..430314c 100644
+--- a/domain/robotSlotLogic.js
++++ b/domain/robotSlotLogic.js
+@@ -2,9 +2,8 @@
+ // Pure logic extracted from RobotSlot for testability (no React, no UI deps).
+ 
+ import { tWeaponsAndArmorScreen } from '../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+-import { getBodyPlan } from './bodyplan';
+ import { getRobotSlotDamageResistance } from './robotDamageResistance';
+-import { isNewSlotModelEnabled, getSlotHitRange } from './robotSlots';
++import { getSlotHitRange } from './robotSlots';
+ 
+ /**
+  * Builds the slot title, limb name, and stats array for a RobotSlot.
+@@ -34,15 +33,10 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
+     : t('robotSlot.noLimb');
+ 
+   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
+-  // Диапазоны попаданий (d20) — из плана тела, если он их объявляет (секьюритрон),
+-  // иначе общий словарь armor.slots (человекоподобная таблица).
+-  // Диапазоны попаданий: у робота — из таблицы плана тела (уникальны для
+-  // каждого плана), у людей — статичный словарь armor.slots в i18n.
+-  let planHitLocation = bodyPlan ? getBodyPlan(bodyPlan)?.hitLocations?.[slotKey] ?? null : null;
+-  if (isNewSlotModelEnabled()) {
+-    const range = getSlotHitRange(bodyPlan, slotKey);
+-    planHitLocation = range ? `${range.from}-${range.to}` : planHitLocation;
+-  }
++  // Диапазоны попаданий (d20): у робота — из таблицы плана тела (уникальны
++  // для каждого плана), у людей — статичный словарь armor.slots в i18n.
++  const hitRange = bodyPlan ? getSlotHitRange(bodyPlan, slotKey) : null;
++  const planHitLocation = hitRange ? `${hitRange.from}-${hitRange.to}` : null;
+   const slotSubtitle = planHitLocation ?? (t(`armor.slots.${slotKey}.subtitle`) || '');
+ 
+   const stats = [];
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 5c76471..1dadb4d 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -1,10 +1,9 @@
+ // domain/robotSlots.js
+ //
+-// Чистая модель слота робота (этап 2 рефакторинга).
++// Чистая модель слота робота.
+ //
+-// Здесь НИЧЕГО не подключено к рабочему коду: функции можно вызывать из
+-// тестов и из будущих точек использования, старые robotEquip.js /
+-// robotDamageResistance.js пока работают по-своему.
++// Единственная модель: robotEquip.js и robotDamageResistance.js работают
++// только через эти функции. Исторические ветки и фича-флаг сняты (этап 4).
+ //
+ // Правила, которыми живут эти функции:
+ //   1. Слот описывается ТИПОМ, а не именем: { id, accepts, capacity,
+@@ -46,40 +45,6 @@ export const LIMB_TYPE_BY_ROBOT_LOCATION = {
+   Thruster: 'mover',
+ };
+ 
+-// ---------------------------------------------------------------------------
+-// Фича-флаг новой модели (временный, снимается на этапе 4)
+-// ---------------------------------------------------------------------------
+-//
+-// Пока флаг выключен, вызывающий код работает по-старому: любой шаг этой
+-// серии обратим одной строчкой. Включить можно тремя способами:
+-//   setNewSlotModelEnabled(true)            — из кода / теста;
+-//   ROBOT_NEW_SLOT_MODEL=1                  — из окружения (прогон всего
+-//                                             набора тестов под новой моделью);
+-//   по умолчанию — выключено.
+-
+-let flagOverride = null;
+-
+-// ROBOT_NEW_SLOT_MODEL=0 — аварийный выключатель: вернуть старую модель,
+-// не откатывая код. Полезно, если после включения что-то поехало вживую.
+-const envDisabled = () =>
+-  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '0';
+-
+-/** Включить/выключить новую модель вручную (null — вернуться к умолчанию). */
+-export function setNewSlotModelEnabled(value) {
+-  flagOverride = value === null ? null : Boolean(value);
+-}
+-
+-/**
+- * Включена ли новая модель слотов.
+- *
+- * Этап 4: новая модель включена по умолчанию. Старые ветки пока лежат рядом
+- * и снимаются следующим патчем — до их удаления их можно вернуть переменной
+- * окружения ROBOT_NEW_SLOT_MODEL=0.
+- */
+-export function isNewSlotModelEnabled() {
+-  return flagOverride === null ? !envDisabled() : flagOverride;
+-}
+-
+ const toNumber = (value) => {
+   const n = Number(value);
+   return Number.isFinite(n) ? n : 0;
+diff --git a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index 8d73655..5b98dd1 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -10,7 +10,7 @@ import {
+ } from 'react-native';
+ import { useCharacter } from '../../../../../components/CharacterContext';
+ import { applyLimbReplacement } from '../../../../../domain/robotEquip';
+-import { isNewSlotModelEnabled, limbOptionsForSlot } from '../../../../../domain/robotSlots';
++import { limbOptionsForSlot } from '../../../../../domain/robotSlots';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+@@ -19,30 +19,6 @@ import { tCharacterScreen } from '../logic/characterScreenI18n';
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-/** Returns a localized limb catalog from the active setting catalog. */
+-const getLimbCatalogForSlot = (catalog, slotKey) => {
+-  if (slotKey === 'head') return catalog.robotHeads || [];
+-  if (slotKey === 'body') return catalog.robotBody || [];
+-  if (
+-    slotKey === 'leftArm' ||
+-    slotKey === 'rightArm' ||
+-    slotKey.startsWith('arm')
+-  ) {
+-    return catalog.robotArms || [];
+-  }
+-  return catalog.robotLegs || [];
+-};
+-
+-/**
+- * Returns the itemType that should be used to filter limbs for a given slotKey.
+- */
+-const getItemTypeForSlot = (slotKey) => {
+-  if (slotKey === 'head') return 'robotHead';
+-  if (slotKey === 'body') return 'robotBody';
+-  if (slotKey === 'leftArm' || slotKey === 'rightArm' || slotKey.startsWith('arm')) return 'robotArm';
+-  return 'robotLegs';
+-};
+-
+ /**
+  * Maps bodyPlan to the arm slot names used in robot arms catalog `slots` field.
+  * Used as a fallback when arms don't have compatibleBodyPlans.
+@@ -151,13 +127,9 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose })
+   // Build filtered limb list
+   const compatibleLimbs = useMemo(() => {
+     if (!slotKey) return [];
+-    // Новая модель: кандидаты отбираются по типу конечности, который слот
+-    // принимает по плану тела, а не по имени слота и itemType.
+-    const pool = isNewSlotModelEnabled()
+-      ? limbOptionsForSlot(equipmentCatalog, bodyPlan, slotKey)
+-      : getLimbCatalogForSlot(equipmentCatalog, slotKey)
+-        .filter((l) => l.itemType === getItemTypeForSlot(slotKey));
+-    return filterByBodyPlan(pool, bodyPlan);
++    // Кандидаты отбираются по типу конечности, который слот принимает по
++    // плану тела, а не по имени слота и itemType.
++    return filterByBodyPlan(limbOptionsForSlot(equipmentCatalog, bodyPlan, slotKey), bodyPlan);
+   }, [equipmentCatalog, slotKey, bodyPlan]);
+ 
+   const handleSelect = (newLimb) => {
+
+-- 
+2.47.3
+
