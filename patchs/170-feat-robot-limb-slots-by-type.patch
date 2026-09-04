@@ -1,0 +1,349 @@
+From 0000000000000000000000000000001788512096 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 08:54:56 +0000
+Subject: [PATCH] feat(robot): limb slots by type instead of slot names
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 3, шаг 6 (последний): слон определяется типом, а не именем.
+
+1. Сторона комплекта (left/right/center) -> slotForDirection: это N-й слот
+   нужного типа в порядке плана тела. Для Хэнди left->arm1, right->arm2,
+   center->arm3; для протектрона left->leftArm, right->rightArm, центра нет.
+   Тесты сравнивают обе модели: результаты совпадают, но новая берёт их
+   из данных.
+2. Раскладка конечностей комплекта в initRobotSlots: голова, корпус,
+   движитель и руки находятся по типу (slotsForLimbType), а не по
+   k.includes('leg') и k === 'chassis' || 'thruster' || 'wheel'.
+3. Каталог конечностей для слота в LimbUpgradeModal: кандидаты отбираются
+   по типу, который слот принимает (accepts), а не по имени слота и
+   itemType. Тип записи берётся из нового каталога по id — экран по-прежнему
+   показывает локализованные имена.
+
+Вне области (решение владельца): хардкоды leftArm/rightArm на человеческой
+стороне — src/store/selectors.js, domain/powerArmor.js, InventoryScreen.
+Слоты людей статичны, плана тела у них нет.
+
+Тесты: +8 в __tests__/robot/robot-slot-model-flag.test.js — стороны в обеих
+моделях, движитель по типу, раскладка комплекта со сторонами, каталог
+конечностей для слота (руки включают оружие-руки, головы/корпуса/движители
+не попадают), равенство наборов新旧 для привычных слотов.
+
+Прогон 261 теста: флаг выключен — 261 зелёный; ROBOT_NEW_SLOT_MODEL=1 —
+261 зелёный. Этап 3 завершён.
+
+---
+ 5 files changed, 200 insertions(+), 8 deletions(-)
+
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-model-flag.test.js
+index 1f1cffe..5470904 100644
+--- a/__tests__/robot/robot-slot-model-flag.test.js
++++ b/__tests__/robot/robot-slot-model-flag.test.js
+@@ -14,6 +14,7 @@ import {
+   canEquipRobotArmor,
+   applyLimbReplacement,
+   canReplaceLimb,
++  getSlotForDirection,
+ } from '../../domain/robotEquip';
+ import {
+   getRobotSlotDamageResistance,
+@@ -28,6 +29,8 @@ import {
+   isNewSlotModelEnabled,
+   getSlotHitRange,
+   resolveHit,
++  slotForDirection,
++  limbOptionsForSlot,
+ } from '../../domain/robotSlots';
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ 
+@@ -596,3 +599,102 @@ describe('съёмность слота (swappable)', () => {
+       .toBe(true);
+   });
+ });
++
++describe('сторона комплекта: порядок, а не имя слота', () => {
++  it('Хэнди: left→arm1, right→arm2, center→arm3', () => {
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      expect(getSlotForDirection('misterHandy', 'left')).toBe('arm1');
++      expect(getSlotForDirection('misterHandy', 'right')).toBe('arm2');
++      expect(getSlotForDirection('misterHandy', 'center')).toBe('arm3');
++    }
++  });
++
++  it('протектрон: left→leftArm, right→rightArm, центра нет', () => {
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      expect(getSlotForDirection('protectron', 'left')).toBe('leftArm');
++      expect(getSlotForDirection('protectron', 'right')).toBe('rightArm');
++      expect(getSlotForDirection('protectron', 'center')).toBeNull();
++    }
++  });
++
++  it('слот движителя ищется по типу, а не по имени', () => {
++    setNewSlotModelEnabled(true);
++    expect(slotForDirection('misterHandy', 'left', 'mover')).toBe('thruster');
++    expect(slotForDirection('securitron', 'left', 'mover')).toBe('wheel');
++    expect(slotForDirection('robobrain', 'left', 'mover')).toBe('chassis');
++    expect(slotForDirection('protectron', 'left', 'mover')).toBe('leftLeg');
++  });
++
++  it('комплект со сторонами раскладывается одинаково в обеих моделях', () => {
++    const kitItems = () => [
++      { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm', slot: 'left' },
++      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm', slot: 'right' },
++    ];
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      const { slots } = initRobotSlots('misterHandy', kitItems(), robotCatalog);
++      expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
++      expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
++    }
++  });
++});
++
++describe('каталог конечностей для слота', () => {
++  const runtimeCatalog = {
++    robotArms: armsCatalog,
++    robotHeads: headsCatalog,
++    robotBody: bodiesCatalog,
++    robotLegs: legsCatalog,
++  };
++  const ids = (list) => list.map((l) => l.id).sort();
++
++  it('слот руки предлагает только руки (включая оружие вместо руки)', () => {
++    setNewSlotModelEnabled(true);
++    const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'arm1');
++    expect(options.length).toBeGreaterThan(0);
++    // Все кандидаты — конечности типа arm: и руки, и оружие-руки.
++    for (const limb of options) {
++      expect(limb.itemType).toBe('robotArm');
++    }
++    // Головы, корпуса и движители в список руки не попадают.
++    expect(ids(options)).not.toContain('robot_head_protectron');
++    expect(ids(options)).not.toContain('robot_body_protectron');
++    expect(ids(options)).not.toContain('robot_legs_mister_handy_thruster');
++  });
++
++  it('слот движителя предлагает движители, а не ноги по имени', () => {
++    setNewSlotModelEnabled(true);
++    const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'thruster');
++    expect(options.every((l) => l.itemType === 'robotLegs' || l.itemType === 'robotLeg')).toBe(true);
++    expect(ids(options)).toContain('robot_legs_mister_handy_thruster');
++  });
++
++  it('слот головы предлагает головы', () => {
++    setNewSlotModelEnabled(true);
++    const options = limbOptionsForSlot(runtimeCatalog, 'protectron', 'head');
++    expect(options.length).toBeGreaterThan(0);
++    expect(options.every((l) => l.itemType === 'robotHead')).toBe(true);
++  });
++
++  it('обе модели дают один и тот же набор для привычных слотов', () => {
++    const newModel = (slot, plan) => {
++      setNewSlotModelEnabled(true);
++      return ids(limbOptionsForSlot(runtimeCatalog, plan, slot));
++    };
++    const oldModel = (slot) => {
++      setNewSlotModelEnabled(false);
++      const pool = slot === 'head' ? headsCatalog
++        : slot === 'body' ? bodiesCatalog
++          : slot.toLowerCase().includes('arm') ? armsCatalog : legsCatalog;
++      return ids(pool);
++    };
++
++    expect(newModel('leftArm', 'protectron')).toEqual(oldModel('leftArm'));
++    expect(newModel('head', 'protectron')).toEqual(oldModel('head'));
++    expect(newModel('body', 'protectron')).toEqual(oldModel('body'));
++    expect(newModel('leftLeg', 'protectron')).toEqual(oldModel('leftLeg'));
++    expect(newModel('arm3', 'misterHandy')).toEqual(oldModel('arm3'));
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 6238157..59718bc 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -376,14 +376,36 @@
+ Старая ветка сохранена целиком: при выключенном флаге пары обнуляются,
+ обшивка на оружии остаётся, голову заменить можно.
+ 
++#### Шаг 6 (патч 170): стороны и каталог по типу
++
++Последние места, где слон определялся по имени:
++
++1. **сторона комплекта** (`left` / `right` / `center`) → `slotForDirection`:
++   это N-й слот нужного типа в порядке плана тела. Для Хэнди `left→arm1`,
++   `right→arm2`, `center→arm3`; для протектрона `left→leftArm`,
++   `right→rightArm`, центра нет. Тесты сравнивают обе модели: результаты
++   совпадают, но новая берёт их из данных;
++2. **раскладка конечностей комплекта** в `initRobotSlots`: голова, корпус,
++   движитель и руки находятся по типу (`slotsForLimbType`), а не по
++   `k.includes('leg')` и `k === 'chassis' || 'thruster' || 'wheel'`;
++3. **каталог конечностей для слота** в `LimbUpgradeModal`: кандидаты
++   отбираются по типу, который слот принимает (`accepts`), а не по имени
++   слота и `itemType`. Тип каждой записи берётся из нового каталога по id —
++   экран по-прежнему показывает локализованные имена.
++
+ #### Что осталось по этапу 3
+ 
+ | Шаг | Точка использования | Статус |
+ |---|---|---|
+ | 168 | диапазоны попаданий из плана тела + СУ конечности-оружия | сделано |
+-| 169 | замена конечностей: `applyLimbReplacement` считает парой только `leftArm/rightArm` | сделано |
+-| 170 | хардкоды `leftArm/rightArm` в `src/store/selectors.js`, `domain/powerArmor.js`, `LimbUpgradeModal.js` | осталось |
+-| — | `hitTable` для `assaultron`, `sentryBot`, `robobrain`, `misterHandy` — данные от владельца | открытый вопрос №1 |
++| 169 | замена конечностей: один слот, защита следует за конечностью | сделано |
++| 170 | стороны комплекта и каталог конечностей по типу, а не по имени слота | сделано |
++
++**Этап 3 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
++человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
++`InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
++плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
++`assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+ После этого этап 4 — флаг включён и старое удалено (один коммит), этап 5 —
+ миграция сейва, этап 6 — удаление мёртвых полей (`robotLocation`,
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index c12d7de..4218655 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -13,6 +13,7 @@ import {
+   slotAcceptsArmor,
+   canEquip,
+   getSlotDef,
++  slotForDirection,
+   LIMB_TYPE_BY_ROBOT_LOCATION,
+ } from './robotSlots';
+ 
+@@ -99,6 +100,9 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
+ }
+ 
+ export function getSlotForDirection(bodyPlan, direction) {
++  // Новая модель: сторона — это порядок слота нужного типа, а не его имя.
++  if (isNewSlotModelEnabled()) return slotForDirection(bodyPlan, direction, 'arm');
++
+   const slotKeys = getRobotSlotKeys(bodyPlan);
+   if (direction === 'left') return slotKeys.find((k) => k === 'leftArm' || k === 'arm1') ?? null;
+   if (direction === 'right') return slotKeys.find((k) => k === 'rightArm' || k === 'arm2') ?? null;
+@@ -255,7 +259,22 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs'].includes(itype)) {
+       let targetKey = null;
+ 
+-      if (itype === 'robotHead') {
++      if (isNewSlotModelEnabled()) {
++        // Новая модель: слот ищется по типу конечности из плана тела.
++        if (itype === 'robotHead') {
++          targetKey = slotsForLimbType(bodyPlan, 'head')[0] ?? null;
++        } else if (itype === 'robotBody') {
++          targetKey = slotsForLimbType(bodyPlan, 'body')[0] ?? null;
++        } else if (itype === 'robotLeg' || itype === 'robotLegs') {
++          targetKey = slotsForLimbType(bodyPlan, 'mover')[0] ?? null;
++        } else if (itype === 'robotArm') {
++          // Сторона — порядок слота; без стороны — первый свободный.
++          const armSlots = slotsForLimbType(bodyPlan, 'arm');
++          if (item.slot === 'left') targetKey = armSlots[0] ?? null;
++          else if (item.slot === 'right') targetKey = armSlots[1] ?? null;
++          else targetKey = armSlots.find(k => slots[k].limb === null) ?? null;
++        }
++      } else if (itype === 'robotHead') {
+         targetKey = 'head';
+       } else if (itype === 'robotBody') {
+         targetKey = 'body';
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index d09524b..71bcfcb 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -186,6 +186,24 @@ export function getSlotDef(bodyPlan, slotId) {
+   return null;
+ }
+ 
++/**
++ * Слот для стороны комплекта: left / right / center → N-й слот нужного типа
++ * в порядке плана тела (для Хэнди: arm1 / arm2 / arm3, для протектрона:
++ * leftArm / rightArm). Сторона — это порядок, а не имя слота.
++ *
++ * @param {string|object} bodyPlan
++ * @param {'left'|'right'|'center'} direction
++ * @param {'head'|'body'|'arm'|'mover'} limbType
++ * @returns {string | null}
++ */
++export function slotForDirection(bodyPlan, direction, limbType = 'arm') {
++  const ids = slotsForLimbType(bodyPlan, limbType);
++  if (direction === 'left') return ids[0] ?? null;
++  if (direction === 'right') return ids[1] ?? null;
++  if (direction === 'center') return ids[2] ?? null;
++  return null;
++}
++
+ /** Все слоты плана, принимающие данный тип конечности. */
+ export function slotsForLimbType(bodyPlan, limbType) {
+   const plan = typeof bodyPlan === 'string' ? getBodyPlan(bodyPlan) : bodyPlan;
+@@ -518,6 +536,33 @@ export function resolveHit(bodyPlan, roll) {
+   return null;
+ }
+ 
++/**
++ * Конечности, которые можно поставить в слот: тип берётся из плана тела
++ * (`accepts`), а не из имени слота (`leftArm`, `startsWith('arm')`).
++ *
++ * Каталог передаётся тот, которым живёт экран (с локализованными именами);
++ * тип конечности для каждой записи достаём из нового каталога по id.
++ *
++ * @param {object} runtimeCatalog — { robotArms?, robotHeads?, robotBody?, robotLegs? }
++ * @param {string|object} bodyPlan
++ * @param {string} slotId
++ * @returns {object[]}
++ */
++export function limbOptionsForSlot(runtimeCatalog, bodyPlan, slotId) {
++  const def = getSlotDef(bodyPlan, slotId);
++  const accepts = def?.accepts ?? [];
++  if (accepts.length === 0) return [];
++
++  const catalog = getRobotLimbCatalog();
++  const pool = [
++    ...(runtimeCatalog?.robotArms || []),
++    ...(runtimeCatalog?.robotHeads || []),
++    ...(runtimeCatalog?.robotBody || []),
++    ...(runtimeCatalog?.robotLegs || []),
++  ];
++  return pool.filter((limb) => accepts.includes(resolveLimb(catalog, limb)?.limbType));
++}
++
+ /**
+  * Диапазон d20, который ведёт в этот слот, — обратная сторона resolveHit.
+  * Нужна экранам: таблица попаданий показывает «слот → числа», а бросок
+diff --git a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index 784e43a..8d73655 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -10,6 +10,7 @@ import {
+ } from 'react-native';
+ import { useCharacter } from '../../../../../components/CharacterContext';
+ import { applyLimbReplacement } from '../../../../../domain/robotEquip';
++import { isNewSlotModelEnabled, limbOptionsForSlot } from '../../../../../domain/robotSlots';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+@@ -150,10 +151,13 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose })
+   // Build filtered limb list
+   const compatibleLimbs = useMemo(() => {
+     if (!slotKey) return [];
+-    const catalog = getLimbCatalogForSlot(equipmentCatalog, slotKey);
+-    const itemType = getItemTypeForSlot(slotKey);
+-    const byType = catalog.filter((l) => l.itemType === itemType);
+-    return filterByBodyPlan(byType, bodyPlan);
++    // Новая модель: кандидаты отбираются по типу конечности, который слот
++    // принимает по плану тела, а не по имени слота и itemType.
++    const pool = isNewSlotModelEnabled()
++      ? limbOptionsForSlot(equipmentCatalog, bodyPlan, slotKey)
++      : getLimbCatalogForSlot(equipmentCatalog, slotKey)
++        .filter((l) => l.itemType === getItemTypeForSlot(slotKey));
++    return filterByBodyPlan(pool, bodyPlan);
+   }, [equipmentCatalog, slotKey, bodyPlan]);
+ 
+   const handleSelect = (newLimb) => {
+
+-- 
+2.47.3
+
