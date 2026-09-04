@@ -1,0 +1,1152 @@
+From 0000000000000000000000000000001788518963 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 10:49:23 +0000
+Subject: [PATCH] slim robot slots in saves: ids plus mod ids, restored on import
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 5, шаг 2: сейв робота хранит только id.
+
+Путь тот же, что проложил v19 для предметов: ужимка на экспорте, разворот на
+импорте, миграция — только бамп версии (v20). Физический формат хранилища не
+меняется: для этого нужен слой доступа во всех читателях (риск Р1).
+
+- domain/robotSlots.js: serializeSlot (слот → id + моды) и deserializeSlot
+  (id + моды → объекты); isSlimSlot. В ужимку зашиты правила: конфликтующая
+  обшивка выбрасывается, оружие вместо руки защиты не хранит, своя атака
+  конечности отделена от установленного в неё оружия.
+- domain/saveSlimming.js: slimRobotSlots на экспорте; на импорте худая форма
+  разворачивается и обогащается каталогом (конечность, слои, оружие в ладони).
+- src/store: CURRENT_SCHEMA_VERSION = 20, пустая миграция v19 → v20.
+- Тесты: 11 слотов из 5 реальных сейвов владельца (фикстура в
+  __tests__/fixtures) — атаки, СУ и «принимает защиту» не меняются, ужимка
+  идемпотентна; −72 % места. Контракт slimSaveData для слотов робота обновлён.
+
+282 теста / 24 файла — зелёные.
+
+---
+ 8 files changed, 966 insertions(+), 10 deletions(-)
+
+diff --git a/__tests__/fixtures/robot-slots-from-saves.json b/__tests__/fixtures/robot-slots-from-saves.json
+new file mode 100644
+index 0000000..c42d234
+--- /dev/null
++++ b/__tests__/fixtures/robot-slots-from-saves.json
+@@ -0,0 +1,530 @@
++{
++  "protectron.head": {
++    "limb": {
++      "id": "robot_head_protectron",
++      "itemType": "robotHead",
++      "physicalDR": 2,
++      "energyDR": 1,
++      "radDR": 0,
++      "name": "Голова Протектрона"
++    },
++    "armor": {
++      "id": "robot_armor_factory_optics",
++      "layer": "armor",
++      "damageResistance": {
++        "physical": 1,
++        "energy": 1
++      },
++      "name": "Заводская броня для головы (оптики)",
++      "itemType": "robotArmor"
++    },
++    "plating": {
++      "id": "robot_plating_primal_optics",
++      "layer": "plating",
++      "incompatibleLayers": [
++        "armor",
++        "frame"
++      ],
++      "damageResistance": {
++        "physical": 2,
++        "energy": 0
++      },
++      "name": "Первобытная плита для головы (оптики)",
++      "itemType": "plating"
++    },
++    "frame": {
++      "id": "robot_frame_hydraulic_optics",
++      "layer": "frame",
++      "damageResistance": {
++        "physical": 3,
++        "energy": 3
++      },
++      "name": "Гидравлическая рама для головы (оптики)",
++      "itemType": "robotFrame"
++    },
++    "heldWeapon": null
++  },
++  "protectron.rightArm": {
++    "limb": {
++      "id": "robot_arm_protectron",
++      "itemType": "robotArm",
++      "physicalDR": 2,
++      "energyDR": 1,
++      "radDR": 0,
++      "weaponSlots": 1,
++      "canHoldWeapons": true,
++      "name": "Рука Протектрона",
++      "builtinWeapons": []
++    },
++    "armor": null,
++    "plating": null,
++    "frame": null,
++    "heldWeapon": {
++      "id": "weapon_railway_rifle",
++      "name": "Железнодорожная винтовка",
++      "damage": 10,
++      "damageType": "physical",
++      "fireRate": "0",
++      "ammoId": "ammo_railway_spike"
++    }
++  },
++  "protectron.body": {
++    "limb": {
++      "id": "robot_body_protectron",
++      "itemType": "robotBody",
++      "physicalDR": 3,
++      "energyDR": 1,
++      "radDR": 0,
++      "name": "Корпус Протектрона"
++    },
++    "armor": null,
++    "plating": {
++      "id": "robot_plating_factory_body",
++      "layer": "plating",
++      "incompatibleLayers": [
++        "armor",
++        "frame"
++      ],
++      "damageResistance": {
++        "physical": 1,
++        "energy": 1
++      },
++      "name": "Заводская обшивка для корпуса",
++      "itemType": "plating"
++    },
++    "frame": null,
++    "heldWeapon": null
++  },
++  "securitron.leftArm": {
++    "limb": {
++      "id": "robot_arm_securitron",
++      "itemType": "robotArm",
++      "physicalDR": 2,
++      "energyDR": 1,
++      "radDR": 0,
++      "weaponSlots": 1,
++      "canHoldWeapons": true,
++      "builtinWeaponId": "robot_weapon_manipulator",
++      "name": "Рука Секьюритрона",
++      "builtinWeapons": [
++        {
++          "id": "robot_weapon_manipulator",
++          "itemType": "weapon",
++          "damage": {
++            "base": 2,
++            "modifiers": [],
++            "total": 2
++          },
++          "damageType": "physical",
++          "mainSkill": "UNARMED",
++          "meleeBonusApplies": true,
++          "qualities": [
++            {
++              "qualityId": "quality_close_quarters"
++            }
++          ],
++          "effects": [],
++          "isBuiltin": true,
++          "weaponId": "robot_weapon_manipulator"
++        },
++        {
++          "id": "weapon_laser_gun",
++          "damage": {
++            "base": 3,
++            "modifiers": [],
++            "total": 3
++          },
++          "damageType": "energy",
++          "qualities": [],
++          "effects": [],
++          "fireRate": {
++            "base": 3,
++            "modifiers": [],
++            "total": 3
++          },
++          "weaponId": "weapon_laser_gun",
++          "isBuiltin": true,
++          "builtinToArm": true
++        }
++      ]
++    },
++    "armor": {
++      "id": "robot_armor_factory_arms",
++      "layer": "armor",
++      "damageResistance": {
++        "physical": 1,
++        "energy": 1
++      },
++      "name": "Заводская броня для руки",
++      "itemType": "robotArmor"
++    },
++    "plating": null,
++    "frame": null,
++    "heldWeapon": null
++  },
++  "securitron.rightArm": {
++    "limb": {
++      "id": "robot_arm_securitron",
++      "itemType": "robotArm",
++      "physicalDR": 2,
++      "energyDR": 1,
++      "radDR": 0,
++      "weaponSlots": 1,
++      "canHoldWeapons": true,
++      "builtinWeaponId": "robot_weapon_manipulator",
++      "name": "Рука Секьюритрона",
++      "builtinWeapons": [
++        {
++          "id": "robot_weapon_manipulator",
++          "itemType": "weapon",
++          "damage": {
++            "base": 2,
++            "modifiers": [],
++            "total": 2
++          },
++          "damageType": "physical",
++          "mainSkill": "UNARMED",
++          "meleeBonusApplies": true,
++          "qualities": [
++            {
++              "qualityId": "quality_close_quarters"
++            }
++          ],
++          "effects": [],
++          "isBuiltin": true,
++          "weaponId": "robot_weapon_manipulator"
++        },
++        {
++          "id": "weapon_submachine_gun",
++          "damage": {
++            "base": 3,
++            "modifiers": [],
++            "total": 3
++          },
++          "damageType": "physical",
++          "qualities": "[{\"qualityId\":\"quality_two-handed\"},{\"qualityId\":\"quality_inaccurate\"}]",
++          "effects": "[{\"effectId\":\"effect_burst\"}]",
++          "fireRate": {
++            "base": 3,
++            "modifiers": [],
++            "total": 3
++          },
++          "weaponId": "weapon_submachine_gun",
++          "isBuiltin": true,
++          "builtinToArm": true
++        }
++      ]
++    },
++    "armor": {
++      "id": "robot_armor_factory_arms",
++      "layer": "armor",
++      "damageResistance": {
++        "physical": 1,
++        "energy": 1
++      },
++      "name": "Заводская броня для руки",
++      "itemType": "robotArmor"
++    },
++    "plating": null,
++    "frame": null,
++    "heldWeapon": null
++  },
++  "robobrain.leftArm": {
++    "limb": {
++      "id": "robot_weapon_tesla_arm",
++      "itemType": "robotArm",
++      "weaponSlots": 0,
++      "canHoldWeapons": false,
++      "builtinWeaponId": "robot_weapon_tesla_arm",
++      "name": "Карабин Теслы",
++      "builtinWeapons": [
++        {
++          "id": "robot_weapon_tesla_arm",
++          "itemType": "weapon",
++          "damage": 4,
++          "damageType": "energy",
++          "fireRate": 2,
++          "mainSkill": "SMALL_GUNS",
++          "ammoId": "ammo_fusion_core",
++          "qualities": [],
++          "effects": [
++            {
++              "effectId": "effect_burst"
++            }
++          ],
++          "isBuiltin": true
++        }
++      ]
++    },
++    "armor": null,
++    "plating": {
++      "id": "robot_plating_toxic_arms",
++      "layer": "plating",
++      "incompatibleLayers": [
++        "armor",
++        "frame"
++      ],
++      "damageResistance": {
++        "physical": 2,
++        "energy": 0
++      },
++      "name": "Радиоактивная плита для руки",
++      "itemType": "plating"
++    },
++    "frame": {
++      "id": "robot_frame_hydraulic_arms",
++      "layer": "frame",
++      "damageResistance": {
++        "physical": 3,
++        "energy": 3
++      },
++      "name": "Гидравлическая рама для руки",
++      "itemType": "robotFrame"
++    },
++    "heldWeapon": null
++  },
++  "robobrain.rightArm": {
++    "limb": {
++      "id": "robot_arm_smoke_manipulator",
++      "itemType": "robotArm",
++      "physicalDR": 2,
++      "energyDR": 3,
++      "radDR": 0,
++      "weaponSlots": 1,
++      "canHoldWeapons": true,
++      "builtinWeaponId": "robot_weapon_smoke_claws",
++      "name": "Экстендер с зажимом",
++      "builtinWeapons": [
++        {
++          "id": "robot_weapon_smoke_claws",
++          "itemType": "weapon",
++          "damage": 4,
++          "damageType": "poison",
++          "fireRate": 0,
++          "mainSkill": "SMALL_GUNS",
++          "builtinToArm": "robot_arm_robobrain",
++          "ammoId": "ammo_gas_grenade",
++          "qualities": [
++            {
++              "qualityId": "quality_blast"
++            },
++            {
++              "qualityId": "quality_inaccurate"
++            }
++          ],
++          "effects": [
++            {
++              "effectId": "effect_persistent"
++            }
++          ],
++          "isBuiltin": true,
++          "weaponId": "robot_weapon_smoke_claws"
++        }
++      ]
++    },
++    "armor": {
++      "id": "robot_armor_factory_arms",
++      "layer": "armor",
++      "damageResistance": {
++        "physical": 1,
++        "energy": 1
++      },
++      "name": "Заводская броня для руки",
++      "itemType": "robotArmor"
++    },
++    "plating": {
++      "id": "robot_plating_toxic_arms",
++      "layer": "plating",
++      "incompatibleLayers": [
++        "armor",
++        "frame"
++      ],
++      "damageResistance": {
++        "physical": 2,
++        "energy": 0
++      },
++      "name": "Радиоактивная плита для руки",
++      "itemType": "plating"
++    },
++    "frame": {
++      "id": "robot_frame_hydraulic_arms",
++      "layer": "frame",
++      "damageResistance": {
++        "physical": 3,
++        "energy": 3
++      },
++      "name": "Гидравлическая рама для руки",
++      "itemType": "robotFrame"
++    },
++    "heldWeapon": {
++      "id": "weapon_combat_shotgun",
++      "weaponId": "weapon_combat_shotgun",
++      "name": "Боевой дробовик",
++      "itemType": "weapon",
++      "appliedMods": {},
++      "damage": 5,
++      "fireRate": 2,
++      "damageType": "physical",
++      "ammoId": "ammo_shotgun_shell"
++    }
++  },
++  "robobrain.body": {
++    "limb": {
++      "id": "robot_body_robobrain",
++      "itemType": "robotBody",
++      "physicalDR": 3,
++      "energyDR": 3,
++      "radDR": 0,
++      "name": "robot_body_robobrain"
++    },
++    "armor": null,
++    "plating": {
++      "id": "robot_plating_serrated_body",
++      "layer": "plating",
++      "incompatibleLayers": [
++        "armor",
++        "frame"
++      ],
++      "damageResistance": {
++        "physical": 2,
++        "energy": 0
++      },
++      "name": "Зубчатая плита для корпуса",
++      "itemType": "plating"
++    },
++    "frame": null,
++    "heldWeapon": null
++  },
++  "misterHandy.arm1": {
++    "limb": {
++      "id": "robot_arm_mister_handy",
++      "itemType": "robotArm",
++      "physicalDR": 2,
++      "energyDR": 2,
++      "radDR": 0,
++      "weaponSlots": 1,
++      "canHoldWeapons": true,
++      "builtinWeaponId": "robot_weapon_manipulator",
++      "name": "Рука Мистера Помощника",
++      "builtinWeapons": [
++        {
++          "id": "robot_weapon_manipulator",
++          "itemType": "weapon",
++          "damage": 2,
++          "damageType": "physical",
++          "mainSkill": "UNARMED",
++          "meleeBonusApplies": true,
++          "qualities": [
++            {
++              "qualityId": "quality_close_quarters"
++            }
++          ],
++          "effects": [],
++          "isBuiltin": true
++        }
++      ]
++    },
++    "armor": null,
++    "plating": null,
++    "frame": null,
++    "heldWeapon": {
++      "id": "weapon_10mm_smg",
++      "weaponId": "weapon_10mm_smg",
++      "itemType": "weapon",
++      "appliedMods": {}
++    }
++  },
++  "misterHandy.body": {
++    "limb": {
++      "id": "robot_body_mister_handy",
++      "itemType": "robotBody",
++      "physicalDR": 3,
++      "energyDR": 2,
++      "radDR": 0,
++      "name": "Корпус Мистера Помощника"
++    },
++    "armor": {
++      "id": "robot_armor_storage_body",
++      "layer": "armor",
++      "damageResistance": {
++        "physical": 1,
++        "energy": 1
++      },
++      "name": "Заводская броня с хранилищем",
++      "itemType": "robotArmor"
++    },
++    "plating": {
++      "id": "robot_plating_gutsy_body",
++      "layer": "plating",
++      "incompatibleLayers": [
++        "armor",
++        "frame"
++      ],
++      "damageResistance": {
++        "physical": 2,
++        "energy": 2
++      },
++      "name": "Обшивка Мистера Храбреца для корпуса",
++      "itemType": "plating"
++    },
++    "frame": {
++      "id": "robot_frame_hydraulic_body",
++      "layer": "frame",
++      "damageResistance": {
++        "physical": 3,
++        "energy": 3
++      },
++      "name": "Гидравлическая рама для корпуса",
++      "itemType": "robotFrame"
++    },
++    "heldWeapon": null
++  },
++  "assaultron.leftArm": {
++    "limb": {
++      "id": "robot_arm_assaultron",
++      "itemType": "robotArm",
++      "physicalDR": 3,
++      "energyDR": 3,
++      "radDR": 0,
++      "weaponSlots": 1,
++      "canHoldWeapons": true,
++      "builtinWeaponId": "robot_weapon_claw",
++      "name": "robot_arm_assaultron",
++      "builtinWeapons": [
++        {
++          "id": "robot_weapon_claw",
++          "itemType": "weapon",
++          "damage": 3,
++          "damageType": "physical",
++          "mainSkill": "UNARMED",
++          "meleeBonusApplies": true,
++          "qualities": [
++            {
++              "qualityId": "quality_close_quarters"
++            }
++          ],
++          "effects": [],
++          "isBuiltin": true,
++          "weaponId": "robot_weapon_claw"
++        },
++        {
++          "id": "weapon_laser_gun",
++          "damage": 4,
++          "damageType": "energy",
++          "fireRate": 2,
++          "qualities": "[{\"qualityId\":\"quality_close_quarters\"}]",
++          "effects": "[{\"effectId\":\"effect_piercing_x\"}]",
++          "ammoId": "ammo_energy_cell",
++          "mainSkill": "ENERGY_WEAPONS",
++          "weaponId": "weapon_laser_gun",
++          "isBuiltin": true,
++          "builtinToArm": true
++        }
++      ]
++    },
++    "armor": null,
++    "plating": null,
++    "frame": null,
++    "heldWeapon": null
++  }
++}
+\ No newline at end of file
+diff --git a/__tests__/saves/robot-slot-slim-roundtrip.test.js b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+new file mode 100644
+index 0000000..a18b57c
+--- /dev/null
++++ b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+@@ -0,0 +1,163 @@
++// __tests__/saves/robot-slot-slim-roundtrip.test.js
++//
++// «Худой» сейв робота: слот хранит только id (да список id модов), всё
++// остальное восстановимо из каталогов.
++//
++// Проверяется на РЕАЛЬНЫХ данных: слоты вырезаны из сейвов, присланных
++// владельцем (протектрон, секьюритрон, робомозг, мистер Хэнди, ассультрон) —
++// __tests__/fixtures/robot-slots-from-saves.json.
++
++import { describe, it, expect } from 'vitest';
++
++import {
++  collectAttacks,
++  serializeSlot,
++  deserializeSlot,
++  slotAcceptsArmor,
++  totalDR,
++} from '../../domain/robotSlots';
++import { slimRobotSlots, restoreSaveData } from '../../domain/saveSlimming';
++import fixtures from '../fixtures/robot-slots-from-saves.json';
++
++const slot = (key) => JSON.parse(JSON.stringify(fixtures[key]));
++const slimOf = (key) => serializeSlot(slot(key));
++
++describe('ужимка слота: что остаётся в сейве', () => {
++  it('оружие в ладони — только id', () => {
++    // Робомозг держит боевой дробовик, Хэнди — ПП «10 мм».
++    expect(slimOf('robobrain.rightArm').heldWeaponId).toBe('weapon_combat_shotgun');
++    expect(slimOf('misterHandy.arm1').heldWeaponId).toBe('weapon_10mm_smg');
++    const slim = slimOf('robobrain.rightArm');
++    expect(slim.heldWeapon).toBeUndefined();
++    expect(slim.limb).toBeUndefined();
++  });
++
++  it('установленное в конечность оружие — отдельный список id', () => {
++    // Секьюритрон: в левой руке сверх манипулятора стоит лазерная пушка,
++    // в правой — ПП. Ассультрон: лазер только в левой.
++    expect(slimOf('securitron.leftArm').installedWeapons)
++      .toEqual([{ id: 'weapon_laser_gun', modIds: [] }]);
++    expect(slimOf('securitron.rightArm').installedWeapons)
++      .toEqual([{ id: 'weapon_submachine_gun', modIds: [] }]);
++    expect(slimOf('assaultron.leftArm').installedWeapons)
++      .toEqual([{ id: 'weapon_laser_gun', modIds: [] }]);
++  });
++
++  it('своя атака конечности в установки не попадает', () => {
++    for (const key of ['securitron.leftArm', 'securitron.rightArm', 'assaultron.leftArm']) {
++      const ids = slimOf(key).installedWeapons.map((w) => w.id);
++      expect(ids).not.toContain('robot_weapon_manipulator');
++      expect(ids).not.toContain('robot_weapon_claw');
++    }
++  });
++
++  it('конфликтующая обшивка выбрасывается (правило владельца)', () => {
++    // Протектрон: на голове броня + рама + обшивка. Обшивка несовместима с
++    // бронёй и рамой → в сейв она не идёт.
++    const head = slimOf('protectron.head');
++    expect(head.armorLayers.armor).toBe('robot_armor_factory_optics');
++    expect(head.armorLayers.frame).toBe('robot_frame_hydraulic_optics');
++    expect(head.armorLayers.plating).toBeNull();
++
++    // Робомозг: то же самое на руке.
++    const arm = slimOf('robobrain.rightArm');
++    expect(arm.armorLayers.armor).toBe('robot_armor_factory_arms');
++    expect(arm.armorLayers.plating).toBeNull();
++  });
++
++  it('обшивка без конфликта остаётся', () => {
++    // Протектрон и робомозг: на корпусе только обшивка — выбрасывать нечего.
++    expect(slimOf('protectron.body').armorLayers.plating)
++      .toBe('robot_plating_factory_body');
++    expect(slimOf('robobrain.body').armorLayers.plating)
++      .toBe('robot_plating_serrated_body');
++    // А у Хэнди на корпусе броня + рама + обшивка — обшивка лишняя.
++    expect(slimOf('misterHandy.body').armorLayers.armor)
++      .toBe('robot_armor_storage_body');
++    expect(slimOf('misterHandy.body').armorLayers.frame)
++      .toBe('robot_frame_hydraulic_body');
++    expect(slimOf('misterHandy.body').armorLayers.plating).toBeNull();
++  });
++
++  it('оружие вместо руки защиты не хранит', () => {
++    // Карабин Теслы — не рука, а оружие: в старом сейве на него надели
++    // обшивку и раму. Оба слоя — мусор, в новый сейв не идут.
++    const tesla = slimOf('robobrain.leftArm');
++    expect(tesla.content).toBe('robot_weapon_tesla_arm');
++    expect(tesla.armorLayers).toEqual({ frame: null, plating: null, armor: null });
++  });
++});
++
++describe('круг «ужали — развернули» ничего не теряет', () => {
++  const keys = Object.keys(fixtures);
++
++  it('атаки после ужимки те же, что до неё', () => {
++    for (const key of keys) {
++      const before = collectAttacks({ x: slot(key) }).map((a) => `${a.id}@${a.source}`);
++      const after = collectAttacks({ x: slimOf(key) }).map((a) => `${a.id}@${a.source}`);
++      expect(after, key).toEqual(before);
++    }
++  });
++
++  it('СУ после ужимки не ниже, чем была (мёртвые слои не считались и так)', () => {
++    for (const key of keys) {
++      const before = totalDR(slot(key));
++      const after = totalDR(slimOf(key));
++      expect(after.physical, key).toBe(before.physical);
++      expect(after.energy, key).toBe(before.energy);
++      expect(after.rad, key).toBe(before.rad);
++    }
++  });
++
++  it('свойство «принимает защиту» не меняется', () => {
++    for (const key of keys) {
++      expect(slotAcceptsArmor(slimOf(key)).allowed, key)
++        .toBe(slotAcceptsArmor(slot(key)).allowed);
++    }
++  });
++
++  it('ужимка идемпотентна', () => {
++    for (const key of keys) {
++      const once = slimOf(key);
++      const twice = serializeSlot(once);
++      expect(twice, key).toEqual(once);
++    }
++  });
++
++  it('худое тело сейва разворачивается и ужимается обратно', () => {
++    const data = { schemaVersion: 19, equippedRobotSlots: {} };
++    for (const key of keys) {
++      const [plan, slotKey] = key.split('.');
++      data.equippedRobotSlots[`${plan}__${slotKey}`] = slot(key);
++    }
++    const slim = slimRobotSlots(data);
++    // в худом теле слотов нет ни предметов, ни имён
++    const json = JSON.stringify(slim.equippedRobotSlots);
++    expect(json).not.toContain('"damageResistance"');
++    expect(json).not.toContain('"builtinWeapons"');
++
++    const wide = restoreSaveData(slim, { resolve: (item) => item });
++    for (const composite of Object.keys(slim.equippedRobotSlots)) {
++      const again = serializeSlot(wide.equippedRobotSlots[composite]);
++      expect(again, composite).toEqual(slim.equippedRobotSlots[composite]);
++    }
++  });
++
++  it('разворот даёт слот, пригодный для экранов: конечность и слои — объекты', () => {
++    const wide = deserializeSlot(slimOf('securitron.leftArm'));
++    expect(wide.limb?.id).toBe('robot_arm_securitron');
++    expect(wide.limb?.itemType).toBe('robotArm');
++    expect(wide.armor?.id).toBe('robot_armor_factory_arms');
++    expect(wide.armor?.damageResistance).toEqual({ physical: 1, energy: 1 });
++    // установленное оружие вернулось внутрь конечности
++    const ids = (wide.limb.builtinWeapons || []).map((w) => w.id);
++    expect(ids).toContain('robot_weapon_manipulator');
++    expect(ids).toContain('weapon_laser_gun');
++  });
++
++  it('разворот: оружие в ладони снова предмет', () => {
++    const wide = deserializeSlot(slimOf('robobrain.rightArm'));
++    expect(wide.heldWeapon?.id).toBe('weapon_combat_shotgun');
++    expect(wide.heldWeapon?.itemType).toBe('weapon');
++  });
++});
+diff --git a/__tests__/saves/save-slimming.test.js b/__tests__/saves/save-slimming.test.js
+index 7d81ea6..4046c63 100644
+--- a/__tests__/saves/save-slimming.test.js
++++ b/__tests__/saves/save-slimming.test.js
+@@ -224,8 +224,13 @@ describe('slimSaveData / restoreSaveData (round-trip)', () => {
+     expect(slim.equippedArmor.head.clothing.name).toBe('Заглючивший голодиск');
+     // equippedPowerArmor frame/пиксели обработаны
+     expect('name' in slim.equippedPowerArmor.frame).toBe(false);
+-    // robot heldWeapon обработано
+-    expect('name' in slim.equippedRobotSlots.rightArm.heldWeapon).toBe(false);
++    // слоты робота ужаты до id + модов: ни предметов, ни их копии в сейве
++    expect(slim.equippedRobotSlots.rightArm.content).toBe('robot_arm_smoke');
++    expect(slim.equippedRobotSlots.rightArm.heldWeaponId).toBe('weapon_combat_shotgun');
++    expect(slim.equippedRobotSlots.rightArm.heldWeapon).toBeUndefined();
++    expect(slim.equippedRobotSlots.rightArm.limb).toBeUndefined();
++    // пустой слот не превращается в мусор
++    expect(slim.equippedRobotSlots.leftArm).toBeNull();
+ 
+     // restore возвращает каталогные поля
+     const restored = restoreSaveData(slim, { resolve });
+@@ -237,7 +242,9 @@ describe('slimSaveData / restoreSaveData (round-trip)', () => {
+     expect(restored.equipment.items[2]).toEqual(makeCustom());
+     expect(restored.equippedWeapons[0].name).toBe('Боевой дробовик');
+     expect(restored.equippedPowerArmor.frame.cost).toBe(87);
++    // разворот: оружие в ладони снова предмет с каталожными полями
+     expect(restored.equippedRobotSlots.rightArm.heldWeapon.cost).toBe(87);
++    expect(restored.equippedRobotSlots.rightArm.heldWeapon.id).toBe('weapon_combat_shotgun');
+   });
+ 
+   it('идемпотентна: slim(slim(x)) === slim(x) и restore(restore(x)) стабилен', () => {
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 50d08c4..265ae36 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -522,13 +522,61 @@
+ |---|---|---|
+ | по умолчанию | 269 | **269** |
+ 
++### Этап 5, шаг 2 (патч 175): слоты робота в «худом» сейве
++
++Сейв хранит только id (да id установленных модов) — ровно как попросил
++владелец. Путь тот же, что проложил v19 для предметов: **ужимка на экспорте,
++разворот на импорте**, сама миграция — только бамп версии (как в v19).
++
++```json
++"leftArm": {
++  "content": "robot_arm_securitron",
++  "armorLayers": { "frame": null, "plating": null, "armor": "robot_armor_factory_arms" },
++  "heldWeaponId": "weapon_railway_rifle",
++  "heldWeaponMods": [],
++  "installedWeapons": [{ "id": "weapon_laser_gun", "modIds": [] }]
++}
++```
++
++| Что | Где |
++|---|---|
++| `serializeSlot` — слот → id + моды | `domain/robotSlots.js` |
++| `deserializeSlot` — id + моды → объекты | `domain/robotSlots.js` |
++| `slimRobotSlots` на экспорте | `domain/saveSlimming.js` (`slimSaveData`) |
++| разворот + обогащение каталогом на импорте | `mapItemContainers` (`restoreSaveData`) |
++| v20 в `saveSchema.js` / пустая миграция | `src/store/*` |
++
++Правила, зашитые в ужимку:
++
++* конфликтующая обшивка **выбрасывается** (правило владельца: броня + рама
++  есть — обшивки нет). Мёртвый слой в сейв не пишется;
++* оружие вместо руки защиты не хранит (старые сейвы хранили на нём обшивку и
++  раму — этот мусор теперь не уезжает в новый сейв);
++* своя атака конечности и установленное оружие разделены (`installedWeapons`);
++* оружие в ладони пишется только там, где конечность его держит. Конечность
++  вне каталога считается «держащей»: непонятные данные не гасим.
++
++Проверено на **реальных** данных: 11 слотов из 5 присланных сейвов
++(`__tests__/fixtures/robot-slots-from-saves.json`). Круг «ужали — развернули»
++даёт те же атаки, ту же СУ и то же свойство «принимает защиту»; ужимка
++идемпотентна. Место: 8465 → 2364 байта на эти слоты (−72 %).
++
++Чего здесь НЕТ: **физический формат хранилища не менялся** — база по-прежнему
++пишет «толстые» слоты. Смена формата требует слоя доступа (`getLimb`,
++`getLayer`) во всех читателях (риск Р1, 21 файл) и идёт отдельным шагом.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 282 | **282** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Дальше: этап 5 — миграция сейва (175), этап 6 — удаление мёртвых полей
++Дальше: слой доступа к слоту во всех читателях → смена физического формата
++хранилища → этап 6 (удаление мёртвых полей)
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index a581b0d..be5eacf 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -207,6 +207,24 @@ export function resolveLimb(catalog, content) {
+   return merged;
+ }
+ 
++/**
++ * Может ли конечность держать оружие в ладони — с точки зрения ЗАПИСИ слота.
++ * Конечность вне каталога (неизвестная) оружие «держит»: мы не понимаем её
++ * устройство и не имеем права гасить уже записанные данные.
++ *
++ * Для атак правило строже (см. attacksFromSlot): неизвестная конечность
++ * атаку из ладони не даёт.
++ *
++ * @param {object} limb
++ * @returns {boolean}
++ */
++const limbKeepsHeldWeapon = (limb) => {
++  if (!limb || !limb.itemCategory) return true;
++  return limb.itemCategory === 'limb'
++    && limb.canHoldWeapons === true
++    && (limb.weaponSlots ?? 1) > 0;
++};
++
+ const resolveWeapon = (catalog, id) => {
+   if (!id) return null;
+   return (catalog?.weapons || []).find((w) => w.id === id)
+@@ -248,6 +266,148 @@ const materializeWeapon = (catalog, entry, modIds = []) => {
+   return mods.length > 0 ? applyWeaponMods(merged, mods) : merged;
+ };
+ 
++// ---------------------------------------------------------------------------
++// Хранимая (худая) форма слота: id + моды
++// ---------------------------------------------------------------------------
++
++/**
++ * Признак худого слота: в нём оружие записано идентификаторами.
++ * @param {object} slot
++ * @returns {boolean}
++ */
++export const isSlimSlot = (slot) => Boolean(slot && typeof slot === 'object'
++  && ('content' in slot || 'armorLayers' in slot || 'heldWeaponId' in slot
++    || 'installedWeapons' in slot));
++
++/**
++ * Слот → худая форма: только id да список id модов.
++ *
++ * Правила, зашитые здесь:
++ *   - слой защиты хранится id; конфликтующие слои отбрасываются (обшивка не
++ *    совместима с бронёй и рамой — правило владельца);
++ *   - слот без настоящей конечности (или с оружием вместо руки) защиты не
++ *     хранит вовсе;
++ *   - оружие в ладони хранится только там, где конечность его держит.
++ *
++ * @param {object} slot
++ * @param {object} options — { catalog? }
++ * @returns {{ content: string|null, armorLayers: object, heldWeaponId: string|null,
++ *             heldWeaponMods: string[], installedWeapons: object[] }}
++ */
++export function serializeSlot(slot, options = {}) {
++  const { catalog = getRobotLimbCatalog() } = options;
++  const state = normalizeSlot(slot, { catalog });
++  const content = typeof state.content === 'string'
++    ? state.content
++    : (state.content?.id ?? null);
++  const limb = resolveLimb(catalog, state.content);
++
++  const armorLayers = { frame: null, plating: null, armor: null };
++  if (limb && slotAcceptsArmor(slot, { catalog }).allowed) {
++    for (const { key } of activeArmorLayers(slot, { catalog })) {
++      const layer = state.armorLayers[key];
++      armorLayers[key] = typeof layer === 'string' ? layer : (layer?.id ?? null);
++    }
++  }
++
++  const canHold = limbKeepsHeldWeapon(limb);
++
++  return {
++    content,
++    armorLayers,
++    heldWeaponId: canHold ? state.heldWeaponId : null,
++    heldWeaponMods: canHold ? state.heldWeaponMods : [],
++    installedWeapons: state.installedWeapons.filter((entry) => entry?.id),
++  };
++}
++
++const ITEM_TYPE_BY_LIMB_TYPE = {
++  arm: 'robotArm',
++  head: 'robotHead',
++  body: 'robotBody',
++  mover: 'robotLegs',
++};
++
++/**
++ * Худая форма → слот в виде объектов (то, что ждёт остальной код приложения).
++ *
++ * Записи каталога кладутся целиком (статы, СУ, совместимость слоёв); локали-
++ * зованные имена дообогащает restoreSaveData на импорте. Установленное оружие
++ * возвращается в массив builtinWeapons конечности — ровно откуда оно пришло.
++ *
++ * @param {object} slot — худая (или любая) форма слота
++ * @param {object} options — { catalog? }
++ * @returns {{ limb: object|null, armor: object|null, plating: object|null,
++ *             frame: object|null, heldWeapon: object|null }}
++ */
++export function deserializeSlot(slot, options = {}) {
++  const { catalog = getRobotLimbCatalog() } = options;
++  const state = normalizeSlot(slot, { catalog });
++  const limbId = typeof state.content === 'string'
++    ? state.content
++    : (state.content?.id ?? null);
++
++  let limb = null;
++  if (limbId) {
++    const entry = resolveLimb(catalog, limbId);
++    const itemType = entry?.itemType
++      ?? ITEM_TYPE_BY_LIMB_TYPE[entry?.limbType]
++      ?? 'robotPart';
++    const builtinWeapons = [];
++    const ownId = entry?.itemCategory === 'weaponAsLimb'
++      ? entry.attackId
++      : (entry?.builtinWeaponId ?? (entry?.builtinManipulator ? entry.id : null));
++    if (ownId) {
++      builtinWeapons.push({ ...(resolveWeapon(catalog, ownId) || {}), id: ownId, weaponId: ownId, itemType: 'weapon', isBuiltin: true });
++    }
++    for (const installed of state.installedWeapons) {
++      builtinWeapons.push({
++        ...(resolveWeapon(catalog, installed.id) || {}),
++        id: installed.id,
++        weaponId: installed.id,
++        itemType: 'weapon',
++        appliedMods: modMap(catalog, installed.modIds),
++        modIds: installed.modIds,
++        isBuiltin: true,
++      });
++    }
++    limb = {
++      ...(entry || {}),
++      id: limbId,
++      itemType,
++      ...(builtinWeapons.length > 0 ? { builtinWeapons } : {}),
++    };
++  }
++
++  const canHold = limbKeepsHeldWeapon(limb);
++
++  const layerObject = (key) => {
++    const raw = state.armorLayers[key];
++    const id = typeof raw === 'string' ? raw : (raw?.id ?? null);
++    if (!id) return null;
++    const entry = (catalog?.armorLayers || []).find((l) => l.id === id);
++    // itemType: 'armor' — ключ, по которому restoreSaveData найдёт запись в
++    // общем каталоге (armorIndex объединяет броню, обшивку и рамы).
++    return { ...(entry || {}), id, itemType: 'armor', ...(typeof raw === 'object' && raw ? raw : {}) };
++  };
++
++  return {
++    limb,
++    armor: layerObject('armor'),
++    plating: layerObject('plating'),
++    frame: layerObject('frame'),
++    heldWeapon: canHold && state.heldWeaponId
++      ? {
++        id: state.heldWeaponId,
++        weaponId: state.heldWeaponId,
++        itemType: 'weapon',
++        appliedMods: modMap(catalog, state.heldWeaponMods),
++        modIds: state.heldWeaponMods,
++      }
++      : null,
++  };
++}
++
+ // ---------------------------------------------------------------------------
+ // План тела
+ // ---------------------------------------------------------------------------
+diff --git a/domain/saveSlimming.js b/domain/saveSlimming.js
+index 5ddc4eb..36a9aaf 100644
+--- a/domain/saveSlimming.js
++++ b/domain/saveSlimming.js
+@@ -86,14 +86,17 @@ export const restoreItem = (instance, resolve) => {
+   return { ...instance, ...resolved };
+ };
+ 
++import { deserializeSlot, isSlimSlot, serializeSlot } from './robotSlots';
++
+ const mapArray = (arr, fn) => (Array.isArray(arr) ? arr.map(fn) : arr);
+ 
+ /**
+  * Обход всех контейнеров предметов в data + применение fn к каждому инстансу.
+  * Контейнеры: equipment.items, equippedWeapons, equippedArmor.*.{armor,clothing},
+- * equippedPowerArmor.{frame,pieces.*}, equippedRobotSlots.*.heldWeapon.
+- * Слои роботов (limb/armor/plating/frame) на этом шаге НЕ трогаются — их
+- * восстановление требует отдельной проверки каталога робочастей (см. доки).
++ * equippedPowerArmor.{frame,pieces.*}, equippedRobotSlots.*.{heldWeapon,limb,
++ * armor,plating,frame}.
++ * Слоты робота в худой форме (content/armorLayers/heldWeaponId) разворачиваются
++ * в объекты, после чего их содержимое восстанавливается каталогом как обычно.
+  */
+ const mapItemContainers = (data, fn) => {
+   if (!data || typeof data !== 'object') return data;
+@@ -138,13 +141,19 @@ const mapItemContainers = (data, fn) => {
+     next.equippedPowerArmor = pa;
+   }
+ 
+-  // equippedRobotSlots — ужимаем только heldWeapon (оружие в «руке»)
++  // equippedRobotSlots — худая форма (id + моды) разворачивается обратно в
++  // объекты, после чего предметы (конечность, слои защиты, оружие в ладони)
++  // обогащаются каталогом как обычно.
+   if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
+     const slots = next.equippedRobotSlots;
+     const out = {};
+     for (const [k, slot] of Object.entries(slots)) {
+       if (!slot || typeof slot !== 'object') { out[k] = slot; continue; }
+-      const s = { ...slot };
++      const s = isSlimSlot(slot) ? deserializeSlot(slot) : { ...slot };
++      if (s.limb) s.limb = fn(s.limb);
++      if (s.armor) s.armor = fn(s.armor);
++      if (s.plating) s.plating = fn(s.plating);
++      if (s.frame) s.frame = fn(s.frame);
+       if (s.heldWeapon) s.heldWeapon = fn(s.heldWeapon);
+       out[k] = s;
+     }
+@@ -154,6 +163,27 @@ const mapItemContainers = (data, fn) => {
+   return next;
+ };
+ 
++/**
++ * Слоты робота → худая форма (только id и моды).
++ *
++ * Отдельно от mapItemContainers: здесь меняется сама структура слота, а не
++ * начинка предметов. На импорте это разворачивается в mapItemContainers.
++ *
++ * @param {object} data
++ * @returns {object}
++ */
++export const slimRobotSlots = (data) => {
++  if (!data || typeof data !== 'object' || !data.equippedRobotSlots
++      || typeof data.equippedRobotSlots !== 'object') {
++    return data;
++  }
++  const out = {};
++  for (const [key, slot] of Object.entries(data.equippedRobotSlots)) {
++    out[key] = slot && typeof slot === 'object' ? serializeSlot(slot) : slot;
++  }
++  return { ...data, equippedRobotSlots: out };
++};
++
+ /**
+  * Ужать тело сейва на экспорте.
+  * @param {object} data      — character.data (или уже сериализованный объект).
+@@ -162,12 +192,15 @@ const mapItemContainers = (data, fn) => {
+  */
+ export const slimSaveData = (data, { getEntry } = {}) => {
+   const lookup = typeof getEntry === 'function' ? getEntry : () => null;
+-  return mapItemContainers(data, (item) => {
++  const slimmed = mapItemContainers(data, (item) => {
+     if (!item || typeof item !== 'object') return item;
+     const id = item.weaponId || item.id;
+     const entry = id ? lookup(id, item.itemType) : null;
+     return slimItem(item, entry);
+   });
++  // Слоты робота ужимаются последними: предметы внутри них уже приведены к
++  // ссылкам, поэтому от оружия в ладони остаётся id да список модов.
++  return slimRobotSlots(slimmed);
+ };
+ 
+ /**
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index c6e4d22..5a49fa8 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -1086,6 +1086,13 @@ const MIGRATIONS = [
+   // приведёт к «худому» виду. Идемпотентна.
+   (state) => state,
+ 
++  // v19 -> v20: «худой» сейв для слотов робота. Конечность, слои защиты и
++  // оружие в ладони хранятся id (+ id установленных модов); характеристики
++  // восстанавливаются из каталогов. Как и в v19, сама ужимка делается на
++  // экспорте (slimRobotSlots), разворот — на импорте (restoreSaveData), а тут
++  // только бамп версии: данные не меняются, миграция идемпотентна.
++  (state) => state,
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 98e9c7b..c5d4f92 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -38,13 +38,21 @@
+ // v16 — одноразовый модификатор сложности для следующей новой категории риска.
+ // v17 — снять лишние ранги перков сверх catalog maxRanks; сейв перка — {id, rank}.
+ // v18 — id перков: triggerRush→scrounger, slacker→dodger, bullRush→painTrain.
++// v19 — «худой» сейв: предметы хранят только состояние экземпляра, имя/цену/
++//       вес/статы/моды достаёт resolveItem по id (domain/saveSlimming.js).
++// v20 — «худой» сейв для слотов робота: конечность, слои защиты и оружие
++//       хранятся id (+ список id модов), характеристики восстанавливаются из
++//       каталогов. Ужимка — на экспорте (slimRobotSlots), разворот — на импорте
++//       (restoreSaveData). Само хранилище пока пишет «толстые» объекты: смена
++//       физического формата требует слоя доступа к слоту (риск Р1) и идёт
++//       отдельным шагом. Миграция — только бамп версии, идемпотентна.
+ // v19 — предметы в сейве хранят только состояние экземпляра (id/quantity/
+ //       equipped/locked/appliedMods/charges/…), а имя/цену/вес/статы/моды
+ //       достаёт resolveItem по id (см. domain/saveSlimming.js). Обратная
+ //       совместимость: старые «жирные» сейвы (v18 и ниже) при загрузке
+ //       восстанавливаются (restoreSaveData), а при сохранении становятся
+ //       «худыми» (slimSaveData). Миграция v18→v19 — только бамп версии.
+-export const CURRENT_SCHEMA_VERSION = 19;
++export const CURRENT_SCHEMA_VERSION = 20;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+
+-- 
+2.47.3
+
