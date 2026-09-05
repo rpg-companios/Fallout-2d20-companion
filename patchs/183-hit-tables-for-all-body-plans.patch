@@ -1,0 +1,510 @@
+From 0000000000000000000000000000001788579851 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sat, 05 Sep 2026 03:44:11 +0000
+Subject: [PATCH] hit tables for all body plans: numbers from the screen locale
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Открытый вопрос №1 закрыт: hitTable теперь есть у каждого плана тела.
+
+Числа не выдуманы: человеческая таблица (голова 1-2, тело/торс 3-8, левая рука
+9-11, правая 12-14, левая нога 15-17, правая 18-20) уже лежала в локали экрана
+защиты — i18n/*/screens/weaponsAndArmor/screen.json, вместе с arm1/arm2/arm3 и
+chassis/thruster. Дальше по владельцу:
+
+- Штурмотрон гуманоидного вида — таблица как у людей (assaultron, sentryBot,
+  humanoid).
+- Робомозг — та же человеческая, движитель (chassis) 15-20.
+- Мистер Хэндℹ: голова 1-2, тело 3-4 (уточнение владельца), дальше arm1 5-8,
+  arm2 9-12, arm3 13-16, thruster 17-20 — единственная раскладка, покрывающая
+  5-20 для трёх рук и движителя. Эту часть надо сверить с книгой.
+- Протекторн и секьюритрон не тронуты (таблицы с патча 168).
+
+Тесты, утверждавшие прежнее положение («у Хэндℹ таблицы нет», «hitTable есть
+только у protectron и securitron»), переписаны осознанно: теперь проверяется,
+что таблица есть у каждого плана, покрывает d20 без дыр и наложений, а экран
+берёт диапазон из плана, а не из статики людей.
+
+300 тестов / 25 файлов — зелёные.
+
+---
+ 5 files changed, 318 insertions(+), 34 deletions(-)
+
+diff --git a/__tests__/robot/robot-data-catalogs.test.js b/__tests__/robot/robot-data-catalogs.test.js
+index d5f88d2..fecd580 100644
+--- a/__tests__/robot/robot-data-catalogs.test.js
++++ b/__tests__/robot/robot-data-catalogs.test.js
+@@ -173,7 +173,8 @@ describe('новые каталоги данных роботов', () => {
+     const withTable = Object.entries(bodyplans)
+       .filter(([, plan]) => plan.hitTable)
+       .map(([planId]) => planId);
+-    expect(withTable.sort()).toEqual(['protectron', 'securitron']);
++    // Таблица есть у каждого плана: диапазоны известны для всех.
++    expect(withTable.sort()).toEqual(Object.keys(bodyplans).sort());
+ 
+     for (const planId of withTable) {
+       const covered = [];
+diff --git a/__tests__/robot/robot-slot-behaviour.test.js b/__tests__/robot/robot-slot-behaviour.test.js
+index d1c61a2..e625bf6 100644
+--- a/__tests__/robot/robot-slot-behaviour.test.js
++++ b/__tests__/robot/robot-slot-behaviour.test.js
+@@ -30,9 +30,11 @@ import {
+   slotForDirection,
+   limbOptionsForSlot,
+ } from '../../domain/robotSlots';
++import { getRobotSlotKeys } from '../../domain/robotEquip';
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ 
+ import limbsCatalog from '../../modules/fallout/data/equipment/robot/limbs.json';
++import bodyplans from '../../modules/fallout/data/bodyplans/bodyplans.json';
+ import weaponAsLimbCatalog from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+ // Модалка замены конечности пока читает каталог оборудования (старые файлы) —
+ // источник для неё один с движком после следующего патча.
+@@ -341,11 +343,12 @@ describe('диапазоны попаданий в экране', () => {
+     expect(getSlotHitRange('protectron', 'leftArm')).toEqual({ from: 4, to: 7 });
+     expect(getSlotHitRange('securitron', 'wheel')).toEqual({ from: 18, to: 20 });
+     expect(getSlotHitRange('protectron', 'нетТакогоСлота')).toBeNull();
+-    expect(getSlotHitRange('misterHandy', 'arm1')).toBeNull(); // таблицы пока нет
++    expect(getSlotHitRange('misterHandy', 'arm1')).toEqual({ from: 5, to: 8 });
++    expect(getSlotHitRange('misterHandy', 'thruster')).toEqual({ from: 17, to: 20 });
+   });
+ 
+   it('для каждого броска 1..20 таблица ведёт в слот, который его содержит', () => {
+-    for (const planId of ['protectron', 'securitron']) {
++    for (const planId of Object.keys(bodyplans)) {
+       for (let roll = 1; roll <= 20; roll += 1) {
+         const slotId = resolveHit(planId, roll);
+         expect(slotId, `${planId}: бросок ${roll} не попал ни в один слот`).toBeTruthy();
+@@ -369,14 +372,22 @@ describe('диапазоны попаданий в экране', () => {
+     // Секьюритрон: колесо 18-20 и так, и так — планы не противоречат.
+     expect(subtitle('securitron', 'wheel')).toBe('18-20');
+ 
+-    // У Хэнди таблицы пока нет — остаётся статика людей.
+-    expect(subtitle('misterHandy', 'arm1')).toBe('9-11');
++    // Хэнди: по плану arm1 — 5-8 и тело 3-4, статика людей давала бы 9-11 и 3-8.
++    expect(subtitle('misterHandy', 'arm1')).toBe('5-8');
++    expect(subtitle('misterHandy', 'body')).toBe('3-4');
++    // Штурмотрон гуманоидного вида — диапазоны как у людей.
++    expect(subtitle('assaultron', 'leftArm')).toBe('9-11');
+   });
+ 
+-  it('у планов без таблицы диапазонов нет — экран берёт статику людей', () => {
+-    // У Хэнди hitTable пока нет: экран показывает общую подпись из i18n.
+-    expect(resolveHit('misterHandy', 10)).toBeNull();
+-    expect(getSlotHitRange('misterHandy', 'arm1')).toBeNull();
++  it('у всех планов таблица есть — статики людей больше нет', () => {
++    // Раньше защиту подписывали общей статикой из i18n: у планов без hitTable
++    // диапазона не было вовсе. Теблица попаданий есть у каждого плана.
++    expect(resolveHit('misterHandy', 10)).toBe('arm2');
++    for (const planId of Object.keys(bodyplans)) {
++      for (const slotId of getRobotSlotKeys(planId)) {
++        expect(getSlotHitRange(planId, slotId), `${planId}/${slotId}: нет диапазона`).toBeTruthy();
++      }
++    }
+   });
+ });
+ 
+diff --git a/__tests__/robot/robot-slot-model.test.js b/__tests__/robot/robot-slot-model.test.js
+index bfc0bba..ee7cf24 100644
+--- a/__tests__/robot/robot-slot-model.test.js
++++ b/__tests__/robot/robot-slot-model.test.js
+@@ -25,6 +25,7 @@ import {
+ } from '../../domain/robotSlots';
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ import modsCatalog from '../../modules/fallout/data/equipment/weapon_mods.json';
++import bodyplans from '../../modules/fallout/data/bodyplans/bodyplans.json';
+ 
+ const catalog = getRobotLimbCatalog();
+ const limbById = (id) => catalog.limbs.find((l) => l.id === id);
+@@ -459,24 +460,57 @@ describe('таблица попаданий', () => {
+     expect(resolveHit('securitron', 13)).toBe('leftArm');
+   });
+ 
+-  it('вне таблицы и без таблицы — null', () => {
++  it('вне таблицы — null', () => {
+     expect(resolveHit('protectron', 0)).toBeNull();
+     expect(resolveHit('protectron', 21)).toBeNull();
+-    expect(resolveHit('misterHandy', 10)).toBeNull(); // hitTable пока нет
+   });
+ 
+-  it('validateHitTable: покрытие без дыр, отсутствие — предупреждение', () => {
+-    const protectron = validateHitTable('protectron');
+-    expect(protectron.ok).toBe(true);
+-    expect(protectron.covered).toHaveLength(20);
+-
+-    const securitron = validateHitTable('securitron');
+-    expect(securitron.ok).toBe(true);
+-    expect(securitron.errors).toEqual([]);
+-
+-    const handy = validateHitTable('misterHandy');
+-    expect(handy.ok).toBe(true); // отсутствие таблицы допустимо
+-    expect(handy.warnings.join(' ')).toContain('нет hitTable');
+-    expect(handy.covered).toEqual([]);
++  it('мистер Хэндℹ: голова 1-2, тело 3-4, три руки и движитель', () => {
++    expect(resolveHit('misterHandy', 1)).toBe('head');
++    expect(resolveHit('misterHandy', 2)).toBe('head');
++    expect(resolveHit('misterHandy', 3)).toBe('body');
++    expect(resolveHit('misterHandy', 4)).toBe('body');
++    expect(resolveHit('misterHandy', 5)).toBe('arm1');
++    expect(resolveHit('misterHandy', 8)).toBe('arm1');
++    expect(resolveHit('misterHandy', 9)).toBe('arm2');
++    expect(resolveHit('misterHandy', 12)).toBe('arm2');
++    expect(resolveHit('misterHandy', 13)).toBe('arm3');
++    expect(resolveHit('misterHandy', 16)).toBe('arm3');
++    expect(resolveHit('misterHandy', 17)).toBe('thruster');
++    expect(resolveHit('misterHandy', 20)).toBe('thruster');
++  });
++
++  it('гуманоидные планы: голова 1-2, тело 3-8, руки 9-14, ноги 15-20', () => {
++    const expectations = [
++      ['humanoid', 'torso'],
++      ['assaultron', 'body'],
++      ['sentryBot', 'body'],
++    ];
++    for (const [planId, bodySlot] of expectations) {
++      expect(resolveHit(planId, 1), planId).toBe('head');
++      expect(resolveHit(planId, 2), planId).toBe('head');
++      expect(resolveHit(planId, 5), planId).toBe(bodySlot);
++      expect(resolveHit(planId, 10), planId).toBe('leftArm');
++      expect(resolveHit(planId, 13), planId).toBe('rightArm');
++      expect(resolveHit(planId, 16), planId).toBe('leftLeg');
++      expect(resolveHit(planId, 19), planId).toBe('rightLeg');
++    }
++  });
++
++  it('робомозг: шасси — движитель, диапазон 15-20', () => {
++    expect(resolveHit('robobrain', 1)).toBe('head');
++    expect(resolveHit('robobrain', 5)).toBe('body');
++    expect(resolveHit('robobrain', 10)).toBe('leftArm');
++    expect(resolveHit('robobrain', 17)).toBe('chassis');
++    expect(resolveHit('robobrain', 20)).toBe('chassis');
++  });
++
++  it('у каждого плана тела таблица есть и покрывает d20 без дыр и наложений', () => {
++    for (const planId of Object.keys(bodyplans)) {
++      const result = validateHitTable(planId);
++      expect(result.errors, `${planId}: ${result.errors.join('; ')}`).toEqual([]);
++      expect(result.warnings, `${planId}: таблицы нет — ${result.warnings.join('; ')}`).toEqual([]);
++      expect(result.covered, `${planId}: покрытие неполное`).toHaveLength(20);
++    }
+   });
+ });
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 5c5ffdc..33a0c7c 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -704,6 +704,30 @@
+ |---|---|---|
+ | по умолчанию | 297 | **297** |
+ 
++### Таблицы попаданий: закрыт открытый вопрос №1
++
++`hitTable` теперь есть у каждого плана тела. Откуда числа:
++
++| План | Таблица | Источник |
++|---|---|---|
++| `humanoid` | голова 1-2, торс 3-8, левая рука 9-11, правая 12-14, левая нога 15-17, правая 18-20 | локаль экрана (`screens/weaponsAndArmor/screen.json`) |
++| `assaultron` | то же, что у людей (план гуманоидного вида) | владелец: «Штурмотрон гуманоид, у него как у людей» |
++| `sentryBot` | то же, что у людей (план гуманоидного вида) | по форме плана |
++| `robobrain` | голова 1-2, тело 3-8, руки 9-11 и 12-14, шасси 15-20 | локаль экрана (`chassis` = 15-20) |
++| `misterHandy` | голова 1-2, тело 3-4, рука1 5-8, рука2 9-12, рука3 13-16, движитель 17-20 | владелец: «голова 1-2, тело 3-4»; дальше — единственная раскладка, покрывающая 5-20 для трёх рук и движителя |
++| `protectron`, `securitron` | без изменений | патч 168 |
++
++Оговорка: продолжение таблицы Хэндℹ (5-8 / 9-12 / 13-16 / 17-20) выведено из
++«голова 1-2, тело 3-4» и требования покрыть d20 — в книге надо сверить.
++
++Локаль экрана (`armor.slots.*.subtitle`) осталась запасником: экран берёт
++диапазон из `hitTable` через `getSlotHitRange()`, а статику использует только
++если у плана таблицы нет.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 300 | **300** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+@@ -713,11 +737,12 @@
+ Этап 6 закрыт: у конечностей ровно один источник данных — и в движке, и в
+ экранах.
+ 
+-Остался открытый вопрос №1 — таблицы попаданий: `hitTable` есть у протекторна и
+-секьюритрона, для `humanoid`, `robobrain`, `misterHandy`, `assaultron` и
+-`sentryBot` чисел в данных нет. Экраны показывают диапазоны из своей локали
+-(`i18n/*/screens/weaponsAndArmor/screen.json`), а `getSlotHitRange()` в
+-`domain/robotSlots.js` уже умеет отдавать их из `hitTable` и пока не подключён.
++Открытых вопросов не осталось. Серия 162→183: модель слотов робота собрана,
++старая удалена, сейвы сходятся, мёртвые поля убраны, таблицы попаданий есть у
++всех планов.
++
++Что можно сделать дальше (не входило в план): подключить `resolveHit()` к
++боевому броску — потребителя у таблицы пока нет, бой считается вручную.
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
+index fd942f6..c704529 100644
+--- a/modules/fallout/data/bodyplans/bodyplans.json
++++ b/modules/fallout/data/bodyplans/bodyplans.json
+@@ -57,7 +57,51 @@
+       "rightArm": null,
+       "leftLeg": null,
+       "rightLeg": null
+-    }
++    },
++    "hitTable": [
++      {
++        "range": [
++          1,
++          2
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          3,
++          8
++        ],
++        "slotId": "torso"
++      },
++      {
++        "range": [
++          9,
++          11
++        ],
++        "slotId": "leftArm"
++      },
++      {
++        "range": [
++          12,
++          14
++        ],
++        "slotId": "rightArm"
++      },
++      {
++        "range": [
++          15,
++          17
++        ],
++        "slotId": "leftLeg"
++      },
++      {
++        "range": [
++          18,
++          20
++        ],
++        "slotId": "rightLeg"
++      }
++    ]
+   },
+   "robobrain": {
+     "slots": [
+@@ -109,7 +153,44 @@
+       "rightArm": "robot_arm_robobrain",
+       "chassis": "robot_legs_robobrain_treads"
+     },
+-    "defaultPlating": {}
++    "defaultPlating": {},
++    "hitTable": [
++      {
++        "range": [
++          1,
++          2
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          3,
++          8
++        ],
++        "slotId": "body"
++      },
++      {
++        "range": [
++          9,
++          11
++        ],
++        "slotId": "leftArm"
++      },
++      {
++        "range": [
++          12,
++          14
++        ],
++        "slotId": "rightArm"
++      },
++      {
++        "range": [
++          15,
++          20
++        ],
++        "slotId": "chassis"
++      }
++    ]
+   },
+   "misterHandy": {
+     "slots": [
+@@ -170,7 +251,51 @@
+       "arm3": "robot_arm_mister_handy",
+       "thruster": "robot_legs_mister_handy_thruster"
+     },
+-    "defaultPlating": {}
++    "defaultPlating": {},
++    "hitTable": [
++      {
++        "range": [
++          1,
++          2
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          3,
++          4
++        ],
++        "slotId": "body"
++      },
++      {
++        "range": [
++          5,
++          8
++        ],
++        "slotId": "arm1"
++      },
++      {
++        "range": [
++          9,
++          12
++        ],
++        "slotId": "arm2"
++      },
++      {
++        "range": [
++          13,
++          16
++        ],
++        "slotId": "arm3"
++      },
++      {
++        "range": [
++          17,
++          20
++        ],
++        "slotId": "thruster"
++      }
++    ]
+   },
+   "protectron": {
+     "slots": [
+@@ -438,7 +563,51 @@
+       "body": "robot_body_assaultron",
+       "rightLeg": "robot_legs_assaultron"
+     },
+-    "defaultPlating": {}
++    "defaultPlating": {},
++    "hitTable": [
++      {
++        "range": [
++          1,
++          2
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          3,
++          8
++        ],
++        "slotId": "body"
++      },
++      {
++        "range": [
++          9,
++          11
++        ],
++        "slotId": "leftArm"
++      },
++      {
++        "range": [
++          12,
++          14
++        ],
++        "slotId": "rightArm"
++      },
++      {
++        "range": [
++          15,
++          17
++        ],
++        "slotId": "leftLeg"
++      },
++      {
++        "range": [
++          18,
++          20
++        ],
++        "slotId": "rightLeg"
++      }
++    ]
+   },
+   "sentryBot": {
+     "slots": [
+@@ -499,6 +668,50 @@
+       "body": "robot_body_sentry_bot",
+       "rightLeg": "robot_legs_sentry_bot"
+     },
+-    "defaultPlating": {}
++    "defaultPlating": {},
++    "hitTable": [
++      {
++        "range": [
++          1,
++          2
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          3,
++          8
++        ],
++        "slotId": "body"
++      },
++      {
++        "range": [
++          9,
++          11
++        ],
++        "slotId": "leftArm"
++      },
++      {
++        "range": [
++          12,
++          14
++        ],
++        "slotId": "rightArm"
++      },
++      {
++        "range": [
++          15,
++          17
++        ],
++        "slotId": "leftLeg"
++      },
++      {
++        "range": [
++          18,
++          20
++        ],
++        "slotId": "rightLeg"
++      }
++    ]
+   }
+ }
+
+-- 
+2.47.3
+
