@@ -1,0 +1,297 @@
+From 0000000000000000000000000000001788518329 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 10:38:49 +0000
+Subject: [PATCH] move attack dedup from domain to weapons screen
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 5, шаг 1: домен больше не скрывает повторы.
+
+Правило владельца: дедуп одинаковых атак — забота экрана, показывается одна
+карточка без счётчика.
+
+- domain/robotSlots.js: из attacksFromSlot убран внутренний дедуп по id —
+  модель отдаёт каждую атаку (две одинаковые руки, оружие в ладони с тем же id,
+  что и установка). Правило №5 в шапке переписано.
+- modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards.js: чистые
+  weaponFingerprint (id + установленные моды) и dedupeWeaponCards; экран
+  пользуется ими вместо встроенной в разметку склейки.
+- Тесты: __tests__/robot/weapon-card-dedupe.test.js (9 штук) — домен отдаёт
+  все атаки, экран сводит одинаковые к одной, порядок и моды сохраняются.
+
+269 тестов / 23 файла — зелёные.
+
+---
+ 5 files changed, 178 insertions(+), 18 deletions(-)
+
+diff --git a/__tests__/robot/weapon-card-dedupe.test.js b/__tests__/robot/weapon-card-dedupe.test.js
+new file mode 100644
+index 0000000..5214908
+--- /dev/null
++++ b/__tests__/robot/weapon-card-dedupe.test.js
+@@ -0,0 +1,94 @@
++// __tests__/robot/weapon-card-dedupe.test.js
++//
++// Правило владельца: дедупликация одинаковых атак — забота экрана, а не
++// модели. Домен обязан отдавать каждую атаку; экран сводит одинаковые
++// карточки к одной, без счётчика и пометок.
++
++import { describe, it, expect } from 'vitest';
++
++import { attacksFromSlot, collectAttacks } from '../../domain/robotSlots';
++import {
++  dedupeWeaponCards,
++  weaponFingerprint,
++} from '../../modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards';
++
++describe('домен: одинаковые атаки не склеиваются', () => {
++  it('в ладони то же оружие, что и встроено, — две карточки', () => {
++    // Рука секьюритрона бьёт манипулятором; в ладонь игрок взял точно такой
++    // же манипулятор. Сутей две, домен обязан отдать обе.
++    const attacks = attacksFromSlot({
++      content: 'robot_arm_securitron',
++      heldWeaponId: 'robot_weapon_manipulator',
++    }, { slotId: 'leftArm' });
++
++    expect(attacks).toHaveLength(2);
++    expect(attacks.map((a) => a.source).sort()).toEqual(['builtin', 'held']);
++    expect(new Set(attacks.map((a) => a.instanceKey)).size).toBe(2);
++  });
++
++  it('установка с тем же id, что в ладони, — тоже две карточки', () => {
++    const attacks = attacksFromSlot({
++      content: 'robot_arm_securitron',
++      heldWeaponId: 'weapon_laser_gun',
++      installedWeapons: [{ id: 'weapon_laser_gun', modIds: [] }],
++    }, { slotId: 'leftArm' });
++
++    expect(attacks).toHaveLength(3); // ладонь + манипулятор + установка
++    const lasers = attacks.filter((a) => a.id === 'weapon_laser_gun');
++    expect(lasers).toHaveLength(2);
++    expect(lasers.map((a) => a.source).sort()).toEqual(['held', 'installed']);
++  });
++
++  it('две одинаковые руки дают две карточки и в общем сборе', () => {
++    const cards = collectAttacks({
++      arm1: { content: 'robot_arm_mister_handy' },
++      arm3: { content: 'robot_arm_mister_handy' },
++    });
++    expect(cards).toHaveLength(2);
++    expect(cards.map((c) => c.sourceSlot).sort()).toEqual(['arm1', 'arm3']);
++  });
++});
++
++describe('экран: одинаковые карточки сводятся к одной', () => {
++  const card = (id, mods = {}) => ({ id, weaponId: id, name: id, appliedMods: mods });
++
++  it('две одинаковые — остаётся одна, без счётчика', () => {
++    const list = [card('robot_weapon_manipulator'), card('robot_weapon_manipulator')];
++    const result = dedupeWeaponCards(list);
++    expect(result).toHaveLength(1);
++    expect(result[0].count).toBeUndefined();
++    expect(result[0].name).toBe('robot_weapon_manipulator');
++  });
++
++  it('порядок сохраняется, первая карточка побеждает', () => {
++    const list = [card('a'), card('b'), card('a'), card('c'), card('b')];
++    expect(dedupeWeaponCards(list).map((w) => w.id)).toEqual(['a', 'b', 'c']);
++  });
++
++  it('разные моды — разные карточки', () => {
++    const list = [
++      card('weapon_10mm_smg'),
++      card('weapon_10mm_smg', { Receiver: 'mod_001' }),
++    ];
++    expect(dedupeWeaponCards(list)).toHaveLength(2);
++  });
++
++  it('оружие с разными id не склеивается', () => {
++    expect(dedupeWeaponCards([card('a'), card('b')])).toHaveLength(2);
++  });
++
++  it('отпечаток одинаков у карточек из разных рук', () => {
++    const fromDomain = collectAttacks({
++      arm1: { content: 'robot_arm_mister_handy' },
++      arm3: { content: 'robot_arm_mister_handy' },
++    });
++    expect(weaponFingerprint(fromDomain[0])).toBe(weaponFingerprint(fromDomain[1]));
++    expect(dedupeWeaponCards(fromDomain)).toHaveLength(1);
++  });
++
++  it('мусор во входе не роняет экран', () => {
++    expect(dedupeWeaponCards([])).toEqual([]);
++    expect(dedupeWeaponCards(null)).toEqual([]);
++    expect(dedupeWeaponCards([null, undefined, card('a')])).toHaveLength(3);
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index e48bec4..50d08c4 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -503,14 +503,32 @@
+ | по умолчанию | 260 | **260** |
+ | `ROBOT_NEW_SLOT_MODEL=0` (переменная не влияет) | 260 | **260** |
+ 
++### Этап 5, шаг 1 (патч 174): дедуп карточек переехал в экран
++
++Правило владельца: «дедуп нужен в UI только — две одинаковые атаки занимают
++место на экране и зашумляют пространство». Показывается одна карточка, без
++счётчика и пометок.
++
++| Было | Стало |
++|---|---|
++| `attacksFromSlot` скрывал повтор id внутри слота | домен отдаёт все атаки как есть |
++| склейка была встроена в разметку экрана | `dedupeWeaponCards` + `weaponFingerprint` (чистые функции, есть тесты) |
++
++Отпечаток карточки — `id` + установленные моды: один и тот же предмет в одном
++состоянии. Снятие оружия из одной руки не гасит вторую, потому что домен
++хранит экземпляры раздельно, а экран убирает только визуальный дубликат.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 269 | **269** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Дальше: этап 5 — миграция сейва (174) + перенос дедупа в экран (175),
+-этап 6 — удаление мёртвых полей
++Дальше: этап 5 — миграция сейва (175), этап 6 — удаление мёртвых полей
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index d955af1..a581b0d 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -15,9 +15,10 @@
+ //      принимает: ни броню, ни обшивку, ни раму (§10.5).
+ //   4. Встроенная атака и оружие в ладони НЕ конкурируют: сбор атак со
+ //      слота возвращает СПИСОК, а не первое совпадение.
+-//   5. Дедупликация атак — только внутри слота и только по экземпляру
+-//      (слот + источник + id). Две одинаковые руки дают две карточки:
+-//      именно в глобальном дедупе по id и жил баг «arm3 теряет атаку».
++//   5. Дедупликации в домене НЕТ ни по id, ни по экземпляру: две одинаковые
++//      руки дают две карточки, «стрельба по-македонски» (одно оружие в обеих
++//      ладонях) — тоже две. Именно глобальный дедуп по id и был багом «arm3
++//      теряет атаку». Сводить одинаковые карточки в одну — правило экрана.
+ //
+ // Состояние слота понимается в двух видах (старый и новый) — см.
+ // normalizeSlot(). Это позволяет использовать функции до миграции сейва.
+@@ -494,14 +495,15 @@ export function attacksFromSlot(slot, options = {}) {
+   const result = [];
+   if (!limb) return result;
+ 
+-  const seen = new Set();
++  // Дедупликации здесь НЕТ: домен отдаёт каждую атаку как есть. Две руки с
++  // одинаковыми манипуляторами — две атаки; оружие в ладони с тем же id, что
++  // и установка, — тоже две сути. Склеивать одинаковые карточки — правило
++  // экрана (dedupeWeaponCards), а не модели.
+   const push = (weapon, source, modIds = []) => {
+     if (!weapon) return;
+     const id = typeof weapon === 'string' ? weapon : (weapon.id || weapon.weaponId);
+     if (!id) return;
+     const instanceKey = `${slotId ?? '?'}:${source}:${id}`;
+-    if (seen.has(id)) return; // внутри одного слота одна и та же атака дважды не считается
+-    seen.add(id);
+     const resolved = materializeWeapon(catalog, weapon, modIds);
+     result.push({
+       ...resolved,
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 4cf08fa..cf4cda2 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -34,6 +34,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects,
+ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
++import { dedupeWeaponCards } from './dedupeWeaponCards';
+ import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
+ import { getBodyPlan } from '../../../../domain/bodyplan';
+ import {
+@@ -630,16 +631,9 @@ const WeaponsAndArmorScreen = () => {
+     });
+   }, [moduleLocale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
+ 
+-  const weaponFingerprint = (w) => {
+-    if (!w) return null;
+-    const mods = w.appliedMods ? Object.entries(w.appliedMods).sort().map(([k, v]) => `${k}:${v}`).join(',') : '';
+-    return `${w.id}|${mods}`;
+-  };
+-  const dedupedEquippedWeapons = localizedEquippedWeapons.filter((w, idx, arr) => {
+-    if (!w) return true;
+-    const fp = weaponFingerprint(w);
+-    return arr.findIndex(x => weaponFingerprint(x) === fp) === idx;
+-  });
++  // Одинаковые карточки (две руки с одним и тем же оружием) на экране
++  // сводятся к одной — это правило отображения, а не модели.
++  const dedupedEquippedWeapons = dedupeWeaponCards(localizedEquippedWeapons);
+ 
+   // ПРАВИЛО (владелец): порядок атак на экране снаряжения — рукопашные первыми,
+   // затем встроенное оружие, затем Mk II (нерабочее), затем экипированное из
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards.js b/modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards.js
+new file mode 100644
+index 0000000..6476485
+--- /dev/null
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards.js
+@@ -0,0 +1,52 @@
++// modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards.js
++//
++// Склейка одинаковых карточек оружия — забота ЭКРАНА, а не домена.
++//
++// Домен (domain/robotSlots.js) честно отдаёт каждую атаку: две руки с
++// одинаковыми манипуляторами — это две атаки, и «стрельба по-македонски»
++// (одно и то же оружие в обеих ладонях) — тоже две. На экране же вторая
++// такая карточка ничего не добавляет, только занимает место и шумит, —
++// поэтому здесь одинаковые карточки сводятся к одной (решение владельца:
++// одну, без счётчика).
++//
++// Одинаковые — значит один и тот же предмет в одном и том же состоянии:
++// совпадают id и установленные моды. Разные экземпляры разным оружием не
++// считаются: снятие оружия из одной руки не должно гасить вторую (это
++// обеспечивает домен, здесь мы только не показываем дубликат).
++
++/**
++ * Отпечаток карточки: что именно делает её «тем же самым оружием».
++ * @param {object} weapon
++ * @returns {string}
++ */
++export const weaponFingerprint = (weapon) => {
++  if (!weapon) return 'null';
++  const mods = weapon.appliedMods
++    ? Object.entries(weapon.appliedMods).sort().map(([slot, id]) => `${slot}:${id}`).join(',')
++    : (weapon.modIds || []).slice().sort().join(',');
++  return `${weapon.id ?? weapon.weaponId ?? 'no-id'}|${mods}`;
++};
++
++/**
++ * Оставить по одной карточке на каждый отпечаток, сохранив порядок.
++ * @param {object[]} weapons
++ * @returns {object[]}
++ */
++export const dedupeWeaponCards = (weapons = []) => {
++  const list = Array.isArray(weapons) ? weapons : [];
++  const seen = new Set();
++  const result = [];
++  for (const weapon of list) {
++    if (!weapon) {
++      result.push(weapon);
++      continue;
++    }
++    const fp = weaponFingerprint(weapon);
++    if (seen.has(fp)) continue;
++    seen.add(fp);
++    result.push(weapon);
++  }
++  return result;
++};
++
++export default dedupeWeaponCards;
+
+-- 
+2.47.3
+

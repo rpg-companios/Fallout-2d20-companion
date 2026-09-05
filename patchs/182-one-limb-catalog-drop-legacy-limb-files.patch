@@ -1,0 +1,1134 @@
+From 0000000000000000000000000000001788579494 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sat, 05 Sep 2026 03:38:14 +0000
+Subject: [PATCH] one limb catalog for engine and shop: drop legacy limb files
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Конечности робота лежали в двух местах: движок работал по единому каталогу
+(limbs.json + weaponAsLimb.json), а витрина и экраны — по четырём старым
+файлам. Второй источник правды убран.
+
+Удалены данные: modules/fallout/data/equipment/robot/robotarms.json,
+robotheads.json, robotlegs.json, robotbody.json. Все их id есть в едином
+каталоге — потерь нет (проверено сравнением).
+
+- i18n/equipmentCatalog.js: конечности собираются из limbs.json +
+  weaponAsLimb.json и раскладываются по limbType (robotArms/robotHeads/
+  robotBody/robotLegs). Имена — объединение тех же файлов локали по id
+  (покрытие 40/40 для ru-RU и en-EN). itemType для экранов считается
+  проекцией limbType, а не читается из данных.
+- LimbUpgradeModal: поля установки называются installComplexity и
+  installPerksRequired (были complexity/perksRequired).
+- InventoryScreen: слоты под конечность даёт план тела (slotsForLimbType),
+  а не поле compatibleSlots внутри конечности; признак конечности —
+  itemCategory, старый itemType из сейвов и комплектов принимается.
+- Тест каталога для модалки замены конечности переведён на единый каталог.
+
+297 тестов / 25 файлов — зелёные.
+
+---
+ 10 files changed, 84 insertions(+), 849 deletions(-)
+
+diff --git a/__tests__/robot/robot-slot-behaviour.test.js b/__tests__/robot/robot-slot-behaviour.test.js
+index 13d1fe6..d1c61a2 100644
+--- a/__tests__/robot/robot-slot-behaviour.test.js
++++ b/__tests__/robot/robot-slot-behaviour.test.js
+@@ -36,10 +36,6 @@ import limbsCatalog from '../../modules/fallout/data/equipment/robot/limbs.json'
+ import weaponAsLimbCatalog from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+ // Модалка замены конечности пока читает каталог оборудования (старые файлы) —
+ // источник для неё один с движком после следующего патча.
+-import armsCatalog from '../../modules/fallout/data/equipment/robot/robotarms.json';
+-import headsCatalog from '../../modules/fallout/data/equipment/robot/robotheads.json';
+-import bodiesCatalog from '../../modules/fallout/data/equipment/robot/robotbody.json';
+-import legsCatalog from '../../modules/fallout/data/equipment/robot/robotlegs.json';
+ import weaponsCatalog from '../../modules/fallout/data/equipment/robot/weapons.json';
+ 
+ // Единый каталог конечностей: обычные конечности + конечности-оружие.
+@@ -510,11 +506,14 @@ describe('сторона комплекта: порядок, а не имя сл
+ });
+ 
+ describe('каталог конечностей для слота', () => {
++  // Каталог оборудования для модалки замены конечности: он строится из того же
++  // единого каталога, что и движок, и разложен по limbType (см. i18n/equipmentCatalog.js).
++  const withItemType = (list, itemType) => list.map((limb) => ({ ...limb, itemType }));
+   const runtimeCatalog = {
+-    robotArms: armsCatalog,
+-    robotHeads: headsCatalog,
+-    robotBody: bodiesCatalog,
+-    robotLegs: legsCatalog,
++    robotArms: withItemType(allLimbs.filter((l) => l.limbType === 'arm'), 'robotArm'),
++    robotHeads: withItemType(allLimbs.filter((l) => l.limbType === 'head'), 'robotHead'),
++    robotBody: withItemType(allLimbs.filter((l) => l.limbType === 'body'), 'robotBody'),
++    robotLegs: withItemType(allLimbs.filter((l) => l.limbType === 'mover'), 'robotLeg'),
+   };
+   const ids = (list) => list.map((l) => l.id).sort();
+ 
+@@ -545,9 +544,9 @@ describe('каталог конечностей для слота', () => {
+ 
+   it('для привычных слотов набор совпадает с каталогом нужного типа', () => {
+     const options = (slot, plan) => ids(limbOptionsForSlot(runtimeCatalog, plan, slot));
+-    const catalog = (slot) => ids(slot === 'head' ? headsCatalog
+-      : slot === 'body' ? bodiesCatalog
+-        : slot.toLowerCase().includes('arm') ? armsCatalog : legsCatalog);
++    const catalog = (slot) => ids(slot === 'head' ? runtimeCatalog.robotHeads
++      : slot === 'body' ? runtimeCatalog.robotBody
++        : slot.toLowerCase().includes('arm') ? runtimeCatalog.robotArms : runtimeCatalog.robotLegs);
+ 
+     expect(options('leftArm', 'protectron')).toEqual(catalog('leftArm'));
+     expect(options('head', 'protectron')).toEqual(catalog('head'));
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index a80ac9b..826f960 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -22,6 +22,7 @@ import {
+ } from '../../../domain/powerArmor';
+ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
++import { slotsForLimbType } from '../../../domain/robotSlots';
+ import { rerollConsumableRadiationRoll } from '../../../domain/effects';
+ import { buildConsumableResultReport } from './logic/consumableResultReport';
+ import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
+@@ -292,7 +293,10 @@ const InventoryScreen = () => {
+   }, [equipmentCatalog, robotBodyPlan]);
+   const isRobotLimbItem = (item) => {
+     const itype = item?.itemType;
+-    return itype === 'robotArm' || itype === 'robotHead' || itype === 'robotBody' || itype === 'robotLeg';
++    if (itype === 'robotArm' || itype === 'robotHead' || itype === 'robotBody' || itype === 'robotLeg') return true;
++    // Конечность из единого каталога: признак — категория, а не старая пометка
++    // itemType (её носят записи комплектов и старые сейвы).
++    return item?.itemCategory === 'limb' || item?.itemCategory === 'weaponAsLimb';
+   };
+ 
+   const robotWeaponIds = useMemo(
+@@ -691,7 +695,9 @@ const InventoryScreen = () => {
+       if (!armDef) return;
+       const slots = equippedRobotSlots || {};
+       const slotKeys = Object.keys(slots);
+-      const compatibleSlots = Array.isArray(armDef.compatibleSlots) ? armDef.compatibleSlots : [];
++      // Слоты под конечность даёт план тела по типу конечности — раньше их
++      // список лежал внутри самой конечности (compatibleSlots).
++      const compatibleSlots = slotsForLimbType(robotBodyPlan, armDef.limbType ?? 'arm');
+       const finalTargets = compatibleSlots.filter((key) => slotKeys.includes(key) && !slots[key]?.limb);
+       if (finalTargets.length === 0) {
+         showAlert(tInventory('screen.alerts.manipulatorRequiredTitle'), tInventory('screen.alerts.robotNoHandlingLimbMessage'));
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index acf866f..5c5ffdc 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -681,19 +681,43 @@
+ |---|---|---|
+ | по умолчанию | 297 | **297** |
+ 
++### Этап 6, шаг 5 (патч 182): витрина и экраны берут конечности оттуда же
++
++Дублирование убрано и снаружи движка. Четыре файла данных
++(`robotarms.json`, `robotheads.json`, `robotlegs.json`, `robotbody.json`)
++удалены: все их id есть в едином каталоге (проверено — потерь нет).
++
++| Место | Было | Стало |
++|---|---|---|
++| `i18n/equipmentCatalog.js` | четыре каталога данных + четыре локали | `limbs.json` + `weaponAsLimb.json`, разложенные по `limbType` |
++| имена | из профильных файлов локали | объединение тех же файлов локали по id |
++| `itemType` (`robotArm`, `robotHead`…) | поле в данных | проекция `limbType` в слое каталога (`LIMB_ITEM_TYPE_BY_LIMB_TYPE`) |
++| `LimbUpgradeModal` | `complexity`, `perksRequired` | `installComplexity`, `installPerksRequired` |
++| `InventoryScreen` | `armDef.compatibleSlots` | `slotsForLimbType(bodyPlan, limbType)` |
++| `InventoryScreen.isRobotLimbItem` | только `itemType` | `itemType` (старые сейвы и комплекты) **или** `itemCategory` |
++
++`itemType` для экранов считается в каталоге, а не лежит в данных: экраны и
++инвентарь исторически различают конечности по этой пометке, и переписывать их
++все ради поля не стоило. В данных истина одна — `limbType`.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 297 | **297** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Этап 6 закрыт для движка. Вне его осталось то же самое дублирование, но в
+-витрине оборудования: `i18n/equipmentCatalog.js`, `LimbUpgradeModal` и
+-`InventoryScreen` читают конечности из старых файлов (`robotarms/heads/legs/
+-body.json`) и старых полей (`itemType`, `compatibleSlots`, `complexity`).
++Этап 6 закрыт: у конечностей ровно один источник данных — и в движке, и в
++экранах.
+ 
+-Из крупного остался открытый вопрос №1 — таблицы попаданий для четырёх планов
+-тела (нужны числа из книги).
++Остался открытый вопрос №1 — таблицы попаданий: `hitTable` есть у протекторна и
++секьюритрона, для `humanoid`, `robobrain`, `misterHandy`, `assaultron` и
++`sentryBot` чисел в данных нет. Экраны показывают диапазоны из своей локали
++(`i18n/*/screens/weaponsAndArmor/screen.json`), а `getSlotHitRange()` в
++`domain/robotSlots.js` уже умеет отдавать их из `hitTable` и пока не подключён.
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 0c225db..807873c 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -103,7 +103,9 @@ export function getSlotForDirection(bodyPlan, direction) {
+  * in a slot. Resolves `builtinWeaponId` against `weaponsCatalog` so that
+  * `getBuiltinWeaponsFromSlots` can produce attack cards.
+  *
+- * @param {object} armEntry        - entry from modules/fallout/data/equipment/robot/robotarms.json (optionally merged with i18n)
++ * @param {object} armEntry        - запись конечности из единого каталога
++ *                                  (modules/fallout/data/equipment/robot/limbs.json,
++ *                                  возможно объединённая с локализацией)
+  * @param {object[]} weaponsCatalog - entries from modules/fallout/data/equipment/robot/weapons.json (optionally merged with i18n)
+  * @returns {object} normalized limb object
+  */
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 801eb5c..ab5a0dd 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -86,10 +86,8 @@ import moduleMagazines from '../modules/fallout/data/consumables/magazines.json'
+ import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+ import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
+ import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
+-import moduleRobotBody from '../modules/fallout/data/equipment/robot/robotbody.json';
+-import moduleRobotHeads from '../modules/fallout/data/equipment/robot/robotheads.json';
+-import moduleRobotLegs from '../modules/fallout/data/equipment/robot/robotlegs.json';
+-import moduleRobotArms from '../modules/fallout/data/equipment/robot/robotarms.json';
++import moduleRobotLimbs from '../modules/fallout/data/equipment/robot/limbs.json';
++import moduleRobotWeaponAsLimb from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+ import moduleRobotArmor from '../modules/fallout/data/equipment/robot/armor.json';
+ import moduleRobotPlating from '../modules/fallout/data/equipment/robot/armor_plating.json';
+ import moduleRobotFrames from '../modules/fallout/data/equipment/robot/frames.json';
+@@ -266,6 +264,16 @@ const buildArmorIndex = (items) => {
+   return { byId };
+ };
+ 
++// Проекция типа конечности в привычное экранам имя: витрина, инвентарь и
++// модалки исторически различают конечности по itemType (robotArm, robotHead…).
++// Данные пишут limbType — это единственный источник, имя для экрана считается здесь.
++const LIMB_ITEM_TYPE_BY_LIMB_TYPE = Object.freeze({
++  arm: 'robotArm',
++  head: 'robotHead',
++  body: 'robotBody',
++  mover: 'robotLeg',
++});
++
+ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+   const i18n = EQUIPMENT_BY_LOCALE[locale];
+   if (!i18n) {
+@@ -299,12 +307,22 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+     i18n.robotWeapons || [],
+   )
+     .map((w) => ({ ...w, itemType: 'weapon', isRobotWeapon: true }));
+-  const robotArmsI18n = [
++  // Конечности робота: источник один — limbs.json + weaponAsLimb.json.
++  // «Руки/головы/корпуса/движители» для экранов — проекция по limbType,
++  // а не четыре разных файла данных.
++  const robotLimbsI18n = [
+     ...(i18n.robotArms || []),
++    ...(i18n.robotHeads || []),
++    ...(i18n.robotBody || []),
++    ...(i18n.robotLegs || []),
+     ...(i18n.robotWeapons || []),
+   ].filter((item, index, arr) => item?.id && arr.findIndex((x) => x?.id === item.id) === index);
+-  const robotArms = mergeById(moduleRobotArms || [], robotArmsI18n)
+-    .map((arm) => ({ ...arm, itemType: 'robotArm', isRobotArm: true }));
++  const robotLimbs = mergeById(
++    [...(moduleRobotLimbs || []), ...(moduleRobotWeaponAsLimb || [])],
++    robotLimbsI18n,
++  ).map((limb) => ({ ...limb, itemType: LIMB_ITEM_TYPE_BY_LIMB_TYPE[limb.limbType] ?? limb.itemType }));
++  const limbsOfType = (limbType) => robotLimbs.filter((limb) => limb.limbType === limbType);
++  const robotArms = limbsOfType('arm').map((arm) => ({ ...arm, isRobotArm: true }));
+   const allWeapons = [...weapons, ...robotWeapons];
+ 
+   // Robot plating and armor: merge data stats with i18n names, add to armorIndex
+@@ -381,12 +399,9 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
+ 
+   const mergedOddities = mergeById(moduleOddities, moduleI18n.oddities || []);
+-  const mergedRobotBody = mergeById(moduleRobotBody || [], i18n.robotBody || [])
+-    .map((b) => ({ ...b, itemType: b.itemType || 'robotBody' }));
+-  const mergedRobotHeads = mergeById(moduleRobotHeads || [], i18n.robotHeads || [])
+-    .map((h) => ({ ...h, itemType: h.itemType || 'robotHead' }));
+-  const mergedRobotLegs = mergeById(moduleRobotLegs || [], i18n.robotLegs || [])
+-    .map((l) => ({ ...l, itemType: l.itemType || 'robotLeg' }));
++  const mergedRobotBody = limbsOfType('body');
++  const mergedRobotHeads = limbsOfType('head');
++  const mergedRobotLegs = limbsOfType('mover');
+   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
+   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
+   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
+@@ -468,5 +483,5 @@ export const getEquipmentData = () => ({
+   ammo: moduleAmmo,
+   robotItems: moduleRobotParts.robotItems,
+   robotModules: moduleRobotParts.robotModules,
+-  robotBody: moduleRobotBody,
++  robotLimbs: [...moduleRobotLimbs, ...moduleRobotWeaponAsLimb],
+ });
+diff --git a/modules/fallout/data/equipment/robot/robotarms.json b/modules/fallout/data/equipment/robot/robotarms.json
+deleted file mode 100644
+index ff5492e..0000000
+--- a/modules/fallout/data/equipment/robot/robotarms.json
++++ /dev/null
+@@ -1,399 +0,0 @@
+-[
+-  {
+-    "id": "robot_weapon_manipulator",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "complexity": 2,
+-    "perksRequired": [],
+-    "skill": "REPAIR",
+-    "rarity": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_manipulator",
+-    "name": "robot_weapon_manipulator"
+-  },
+-  {
+-    "id": "robot_weapon_protectron_manipulator",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "complexity": 3,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_protectron_manipulator",
+-    "name": "robot_weapon_protectron_manipulator"
+-  },
+-  {
+-    "id": "robot_arm_protectron",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "melee": 2,
+-    "guns": 2,
+-    "physicalDR": 2,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "name": "robot_arm_protectron"
+-  },
+-  {
+-    "id": "robot_arm_mister_handy",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "maxSlots": 3,
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "melee": 3,
+-    "guns": 1,
+-    "physicalDR": 2,
+-    "energyDR": 2,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_manipulator",
+-    "name": "robot_arm_mister_handy"
+-  },
+-  {
+-    "id": "robot_arm_assaultron",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 2"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "melee": 5,
+-    "guns": 5,
+-    "physicalDR": 3,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_claw",
+-    "name": "robot_arm_assaultron"
+-  },
+-  {
+-    "id": "robot_arm_assaultron_shocker",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "melee": 5,
+-    "guns": 3,
+-    "physicalDR": 3,
+-    "energyDR": 4,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_shocker_arms",
+-    "name": "robot_arm_assaultron_shocker"
+-  },
+-  {
+-    "id": "robot_arm_robobrain",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "melee": 2,
+-    "guns": 4,
+-    "physicalDR": 2,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "name": "robot_arm_robobrain"
+-  },
+-  {
+-    "id": "robot_arm_sentry_bot",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Armorer 1",
+-      "Robotics Expert 3",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "melee": 4,
+-    "guns": 5,
+-    "physicalDR": 4,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "name": "robot_arm_sentry_bot"
+-  },
+-  {
+-    "id": "robot_weapon_flamethrower",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_flamethrower",
+-    "name": "robot_weapon_flamethrower"
+-  },
+-  {
+-    "id": "robot_weapon_circular_saw",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_circular_saw",
+-    "name": "robot_weapon_circular_saw"
+-  },
+-  {
+-    "id": "robot_weapon_laser_cutter",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_laser_cutter",
+-    "name": "robot_weapon_laser_cutter"
+-  },
+-  {
+-    "id": "robot_weapon_auto_10mm",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_auto_10mm",
+-    "name": "robot_weapon_auto_10mm"
+-  },
+-  {
+-    "id": "robot_weapon_cryojet",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_cryojet",
+-    "name": "robot_weapon_cryojet"
+-  },
+-  {
+-    "id": "robot_weapon_shocker_arms",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_shocker_arms",
+-    "name": "robot_weapon_shocker_arms"
+-  },
+-  {
+-    "id": "robot_weapon_construction_claw",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_construction_claw",
+-    "name": "robot_weapon_construction_claw"
+-  },
+-  {
+-    "id": "robot_weapon_drill",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_drill",
+-    "name": "robot_weapon_drill"
+-  },
+-  {
+-    "id": "robot_weapon_vice_grip",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_vice_grip",
+-    "name": "robot_weapon_vice_grip"
+-  },
+-  {
+-    "id": "robot_weapon_claw",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm",
+-      "arm1",
+-      "arm2",
+-      "arm3"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_claw",
+-    "name": "robot_weapon_claw"
+-  },
+-  {
+-    "id": "robot_weapon_tesla_arm",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "weaponSlots": 0,
+-    "canHoldWeapons": false,
+-    "builtinWeaponId": "robot_weapon_tesla_arm",
+-    "name": "robot_weapon_tesla_arm"
+-  },
+-  {
+-    "id": "robot_arm_smoke_manipulator",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "melee": 2,
+-    "guns": 4,
+-    "physicalDR": 2,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_smoke_claws",
+-    "name": "robot_arm_smoke_manipulator"
+-  },
+-  {
+-    "id": "robot_arm_securitron",
+-    "itemType": "robotArm",
+-    "compatibleSlots": [
+-      "leftArm",
+-      "rightArm"
+-    ],
+-    "maxSlots": 2,
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "melee": 2,
+-    "guns": 2,
+-    "physicalDR": 2,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "weaponSlots": 1,
+-    "canHoldWeapons": true,
+-    "builtinWeaponId": "robot_weapon_manipulator",
+-    "name": "robot_arm_securitron"
+-  }
+-]
+diff --git a/modules/fallout/data/equipment/robot/robotbody.json b/modules/fallout/data/equipment/robot/robotbody.json
+deleted file mode 100644
+index 3e88f02..0000000
+--- a/modules/fallout/data/equipment/robot/robotbody.json
++++ /dev/null
+@@ -1,156 +0,0 @@
+-[
+-  {
+-    "id": "robot_body_mister_handy",
+-    "itemType": "robotBody",
+-    "robotBodyPlan": "misterHandy",
+-    "replaceable": false,
+-    "armorSlots": [
+-      "Optics",
+-      "Main Body",
+-      "Arms",
+-      "Thruster"
+-    ],
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "body": 5,
+-    "carryWeight": 150,
+-    "physicalDR": 3,
+-    "energyDR": 2,
+-    "radDR": 0,
+-    "name": "robot_body_mister_handy"
+-  },
+-  {
+-    "id": "robot_body_protectron",
+-    "itemType": "robotBody",
+-    "robotBodyPlan": "protectron",
+-    "replaceable": true,
+-    "armorSlots": [
+-      "Head",
+-      "Main Body",
+-      "Left Arm",
+-      "Right Arm",
+-      "Left Leg",
+-      "Right Leg"
+-    ],
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "body": 5,
+-    "carryWeight": 225,
+-    "physicalDR": 3,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_body_protectron"
+-  },
+-  {
+-    "id": "robot_body_assaultron",
+-    "itemType": "robotBody",
+-    "robotBodyPlan": "assaultron",
+-    "replaceable": true,
+-    "armorSlots": [
+-      "Head",
+-      "Main Body",
+-      "Left Arm",
+-      "Right Arm",
+-      "Left Leg",
+-      "Right Leg"
+-    ],
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 2"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "body": 9,
+-    "carryWeight": 150,
+-    "physicalDR": 4,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "name": "robot_body_assaultron"
+-  },
+-  {
+-    "id": "robot_body_robobrain",
+-    "itemType": "robotBody",
+-    "robotBodyPlan": "robobrain",
+-    "replaceable": true,
+-    "armorSlots": [
+-      "Head",
+-      "Main Body",
+-      "Left Arm",
+-      "Right Arm"
+-    ],
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "body": 6,
+-    "carryWeight": 150,
+-    "physicalDR": 3,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "name": "robot_body_robobrain"
+-  },
+-  {
+-    "id": "robot_body_sentry_bot",
+-    "itemType": "robotBody",
+-    "robotBodyPlan": "sentryBot",
+-    "replaceable": true,
+-    "armorSlots": [
+-      "Head",
+-      "Main Body",
+-      "Left Arm",
+-      "Right Arm",
+-      "Left Leg",
+-      "Right Leg"
+-    ],
+-    "complexity": 7,
+-    "perksRequired": [
+-      "Armorer 1",
+-      "Robotics Expert 3",
+-      "Science! 2"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "body": 10,
+-    "carryWeight": 225,
+-    "physicalDR": 5,
+-    "energyDR": 4,
+-    "radDR": 0,
+-    "name": "robot_body_sentry_bot"
+-  },
+-  {
+-    "id": "robot_body_securitron",
+-    "itemType": "robotBody",
+-    "robotBodyPlan": "securitron",
+-    "replaceable": true,
+-    "armorSlots": [
+-      "Head",
+-      "Main Body",
+-      "Left Arm",
+-      "Right Arm",
+-      "Wheel"
+-    ],
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "body": 5,
+-    "carryWeight": 150,
+-    "physicalDR": 3,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_body_securitron"
+-  }
+-]
+diff --git a/modules/fallout/data/equipment/robot/robotheads.json b/modules/fallout/data/equipment/robot/robotheads.json
+deleted file mode 100644
+index 9c565d2..0000000
+--- a/modules/fallout/data/equipment/robot/robotheads.json
++++ /dev/null
+@@ -1,143 +0,0 @@
+-[
+-  {
+-    "id": "robot_head_protectron",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": "protectron",
+-    "unique": false,
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "mind": 5,
+-    "other": 2,
+-    "physicalDR": 2,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_head_protectron"
+-  },
+-  {
+-    "id": "robot_head_mister_handy_eye_stalk",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": "misterHandy",
+-    "unique": true,
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "mind": null,
+-    "other": null,
+-    "physicalDR": 1,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_head_mister_handy_eye_stalk"
+-  },
+-  {
+-    "id": "robot_head_assaultron",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": "assaultron",
+-    "unique": false,
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "mind": 6,
+-    "other": 4,
+-    "physicalDR": 3,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "name": "robot_head_assaultron"
+-  },
+-  {
+-    "id": "robot_head_assaultron_laser",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": null,
+-    "builtinWeaponId": "robot_weapon_assaultron_head_laser",
+-    "unique": false,
+-    "complexity": 7,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 2"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "mind": 6,
+-    "other": 4,
+-    "physicalDR": 3,
+-    "energyDR": 4,
+-    "radDR": 0,
+-    "name": "robot_head_assaultron_laser"
+-  },
+-  {
+-    "id": "robot_head_robobrain",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": "robobrain",
+-    "unique": true,
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 3"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "mind": 7,
+-    "other": 3,
+-    "physicalDR": 2,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "builtinWeaponId": "robot_weapon_mesmetron",
+-    "name": "robot_head_robobrain"
+-  },
+-  {
+-    "id": "robot_head_sentry_bot",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": "sentryBot",
+-    "unique": false,
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Armorer 1",
+-      "Robotics Expert 2",
+-      "Science! 2"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "mind": 6,
+-    "other": 4,
+-    "physicalDR": 4,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "name": "robot_head_sentry_bot"
+-  },
+-  {
+-    "id": "robot_head_securitron",
+-    "itemType": "robotHead",
+-    "replaceable": false,
+-    "defaultForBodyPlan": "securitron",
+-    "unique": false,
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "mind": 5,
+-    "other": 2,
+-    "physicalDR": 2,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_head_securitron"
+-  }
+-]
+diff --git a/modules/fallout/data/equipment/robot/robotlegs.json b/modules/fallout/data/equipment/robot/robotlegs.json
+deleted file mode 100644
+index 564527f..0000000
+--- a/modules/fallout/data/equipment/robot/robotlegs.json
++++ /dev/null
+@@ -1,113 +0,0 @@
+-[
+-  {
+-    "id": "robot_legs_mister_handy_thruster",
+-    "itemType": "robotLegs",
+-    "slot": "Thruster",
+-    "compatibleBodyPlans": [
+-      "misterHandy"
+-    ],
+-    "complexity": 4,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "physicalDR": 2,
+-    "energyDR": 2,
+-    "radDR": 0,
+-    "name": "robot_legs_mister_handy_thruster"
+-  },
+-  {
+-    "id": "robot_legs_protectron",
+-    "itemType": "robotLegs",
+-    "slot": "Legs",
+-    "compatibleBodyPlans": [
+-      "protectron"
+-    ],
+-    "complexity": 3,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "physicalDR": 2,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_legs_protectron"
+-  },
+-  {
+-    "id": "robot_legs_assaultron",
+-    "itemType": "robotLegs",
+-    "slot": "Legs",
+-    "compatibleBodyPlans": [
+-      "assaultron"
+-    ],
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 2"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "physicalDR": 3,
+-    "energyDR": 2,
+-    "radDR": 0,
+-    "name": "robot_legs_assaultron"
+-  },
+-  {
+-    "id": "robot_legs_robobrain_treads",
+-    "itemType": "robotLegs",
+-    "slot": "Legs",
+-    "compatibleBodyPlans": [
+-      "robobrain"
+-    ],
+-    "complexity": 5,
+-    "perksRequired": [
+-      "Robotics Expert 2",
+-      "Science! 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "physicalDR": 2,
+-    "energyDR": 2,
+-    "radDR": 0,
+-    "name": "robot_legs_robobrain_treads"
+-  },
+-  {
+-    "id": "robot_legs_sentry_bot",
+-    "itemType": "robotLegs",
+-    "slot": "Legs",
+-    "compatibleBodyPlans": [
+-      "sentryBot"
+-    ],
+-    "complexity": 6,
+-    "perksRequired": [
+-      "Armorer 1",
+-      "Robotics Expert 3"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 2,
+-    "physicalDR": 4,
+-    "energyDR": 3,
+-    "radDR": 0,
+-    "name": "robot_legs_sentry_bot"
+-  },
+-  {
+-    "id": "robot_legs_securitron",
+-    "itemType": "robotLegs",
+-    "slot": "Wheel",
+-    "compatibleBodyPlans": [
+-      "securitron"
+-    ],
+-    "defaultForBodyPlan": "securitron",
+-    "complexity": 3,
+-    "perksRequired": [
+-      "Robotics Expert 1"
+-    ],
+-    "skill": "REPAIR",
+-    "rarity": 1,
+-    "physicalDR": 2,
+-    "energyDR": 1,
+-    "radDR": 0,
+-    "name": "robot_legs_securitron"
+-  }
+-]
+diff --git a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index 5b98dd1..f8d9964 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -36,7 +36,7 @@ const BODY_PLAN_ARM_SLOTS = {
+  * A limb is compatible if:
+  *   - limb.compatibleBodyPlans includes bodyPlan, OR
+  *   - limb.defaultForBodyPlan === bodyPlan, OR
+- *   - limb.robotBodyPlan === bodyPlan (used in robotbody.json), OR
++ *   - limb.robotBodyPlan === bodyPlan (пометка в данных конечности), OR
+  *   - limb.slots intersects with the expected arm slots for the bodyPlan (arms fallback)
+  * If no limbs match any of the above, all limbs are returned (graceful fallback).
+  */
+@@ -92,11 +92,11 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
+       {limb.body    !== undefined && <StatRow label={tCharacterScreen("labels.body")}      value={limb.body} />}
+       {limb.carryWeight !== undefined && <StatRow label={tCharacterScreen("labels.carryWeight")} value={limb.carryWeight} />}
+       {limb.rarity  !== undefined && <StatRow label={tCharacterScreen("labels.rarity")}    value={limb.rarity} />}
+-      {limb.complexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity")} value={limb.complexity} />}
++      {limb.installComplexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity")} value={limb.installComplexity} />}
+     </View>
+-    {Array.isArray(limb.perksRequired) && limb.perksRequired.length > 0 && (
++    {Array.isArray(limb.installPerksRequired) && limb.installPerksRequired.length > 0 && (
+       <Text style={styles.perksRequired}>
+-        {tCharacterScreen("labels.requires")}{limb.perksRequired.join(', ')}
++        {tCharacterScreen("labels.requires")}{limb.installPerksRequired.join(', ')}
+       </Text>
+     )}
+   </TouchableOpacity>
+
+-- 
+2.47.3
+

@@ -1,0 +1,487 @@
+From 0000000000000000000000000000001788508176 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 07:49:36 +0000
+Subject: [PATCH] feat(robot): сбор атак по новой модели за фича-флагом
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 3, первая точка использования. Переведён сбор атак:
+getBuiltinWeaponsFromSlots уходит в collectAttacks из domain/robotSlots.js,
+но только при включённом фича-флаге.
+
+Флаг (временный, снимается на этапе 4):
+  setNewSlotModelEnabled(true/false/null) — из кода и тестов;
+  ROBOT_NEW_SLOT_MODEL=1                  — из окружения, прогнать весь
+                                            набор тестов под новой моделью;
+  по умолчанию ВЫКЛЮЧЕН — поведение прежнее.
+
+Формат записи на выходе сохранён (id, weaponId, sourceSlot, sourceLimb,
+isBuiltin, isManipulator) — экраны и сейвы не меняются. Служебные поля
+(source, slotId, instanceKey) наружу не уходят и в сейв не пишутся.
+
+Три правила нового сбора:
+  1. дедуп по экземпляру (слот:источник:id), а не по id оружия — две
+     одинаковые руки дают две карточки; это и есть лечение «arm3 теряется»;
+  2. экземпляр важнее каталога: оружие в ладони — конкретный предмет с
+     модами и именем, каталог лишь дополняет характеристики;
+  3. приоритет источников встроенной атаки прежний: limb.builtinWeapons ->
+     builtinWeaponId -> attackId у оружия вместо руки.
+
+Тесты: __tests__/robot/robot-slot-model-flag.test.js (12 шт) плюс
+acceptance-файл Хэнди теперь работает под флагом и фиксирует старое
+поведение отдельным тестом.
+
+Прогон 228 тестов:
+  флаг выключен            — 227 зелёных, 1 красный;
+  ROBOT_NEW_SLOT_MODEL=1   — 227 зелёных, 1 красный.
+Один и тот же красный в обоих режимах — критерий «оружие вместо руки не
+принимает обшивку»: броня пока не переведена. Ни один другой тест не
+сломался, набор готов к включению флага после перевода брони.
+
+---
+ 5 files changed, 350 insertions(+), 4 deletions(-)
+
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+index 99d650d..0b51572 100644
+--- a/__tests__/robot/mister-handy.test.js
++++ b/__tests__/robot/mister-handy.test.js
+@@ -18,7 +18,7 @@
+ // Часть проверок зелёная уже сейчас — это регрессионные страховки: они должны
+ // остаться зелёными на всех этапах.
+ 
+-import { describe, it, expect } from 'vitest';
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+ 
+ import kits from '../../modules/fallout/data/equipmentKits/index.js';
+ import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
+@@ -33,6 +33,7 @@ import {
+   getBuiltinWeaponsFromSlots,
+   findFreeWeaponHand,
+ } from '../../domain/robotEquip';
++import { setNewSlotModelEnabled } from '../../domain/robotSlots';
+ 
+ // ---------------------------------------------------------------------------
+ // Сборка предметов кита: то же, что делает kitResolver, но синхронно и без БД
+@@ -99,6 +100,12 @@ const attacksOfSlot = (slots, slotKey) =>
+ const emptyHandy = () => initRobotSlots('misterHandy', [], robotCatalog);
+ 
+ describe('Мистер Хэнди — acceptance-критерий новой модели слотов', () => {
++  // Acceptance проверяет НОВУЮ модель, поэтому файл включает фича-флаг
++  // на время прогона. Когда флаг станет постоянным (этап 4), эти строчки
++  // просто уберутся, а проверки останутся.
++  beforeEach(() => setNewSlotModelEnabled(true));
++  afterEach(() => setNewSlotModelEnabled(null));
++
+   // -------------------------------------------------------------------------
+   // Регрессионные страховки (зелёные сейчас, должны остаться зелёными)
+   // -------------------------------------------------------------------------
+@@ -233,4 +240,19 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+     expect(slots.arm2.plating).toBeFalsy();
+     expect(slots.arm3.plating).toBeFalsy();
+   });
++
++  it('старая модель (флаг выключен) съедает вторую одинаковую руку', () => {
++    // Фиксация причины переезда: пока включена старая модель, arm3 не даёт
++    // отдельной карточки — дедупликация по id оружия. Тест живёт до этапа 4,
++    // где старая ветка будет удалена вместе с флагом.
++    setNewSlotModelEnabled(false);
++    const { slots } = initRobotSlots(
++      'misterHandy',
++      resolveKit('mister_handy_nanny'),
++      robotCatalog,
++    );
++    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
++    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(2);
++  });
+ });
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-model-flag.test.js
+new file mode 100644
+index 0000000..3d7b9ae
+--- /dev/null
++++ b/__tests__/robot/robot-slot-model-flag.test.js
+@@ -0,0 +1,182 @@
++// __tests__/robot/robot-slot-model-flag.test.js
++//
++// Этап 3: первая точка использования переведена на новую модель за фича-
++// флагом — сбор атак (getBuiltinWeaponsFromSlots → collectAttacks).
++//
++// Главное правило этапа: при ВЫКЛЮЧЕННОМ флаге поведение обязано быть
++// прежним, без исключений. Новое поведение видно только при включённом.
++
++import { describe, it, expect, afterEach } from 'vitest';
++
++import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
++import { setNewSlotModelEnabled, isNewSlotModelEnabled } from '../../domain/robotSlots';
++import { getRobotLimbCatalog } from '../../domain/registry';
++
++import armsCatalog from '../../modules/fallout/data/equipment/robot/robotarms.json';
++import headsCatalog from '../../modules/fallout/data/equipment/robot/robotheads.json';
++import bodiesCatalog from '../../modules/fallout/data/equipment/robot/robotbody.json';
++import legsCatalog from '../../modules/fallout/data/equipment/robot/robotlegs.json';
++import weaponsCatalog from '../../modules/fallout/data/equipment/robot/weapons.json';
++
++const robotCatalog = {
++  arms: armsCatalog,
++  heads: headsCatalog,
++  bodies: bodiesCatalog,
++  legs: legsCatalog,
++  weapons: weaponsCatalog,
++};
++
++const byId = (list, id) => list.find((entry) => entry.id === id);
++const kit = (...ids) => ids.map((id) => ({ ...byId(armsCatalog, id) ?? byId(headsCatalog, id), itemType: 'robotArm' }));
++
++// Комплект «Няня»: две одинаковые руки-манипулятора и огнемёт между ними.
++const handyNanny = () => initRobotSlots('misterHandy', [
++  { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++  { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++  { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++], robotCatalog);
++
++afterEach(() => setNewSlotModelEnabled(null));
++
++// Флаг можно поднять из окружения: ROBOT_NEW_SLOT_MODEL=1 прогоняет весь
++// набор тестов под новой моделью и показывает, что сломается на этапе 4.
++const envOn = () =>
++  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '1';
++
++describe('фича-флаг новой модели', () => {
++  it('по умолчанию выключен (если окружение не велит иного)', () => {
++    setNewSlotModelEnabled(null);
++    expect(isNewSlotModelEnabled()).toBe(envOn());
++  });
++
++  it('ручной режим приоритетнее окружения и возвращается к нему', () => {
++    setNewSlotModelEnabled(true);
++    expect(isNewSlotModelEnabled()).toBe(true);
++    setNewSlotModelEnabled(false);
++    expect(isNewSlotModelEnabled()).toBe(false);
++    setNewSlotModelEnabled(null);
++    expect(isNewSlotModelEnabled()).toBe(envOn());
++  });
++});
++
++describe('сбор атак: старая модель (флаг выключен)', () => {
++  it('две одинаковые руки склеиваются в одну карточку', () => {
++    setNewSlotModelEnabled(false);
++    const { slots } = handyNanny();
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++    expect(weapons).toHaveLength(2); // манипулятор + огнемёт, arm3 потерян
++    expect(weapons.map((w) => w.id)).toContain('robot_weapon_flamethrower');
++  });
++});
++
++describe('сбор атак: новая модель (флаг включён)', () => {
++  it('каждая рука даёт свою карточку — arm3 не теряется', () => {
++    setNewSlotModelEnabled(true);
++    const { slots } = handyNanny();
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++
++    expect(weapons).toHaveLength(3);
++    const manipulators = weapons.filter((w) => w.id === 'robot_weapon_manipulator');
++    expect(manipulators).toHaveLength(2);
++    expect(manipulators.map((w) => w.sourceSlot).sort()).toEqual(['arm1', 'arm3']);
++  });
++
++  it('запись сохраняет форму, которую ждут экраны и сейв', () => {
++    setNewSlotModelEnabled(true);
++    const { slots } = handyNanny();
++    const [attack] = getBuiltinWeaponsFromSlots(slots);
++
++    expect(attack).toMatchObject({
++      id: 'robot_weapon_manipulator',
++      weaponId: 'robot_weapon_manipulator',
++      sourceSlot: 'arm1',
++      sourceLimb: 'robot_arm_mister_handy',
++      isBuiltin: true,
++    });
++    // Служебные поля нового домена наружу не торчат.
++    expect(attack.instanceKey).toBeUndefined();
++    expect(attack.source).toBeUndefined();
++    expect(attack.slotId).toBeUndefined();
++  });
++
++  it('оружие вместо руки свою атаку даёт, ладонь — нет', () => {
++    setNewSlotModelEnabled(true);
++    const { slots } = handyNanny();
++    // Положили пилу в ладонь слота с огнемётом: ладони у него нет.
++    slots.arm2.heldWeapon = byId(weaponsCatalog, 'robot_weapon_circular_saw');
++    const fromArm2 = getBuiltinWeaponsFromSlots(slots).filter((w) => w.sourceSlot === 'arm2');
++    expect(fromArm2).toHaveLength(1);
++    expect(fromArm2[0].id).toBe('robot_weapon_flamethrower');
++  });
++
++  it('оружие в ладони настоящей руки считается', () => {
++    setNewSlotModelEnabled(true);
++    const { slots } = handyNanny();
++    const held = byId(weaponsCatalog, 'robot_weapon_protectron_manipulator');
++    slots.arm1.heldWeapon = { ...held, name: 'Манипулятор няни', mods: [{ id: 'mod_x' }] };
++
++    const fromArm1 = getBuiltinWeaponsFromSlots(slots).filter((w) => w.sourceSlot === 'arm1');
++    expect(fromArm1).toHaveLength(2);
++    // В ладони лежит КОНКРЕТНЫЙ предмет: его имя и моды важнее каталога.
++    const heldCard = fromArm1.find((w) => w.sourceLimb && w.name === 'Манипулятор няни');
++    expect(heldCard?.mods).toHaveLength(1);
++    expect(heldCard?.isBuiltin).toBeUndefined();
++  });
++
++  it('пустые и незаполненные слоты не дают мусора', () => {
++    setNewSlotModelEnabled(true);
++    expect(getBuiltinWeaponsFromSlots({})).toEqual([]);
++    expect(getBuiltinWeaponsFromSlots(null)).toEqual([]);
++    expect(getBuiltinWeaponsFromSlots({ arm1: null, arm2: {} })).toEqual([]);
++  });
++});
++
++describe('регрессии под новой моделью', () => {
++  it('лазер головы ассультрон сохраняет боевые характеристики', () => {
++    setNewSlotModelEnabled(true);
++    const head = byId(headsCatalog, 'robot_head_assaultron_laser');
++    const { slots } = initRobotSlots('assaultron', [{ ...head }], robotCatalog);
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++    const laser = weapons.find((w) => w.id === 'robot_weapon_assaultron_head_laser');
++
++    expect(laser).toBeTruthy();
++    expect(laser.damage).toBe(5);
++    expect(laser.damageType).toBe('energy');
++    expect(laser.mainSkill).toBe('ENERGY_WEAPONS');
++    expect(laser.isBuiltin).toBe(true);
++  });
++
++  it('строительные когти: одинаковые руки дают две карточки', () => {
++    setNewSlotModelEnabled(true);
++    const claw = byId(weaponsCatalog, 'robot_weapon_construction_claw');
++    const { slots } = initRobotSlots('assaultron', [
++      { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'left' },
++      { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'right' },
++    ], robotCatalog);
++
++    expect(slots.leftArm.limb?.id).toBe('robot_weapon_construction_claw');
++    expect(slots.rightArm.limb?.id).toBe('robot_weapon_construction_claw');
++    const claws = getBuiltinWeaponsFromSlots(slots).filter((w) => w.id === 'robot_weapon_construction_claw');
++    expect(claws).toHaveLength(2);
++    expect(claws.map((w) => w.sourceSlot).sort()).toEqual(['leftArm', 'rightArm']);
++    expect(claws[0].damage).toBe(4);
++  });
++
++  it('протектрон: встроенного оружия нет, ладонь считается', () => {
++    setNewSlotModelEnabled(true);
++    const { slots } = initRobotSlots('protectron', [], robotCatalog);
++    expect(getBuiltinWeaponsFromSlots(slots)).toEqual([]);
++
++    slots.leftArm.heldWeapon = byId(weaponsCatalog, 'robot_weapon_protectron_manipulator');
++    const weapons = getBuiltinWeaponsFromSlots(slots);
++    expect(weapons).toHaveLength(1);
++    expect(weapons[0].sourceSlot).toBe('leftArm');
++  });
++
++  it('каталог конечностей доступен из реестра', () => {
++    const catalog = getRobotLimbCatalog();
++    expect(catalog.limbs.length).toBeGreaterThan(0);
++    expect(catalog.weaponAsLimb.length).toBeGreaterThan(0);
++    expect(catalog.armorLayers.length).toBeGreaterThan(0);
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 5acc269..abf8f6f 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -239,6 +239,45 @@
+ (`domain/registry.js`) — конечности, оружие вместо конечности, атаки, слои
+ защиты.
+ 
++### Этап 3 — сделано (патч 165): первая точка использования за флагом
++
++Переведён **сбор атак**: `getBuiltinWeaponsFromSlots` (`domain/robotEquip.js`)
++при включённом флаге уходит в `collectAttacks` (`domain/robotSlots.js`).
++
++**Фича-флаг `useNewSlotModel`** — временный, снимается на этапе 4:
++
++| Способ | Как |
++|---|---|
++| `setNewSlotModelEnabled(true/false/null)` | из кода и тестов; `null` — вернуться к умолчанию |
++| `ROBOT_NEW_SLOT_MODEL=1` | из окружения: прогнать **весь** набор тестов под новой моделью |
++| по умолчанию | **выключено** — поведение прежнее |
++
++Формат записи на выходе сохранён один в один (`id`, `weaponId`, `sourceSlot`,
++`sourceLimb`, `isBuiltin`, `isManipulator`) — экраны и сейвы не меняются.
++Служебные поля нового домена (`source`, `slotId`, `instanceKey`) наружу не
++уходят и в сейв не пишутся.
++
++Три правила, по которым живёт новый сбор:
++
++1. **дедуп по экземпляру** (`слот:источник:id`), а не по id оружия — две
++   одинаковые руки дают две карточки (это и есть лечение «arm3 теряется»);
++2. **экземпляр важнее каталога** — оружие в ладони это конкретный предмет
++   со модами и именем, каталог только подставляет недостающие характеристики;
++3. **приоритет источников встроенной атаки** тот же, что и раньше:
++   `limb.builtinWeapons` → `builtinWeaponId` → `attackId` у оружия вместо руки.
++
++**Прогон набора тестов (228 шт.):**
++
++| Режим | Зелёных | Красных |
++|---|---|---|
++| флаг выключен (как в проде) | 227 | 1 |
++| `ROBOT_NEW_SLOT_MODEL=1` | 227 | 1 |
++
++Один и тот же красный в обоих режимах — acceptance-критерий «оружие вместо
++руки не принимает обшивку»: броня пока не переведена, этим займётся
++следующий шаг этапа 3. **Ни один другой тест не сломался** — это главная
++новость: остальной набор уже готов к включению флага.
++
+ ---
+ 
+ ## 5. Реестр рисков
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 4b4011a..ed1c80a 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -6,6 +6,7 @@ import {
+   getDefaultPlating,
+ } from './bodyplan';
+ import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
++import { collectAttacks, isNewSlotModelEnabled } from './robotSlots';
+ 
+ // domain/robotEquip.js
+ // Pure functions for robot equipment logic — IRON RULES (see docs/robot-rules.md).
+@@ -557,7 +558,11 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+  * @param {object} slots - RobotSlotsObject
+  * @returns {object[]}
+  */
+-export function getBuiltinWeaponsFromSlots(slots) {
++export function getBuiltinWeaponsFromSlots(slots, options = {}) {
++  // Этап 3: новая модель за фича-флагом. Пока флаг выключен — путь старый,
++  // поведение не меняется ни на йоту.
++  if (isNewSlotModelEnabled()) return collectAttacks(slots, options);
++
+   if (!slots || typeof slots !== 'object') return [];
+ 
+   const weapons = [];
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 562f9b9..22790fb 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -32,6 +32,32 @@ export const LAYER_KEYS = ['armor', 'frame', 'plating'];
+ /** Типы конечностей — закрытый список двигателя. */
+ export const LIMB_TYPES = ['head', 'body', 'arm', 'mover'];
+ 
++// ---------------------------------------------------------------------------
++// Фича-флаг новой модели (временный, снимается на этапе 4)
++// ---------------------------------------------------------------------------
++//
++// Пока флаг выключен, вызывающий код работает по-старому: любой шаг этой
++// серии обратим одной строчкой. Включить можно тремя способами:
++//   setNewSlotModelEnabled(true)            — из кода / теста;
++//   ROBOT_NEW_SLOT_MODEL=1                  — из окружения (прогон всего
++//                                             набора тестов под новой моделью);
++//   по умолчанию — выключено.
++
++let flagOverride = null;
++
++const envEnabled = () =>
++  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '1';
++
++/** Включить/выключить новую модель вручную (null — вернуться к умолчанию). */
++export function setNewSlotModelEnabled(value) {
++  flagOverride = value === null ? null : Boolean(value);
++}
++
++/** Включена ли новая модель слотов. */
++export function isNewSlotModelEnabled() {
++  return flagOverride === null ? envEnabled() : flagOverride;
++}
++
+ const toNumber = (value) => {
+   const n = Number(value);
+   return Number.isFinite(n) ? n : 0;
+@@ -361,10 +387,82 @@ export function attacksFromSlot(slot, options = {}) {
+     }
+   }
+ 
+-  if (limb.itemCategory === 'weaponAsLimb' && limb.attackId) {
++  // Встроенные атаки конечности. Порядок источников — как в старом коде:
++  // сначала то, что уже лежит в экземпляре (там могут быть моды), потом
++  // то, что про конечность знает каталог.
++  if (Array.isArray(limb.builtinWeapons) && limb.builtinWeapons.length > 0) {
++    for (const weapon of limb.builtinWeapons) {
++      push(typeof weapon === 'string' ? resolveWeapon(catalog, weapon) : weapon, 'builtin');
++    }
++  } else if (limb.itemCategory === 'weaponAsLimb' && limb.attackId) {
+     push(resolveWeapon(catalog, limb.attackId), 'builtin');
+-  } else if (limb.itemCategory === 'limb' && limb.builtinWeaponId) {
++  } else if (limb.builtinWeaponId) {
+     push(resolveWeapon(catalog, limb.builtinWeaponId), 'builtin');
++  } else if (limb.builtinManipulator) {
++    // Наследие: рука-манипулятор без ссылки на оружие бьёт сама собой.
++    push({ ...limb, isManipulator: true }, 'builtin');
++  }
++
++  return result;
++}
++
++// ---------------------------------------------------------------------------
++// Сбор атак со всех слотов
++// ---------------------------------------------------------------------------
++
++/**
++ * Атаки со всех слотов персонажа — единая точка вместо покомпонентного
++ * обхода в вызывающем коде.
++ *
++ * Формат записи совпадает со старым getBuiltinWeaponsFromSlots
++ * (id, weaponId, sourceSlot, sourceLimb, isBuiltin[, isManipulator]),
++ * чтобы экраны и сейвы не менялись. Отличие одно и главное: дедупликация
++ * идёт по ЭКЗЕМПЛЯРУ (слот + источник + id), а не по id оружия — две
++ * одинаковые руки дают две карточки.
++ *
++ * @param {object} slots — состояние слотов персонажа
++ * @param {object} options — { bodyPlan?, catalog? }
++ * @returns {object[]}
++ */
++export function collectAttacks(slots, options = {}) {
++  const { catalog = getRobotLimbCatalog() } = options;
++  if (!slots || typeof slots !== 'object') return [];
++
++  const result = [];
++  const seenInstances = new Set();
++
++  for (const [slotKey, slotData] of Object.entries(slots)) {
++    if (!slotData) continue;
++    const state = normalizeSlot(slotData);
++    const limbId = typeof state.content === 'string' ? state.content : state.content?.id;
++    const attacks = attacksFromSlot(slotData, { slotId: slotKey, catalog });
++
++    for (const attack of attacks) {
++      const instanceKey = attack.instanceKey || `${slotKey}:${attack.source}:${attack.id}`;
++      if (seenInstances.has(instanceKey)) continue;
++      seenInstances.add(instanceKey);
++
++      // Экземпляр важнее каталога: в ладони лежит конкретный предмет
++      // (моды, имя, состояние), а не абстрактная запись каталога.
++      const stored = attack.source === 'held'
++        ? (typeof slotData.heldWeapon === 'object' ? slotData.heldWeapon : null)
++        : null;
++
++      result.push({
++        ...attack,
++        ...(stored || {}),
++        id: attack.id,
++        weaponId: attack.weaponId || attack.id,
++        sourceSlot: slotKey,
++        sourceLimb: limbId ?? null,
++        // Служебные поля нового домена в сейв и экраны не уходят.
++        source: undefined,
++        slotId: undefined,
++        instanceKey: undefined,
++        ...(attack.source === 'builtin' ? { isBuiltin: true } : {}),
++        ...(attack.isManipulator ? { isManipulator: true } : {}),
++      });
++    }
+   }
+ 
+   return result;
+
+-- 
+2.47.3
+
