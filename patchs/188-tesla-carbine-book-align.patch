@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 6 Sep 2026 14:03:28 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20188:=20=D0=BA=D0=B0?=
+ =?UTF-8?q?=D1=80=D0=B0=D0=B1=D0=B8=D0=BD=20=D0=A2=D0=B5=D1=81=D0=BB=D1=8B?=
+ =?UTF-8?q?=20=D0=BF=D0=BE=20=D0=BA=D0=BD=D0=B8=D0=B3=D0=B5=20=E2=80=94=20?=
+ =?UTF-8?q?=D0=B8=D0=BC=D1=8F=20=D0=9A=D0=B0=D1=80=D0=B0=D0=B1=D0=B8=D0=BD?=
+ =?UTF-8?q?=20=D0=A2=D0=B5=D1=81=D0=BB=D1=8B,=20=D1=83=D1=80=D0=BE=D0=BD?=
+ =?UTF-8?q?=204=20DC,=20=D0=94=D1=83=D0=B3=D0=B0,=20=D1=8D=D0=BD=D0=B5?=
+ =?UTF-8?q?=D1=80=D0=B3=D0=BE=D1=8F=D1=87=D0=B5=D0=B9=D0=BA=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ modules/fallout/data/equipment/weapons.json                   | 4 ++--
+ .../fallout/i18n/ru-RU/data/equipment/weapons/weapons.json    | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/modules/fallout/data/equipment/weapons.json b/modules/fallout/data/equipment/weapons.json
+index eab3aef..6d3f9be 100644
+--- a/modules/fallout/data/equipment/weapons.json
++++ b/modules/fallout/data/equipment/weapons.json
+@@ -1836,7 +1836,7 @@
+     "weight": "8",
+     "cost": 180,
+     "rarity": 4,
+-    "ammoId": "ammo_fusion_core",
++    "ammoId": "ammo_energy_cell",
+     "range": "M",
+     "imageName": "Tesla Rifle",
+     "mainAttr": "PER",
+@@ -1851,7 +1851,7 @@
+     "weaponType": "Energy",
+     "effects": [
+       {
+-        "effectId": "effect_burst"
++        "effectId": "effect_arc"
+       }
+     ]
+   },
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json b/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json
+index 1036062..0ab3b60 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json
+@@ -681,7 +681,7 @@
+   },
+   {
+     "id": "weapon_tesla_rifle",
+-    "name": "Винтовка Теслы",
++    "name": "Карабин Теслы",
+     "rangeName": "Средняя",
+     "flavour": "The Tesla gun is a firearm that takes the energy from a fusion cell and launches the energy out as a coil of electrical energy. The energy generally seeks out a way to dissipate allowing for it to arc out to multiple targets in a single shot.",
+     "stockNames": {
+-- 
+2.39.5
+

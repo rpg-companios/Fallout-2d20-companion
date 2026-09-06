@@ -1836,7 +1836,7 @@
     "weight": "8",
     "cost": 180,
     "rarity": 4,
-    "ammoId": "ammo_fusion_core",
+    "ammoId": "ammo_energy_cell",
     "range": "M",
     "imageName": "Tesla Rifle",
     "mainAttr": "PER",
@@ -1851,7 +1851,7 @@
     "weaponType": "Energy",
     "effects": [
       {
-        "effectId": "effect_burst"
+        "effectId": "effect_arc"
       }
     ]
   },
