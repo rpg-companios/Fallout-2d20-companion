@@ -4,7 +4,6 @@ import moduleRuRobotArmsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/
 import moduleRuRobotArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
 import moduleRuRobotPlatingI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
 import moduleRuRobotFramesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
-import moduleRuRobotLocationsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/locations.json';
 import moduleRuRobotModulesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/modules.json';
 import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/items.json';
 import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
@@ -16,7 +15,6 @@ import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/
 import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
 import moduleEnRobotPlatingI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
 import moduleEnRobotFramesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
-import moduleEnRobotLocationsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/locations.json';
 import moduleEnRobotModulesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/modules.json';
 import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
 import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
@@ -88,10 +86,8 @@ import moduleMagazines from '../modules/fallout/data/consumables/magazines.json'
 import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
 import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
 import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
-import moduleRobotBody from '../modules/fallout/data/equipment/robot/robotbody.json';
-import moduleRobotHeads from '../modules/fallout/data/equipment/robot/robotheads.json';
-import moduleRobotLegs from '../modules/fallout/data/equipment/robot/robotlegs.json';
-import moduleRobotArms from '../modules/fallout/data/equipment/robot/robotarms.json';
+import moduleRobotLimbs from '../modules/fallout/data/equipment/robot/limbs.json';
+import moduleRobotWeaponAsLimb from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
 import moduleRobotArmor from '../modules/fallout/data/equipment/robot/armor.json';
 import moduleRobotPlating from '../modules/fallout/data/equipment/robot/armor_plating.json';
 import moduleRobotFrames from '../modules/fallout/data/equipment/robot/frames.json';
@@ -167,7 +163,6 @@ const EQUIPMENT_BY_LOCALE = {
     robotArmor: moduleRuRobotArmorI18n,
     robotPlating: moduleRuRobotPlatingI18n,
     robotFrames: moduleRuRobotFramesI18n,
-    robotLocations: moduleRuRobotLocationsI18n,
     robotModules: moduleRuRobotModulesI18n,
     robotItems: moduleRuRobotItemsI18n,
     robotBody: moduleRuRobotBodyI18n,
@@ -180,7 +175,6 @@ const EQUIPMENT_BY_LOCALE = {
     robotArmor: moduleEnRobotArmorI18n,
     robotPlating: moduleEnRobotPlatingI18n,
     robotFrames: moduleEnRobotFramesI18n,
-    robotLocations: moduleEnRobotLocationsI18n,
     robotModules: moduleEnRobotModulesI18n,
     robotItems: moduleEnRobotItemsI18n,
     robotBody: moduleEnRobotBodyI18n,
@@ -270,6 +264,16 @@ const buildArmorIndex = (items) => {
   return { byId };
 };
 
+// Проекция типа конечности в привычное экранам имя: витрина, инвентарь и
+// модалки исторически различают конечности по itemType (robotArm, robotHead…).
+// Данные пишут limbType — это единственный источник, имя для экрана считается здесь.
+const LIMB_ITEM_TYPE_BY_LIMB_TYPE = Object.freeze({
+  arm: 'robotArm',
+  head: 'robotHead',
+  body: 'robotBody',
+  mover: 'robotLeg',
+});
+
 export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const i18n = EQUIPMENT_BY_LOCALE[locale];
   if (!i18n) {
@@ -303,12 +307,22 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     i18n.robotWeapons || [],
   )
     .map((w) => ({ ...w, itemType: 'weapon', isRobotWeapon: true }));
-  const robotArmsI18n = [
+  // Конечности робота: источник один — limbs.json + weaponAsLimb.json.
+  // «Руки/головы/корпуса/движители» для экранов — проекция по limbType,
+  // а не четыре разных файла данных.
+  const robotLimbsI18n = [
     ...(i18n.robotArms || []),
+    ...(i18n.robotHeads || []),
+    ...(i18n.robotBody || []),
+    ...(i18n.robotLegs || []),
     ...(i18n.robotWeapons || []),
   ].filter((item, index, arr) => item?.id && arr.findIndex((x) => x?.id === item.id) === index);
-  const robotArms = mergeById(moduleRobotArms || [], robotArmsI18n)
-    .map((arm) => ({ ...arm, itemType: 'robotArm', isRobotArm: true }));
+  const robotLimbs = mergeById(
+    [...(moduleRobotLimbs || []), ...(moduleRobotWeaponAsLimb || [])],
+    robotLimbsI18n,
+  ).map((limb) => ({ ...limb, itemType: LIMB_ITEM_TYPE_BY_LIMB_TYPE[limb.limbType] ?? limb.itemType }));
+  const limbsOfType = (limbType) => robotLimbs.filter((limb) => limb.limbType === limbType);
+  const robotArms = limbsOfType('arm').map((arm) => ({ ...arm, isRobotArm: true }));
   const allWeapons = [...weapons, ...robotWeapons];
 
   // Robot plating and armor: merge data stats with i18n names, add to armorIndex
@@ -385,12 +399,9 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
 
   const mergedOddities = mergeById(moduleOddities, moduleI18n.oddities || []);
-  const mergedRobotBody = mergeById(moduleRobotBody || [], i18n.robotBody || [])
-    .map((b) => ({ ...b, itemType: b.itemType || 'robotBody' }));
-  const mergedRobotHeads = mergeById(moduleRobotHeads || [], i18n.robotHeads || [])
-    .map((h) => ({ ...h, itemType: h.itemType || 'robotHead' }));
-  const mergedRobotLegs = mergeById(moduleRobotLegs || [], i18n.robotLegs || [])
-    .map((l) => ({ ...l, itemType: l.itemType || 'robotLeg' }));
+  const mergedRobotBody = limbsOfType('body');
+  const mergedRobotHeads = limbsOfType('head');
+  const mergedRobotLegs = limbsOfType('mover');
   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
@@ -472,5 +483,5 @@ export const getEquipmentData = () => ({
   ammo: moduleAmmo,
   robotItems: moduleRobotParts.robotItems,
   robotModules: moduleRobotParts.robotModules,
-  robotBody: moduleRobotBody,
+  robotLimbs: [...moduleRobotLimbs, ...moduleRobotWeaponAsLimb],
 });

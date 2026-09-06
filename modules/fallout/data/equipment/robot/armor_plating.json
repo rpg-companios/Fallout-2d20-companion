@@ -8,14 +8,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Optics",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": 0,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "head"
     },
     {
       "id": "robot_plating_standard_body",
@@ -25,14 +25,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Main Body",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": 0,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "body"
     },
     {
       "id": "robot_plating_standard_arms",
@@ -42,14 +42,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Arms",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": 0,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "arm"
     },
     {
       "id": "robot_plating_standard_thruster",
@@ -59,14 +59,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Thruster",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": 0,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "mover"
     },
     {
       "id": "robot_plating_gutsy_optics",
@@ -76,14 +76,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Optics",
       "damageResistance": {
         "physical": 2,
         "energy": 2
       },
       "carryWeightModifier": -10,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "head"
     },
     {
       "id": "robot_plating_gutsy_body",
@@ -93,14 +93,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Main Body",
       "damageResistance": {
         "physical": 2,
         "energy": 2
       },
       "carryWeightModifier": -10,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "body"
     },
     {
       "id": "robot_plating_gutsy_arms",
@@ -110,14 +110,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Arms",
       "damageResistance": {
         "physical": 2,
         "energy": 2
       },
       "carryWeightModifier": -10,
       "cost": 0,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "arm"
     },
     {
       "id": "robot_plating_gutsy_thruster",
@@ -127,82 +127,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Thruster",
       "damageResistance": {
         "physical": 2,
         "energy": 2
       },
       "carryWeightModifier": -10,
       "cost": 0,
-      "perkRequired": null
-    },
-    {
-      "id": "robot_plating_factory_optics",
-      "templateId": "robot_plating_factory",
-      "layer": "plating",
-      "incompatibleLayers": [
-        "armor",
-        "frame"
-      ],
-      "robotLocation": "Optics",
-      "damageResistance": {
-        "physical": 1,
-        "energy": 1
-      },
-      "carryWeightModifier": 0,
-      "cost": 5,
-      "perkRequired": null
-    },
-    {
-      "id": "robot_plating_factory_body",
-      "templateId": "robot_plating_factory",
-      "layer": "plating",
-      "incompatibleLayers": [
-        "armor",
-        "frame"
-      ],
-      "robotLocation": "Main Body",
-      "damageResistance": {
-        "physical": 1,
-        "energy": 1
-      },
-      "carryWeightModifier": 0,
-      "cost": 5,
-      "perkRequired": null
-    },
-    {
-      "id": "robot_plating_factory_arms",
-      "templateId": "robot_plating_factory",
-      "layer": "plating",
-      "incompatibleLayers": [
-        "armor",
-        "frame"
-      ],
-      "robotLocation": "Arms",
-      "damageResistance": {
-        "physical": 1,
-        "energy": 1
-      },
-      "carryWeightModifier": 0,
-      "cost": 5,
-      "perkRequired": null
-    },
-    {
-      "id": "robot_plating_factory_thruster",
-      "templateId": "robot_plating_factory",
-      "layer": "plating",
-      "incompatibleLayers": [
-        "armor",
-        "frame"
-      ],
-      "robotLocation": "Thruster",
-      "damageResistance": {
-        "physical": 1,
-        "energy": 1
-      },
-      "carryWeightModifier": 0,
-      "cost": 5,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "mover"
     },
     {
       "id": "robot_plating_primal_optics",
@@ -212,14 +144,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Optics",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 10,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "head"
     },
     {
       "id": "robot_plating_primal_body",
@@ -229,14 +161,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Main Body",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -20,
-      "cost": 10,
-      "perkRequired": null
+      "cost": 20,
+      "perkRequired": null,
+      "limbType": "body"
     },
     {
       "id": "robot_plating_primal_arms",
@@ -246,14 +178,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Arms",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 10,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "arm"
     },
     {
       "id": "robot_plating_primal_thruster",
@@ -263,14 +195,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Thruster",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 10,
-      "perkRequired": null
+      "perkRequired": null,
+      "limbType": "mover"
     },
     {
       "id": "robot_plating_serrated_optics",
@@ -280,14 +212,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Optics",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 1"
+      "perkRequired": "Armorer 1",
+      "limbType": "head"
     },
     {
       "id": "robot_plating_serrated_body",
@@ -297,14 +229,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Main Body",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -20,
-      "cost": 15,
-      "perkRequired": "Armorer 1"
+      "cost": 30,
+      "perkRequired": "Armorer 1",
+      "limbType": "body"
     },
     {
       "id": "robot_plating_serrated_arms",
@@ -314,14 +246,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Arms",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 1"
+      "perkRequired": "Armorer 1",
+      "limbType": "arm"
     },
     {
       "id": "robot_plating_serrated_thruster",
@@ -331,14 +263,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Thruster",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 1"
+      "perkRequired": "Armorer 1",
+      "limbType": "mover"
     },
     {
       "id": "robot_plating_noxious_optics",
@@ -348,14 +280,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Optics",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 1"
+      "perkRequired": "Armorer 1",
+      "limbType": "head"
     },
     {
       "id": "robot_plating_noxious_body",
@@ -365,14 +297,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Main Body",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -20,
-      "cost": 15,
-      "perkRequired": "Armorer 1"
+      "cost": 30,
+      "perkRequired": "Armorer 1",
+      "limbType": "body"
     },
     {
       "id": "robot_plating_noxious_arms",
@@ -382,14 +314,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Arms",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 1"
+      "perkRequired": "Armorer 1",
+      "limbType": "arm"
     },
     {
       "id": "robot_plating_noxious_thruster",
@@ -399,14 +331,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Thruster",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 1"
+      "perkRequired": "Armorer 1",
+      "limbType": "mover"
     },
     {
       "id": "robot_plating_toxic_optics",
@@ -416,14 +348,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Optics",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 3"
+      "perkRequired": "Armorer 3",
+      "limbType": "head"
     },
     {
       "id": "robot_plating_toxic_body",
@@ -433,14 +365,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Main Body",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -20,
-      "cost": 15,
-      "perkRequired": "Armorer 3"
+      "cost": 30,
+      "perkRequired": "Armorer 3",
+      "limbType": "body"
     },
     {
       "id": "robot_plating_toxic_arms",
@@ -450,14 +382,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Arms",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 3"
+      "perkRequired": "Armorer 3",
+      "limbType": "arm"
     },
     {
       "id": "robot_plating_toxic_thruster",
@@ -467,14 +399,14 @@
         "armor",
         "frame"
       ],
-      "robotLocation": "Thruster",
       "damageResistance": {
         "physical": 2,
         "energy": 0
       },
       "carryWeightModifier": -10,
       "cost": 15,
-      "perkRequired": "Armorer 3"
+      "perkRequired": "Armorer 3",
+      "limbType": "mover"
     }
   ]
 }

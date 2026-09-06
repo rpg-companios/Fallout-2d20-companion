@@ -42,20 +42,36 @@ export function createSlotsFromBodyPlan(planId) {
   const plan = bodyPlansRegistry[planId];
   if (!plan) return {};
 
-  return (plan.slots || []).reduce((acc, slotKey) => {
+  return getBodyPlanSlotIds(plan).reduce((acc, slotKey) => {
     acc[slotKey] = {
       limb: null,
       armor: null,
       plating: null,
       frame: null,
       heldWeapon: null,
-      capabilities: {
-        canEquipWeapon: plan.slotCapabilities?.[slotKey]?.canEquipWeapon === true,
-        canEquipArmor: plan.slotCapabilities?.[slotKey]?.canEquipArmor !== false,
-      },
     };
     return acc;
   }, {});
+}
+
+/**
+ * Идентификаторы слотов плана тела.
+ *
+ * Слоты в данных бывают двух видов:
+ *   ["head", "arm1"]                             — старый формат (строки);
+ *   [{ id: "head", accepts: ["head"], ... }, …]  — новый формат (объекты).
+ *
+ * Оба допустимы: миграция данных уже перевела plans в объекты, а читатели
+ * кода переходят постепенно (этап 3). Единственная точка, которая знает про
+ * оба вида, — эта функция.
+ *
+ * @param {object} plan — запись из bodyplans.json
+ * @returns {string[]}
+ */
+export function getBodyPlanSlotIds(plan) {
+  return (Array.isArray(plan?.slots) ? plan.slots : [])
+    .map((slot) => (typeof slot === 'string' ? slot : slot?.id))
+    .filter(Boolean);
 }
 
 export function getDefaultLimbs(planId) {

@@ -22,6 +22,7 @@ import {
 } from '../../../domain/powerArmor';
 import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+import { slotsForLimbType } from '../../../domain/robotSlots';
 import { rerollConsumableRadiationRoll } from '../../../domain/effects';
 import { buildConsumableResultReport } from './logic/consumableResultReport';
 import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
@@ -292,7 +293,10 @@ const InventoryScreen = () => {
   }, [equipmentCatalog, robotBodyPlan]);
   const isRobotLimbItem = (item) => {
     const itype = item?.itemType;
-    return itype === 'robotArm' || itype === 'robotHead' || itype === 'robotBody' || itype === 'robotLeg';
+    if (itype === 'robotArm' || itype === 'robotHead' || itype === 'robotBody' || itype === 'robotLeg') return true;
+    // Конечность из единого каталога: признак — категория, а не старая пометка
+    // itemType (её носят записи комплектов и старые сейвы).
+    return item?.itemCategory === 'limb' || item?.itemCategory === 'weaponAsLimb';
   };
 
   const robotWeaponIds = useMemo(
@@ -691,7 +695,9 @@ const InventoryScreen = () => {
       if (!armDef) return;
       const slots = equippedRobotSlots || {};
       const slotKeys = Object.keys(slots);
-      const compatibleSlots = Array.isArray(armDef.compatibleSlots) ? armDef.compatibleSlots : [];
+      // Слоты под конечность даёт план тела по типу конечности — раньше их
+      // список лежал внутри самой конечности (compatibleSlots).
+      const compatibleSlots = slotsForLimbType(robotBodyPlan, armDef.limbType ?? 'arm');
       const finalTargets = compatibleSlots.filter((key) => slotKeys.includes(key) && !slots[key]?.limb);
       if (finalTargets.length === 0) {
         showAlert(tInventory('screen.alerts.manipulatorRequiredTitle'), tInventory('screen.alerts.robotNoHandlingLimbMessage'));

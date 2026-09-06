@@ -1,0 +1,568 @@
+[
+  {
+    "id": "robot_head_assaultron",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "physicalDR": 3,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": "assaultron",
+    "replaceable": false,
+    "unique": false,
+    "mind": 6,
+    "other": 4,
+    "rarity": 1,
+    "name": "robot_head_assaultron"
+  },
+  {
+    "id": "robot_head_assaultron_laser",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "builtinWeaponId": "robot_weapon_assaultron_head_laser",
+    "physicalDR": 3,
+    "energyDR": 4,
+    "radDR": 0,
+    "installComplexity": 7,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 2"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": null,
+    "replaceable": false,
+    "unique": false,
+    "mind": 6,
+    "other": 4,
+    "rarity": 2,
+    "name": "robot_head_assaultron_laser"
+  },
+  {
+    "id": "robot_head_mister_handy_eye_stalk",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "physicalDR": 1,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": "misterHandy",
+    "replaceable": false,
+    "unique": true,
+    "mind": null,
+    "other": null,
+    "rarity": 1,
+    "name": "robot_head_mister_handy_eye_stalk"
+  },
+  {
+    "id": "robot_head_protectron",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": "protectron",
+    "replaceable": false,
+    "unique": false,
+    "mind": 5,
+    "other": 2,
+    "rarity": 1,
+    "name": "robot_head_protectron"
+  },
+  {
+    "id": "robot_head_robobrain",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "builtinWeaponId": "robot_weapon_mesmetron",
+    "physicalDR": 2,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 3"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": "robobrain",
+    "replaceable": false,
+    "unique": true,
+    "mind": 7,
+    "other": 3,
+    "rarity": 2,
+    "name": "robot_head_robobrain"
+  },
+  {
+    "id": "robot_head_securitron",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": "securitron",
+    "replaceable": false,
+    "unique": false,
+    "mind": 5,
+    "other": 2,
+    "rarity": 1,
+    "name": "robot_head_securitron"
+  },
+  {
+    "id": "robot_head_sentry_bot",
+    "itemCategory": "limb",
+    "limbType": "head",
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Armorer 1",
+      "Robotics Expert 2",
+      "Science! 2"
+    ],
+    "installSkill": "REPAIR",
+    "defaultForBodyPlan": "sentryBot",
+    "replaceable": false,
+    "unique": false,
+    "mind": 6,
+    "other": 4,
+    "rarity": 2,
+    "name": "robot_head_sentry_bot"
+  },
+  {
+    "id": "robot_body_assaultron",
+    "itemCategory": "limb",
+    "limbType": "body",
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 2"
+    ],
+    "installSkill": "REPAIR",
+    "robotBodyPlan": "assaultron",
+    "replaceable": true,
+    "body": 9,
+    "carryWeight": 150,
+    "rarity": 1,
+    "name": "robot_body_assaultron"
+  },
+  {
+    "id": "robot_body_mister_handy",
+    "itemCategory": "limb",
+    "limbType": "body",
+    "physicalDR": 3,
+    "energyDR": 2,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "robotBodyPlan": "misterHandy",
+    "replaceable": false,
+    "body": 5,
+    "carryWeight": 150,
+    "rarity": 1,
+    "name": "robot_body_mister_handy"
+  },
+  {
+    "id": "robot_body_protectron",
+    "itemCategory": "limb",
+    "limbType": "body",
+    "physicalDR": 3,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "robotBodyPlan": "protectron",
+    "replaceable": true,
+    "body": 5,
+    "carryWeight": 225,
+    "rarity": 1,
+    "name": "robot_body_protectron"
+  },
+  {
+    "id": "robot_body_robobrain",
+    "itemCategory": "limb",
+    "limbType": "body",
+    "physicalDR": 3,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "robotBodyPlan": "robobrain",
+    "replaceable": true,
+    "body": 6,
+    "carryWeight": 150,
+    "rarity": 2,
+    "name": "robot_body_robobrain"
+  },
+  {
+    "id": "robot_body_securitron",
+    "itemCategory": "limb",
+    "limbType": "body",
+    "physicalDR": 3,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "robotBodyPlan": "securitron",
+    "replaceable": true,
+    "body": 5,
+    "carryWeight": 150,
+    "rarity": 1,
+    "name": "robot_body_securitron"
+  },
+  {
+    "id": "robot_body_sentry_bot",
+    "itemCategory": "limb",
+    "limbType": "body",
+    "physicalDR": 5,
+    "energyDR": 4,
+    "radDR": 0,
+    "installComplexity": 7,
+    "installPerksRequired": [
+      "Armorer 1",
+      "Robotics Expert 3",
+      "Science! 2"
+    ],
+    "installSkill": "REPAIR",
+    "robotBodyPlan": "sentryBot",
+    "replaceable": true,
+    "body": 10,
+    "carryWeight": 225,
+    "rarity": 2,
+    "name": "robot_body_sentry_bot"
+  },
+  {
+    "id": "robot_arm_assaultron",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_claw",
+    "physicalDR": 3,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 2"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 5,
+    "guns": 5,
+    "rarity": 1,
+    "name": "robot_arm_assaultron"
+  },
+  {
+    "id": "robot_arm_assaultron_shocker",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_shocker_arms",
+    "physicalDR": 3,
+    "energyDR": 4,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 5,
+    "guns": 3,
+    "rarity": 2,
+    "name": "robot_arm_assaultron_shocker"
+  },
+  {
+    "id": "robot_arm_mister_handy",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_manipulator",
+    "physicalDR": 2,
+    "energyDR": 2,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 3,
+    "guns": 1,
+    "rarity": 1,
+    "name": "robot_arm_mister_handy"
+  },
+  {
+    "id": "robot_arm_protectron",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 2,
+    "guns": 2,
+    "rarity": 1,
+    "name": "robot_arm_protectron"
+  },
+  {
+    "id": "robot_arm_robobrain",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "physicalDR": 2,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 2,
+    "guns": 4,
+    "rarity": 2,
+    "name": "robot_arm_robobrain"
+  },
+  {
+    "id": "robot_arm_securitron",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_manipulator",
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 2,
+    "guns": 2,
+    "rarity": 1,
+    "name": "robot_arm_securitron"
+  },
+  {
+    "id": "robot_arm_sentry_bot",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Armorer 1",
+      "Robotics Expert 3",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 4,
+    "guns": 5,
+    "rarity": 2,
+    "name": "robot_arm_sentry_bot"
+  },
+  {
+    "id": "robot_arm_smoke_manipulator",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_smoke_claws",
+    "physicalDR": 2,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "melee": 2,
+    "guns": 4,
+    "rarity": 2,
+    "name": "robot_arm_smoke_manipulator"
+  },
+  {
+    "id": "robot_weapon_manipulator",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_manipulator",
+    "installComplexity": 2,
+    "installPerksRequired": [],
+    "installSkill": "REPAIR",
+    "rarity": 0,
+    "name": "robot_weapon_manipulator"
+  },
+  {
+    "id": "robot_weapon_protectron_manipulator",
+    "itemCategory": "limb",
+    "limbType": "arm",
+    "canHoldWeapons": true,
+    "weaponSlots": 1,
+    "builtinWeaponId": "robot_weapon_protectron_manipulator",
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "rarity": 0,
+    "name": "robot_weapon_protectron_manipulator"
+  },
+  {
+    "id": "robot_legs_assaultron",
+    "itemCategory": "limb",
+    "limbType": "mover",
+    "physicalDR": 3,
+    "energyDR": 2,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 2"
+    ],
+    "installSkill": "REPAIR",
+    "compatibleBodyPlans": [
+      "assaultron"
+    ],
+    "rarity": 1,
+    "name": "robot_legs_assaultron"
+  },
+  {
+    "id": "robot_legs_mister_handy_thruster",
+    "itemCategory": "limb",
+    "limbType": "mover",
+    "physicalDR": 2,
+    "energyDR": 2,
+    "radDR": 0,
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "compatibleBodyPlans": [
+      "misterHandy"
+    ],
+    "rarity": 1,
+    "name": "robot_legs_mister_handy_thruster"
+  },
+  {
+    "id": "robot_legs_protectron",
+    "itemCategory": "limb",
+    "limbType": "mover",
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "compatibleBodyPlans": [
+      "protectron"
+    ],
+    "rarity": 1,
+    "name": "robot_legs_protectron"
+  },
+  {
+    "id": "robot_legs_robobrain_treads",
+    "itemCategory": "limb",
+    "limbType": "mover",
+    "physicalDR": 2,
+    "energyDR": 2,
+    "radDR": 0,
+    "installComplexity": 5,
+    "installPerksRequired": [
+      "Robotics Expert 2",
+      "Science! 1"
+    ],
+    "installSkill": "REPAIR",
+    "compatibleBodyPlans": [
+      "robobrain"
+    ],
+    "rarity": 1,
+    "name": "robot_legs_robobrain_treads"
+  },
+  {
+    "id": "robot_legs_securitron",
+    "itemCategory": "limb",
+    "limbType": "mover",
+    "physicalDR": 2,
+    "energyDR": 1,
+    "radDR": 0,
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Robotics Expert 1"
+    ],
+    "installSkill": "REPAIR",
+    "compatibleBodyPlans": [
+      "securitron"
+    ],
+    "defaultForBodyPlan": "securitron",
+    "rarity": 1,
+    "name": "robot_legs_securitron"
+  },
+  {
+    "id": "robot_legs_sentry_bot",
+    "itemCategory": "limb",
+    "limbType": "mover",
+    "physicalDR": 4,
+    "energyDR": 3,
+    "radDR": 0,
+    "installComplexity": 6,
+    "installPerksRequired": [
+      "Armorer 1",
+      "Robotics Expert 3"
+    ],
+    "installSkill": "REPAIR",
+    "compatibleBodyPlans": [
+      "sentryBot"
+    ],
+    "rarity": 2,
+    "name": "robot_legs_sentry_bot"
+  }
+]

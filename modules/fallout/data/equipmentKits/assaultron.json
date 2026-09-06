@@ -7,7 +7,7 @@
         "itemType": "weapon",
         "weight": 0,
         "slot": "left",
-        "builtinToArm": true,
+        "installTo": "arm",
         "ammo": {
           "ammoId": "ammo_energy_cell",
           "quantity": {
@@ -136,7 +136,7 @@
         "itemType": "weapon",
         "weight": 0,
         "slot": "left",
-        "builtinToArm": true,
+        "installTo": "arm",
         "ammo": {
           "ammoId": "ammo_energy_cell",
           "quantity": {

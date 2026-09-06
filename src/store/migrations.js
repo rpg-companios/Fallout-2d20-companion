@@ -452,6 +452,76 @@ const _migrateEquippedEntryV0V1 = (entry) => {
   return out;
 };
 
+/**
+ * v20 -> v21: «Заводская обшивка» удалена из каталога — в книге её нет, есть
+ * только стандартная обшивка. Старые сейвы (и комплект защитрона) ссылались на
+ * robot_plating_factory_*; без переименования слой не разрешится каталогом, и
+ * персонаж молча потеряет защиту при загрузке.
+ *
+ * Правит и «толстый» вид слота (слои объектами на верхнем уровне), и новый
+ * (armorLayers с id), и инвентарь. Идемпотентна: после подмены id больше не
+ * начинается с robot_plating_factory_.
+ */
+export const migrateRobotPlatingIds = (state) => {
+  if (!state || typeof state !== 'object') return state;
+
+  const remapId = (id) => (typeof id === 'string' && id.startsWith('robot_plating_factory_')
+    ? id.replace('robot_plating_factory_', 'robot_plating_standard_')
+    : id);
+
+  const remapLayer = (layer) => {
+    if (typeof layer === 'string') return remapId(layer);
+    if (layer && typeof layer === 'object' && typeof layer.id === 'string') {
+      const id = remapId(layer.id);
+      return id === layer.id ? layer : { ...layer, id };
+    }
+    return layer;
+  };
+
+  const LAYER_KEYS = ['plating', 'armor', 'frame'];
+  let changed = false;
+  const next = { ...state };
+
+  if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
+    const slots = {};
+    let slotsChanged = false;
+    for (const [key, slot] of Object.entries(next.equippedRobotSlots)) {
+      if (!slot || typeof slot !== 'object') { slots[key] = slot; continue; }
+      const patched = { ...slot };
+      for (const layerKey of LAYER_KEYS) {
+        if (patched[layerKey] === undefined || patched[layerKey] === null) continue;
+        const mapped = remapLayer(patched[layerKey]);
+        if (mapped !== patched[layerKey]) { patched[layerKey] = mapped; slotsChanged = true; }
+      }
+      if (patched.armorLayers && typeof patched.armorLayers === 'object') {
+        const layers = { ...patched.armorLayers };
+        for (const layerKey of LAYER_KEYS) {
+          if (layers[layerKey] === undefined || layers[layerKey] === null) continue;
+          const mapped = remapLayer(layers[layerKey]);
+          if (mapped !== layers[layerKey]) { layers[layerKey] = mapped; slotsChanged = true; }
+        }
+        patched.armorLayers = layers;
+      }
+      slots[key] = patched;
+    }
+    if (slotsChanged) { next.equippedRobotSlots = slots; changed = true; }
+  }
+
+  if (Array.isArray(next.equipment?.items)) {
+    let itemsChanged = false;
+    const items = next.equipment.items.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const id = remapId(item.id);
+      if (id === item.id) return item;
+      itemsChanged = true;
+      return { ...item, id };
+    });
+    if (itemsChanged) { next.equipment = { ...next.equipment, items }; changed = true; }
+  }
+
+  return changed ? next : state;
+};
+
 const MIGRATIONS = [
   // v0 -> v1: разделить эффекты/качества в экипированном оружии.
   (state) => {
@@ -1085,6 +1155,19 @@ const MIGRATIONS = [
   // restore дообогатит их теми же каталожными данными, а повторный экспорт
   // приведёт к «худому» виду. Идемпотентна.
   (state) => state,
+
+  // v19 -> v20: «худой» сейв для слотов робота. Конечность, слои защиты и
+  // оружие в ладони хранятся id (+ id установленных модов); характеристики
+  // восстанавливаются из каталогов. Как и в v19, сама ужимка делается на
+  // экспорте (slimRobotSlots), разворот — на импорте (restoreSaveData), а тут
+  // только бамп версии: данные не меняются, миграция идемпотентна.
+  (state) => state,
+
+  // v20 -> v21: «Заводская обшивка» убрана из каталога (в книге её нет).
+  // Ссылки robot_plating_factory_* в слотах и инвентаре переименовываются в
+  // robot_plating_standard_* — иначе слой не разрешится и персонаж потеряет
+  // защиту. Идемпотентна.
+  migrateRobotPlatingIds,
 
 ];
 /**

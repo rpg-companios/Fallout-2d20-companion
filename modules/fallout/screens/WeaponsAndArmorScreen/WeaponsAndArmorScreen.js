@@ -15,6 +15,7 @@ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMe
 import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
+import { normalizeSlot } from '../../../../domain/robotSlots';
 import styles from '../../../../styles/CharacterScreen.styles';
 import localStyles from '../../../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
@@ -34,6 +35,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+import { dedupeWeaponCards } from './dedupeWeaponCards';
 import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
 import { getBodyPlan } from '../../../../domain/bodyplan';
 import {
@@ -482,8 +484,18 @@ const findLocalizedRobotPart = (catalogItems, item) => {
   return localized;
 };
 
+// Слот сейва бывает двух видов: старый ({ limb, plating, frame }) и новый
+// ({ content, armorLayers }), причём в новом слои могут лежать одним id.
+// Читаем через движок, иначе на slim-сейве карточка показывала «нет
+// конечности» и пустые названия слоёв.
+const localizeRobotPart = (catalogItems, raw) => {
+  if (!raw) return raw;
+  return findLocalizedRobotPart(catalogItems, typeof raw === 'string' ? { id: raw } : raw);
+};
+
 const localizeRobotSlotData = (catalog, slotData) => {
   if (!slotData) return slotData;
+  const state = normalizeSlot(slotData);
   const limbs = [
     ...(catalog?.robotHeads || []),
     ...(catalog?.robotBody || []),
@@ -492,10 +504,10 @@ const localizeRobotSlotData = (catalog, slotData) => {
   ];
   return {
     ...slotData,
-    limb: findLocalizedRobotPart(limbs, slotData.limb),
-    plating: findLocalizedRobotPart(catalog?.robotPlating, slotData.plating),
-    armor: findLocalizedRobotPart(catalog?.robotArmorLayer, slotData.armor),
-    frame: findLocalizedRobotPart(catalog?.robotFrames, slotData.frame),
+    limb: localizeRobotPart(limbs, state.content),
+    plating: localizeRobotPart(catalog?.robotPlating, state.armorLayers.plating),
+    armor: localizeRobotPart(catalog?.robotArmorLayer, state.armorLayers.armor),
+    frame: localizeRobotPart(catalog?.robotFrames, state.armorLayers.frame),
   };
 };
 
@@ -630,16 +642,9 @@ const WeaponsAndArmorScreen = () => {
     });
   }, [moduleLocale, equippedWeaponsForDisplay, localizedEquippedWeapons]);
 
-  const weaponFingerprint = (w) => {
-    if (!w) return null;
-    const mods = w.appliedMods ? Object.entries(w.appliedMods).sort().map(([k, v]) => `${k}:${v}`).join(',') : '';
-    return `${w.id}|${mods}`;
-  };
-  const dedupedEquippedWeapons = localizedEquippedWeapons.filter((w, idx, arr) => {
-    if (!w) return true;
-    const fp = weaponFingerprint(w);
-    return arr.findIndex(x => weaponFingerprint(x) === fp) === idx;
-  });
+  // Одинаковые карточки (две руки с одним и тем же оружием) на экране
+  // сводятся к одной — это правило отображения, а не модели.
+  const dedupedEquippedWeapons = dedupeWeaponCards(localizedEquippedWeapons);
 
   // ПРАВИЛО (владелец): порядок атак на экране снаряжения — рукопашные первыми,
   // затем встроенное оружие, затем Mk II (нерабочее), затем экипированное из
@@ -856,7 +861,18 @@ const WeaponsAndArmorScreen = () => {
     
     // Если робот и есть equippedRobotSlots, отображаем RobotSlot
     if (isRobot && equippedRobotSlots && equippedRobotSlots[slotKey]) {
-      return <RobotSlot key={slotKey} slotKey={slotKey} slotData={equippedRobotSlots[slotKey]} />;
+      return (
+        <RobotSlot
+          key={slotKey}
+          slotKey={slotKey}
+          slotData={localizeRobotSlotData(equipmentCatalog, equippedRobotSlots[slotKey])}
+          bodyPlan={bodyPlan}
+          onUpgradeLimb={handleOpenLimbUpgradeModal}
+          onOpenArmorPicker={handleOpenArmorPicker}
+          onWeaponPress={handleWeaponPress}
+          hasRadImmunity={hasRadImmunity}
+        />
+      );
     }
     
     // Иначе отображаем обычный ArmorPart

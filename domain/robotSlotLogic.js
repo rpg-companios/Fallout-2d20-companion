@@ -2,8 +2,8 @@
 // Pure logic extracted from RobotSlot for testability (no React, no UI deps).
 
 import { tWeaponsAndArmorScreen } from '../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
-import { getBodyPlan } from './bodyplan';
 import { getRobotSlotDamageResistance } from './robotDamageResistance';
+import { getSlotHitRange } from './robotSlots';
 
 /**
  * Builds the slot title, limb name, and stats array for a RobotSlot.
@@ -33,9 +33,10 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
     : t('robotSlot.noLimb');
 
   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
-  // Диапазоны попаданий (d20) — из плана тела, если он их объявляет (секьюритрон),
-  // иначе общий словарь armor.slots (человекоподобная таблица).
-  const planHitLocation = bodyPlan ? getBodyPlan(bodyPlan)?.hitLocations?.[slotKey] : null;
+  // Диапазоны попаданий (d20): у робота — из таблицы плана тела (уникальны
+  // для каждого плана), у людей — статичный словарь armor.slots в i18n.
+  const hitRange = bodyPlan ? getSlotHitRange(bodyPlan, slotKey) : null;
+  const planHitLocation = hitRange ? `${hitRange.from}-${hitRange.to}` : null;
   const slotSubtitle = planHitLocation ?? (t(`armor.slots.${slotKey}.subtitle`) || '');
 
   const stats = [];

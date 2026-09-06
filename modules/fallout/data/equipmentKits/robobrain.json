@@ -4,6 +4,7 @@
       {
         "type": "fixed",
         "weaponId": "robot_weapon_mesmetron",
+        "installTo": "head",
         "itemType": "weapon"
       },
       {
@@ -62,6 +63,7 @@
       {
         "type": "fixed",
         "weaponId": "robot_weapon_mesmetron",
+        "installTo": "head",
         "itemType": "weapon",
         "ammo": {
           "ammoId": "ammo_energy_cell",
@@ -188,6 +190,7 @@
       {
         "type": "fixed",
         "weaponId": "robot_weapon_mesmetron",
+        "installTo": "head",
         "itemType": "weapon",
         "ammo": {
           "ammoId": "ammo_energy_cell",

@@ -3,7 +3,7 @@
 // Pure functions — no React, no UI, no modules/fallout зависимости.
 //
 // МОДЕЛЬ ДАННЫХ СЛОТА:
-//   slot = { limb, armor, plating, frame, heldWeapon, capabilities }
+//   slot = { limb, armor, plating, frame, heldWeapon }
 //   - limb   (конечность): physicalDR / energyDR / radDR  (числа; может не быть)
 //   - armor / plating / frame (защитные слои): damageResistance = { physical, energy }
 //     и собственный incompatibleLayers (массив слоёв, с которыми НЕ совместим).
@@ -16,40 +16,20 @@
 //   Итог: либо «броня + рама», либо «обшивка»; конфликтующие слои НЕ суммируются
 //   (в легаси-сейвах возможна несовместимая комбинация — её приводим к валидной).
 
-/**
- * Приоритет выбора активных защитных слоёв.
- * armor и frame совместимы (нет incompatibleLayers), поэтому идут первыми;
- * plating конфликтует с ними — добавляется только если armor/frame не заняты.
- */
-const LAYER_ORDER = ['armor', 'frame', 'plating'];
+import { activeArmorLayers, totalDR } from './robotSlots';
 
 const toNumber = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 };
 
-const getLayerKeys = (slotData) =>
-  LAYER_ORDER.filter((key) => slotData?.[key] && typeof slotData[key] === 'object');
-
 /**
- * Активные защитные слои без конфликтов.
- * Набор строится в LAYER_ORDER; слой пропускается, если его incompatibleLayers
- * пересекается с уже принятыми слоями.
+ * Активные защитные слои без конфликтов (читает и старое, и новое состояние
+ * слота; понимает слои, записанные идентификатором).
  * @param {object} slotData - { armor?, plating?, frame?, limb? }
  * @returns {{ key: string, layer: object }[]}
  */
-export const getActiveRobotLayers = (slotData) => {
-  const keys = getLayerKeys(slotData);
-  const active = [];
-  for (const key of keys) {
-    const layer = slotData[key];
-    const incompatible = Array.isArray(layer.incompatibleLayers) ? layer.incompatibleLayers : [];
-    const conflicts = incompatible.some((blocked) => active.some((a) => a.key === blocked));
-    if (conflicts) continue;
-    active.push({ key, layer });
-  }
-  return active;
-};
+export const getActiveRobotLayers = (slotData) => activeArmorLayers(slotData);
 
 /**
  * СУ конечности (limb) как числа { physical, energy, rad }.
@@ -69,13 +49,8 @@ export const getLimbDamageResistance = (limb) => ({
  * @returns {{ physical: number, energy: number, rad: number }}
  */
 export const getRobotSlotDamageResistance = (slotData) => {
-  const result = getLimbDamageResistance(slotData?.limb);
-  const active = getActiveRobotLayers(slotData);
-  for (const { layer } of active) {
-    const dr = layer.damageResistance || {};
-    result.physical += toNumber(dr.physical);
-    result.energy += toNumber(dr.energy);
-  }
-  // Радиация: только от конечности/иммунитета — слои радиационной СУ не несут.
-  return result;
+  // СУ = конечность + совместимые слои, и только там, где защита законна
+  // (нет конечности или слот занят оружием — вклада нет). Радиационная СУ
+  // берётся только от конечности: слои её не несут.
+  return totalDR(slotData);
 };

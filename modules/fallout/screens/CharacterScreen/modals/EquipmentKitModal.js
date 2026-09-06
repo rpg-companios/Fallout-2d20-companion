@@ -12,10 +12,8 @@ import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 // Lazy-load robot catalog data — на основании данных, без обогатителя
 const loadRobotCatalog = () => ({
-  heads: require('../../../data/equipment/robot/robotheads.json'),
-  bodies: require('../../../data/equipment/robot/robotbody.json'),
-  arms: require('../../../data/equipment/robot/robotarms.json'),
-  legs: require('../../../data/equipment/robot/robotlegs.json'),
+  limbs: require('../../../data/equipment/robot/limbs.json'),
+  weaponAsLimb: require('../../../data/equipment/robot/weaponAsLimb.json'),
   weapons: require('../../../data/equipment/robot/weapons.json'),
   plating: require('../../../data/equipment/robot/armor_plating.json').plating || [],
   frames: require('../../../data/equipment/robot/frames.json').frames || [],
@@ -131,8 +129,8 @@ const toInventoryItems = (entries) => {
         itemType: 'weapon',
         hasMods: item.hasMods ?? false,
         // item-level флаги встроенного оружия не лежат в _weapon — переносим явно,
-        // иначе builtinToArm/requiresMkII теряются при фильтрации finalItems.
-        builtinToArm: item.builtinToArm,
+        // иначе installTo/requiresMkII теряются при фильтрации finalItems.
+        installTo: item.installTo,
         requiresMkII: item.requiresMkII,
         // Вариант (заменённое имя) и уникальные качества — тоже item-level:
         // без явного переноса бритва/«Дерзкая …» потеряли бы имя и стек.
@@ -315,7 +313,8 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
       ]);
       const finalItemsOnly = finalItems.filter((item) => {
         if (slotConsumedTypes.has(item.itemType)) return false;
-        if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
+        // Установленное в конечность оружие (installTo) слот на руке не тратит.
+        if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.installTo)) return false;
         if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
         return true;
       });
