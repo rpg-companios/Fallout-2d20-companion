@@ -1,0 +1,1161 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 6 Sep 2026 19:18:44 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20193:=20=D0=B7=D0=B0?=
+ =?UTF-8?q?=D0=B4=D0=B5=D0=BB=20=D0=BA=D0=B0=D1=81=D1=82=D0=BE=D0=BC=D0=BD?=
+ =?UTF-8?q?=D1=8B=D1=85=20=D0=B0=D0=B2=D0=B0=D1=82=D0=B0=D1=80=D0=BE=D0=B2?=
+ =?UTF-8?q?=20=D0=B1=D0=B5=D0=B7=20UI=20=E2=80=94=20=D0=BA=D1=8D=D1=88,=20?=
+ =?UTF-8?q?=D1=80=D0=B5=D0=B4=D0=BA=D0=B8=D0=B9=20Drive-=D1=81=D0=B8=D0=BD?=
+ =?UTF-8?q?=D0=BA,=20=D1=80=D0=B5=D0=B5=D1=81=D1=82=D1=80=20=D0=BF=D1=80?=
+ =?UTF-8?q?=D0=B5=D0=BC=D0=B8=D1=83=D0=BC-=D1=84=D0=B8=D1=87?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/avatar/avatar-sync-protocol.test.js | 240 ++++++++++++++++++
+ __tests__/avatar/character-avatar.test.js     | 103 ++++++++
+ __tests__/avatar/premium-registry.test.js     |  67 +++++
+ components/cloudSync/avatarSync.js            | 202 +++++++++++++++
+ components/cloudSync/googleDriveSync.js       | 128 ++++++++++
+ db/avatarCache.js                             |  71 ++++++
+ db/schema.js                                  |  11 +
+ domain/characterAvatar.js                     | 121 +++++++++
+ domain/premium.js                             |  98 +++++++
+ 9 files changed, 1041 insertions(+)
+ create mode 100644 __tests__/avatar/avatar-sync-protocol.test.js
+ create mode 100644 __tests__/avatar/character-avatar.test.js
+ create mode 100644 __tests__/avatar/premium-registry.test.js
+ create mode 100644 components/cloudSync/avatarSync.js
+ create mode 100644 db/avatarCache.js
+ create mode 100644 domain/characterAvatar.js
+ create mode 100644 domain/premium.js
+
+diff --git a/__tests__/avatar/avatar-sync-protocol.test.js b/__tests__/avatar/avatar-sync-protocol.test.js
+new file mode 100644
+index 0000000..b583ccd
+--- /dev/null
++++ b/__tests__/avatar/avatar-sync-protocol.test.js
+@@ -0,0 +1,240 @@
++// __tests__/avatar/avatar-sync-protocol.test.js
++//
++// Протокол редкого синка аватаров (components/cloudSync/avatarSync.js,
++// задел патча 193; UI нет). Правила — docs/premium-and-avatar-design.md §1.2.
++
++import { describe, it, expect } from 'vitest';
++import {
++  AVATARS_FOLDER_NAME,
++  avatarFileName,
++  characterIdFromAvatarFileName,
++  decideAvatarAction,
++  planAvatarSync,
++  syncAvatars,
++} from '../../components/cloudSync/avatarSync';
++
++const makeLocal = (characterId, { md5 = null, updatedAt = 1000 } = {}) => ({ characterId, md5, updatedAt });
++const makeRemote = (characterId, { fileId = 'f1', md5 = null, modifiedTime = 1000 } = {}) => ({
++  fileId,
++  name: avatarFileName(characterId),
++  md5,
++  modifiedTime,
++});
++
++describe('avatar sync: имена файлов', () => {
++  it('папка называется avatars, файл — <characterId>.jpg', () => {
++    expect(AVATARS_FOLDER_NAME).toBe('avatars');
++    expect(avatarFileName('char_abc')).toBe('char_abc.jpg');
++    expect(characterIdFromAvatarFileName('char_abc.jpg')).toBe('char_abc');
++    expect(characterIdFromAvatarFileName('что-то-не-то.json')).toBeNull();
++  });
++});
++
++describe('avatar sync: решение по одной паре копий', () => {
++  it('нет локальной — качаем; нет облачной — грузим', () => {
++    expect(decideAvatarAction({ local: null, remote: { md5: 'x', modifiedTime: 1 } })).toBe('download');
++    expect(decideAvatarAction({ local: { md5: 'x', updatedAt: 1 }, remote: null })).toBe('upload');
++  });
++
++  it('md5 совпадает — ноль действий', () => {
++    expect(decideAvatarAction({
++      local: { md5: 'same', updatedAt: 1 },
++      remote: { md5: 'same', modifiedTime: 999 },
++    })).toBe('noop');
++  });
++
++  it('расхождение — last-write-wins по времени', () => {
++    expect(decideAvatarAction({
++      local: { md5: 'a', updatedAt: 2000 },
++      remote: { md5: 'b', modifiedTime: 1000 },
++    })).toBe('upload');
++    expect(decideAvatarAction({
++      local: { md5: 'a', updatedAt: 1000 },
++      remote: { md5: 'b', modifiedTime: 2000 },
++    })).toBe('download');
++  });
++});
++
++describe('avatar sync: план синка', () => {
++  it('локальная копия без облачной — выгрузка', () => {
++    const plan = planAvatarSync({
++      local: [makeLocal('c1', { md5: 'm1' })],
++      remote: [],
++      existingCharacterIds: ['c1'],
++    });
++    expect(plan.uploads).toEqual([{ characterId: 'c1', fileId: null }]);
++    expect(plan.downloads).toEqual([]);
++  });
++
++  it('облачная без локальной — загрузка в кэш', () => {
++    const plan = planAvatarSync({
++      local: [],
++      remote: [makeRemote('c1', { fileId: 'f9' })],
++      existingCharacterIds: ['c1'],
++    });
++    expect(plan.downloads).toEqual([{ characterId: 'c1', fileId: 'f9' }]);
++    expect(plan.uploads).toEqual([]);
++  });
++
++  it('md5 равны — noop, без запросов', () => {
++    const plan = planAvatarSync({
++      local: [makeLocal('c1', { md5: 'same' })],
++      remote: [makeRemote('c1', { md5: 'same' })],
++      existingCharacterIds: ['c1'],
++    });
++    expect(plan.noop).toEqual([{ characterId: 'c1' }]);
++    expect(plan.uploads).toEqual([]);
++    expect(plan.downloads).toEqual([]);
++  });
++
++  it('расхождение: новее локальная — выгрузка с PATCH по fileId', () => {
++    const plan = planAvatarSync({
++      local: [makeLocal('c1', { md5: 'local', updatedAt: 2000 })],
++      remote: [makeRemote('c1', { fileId: 'f7', md5: 'remote', modifiedTime: 1000 })],
++      existingCharacterIds: ['c1'],
++    });
++    expect(plan.uploads).toEqual([{ characterId: 'c1', fileId: 'f7' }]);
++  });
++
++  it('осиротевшие копии: персонажа нет — убрать и локально, и в облаке', () => {
++    const plan = planAvatarSync({
++      local: [makeLocal('dead-local')],
++      remote: [makeRemote('dead-remote', { fileId: 'f5' })],
++      existingCharacterIds: ['alive'],
++    });
++    expect(plan.localDeletes).toEqual([{ characterId: 'dead-local' }]);
++    expect(plan.remoteDeletes).toEqual([{ characterId: 'dead-remote', fileId: 'f5' }]);
++    // живому персонажу без аватаров ничего не планируется
++    expect(plan.uploads).toEqual([]);
++    expect(plan.downloads).toEqual([]);
++  });
++});
++
++describe('avatar sync: оркестратор', () => {
++  const makeDrive = () => {
++    const calls = { list: 0, upload: [], download: [], delete: [], ensure: 0 };
++    return {
++      calls,
++      driveOps: {
++        listAvatarFiles: async () => { calls.list += 1; return []; },
++        uploadAvatarFile: async (args) => { calls.upload.push(args); return { id: 'new-id', md5Checksum: 'drive-md5' }; },
++        downloadAvatarFile: async (tokenArg, fileId) => { calls.download.push(fileId); return 'data:image/jpeg;base64,QUJD'; },
++        deleteAvatarFile: async (fileId) => { calls.delete.push(fileId); },
++      },
++    };
++  };
++
++  const makeCache = (rows = []) => {
++    const state = new Map(rows.map((r) => [r.character_id, r]));
++    return {
++      state,
++      list: async () => Array.from(state.values()),
++      get: async (id) => state.get(id) ?? null,
++      setFromRemote: async (id, dataUrl, md5, updatedAt) => { state.set(id, { character_id: id, data_url: dataUrl, md5, updated_at: updatedAt }); },
++      updateMd5: async (id, md5) => { state.set(id, { ...state.get(id), md5 }); },
++      delete: async (id) => { state.delete(id); },
++    };
++  };
++
++  it('пусто и локально, и в облаке — папка не создаётся, ни загрузок, ни выгрузок', async () => {
++    const { calls, driveOps } = makeDrive();
++    const stats = await syncAvatars({
++      token: 't',
++      driveOps,
++      cacheOps: makeCache([]),
++      listCharacterIds: async () => ['c1'],
++      findFolder: async () => null,
++      ensureFolder: async () => { calls.ensure += 1; return 'folder'; },
++      validateDataUrl: (d) => validate(d),
++    });
++    expect(stats).toEqual({ uploaded: 0, downloaded: 0, noop: 0, localDeleted: 0, remoteDeleted: 0 });
++    expect(calls.ensure).toBe(0);
++    expect(calls.upload).toEqual([]);
++    expect(calls.download).toEqual([]);
++  });
++
++  it('новое устройство: локальный кэш пуст, аватар из облака скачивается', async () => {
++    const { calls, driveOps } = makeDrive();
++    const driveWithFile = {
++      ...driveOps,
++      listAvatarFiles: async () => [{ id: 'f1', name: 'c1.jpg', md5Checksum: 'm1', modifiedTime: '2026-09-06T00:00:00.000Z' }],
++    };
++    const cache = makeCache([]);
++    const stats = await syncAvatars({
++      token: 't',
++      driveOps: driveWithFile,
++      cacheOps: cache,
++      listCharacterIds: async () => ['c1'],
++      findFolder: async () => 'folder-id',
++      ensureFolder: async () => { throw new Error('не должна вызываться'); },
++      validateDataUrl: (d) => validate(d),
++    });
++    expect(stats.downloaded).toBe(1);
++    expect(cache.state.get('c1').md5).toBe('m1');
++    expect(calls.upload).toEqual([]);
++  });
++
++  it('выгрузка: файл создаётся, md5 из Drive пишется в кэш', async () => {
++    const { calls, driveOps } = makeDrive();
++    const cache = makeCache([{ character_id: 'c1', data_url: 'data:image/jpeg;base64,QUJD', md5: null, updated_at: 2000 }]);
++    const stats = await syncAvatars({
++      token: 't',
++      driveOps,
++      cacheOps: cache,
++      listCharacterIds: async () => ['c1'],
++      ensureFolder: async () => 'folder-id',
++      validateDataUrl: (d) => validate(d),
++    });
++    expect(stats.uploaded).toBe(1);
++    expect(calls.upload[0]).toMatchObject({ characterId: 'c1', fileId: null, folderId: 'folder-id' });
++    expect(cache.state.get('c1').md5).toBe('drive-md5');
++  });
++
++  it('загрузка: чужой аватар валидируется и кладётся в кэш с md5 облака', async () => {
++    const { calls, driveOps } = makeDrive();
++    const driveWithFile = {
++      ...driveOps,
++      listAvatarFiles: async () => [{ id: 'f3', name: 'c1.jpg', md5Checksum: 'cloud-md5', modifiedTime: '2026-09-06T00:00:00.000Z' }],
++    };
++    const cache = makeCache([]);
++    const stats = await syncAvatars({
++      token: 't',
++      driveOps: driveWithFile,
++      cacheOps: cache,
++      listCharacterIds: async () => ['c1'],
++      findFolder: async () => 'folder-id',
++      ensureFolder: async () => 'folder-id',
++      validateDataUrl: (d) => validate(d),
++    });
++    expect(stats.downloaded).toBe(1);
++    expect(calls.download).toEqual(['f3']);
++    const row = cache.state.get('c1');
++    expect(row.md5).toBe('cloud-md5');
++    expect(row.data_url).toMatch(/^data:image\/jpeg;base64,/);
++  });
++
++  it('«толстый» файл из облака в кэш не попадает', async () => {
++    const { driveOps } = makeDrive();
++    const driveWithBig = {
++      ...driveOps,
++      listAvatarFiles: async () => [{ id: 'f4', name: 'c1.jpg', md5Checksum: 'big', modifiedTime: '2026-09-06T00:00:00.000Z' }],
++      downloadAvatarFile: async () => `data:image/jpeg;base64,${'A'.repeat(500000)}`,
++    };
++    const cache = makeCache([{ character_id: 'other', data_url: 'data:image/jpeg;base64,QUJD', md5: 'm', updated_at: 1 }]);
++    const stats = await syncAvatars({
++      token: 't',
++      driveOps: driveWithBig,
++      cacheOps: cache,
++      listCharacterIds: async () => ['c1', 'other'],
++      findFolder: async () => 'folder-id',
++      ensureFolder: async () => 'folder-id',
++      validateDataUrl: (d) => validate(d),
++    });
++    expect(stats.downloaded).toBe(1); // пытались
++    expect(cache.state.get('c1')).toBeUndefined(); // но не положили
++  });
++});
++
++// Локальный импорт валидатора, чтобы тесты не тянули домен отдельно
++import { validateAvatarDataUrl as validateModule } from '../../domain/characterAvatar';
++const validate = (d) => validateModule(d);
+diff --git a/__tests__/avatar/character-avatar.test.js b/__tests__/avatar/character-avatar.test.js
+new file mode 100644
+index 0000000..7c14ba0
+--- /dev/null
++++ b/__tests__/avatar/character-avatar.test.js
+@@ -0,0 +1,103 @@
++// __tests__/avatar/character-avatar.test.js
++//
++// Домен аватара (domain/characterAvatar.js) + таблица кэша в схеме БД.
++
++import { describe, it, expect } from 'vitest';
++import {
++  AVATAR_LIMITS,
++  base64ByteLength,
++  validateAvatarDataUrl,
++  buildAvatarMetadata,
++  compressAvatarImage,
++} from '../../domain/characterAvatar';
++import { CREATE_TABLES } from '../../db/schema';
++
++const smallJpeg = (bytes = 1024) => `data:image/jpeg;base64,${'A'.repeat(Math.ceil((bytes * 4) / 3))}`;
++
++describe('avatar: лимиты и валидация', () => {
++  it('лимиты зафиксированы: 512px, q0.7, 300КБ, JPEG', () => {
++    expect(AVATAR_LIMITS.maxEdge).toBe(512);
++    expect(AVATAR_LIMITS.jpegQuality).toBeLessThanOrEqual(1);
++    expect(AVATAR_LIMITS.maxBytes).toBe(300 * 1024);
++    expect(AVATAR_LIMITS.mimeType).toBe('image/jpeg');
++  });
++
++  it('base64ByteLength считает байты без atob', () => {
++    expect(base64ByteLength('QUJD')).toBe(3); // 'ABC'
++    expect(base64ByteLength('QQ==')).toBe(1); // 'A'
++    expect(base64ByteLength('')).toBe(0);
++  });
++
++  it('валидный JPEG data URL проходит', () => {
++    const check = validateAvatarDataUrl(smallJpeg(2048));
++    expect(check.ok).toBe(true);
++    expect(check.reason).toBeNull();
++    expect(check.bytes).toBeGreaterThan(0);
++  });
++
++  it('не-JPEG и мусор отбрасываются', () => {
++    expect(validateAvatarDataUrl('data:image/png;base64,AAAA').ok).toBe(false);
++    expect(validateAvatarDataUrl('http://x/y.jpg').ok).toBe(false);
++    expect(validateAvatarDataUrl(null).ok).toBe(false);
++    expect(validateAvatarDataUrl('').ok).toBe(false);
++  });
++
++  it('файл больше 300КБ отбрасывается', () => {
++    const check = validateAvatarDataUrl(smallJpeg(AVATAR_LIMITS.maxBytes + 4096));
++    expect(check.ok).toBe(false);
++    expect(check.reason).toBe('avatar.tooLarge');
++  });
++});
++
++describe('avatar: метаданные для сейва', () => {
++  it('метаданные — только md5 и updatedAt, не фото', () => {
++    const meta = buildAvatarMetadata({ characterId: 'c1', md5: 'abc', updated_at: 123 });
++    expect(meta).toEqual({ md5: 'abc', updatedAt: 123 });
++  });
++
++  it('без записи кэша метаданных нет', () => {
++    expect(buildAvatarMetadata(null)).toBeNull();
++    expect(buildAvatarMetadata({})).toBeNull();
++  });
++});
++
++describe('avatar: сжатие через адаптер', () => {
++  it('адаптер вызывается с лимитами, результат валидируется', async () => {
++    const calls = [];
++    const adapter = {
++      async resizeToJpeg(args) {
++        calls.push(args);
++        return { dataUrl: smallJpeg(2048) };
++      },
++    };
++    const result = await compressAvatarImage({ uri: 'file:///x.jpg', width: 1000, height: 500 }, adapter);
++    expect(result.dataUrl).toMatch(/^data:image\/jpeg;base64,/);
++    expect(result.bytes).toBeGreaterThan(0);
++    expect(calls[0].maxEdge).toBe(AVATAR_LIMITS.maxEdge);
++    expect(calls[0].quality).toBe(AVATAR_LIMITS.jpegQuality);
++  });
++
++  it('«толстый» результат адаптера отбрасывается', async () => {
++    const adapter = {
++      async resizeToJpeg() {
++        return { dataUrl: smallJpeg(AVATAR_LIMITS.maxBytes + 8192) };
++      },
++    };
++    await expect(compressAvatarImage({ uri: 'file:///x.jpg' }, adapter)).rejects.toMatchObject({
++      message: 'avatar.tooLarge',
++    });
++  });
++
++  it('пустой источник — явная ошибка', async () => {
++    await expect(compressAvatarImage({}, {})).rejects.toThrow('avatar.invalidSource');
++  });
++});
++
++describe('avatar: схема БД', () => {
++  it('таблица character_avatars объявлена в CREATE_TABLES', () => {
++    const ddl = CREATE_TABLES.join('\n');
++    expect(ddl).toContain('character_avatars');
++    expect(ddl).toContain('data_url TEXT NOT NULL');
++    expect(ddl).toContain('md5 TEXT');
++  });
++});
+diff --git a/__tests__/avatar/premium-registry.test.js b/__tests__/avatar/premium-registry.test.js
+new file mode 100644
+index 0000000..4257fb0
+--- /dev/null
++++ b/__tests__/avatar/premium-registry.test.js
+@@ -0,0 +1,67 @@
++// __tests__/avatar/premium-registry.test.js
++//
++// Движковый реестр премиум-фич (domain/premium.js, задел патча 193).
++// UI нет: проверяем, что скелет ведёт себя правильно до и после подключения
++// будущего провайдера лицензий.
++
++import { describe, it, expect, afterEach } from 'vitest';
++import {
++  FEATURE_IDS,
++  registerFeatures,
++  getFeature,
++  listFeatures,
++  getEntitlement,
++  setEntitlement,
++  isFeatureAvailable,
++} from '../../domain/premium';
++
++describe('premium: реестр фич', () => {
++  it('customAvatar зарегистрирована как премиум-фича', () => {
++    const feature = getFeature(FEATURE_IDS.CUSTOM_AVATAR);
++    expect(feature).toBeTruthy();
++    expect(feature.premium).toBe(true);
++  });
++
++  it('в open-beta (права по умолчанию) премиум-фича доступна', () => {
++    expect(getEntitlement().plan).toBe('open-beta');
++    expect(isFeatureAvailable(FEATURE_IDS.CUSTOM_AVATAR)).toBe(true);
++  });
++
++  it('неизвестная фича недоступна — опечатка не открывает премию', () => {
++    expect(isFeatureAvailable('no-such-feature')).toBe(false);
++    expect(getFeature('no-such-feature')).toBeNull();
++  });
++
++  it('непремиум-фича доступна при любом праве', () => {
++    registerFeatures([{ id: 'test.freeFeature', premium: false }]);
++    setEntitlement({ allFeatures: false, features: [] });
++    expect(isFeatureAvailable('test.freeFeature')).toBe(true);
++  });
++
++  it('право списком фич: входит — доступна, не входит — нет', () => {
++    setEntitlement({ allFeatures: false, features: [FEATURE_IDS.CUSTOM_AVATAR] });
++    expect(isFeatureAvailable(FEATURE_IDS.CUSTOM_AVATAR)).toBe(true);
++    setEntitlement({ allFeatures: false, features: ['somethingElse'] });
++    expect(isFeatureAvailable(FEATURE_IDS.CUSTOM_AVATAR)).toBe(false);
++  });
++
++  it('просроченное право не открывает премиум-фичу', () => {
++    setEntitlement({
++      allFeatures: false,
++      features: [FEATURE_IDS.CUSTOM_AVATAR],
++      expiresAt: Date.now() - 1000,
++    });
++    expect(isFeatureAvailable(FEATURE_IDS.CUSTOM_AVATAR)).toBe(false);
++  });
++
++  it('listFeatures отдаёт и premium, и обычные фичи', () => {
++    const ids = listFeatures().map((f) => f.id);
++    expect(ids).toContain(FEATURE_IDS.CUSTOM_AVATAR);
++    expect(ids).toContain('test.freeFeature');
++  });
++
++  afterEach(() => {
++    // не протекаем состоянием права в другие тесты
++    setEntitlement(null);
++  });
++});
+diff --git a/components/cloudSync/avatarSync.js b/components/cloudSync/avatarSync.js
+new file mode 100644
+index 0000000..a796d85
+--- /dev/null
++++ b/components/cloudSync/avatarSync.js
+@@ -0,0 +1,202 @@
++// components/cloudSync/avatarSync.js
++//
++// Редкий синк аватаров (задел премиум-фичи, патч 193; UI нет).
++//
++// Протокол (docs/premium-and-avatar-design.md, §1.2): аватар меняется редко,
++// поэтому проверяется ТОЛЬКО в полной синхронизации («Синхронизировать с
++// Google Drive») — и в будущем при первой загрузке персонажа на устройстве.
++// Автосейв персонажа аватар не трогает.
++//
++// Размещение: appDataFolder/<сеттинг>/avatars/<characterId>.jpg — имя по
++// стабильному id, переименование персонажа аватар не трогает.
++//
++// Архитектура: planAvatarSync — чистая функция (протокол, легко тестировать),
++// syncAvatars — оркестратор с инъекцией зависимостей (Drive-операции поставляет
++// googleDriveSync.js, кэш — db/avatarCache.js). Цикл импортов исключён.
++
++/** Имя подпапки аватаров внутри папки сеттинга. */
++export const AVATARS_FOLDER_NAME = 'avatars';
++
++/** Имя файла аватара в Drive: <characterId>.jpg. */
++export const avatarFileName = (characterId) => `${characterId}.jpg`;
++
++/** characterId из имени файла аватара или null. */
++export const characterIdFromAvatarFileName = (name) => {
++  const match = String(name || '').match(/^([^\/]+)\.jpg$/i);
++  return match ? match[1] : null;
++};
++
++/**
++ * Сравнить локальную и облачную копию одного персонажа.
++ * md5 равны (обе есть) → noop; иначе last-write-wins по времени.
++ *
++ * @returns {'noop'|'upload'|'download'}
++ */
++export const decideAvatarAction = ({ local, remote }) => {
++  if (!local) return 'download';
++  if (!remote) return 'upload';
++  if (local.md5 && remote.md5 && local.md5 === remote.md5) return 'noop';
++  const localAt = Number(local.updatedAt || 0);
++  const remoteAt = Number(remote.modifiedTime || 0);
++  return remoteAt > localAt ? 'download' : 'upload';
++};
++
++/**
++ * Составить план синка аватаров (чистая функция, протокол из дизайн-дока).
++ *
++ * @param {object} args
++ * @param {Array<{characterId: string, md5?: string|null, updatedAt?: number}>} args.local — строки кэша
++ * @param {Array<{fileId: string, name: string, md5?: string, modifiedTime?: number}>} args.remote — файлы Drive
++ * @param {Iterable<string>} args.existingCharacterIds — id живых персонажей (локальный список)
++ * @returns {{
++ *   noop: Array<{characterId: string}>,
++ *   uploads: Array<{characterId: string}>,
++ *   downloads: Array<{characterId: string, fileId: string}>,
++ *   localDeletes: Array<{characterId: string}>,
++ *   remoteDeletes: Array<{characterId: string, fileId: string}>,
++ * }}
++ */
++export function planAvatarSync({ local = [], remote = [], existingCharacterIds = [] }) {
++  const existing = new Set(existingCharacterIds);
++
++  const remoteByCharacterId = new Map();
++  for (const file of remote) {
++    const characterId = characterIdFromAvatarFileName(file.name);
++    if (characterId) remoteByCharacterId.set(characterId, file);
++  }
++  const localByCharacterId = new Map(local.map((row) => [row.characterId, row]));
++
++  const noop = [];
++  const uploads = [];
++  const downloads = [];
++  const localDeletes = [];
++  const remoteDeletes = [];
++
++  // Осиротевшие локальные аватары (персонаж удалён) — убрать из кэша.
++  for (const row of local) {
++    if (!existing.has(row.characterId)) localDeletes.push({ characterId: row.characterId });
++  }
++  // Осиротевшие облачные аватары — удалить файлы.
++  for (const [characterId, file] of remoteByCharacterId) {
++    if (!existing.has(characterId)) remoteDeletes.push({ characterId, fileId: file.fileId });
++  }
++
++  // Живые персонажи: сравнение копий.
++  for (const characterId of existing) {
++    const row = localByCharacterId.get(characterId);
++    const file = remoteByCharacterId.get(characterId);
++    if (!row && !file) continue;
++    const action = decideAvatarAction({
++      local: row ? { md5: row.md5 ?? null, updatedAt: Number(row.updatedAt || 0) } : null,
++      remote: file ? { md5: file.md5 ?? null, modifiedTime: file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0 } : null,
++    });
++    if (action === 'noop') noop.push({ characterId });
++    else if (action === 'upload') uploads.push({ characterId, fileId: file ? file.fileId : null });
++    else downloads.push({ characterId, fileId: file.fileId });
++  }
++
++  return { noop, uploads, downloads, localDeletes, remoteDeletes };
++}
++
++/**
++ * Выполнить план синка аватаров. Зависимости инъектируются:
++ *
++ * @param {object} args
++ * @param {object} args.driveOps — {
++ *   listAvatarFiles(token, folderId),
++ *   uploadAvatarFile({ token, folderId, fileId, characterId, dataUrl }) → { id, md5Checksum },
++ *   downloadAvatarFile(token, fileId) → dataUrl (текст),
++ *   deleteAvatarFile(token, fileId),
++ * }
++ * @param {object} args.cacheOps — { list, get, setFromRemote, updateMd5, delete } (db/avatarCache.js)
++ * @param {Function} args.listCharacterIds — async () => string[] (живые персонажи)
++ * @param {Function} [args.findFolder] — async () => string|null — найти подпапку avatars БЕЗ создания
++ * @param {Function} [args.ensureFolder] — async () => string — найти/создать (вызывается лениво,
++ *   только когда есть что выгрузить: неиспользуемая фича не оставляет следов в облаке)
++ * @param {Function} [args.validateDataUrl] — (dataUrl) => { ok } (domain/characterAvatar.js)
++ * @param {string} args.token — access token Drive
++ * @returns {Promise<{uploaded:number, downloaded:number, noop:number, localDeleted:number, remoteDeleted:number}>}
++ */
++export async function syncAvatars({
++  token,
++  driveOps,
++  cacheOps,
++  listCharacterIds,
++  findFolder,
++  ensureFolder,
++  validateDataUrl,
++}) {
++  const [localRows, characterIds] = await Promise.all([
++    cacheOps.list(),
++    listCharacterIds(),
++  ]);
++
++  // Папку аватаров только ИЩЕМ (без создания): её отсутствие == пустое облако.
++  const folderId = findFolder ? await findFolder() : null;
++  const remoteFiles = folderId ? await driveOps.listAvatarFiles(token, folderId) : [];
++
++  const plan = planAvatarSync({
++    local: localRows.map((row) => ({
++      characterId: row.character_id ?? row.characterId,
++      md5: row.md5 ?? null,
++      updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0),
++    })),
++    remote: remoteFiles.map((file) => ({
++      fileId: file.id ?? file.fileId,
++      name: file.name,
++      md5: file.md5Checksum ?? file.md5 ?? null,
++      modifiedTime: file.modifiedTime ?? null,
++    })),
++    existingCharacterIds: characterIds,
++  });
++
++  // Нечего делать — не создаём папку и не делаем больше ни одного запроса
++  // (полная синхронизация без аватаров не оставляет следов в облаке).
++  const total = plan.uploads.length + plan.downloads.length + plan.noop.length
++    + plan.localDeletes.length + plan.remoteDeletes.length;
++  if (total === 0) {
++    return { uploaded: 0, downloaded: 0, noop: 0, localDeleted: 0, remoteDeleted: 0 };
++  }
++
++  let uploadFolderId = folderId;
++  if (plan.uploads.length > 0 && !uploadFolderId) {
++    uploadFolderId = ensureFolder ? await ensureFolder() : null;
++  }
++
++  for (const { characterId } of plan.localDeletes) {
++    await cacheOps.delete(characterId);
++  }
++  for (const { fileId } of plan.remoteDeletes) {
++    await driveOps.deleteAvatarFile(token, fileId);
++  }
++  for (const { characterId, fileId } of plan.uploads) {
++    const row = await cacheOps.get(characterId);
++    if (!row?.data_url && !row?.dataUrl) continue;
++    const uploaded = await driveOps.uploadAvatarFile({
++      token,
++      folderId: uploadFolderId,
++      fileId: fileId ?? null,
++      characterId,
++      dataUrl: row.data_url ?? row.dataUrl,
++    });
++    if (uploaded?.md5Checksum) {
++      await cacheOps.updateMd5(characterId, uploaded.md5Checksum);
++    }
++  }
++  for (const { characterId, fileId } of plan.downloads) {
++    const dataUrl = await driveOps.downloadAvatarFile(token, fileId);
++    // Чужой файл мог быть «толстым» или не-аватаром: валидируем до кэша.
++    if (validateDataUrl ? !validateDataUrl(dataUrl).ok : false) continue;
++    const file = remoteFiles.find((f) => (f.id ?? f.fileId) === fileId);
++    const modifiedMs = file?.modifiedTime ? new Date(file.modifiedTime).getTime() : Date.now();
++    await cacheOps.setFromRemote(characterId, dataUrl, file?.md5Checksum ?? null, modifiedMs);
++  }
++
++  return {
++    uploaded: plan.uploads.length,
++    downloaded: plan.downloads.length,
++    noop: plan.noop.length,
++    localDeleted: plan.localDeletes.length,
++    remoteDeleted: plan.remoteDeletes.length,
++  };
++}
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 91b65bf..a4abbfb 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -4,6 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
+ import * as db from '../../db';
+ import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
+ import { getActiveModuleId } from '../../domain/moduleLocale';
++import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
++import { validateAvatarDataUrl } from '../../domain/characterAvatar';
++import * as avatarCache from '../../db/avatarCache';
+ 
+ // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
+ // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
+@@ -234,6 +237,108 @@ const makeRemoteFilename = (character) => {
+   return `${character.id}__${safeName}.json`;
+ };
+ 
++// ─── Аватары персонажей (задел премиум-фичи, патч 193; UI нет) ───────────────
++// Файлы лежат РЯДОМ с сейвами: appDataFolder/<сеттинг>/avatars/<characterId>.jpg.
++// Синк редкий: только полная синхронизация и (в будущем) первая загрузка
++// персонажа на устройстве. Автосейв аватары не трогает.
++
++const findAvatarsFolderId = async (token, moduleFolderId) => {
++  const q = encodeURIComponent(
++    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${AVATARS_FOLDER_NAME}' and '${moduleFolderId}' in parents`,
++  );
++  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
++  const listData = await listResp.json();
++  return listData.files?.[0]?.id ?? null;
++};
++
++const getAvatarsFolderId = async (token, moduleFolderId) => {
++  const existingId = await findAvatarsFolderId(token, moduleFolderId);
++  if (existingId) return existingId;
++
++  const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({
++      name: AVATARS_FOLDER_NAME,
++      mimeType: 'application/vnd.google-apps.folder',
++      parents: [moduleFolderId],
++    }),
++  });
++  const created = await createResp.json();
++  if (!created.id) {
++    throw new Error('Не удалось создать подпапку avatars в appDataFolder');
++  }
++  return created.id;
++};
++
++const listAvatarFiles = async (token, avatarsFolderId) => {
++  const q = encodeURIComponent(`'${avatarsFolderId}' in parents and trashed=false`);
++  const resp = await driveFetch(
++    token,
++    `${DRIVE_API}/files?q=${q}&fields=files(id,name,md5Checksum,modifiedTime)&spaces=appDataFolder&pageSize=200`,
++  );
++  const data = await resp.json();
++  return data.files || [];
++};
++
++// Контент файла — data URL текстом (масштабируется теми же лимитами, что и
++// локальный кэш; multipart как у сейвов, но MIME image/jpeg).
++const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl }) => {
++  const metadata = fileId ? null : { name: avatarFileName(characterId), parents: [folderId], mimeType: 'image/jpeg' };
++  const delimiter = '-------fallout2d20avatar';
++  const multipartBody = [
++    `--${delimiter}`,
++    'Content-Type: application/json; charset=UTF-8',
++    '',
++    JSON.stringify(metadata || {}),
++    `--${delimiter}`,
++    'Content-Type: image/jpeg',
++    '',
++    dataUrl,
++    `--${delimiter}--`,
++  ].join('\r\n');
++
++  const endpoint = fileId
++    ? `${UPLOAD_API}/files/${fileId}?uploadType=multipart`
++    : `${UPLOAD_API}/files?uploadType=multipart`;
++  const resp = await driveFetch(token, endpoint, {
++    method: fileId ? 'PATCH' : 'POST',
++    headers: { 'Content-Type': `multipart/related; boundary=${delimiter}` },
++    body: multipartBody,
++  });
++  const parsed = await resp.json();
++  return { id: parsed.id ?? null, md5Checksum: parsed.md5Checksum ?? null };
++};
++
++const downloadAvatarFile = async (token, fileId) => {
++  const resp = await driveFetch(token, `${DRIVE_API}/files/${fileId}?alt=media`);
++  return resp.text();
++};
++
++const deleteAvatarFile = async (token, fileId) => {
++  await driveFetch(token, `${DRIVE_API}/files/${fileId}`, { method: 'DELETE' });
++};
++
++// Редкий синк аватаров внутри уже открытой сессии (token/folder есть).
++// Падение аватаров не должно ронять синк персонажей — вызывающий ловит.
++const syncAvatarsInSession = async (token, moduleFolderId) => {
++  return syncAvatars({
++    token,
++    driveOps: { listAvatarFiles, uploadAvatarFile, downloadAvatarFile, deleteAvatarFile },
++    cacheOps: {
++      list: avatarCache.listAvatarCache,
++      get: avatarCache.getAvatarCache,
++      setFromRemote: avatarCache.setAvatarCacheFromRemote,
++      updateMd5: avatarCache.updateAvatarCacheMd5,
++      delete: avatarCache.deleteAvatarCache,
++    },
++    listCharacterIds: async () => (await db.getCharactersList()).map((c) => c.id),
++    findFolder: () => findAvatarsFolderId(token, moduleFolderId),
++    ensureFolder: () => getAvatarsFolderId(token, moduleFolderId),
++    validateDataUrl: validateAvatarDataUrl,
++  });
++};
++
+ export const isCloudSyncConfigured = async () => (await AsyncStorage.getItem(SYNC_KEY)) === '1';
+ 
+ export const setCloudSyncConfigured = async (enabled) => {
+@@ -338,6 +443,16 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
+   }
+ 
+   await setCloudSyncConfigured(true);
++
++  // Аватары (задел премиум-фичы, UI пока нет): редкий синк — ровно здесь.
++  // Пустой кэш → ни одного запроса; сбой аватаров не роняет синк персонажей.
++  try {
++    const avatarStats = await syncAvatarsInSession(token, folderId);
++    debugLog('sync.avatars:done', avatarStats);
++  } catch (e) {
++    debugLog('sync.avatars:failed', { message: e?.message });
++  }
++
+   report('done');
+   debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
+   return { uploaded: uploads.length, downloaded: downloadedCount };
+@@ -375,6 +490,19 @@ export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
+ 
+     await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
+     debugLog('sync.delete:done', { characterId, fileId: remote.id });
++
++    // Аватар этого персонажа (если был) удаляем лучшими усилиями: сбой
++    // удаления фото не должен отменять уже удалённый сейв.
++    try {
++      const avatarsFolderId = await getAvatarsFolderId(token, folderId);
++      const avatarFiles = await listAvatarFiles(token, avatarsFolderId);
++      const avatar = avatarFiles.find((file) => file.name === avatarFileName(characterId));
++      if (avatar) await deleteAvatarFile(token, avatar.id);
++      await avatarCache.deleteAvatarCache(characterId);
++    } catch (e) {
++      debugLog('sync.delete:avatar-failed', { characterId, message: e?.message });
++    }
++
+     return { removed: true };
+   } catch (e) {
+     const message = e?.message || String(e);
+diff --git a/db/avatarCache.js b/db/avatarCache.js
+new file mode 100644
+index 0000000..8014ea2
+--- /dev/null
++++ b/db/avatarCache.js
+@@ -0,0 +1,71 @@
++// db/avatarCache.js
++//
++// Локальный кэш аватаров персонажей (задел премиум-фичи, патч 193; UI нет).
++// Таблица character_avatars (db/schema.js): web — IndexedDB-подобный адаптер
++// поверх AsyncStorage, native — SQLite. SQL поддерживается обоими адаптерами:
++// INSERT OR REPLACE / SELECT / DELETE (см. db/adapters/WebAdapter.js).
++
++import { runQuery, getAll, getFirst } from './Database';
++
++/**
++ * Запись аватара персонажа в локальный кэш (upsert).
++ *
++ * @param {string} characterId
++ * @param {string} dataUrl — JPEG data URL (прошёл validateAvatarDataUrl)
++ * @param {string|null} md5 — md5Checksum из Drive (после выгрузки) или null
++ * @returns {Promise<void>}
++ */
++export async function setAvatarCache(characterId, dataUrl, md5 = null) {
++  if (!characterId || typeof dataUrl !== 'string') return;
++  await runQuery(
++    'INSERT OR REPLACE INTO character_avatars (character_id, data_url, md5, updated_at) VALUES (?, ?, ?, ?)',
++    [characterId, dataUrl, md5, Date.now()],
++  );
++}
++
++/**
++ * Запись аватара, скачанного из Drive (с его md5 и временем).
++ *
++ * @param {string} characterId
++ * @param {string} dataUrl
++ * @param {string|null} md5
++ * @param {number} updatedAt — время изменения файла в облаке (ms)
++ */
++export async function setAvatarCacheFromRemote(characterId, dataUrl, md5, updatedAt) {
++  if (!characterId || typeof dataUrl !== 'string') return;
++  await runQuery(
++    'INSERT OR REPLACE INTO character_avatars (character_id, data_url, md5, updated_at) VALUES (?, ?, ?, ?)',
++    [characterId, dataUrl, md5 ?? null, Number(updatedAt) || Date.now()],
++  );
++}
++
++/**
++ * Обновить только md5 локального аватара (Drive вернул md5Checksum выгрузки).
++ */
++export async function updateAvatarCacheMd5(characterId, md5) {
++  if (!characterId) return;
++  await runQuery(
++    'UPDATE character_avatars SET md5 = ? WHERE character_id = ?',
++    [md5 ?? null, characterId],
++  );
++}
++
++/** Строка кэша аватара персонажа или null: { character_id, data_url, md5, updated_at }. */
++export async function getAvatarCache(characterId) {
++  if (!characterId) return null;
++  return getFirst(
++    'SELECT character_id, data_url, md5, updated_at FROM character_avatars WHERE character_id = ?',
++    [characterId],
++  );
++}
++
++/** Все строки кэша (для полного синка). */
++export async function listAvatarCache() {
++  return getAll('SELECT character_id, data_url, md5, updated_at FROM character_avatars');
++}
++
++/** Удалить аватар персонажа из кэша. */
++export async function deleteAvatarCache(characterId) {
++  if (!characterId) return;
++  await runQuery('DELETE FROM character_avatars WHERE character_id = ?', [characterId]);
++}
+diff --git a/db/schema.js b/db/schema.js
+index cc08880..ba315ad 100644
+--- a/db/schema.js
++++ b/db/schema.js
+@@ -39,4 +39,15 @@ export const CREATE_TABLES = [
+   `CREATE TABLE IF NOT EXISTS character_rename_requests (
+     character_id TEXT PRIMARY KEY
+   )`,
++
++  // Аватары персонажей (патч 193, задел премиум-фичы без UI): локальная копия
++  // фото, облачная лежит рядом с сейвом в appDataFolder/<сеттинг>/avatars/.
++  // В сейве персонажа — только метаданные (md5/updatedAt), не само фото.
++  // CREATE TABLE IF NOT EXISTS идемпотентен: бамп SCHEMA_VERSION не нужен.
++  `CREATE TABLE IF NOT EXISTS character_avatars (
++    character_id TEXT PRIMARY KEY,
++    data_url TEXT NOT NULL,
++    md5 TEXT,
++    updated_at INTEGER NOT NULL
++  )`,
+ ];
+diff --git a/domain/characterAvatar.js b/domain/characterAvatar.js
+new file mode 100644
+index 0000000..0c8e939
+--- /dev/null
++++ b/domain/characterAvatar.js
+@@ -0,0 +1,121 @@
++// domain/characterAvatar.js
++//
++// Домен кастомного аватара персонажа (задел премиум-фичи, патч 193; UI нет).
++// Формат хранения:
++//   — локально/в облаке: JPEG data URL (~50–150 КБ после сжатия);
++//   — в сейве персонажа: только метаданные { md5, updatedAt } (~100 байт),
++//     само фото рядом с сейвом (appDataFolder/<сеттинг>/avatars/<id>.jpg).
++//
++// Сжатие и лимиты отсюда применяет и UI-пикер (будущий), и синк при загрузке
++// чужого аватара (защита от «толстого» файла в облаке).
++
++/** Единые лимиты аватара. Меняются только здесь. */
++export const AVATAR_LIMITS = Object.freeze({
++  /** Максимальная сторона в пикселях после сжатия. */
++  maxEdge: 512,
++  /** Качество JPEG (0..1) при сжатии. */
++  jpegQuality: 0.7,
++  /** Жёсткий потолок размера data URL (байты base64-декодированные). */
++  maxBytes: 300 * 1024,
++  /** Допустимый MIME. */
++  mimeType: 'image/jpeg',
++});
++
++const DATA_URL_RE = /^data:image\/jpeg;base64,([A-Za-z0-9+/=\s]+)$/;
++
++/** Размер в байтах base64-строки (без atob — работает и в RN, и в web). */
++export function base64ByteLength(base64) {
++  const clean = String(base64 || '').replace(/\s/g, '');
++  const padding = clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0;
++  return Math.floor((clean.length * 3) / 4) - padding;
++}
++
++/**
++ * Валиден ли data URL как аватар: формат JPEG и в пределах лимита размера.
++ *
++ * @param {string} dataUrl
++ * @returns {{ ok: boolean, reason: string|null, bytes: number }}
++ */
++export function validateAvatarDataUrl(dataUrl) {
++  const value = typeof dataUrl === 'string' ? dataUrl.trim() : '';
++  const match = value.match(DATA_URL_RE);
++  if (!match) return { ok: false, reason: 'avatar.invalidFormat', bytes: 0 };
++  const bytes = base64ByteLength(match[1]);
++  if (bytes <= 0) return { ok: false, reason: 'avatar.invalidFormat', bytes };
++  if (bytes > AVATAR_LIMITS.maxBytes) return { ok: false, reason: 'avatar.tooLarge', bytes };
++  return { ok: true, reason: null, bytes };
++}
++
++/**
++ * Метаданные аватара для сейва персонажа (~100 байт, не фото).
++ *
++ * @param {{ characterId: string, md5?: string|null, updated_at?: number|null }|null} row — запись кэша
++ * @returns {{ md5: string|null, updatedAt: number|null }|null}
++ */
++export function buildAvatarMetadata(row) {
++  if (!row?.characterId) return null;
++  return {
++    md5: row.md5 ?? null,
++    updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0) || null,
++  };
++}
++
++/**
++ * Сжать выбранное изображение в JPEG data URL под лимиты.
++ *
++ * Адаптер платформенно-зависим (expo-image-manipulator; зависимость появится
++ * на UI-этапе — поэтому ленивый require) и подменяется в тестах. Источник —
++ * результат expo-image-picker или uri/base64 из другого источника.
++ *
++ * @param {{ uri?: string, base64?: string, width?: number, height?: number }} source
++ * @param {object} [adapter] — { resizeToJpeg({ source, maxEdge, quality }) → { dataUrl } }
++ * @returns {Promise<{ dataUrl: string, bytes: number }>}
++ * @throws {Error} avatar.tooLarge / avatar.invalidFormat / adapter-ошибки
++ */
++export async function compressAvatarImage(source, adapter = defaultImageAdapter) {
++  if (!source?.uri && !source?.base64) {
++    throw new Error('avatar.invalidSource');
++  }
++  const { dataUrl } = await adapter.resizeToJpeg({
++    source,
++    maxEdge: AVATAR_LIMITS.maxEdge,
++    quality: AVATAR_LIMITS.jpegQuality,
++  });
++  const check = validateAvatarDataUrl(dataUrl);
++  if (!check.ok) {
++    const error = new Error(check.reason);
++    error.code = check.reason;
++    error.bytes = check.bytes;
++    throw error;
++  }
++  return { dataUrl, bytes: check.bytes };
++}
++
++/**
++ * Платформенный адаптер сжатия. Пакет expo-image-manipulator подключается
++ * лениво: пока UI-этап не добавил зависимость, честная ошибка вместо
++ * падения импорта. В web-сборке манипулятор работает через canvas.
++ */
++export const defaultImageAdapter = {
++  async resizeToJpeg({ source, maxEdge, quality }) {
++    let manipulator;
++    try {
++      // Ленивый require: зависимости в package.json появится на UI-этапе.
++      manipulator = require('expo-image-manipulator');
++    } catch {
++      throw new Error('avatar.manipulatorUnavailable');
++    }
++    // Сторону для resize выбираем по большей стороне исходника, чтобы не
++    // искажать пропорции (манипулятор сохраняет аспект, если задана одна ось).
++    const width = Number(source.width) || 0;
++    const height = Number(source.height) || 0;
++    const actions = width > 0 && height > 0
++      ? [{ resize: width >= height ? { width: maxEdge } : { height: maxEdge } }]
++      : [{ resize: { width: maxEdge } }];
++    const result = await manipulator.manipulateAsync(source.uri ?? `data:image/jpeg;base64,${source.base64}`, actions, {
++      compress: quality,
++      format: manipulator.SaveFormat.JPEG,
++    });
++    return { dataUrl: `data:image/jpeg;base64,${result.base64}` };
++  },
++};
+diff --git a/domain/premium.js b/domain/premium.js
+new file mode 100644
+index 0000000..feb7156
+--- /dev/null
++++ b/domain/premium.js
+@@ -0,0 +1,98 @@
++// domain/premium.js
++//
++// Движковый скелет премиум-доступа (задел, патч 193). UI пока нет — это
++// фундамент для будущих премиум-фич (первая — кастомный аватар персонажа,
++// см. docs/premium-and-avatar-design.md).
++//
++// Правила:
++//   1. Реестр фич — единственная точка, где фича объявляется премиальной.
++//      UI всегда спрашивает isFeatureAvailable(featureId) и ничего не знает
++//      о способе проверки права.
++//   2. Право (entitlement) — заменяемый источник: сейчас «open beta» (все
++//      фичи доступны), позже его даст провайдер лицензий (оффлайн-ключи
++//      Ed25519 или бэкенд — вариант решает владелец, см. дизайн-док).
++//   3. Железное правило данных: окончание премиума НИКОГДА не удаляет данные
++//      пользователя. Блокируется изменение, но не просмотр.
++//   4. Модули сеттингов могут регистрировать свои фичи (registerFeatures),
++//      движок — свои (ниже). В id — camelCase.
++
++/** Идентификаторы движковых фич. */
++export const FEATURE_IDS = Object.freeze({
++  CUSTOM_AVATAR: 'customAvatar',
++});
++
++const featuresById = new Map();
++
++/**
++ * Зарегистрировать фичи (движок или модуль сеттинга).
++ * Повторная регистрация того же id перезаписывает — так тесты и модули
++ * могут уточнять описание.
++ *
++ * @param {Array<{id: string, premium?: boolean, moduleId?: string, titleKey?: string}>} list
++ */
++export function registerFeatures(list) {
++  if (!Array.isArray(list)) return;
++  for (const feature of list) {
++    if (!feature?.id || typeof feature.id !== 'string') continue;
++    featuresById.set(feature.id, { premium: false, moduleId: null, ...feature });
++  }
++}
++
++/** Описание фичи или null. */
++export function getFeature(featureId) {
++  return featuresById.get(featureId) ?? null;
++}
++
++/** Все зарегистрированные фичи (для экрана «О премиуме» в будущем). */
++export function listFeatures() {
++  return Array.from(featuresById.values());
++}
++
++// Текущее право доступа. До подключения провайдера лицензий — открытый
++// доступ (open beta): фича обкатывается массово, включение платности
++// станет заменой этого объекта, не авралом с кодом (этап 3 дизайна).
++let entitlement = Object.freeze({
++  plan: 'open-beta',
++  allFeatures: true,
++  features: null,
++  expiresAt: null,
++});
++
++/** Текущее право (иммутабельное). */
++export function getEntitlement() {
++  return entitlement;
++}
++
++/**
++ * Заменить право (вызовет будущий провайдер лицензий; тесты — тоже).
++ * null/undefined возвращает open-beta.
++ */
++export function setEntitlement(next) {
++  entitlement = next
++    ? Object.freeze({ plan: 'unknown', allFeatures: false, features: null, expiresAt: null, ...next })
++    : Object.freeze({ plan: 'open-beta', allFeatures: true, features: null, expiresAt: null });
++}
++
++/**
++ * Доступна ли фича. Неизвестная фича недоступна — опечатка в id не должна
++ * молча открывать премию.
++ *
++ * @param {string} featureId
++ * @returns {boolean}
++ */
++export function isFeatureAvailable(featureId) {
++  const feature = featuresById.get(featureId);
++  if (!feature) return false;
++  if (!feature.premium) return true;
++  const e = entitlement;
++  if (e.allFeatures) return true;
++  if (e.expiresAt != null && Number(e.expiresAt) < Date.now()) return false;
++  return Array.isArray(e.features) && e.features.includes(featureId);
++}
++
++// Движковая регистрация: кастомный аватар — первая премиум-фича.
++// UI (кнопка на фото, пикер) появится позже; синк и кэш уже в коде
++// (components/cloudSync/avatarSync.js, db/avatarCache.js).
++registerFeatures([
++  { id: FEATURE_IDS.CUSTOM_AVATAR, premium: true },
++]);
+-- 
+2.39.5
+
