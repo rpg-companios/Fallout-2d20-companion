@@ -1,0 +1,134 @@
+From 0000000000000000000000000000001788512218 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 08:56:58 +0000
+Subject: [PATCH] feat(robot): enable new slot model by default
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 4, шаг 1: новая модель включена по умолчанию.
+
+isNewSlotModelEnabled() теперь возвращает true, если иное не задано явно.
+Приложение живёт по новой модели — это и есть переключение.
+
+ROBOT_NEW_SLOT_MODEL=0 — аварийный выключатель: возвращает старую ветку,
+пока она не удалена (патч 172). Полезно, если после включения что-то
+поехало вживую.
+
+Сейвы НЕ меняют формы: новая модель читает оба вида состояния
+(normalizeSlot), поэтому старые сохранения работают и до миграции этапа 5.
+
+Тесты: поправлены две проверки про умолчание флага. Прогон 261 теста —
+261 зелёный и с новой моделью по умолчанию, и с ROBOT_NEW_SLOT_MODEL=0.
+
+Следующий патч (172) удаляет старые ветки, сам флаг и тесты, закреплявшие
+старое поведение.
+
+---
+ 3 files changed, 40 insertions(+), 11 deletions(-)
+
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-model-flag.test.js
+index 5470904..cf21e36 100644
+--- a/__tests__/robot/robot-slot-model-flag.test.js
++++ b/__tests__/robot/robot-slot-model-flag.test.js
+@@ -73,15 +73,15 @@ const handyNanny = () => initRobotSlots('misterHandy', [
+ 
+ afterEach(() => setNewSlotModelEnabled(null));
+ 
+-// Флаг можно поднять из окружения: ROBOT_NEW_SLOT_MODEL=1 прогоняет весь
+-// набор тестов под новой моделью и показывает, что сломается на этапе 4.
+-const envOn = () =>
+-  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '1';
++// Этап 4: новая модель включена по умолчанию. ROBOT_NEW_SLOT_MODEL=0 —
++// аварийный выключатель, возвращающий старую ветку до её удаления.
++const envOff = () =>
++  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '0';
+ 
+ describe('фича-флаг новой модели', () => {
+-  it('по умолчанию выключен (если окружение не велит иного)', () => {
++  it('по умолчанию включен (кроме аварийного выключателя в окружении)', () => {
+     setNewSlotModelEnabled(null);
+-    expect(isNewSlotModelEnabled()).toBe(envOn());
++    expect(isNewSlotModelEnabled()).toBe(!envOff());
+   });
+ 
+   it('ручной режим приоритетнее окружения и возвращается к нему', () => {
+@@ -90,7 +90,7 @@ describe('фича-флаг новой модели', () => {
+     setNewSlotModelEnabled(false);
+     expect(isNewSlotModelEnabled()).toBe(false);
+     setNewSlotModelEnabled(null);
+-    expect(isNewSlotModelEnabled()).toBe(envOn());
++    expect(isNewSlotModelEnabled()).toBe(!envOff());
+   });
+ });
+ 
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 59718bc..aa263d8 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -393,6 +393,27 @@
+    слота и `itemType`. Тип каждой записи берётся из нового каталога по id —
+    экран по-прежнему показывает локализованные имена.
+ 
++### Этап 4, шаг 1 (патч 171): новая модель включена
++
++Флаг перевёрнут: `isNewSlotModelEnabled()` по умолчанию возвращает `true`.
++Приложение живёт по новой модели — это и есть переключение.
++
++Сделано в два приёма сознательно:
++
++* **171 — переключение.** Одна правка, откат одной правкой. Старые ветки
++  лежат рядом и доступны через `ROBOT_NEW_SLOT_MODEL=0` — аварийный
++  выключатель на случай, если вживую что-то поедет;
++* **172 — удаление.** Чистка старых веток, самого флага и тестов, которые
++  закрепляли старое поведение.
++
++Сейвы при этом НЕ меняют формы: новая модель читает оба вида состояния
++(`normalizeSlot`), поэтому старые сохранения работают и до миграции этапа 5.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию (новая модель) | 261 | **261** |
++| `ROBOT_NEW_SLOT_MODEL=0` (старая) | 261 | **261** |
++
+ #### Что осталось по этапу 3
+ 
+ | Шаг | Точка использования | Статус |
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 71bcfcb..5c76471 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -59,17 +59,25 @@ export const LIMB_TYPE_BY_ROBOT_LOCATION = {
+ 
+ let flagOverride = null;
+ 
+-const envEnabled = () =>
+-  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '1';
++// ROBOT_NEW_SLOT_MODEL=0 — аварийный выключатель: вернуть старую модель,
++// не откатывая код. Полезно, если после включения что-то поехало вживую.
++const envDisabled = () =>
++  typeof process !== 'undefined' && process.env?.ROBOT_NEW_SLOT_MODEL === '0';
+ 
+ /** Включить/выключить новую модель вручную (null — вернуться к умолчанию). */
+ export function setNewSlotModelEnabled(value) {
+   flagOverride = value === null ? null : Boolean(value);
+ }
+ 
+-/** Включена ли новая модель слотов. */
++/**
++ * Включена ли новая модель слотов.
++ *
++ * Этап 4: новая модель включена по умолчанию. Старые ветки пока лежат рядом
++ * и снимаются следующим патчем — до их удаления их можно вернуть переменной
++ * окружения ROBOT_NEW_SLOT_MODEL=0.
++ */
+ export function isNewSlotModelEnabled() {
+-  return flagOverride === null ? envEnabled() : flagOverride;
++  return flagOverride === null ? !envDisabled() : flagOverride;
+ }
+ 
+ const toNumber = (value) => {
+
+-- 
+2.47.3
+

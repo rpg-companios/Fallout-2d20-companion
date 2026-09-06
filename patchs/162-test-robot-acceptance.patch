@@ -1,0 +1,475 @@
+From 0000000000000000000000000000001788505269 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 07:01:09 +0000
+Subject: [PATCH] test(robot): acceptance-тест Мистера Хэнди + план рефакторинга слотов
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 0.
+
+Baseline: 163 теста (18 файлов), все зелёные. Добавлен acceptance-тест
+__tests__/robot/mister-handy.test.js — он красный сейчас и должен стать
+зелёным к концу этапа 4:
+
+  * arm3 теряет свою атаку (глобальный дедуп по id оружия в
+    getBuiltinWeaponsFromSlots);
+  * оружие вместо руки принимает обшивку (нарушение 10.5).
+
+Остальные шесть проверок зелёные уже сейчас — регрессионные страховки
+(три руки заполняются, thruster работает, броня ложится по одной на руку,
+рука с пустой ладонью даёт одну атаку, рука с оружием — две).
+
+docs/architecture/robot-slot-refactoring.md фиксирует baseline, целевые
+схемы, разбивку по этапам, реестр рисков (Р1-Р12) и открытые вопросы
+к владельцу.
+
+---
+ 2 files changed, 430 insertions(+)
+
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+new file mode 100644
+index 0000000..99d650d
+--- /dev/null
++++ b/__tests__/robot/mister-handy.test.js
+@@ -0,0 +1,236 @@
++// __tests__/robot/mister-handy.test.js
++//
++// ACCEPTANCE-тест переработки слотовой модели роботов (этап 0 плана,
++// см. docs/architecture/robot-slot-refactoring.md).
++//
++// Мистер Хэнди выбран не случайно: это единственный план тела, который ломает
++// все три старые модели слотов одновременно —
++//   * три руки arm1/arm2/arm3 (ни одна не называется leftArm/rightArm);
++//   * движитель называется thruster (не leftLeg/rightLeg);
++//   * голову зовут head, но это «оптика» (Optics) для брони.
++//
++// Тест ПАДАЕТ до рефакторинга — это и есть критерий готовности: зелёный файл
++// означает, что этапы 1–4 выполнены. Зачем он такой, а не «проверяет новые
++// чистые функции»: он идёт через существующие точки входа (initRobotSlots →
++// getBuiltinWeaponsFromSlots), поэтому остаётся рабочим и во время переезда,
++// когда новые функции ещё не подключены к коду.
++//
++// Часть проверок зелёная уже сейчас — это регрессионные страховки: они должны
++// остаться зелёными на всех этапах.
++
++import { describe, it, expect } from 'vitest';
++
++import kits from '../../modules/fallout/data/equipmentKits/index.js';
++import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
++import bodies from '../../modules/fallout/data/equipment/robot/robotbody.json';
++import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
++import legs from '../../modules/fallout/data/equipment/robot/robotlegs.json';
++import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
++import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
++import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
++import {
++  initRobotSlots,
++  getBuiltinWeaponsFromSlots,
++  findFreeWeaponHand,
++} from '../../domain/robotEquip';
++
++// ---------------------------------------------------------------------------
++// Сборка предметов кита: то же, что делает kitResolver, но синхронно и без БД
++// ---------------------------------------------------------------------------
++
++const PLATING = platingFile.plating || [];
++const FRAMES = framesFile.frames || [];
++
++const robotCatalog = {
++  heads,
++  bodies,
++  arms,
++  legs,
++  weapons: robotWeapons,
++  plating: PLATING,
++  frames: FRAMES,
++};
++
++const CATALOG_BY_ID = new Map(
++  [...heads, ...bodies, ...arms, ...legs, ...robotWeapons, ...PLATING, ...FRAMES]
++    .map((entry) => [entry.id, entry]),
++);
++
++/** Разворачивает комплект в список предметов для initRobotSlots. */
++const resolveKit = (kitId, { choiceIndex = 0 } = {}) => {
++  const kit = kits[kitId];
++  if (!kit) throw new Error(`нет комплекта ${kitId}`);
++
++  const pushEntry = (out, entry) => {
++    const id = entry.itemId || entry.weaponId || entry.armorId;
++    if (!id) return;
++    const source = CATALOG_BY_ID.get(id);
++    if (!source) return;
++    out.push({ ...source, ...entry, itemType: entry.itemType });
++  };
++
++  const out = [];
++  for (const entry of kit.items) {
++    if (entry.type === 'choice') {
++      // Выбор игрока в тесте детерминирован: берём вариант choiceIndex.
++      const chosen = entry.items?.[choiceIndex];
++      if (!chosen) continue;
++      if (chosen.type === 'fixed') pushEntry(out, chosen);
++      continue;
++    }
++    pushEntry(out, entry);
++  }
++  return out;
++};
++
++/** Защитный слой (обшивка) указанной локации — как запись из каталога. */
++const platingFor = (location) => {
++  const found = PLATING.find((entry) => entry.robotLocation === location);
++  if (!found) throw new Error(`нет обшивки для локации ${location}`);
++  return { ...found, itemType: 'plating' };
++};
++
++/** Атаки, которые слот отдаёт в список оружия. */
++const attacksOfSlot = (slots, slotKey) =>
++  getBuiltinWeaponsFromSlots(slots).filter((w) => w.sourceSlot === slotKey);
++
++// Пустой Хэнди = базовая модель из bodyPlan.defaults: три руки-манипулятора,
++// корпус, оптика и реактивная тяга.
++const emptyHandy = () => initRobotSlots('misterHandy', [], robotCatalog);
++
++describe('Мистер Хэнди — acceptance-критерий новой модели слотов', () => {
++  // -------------------------------------------------------------------------
++  // Регрессионные страховки (зелёные сейчас, должны остаться зелёными)
++  // -------------------------------------------------------------------------
++
++  it('три слота рук и движитель заполняются из комплекта, arm3 не теряется', () => {
++    const { slots } = initRobotSlots(
++      'misterHandy',
++      resolveKit('mister_handy_assistant'),
++      robotCatalog,
++    );
++
++    expect(Object.keys(slots)).toEqual(['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster']);
++    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
++    expect(slots.arm3.limb?.id).toBe('robot_weapon_circular_saw');
++    // Движитель: thruster, а не leftLeg/rightLeg.
++    expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
++  });
++
++  it('все три руки доступны для оружия (arm3 не пропускается при выборе)', () => {
++    const { slots } = emptyHandy();
++
++    // Ищем свободную руку three раза подряд, помечая предыдущие занятыми —
++    // так же, как это делает инвентарь при экипировке оружия.
++    const occupied = [];
++    const found = [];
++    for (let i = 0; i < 3; i += 1) {
++      const hand = findFreeWeaponHand(slots, occupied);
++      if (!hand) break;
++      found.push(hand[0]);
++      occupied.push(hand[0]);
++    }
++
++    expect(found).toEqual(['arm1', 'arm2', 'arm3']);
++  });
++
++  it('обшивка локации «Thruster» ложится на слот движителя', () => {
++    const { slots } = initRobotSlots(
++      'misterHandy',
++      [platingFor('Thruster')],
++      robotCatalog,
++    );
++
++    expect(slots.thruster.plating?.id).toBeTruthy();
++    expect(slots.body.plating).toBeFalsy();
++  });
++
++  it('рука-манипулятор с ПУСТОЙ ладонью даёт одну атаку', () => {
++    const { slots } = emptyHandy();
++
++    expect(attacksOfSlot(slots, 'arm1').map((w) => w.id)).toEqual([
++      'robot_weapon_manipulator',
++    ]);
++  });
++
++  it('три одинаковые руки-манипулятора: обшивка «Arms» — по одной на руку', () => {
++    const { slots } = initRobotSlots(
++      'misterHandy',
++      [platingFor('Arms'), platingFor('Arms'), platingFor('Arms')],
++      robotCatalog,
++    );
++
++    // 1 предмет = 1 слот: три обшивки должны лечь на три РАЗНЫЕ руки,
++    // а не все три в первый подходящий слот.
++    expect(slots.arm1.plating?.id).toBeTruthy();
++    expect(slots.arm2.plating?.id).toBeTruthy();
++    expect(slots.arm3.plating?.id).toBeTruthy();
++    expect(slots.thruster.plating).toBeFalsy();
++    expect(slots.head.plating).toBeFalsy();
++  });
++
++  // -------------------------------------------------------------------------
++  // Критерии готовности (падают до рефакторинга)
++  // -------------------------------------------------------------------------
++
++  it('рука-манипулятор, держащая оружие, даёт две атаки', () => {
++    const { slots: baseSlots } = emptyHandy();
++    const slots = {
++      ...baseSlots,
++      arm1: {
++        ...baseSlots.arm1,
++        heldWeapon: { id: 'weapon_10mm_pistol', itemType: 'weapon', name: '10mm pistol' },
++      },
++    };
++
++    // Встроенный манипулятор не занимает ладонь, поэтому атак две:
++    // вложенный пистолет + встроенный манипулятор.
++    const attacks = attacksOfSlot(slots, 'arm1').map((w) => w.id);
++    expect(attacks).toHaveLength(2);
++    expect(attacks).toContain('weapon_10mm_pistol');
++    expect(attacks).toContain('robot_weapon_manipulator');
++  });
++
++  it('arm3 не теряется: каждая рука-манипулятор даёт собственную атаку', () => {
++    // Комплект «Няня»: arm1 — рука-манипулятор, arm2 — огнемёт,
++    // arm3 — рука-манипулятор (первый вариант выбора).
++    const { slots } = initRobotSlots(
++      'misterHandy',
++      resolveKit('mister_handy_nanny'),
++      robotCatalog,
++    );
++
++    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
++
++    // Три источника атак: манипулятор arm1, огнемёт arm2, манипулятор arm3.
++    // Сейчас getItem-дедуп по id оружия съедает второй манипулятор.
++    expect(attacksOfSlot(slots, 'arm1')).toHaveLength(1);
++    expect(attacksOfSlot(slots, 'arm2')).toHaveLength(1);
++    expect(attacksOfSlot(slots, 'arm3')).toHaveLength(1);
++    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(3);
++  });
++
++  it('оружие вместо руки не принимает обшивку (броня — только на конечность)', () => {
++    // Комплект «Помощник»: arm1 — рука-манипулятор, arm2 — огнемёт,
++    // arm3 — циркулярная пила (обе — оружие вместо руки).
++    const { slots } = initRobotSlots(
++      'misterHandy',
++      [
++        ...resolveKit('mister_handy_assistant'),
++        platingFor('Arms'),
++        platingFor('Arms'),
++        platingFor('Arms'),
++      ],
++      robotCatalog,
++    );
++
++    // Обшивка ложится только на настоящую конечность.
++    expect(slots.arm1.plating?.id).toBeTruthy();
++    // Слот, занятый оружием вместо руки, защиты не принимает: у него нет своей
++    // СУ и нет куда её надевать — только характеристики самого оружия.
++    expect(slots.arm2.plating).toBeFalsy();
++    expect(slots.arm3.plating).toBeFalsy();
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+new file mode 100644
+index 0000000..62551b9
+--- /dev/null
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -0,0 +1,194 @@
++# Рефакторинг слотовой модели роботов: план, baseline и реестр рисков
++
++Дата: 2026-09-04. Базовый коммит: `d40e6b9` (ветка `arena/01a06b0b-fallout-2d20-companion`).
++
++Документ — рабочий: ведёт поэтапную переработку модели слотов роботов
++(конечности / оружие-конечность / броня по типу конечности). Срез текущего
++состояния механик — `docs/architecture/robots.md` (§1–§10, там же нумерация
++противоречий 9.x, на которую здесь ссылки).
++
++---
++
++## 1. Baseline
++
++| Показатель | Значение |
++|---|---|
++| Тестов до начала работ | **163** (18 файлов), все зелёные |
++| Тестов по роботам | 19 (`__tests__/robot/assaultron-kits.test.js` — 9, `robot-damage-resistance.test.js` — 10) |
++| Планов тела | 7 (`humanoid`, `protectron`, `assaultron`, `sentryBot`, `misterHandy`, `robobrain`, `securitron`) |
++| Записей конечностей | 21 рука, 7 голов, 6 движителей, 6 корпусов |
++| Робо-оружия | 19 записей, из них **13** задвоены с `robotarms.json` |
++| Броня | 12 frame, 28 plating, 5 armor — адресуется 4 локациями |
++| Основная логика | `domain/robotEquip.js` (779 строк) |
++| Точек чтения состояния слота | **115** обращений к `.limb` / `.plating` / `.frame` / `.heldWeapon` в **21** файле |
++
++> **Расхождение с планом:** в задании указано «169 тестов». Фактически на
++> baseline **163**. Все упоминания «169» дальше означают «текущий полный прогон»
++> и равны 163 + новые тесты этапов.
++
++### Критерий готовности (уточнён)
++
++Принятая формулировка про «две атаки» (§10 исходного документа) заменена на
++точную. Конечность `robot_arm_mister_handy` (хватка + встроенный манипулятор):
++
++| Состояние ладони | Атак от слота |
++|---|---|
++| пустая | **1** (встроенный манипулятор) |
++| держит оружие | **2** (вложенное оружие + встроенный манипулятор) |
++
++«Голая рука даёт две атаки» — неверно. Проверяются оба состояния отдельно
++(см. `__tests__/robot/mister-handy.test.js`).
++
++---
++
++## 2. Что показал разбор кода (факты, влияющие на план)
++
++1. **`getRobotSlotKeys` уже читает данные** — имена слотов не захардкожены.
++   Ломается не список слотов, а всё, что *сопоставляет* имена: `includes('arm')`,
++   `leftArm||arm1`, `Hand → [leftArm, rightArm]`.
++2. **Три независимые модели слотов** (9.1–9.3): слоты конечностей (данные),
++   слоты человеческой брони (литерал 6 позиций в `equippedArmor.js`), локации
++   брони робота (`Optics/Main Body/Arms/Thruster`, маппинг цепочкой `if`).
++3. **`arm3` не потерян в `initRobotSlots`**, но **теряется при сборе атак**:
++   `getBuiltinWeaponsFromSlots` дедуплицирует по id оружия *глобально*, поэтому
++   у Хэнди с двумя руками-манипуляторами вторая атака исчезает
++   (комплект `mister_handy_nanny` → 2 атаки вместо 3).
++4. **`builtinToArm` содержит ошибку данных**: `robot_weapon_smoke_claws.builtinToArm
++   = "robot_arm_robobrain"`, хотя `builtinWeaponId` на неё стоит у
++   `robot_arm_smoke_manipulator`. Сейчас робомозг получает дымовые когти «из
++   воздуха» через reverse lookup. Удаление обратной ссылки (этап 6) — это
++   **исправление данных**, а не только чистка.
++5. **Оружие вместо руки принимает броню** (9.7): слот с
++   `robot_weapon_flamethrower` матчится на локацию `Arms` и получает обшивку.
++6. **Поля конечностей живут в UI**: `melee`, `guns`, `mind`, `other`, `body`,
++   `carryWeight`, `complexity`, `perksRequired`, `rarity` читаются
++   `LimbUpgradeModal` и расчётом переносимого веса (`body.carryWeight`).
++   Схема `limbs.json` из задания их не перечисляет — терять их нельзя.
++7. **`hitTable` в данных нет нигде**, кроме `securitron.hitLocations`
++   (`head 1-2`, `body 3-11`, `leftArm 12-14`, `rightArm 15-17`, `wheel 18-20`) —
++   и то это строка для подписи в UI (`robotSlotLogic.js:38`). Боевой системы
++   с таблицей попаданий в проекте нет: диапазоны для остальных 6 планов нужно
++   взять из книги (решение владельца).
++8. **Сейв хранит конечности и слои брони целиком** (объектами, не ссылками):
++   `saveSlimming` ужимает только `heldWeapon`. Значит переименование id
++   конечностей (`robot_arm_protectron` → `limb_arm_protectron`) требует
++   миграции сейвов, иначе старые персонажи потеряют конечности.
++9. **Дубли id разрешаются по `itemType`**, а не по каталогу:
++   `resolveItem.js:84 case 'robotPart'` перебирает каталоги подряд и для 13
++   задвоенных id всегда вернёт версию-руку.
++
++---
++
++## 3. Целевые схемы
++
++### `bodyPlans.json` — 5 полей на план
++
++```json
++"protectron": {
++  "slots": [
++    { "id": "head",     "accepts": ["head"],  "capacity": 1, "swappable": false },
++    { "id": "leftArm",  "accepts": ["arm"],   "capacity": 1, "swappable": true },
++    { "id": "rightArm", "accepts": ["arm"],   "capacity": 1, "swappable": true },
++    { "id": "body",     "accepts": ["body"],  "capacity": 1, "swappable": true },
++    { "id": "leftLeg",  "accepts": ["mover"], "capacity": 1, "swappable": true },
++    { "id": "rightLeg", "accepts": ["mover"], "capacity": 1, "swappable": true }
++  ],
++  "pairedTypes": ["arm", "mover"],
++  "hitTable": [
++    { "range": [1, 3],   "slotId": "head" },
++    { "range": [4, 7],   "slotId": "leftArm" },
++    { "range": [8, 11],  "slotId": "rightArm" },
++    { "range": [12, 15], "slotId": "body" },
++    { "range": [16, 18], "slotId": "leftLeg" },
++    { "range": [19, 20], "slotId": "rightLeg" }
++  ],
++  "defaults": { "head": "…", "leftArm": "…", "rightArm": "…", "body": "…", "leftLeg": "…", "rightLeg": "…" }
++}
++```
++
++* `pairedTypes` — какие типы у **этого** плана приходят парами (протектрон:
++  руки и движители). У Хэнди руки **не** парные → `pairedTypes: []`: замена
++  `arm1` не должна трогать `arm2`/`arm3`.
++* `swappable: false` у головы — не отдельное правило, а данные; проверяет
++  валидатор.
++* `hitTable` — диапазоны d20, непрерывно покрывающие 1..20, без дыр и наложений.
++
++### `limbs.json` — все конечности, `itemCategory: "limb"`
++
++`limbType`: `head` | `body` | `arm` | `mover`. Поля: `canHoldWeapons`,
++`weaponSlots`, `builtinWeaponId`, `physicalDR`/`energyDR`/`radDR`,
++`installComplexity`/`installPerksRequired`/`installSkill` **плюс сохраняемые
++как есть** `melee`/`guns`/`mind`/`other`/`body`/`carryWeight`/`rarity`/
++`compatibleBodyPlans`/`defaultForBodyPlan`.
++
++### `weaponAsLimb.json` — оружие вместо конечности, `itemCategory: "weaponAsLimb"`
++
++`limbType`, `attackId`, требования установки. Ни `DR`, ни `canHoldWeapons`,
++ни `weaponSlots` — поля **отсутствуют**, а не равны 0/false.
++
++### `weapons.json` — единственный источник боевых характеристик
++
++Добавляется `handheld: true|false`: можно ли вложить в `weaponSlots` руки.
++
++### Броня: `limbType` вместо `robotLocation`
++
++`Optics → head`, `Main Body → body`, `Arms → arm`, `Thruster → mover`.
++
++### Рантайм-состояние слота (новое)
++
++```json
++"leftArm": {
++  "content": "limb_arm_protectron",
++  "armorLayers": { "frame": null, "plating": "plating_standard_arms", "armor": null },
++  "heldWeaponId": "attack_10mm_pistol"
++}
++```
++
++---
++
++## 4. Этапы и патчи
++
++| Этап | Патч | Содержание | Тесты |
++|---|---|---|---|
++| 0 | **162** | baseline зафиксирован, acceptance-тест Хэнди (красный) | 163 + 8 (6 зелёных, 2 красных) |
++| 1 | 163+ | новые каталоги данных + валидатор, без подключения к коду | без изменений |
++| 2 | | чистые функции нового домена + юнит-тесты | + новые, зелёные |
++| 3 | | замена точек использования по одной, за фича-флагом | старые зелёные |
++| 4 | | флаг включён, старый путь удалён, Хэнди зелёный целиком | все зелёные |
++| 5 | | миграция сейва на новый формат слота | + тест на старом сейве |
++| 6 | | удаление мёртвого (`slotCapabilities`, `builtinTo*`, `compatibleSlots`) | все зелёные |
++
++---
++
++## 5. Реестр рисков
++
++| # | Риск | Где | Как митигируем |
++|---|---|---|---|
++| Р1 | **Смена формата слота** (`armor/plating/frame` → `armorLayers`, `limb` → `content`) затрагивает 115 обращений в 21 файле | `robotEquip`, `robotSlotLogic`, `robotDamageResistance`, `saveSlimming`, `robotSlice`, экраны, `characterCreation` | Ввести **слой доступа** (`getLimb(slot)`, `getLayer(slot, layer)`) до смены физического формата; мигрировать формат один раз на этапе 5 |
++| Р2 | **Переименование id конечностей** ломает i18n (`mergeById` по id), комплекты, `bodyplans.defaults`, allowlist по префиксам `robot_arm_*`/`robot_weapon_*`, сейвы | `i18n/equipmentCatalog.js`, `equipmentKits/*`, `modules/fallout/data/allowlist/*`, сейвы | Не переименовывать существующие id; новый префикс `weaponlimb_*` — только для новых записей оружия-конечности; для старых сейвов — карта алиасов |
++| Р3 | **Этап 5 (сейвы) запланирован слишком поздно**: формат меняется на этапах 3–4 | сейвы | Аксессоры (Р1) + карта алиасов id + миграция при загрузке пишутся на этапе 1–2, а не в конце |
++| Р4 | **13 задвоенных id**: план отправляет все 13 в `weaponAsLimb`, но `robot_weapon_manipulator` и `robot_weapon_protectron_manipulator` имеют `canHoldWeapons: true` и по правилу §3 — конечности; более того, киты протектрона кладут `robot_weapon_protectron_manipulator` **в ладонь** | `robotarms.json`, `equipmentKits/protectron.json` | Разделить: 11 записей без хватки → `weaponAsLimb`; 2 манипулятора → `limbs.json`. Нужно подтверждение владельца |
++| Р5 | **`builtinToArm` ошибочен** (`smoke_claws → robot_arm_robobrain`); удаление ссылки меняет состав атак робомозга | `weapons.json`, `robotEquip.normalizeBuiltinWeapons` | Перед удалением вынести правку данных отдельным решением; зафиксировать тестом, у какой руки какие атаки |
++| Р6 | **`hitTable` неизвестна** для 6 из 7 планов; боевой системы с попаданиями нет | `bodyplans.json` | Значения из книги — от владельца; до их появления поле не выдумываем, `validateHitTable` допускает отсутствие таблицы |
++| Р7 | **`swappable: false` у головы** меняет поведение UI: сегодня голову можно заменить (`LimbUpgradeModal` открывается на любом слоте) | `WeaponsAndArmorScreen`, `robotSlotLogic` | Этап 3: скрывать/блокировать кнопку «Конечность» по `swappable`; проверить кит штурмотрона (голова-лазер — базовая) |
++| Р8 | **`pairedTypes`** при неверной семантике приведёт к снятию соседних рук у Хэнди | `applyLimbReplacement` | Правило: снимается только слот, где стоит **тот же экземпляр** конечности, и только если тип входит в `pairedTypes` |
++| Р9 | **Потеря полей конечностей** (`melee/guns/mind/other/body/carryWeight`) при миграции | `LimbUpgradeModal`, `characterCreation` | Миграция переносит все known-поля как есть; валидатор предупреждает о неизвестных полях, но не удаляет их |
++| Р10 | **`compatibleBodyPlans`/`defaultForBodyPlan`** (движители, головы) — ограничение «только своё шасси». В целевой схеме поля нет | `canReplaceLimb`, `LimbUpgradeModal.filterByBodyPlan` | Сохранить поля; `limbType` отвечает за тип слота, `compatibleBodyPlans` — за принадлежность шасси |
++| Р11 | **Четыре модели `Hand → [leftArm, rightArm]`** (`selectors.js:38`, `InventoryScreen.js:623/631`, `powerArmor.js:37`) — человеческая броня, а не робот; трогать осторожно | см. файлы | Общая `slotsForArmorLocation(bodyPlan, location)` вводится **только** для робо-пути; человеческий путь не меняем до отдельного решения |
++| Р12 | **i18n подписей слотов** завязаны на имена (`robotSlot.slotNames.arm3`); новая `hitTable` не должна дублировать подписи | `robotSlotLogic` | После появления `hitTable` подпись рендерить из неё, старые ключи i18n оставить фолбэком |
++
++---
++
++## 6. Открытые вопросы к владельцу
++
++1. Переименовывать ли id конечностей (`robot_arm_*` → `limb_arm_*`) или
++   оставить как есть + карта алиасов для сейвов?
++2. Значения `hitTable` для `protectron`, `assaultron`, `sentryBot`, `robobrain`,
++   `misterHandy` (у `securitron` есть). Готовые диапазоны для протектрона из
++   задания взяты как есть.
++3. 13 задвоенных id: 11 в `weaponAsLimb` + 2 манипулятора в `limbs` (Р4) —
++   подтвердить.
++4. `robot_weapon_smoke_claws` belongs to `robot_arm_smoke_manipulator`
++   (исправление данных) — подтвердить.
++5. Голова не меняется: подтвердить, что кнопка «Конечность» на слоте головы
++   скрывается (и что кит штурмотрона не рассчитывает на замену головы).
+
+-- 
+2.47.3
+

@@ -1,0 +1,191 @@
+From 0000000000000000000000000000001788614609 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sat, 05 Sep 2026 13:23:29 +0000
+Subject: [PATCH] test the real kit assembly path: resolver to slots
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Реальный путь модалки комплекта не был покрыт тестами: kitResolver тянет БД и
+react-native, поэтому в тестах проверялась его копия (resolveKit в
+mister-handy.test.js). Теперь тяжёлые зависимости подменяются, а разворот идёт
+настоящий: resolveKitItems(кит) → initRobotSlots(план, записи, каталог).
+
+Новый __tests__/robot/robot-kit-assembly.test.js на комплекте
+mister_handy_assistant:
+  - все шесть слотов заняты ожидаемыми конечностями;
+  - конечности приходят из каталога — есть СУ и itemCategory (иначе в слот
+    лёг бы голый itemId из записи кита);
+  - у оружия-конечности в слоте нет полей СУ (правило владельца для данных),
+    а canHoldWeapons: false ставит движок;
+  - обшивка из комплекта легла в слой и не задвоилась в инвентарь;
+  - атаки: своя атака руки (манипулятор) плюс огнемёт и циркулярная пила;
+  - второй комплект — Штурмотрон, гуманоидный план.
+
+305 тестов / 26 файлов — зелёные.
+
+---
+ 2 files changed, 141 insertions(+)
+
+diff --git a/__tests__/robot/robot-kit-assembly.test.js b/__tests__/robot/robot-kit-assembly.test.js
+new file mode 100644
+index 0000000..d02fbe7
+--- /dev/null
++++ b/__tests__/robot/robot-kit-assembly.test.js
+@@ -0,0 +1,117 @@
++// __tests__/robot/robot-kit-assembly.test.js
++//
++// Реальный путь модалки комплекта снаряжения:
++//   kitResolver.resolveKitItems(кит) → initRobotSlots(план тела, записи, каталог)
++//
++// До этого проверялась только копия разворота (resolveKit в mister-handy.test.js):
++// kitResolver тянет БД и react-native и в тесты не импортировался. Здесь
++// тяжёлые зависимости подменены, сам разворот настоящий — так видно, что
++// конечности и защита из комплекта действительно встают в слоты робота.
++import { describe, it, expect, vi } from 'vitest';
++
++vi.mock('../../db/Database', () => ({
++  getWeaponById: async () => null,
++  getWeaponModById: async () => null,
++  getAmmoById: async () => null,
++  getItemByName: async () => null,
++}));
++vi.mock('../../modules/fallout/screens/CharacterScreen/logic/RandomLootLogic', () => ({
++  resolveRandomLootByRoll: () => null,
++}));
++vi.mock('../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n', () => ({
++  tWeaponsAndArmorScreen: (key) => key,
++}));
++
++import kits from '../../modules/fallout/data/equipmentKits/index.js';
++import { resolveKitItems } from '../../domain/kitResolver';
++import { initRobotSlots } from '../../domain/robotEquip';
++import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
++import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
++import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
++
++// Каталог ровно тот, что модалка комплекта передаёт в initRobotSlots.
++const robotCatalog = {
++  limbs,
++  weaponAsLimb,
++  weapons: robotWeapons,
++  plating: platingFile.plating || [],
++  frames: framesFile.frames || [],
++};
++
++const assemble = async (kitId, bodyPlan) => {
++  const kit = kits[kitId];
++  if (!kit) throw new Error(`нет комплекта ${kitId}`);
++  const resolved = await resolveKitItems(kit, {});
++  return initRobotSlots(bodyPlan, resolved.items, robotCatalog);
++};
++
++describe('комплект снаряжения собирает робота (реальный разворот)', () => {
++  it('мистер Хэндℹ: все шесть слотов заняты, защита на месте', async () => {
++    const { slots } = await assemble('mister_handy_assistant', 'misterHandy');
++
++    expect(slots.head.limb?.id).toBe('robot_head_mister_handy_eye_stalk');
++    expect(slots.body.limb?.id).toBe('robot_body_mister_handy');
++    expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
++    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
++    expect(slots.arm3.limb?.id).toBe('robot_weapon_circular_saw');
++  });
++
++  it('конечности приходят из каталога, а не заглушками из кита', async () => {
++    const { slots } = await assemble('mister_handy_assistant', 'misterHandy');
++
++    // У записи кита своих характеристик нет: если разворот сломался,
++    // в слот ляжет голый itemId без СУ и без типа конечности.
++    for (const key of Object.keys(slots)) {
++      const limb = slots[key].limb;
++      expect(limb, `слот ${key} пуст`).toBeTruthy();
++      expect(['limb', 'weaponAsLimb']).toContain(limb.itemCategory);
++
++      if (limb.itemCategory === 'limb') {
++        expect(limb.physicalDR, `у конечности ${key} нет СУ из каталога`).toBeTypeOf('number');
++      } else {
++        // Конечность-оружие: полей СУ в данных у неё нет вовсе (правило
++        // владельца) — вклада от слоёв защиты она не получает. А вот хватать
++        // ей нечем: canHoldWeapons движок ставит сам.
++        for (const field of ['physicalDR', 'energyDR', 'radDR']) {
++          expect(limb[field], `${key}: у оружия-конечности не должно быть ${field}`).toBeUndefined();
++        }
++        expect(limb.canHoldWeapons, `${key}: оружие вместо руки ничего не держит`).toBe(false);
++      }
++    }
++  });
++
++  it('обшивка из комплекта ложится в слот, а не теряется', async () => {
++    const { slots, inventoryItems } = await assemble('mister_handy_assistant', 'misterHandy');
++
++    const layers = Object.values(slots).flatMap((slot) => [
++      slot.plating?.id, slot.frame?.id, slot.armor?.id,
++    ]).filter(Boolean);
++    expect(layers).toContain('robot_plating_standard_body');
++
++    // Защита не дублируется в инвентарь и не пропадает: ровно один слой.
++    const ids = Object.keys(inventoryItems).length;
++    expect(layers.filter((id) => id === 'robot_plating_standard_body')).toHaveLength(1);
++    expect(ids).toBeGreaterThan(0);
++  });
++
++  it('атаки: своя атака руки плюс оружие в ладонях', async () => {
++    const { weapons } = await assemble('mister_handy_assistant', 'misterHandy');
++    const ids = weapons.map((w) => w.id);
++
++    expect(ids).toContain('robot_weapon_manipulator'); // встроенная атака руки
++    expect(ids).toContain('robot_weapon_flamethrower');
++    expect(ids).toContain('robot_weapon_circular_saw');
++  });
++
++  it('штурмотрон: гуманоидный план собирается так же', async () => {
++    const { slots, weapons } = await assemble('assaultron_us_military', 'assaultron');
++
++    for (const key of ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg']) {
++      expect(slots[key]?.limb, `слот ${key} пуст`).toBeTruthy();
++    }
++    expect(weapons.length).toBeGreaterThan(0);
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 33a0c7c..9bd651f 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -728,6 +728,30 @@
+ |---|---|---|
+ | по умолчанию | 300 | **300** |
+ 
++### Проверка сборки из комплекта (патч 184)
++
++Реальный путь модалки комплекта раньше не проверялся: `kitResolver` тянет БД и
++react-native и в тесты не импортировался, проверялась только его копия
++(`resolveKit` в `mister-handy.test.js`). Теперь тяжёлые зависимости подменяются,
++а разворот идёт настоящий:
++
++```
++resolveKitItems(кит) → initRobotSlots(план тела, записи, каталог)
++```
++
++`__tests__/robot/robot-kit-assembly.test.js` проверяет на комплекте
++`mister_handy_assistant`: все шесть слотов заняты; конечности приходят из
++каталога (есть СУ, есть `itemCategory` — иначе в слот лёг бы голый `itemId`
++из кита); обшивка легла в слой и не задвоилась в инвентарь; атаки — своя атака
++руки плюс оружие в ладонях. Второй тест — гуманоидный Штурмотрон.
++
++У оружия-конечности в слоте нет полей СУ (это правило владельца для данных),
++а `canHoldWeapons: false` ставит движок.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 305 | **305** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+
+-- 
+2.47.3
+

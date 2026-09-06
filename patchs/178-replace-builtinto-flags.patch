@@ -1,0 +1,434 @@
+From 0000000000000000000000000000001788542554 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 17:22:34 +0000
+Subject: [PATCH] replace builtinTo flags: limbs declare own attack, kits declare installs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 6, шаг 1. Мёртвое поле builtinTo* уходит из данных и кода.
+
+Два смысла жили в одном поле; оба переехали туда, где им место:
+  - свою атаку конечность объявляет сама (limb.builtinWeaponId);
+  - установку в конечность объявляет комплект (installTo: 'arm' | 'head').
+
+- robot/weapons.json: builtinToArm/builtinToHead удалены у трёх записей.
+  Лазер головы и месметрон уже объявлены через builtinWeaponId у своих голов,
+  а builtinToArm: robot_arm_robobrain указывал на несуществующую конечность —
+  из-за неё Робомозг получал дымовые когти «из воздуха» (риск Р5, открытый
+  вопрос №2 закрыт).
+- Комплекты: securitron/assaultron — builtinToArm: true → installTo: 'arm'
+  (4 записи); robobrain — месметрон получает installTo: 'head' (3 записи),
+  иначе он уезжал бы в руку.
+- domain/kitResolver.js: переносит installTo из комплекта.
+- domain/robotEquip.js: обратный поиск оружия по ссылке на конечность удалён;
+  ветки установки смотрят на installTo.
+- EquipmentKitModal: по installTo решает, тратит ли оружие слот на руке.
+- Тесты: __tests__/robot/robot-kit-installed-weapons.test.js — своих атак
+  конечность не теряет, установка не занимает ладонь, комплект Штурмотрона
+  собирается ровно так, как выглядит живой сейв (коготь, установка, лазер
+  головы, коготь).
+
+294 теста / 25 файлов — зелёные.
+
+---
+ 9 files changed, 173 insertions(+), 29 deletions(-)
+
+diff --git a/__tests__/robot/robot-kit-installed-weapons.test.js b/__tests__/robot/robot-kit-installed-weapons.test.js
+new file mode 100644
+index 0000000..6a591c6
+--- /dev/null
++++ b/__tests__/robot/robot-kit-installed-weapons.test.js
+@@ -0,0 +1,114 @@
++// __tests__/robot/robot-kit-installed-weapons.test.js
++//
++// Откуда берётся оружие робота при сборке персонажа из комплекта:
++//   - СВОЯ атака конечности объявляется каталогом (limb.builtinWeaponId /
++//     attackId у оружия вместо руки). Никаких обратных ссылок из оружия на
++//     конечность в данных больше нет.
++//   - УСТАНОВЛЕННОЕ в конечность оружие (лазерная пушка Секьюритрона,
++//     месметрон Робомозга) объявляет комплект: installTo: 'arm' | 'head'.
++//     Оно не занимает ладонь и не лежит в инвентаре.
++
++import { describe, it, expect } from 'vitest';
++
++import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
++import bodies from '../../modules/fallout/data/equipment/robot/robotbody.json';
++import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
++import legs from '../../modules/fallout/data/equipment/robot/robotlegs.json';
++import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
++import generalWeapons from '../../modules/fallout/data/equipment/weapons.json';
++import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
++import { serializeSlot, collectAttacks } from '../../domain/robotSlots';
++
++const robotCatalog = { heads, bodies, arms, legs, weapons: robotWeapons };
++const byId = (list, id) => list.find((entry) => entry.id === id);
++const asKitWeapon = (weapon, extra = {}) => ({ ...weapon, itemType: 'weapon', weaponId: weapon.id, ...extra });
++
++describe('данные: обратных ссылок из оружия на конечность больше нет', () => {
++  it('в каталоге оружия роботов нет полей builtinTo*', () => {
++    const leftovers = robotWeapons.filter((w) => 'builtinToArm' in w || 'builtinToHead' in w);
++    expect(leftovers.map((w) => w.id)).toEqual([]);
++  });
++
++  it('лазер головы и месметрон принадлежат головам через builtinWeaponId', () => {
++    expect(byId(heads, 'robot_head_assaultron_laser').builtinWeaponId)
++      .toBe('robot_weapon_assaultron_head_laser');
++    expect(byId(heads, 'robot_head_robobrain').builtinWeaponId)
++      .toBe('robot_weapon_mesmetron');
++  });
++
++  it('дымовые когти — атака своей руки, а не установка «из воздуха»', () => {
++    // Раньше weapon.builtinToArm указывал на несуществующую robot_arm_robobrain.
++    const claws = byId(robotWeapons, 'robot_weapon_smoke_claws');
++    expect(claws.builtinToArm).toBeUndefined();
++    expect(byId(arms, 'robot_arm_smoke_manipulator').builtinWeaponId)
++      .toBe('robot_weapon_smoke_claws');
++    expect(byId(arms, 'robot_arm_robobrain')).toBeTruthy(); // рука без своей атаки — это нормально
++  });
++});
++
++describe('комплект: оружие с installTo уходит в установку, а не в ладонь', () => {
++  it('installTo: arm — лазерная пушка Секьюритрона становится установкой', () => {
++    const laser = byId(generalWeapons, 'weapon_laser_gun');
++    const { slots } = initRobotSlots('securitron', [
++      asKitWeapon(laser, { slot: 'left', installTo: 'arm' }),
++    ], robotCatalog);
++
++    const left = serializeSlot(slots.leftArm);
++    expect(left.content).toBe('robot_arm_securitron');
++    expect(left.installedWeapons).toEqual([{ id: 'weapon_laser_gun', modIds: [] }]);
++    // ладонь осталась свободной — оружие встроено, а не взято в руку
++    expect(left.heldWeaponId).toBeNull();
++  });
++
++  it('без installTo оружие внутрь конечности не устанавливается', () => {
++    const laser = byId(generalWeapons, 'weapon_laser_gun');
++    const { slots, inventoryItems } = initRobotSlots('securitron', [
++      asKitWeapon(laser, { slot: 'left' }),
++    ], robotCatalog);
++
++    // В руку оно не встраивается: без пометки это просто предмет инвентаря,
++    // игрок сам решает, брать его в ладонь или нет.
++    const left = serializeSlot(slots.leftArm);
++    expect(left.installedWeapons).toEqual([]);
++    expect(left.heldWeaponId).toBeNull();
++    expect(inventoryItems.some((i) => (i.weaponId || i.id) === 'weapon_laser_gun')).toBe(true);
++  });
++
++  it('installTo: head — месметрон Робомозга уходит в голову, а не в руку', () => {
++    const mesmetron = byId(robotWeapons, 'robot_weapon_mesmetron');
++    const { slots } = initRobotSlots('robobrain', [
++      asKitWeapon(mesmetron, { installTo: 'head' }),
++    ], robotCatalog);
++
++    expect(slots.head.limb?.id).toBe('robot_head_robobrain');
++    const ids = getBuiltinWeaponsFromSlots(slots).map((w) => w.id);
++    expect(ids).toContain('robot_weapon_mesmetron');
++    // рука месметроном не занята
++    expect(slots.leftArm.limb?.id).not.toBe('robot_weapon_mesmetron');
++    expect(slots.rightArm.limb?.id).not.toBe('robot_weapon_mesmetron');
++  });
++});
++
++describe('комплект Штурмотрона собирается так же, как выглядит живой сейв', () => {
++  it('когти — свои, лазер — установка, лазер головы — свой', () => {
++    const laser = byId(generalWeapons, 'weapon_laser_gun');
++    const { slots } = initRobotSlots('assaultron', [
++      asKitWeapon(laser, { slot: 'left', installTo: 'arm' }),
++    ], robotCatalog);
++
++    expect(serializeSlot(slots.leftArm)).toMatchObject({
++      content: 'robot_arm_assaultron',
++      installedWeapons: [{ id: 'weapon_laser_gun', modIds: [] }],
++    });
++    // правая рука — без установки
++    expect(serializeSlot(slots.rightArm).installedWeapons).toEqual([]);
++
++    const cards = collectAttacks(slots);
++    expect(cards.map((c) => c.id).sort()).toEqual([
++      'robot_weapon_assaultron_head_laser',
++      'robot_weapon_claw',
++      'robot_weapon_claw',
++      'weapon_laser_gun',
++    ].sort());
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 265ae36..4ad80b3 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -569,14 +569,48 @@
+ |---|---|---|
+ | по умолчанию | 282 | **282** |
+ 
++### Этап 6, шаг 1 (патч 178): `builtinTo*` уходит, установку объявляет комплект
++
++Два разных смысла жили в одном поле, и оба переехали туда, где им место.
++
++| Было | Стало |
++|---|---|
++| `weapon.builtinToHead: <id головы>` — обратная ссылка из оружия на конечность | конечность сама объявляет атаку: `limb.builtinWeaponId` |
++| `weapon.builtinToArm: true` в комплекте | `installTo: 'arm'` в комплекте |
++| `weapon.builtinToArm: <id руки>` в каталоге (когти → `robot_arm_robobrain`) | не нужно: когти — атака своей руки `robot_arm_smoke_manipulator` |
++
++Что изменилось по файлам:
++
++* `robot/weapons.json` — поля `builtinToArm`/`builtinToHead` удалены у трёх
++  записей. Все три ссылки были избыточны или ошибочны: лазер головы и
++  месметрон уже объявлены через `builtinWeaponId` у своих голов, а
++  `builtinToArm: robot_arm_robobrain` указывал на несуществующую конечность —
++  из-за неё Робомозг и получал когти «из воздуха» (риск Р5, открытый вопрос
++  №2 из §6 **закрыт**);
++* комплекты `securitron.json`, `assaultron.json` — `builtinToArm: true` →
++  `installTo: 'arm'` (4 записи); `robobrain.json` — месметрон получает
++  `installTo: 'head'` (3 записи): в комплекте он числился оружием и попадал в
++  голову только через флаг в каталоге;
++* `domain/kitResolver.js` — переносит `installTo` из комплекта;
++* `domain/robotEquip.js` — `normalizeBuiltinWeapons` больше не ищет оружие по
++  обратной ссылке; ветки установки смотрят на `installTo`;
++* `EquipmentKitModal` — по `installTo` решает, тратит ли оружие слот на руке.
++
++Правило теперь простое: **свою атаку конечность объявляет сама, установку —
++комплект**. Никаких ссылок из оружия на конечность в данных нет.
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 294 | **294** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Дальше: слой доступа к слоту во всех читателях → смена физического формата
+-хранилища → этап 6 (удаление мёртвых полей)
++Дальше: этап 6, шаг 2 — `robotLocation` → `limbType` в защите и удаление
++`hitLocations`
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/kitResolver.js b/domain/kitResolver.js
+index 60eb312..49de156 100644
+--- a/domain/kitResolver.js
++++ b/domain/kitResolver.js
+@@ -222,8 +222,10 @@ export async function resolveWeaponItem(item) {
+     // baseName только у вариантов: у обычного оружия имя — из каталога.
+     baseName: trueItemId ? baseName : undefined,
+     _weapon: weaponData,
+-    builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
+-    builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
++    // Куда оружие устанавливается, а не что оно такое: объявляет комплект
++    // (installTo: 'arm' | 'head'). Из каталога оружия это больше не приходит —
++    // свою встроенную атаку конечность объявляет сама (builtinWeaponId).
++    installTo: item.installTo ?? null,
+     _mods: mods,
+     appliedMods,
+     displayName,
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index db0e236..82875cc 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -82,15 +82,6 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
+     pushWeapon(byId ? { ...byId } : { id: limb.builtinWeaponId });
+   }
+ 
+-  // Reverse lookup: weapon.builtinToHead == limb.id (e.g. assaultron head laser)
+-  if (limb.id) {
+-    for (const w of catalog) {
+-      if (w.builtinToHead === limb.id) {
+-        pushWeapon(w);
+-      }
+-    }
+-  }
+-
+   if (normalized.length === 0 && limb.builtinManipulator) {
+     pushWeapon({ ...limb, isManipulator: true });
+   }
+@@ -295,8 +286,10 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     if (itype === 'weapon') {
+       const weaponData = item._weapon ?? item;
+       const weaponId = weaponData.id || item.weaponId;
+-      // Resolve from catalog to pick up flags like builtinToHead that live only in catalog data
+       const resolvedWeapon = weaponId ? resolveWeaponStats(weaponId) : null;
++      // Куда оружие устанавливается — говорит комплект (kitResolver кладёт в
++      // installTo). Без пометки оружие просто носят в ладони.
++      const installTo = item.installTo ?? null;
+ 
+       // Нерабочее встроенное оружие (например, ракетница и гранатомёт
+       // Секьюритрона до установки ОС Mk II): не занимает слоты и руки,
+@@ -311,7 +304,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       // item.slot задаёт сторону: left → leftArm, right → rightArm.
+       // Если руки ещё нет (базовая модель ещё не заполнена из defaults), откладываем
+       // в pendingArmBuiltinWeapons — после автозаполнения конечностей прикрепим.
+-      if (item.builtinToArm || weaponData.builtinToArm || resolvedWeapon?.builtinToArm) {
++      if (installTo === 'arm') {
+         const direction = item.slot === 'right' ? 'right' : item.slot === 'left' ? 'left' : null;
+         const targetKey = direction ? getSlotForDirection(bodyPlan, direction) : null;
+         const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
+@@ -324,7 +317,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+           name: item.displayName || weaponData.name || weaponId,
+           baseWeaponName: weaponData.name,
+           isBuiltin: true,
+-          builtinToArm: true,
++          installTo: 'arm',
+           locked: true,
+           _sourceSlot: targetKey,
+           _sourceItem: item,
+@@ -343,7 +336,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+       }
+ 
+       // Встроенное оружие в голову
+-      if (weaponData.builtinToHead || item.builtinToHead || resolvedWeapon?.builtinToHead) {
++      if (installTo === 'head') {
+         const weaponStats = resolvedWeapon || resolveWeaponStats(weaponId);
+         if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
+         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
+@@ -518,7 +511,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     }
+   }
+ 
+-  // Прикрепляем отложенные builtinToArm оружия после автозаполнения конечностей из defaults
++  // Прикрепляем отложенные установки (installTo) после автозаполнения конечностей из defaults
+   // (базовая модель даёт руки, а лазер-ган из кита должен встать в них)
+   if (pendingArmBuiltinWeapons.length > 0) {
+     for (const builtin of pendingArmBuiltinWeapons) {
+@@ -535,7 +528,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+         }
+       } else {
+         // Всё ещё нет руки — в инвентарь как fallback
+-        inventoryItems.push({ ...(sourceItem || {}), builtinToArm: true, _weapon: builtin });
++        inventoryItems.push({ ...(sourceItem || {}), installTo: 'arm', _weapon: builtin });
+       }
+     }
+   }
+diff --git a/modules/fallout/data/equipment/robot/weapons.json b/modules/fallout/data/equipment/robot/weapons.json
+index 39d61f3..98b12d0 100644
+--- a/modules/fallout/data/equipment/robot/weapons.json
++++ b/modules/fallout/data/equipment/robot/weapons.json
+@@ -412,7 +412,6 @@
+     "weight": 8,
+     "cost": 115,
+     "rarity": 4,
+-    "builtinToHead": "robot_head_assaultron_laser",
+     "installComplexity": null,
+     "installPerksRequired": null,
+     "installSkill": null,
+@@ -444,7 +443,6 @@
+     "weight": 2,
+     "cost": 120,
+     "rarity": 4,
+-    "builtinToHead": true,
+     "installComplexity": null,
+     "installPerksRequired": null,
+     "installSkill": null,
+@@ -523,7 +521,6 @@
+     "weight": 0,
+     "cost": 0,
+     "rarity": 0,
+-    "builtinToArm": "robot_arm_robobrain",
+     "installComplexity": null,
+     "installPerksRequired": null,
+     "installSkill": null,
+diff --git a/modules/fallout/data/equipmentKits/assaultron.json b/modules/fallout/data/equipmentKits/assaultron.json
+index ef1c157..e65b19c 100644
+--- a/modules/fallout/data/equipmentKits/assaultron.json
++++ b/modules/fallout/data/equipmentKits/assaultron.json
+@@ -7,7 +7,7 @@
+         "itemType": "weapon",
+         "weight": 0,
+         "slot": "left",
+-        "builtinToArm": true,
++        "installTo": "arm",
+         "ammo": {
+           "ammoId": "ammo_energy_cell",
+           "quantity": {
+@@ -136,7 +136,7 @@
+         "itemType": "weapon",
+         "weight": 0,
+         "slot": "left",
+-        "builtinToArm": true,
++        "installTo": "arm",
+         "ammo": {
+           "ammoId": "ammo_energy_cell",
+           "quantity": {
+diff --git a/modules/fallout/data/equipmentKits/robobrain.json b/modules/fallout/data/equipmentKits/robobrain.json
+index 4759e7a..d02c52a 100644
+--- a/modules/fallout/data/equipmentKits/robobrain.json
++++ b/modules/fallout/data/equipmentKits/robobrain.json
+@@ -4,6 +4,7 @@
+       {
+         "type": "fixed",
+         "weaponId": "robot_weapon_mesmetron",
++        "installTo": "head",
+         "itemType": "weapon"
+       },
+       {
+@@ -62,6 +63,7 @@
+       {
+         "type": "fixed",
+         "weaponId": "robot_weapon_mesmetron",
++        "installTo": "head",
+         "itemType": "weapon",
+         "ammo": {
+           "ammoId": "ammo_energy_cell",
+@@ -188,6 +190,7 @@
+       {
+         "type": "fixed",
+         "weaponId": "robot_weapon_mesmetron",
++        "installTo": "head",
+         "itemType": "weapon",
+         "ammo": {
+           "ammoId": "ammo_energy_cell",
+diff --git a/modules/fallout/data/equipmentKits/securitron.json b/modules/fallout/data/equipmentKits/securitron.json
+index 15c5183..3c7979c 100644
+--- a/modules/fallout/data/equipmentKits/securitron.json
++++ b/modules/fallout/data/equipmentKits/securitron.json
+@@ -34,7 +34,7 @@
+         "itemType": "weapon",
+         "weight": 0,
+         "slot": "left",
+-        "builtinToArm": true,
++        "installTo": "arm",
+         "requiresWeaponId": "robot_arm_securitron",
+         "modIds": [
+           "mod_053"
+@@ -55,7 +55,7 @@
+         "itemType": "weapon",
+         "weight": 0,
+         "slot": "right",
+-        "builtinToArm": true,
++        "installTo": "arm",
+         "requiresWeaponId": "robot_arm_securitron",
+         "ammo": {
+           "ammoId": "ammo_45",
+diff --git a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 4d36515..2068a0c 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -131,8 +131,8 @@ const toInventoryItems = (entries) => {
+         itemType: 'weapon',
+         hasMods: item.hasMods ?? false,
+         // item-level флаги встроенного оружия не лежат в _weapon — переносим явно,
+-        // иначе builtinToArm/requiresMkII теряются при фильтрации finalItems.
+-        builtinToArm: item.builtinToArm,
++        // иначе installTo/requiresMkII теряются при фильтрации finalItems.
++        installTo: item.installTo,
+         requiresMkII: item.requiresMkII,
+         // Вариант (заменённое имя) и уникальные качества — тоже item-level:
+         // без явного переноса бритва/«Дерзкая …» потеряли бы имя и стек.
+@@ -315,7 +315,8 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
+       ]);
+       const finalItemsOnly = finalItems.filter((item) => {
+         if (slotConsumedTypes.has(item.itemType)) return false;
+-        if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.builtinToHead || item.builtinToArm)) return false;
++        // Установленное в конечность оружие (installTo) слот на руке не тратит.
++        if (item.itemType === 'weapon' && (item.replacesArm || item.selfDestruct || item.installTo)) return false;
+         if (item.itemType === 'weapon' && String(item.id || item.weaponId || '').startsWith('robot_weapon_')) return false;
+         return true;
+       });
+
+-- 
+2.47.3
+

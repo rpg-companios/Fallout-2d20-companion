@@ -1,0 +1,942 @@
+From 0000000000000000000000000000001788543066 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 17:31:06 +0000
+Subject: [PATCH] drop robotLocation and hitLocations: armor addresses limb type
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 6, шаг 2. Строковые локации защиты уходят из данных и кода.
+
+- Данные: robotLocation удалён у всех 45 слоёв (armor.json 5, armor_plating.json
+  28, frames.json 12). limbType лежал в данных с этапа 1, так что фолбэк был
+  мёртв. hitLocations удалён из bodyplans.json (мёртв с патча 168, остался
+  hitTable).
+- domain/robotSlots.js: LIMB_TYPE_BY_ROBOT_LOCATION удалён.
+- domain/robotEquip.js: слоты для слоя считаются только по limbType; мёртвая
+  локальная переменная location убрана.
+- ArmorLayerModal: вместо таблицы «слот → локация» тип слота берётся из плана
+  тела (getSlotDef + useRobotBodyPlan), кандидаты фильтруются по limbType.
+- i18n: файлы robot/locations.json («Оптика», «Руки», «Тяга») удалены —
+  локаций в данных больше нет, и показывать их было негде.
+- Тесты: слои в тестах теперь собираются по limbType; проверка каталогов
+  требует отсутствия robotLocation у защиты; новая проверка — hitLocations
+  удалён, hitTable на месте.
+
+295 тестов / 25 файлов — зелёные.
+
+---
+ 15 files changed, 104 insertions(+), 159 deletions(-)
+
+diff --git a/__tests__/robot/assaultron-kits.test.js b/__tests__/robot/assaultron-kits.test.js
+index 5a27d3a..3cbbee3 100644
+--- a/__tests__/robot/assaultron-kits.test.js
++++ b/__tests__/robot/assaultron-kits.test.js
+@@ -100,21 +100,21 @@ describe('комплекты снаряжения Штурмотрона', () =>
+         id: 'robot_frame_actuated_body',
+         itemType: 'robotFrame',
+         layer: 'frame',
+-        robotLocation: 'Main Body',
++        limbType: 'body',
+         damageResistance: { physical: 1, energy: 1 },
+       },
+       {
+         id: 'robot_plating_standard_thruster',
+         itemType: 'plating',
+         layer: 'plating',
+-        robotLocation: 'Thruster',
++        limbType: 'mover',
+         damageResistance: { physical: 2, energy: 0 },
+       },
+       {
+         id: 'robot_plating_standard_thruster_2',
+         itemType: 'plating',
+         layer: 'plating',
+-        robotLocation: 'Thruster',
++        limbType: 'mover',
+         damageResistance: { physical: 2, energy: 0 },
+       },
+     ];
+@@ -133,7 +133,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
+         id: 'robot_frame_actuated_arms',
+         itemType: 'robotFrame',
+         layer: 'frame',
+-        robotLocation: 'Arms',
++        limbType: 'arm',
+         damageResistance: { physical: 1, energy: 1 },
+       },
+     ];
+@@ -154,8 +154,8 @@ describe('комплекты снаряжения Штурмотрона', () =>
+     const { slots: emptySlots } = initRobotSlots('assaultron', [], {
+       ...robotCatalog,
+       plating: [
+-        { id: 'robot_plating_standard_optics', layer: 'plating', robotLocation: 'Optics', damageResistance: { physical: 2, energy: 0 } },
+-        { id: 'robot_plating_standard_body', layer: 'plating', robotLocation: 'Main Body', damageResistance: { physical: 2, energy: 0 } },
++        { id: 'robot_plating_standard_optics', layer: 'plating', limbType: 'head', damageResistance: { physical: 2, energy: 0 } },
++        { id: 'robot_plating_standard_body', layer: 'plating', limbType: 'body', damageResistance: { physical: 2, energy: 0 } },
+       ],
+       frames: [],
+     });
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+index 61d2fa8..92853f7 100644
+--- a/__tests__/robot/mister-handy.test.js
++++ b/__tests__/robot/mister-handy.test.js
+@@ -82,10 +82,10 @@ const resolveKit = (kitId, { choiceIndex = 0 } = {}) => {
+   return out;
+ };
+ 
+-/** Защитный слой (обшивка) указанной локации — как запись из каталога. */
+-const platingFor = (location) => {
+-  const found = PLATING.find((entry) => entry.robotLocation === location);
+-  if (!found) throw new Error(`нет обшивки для локации ${location}`);
++/** Защитный слой (обшивка) указанного типа конечности — как запись из каталога. */
++const platingFor = (limbType) => {
++  const found = PLATING.find((entry) => entry.limbType === limbType);
++  if (!found) throw new Error(`нет обшивки для типа конечности ${limbType}`);
+   return { ...found, itemType: 'plating' };
+ };
+ 
+@@ -137,7 +137,7 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+   it('обшивка локации «Thruster» ложится на слот движителя', () => {
+     const { slots } = initRobotSlots(
+       'misterHandy',
+-      [platingFor('Thruster')],
++      [platingFor('mover')],
+       robotCatalog,
+     );
+ 
+@@ -156,7 +156,7 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+   it('три одинаковые руки-манипулятора: обшивка «Arms» — по одной на руку', () => {
+     const { slots } = initRobotSlots(
+       'misterHandy',
+-      [platingFor('Arms'), platingFor('Arms'), platingFor('Arms')],
++      [platingFor('arm'), platingFor('arm'), platingFor('arm')],
+       robotCatalog,
+     );
+ 
+@@ -218,9 +218,9 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+       'misterHandy',
+       [
+         ...resolveKit('mister_handy_assistant'),
+-        platingFor('Arms'),
+-        platingFor('Arms'),
+-        platingFor('Arms'),
++        platingFor('arm'),
++        platingFor('arm'),
++        platingFor('arm'),
+       ],
+       robotCatalog,
+     );
+diff --git a/__tests__/robot/robot-data-catalogs.test.js b/__tests__/robot/robot-data-catalogs.test.js
+index f05ca0d..033c169 100644
+--- a/__tests__/robot/robot-data-catalogs.test.js
++++ b/__tests__/robot/robot-data-catalogs.test.js
+@@ -100,16 +100,38 @@ describe('новые каталоги данных роботов', () => {
+   });
+ 
+   it('броня адресуется типом конечности, а не именем слота', () => {
+-    const expected = {
+-      Optics: 'head',
+-      'Main Body': 'body',
+-      Arms: 'arm',
+-      Thruster: 'mover',
++    // Локации («Optics», «Arms», «Thruster») из данных убраны: слой сам
++    // знает свой тип конечности (limbType), а план тела — какие слоты его
++    // принимают. Проверяем по именам: optics → голова, arms → рука и т.д.
++    const expectedBySuffix = {
++      optics: 'head',
++      body: 'body',
++      arms: 'arm',
++      thruster: 'mover',
++      legs: 'mover',
++      wheel: 'mover',
+     };
+     for (const entry of armorEntries) {
+       expect(LIMB_TYPES).toContain(entry.limbType);
+-      expect(entry.limbType, `${entry.id}: ${entry.robotLocation}`)
+-        .toBe(expected[entry.robotLocation]);
++      expect('robotLocation' in entry, `${entry.id}: старой локации быть не должно`).toBe(false);
++      const suffix = Object.keys(expectedBySuffix).find((key) => entry.id.endsWith(`_${key}`));
++      expect(suffix, `${entry.id}: не удалось определить тип по имени`).toBeTruthy();
++      expect(entry.limbType, entry.id).toBe(expectedBySuffix[suffix]);
++    }
++  });
++
++  it('таблица попаданий — свойство плана тела, старых hitLocations нет', () => {
++    const plans = bodyplans;
++    for (const [planId, plan] of Object.entries(plans)) {
++      expect('hitLocations' in plan, `${planId}: старые hitLocations должны быть удалены`).toBe(false);
++    }
++    // hitTable есть не у всех планов (значения ждём от владельца), но у тех,
++    // что есть, это массив записей с диапазоном и слотом.
++    for (const [planId, plan] of Object.entries(plans)) {
++      if (!Array.isArray(plan.hitTable)) continue;
++      for (const row of plan.hitTable) {
++        expect(row, `${planId}`).toHaveProperty('slotId');
++      }
+     }
+   });
+ 
+diff --git a/__tests__/robot/robot-slot-behaviour.test.js b/__tests__/robot/robot-slot-behaviour.test.js
+index bdd5e09..af3f98f 100644
+--- a/__tests__/robot/robot-slot-behaviour.test.js
++++ b/__tests__/robot/robot-slot-behaviour.test.js
+@@ -50,14 +50,14 @@ const PLATING = platingCatalogJson.plating || platingCatalogJson;
+ const FRAMES = framesCatalogJson.frames || framesCatalogJson;
+ 
+ const byId = (list, id) => list.find((entry) => entry.id === id);
+-const platingFor = (location) => {
+-  const found = PLATING.find((p) => p.robotLocation === location);
+-  if (!found) throw new Error(`нет обшивки для локации ${location}`);
++const platingFor = (limbType) => {
++  const found = PLATING.find((p) => p.limbType === limbType);
++  if (!found) throw new Error(`нет обшивки для типа конечности ${limbType}`);
+   return { ...found, itemType: 'plating' };
+ };
+-const frameFor = (location) => {
+-  const found = FRAMES.find((f) => f.robotLocation === location);
+-  if (!found) throw new Error(`нет рамы для локации ${location}`);
++const frameFor = (limbType) => {
++  const found = FRAMES.find((f) => f.limbType === limbType);
++  if (!found) throw new Error(`нет рамы для типа конечности ${limbType}`);
+   return { ...found, itemType: 'frame' };
+ };
+ const kit = (...ids) => ids.map((id) => ({ ...byId(armsCatalog, id) ?? byId(headsCatalog, id), itemType: 'robotArm' }));
+@@ -185,9 +185,9 @@ describe('защита: раскладка по слотам', () => {
+   it('обшивка ложится только на настоящую конечность', () => {
+     const { slots, inventoryItems } = initRobotSlots('misterHandy', [
+       ...handyAssistant(),
+-      platingFor('Arms'),
+-      platingFor('Arms'),
+-      platingFor('Arms'),
++      platingFor('arm'),
++      platingFor('arm'),
++      platingFor('arm'),
+     ], robotCatalog);
+ 
+     expect(slots.arm1.plating?.id).toBeTruthy();
+@@ -198,16 +198,16 @@ describe('защита: раскладка по слотам', () => {
+   });
+ 
+   it('обшивка «Thruster» идёт в слот движителя', () => {
+-    const { slots } = initRobotSlots('misterHandy', [platingFor('Thruster')], robotCatalog);
++    const { slots } = initRobotSlots('misterHandy', [platingFor('mover')], robotCatalog);
+     expect(slots.thruster.plating?.id).toBeTruthy();
+     expect(slots.body.plating).toBeFalsy();
+   });
+ 
+   it('три обшивки «Arms» — по одной на руку', () => {
+     const { slots } = initRobotSlots('misterHandy', [
+-      platingFor('Arms'),
+-      platingFor('Arms'),
+-      platingFor('Arms'),
++      platingFor('arm'),
++      platingFor('arm'),
++      platingFor('arm'),
+     ], robotCatalog);
+     expect(slots.arm1.plating?.id).toBeTruthy();
+     expect(slots.arm2.plating?.id).toBeTruthy();
+@@ -231,17 +231,17 @@ describe('canEquipRobotArmor', () => {
+ 
+   it('оружие вместо руки обшивку не принимает', () => {
+     const slots = handySlots();
+-    const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm2', 'plating', slots);
++    const { allowed, reason } = canEquipRobotArmor(platingFor('arm'), 'arm2', 'plating', slots);
+     expect(allowed).toBe(false);
+     expect(reason).toBe('equip.error.slotRejectsArmor');
+     // А настоящая рука — принимает.
+-    expect(canEquipRobotArmor(platingFor('Arms'), 'arm1', 'plating', slots).allowed).toBe(true);
++    expect(canEquipRobotArmor(platingFor('arm'), 'arm1', 'plating', slots).allowed).toBe(true);
+   });
+ 
+   it('пустой слот защиты не принимает', () => {
+     const slots = handySlots();
+     slots.arm3.limb = null;
+-    const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm3', 'plating', slots);
++    const { allowed, reason } = canEquipRobotArmor(platingFor('arm'), 'arm3', 'plating', slots);
+     expect(allowed).toBe(false);
+     expect(reason).toBe('equip.error.noLimb');
+   });
+@@ -250,8 +250,8 @@ describe('canEquipRobotArmor', () => {
+     // Обшивка несовместима с рамой и бронёй (incompatibleLayers самой
+     // обшивки) — проверяем ровно то направление, которое задано данными.
+         const slots = handySlots();
+-    slots.arm1.frame = frameFor('Arms');
+-    const { allowed, reason } = canEquipRobotArmor(platingFor('Arms'), 'arm1', 'plating', slots);
++    slots.arm1.frame = frameFor('arm');
++    const { allowed, reason } = canEquipRobotArmor(platingFor('arm'), 'arm1', 'plating', slots);
+     expect(allowed).toBe(false);
+     expect(reason).toBe('equip.error.armorLayerIncompatible');
+   });
+@@ -261,7 +261,7 @@ describe('СУ слота: чтение состояния', () => {
+   // Старый вид состояния: объекты в полях limb / plating / frame / armor.
+   const oldShapeSlot = () => ({
+     limb: { id: 'robot_arm_protectron', physicalDR: 2, energyDR: 1, radDR: 0, canHoldWeapons: true },
+-    plating: platingFor('Arms'),
++    plating: platingFor('arm'),
+     frame: null,
+     armor: null,
+     heldWeapon: null,
+@@ -291,7 +291,7 @@ describe('СУ слота: чтение состояния', () => {
+     // Битое состояние старого сейва: на огнемёт надели обшивку.
+     const brokenSlot = () => ({
+       limb: { id: 'robot_weapon_flamethrower', itemType: 'robotArm' },
+-      plating: platingFor('Arms'),
++      plating: platingFor('arm'),
+       frame: null,
+       armor: null,
+       heldWeapon: null,
+@@ -313,7 +313,7 @@ describe('СУ слота: чтение состояния', () => {
+         energyDR: 2,
+         radDR: 1,
+       },
+-      plating: platingFor('Arms'), // битое состояние старого сейва
++      plating: platingFor('arm'), // битое состояние старого сейва
+       frame: null,
+       armor: null,
+       heldWeapon: null,
+@@ -422,7 +422,7 @@ describe('замена конечностей', () => {
+   it('защита снимается, если вместо руки ставится оружие', () => {
+     const prepare = () => {
+       const { slots } = initRobotSlots('protectron', [], robotCatalog);
+-      slots.leftArm.plating = platingFor('Arms');
++      slots.leftArm.plating = platingFor('arm');
+       return slots;
+     };
+ 
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 4ad80b3..1dbbec3 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -603,14 +603,40 @@
+ |---|---|---|
+ | по умолчанию | 294 | **294** |
+ 
++### Этап 6, шаг 2 (патч 179): `robotLocation` и `hitLocations` удалены
++
++Защита адресуется типом конечности, а не строковой локацией.
++
++| Было | Стало |
++|---|---|
++| слой защиты: `robotLocation: "Arms"` | `limbType: "arm"` (поле уже лежало в данных с этапа 1) |
++| фолбэк `LIMB_TYPE_BY_ROBOT_LOCATION` в `robotSlots.js` | удалён: у всех 45 слоёв есть `limbType` |
++| модалка выбора слоя: таблица «слот → локация» в коде | тип слота из плана тела (`getSlotDef(bodyPlan, slotKey).accepts`) |
++| `bodyplans.json`: `hitLocations` | удалён (мёртв с патча 168; остался `hitTable`) |
++| i18n `robot/locations.json` («Оптика», «Руки», «Тяга») | удалён: локаций в данных больше нет, а больше их никто и не показывал |
++
++Итог по мёртвым полям этапа 6:
++
++| Поле | Где | Статус |
++|---|---|---|
++| `capabilities` | сейв | не пишется с патча 175, уходит при первой перезаписи |
++| `robotLocation` | сейв и данные | удалён |
++| `builtinTo*` | сейв и данные | удалён (патч 178) |
++| `hitLocations` | `bodyplans.json` | удалён |
++| `slotCapabilities` | `bodyplans.json` | **остаётся**: его читает `domain/bodyplan.js` |
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 295 | **295** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Дальше: этап 6, шаг 2 — `robotLocation` → `limbType` в защите и удаление
+-`hitLocations`
++Этап 6 закрыт, кроме `slotCapabilities` (жив: `domain/bodyplan.js` считает по
++нему возможности слота — убрать можно вместе с переходом на `getSlotDef`).
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 82875cc..2525b0d 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -13,7 +13,6 @@ import {
+   canEquip,
+   getSlotDef,
+   slotForDirection,
+-  LIMB_TYPE_BY_ROBOT_LOCATION,
+ } from './robotSlots';
+ 
+ // domain/robotEquip.js
+@@ -170,9 +169,7 @@ const applyWeaponMods = (weapon, mods = []) => {
+  * @returns {string[]} — ключи слотов в порядке плана тела
+  */
+ function armorSlotsByLimbType({ slots, slotKeys, bodyPlan, armorData }) {
+-  const limbType = armorData?.limbType
+-    ?? LIMB_TYPE_BY_ROBOT_LOCATION[armorData?.robotLocation]
+-    ?? null;
++  const limbType = armorData?.limbType ?? null;
+   if (!limbType) return [];
+ 
+   return slotsForLimbType(bodyPlan, limbType)
+@@ -389,7 +386,6 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     // у протектрона/штурмотрона — ноги, у секьюритрона — колесо. Это не фолбэк, а маппинг типов шасси.
+     if (['plating', 'armor', 'frame', 'robotArmor', 'robotFrame'].includes(itype)) {
+       const armorData = item._armor ?? item;
+-      const location = armorData.robotLocation ?? item.robotLocation;
+       const layer = armorData.layer ?? itype;
+ 
+       // Слот ищется по ТИПУ конечности из данных плана тела, а не по
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index e9e033d..9864103 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -33,20 +33,6 @@ export const LAYER_KEYS = ['armor', 'frame', 'plating'];
+ /** Типы конечностей — закрытый список двигателя. */
+ export const LIMB_TYPES = ['head', 'body', 'arm', 'mover'];
+ 
+-/**
+- * Старые локации защиты (robotLocation) → тип конечности.
+- * Нужно только для чтения данных, где `limbType` ещё не проставлен;
+- * удаляется на этапе 6 вместе с robotLocation.
+- */
+-export const LIMB_TYPE_BY_ROBOT_LOCATION = {
+-  Optics: 'head',
+-  'Main Body': 'body',
+-  Arms: 'arm',
+-  Legs: 'mover',
+-  Wheel: 'mover',
+-  Thruster: 'mover',
+-};
+-
+ const toNumber = (value) => {
+   const n = Number(value);
+   return Number.isFinite(n) ? n : 0;
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 8ba5152..801eb5c 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -4,7 +4,6 @@ import moduleRuRobotArmsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/
+ import moduleRuRobotArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
+ import moduleRuRobotPlatingI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
+ import moduleRuRobotFramesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
+-import moduleRuRobotLocationsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/locations.json';
+ import moduleRuRobotModulesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/modules.json';
+ import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/items.json';
+ import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+@@ -16,7 +15,6 @@ import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/
+ import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
+ import moduleEnRobotPlatingI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
+ import moduleEnRobotFramesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
+-import moduleEnRobotLocationsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/locations.json';
+ import moduleEnRobotModulesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/modules.json';
+ import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
+ import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+@@ -167,7 +165,6 @@ const EQUIPMENT_BY_LOCALE = {
+     robotArmor: moduleRuRobotArmorI18n,
+     robotPlating: moduleRuRobotPlatingI18n,
+     robotFrames: moduleRuRobotFramesI18n,
+-    robotLocations: moduleRuRobotLocationsI18n,
+     robotModules: moduleRuRobotModulesI18n,
+     robotItems: moduleRuRobotItemsI18n,
+     robotBody: moduleRuRobotBodyI18n,
+@@ -180,7 +177,6 @@ const EQUIPMENT_BY_LOCALE = {
+     robotArmor: moduleEnRobotArmorI18n,
+     robotPlating: moduleEnRobotPlatingI18n,
+     robotFrames: moduleEnRobotFramesI18n,
+-    robotLocations: moduleEnRobotLocationsI18n,
+     robotModules: moduleEnRobotModulesI18n,
+     robotItems: moduleEnRobotItemsI18n,
+     robotBody: moduleEnRobotBodyI18n,
+diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
+index d193df4..675a703 100644
+--- a/modules/fallout/data/bodyplans/bodyplans.json
++++ b/modules/fallout/data/bodyplans/bodyplans.json
+@@ -387,13 +387,6 @@
+         "wheel"
+       ]
+     ],
+-    "hitLocations": {
+-      "head": "1-2",
+-      "body": "3-11",
+-      "leftArm": "12-14",
+-      "rightArm": "15-17",
+-      "wheel": "18-20"
+-    },
+     "hitTable": [
+       {
+         "range": [
+diff --git a/modules/fallout/data/equipment/robot/armor.json b/modules/fallout/data/equipment/robot/armor.json
+index 0dc4df3..9b4be14 100644
+--- a/modules/fallout/data/equipment/robot/armor.json
++++ b/modules/fallout/data/equipment/robot/armor.json
+@@ -4,7 +4,6 @@
+       "id": "robot_armor_factory_optics",
+       "templateId": "robot_armor_factory",
+       "layer": "armor",
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -18,7 +17,6 @@
+       "id": "robot_armor_factory_body",
+       "templateId": "robot_armor_factory",
+       "layer": "armor",
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -32,7 +30,6 @@
+       "id": "robot_armor_factory_arms",
+       "templateId": "robot_armor_factory",
+       "layer": "armor",
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -46,7 +43,6 @@
+       "id": "robot_armor_factory_thruster",
+       "templateId": "robot_armor_factory",
+       "layer": "armor",
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -60,7 +56,6 @@
+       "id": "robot_armor_storage_body",
+       "templateId": "robot_armor_factory_storage",
+       "layer": "armor",
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+diff --git a/modules/fallout/data/equipment/robot/armor_plating.json b/modules/fallout/data/equipment/robot/armor_plating.json
+index ab51682..3cbdfa2 100644
+--- a/modules/fallout/data/equipment/robot/armor_plating.json
++++ b/modules/fallout/data/equipment/robot/armor_plating.json
+@@ -8,7 +8,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -26,7 +25,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -44,7 +42,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -62,7 +59,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -80,7 +76,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -98,7 +93,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -116,7 +110,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -134,7 +127,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -152,7 +144,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -170,7 +161,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -188,7 +178,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -206,7 +195,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -224,7 +212,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -242,7 +229,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -260,7 +246,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -278,7 +263,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -296,7 +280,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -314,7 +297,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -332,7 +314,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -350,7 +331,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -368,7 +348,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -386,7 +365,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -404,7 +382,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -422,7 +399,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -440,7 +416,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -458,7 +433,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -476,7 +450,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+@@ -494,7 +467,6 @@
+         "armor",
+         "frame"
+       ],
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 0
+diff --git a/modules/fallout/data/equipment/robot/frames.json b/modules/fallout/data/equipment/robot/frames.json
+index 1ba3c04..bdd288a 100644
+--- a/modules/fallout/data/equipment/robot/frames.json
++++ b/modules/fallout/data/equipment/robot/frames.json
+@@ -4,7 +4,6 @@
+       "id": "robot_frame_actuated_optics",
+       "templateId": "robot_frame_actuated",
+       "layer": "frame",
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -18,7 +17,6 @@
+       "id": "robot_frame_actuated_body",
+       "templateId": "robot_frame_actuated",
+       "layer": "frame",
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -32,7 +30,6 @@
+       "id": "robot_frame_actuated_arms",
+       "templateId": "robot_frame_actuated",
+       "layer": "frame",
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -46,7 +43,6 @@
+       "id": "robot_frame_actuated_thruster",
+       "templateId": "robot_frame_actuated",
+       "layer": "frame",
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 1,
+         "energy": 1
+@@ -60,7 +56,6 @@
+       "id": "robot_frame_voltaic_optics",
+       "templateId": "robot_frame_voltaic",
+       "layer": "frame",
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -74,7 +69,6 @@
+       "id": "robot_frame_voltaic_body",
+       "templateId": "robot_frame_voltaic",
+       "layer": "frame",
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -88,7 +82,6 @@
+       "id": "robot_frame_voltaic_arms",
+       "templateId": "robot_frame_voltaic",
+       "layer": "frame",
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -102,7 +95,6 @@
+       "id": "robot_frame_voltaic_thruster",
+       "templateId": "robot_frame_voltaic",
+       "layer": "frame",
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 2,
+         "energy": 2
+@@ -116,7 +108,6 @@
+       "id": "robot_frame_hydraulic_optics",
+       "templateId": "robot_frame_hydraulic",
+       "layer": "frame",
+-      "robotLocation": "Optics",
+       "damageResistance": {
+         "physical": 3,
+         "energy": 3
+@@ -130,7 +121,6 @@
+       "id": "robot_frame_hydraulic_body",
+       "templateId": "robot_frame_hydraulic",
+       "layer": "frame",
+-      "robotLocation": "Main Body",
+       "damageResistance": {
+         "physical": 3,
+         "energy": 3
+@@ -144,7 +134,6 @@
+       "id": "robot_frame_hydraulic_arms",
+       "templateId": "robot_frame_hydraulic",
+       "layer": "frame",
+-      "robotLocation": "Arms",
+       "damageResistance": {
+         "physical": 3,
+         "energy": 3
+@@ -158,7 +147,6 @@
+       "id": "robot_frame_hydraulic_thruster",
+       "templateId": "robot_frame_hydraulic",
+       "layer": "frame",
+-      "robotLocation": "Thruster",
+       "damageResistance": {
+         "physical": 3,
+         "energy": 3
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/robot/locations.json b/modules/fallout/i18n/en-EN/data/equipment/robot/locations.json
+deleted file mode 100644
+index ad49a0e..0000000
+--- a/modules/fallout/i18n/en-EN/data/equipment/robot/locations.json
++++ /dev/null
+@@ -1,6 +0,0 @@
+-{
+-  "Optics": "Optics",
+-  "Main Body": "Main Body",
+-  "Arms": "Arms",
+-  "Thruster": "Thruster"
+-}
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/robot/locations.json b/modules/fallout/i18n/ru-RU/data/equipment/robot/locations.json
+deleted file mode 100644
+index 153b05b..0000000
+--- a/modules/fallout/i18n/ru-RU/data/equipment/robot/locations.json
++++ /dev/null
+@@ -1,8 +0,0 @@
+-{
+-  "robotLocations": {
+-    "Optics": "Оптика",
+-    "Main Body": "Корпус",
+-    "Arms": "Руки",
+-    "Thruster": "Тяга"
+-  }
+-}
+diff --git a/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js b/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
+index cd63294..057869e 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
+@@ -8,8 +8,9 @@ import {
+   StyleSheet,
+   Pressable,
+ } from 'react-native';
+-import { useCharacter } from '../../../../../components/CharacterContext';
++import { useCharacter, useRobotBodyPlan } from '../../../../../components/CharacterContext';
+ import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
++import { getSlotDef } from '../../../../../domain/robotSlots';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+@@ -23,30 +24,11 @@ const LAYER_COLORS = {
+   frame:   '#27ae60',
+ };
+ 
+-// ---------------------------------------------------------------------------
+-// Slot → robotLocation mapping
+-// ---------------------------------------------------------------------------
+-const SLOT_LOCATION_MAP = {
+-  head:      'Optics',
+-  body:      'Main Body',
+-  leftArm:   'Arms',
+-  rightArm:  'Arms',
+-  arm1:      'Arms',
+-  arm2:      'Arms',
+-  arm3:      'Arms',
+-  leftLeg:   'Thruster',
+-  rightLeg:  'Thruster',
+-  thruster:  'Thruster',
+-  chassis:   'Thruster',
+-  wheel:     'Thruster',
+-};
+ 
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+ 
+-/** Maps slotKey to robotLocation string */
+-const getSlotLocation = (slotKey) => SLOT_LOCATION_MAP[slotKey] ?? null;
+ 
+ /** Returns localized robot armor from the active setting catalog. */
+ const getArmorCatalogForLayer = (catalog, layer) => {
+@@ -127,6 +109,7 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
+  */
+ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+   const { equippedRobotSlots, setEquippedRobotSlots } = useCharacter();
++  const bodyPlan = useRobotBodyPlan();
+   useLocale();
+   const moduleLocale = useModuleLocale();
+   const equipmentCatalog = useMemo(
+@@ -146,16 +129,18 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+ 
+   const compatibleItems = useMemo(() => {
+     if (!slotKey || !layer || !equippedRobotSlots) return [];
+-    const location = getSlotLocation(slotKey);
+-    if (!location) return [];
++    // Слой подходит по ТИПУ конечности, который принимает слот плана тела.
++    // Никаких строковых локаций («Arms», «Optics») — только данные.
++    const limbType = getSlotDef(bodyPlan, slotKey)?.accepts?.[0] ?? null;
++    if (!limbType) return [];
+ 
+     const catalog = getArmorCatalogForLayer(equipmentCatalog, layer);
+     return catalog.filter((item) => {
+-      if (item.robotLocation !== location) return false;
++      if (item.limbType !== limbType) return false;
+       const { allowed } = canEquipRobotArmor(item, slotKey, layer, equippedRobotSlots);
+       return allowed;
+     });
+-  }, [slotKey, layer, equippedRobotSlots, equipmentCatalog]);
++  }, [slotKey, layer, equippedRobotSlots, equipmentCatalog, bodyPlan]);
+ 
+   const handleApply = () => {
+     if (!equippedRobotSlots || !slotKey) return;
+
+-- 
+2.47.3
+

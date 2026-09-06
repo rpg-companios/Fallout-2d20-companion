@@ -1,0 +1,248 @@
+From 0000000000000000000000000000001788509242 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 08:07:22 +0000
+Subject: [PATCH] feat(robot): damage resistance via new slot model behind flag
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 3, шаг 3: расчёт СУ переведён на новую модель (за флагом).
+
+getRobotSlotDamageResistance и getActiveRobotLayers при включённом флаге
+уходят в totalDR и activeArmorLayers из domain/robotSlots.js. Через
+robotSlotLogic.js это покрывает весь расчёт защиты персонажа.
+
+Два правила:
+  * защита считается только там, где она законна: нет конечности или в слоте
+    оружие вместо руки — надетые слои вклада не дают. Для старых сейвов
+    (обшивка на огнемёте) это «не начислять СУ», а не «начислить»;
+  * у оружия вместо конечности СУ нет по определению — если в старых данных
+    поля physicalDR/energyDR/radDR проставлены, при разборе содержимого они
+    отбрасываются.
+
+Побочная польза: новая ветка уже читает НОВЫЙ формат сейва (content +
+armorLayers с идентификаторами), старая — нет. Миграция на этапе 5 станет
+последним штрихом, а не переписыванием чтения.
+
+Тесты: +4 в __tests__/robot/robot-slot-model-flag.test.js — оба вида
+состояния, битый старый сейв с обшивкой на оружии, пустой слот.
+
+Прогон 241 теста: флаг выключен — 241 зелёный; ROBOT_NEW_SLOT_MODEL=1 —
+241 зелёный. Каталоги: validate-robot-data чисто.
+
+---
+ 4 files changed, 134 insertions(+), 1 deletion(-)
+
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-model-flag.test.js
+index abd0d30..7ea4c0a 100644
+--- a/__tests__/robot/robot-slot-model-flag.test.js
++++ b/__tests__/robot/robot-slot-model-flag.test.js
+@@ -13,6 +13,10 @@ import {
+   getBuiltinWeaponsFromSlots,
+   canEquipRobotArmor,
+ } from '../../domain/robotEquip';
++import {
++  getRobotSlotDamageResistance,
++  getActiveRobotLayers,
++} from '../../domain/robotDamageResistance';
+ import platingCatalogJson from '../../modules/fallout/data/equipment/robot/armor_plating.json';
+ import framesCatalogJson from '../../modules/fallout/data/equipment/robot/frames.json';
+ import { setNewSlotModelEnabled, isNewSlotModelEnabled } from '../../domain/robotSlots';
+@@ -312,3 +316,68 @@ describe('canEquipRobotArmor под флагом', () => {
+     }
+   });
+ });
++
++describe('СУ слота: чтение состояния', () => {
++  // Старый вид состояния: объекты в полях limb / plating / frame / armor.
++  const oldShapeSlot = () => ({
++    limb: { id: 'robot_arm_protectron', physicalDR: 2, energyDR: 1, radDR: 0, canHoldWeapons: true },
++    plating: platingFor('Arms'),
++    frame: null,
++    armor: null,
++    heldWeapon: null,
++  });
++
++  // Новый вид: content + armorLayers с идентификаторами.
++  const newShapeSlot = () => ({
++    content: 'robot_arm_protectron',
++    armorLayers: { frame: null, plating: 'robot_plating_standard_arms', armor: null },
++    heldWeaponId: null,
++  });
++
++  it('старый вид читается одинаково в обеих моделях', () => {
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      // Рука протектрона 2/1 + обшивка рук 2/0.
++      expect(getRobotSlotDamageResistance(oldShapeSlot()))
++        .toEqual({ physical: 4, energy: 1, rad: 0 });
++    }
++  });
++
++  it('новый вид читает только новая модель', () => {
++    setNewSlotModelEnabled(false);
++    expect(getRobotSlotDamageResistance(newShapeSlot()))
++      .toEqual({ physical: 0, energy: 0, rad: 0 });
++
++    setNewSlotModelEnabled(true);
++    expect(getRobotSlotDamageResistance(newShapeSlot()))
++      .toEqual({ physical: 4, energy: 1, rad: 0 });
++    expect(getActiveRobotLayers(newShapeSlot()).map((l) => l.key)).toEqual(['plating']);
++  });
++
++  it('оружие вместо руки СУ от надетой защиты не получает', () => {
++    // Битое состояние старого сейва: на огнемёт надели обшивку.
++    const brokenSlot = () => ({
++      limb: { id: 'robot_weapon_flamethrower', itemType: 'robotArm' },
++      plating: platingFor('Arms'),
++      frame: null,
++      armor: null,
++      heldWeapon: null,
++    });
++
++    setNewSlotModelEnabled(false);
++    // Старая модель считает обшивку — отсюда и живёт баг.
++    expect(getRobotSlotDamageResistance(brokenSlot()).physical).toBeGreaterThan(0);
++
++    setNewSlotModelEnabled(true);
++    expect(getRobotSlotDamageResistance(brokenSlot()))
++      .toEqual({ physical: 0, energy: 0, rad: 0 });
++  });
++
++  it('пустой слот защиты не несёт ни в одной модели', () => {
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      expect(getRobotSlotDamageResistance({})).toEqual({ physical: 0, energy: 0, rad: 0 });
++      expect(getRobotSlotDamageResistance(null)).toEqual({ physical: 0, energy: 0, rad: 0 });
++    }
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index b2742e5..6ac7827 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -307,6 +307,45 @@
+ | флаг выключен (как в проде) | **237** | 0 |
+ | `ROBOT_NEW_SLOT_MODEL=1` | **237** | 0 |
+ 
++#### Шаг 3 (патч 167): расчёт СУ
++
++`getRobotSlotDamageResistance` и `getActiveRobotLayers`
++(`domain/robotDamageResistance.js`) при включённом флаге уходят в `totalDR` и
++`activeArmorLayers`. Через `robotSlotLogic.js` это покрывает весь расчёт
++защиты персонажа.
++
++Два правила, которые здесь проявляются:
++
++* **защита считается только там, где она законна.** Нет конечности или в
++  слоте оружие вместо руки — надетые слои вклада не дают. Для старых сейвов
++  (обшивка на огнемёте) это означает не «начислить СУ», а «не начислять»;
++* **у оружия вместо конечности СУ нет по определению** — даже если в старых
++  данных поля `physicalDR/energyDR/radDR` случайно проставлены, при
++  разборе содержимого они отбрасываются.
++
++Побочная польза: новая ветка уже читает **новый формат сейва**
++(`content` + `armorLayers` с идентификаторами), старая — нет. Миграция на
++этапе 5 станет последним штрихом, а не переписыванием чтения.
++
++**Прогон набора тестов (241 шт.):**
++
++| Режим | Зелёных | Красных |
++|---|---|---|
++| флаг выключен (как в проде) | **241** | 0 |
++| `ROBOT_NEW_SLOT_MODEL=1` | **241** | 0 |
++
++#### Что осталось по этапу 3
++
++| Шаг | Точка использования | Сложность |
++|---|---|---|
++| 168 | замена конечностей: `applyLimbReplacement` считает парой только `leftArm/rightArm` | средняя |
++| 169 | хардкоды `leftArm/rightArm` в `src/store/selectors.js`, `domain/powerArmor.js`, `LimbUpgradeModal.js` | средняя |
++| — | подключение `resolveHit` / `hitTable`: пока нет потребителя, таблица ниоткуда не вызывается | нужна договорённость, где считается попадание |
++
++После этого этап 4 — флаг включён и старое удалено (один коммит), этап 5 —
++миграция сейва, этап 6 — удаление мёртвых полей (`robotLocation`,
++`builtinTo*`, `slotCapabilities`, `hitLocations`).
++
+ Оба acceptance-критерия Хэнди выполнены в обоих режимах (при выключенном
+ флаге — через старую ветку, при включённом — через новую).
+ 
+diff --git a/domain/robotDamageResistance.js b/domain/robotDamageResistance.js
+index 3d577cd..cd0dc58 100644
+--- a/domain/robotDamageResistance.js
++++ b/domain/robotDamageResistance.js
+@@ -16,6 +16,8 @@
+ //   Итог: либо «броня + рама», либо «обшивка»; конфликтующие слои НЕ суммируются
+ //   (в легаси-сейвах возможна несовместимая комбинация — её приводим к валидной).
+ 
++import { isNewSlotModelEnabled, activeArmorLayers, totalDR } from './robotSlots';
++
+ /**
+  * Приоритет выбора активных защитных слоёв.
+  * armor и frame совместимы (нет incompatibleLayers), поэтому идут первыми;
+@@ -39,6 +41,10 @@ const getLayerKeys = (slotData) =>
+  * @returns {{ key: string, layer: object }[]}
+  */
+ export const getActiveRobotLayers = (slotData) => {
++  // Новая модель читает оба вида состояния слота и понимает слои,
++  // записанные идентификатором (новый формат сейва).
++  if (isNewSlotModelEnabled()) return activeArmorLayers(slotData);
++
+   const keys = getLayerKeys(slotData);
+   const active = [];
+   for (const key of keys) {
+@@ -69,6 +75,10 @@ export const getLimbDamageResistance = (limb) => ({
+  * @returns {{ physical: number, energy: number, rad: number }}
+  */
+ export const getRobotSlotDamageResistance = (slotData) => {
++  // Новая модель: СУ = конечность + совместимые слои, и только там, где
++  // защита законна (нет конечности или слот занят оружием — вклада нет).
++  if (isNewSlotModelEnabled()) return totalDR(slotData);
++
+   const result = getLimbDamageResistance(slotData?.limb);
+   const active = getActiveRobotLayers(slotData);
+   for (const { layer } of active) {
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index baa1d23..e7ed2c9 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -139,12 +139,22 @@ export function resolveLimb(catalog, content) {
+   if (typeof content === 'string') return entry;
+   if (!entry) return content;
+   // Категория и тип — из каталога (истина), наложенные поля — из экземпляра.
+-  return {
++  const merged = {
+     ...entry,
+     ...content,
+     itemCategory: entry.itemCategory,
+     limbType: entry.limbType,
+   };
++  if (entry.itemCategory === 'weaponAsLimb') {
++    // Защиты у оружия вместо конечности нет по определению модели — даже
++    // если в старых данных поля СУ случайно проставлены.
++    delete merged.physicalDR;
++    delete merged.energyDR;
++    delete merged.radDR;
++    delete merged.canHoldWeapons;
++    delete merged.weaponSlots;
++  }
++  return merged;
+ }
+ 
+ const resolveWeapon = (catalog, id) => {
+@@ -255,6 +265,11 @@ export function totalDR(slot, options = {}) {
+     energy: toNumber(limb?.energyDR),
+     rad: toNumber(limb?.radDR),
+   };
++  // Защита — свойство конечности. Нет конечности (пустой слот) или в слоте
++  // оружие вместо руки — надетые слои защиты не считаются: это битое
++  // состояние старого сейва, а не источник СУ.
++  if (!slotAcceptsArmor(state, { catalog }).allowed) return result;
++
+   for (const { layer } of activeArmorLayers(state, { catalog })) {
+     const dr = layer.damageResistance || {};
+     result.physical += toNumber(dr.physical);
+
+-- 
+2.47.3
+

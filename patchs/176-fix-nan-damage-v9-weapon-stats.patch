@@ -1,0 +1,90 @@
+From 0000000000000000000000000000001788519120 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 10:52:00 +0000
+Subject: [PATCH] fix NaN damage for v9 weapon stats stored as objects
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Старые сейвы (v9) хранят числовые статы предметов объектом
+{ base, modifiers, total }. Встроенное оружие конечностей мигрировалось
+вместе с предметами, поэтому в живых сейвах (например, секьюритрон) у
+манипулятора damage — объект, и карточка показывала NaN: экран делает
+Number(weapon.damage ?? 0).
+
+materializeWeapon теперь приводит damage и fireRate к числу по полю total —
+ровно тот же смысл, который вкладывала миграция v9.
+
+283 теста / 24 файла — зелёные.
+
+---
+ 2 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/__tests__/saves/robot-slot-slim-roundtrip.test.js b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+index a18b57c..86a6744 100644
+--- a/__tests__/saves/robot-slot-slim-roundtrip.test.js
++++ b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+@@ -116,6 +116,22 @@ describe('круг «ужали — развернули» ничего не т
+     }
+   });
+ 
++  it('урон из старого сейва ({base, modifiers, total}) приходит в карточку числом', () => {
++    // v9 записала числовые статы предметов объектом. В сейве секьюритрона
++    // у манипулятора damage — ровно такой объект; цифра лежит в total.
++    expect(slot('securitron.leftArm').limb.builtinWeapons[0].damage).toEqual({
++      base: 2,
++      modifiers: [],
++      total: 2,
++    });
++    const cards = collectAttacks({ leftArm: slot('securitron.leftArm') });
++    const manipulator = cards.find((c) => c.id === 'robot_weapon_manipulator');
++    expect(manipulator.damage).toBe(2);
++    // и после ужимки — тоже число (характеристики берутся из каталога)
++    const slimmed = collectAttacks({ leftArm: slimOf('securitron.leftArm') });
++    expect(slimmed.find((c) => c.id === 'robot_weapon_manipulator').damage).toBe(2);
++  });
++
+   it('ужимка идемпотентна', () => {
+     for (const key of keys) {
+       const once = slimOf(key);
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index be5eacf..9b5038f 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -246,6 +246,22 @@ const modMap = (catalog, ids = []) => Object.fromEntries(
+   resolveMods(catalog, ids).map((mod) => [mod.slot ?? mod.id, mod.id]),
+ );
+ 
++/**
++ * Числовые статы оружия в старых сейвах записаны объектом v9
++ * `{ base, modifiers, total }`. Карточке нужно готовое число.
++ */
++const STAT_KEYS = ['damage', 'fireRate'];
++const flattenStats = (weapon) => {
++  const out = { ...weapon };
++  for (const key of STAT_KEYS) {
++    const value = out[key];
++    if (value && typeof value === 'object' && 'total' in value) {
++      out[key] = Number(value.total);
++    }
++  }
++  return out;
++};
++
+ /**
+  * Оружие из id + список id модов: база из каталога, поверх — моды.
+  * Экземпляр (если он есть) важнее каталога: в нём могут быть имя и состояние,
+@@ -263,7 +279,8 @@ const materializeWeapon = (catalog, entry, modIds = []) => {
+     : (instance ? { ...instance } : { id });
+   const ids = modIds.length > 0 ? modIds : toModIds(instance);
+   const mods = resolveMods(catalog, ids);
+-  return mods.length > 0 ? applyWeaponMods(merged, mods) : merged;
++  const plain = flattenStats(merged);
++  return mods.length > 0 ? applyWeaponMods(plain, mods) : plain;
+ };
+ 
+ // ---------------------------------------------------------------------------
+
+-- 
+2.47.3
+

@@ -1,0 +1,2921 @@
+From 0000000000000000000000000000001788506096 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 07:14:56 +0000
+Subject: [PATCH] data(robot): новые каталоги конечностей, limbType у брони, структурированные слоты
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 1. Новые данные лежат рядом со старыми и пока никуда не подключены —
+поведение игры не меняется. Решения владельца: id не переименовываем (А1),
+pairedTypes убран как атавизм, голова всегда swappable: false.
+
+Новые файлы:
+  equipment/robot/limbs.json        — 29 конечностей (7 голов, 6 корпусов,
+                                      10 рук, 6 движителей), itemCategory limb
+  equipment/robot/weaponAsLimb.json — 11 записей оружия вместо конечности,
+                                      без СУ и хватки, attackId вместо
+                                      builtinWeaponId
+  bodyplans/bodyplans.json          — слоты стали объектами
+                                      { id, accepts, capacity, swappable };
+                                      hitTable только для protectron и
+                                      securitron (где диапазоны известны)
+
+Аддитивные поля в существующих файлах:
+  weapons.json        — handheld (true только у двух манипуляторов)
+  armor.json / armor_plating.json / frames.json — limbType вместо опоры на
+                                      robotLocation (Optics→head,
+                                      Main Body→body, Arms→arm, Thruster→mover)
+
+Разделение рук по правилу §3: нет хватки и нет своей СУ → оружие вместо
+конечности. Из 21 записи рук 10 остались конечностями (включая два
+манипулятора — у них есть хватка), 11 ушли в weaponAsLimb.json.
+
+Единственная правка в коде — три строки: getBodyPlanSlotIds() в
+domain/bodyplan.js понимает оба формата слотов (строки и объекты) и
+используется в createSlotsFromBodyPlan и getRobotSlotKeys. Тест проверяет,
+что имена слотов всех семи планов не изменились.
+
+Инструменты (идемпотентны, есть --check для CI):
+  scripts/migrate-robot-limbs.mjs, scripts/migrate-bodyplans.mjs,
+  scripts/validate-robot-data.mjs (одна реализация на CLI и на тест)
+
+Тесты: +10 зелёных (__tests__/robot/robot-data-catalogs.test.js).
+Итого 181 тест: 179 зелёных и 2 красных — те же два acceptance-критерия
+Хэнди, что и на этапе 0.
+
+---
+ 14 files changed, 2121 insertions(+), 125 deletions(-)
+
+diff --git a/__tests__/robot/robot-data-catalogs.test.js b/__tests__/robot/robot-data-catalogs.test.js
+new file mode 100644
+index 0000000..f05ca0d
+--- /dev/null
++++ b/__tests__/robot/robot-data-catalogs.test.js
+@@ -0,0 +1,171 @@
++// __tests__/robot/robot-data-catalogs.test.js
++//
++// Этап 1: новые каталоги данных (limbs.json, weaponAsLimb.json, limbType у
++// брони, структурированные слоты в bodyplans.json).
++//
++// Каталоги пока НИКУДА не подключены — это чистые данные. Тесты здесь
++// проверяют целостность данных и то, что существующий код продолжает
++// читать планы тел так же, как раньше (слоты из строк стали объектами).
++
++import { describe, it, expect } from 'vitest';
++
++import { validateAll, LIMB_TYPES } from '../../scripts/validate-robot-data.mjs';
++
++import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
++import armorFile from '../../modules/fallout/data/equipment/robot/armor.json';
++import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
++import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
++import bodyplans from '../../modules/fallout/data/bodyplans/bodyplans.json';
++import { getRobotSlotKeys } from '../../domain/robotEquip';
++
++const ROOT = new URL('../../', import.meta.url).pathname;
++
++const armorEntries = [
++  ...armorFile.armor,
++  ...platingFile.plating,
++  ...framesFile.frames,
++];
++
++const limbIds = new Set(limbs.map((l) => l.id));
++const weaponLimbIds = new Set(weaponAsLimb.map((l) => l.id));
++const weaponIds = new Set(robotWeapons.map((w) => w.id));
++
++describe('новые каталоги данных роботов', () => {
++  it('валидатор не находит ошибок', () => {
++    const { errors, warnings } = validateAll(ROOT);
++    // Предупреждения допустимы, ошибки — нет.
++    expect(errors, `ошибки валидации:\n${errors.join('\n')}`).toEqual([]);
++    expect(Array.isArray(warnings)).toBe(true);
++  });
++
++  it('limbs.json и weaponAsLimb.json не пересекаются по id', () => {
++    const intersection = [...weaponLimbIds].filter((id) => limbIds.has(id));
++    expect(intersection).toEqual([]);
++  });
++
++  it('конечности: 29 записей четырёх типов', () => {
++    expect(limbs).toHaveLength(29);
++    const byType = limbs.reduce((acc, l) => {
++      acc[l.limbType] = (acc[l.limbType] || 0) + 1;
++      return acc;
++    }, {});
++    expect(byType).toEqual({ head: 7, body: 6, arm: 10, mover: 6 });
++    for (const limb of limbs) {
++      expect(limb.itemCategory).toBe('limb');
++      expect(LIMB_TYPES).toContain(limb.limbType);
++    }
++  });
++
++  it('оружие вместо конечности: 11 записей без защиты и хватки', () => {
++    expect(weaponAsLimb).toHaveLength(11);
++    for (const entry of weaponAsLimb) {
++      expect(entry.itemCategory).toBe('weaponAsLimb');
++      expect(entry.limbType).toBe('arm');
++      // Поля ОТСУТСТВУЮТ, а не равны 0/false.
++      expect(entry).not.toHaveProperty('physicalDR');
++      expect(entry).not.toHaveProperty('energyDR');
++      expect(entry).not.toHaveProperty('radDR');
++      expect(entry).not.toHaveProperty('canHoldWeapons');
++      expect(entry).not.toHaveProperty('weaponSlots');
++      expect(weaponIds).toContain(entry.attackId);
++    }
++  });
++
++  it('13 задвоенных id: оружие — в weapons.json, роль — itemCategory', () => {
++    const shared = [...weaponIds].filter((id) => limbIds.has(id) || weaponLimbIds.has(id));
++    expect(shared).toHaveLength(13);
++    // Каждый задвоенный id ровно в одном каталоге конечностей.
++    for (const id of shared) {
++      const inLimbs = limbIds.has(id);
++      const inWeaponLimbs = weaponLimbIds.has(id);
++      expect(inLimbs !== inWeaponLimbs, `id ${id} должен быть ровно в одном каталоге`).toBe(true);
++    }
++    // Два манипулятора — конечности (у них есть хватка), остальные — оружие.
++    expect(limbIds.has('robot_weapon_manipulator')).toBe(true);
++    expect(limbIds.has('robot_weapon_protectron_manipulator')).toBe(true);
++    expect(weaponLimbIds.has('robot_weapon_flamethrower')).toBe(true);
++  });
++
++  it('handheld: в ладонь можно взять только манипуляторы', () => {
++    const handheld = robotWeapons.filter((w) => w.handheld).map((w) => w.id);
++    expect(handheld.sort()).toEqual([
++      'robot_weapon_manipulator',
++      'robot_weapon_protectron_manipulator',
++    ].sort());
++    for (const weapon of robotWeapons) {
++      expect(typeof weapon.handheld).toBe('boolean');
++    }
++  });
++
++  it('броня адресуется типом конечности, а не именем слота', () => {
++    const expected = {
++      Optics: 'head',
++      'Main Body': 'body',
++      Arms: 'arm',
++      Thruster: 'mover',
++    };
++    for (const entry of armorEntries) {
++      expect(LIMB_TYPES).toContain(entry.limbType);
++      expect(entry.limbType, `${entry.id}: ${entry.robotLocation}`)
++        .toBe(expected[entry.robotLocation]);
++    }
++  });
++
++  it('слоты планов тел: имена не изменились, голова несъёмная', () => {
++    const expectedSlots = {
++      humanoid: ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
++      robobrain: ['leftArm', 'head', 'rightArm', 'body', 'chassis'],
++      misterHandy: ['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster'],
++      protectron: ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
++      securitron: ['head', 'leftArm', 'body', 'rightArm', 'wheel'],
++      assaultron: ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
++      sentryBot: ['leftArm', 'head', 'rightArm', 'leftLeg', 'body', 'rightLeg'],
++    };
++    for (const [planId, slots] of Object.entries(expectedSlots)) {
++      expect(getRobotSlotKeys(planId), planId).toEqual(slots);
++    }
++
++    for (const [planId, plan] of Object.entries(bodyplans)) {
++      for (const slot of plan.slots) {
++        expect(slot.accepts.length, `${planId}.${slot.id}`).toBeGreaterThan(0);
++        for (const type of slot.accepts) expect(LIMB_TYPES).toContain(type);
++      }
++      const head = plan.slots.find((s) => s.accepts.includes('head'));
++      expect(head?.swappable, `${planId}: голова должна быть несъёмной`).toBe(false);
++    }
++  });
++
++  it('hitTable есть только там, где диапазоны известны, и покрывает 1..20', () => {
++    const withTable = Object.entries(bodyplans)
++      .filter(([, plan]) => plan.hitTable)
++      .map(([planId]) => planId);
++    expect(withTable.sort()).toEqual(['protectron', 'securitron']);
++
++    for (const planId of withTable) {
++      const covered = [];
++      for (const row of bodyplans[planId].hitTable) {
++        const [from, to] = row.range;
++        for (let n = from; n <= to; n += 1) covered.push(n);
++      }
++      expect(new Set(covered).size, `${planId}: наложения в hitTable`).toBe(covered.length);
++      expect(covered.sort((a, b) => a - b), `${planId}: дыры в hitTable`)
++        .toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
++    }
++  });
++
++  it('defaults планов тел резолвятся в конечности подходящего типа', () => {
++    const byId = new Map([...limbs, ...weaponAsLimb].map((l) => [l.id, l]));
++    for (const [planId, plan] of Object.entries(bodyplans)) {
++      for (const [slotId, defaultId] of Object.entries(plan.defaults || {})) {
++        if (defaultId === null) continue;
++        const entry = byId.get(defaultId);
++        expect(entry, `${planId}.${slotId}: нет конечности ${defaultId}`).toBeTruthy();
++        const slot = plan.slots.find((s) => s.id === slotId);
++        expect(slot.accepts, `${planId}.${slotId}: тип ${entry.limbType} не подходит`)
++          .toContain(entry.limbType);
++      }
++    }
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 62551b9..62950dd 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -151,13 +151,57 @@
+ | Этап | Патч | Содержание | Тесты |
+ |---|---|---|---|
+ | 0 | **162** | baseline зафиксирован, acceptance-тест Хэнди (красный) | 163 + 8 (6 зелёных, 2 красных) |
+-| 1 | 163+ | новые каталоги данных + валидатор, без подключения к коду | без изменений |
++| 1 | **163** | новые каталоги данных + валидатор, без подключения к коду | +10 зелёных |
+ | 2 | | чистые функции нового домена + юнит-тесты | + новые, зелёные |
+ | 3 | | замена точек использования по одной, за фича-флагом | старые зелёные |
+ | 4 | | флаг включён, старый путь удалён, Хэнди зелёный целиком | все зелёные |
+ | 5 | | миграция сейва на новый формат слота | + тест на старом сейве |
+ | 6 | | удаление мёртвого (`slotCapabilities`, `builtinTo*`, `compatibleSlots`) | все зелёные |
+ 
++### Решения владельца, вошедшие в план
++
++| Вопрос | Решение |
++|---|---|
++| `pairedTypes` | **Убрать.** Атавизм. Замена конечности меняет ровно один слот |
++| Переименование id | **А1: не переименовывать.** Коллизию снимает `itemCategory`, а не имя |
++| `swappable` | `false` = конечность нельзя снять. Голова — всегда `false` |
++| Сейвы | Публикация — только после устранения ошибок; миграция обязательна перед релизом, порядок этапов не меняется |
++| Человеческая броня (`Hand → [leftArm, rightArm]`) | Пока не трогаем |
++
++### Этап 1 — сделано (патч 163)
++
++Данные. Старые файлы на месте и продолжают работать, новое лежит рядом:
++
++| Файл | Что появилось |
++|---|---|
++| `equipment/robot/limbs.json` | 29 конечностей: 7 голов, 6 корпусов, 10 рук, 6 движителей. `itemCategory: "limb"`, `limbType` |
++| `equipment/robot/weaponAsLimb.json` | 11 записей оружия вместо конечности. `itemCategory: "weaponAsLimb"`, `attackId`, без СУ и хватки |
++| `equipment/robot/weapons.json` | + `handheld` (true только у двух манипуляторов) |
++| `armor.json` / `armor_plating.json` / `frames.json` | + `limbType` (`Optics→head`, `Main Body→body`, `Arms→arm`, `Thruster→mover`) |
++| `bodyplans/bodyplans.json` | слоты из строк стали объектами `{ id, accepts, capacity, swappable }`; `hitTable` — только для `protectron` и `securitron`, где диапазоны известны |
++
++Разделение рук на «конечность» и «оружие вместо конечности» — по правилу §3:
++нет хватки и нет своей СУ → оружие вместо конечности. Из 21 записи рук
++10 остались конечностями (включая два манипулятора — у них есть хватка),
++11 ушли в `weaponAsLimb.json`.
++
++Инструменты:
++
++* `scripts/migrate-robot-limbs.mjs` — пересоздаёт каталоги из старых файлов
++  (идемпотентно, `--check` для CI);
++* `scripts/migrate-bodyplans.mjs` — структурированные слоты и `hitTable`
++  (тоже `--check`);
++* `scripts/validate-robot-data.mjs` — одна реализация на CLI и на тест
++  (`__tests__/robot/robot-data-catalogs.test.js` импортирует её же).
++
++Единственная правка в коде — три строки, чтобы планы тел читались в обоих
++форматах слотов: `getBodyPlanSlotIds()` в `domain/bodyplan.js`, использована
++в `createSlotsFromBodyPlan` и `getRobotSlotKeys`. Тесты это покрывают:
++имена слотов всех семи планов не изменились.
++
++`hitTable` для `assaultron`, `sentryBot`, `robobrain`, `misterHandy`
++**отсутствует** — диапазоны неизвестны, выдумывать их не стали.
++
+ ---
+ 
+ ## 5. Реестр рисков
+@@ -165,13 +209,13 @@
+ | # | Риск | Где | Как митигируем |
+ |---|---|---|---|
+ | Р1 | **Смена формата слота** (`armor/plating/frame` → `armorLayers`, `limb` → `content`) затрагивает 115 обращений в 21 файле | `robotEquip`, `robotSlotLogic`, `robotDamageResistance`, `saveSlimming`, `robotSlice`, экраны, `characterCreation` | Ввести **слой доступа** (`getLimb(slot)`, `getLayer(slot, layer)`) до смены физического формата; мигрировать формат один раз на этапе 5 |
+-| Р2 | **Переименование id конечностей** ломает i18n (`mergeById` по id), комплекты, `bodyplans.defaults`, allowlist по префиксам `robot_arm_*`/`robot_weapon_*`, сейвы | `i18n/equipmentCatalog.js`, `equipmentKits/*`, `modules/fallout/data/allowlist/*`, сейвы | Не переименовывать существующие id; новый префикс `weaponlimb_*` — только для новых записей оружия-конечности; для старых сейвов — карта алиасов |
++| Р2 | **Переименование id конечностей** ломает i18n (`mergeById` по id), комплекты, `bodyplans.defaults`, allowlist по префиксам `robot_arm_*`/`robot_weapon_*`, сейвы | `i18n/equipmentCatalog.js`, `equipmentKits/*`, `modules/fallout/data/allowlist/*`, сейвы | **Снято решением А1 (этап 1):** id не переименовываются, коллизию 13 записей снимает `itemCategory` + маршрутизация по каталогам |
+ | Р3 | **Этап 5 (сейвы) запланирован слишком поздно**: формат меняется на этапах 3–4 | сейвы | Аксессоры (Р1) + карта алиасов id + миграция при загрузке пишутся на этапе 1–2, а не в конце |
+-| Р4 | **13 задвоенных id**: план отправляет все 13 в `weaponAsLimb`, но `robot_weapon_manipulator` и `robot_weapon_protectron_manipulator` имеют `canHoldWeapons: true` и по правилу §3 — конечности; более того, киты протектрона кладут `robot_weapon_protectron_manipulator` **в ладонь** | `robotarms.json`, `equipmentKits/protectron.json` | Разделить: 11 записей без хватки → `weaponAsLimb`; 2 манипулятора → `limbs.json`. Нужно подтверждение владельца |
++| Р4 | **13 задвоенных id**: план отправлял все 13 в `weaponAsLimb`, но два манипулятора имеют `canHoldWeapons: true` и по правилу §3 — конечности | `robotarms.json`, `equipmentKits/protectron.json` | Реализовано в этапе 1: 11 записей без хватки → `weaponAsLimb.json`, 2 манипулятора → `limbs.json`. Валидатор следит, чтобы id не попал в оба каталога |
+ | Р5 | **`builtinToArm` ошибочен** (`smoke_claws → robot_arm_robobrain`); удаление ссылки меняет состав атак робомозга | `weapons.json`, `robotEquip.normalizeBuiltinWeapons` | Перед удалением вынести правку данных отдельным решением; зафиксировать тестом, у какой руки какие атаки |
+ | Р6 | **`hitTable` неизвестна** для 6 из 7 планов; боевой системы с попаданиями нет | `bodyplans.json` | Значения из книги — от владельца; до их появления поле не выдумываем, `validateHitTable` допускает отсутствие таблицы |
+-| Р7 | **`swappable: false` у головы** меняет поведение UI: сегодня голову можно заменить (`LimbUpgradeModal` открывается на любом слоте) | `WeaponsAndArmorScreen`, `robotSlotLogic` | Этап 3: скрывать/блокировать кнопку «Конечность» по `swappable`; проверить кит штурмотрона (голова-лазер — базовая) |
+-| Р8 | **`pairedTypes`** при неверной семантике приведёт к снятию соседних рук у Хэнди | `applyLimbReplacement` | Правило: снимается только слот, где стоит **тот же экземпляр** конечности, и только если тип входит в `pairedTypes` |
++| Р7 | **`swappable: false` = конечность не снимается** (а значит и не заменяется). Сегодня голову заменить можно | `WeaponsAndArmorScreen`, `LimbUpgradeModal`, `robotSlotLogic` | Данные готовы (этап 1): у всех планов слот головы — `swappable: false`. Этап 3: скрывать/блокировать кнопку «Конечность» по `swappable`. По владельцу: `robot_head_assaultron` и `robot_head_assaultron_laser` — одно и то же, потеря несущественна |
++| Р8 | ~~**`pairedTypes`**~~ | `applyLimbReplacement` | **Поля не будет** (атавизм, решение владельца). Замена конечности меняет ровно один слот. Механизм «снятия пары» удаляется вместе с причиной его существования — см. вопрос 3 в §6 |
+ | Р9 | **Потеря полей конечностей** (`melee/guns/mind/other/body/carryWeight`) при миграции | `LimbUpgradeModal`, `characterCreation` | Миграция переносит все known-поля как есть; валидатор предупреждает о неизвестных полях, но не удаляет их |
+ | Р10 | **`compatibleBodyPlans`/`defaultForBodyPlan`** (движители, головы) — ограничение «только своё шасси». В целевой схеме поля нет | `canReplaceLimb`, `LimbUpgradeModal.filterByBodyPlan` | Сохранить поля; `limbType` отвечает за тип слота, `compatibleBodyPlans` — за принадлежность шасси |
+ | Р11 | **Четыре модели `Hand → [leftArm, rightArm]`** (`selectors.js:38`, `InventoryScreen.js:623/631`, `powerArmor.js:37`) — человеческая броня, а не робот; трогать осторожно | см. файлы | Общая `slotsForArmorLocation(bodyPlan, location)` вводится **только** для робо-пути; человеческий путь не меняем до отдельного решения |
+@@ -181,14 +225,19 @@
+ 
+ ## 6. Открытые вопросы к владельцу
+ 
+-1. Переименовывать ли id конечностей (`robot_arm_*` → `limb_arm_*`) или
+-   оставить как есть + карта алиасов для сейвов?
+-2. Значения `hitTable` для `protectron`, `assaultron`, `sentryBot`, `robobrain`,
+-   `misterHandy` (у `securitron` есть). Готовые диапазоны для протектрона из
+-   задания взяты как есть.
+-3. 13 задвоенных id: 11 в `weaponAsLimb` + 2 манипулятора в `limbs` (Р4) —
+-   подтвердить.
+-4. `robot_weapon_smoke_claws` belongs to `robot_arm_smoke_manipulator`
+-   (исправление данных) — подтвердить.
+-5. Голова не меняется: подтвердить, что кнопка «Конечность» на слоте головы
+-   скрывается (и что кит штурмотрона не рассчитывает на замену головы).
++**Отвечено (см. §4):** A1 по id; голова несъёмная; `pairedTypes` убран;
++сейвы мигрируются перед релизом; человеческая броня пока вне работ.
++
++1. Значения `hitTable` для `assaultron`, `sentryBot`, `robobrain`,
++   `misterHandy` (есть у `protectron` и `securitron`).
++2. `robot_weapon_smoke_claws` — чья атака? В данных
++   `builtinToArm: "robot_arm_robobrain"`, но `builtinWeaponId` на неё стоит у
++   `robot_arm_smoke_manipulator`. Сейчас робомозг получает когти «из воздуха».
++   Исправление меняет состав атак робомозга — нужно подтверждение.
++3. Один предмет «рука-оружие» — в один слот или во все свободные руки?
++   Сейчас `InventoryScreen.js:695-724` кладёт один предмет во **все** свободные
++   руки одним объектом (у Хэнди — до трёх от одной пилы), списывая одну штуку.
++   Это противоречит правилу «1 предмет = 1 слот» и единственная причина, по
++   которой существовал механизм «снятия парной конечности».
++4. Есть ли реальный файл старого сейва (протектрон + Хэнди) для теста
++   миграции на этапе 5?
+diff --git a/domain/bodyplan.js b/domain/bodyplan.js
+index 0f65933..6e383dd 100644
+--- a/domain/bodyplan.js
++++ b/domain/bodyplan.js
+@@ -42,7 +42,7 @@ export function createSlotsFromBodyPlan(planId) {
+   const plan = bodyPlansRegistry[planId];
+   if (!plan) return {};
+ 
+-  return (plan.slots || []).reduce((acc, slotKey) => {
++  return getBodyPlanSlotIds(plan).reduce((acc, slotKey) => {
+     acc[slotKey] = {
+       limb: null,
+       armor: null,
+@@ -58,6 +58,26 @@ export function createSlotsFromBodyPlan(planId) {
+   }, {});
+ }
+ 
++/**
++ * Идентификаторы слотов плана тела.
++ *
++ * Слоты в данных бывают двух видов:
++ *   ["head", "arm1"]                             — старый формат (строки);
++ *   [{ id: "head", accepts: ["head"], ... }, …]  — новый формат (объекты).
++ *
++ * Оба допустимы: миграция данных уже перевела plans в объекты, а читатели
++ * кода переходят постепенно (этап 3). Единственная точка, которая знает про
++ * оба вида, — эта функция.
++ *
++ * @param {object} plan — запись из bodyplans.json
++ * @returns {string[]}
++ */
++export function getBodyPlanSlotIds(plan) {
++  return (Array.isArray(plan?.slots) ? plan.slots : [])
++    .map((slot) => (typeof slot === 'string' ? slot : slot?.id))
++    .filter(Boolean);
++}
++
+ export function getDefaultLimbs(planId) {
+   return { ...(bodyPlansRegistry[planId]?.defaults || {}) };
+ }
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 2a5ebd5..4b4011a 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -1,4 +1,10 @@
+-import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs, getDefaultPlating } from './bodyplan';
++import {
++  getBodyPlan,
++  getBodyPlanSlotIds,
++  createSlotsFromBodyPlan,
++  getDefaultLimbs,
++  getDefaultPlating,
++} from './bodyplan';
+ import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
+ 
+ // domain/robotEquip.js
+@@ -30,7 +36,9 @@ import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
+ 
+ export function getRobotSlotKeys(bodyPlan) {
+   const plan = getBodyPlan(bodyPlan) || getBodyPlan('humanoid');
+-  return Array.isArray(plan?.slots) ? [...plan.slots] : [];
++  // Слоты в данных — объекты { id, accepts, capacity, swappable }; имена
++  // достаём через getBodyPlanSlotIds, который понимает и старые строки.
++  return getBodyPlanSlotIds(plan);
+ }
+ 
+ export function createEmptyRobotSlots(bodyPlan) {
+diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
+index 9fdb741..d193df4 100644
+--- a/modules/fallout/data/bodyplans/bodyplans.json
++++ b/modules/fallout/data/bodyplans/bodyplans.json
+@@ -1,12 +1,54 @@
+ {
+   "humanoid": {
+     "slots": [
+-      "head",
+-      "torso",
+-      "leftArm",
+-      "rightArm",
+-      "leftLeg",
+-      "rightLeg"
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "torso",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "leftArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "rightArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "leftLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "rightLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "head": null,
+@@ -27,11 +69,46 @@
+   },
+   "robobrain": {
+     "slots": [
+-      "leftArm",
+-      "head",
+-      "rightArm",
+-      "body",
+-      "chassis"
++      {
++        "id": "leftArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "rightArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "body",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "chassis",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "head": "robot_head_robobrain",
+@@ -55,12 +132,54 @@
+   },
+   "misterHandy": {
+     "slots": [
+-      "head",
+-      "body",
+-      "arm1",
+-      "arm2",
+-      "arm3",
+-      "thruster"
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "body",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "arm1",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "arm2",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "arm3",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "thruster",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "head": "robot_head_mister_handy_eye_stalk",
+@@ -85,12 +204,54 @@
+   },
+   "protectron": {
+     "slots": [
+-      "leftArm",
+-      "head",
+-      "rightArm",
+-      "leftLeg",
+-      "body",
+-      "rightLeg"
++      {
++        "id": "leftArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "rightArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "leftLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "body",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "rightLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "leftArm": "robot_arm_protectron",
+@@ -108,15 +269,94 @@
+       "rightArm": {
+         "canEquipWeapon": true
+       }
+-    }
++    },
++    "hitTable": [
++      {
++        "range": [
++          1,
++          3
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          4,
++          7
++        ],
++        "slotId": "leftArm"
++      },
++      {
++        "range": [
++          8,
++          11
++        ],
++        "slotId": "rightArm"
++      },
++      {
++        "range": [
++          12,
++          15
++        ],
++        "slotId": "body"
++      },
++      {
++        "range": [
++          16,
++          18
++        ],
++        "slotId": "leftLeg"
++      },
++      {
++        "range": [
++          19,
++          20
++        ],
++        "slotId": "rightLeg"
++      }
++    ]
+   },
+   "securitron": {
+     "slots": [
+-      "head",
+-      "leftArm",
+-      "body",
+-      "rightArm",
+-      "wheel"
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "leftArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "body",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "rightArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "wheel",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "head": "robot_head_securitron",
+@@ -153,16 +393,95 @@
+       "leftArm": "12-14",
+       "rightArm": "15-17",
+       "wheel": "18-20"
+-    }
++    },
++    "hitTable": [
++      {
++        "range": [
++          1,
++          2
++        ],
++        "slotId": "head"
++      },
++      {
++        "range": [
++          3,
++          11
++        ],
++        "slotId": "body"
++      },
++      {
++        "range": [
++          12,
++          14
++        ],
++        "slotId": "leftArm"
++      },
++      {
++        "range": [
++          15,
++          17
++        ],
++        "slotId": "rightArm"
++      },
++      {
++        "range": [
++          18,
++          20
++        ],
++        "slotId": "wheel"
++      }
++    ]
+   },
+   "assaultron": {
+     "slots": [
+-      "leftArm",
+-      "head",
+-      "rightArm",
+-      "leftLeg",
+-      "body",
+-      "rightLeg"
++      {
++        "id": "leftArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "rightArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "leftLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "body",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "rightLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "leftArm": "robot_arm_assaultron",
+@@ -187,12 +506,54 @@
+   },
+   "sentryBot": {
+     "slots": [
+-      "leftArm",
+-      "head",
+-      "rightArm",
+-      "leftLeg",
+-      "body",
+-      "rightLeg"
++      {
++        "id": "leftArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "head",
++        "accepts": [
++          "head"
++        ],
++        "capacity": 1,
++        "swappable": false
++      },
++      {
++        "id": "rightArm",
++        "accepts": [
++          "arm"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "leftLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "body",
++        "accepts": [
++          "body"
++        ],
++        "capacity": 1,
++        "swappable": true
++      },
++      {
++        "id": "rightLeg",
++        "accepts": [
++          "mover"
++        ],
++        "capacity": 1,
++        "swappable": true
++      }
+     ],
+     "defaults": {
+       "leftArm": "robot_arm_sentry_bot",
+diff --git a/modules/fallout/data/equipment/robot/armor.json b/modules/fallout/data/equipment/robot/armor.json
+index 17f43e3..0dc4df3 100644
+--- a/modules/fallout/data/equipment/robot/armor.json
++++ b/modules/fallout/data/equipment/robot/armor.json
+@@ -11,7 +11,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "head"
+     },
+     {
+       "id": "robot_armor_factory_body",
+@@ -24,7 +25,8 @@
+       },
+       "carryWeightModifier": 20,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "body"
+     },
+     {
+       "id": "robot_armor_factory_arms",
+@@ -37,7 +39,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_armor_factory_thruster",
+@@ -50,7 +53,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_armor_storage_body",
+@@ -63,7 +67,8 @@
+       },
+       "carryWeightModifier": 20,
+       "cost": 25,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "body"
+     }
+   ]
+ }
+diff --git a/modules/fallout/data/equipment/robot/armor_plating.json b/modules/fallout/data/equipment/robot/armor_plating.json
+index ae0d307..ab51682 100644
+--- a/modules/fallout/data/equipment/robot/armor_plating.json
++++ b/modules/fallout/data/equipment/robot/armor_plating.json
+@@ -15,7 +15,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_standard_body",
+@@ -32,7 +33,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_standard_arms",
+@@ -49,7 +51,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_standard_thruster",
+@@ -66,7 +69,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_plating_gutsy_optics",
+@@ -83,7 +87,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_gutsy_body",
+@@ -100,7 +105,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_gutsy_arms",
+@@ -117,7 +123,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_gutsy_thruster",
+@@ -134,7 +141,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 0,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_plating_factory_optics",
+@@ -151,7 +159,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 5,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_factory_body",
+@@ -168,7 +177,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 5,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_factory_arms",
+@@ -185,7 +195,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 5,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_factory_thruster",
+@@ -202,7 +213,8 @@
+       },
+       "carryWeightModifier": 0,
+       "cost": 5,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_plating_primal_optics",
+@@ -219,7 +231,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_primal_body",
+@@ -236,7 +249,8 @@
+       },
+       "carryWeightModifier": -20,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_primal_arms",
+@@ -253,7 +267,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_primal_thruster",
+@@ -270,7 +285,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 10,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_plating_serrated_optics",
+@@ -287,7 +303,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_serrated_body",
+@@ -304,7 +321,8 @@
+       },
+       "carryWeightModifier": -20,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_serrated_arms",
+@@ -321,7 +339,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_serrated_thruster",
+@@ -338,7 +357,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_plating_noxious_optics",
+@@ -355,7 +375,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_noxious_body",
+@@ -372,7 +393,8 @@
+       },
+       "carryWeightModifier": -20,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_noxious_arms",
+@@ -389,7 +411,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_noxious_thruster",
+@@ -406,7 +429,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 1"
++      "perkRequired": "Armorer 1",
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_plating_toxic_optics",
+@@ -423,7 +447,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "head"
+     },
+     {
+       "id": "robot_plating_toxic_body",
+@@ -440,7 +465,8 @@
+       },
+       "carryWeightModifier": -20,
+       "cost": 15,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "body"
+     },
+     {
+       "id": "robot_plating_toxic_arms",
+@@ -457,7 +483,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_plating_toxic_thruster",
+@@ -474,7 +501,8 @@
+       },
+       "carryWeightModifier": -10,
+       "cost": 15,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "mover"
+     }
+   ]
+ }
+diff --git a/modules/fallout/data/equipment/robot/frames.json b/modules/fallout/data/equipment/robot/frames.json
+index d02ee2a..1ba3c04 100644
+--- a/modules/fallout/data/equipment/robot/frames.json
++++ b/modules/fallout/data/equipment/robot/frames.json
+@@ -11,7 +11,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 15,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "head"
+     },
+     {
+       "id": "robot_frame_actuated_body",
+@@ -24,7 +25,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 30,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "body"
+     },
+     {
+       "id": "robot_frame_actuated_arms",
+@@ -37,7 +39,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 15,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_frame_actuated_thruster",
+@@ -50,7 +53,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 15,
+-      "perkRequired": null
++      "perkRequired": null,
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_frame_voltaic_optics",
+@@ -63,7 +67,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 20,
+-      "perkRequired": "Armorer 2"
++      "perkRequired": "Armorer 2",
++      "limbType": "head"
+     },
+     {
+       "id": "robot_frame_voltaic_body",
+@@ -76,7 +81,8 @@
+       },
+       "carryWeightModifier": 20,
+       "cost": 40,
+-      "perkRequired": "Armorer 2"
++      "perkRequired": "Armorer 2",
++      "limbType": "body"
+     },
+     {
+       "id": "robot_frame_voltaic_arms",
+@@ -89,7 +95,8 @@
+       },
+       "carryWeightModifier": 20,
+       "cost": 20,
+-      "perkRequired": "Armorer 2"
++      "perkRequired": "Armorer 2",
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_frame_voltaic_thruster",
+@@ -102,7 +109,8 @@
+       },
+       "carryWeightModifier": 20,
+       "cost": 20,
+-      "perkRequired": "Armorer 2"
++      "perkRequired": "Armorer 2",
++      "limbType": "mover"
+     },
+     {
+       "id": "robot_frame_hydraulic_optics",
+@@ -115,7 +123,8 @@
+       },
+       "carryWeightModifier": 5,
+       "cost": 30,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "head"
+     },
+     {
+       "id": "robot_frame_hydraulic_body",
+@@ -128,7 +137,8 @@
+       },
+       "carryWeightModifier": 10,
+       "cost": 60,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "body"
+     },
+     {
+       "id": "robot_frame_hydraulic_arms",
+@@ -141,7 +151,8 @@
+       },
+       "carryWeightModifier": 5,
+       "cost": 30,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "arm"
+     },
+     {
+       "id": "robot_frame_hydraulic_thruster",
+@@ -154,7 +165,8 @@
+       },
+       "carryWeightModifier": 5,
+       "cost": 30,
+-      "perkRequired": "Armorer 3"
++      "perkRequired": "Armorer 3",
++      "limbType": "mover"
+     }
+   ]
+ }
+diff --git a/modules/fallout/data/equipment/robot/limbs.json b/modules/fallout/data/equipment/robot/limbs.json
+new file mode 100644
+index 0000000..d086876
+--- /dev/null
++++ b/modules/fallout/data/equipment/robot/limbs.json
+@@ -0,0 +1,568 @@
++[
++  {
++    "id": "robot_head_assaultron",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "physicalDR": 3,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": "assaultron",
++    "replaceable": false,
++    "unique": false,
++    "mind": 6,
++    "other": 4,
++    "rarity": 1,
++    "name": "robot_head_assaultron"
++  },
++  {
++    "id": "robot_head_assaultron_laser",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "builtinWeaponId": "robot_weapon_assaultron_head_laser",
++    "physicalDR": 3,
++    "energyDR": 4,
++    "radDR": 0,
++    "installComplexity": 7,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 2"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": null,
++    "replaceable": false,
++    "unique": false,
++    "mind": 6,
++    "other": 4,
++    "rarity": 2,
++    "name": "robot_head_assaultron_laser"
++  },
++  {
++    "id": "robot_head_mister_handy_eye_stalk",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "physicalDR": 1,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": "misterHandy",
++    "replaceable": false,
++    "unique": true,
++    "mind": null,
++    "other": null,
++    "rarity": 1,
++    "name": "robot_head_mister_handy_eye_stalk"
++  },
++  {
++    "id": "robot_head_protectron",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": "protectron",
++    "replaceable": false,
++    "unique": false,
++    "mind": 5,
++    "other": 2,
++    "rarity": 1,
++    "name": "robot_head_protectron"
++  },
++  {
++    "id": "robot_head_robobrain",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "builtinWeaponId": "robot_weapon_mesmetron",
++    "physicalDR": 2,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 3"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": "robobrain",
++    "replaceable": false,
++    "unique": true,
++    "mind": 7,
++    "other": 3,
++    "rarity": 2,
++    "name": "robot_head_robobrain"
++  },
++  {
++    "id": "robot_head_securitron",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": "securitron",
++    "replaceable": false,
++    "unique": false,
++    "mind": 5,
++    "other": 2,
++    "rarity": 1,
++    "name": "robot_head_securitron"
++  },
++  {
++    "id": "robot_head_sentry_bot",
++    "itemCategory": "limb",
++    "limbType": "head",
++    "physicalDR": 4,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Armorer 1",
++      "Robotics Expert 2",
++      "Science! 2"
++    ],
++    "installSkill": "REPAIR",
++    "defaultForBodyPlan": "sentryBot",
++    "replaceable": false,
++    "unique": false,
++    "mind": 6,
++    "other": 4,
++    "rarity": 2,
++    "name": "robot_head_sentry_bot"
++  },
++  {
++    "id": "robot_body_assaultron",
++    "itemCategory": "limb",
++    "limbType": "body",
++    "physicalDR": 4,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 2"
++    ],
++    "installSkill": "REPAIR",
++    "robotBodyPlan": "assaultron",
++    "replaceable": true,
++    "body": 9,
++    "carryWeight": 150,
++    "rarity": 1,
++    "name": "robot_body_assaultron"
++  },
++  {
++    "id": "robot_body_mister_handy",
++    "itemCategory": "limb",
++    "limbType": "body",
++    "physicalDR": 3,
++    "energyDR": 2,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "robotBodyPlan": "misterHandy",
++    "replaceable": false,
++    "body": 5,
++    "carryWeight": 150,
++    "rarity": 1,
++    "name": "robot_body_mister_handy"
++  },
++  {
++    "id": "robot_body_protectron",
++    "itemCategory": "limb",
++    "limbType": "body",
++    "physicalDR": 3,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "robotBodyPlan": "protectron",
++    "replaceable": true,
++    "body": 5,
++    "carryWeight": 225,
++    "rarity": 1,
++    "name": "robot_body_protectron"
++  },
++  {
++    "id": "robot_body_robobrain",
++    "itemCategory": "limb",
++    "limbType": "body",
++    "physicalDR": 3,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "robotBodyPlan": "robobrain",
++    "replaceable": true,
++    "body": 6,
++    "carryWeight": 150,
++    "rarity": 2,
++    "name": "robot_body_robobrain"
++  },
++  {
++    "id": "robot_body_securitron",
++    "itemCategory": "limb",
++    "limbType": "body",
++    "physicalDR": 3,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "robotBodyPlan": "securitron",
++    "replaceable": true,
++    "body": 5,
++    "carryWeight": 150,
++    "rarity": 1,
++    "name": "robot_body_securitron"
++  },
++  {
++    "id": "robot_body_sentry_bot",
++    "itemCategory": "limb",
++    "limbType": "body",
++    "physicalDR": 5,
++    "energyDR": 4,
++    "radDR": 0,
++    "installComplexity": 7,
++    "installPerksRequired": [
++      "Armorer 1",
++      "Robotics Expert 3",
++      "Science! 2"
++    ],
++    "installSkill": "REPAIR",
++    "robotBodyPlan": "sentryBot",
++    "replaceable": true,
++    "body": 10,
++    "carryWeight": 225,
++    "rarity": 2,
++    "name": "robot_body_sentry_bot"
++  },
++  {
++    "id": "robot_arm_assaultron",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_claw",
++    "physicalDR": 3,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 2"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 5,
++    "guns": 5,
++    "rarity": 1,
++    "name": "robot_arm_assaultron"
++  },
++  {
++    "id": "robot_arm_assaultron_shocker",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_shocker_arms",
++    "physicalDR": 3,
++    "energyDR": 4,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 5,
++    "guns": 3,
++    "rarity": 2,
++    "name": "robot_arm_assaultron_shocker"
++  },
++  {
++    "id": "robot_arm_mister_handy",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_manipulator",
++    "physicalDR": 2,
++    "energyDR": 2,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 3,
++    "guns": 1,
++    "rarity": 1,
++    "name": "robot_arm_mister_handy"
++  },
++  {
++    "id": "robot_arm_protectron",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 2,
++    "guns": 2,
++    "rarity": 1,
++    "name": "robot_arm_protectron"
++  },
++  {
++    "id": "robot_arm_robobrain",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "physicalDR": 2,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 2,
++    "guns": 4,
++    "rarity": 2,
++    "name": "robot_arm_robobrain"
++  },
++  {
++    "id": "robot_arm_securitron",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_manipulator",
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 2,
++    "guns": 2,
++    "rarity": 1,
++    "name": "robot_arm_securitron"
++  },
++  {
++    "id": "robot_arm_sentry_bot",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "physicalDR": 4,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Armorer 1",
++      "Robotics Expert 3",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 4,
++    "guns": 5,
++    "rarity": 2,
++    "name": "robot_arm_sentry_bot"
++  },
++  {
++    "id": "robot_arm_smoke_manipulator",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_smoke_claws",
++    "physicalDR": 2,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "melee": 2,
++    "guns": 4,
++    "rarity": 2,
++    "name": "robot_arm_smoke_manipulator"
++  },
++  {
++    "id": "robot_weapon_manipulator",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_manipulator",
++    "installComplexity": 2,
++    "installPerksRequired": [],
++    "installSkill": "REPAIR",
++    "rarity": 0,
++    "name": "robot_weapon_manipulator"
++  },
++  {
++    "id": "robot_weapon_protectron_manipulator",
++    "itemCategory": "limb",
++    "limbType": "arm",
++    "canHoldWeapons": true,
++    "weaponSlots": 1,
++    "builtinWeaponId": "robot_weapon_protectron_manipulator",
++    "installComplexity": 3,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "rarity": 0,
++    "name": "robot_weapon_protectron_manipulator"
++  },
++  {
++    "id": "robot_legs_assaultron",
++    "itemCategory": "limb",
++    "limbType": "mover",
++    "physicalDR": 3,
++    "energyDR": 2,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 2"
++    ],
++    "installSkill": "REPAIR",
++    "compatibleBodyPlans": [
++      "assaultron"
++    ],
++    "rarity": 1,
++    "name": "robot_legs_assaultron"
++  },
++  {
++    "id": "robot_legs_mister_handy_thruster",
++    "itemCategory": "limb",
++    "limbType": "mover",
++    "physicalDR": 2,
++    "energyDR": 2,
++    "radDR": 0,
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "compatibleBodyPlans": [
++      "misterHandy"
++    ],
++    "rarity": 1,
++    "name": "robot_legs_mister_handy_thruster"
++  },
++  {
++    "id": "robot_legs_protectron",
++    "itemCategory": "limb",
++    "limbType": "mover",
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 3,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "compatibleBodyPlans": [
++      "protectron"
++    ],
++    "rarity": 1,
++    "name": "robot_legs_protectron"
++  },
++  {
++    "id": "robot_legs_robobrain_treads",
++    "itemCategory": "limb",
++    "limbType": "mover",
++    "physicalDR": 2,
++    "energyDR": 2,
++    "radDR": 0,
++    "installComplexity": 5,
++    "installPerksRequired": [
++      "Robotics Expert 2",
++      "Science! 1"
++    ],
++    "installSkill": "REPAIR",
++    "compatibleBodyPlans": [
++      "robobrain"
++    ],
++    "rarity": 1,
++    "name": "robot_legs_robobrain_treads"
++  },
++  {
++    "id": "robot_legs_securitron",
++    "itemCategory": "limb",
++    "limbType": "mover",
++    "physicalDR": 2,
++    "energyDR": 1,
++    "radDR": 0,
++    "installComplexity": 3,
++    "installPerksRequired": [
++      "Robotics Expert 1"
++    ],
++    "installSkill": "REPAIR",
++    "compatibleBodyPlans": [
++      "securitron"
++    ],
++    "defaultForBodyPlan": "securitron",
++    "rarity": 1,
++    "name": "robot_legs_securitron"
++  },
++  {
++    "id": "robot_legs_sentry_bot",
++    "itemCategory": "limb",
++    "limbType": "mover",
++    "physicalDR": 4,
++    "energyDR": 3,
++    "radDR": 0,
++    "installComplexity": 6,
++    "installPerksRequired": [
++      "Armorer 1",
++      "Robotics Expert 3"
++    ],
++    "installSkill": "REPAIR",
++    "compatibleBodyPlans": [
++      "sentryBot"
++    ],
++    "rarity": 2,
++    "name": "robot_legs_sentry_bot"
++  }
++]
+diff --git a/modules/fallout/data/equipment/robot/weaponAsLimb.json b/modules/fallout/data/equipment/robot/weaponAsLimb.json
+new file mode 100644
+index 0000000..59c7629
+--- /dev/null
++++ b/modules/fallout/data/equipment/robot/weaponAsLimb.json
+@@ -0,0 +1,111 @@
++[
++  {
++    "id": "robot_weapon_auto_10mm",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_auto_10mm",
++    "name": "robot_weapon_auto_10mm"
++  },
++  {
++    "id": "robot_weapon_circular_saw",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_circular_saw",
++    "installComplexity": 3,
++    "installPerksRequired": [
++      "Blacksmith 1"
++    ],
++    "installSkill": "REPAIR",
++    "name": "robot_weapon_circular_saw"
++  },
++  {
++    "id": "robot_weapon_claw",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_claw",
++    "name": "robot_weapon_claw"
++  },
++  {
++    "id": "robot_weapon_construction_claw",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_construction_claw",
++    "installComplexity": 3,
++    "installPerksRequired": [
++      "Blacksmith 1"
++    ],
++    "installSkill": "REPAIR",
++    "name": "robot_weapon_construction_claw"
++  },
++  {
++    "id": "robot_weapon_cryojet",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_cryojet",
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1",
++      "Science! 1"
++    ],
++    "installSkill": "SCIENCE",
++    "name": "robot_weapon_cryojet"
++  },
++  {
++    "id": "robot_weapon_drill",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_drill",
++    "installComplexity": 3,
++    "installPerksRequired": [
++      "Blacksmith 2"
++    ],
++    "installSkill": "REPAIR",
++    "name": "robot_weapon_drill"
++  },
++  {
++    "id": "robot_weapon_flamethrower",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_flamethrower",
++    "name": "robot_weapon_flamethrower"
++  },
++  {
++    "id": "robot_weapon_laser_cutter",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_laser_cutter",
++    "name": "robot_weapon_laser_cutter"
++  },
++  {
++    "id": "robot_weapon_shocker_arms",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_shocker_arms",
++    "name": "robot_weapon_shocker_arms"
++  },
++  {
++    "id": "robot_weapon_tesla_arm",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_tesla_arm",
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Robotics Expert 1",
++      "Science! 1"
++    ],
++    "installSkill": "SCIENCE",
++    "name": "robot_weapon_tesla_arm"
++  },
++  {
++    "id": "robot_weapon_vice_grip",
++    "itemCategory": "weaponAsLimb",
++    "limbType": "arm",
++    "attackId": "robot_weapon_vice_grip",
++    "installComplexity": 4,
++    "installPerksRequired": [
++      "Blacksmith 3"
++    ],
++    "installSkill": "REPAIR",
++    "name": "robot_weapon_vice_grip"
++  }
++]
+diff --git a/modules/fallout/data/equipment/robot/weapons.json b/modules/fallout/data/equipment/robot/weapons.json
+index 2a2067f..39d61f3 100644
+--- a/modules/fallout/data/equipment/robot/weapons.json
++++ b/modules/fallout/data/equipment/robot/weapons.json
+@@ -18,7 +18,8 @@
+         "qualityId": "quality_close_quarters"
+       }
+     ],
+-    "effects": []
++    "effects": [],
++    "handheld": true
+   },
+   {
+     "id": "robot_weapon_protectron_manipulator",
+@@ -39,7 +40,8 @@
+         "qualityId": "quality_close_quarters"
+       }
+     ],
+-    "effects": []
++    "effects": [],
++    "handheld": true
+   },
+   {
+     "id": "robot_weapon_flamethrower",
+@@ -67,7 +69,8 @@
+       {
+         "effectId": "effect_spread"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_circular_saw",
+@@ -100,7 +103,8 @@
+       {
+         "effectId": "effect_piercing_x"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_laser_cutter",
+@@ -125,7 +129,8 @@
+       {
+         "effectId": "effect_piercing_x"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_auto_10mm",
+@@ -154,7 +159,8 @@
+       {
+         "effectId": "effect_burst"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_cryojet",
+@@ -188,7 +194,8 @@
+       {
+         "effectId": "effect_freeze"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_shocker_arms",
+@@ -215,7 +222,8 @@
+       {
+         "effectId": "effect_stun"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_self_destruct",
+@@ -238,7 +246,8 @@
+         "qualityId": "quality_blast"
+       }
+     ],
+-    "effects": []
++    "effects": [],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_construction_claw",
+@@ -267,7 +276,8 @@
+       {
+         "effectId": "effect_breaking"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_drill",
+@@ -299,7 +309,8 @@
+       {
+         "effectId": "effect_vicious"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_vice_grip",
+@@ -331,7 +342,8 @@
+       {
+         "effectId": "effect_breaking"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_mod_shock",
+@@ -357,7 +369,8 @@
+       {
+         "effectId": "effect_stun"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_mod_stun",
+@@ -383,7 +396,8 @@
+       {
+         "effectId": "effect_stun"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_assaultron_head_laser",
+@@ -414,7 +428,8 @@
+       {
+         "effectId": "effect_piercing_x"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_mesmetron",
+@@ -439,7 +454,8 @@
+       {
+         "effectId": "effect_stun"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_claw",
+@@ -462,7 +478,8 @@
+         "qualityId": "quality_close_quarters"
+       }
+     ],
+-    "effects": []
++    "effects": [],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_tesla_arm",
+@@ -490,7 +507,8 @@
+       {
+         "effectId": "effect_burst"
+       }
+-    ]
++    ],
++    "handheld": false
+   },
+   {
+     "id": "robot_weapon_smoke_claws",
+@@ -522,6 +540,7 @@
+       {
+         "effectId": "effect_persistent"
+       }
+-    ]
++    ],
++    "handheld": false
+   }
+ ]
+diff --git a/scripts/migrate-bodyplans.mjs b/scripts/migrate-bodyplans.mjs
+new file mode 100644
+index 0000000..7b9c7ec
+--- /dev/null
++++ b/scripts/migrate-bodyplans.mjs
+@@ -0,0 +1,139 @@
++#!/usr/bin/env node
++/**
++ * Миграция планов тел (этап 1): слоты из строк становятся объектами.
++ *
++ *   было: "slots": ["head", "arm1", ...]
++ *   стало: "slots": [{ "id": "head", "accepts": ["head"], "capacity": 1,
++ *                      "swappable": false }, ...]
++ *
++ * Что ещё добавляется:
++ *   hitTable — диапазоны d20 по слотам. Есть ТОЛЬКО там, где диапазоны
++ *              известны из книги. Выдумывать их миграция не умеет и не будет:
++ *              у планов без hitTable поле просто отсутствует (валидатор это
++ *              допускает, см. scripts/validate-robot-data.mjs).
++ *
++ * Что НЕ трогается (снимается на этапе 6, когда код переедет):
++ *   slotCapabilities — дублирует canHoldWeapons конечности;
++ *   hitLocations     — строковая копия hitTable для подписи в UI;
++ *   defaultPlating   — живая механика (IRON RULE: возможность задать должна
++ *                      остаться);
++ *   layout           — раскладка экрана.
++ *
++ * Запуск:  node scripts/migrate-bodyplans.mjs [--check]
++ */
++
++import fs from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
++const BODYPLANS = path.join(ROOT, 'modules/fallout/data/bodyplans/bodyplans.json');
++
++// Диапазоны попаданий d20. Источник: книга/владелец. Ничего не выдумано:
++// чего в этом списке нет — того в данных нет.
++const HIT_TABLES = {
++  protectron: [
++    ['head', 1, 3],
++    ['leftArm', 4, 7],
++    ['rightArm', 8, 11],
++    ['body', 12, 15],
++    ['leftLeg', 16, 18],
++    ['rightLeg', 19, 20],
++  ],
++  securitron: [
++    ['head', 1, 2],
++    ['body', 3, 11],
++    ['leftArm', 12, 14],
++    ['rightArm', 15, 17],
++    ['wheel', 18, 20],
++  ],
++};
++
++/** Имя слота → тип конечностей, которые он принимает. */
++const acceptsForSlot = (slotId) => {
++  if (slotId === 'head') return ['head'];
++  if (slotId === 'body' || slotId === 'torso') return ['body'];
++  if (/arm/i.test(slotId)) return ['arm'];
++  // Движитель: ноги, гусеницы, реактивная тяга, колесо — один тип mover.
++  if (/leg/i.test(slotId) || ['chassis', 'thruster', 'wheel'].includes(slotId)) {
++    return ['mover'];
++  }
++  return [];
++};
++
++/**
++ * Снимается ли конечность со слота.
++ * Голова — никогда (решение владельца: «головы чаще всего не снимаются»).
++ * Для корпуса берём признак `replaceable` из каталога корпусов.
++ */
++const makeSwappable = (slotId, planId, bodiesById, bodyPlanDefaults) => {
++  if (slotId === 'head' || acceptsForSlot(slotId).includes('head')) return false;
++  if (acceptsForSlot(slotId).includes('body')) {
++    const defaultId = bodyPlanDefaults?.[slotId];
++    const body = defaultId ? bodiesById.get(defaultId) : null;
++    if (body && body.replaceable !== undefined) return body.replaceable === true;
++  }
++  return true;
++};
++
++export function migrate() {
++  const plans = JSON.parse(fs.readFileSync(BODYPLANS, 'utf8'));
++  const bodies = JSON.parse(
++    fs.readFileSync(
++      path.join(ROOT, 'modules/fallout/data/equipment/robot/robotbody.json'),
++      'utf8',
++    ),
++  );
++  const bodiesById = new Map(bodies.map((b) => [b.id, b]));
++
++  const out = {};
++  for (const [planId, plan] of Object.entries(plans)) {
++    const defaults = plan.defaults || {};
++    const slots = (plan.slots || []).map((slot) => {
++      const slotId = typeof slot === 'string' ? slot : slot.id;
++      if (typeof slot === 'object' && slot !== null) return slot; // уже мигрировано
++      return {
++        id: slotId,
++        accepts: acceptsForSlot(slotId),
++        capacity: 1,
++        swappable: makeSwappable(slotId, planId, bodiesById, defaults),
++      };
++    });
++
++    const hitTable = (HIT_TABLES[planId] || []).map(([slotId, from, to]) => ({
++      range: [from, to],
++      slotId,
++    }));
++
++    out[planId] = {
++      ...plan,
++      slots,
++      ...(hitTable.length > 0 ? { hitTable } : {}),
++    };
++  }
++  return out;
++}
++
++const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
++if (isMain) {
++  const checkOnly = process.argv.includes('--check');
++  const result = migrate();
++  if (checkOnly) {
++    const current = JSON.parse(fs.readFileSync(BODYPLANS, 'utf8'));
++    const same = JSON.stringify(current) === JSON.stringify(JSON.parse(JSON.stringify(result)));
++    if (!same) {
++      console.error('bodyplans.json устарел — нужен запуск миграции.');
++      process.exit(1);
++    }
++    console.log('bodyplans.json актуален.');
++  } else {
++    fs.writeFileSync(BODYPLANS, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
++    for (const [planId, plan] of Object.entries(result)) {
++      const slots = plan.slots.map((s) => (typeof s === 'string' ? s : s.id)).join(', ');
++      console.log(`${planId.padEnd(12)} слотов: ${plan.slots.length} (${slots})`);
++      if (plan.hitTable) {
++        console.log(`${''.padEnd(12)} hitTable: ${plan.hitTable.length} диапазонов`);
++      }
++    }
++  }
++}
+diff --git a/scripts/migrate-robot-limbs.mjs b/scripts/migrate-robot-limbs.mjs
+new file mode 100644
+index 0000000..43c658b
+--- /dev/null
++++ b/scripts/migrate-robot-limbs.mjs
+@@ -0,0 +1,240 @@
++#!/usr/bin/env node
++/**
++ * Миграция каталогов конечностей роботов (этап 1).
++ *
++ * Что делает — и всё это АДДИТИВНО, старые файлы не удаляются и не ломаются:
++ *
++ *   1. robotarms.json + robotheads.json + robotlegs.json + robotbody.json
++ *      → limbs.json      (itemCategory: "limb")
++ *      → weaponAsLimb.json (itemCategory: "weaponAsLimb")
++ *      Разделение по правилу §3 docs/architecture/robots.md:
++ *      «нет хватки (canHoldWeapons: false) и нет своей СУ» → оружие вместо
++ *      конечности; иначе — конечность.
++ *
++ *   2. weapons.json (робо-оружие): добавляет флаг handheld.
++ *      true  — можно вложить в weaponSlots руки;
++ *      false — только встроенная атака / оружие вместо конечности.
++ *
++ *   3. armor.json / armor_plating.json / frames.json: добавляет limbType
++ *      вместо опоры на robotLocation (Optics→head, Main Body→body,
++ *      Arms→arm, Thruster→mover). Поле robotLocation остаётся до переезда
++ *      кода на limbType.
++ *
++ * Решение владельца (А1): существующие id НЕ переименовываются.
++ * Коллизию 13 задвоенных id снимает не имя, а маршрутизация по
++ * itemCategory — см. scripts/validate-robot-data.mjs.
++ *
++ * Запуск:  node scripts/migrate-robot-limbs.mjs [--check]
++ *          --check — не писать файлы, только проверить, что они актуальны
++ *                    (для тестов и CI).
++ */
++
++import fs from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
++const ROBOT_DIR = path.join(ROOT, 'modules/fallout/data/equipment/robot');
++
++const read = (file) => JSON.parse(fs.readFileSync(path.join(ROBOT_DIR, file), 'utf8'));
++const write = (file, data) => {
++  const p = path.join(ROBOT_DIR, file);
++  fs.writeFileSync(p, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
++};
++
++// ---------------------------------------------------------------------------
++// Карты
++// ---------------------------------------------------------------------------
++
++const LOCATION_TO_LIMB_TYPE = {
++  Optics: 'head',
++  'Main Body': 'body',
++  Arms: 'arm',
++  Thruster: 'mover',
++};
++
++const DR_FIELDS = ['physicalDR', 'energyDR', 'radDR'];
++// Поля, которые переносим как есть: они нужны UI и расчётам.
++const PASSTHROUGH_FIELDS = [
++  'compatibleBodyPlans',
++  'defaultForBodyPlan',
++  'robotBodyPlan',
++  'replaceable',
++  'unique',
++  'melee',
++  'guns',
++  'mind',
++  'other',
++  'body',
++  'carryWeight',
++  'rarity',
++  'name',
++];
++
++const pick = (source, keys) => {
++  const out = {};
++  for (const key of keys) {
++    if (source[key] !== undefined) out[key] = source[key];
++  }
++  return out;
++};
++
++const hasDR = (entry) => DR_FIELDS.some((f) => entry[f] !== undefined);
++
++// ---------------------------------------------------------------------------
++// Конечности
++// ---------------------------------------------------------------------------
++
++const buildLimb = (entry, limbType) => ({
++  id: entry.id,
++  itemCategory: 'limb',
++  limbType,
++  ...(entry.canHoldWeapons !== undefined ? { canHoldWeapons: entry.canHoldWeapons } : {}),
++  ...(entry.weaponSlots !== undefined ? { weaponSlots: entry.weaponSlots } : {}),
++  ...(entry.builtinWeaponId ? { builtinWeaponId: entry.builtinWeaponId } : {}),
++  ...pick(entry, DR_FIELDS),
++  ...(entry.complexity !== undefined ? { installComplexity: entry.complexity } : {}),
++  ...(entry.perksRequired !== undefined
++    ? { installPerksRequired: entry.perksRequired }
++    : {}),
++  ...(entry.skill !== undefined
++    ? { installSkill: String(entry.skill).toUpperCase() }
++    : {}),
++  ...pick(entry, PASSTHROUGH_FIELDS),
++});
++
++/**
++ * Оружие вместо конечности: своей защиты нет, хватки нет, вместо
++ * builtinWeaponId — attackId. Требования установки живут в weapons.json
++ * (исторически), поэтому переносим их оттуда.
++ */
++const buildWeaponAsLimb = (entry, weaponById) => {
++  const weapon = weaponById.get(entry.id);
++  return {
++    id: entry.id,
++    itemCategory: 'weaponAsLimb',
++    limbType: 'arm',
++    attackId: entry.builtinWeaponId || entry.id,
++    ...(weapon?.installComplexity != null
++      ? { installComplexity: weapon.installComplexity }
++      : (entry.complexity !== undefined ? { installComplexity: entry.complexity } : {})),
++    ...(weapon?.installPerksRequired != null
++      ? { installPerksRequired: weapon.installPerksRequired }
++      : (entry.perksRequired !== undefined
++        ? { installPerksRequired: entry.perksRequired }
++        : {})),
++    ...(weapon?.installSkill != null
++      ? { installSkill: String(weapon.installSkill).toUpperCase() }
++      : (entry.skill !== undefined ? { installSkill: String(entry.skill).toUpperCase() } : {})),
++    ...pick(entry, PASSTHROUGH_FIELDS),
++  };
++};
++
++const LIMB_TYPE_ORDER = ['head', 'body', 'arm', 'mover'];
++
++export function migrate() {
++  const arms = read('robotarms.json');
++  const heads = read('robotheads.json');
++  const movers = read('robotlegs.json');
++  const bodies = read('robotbody.json');
++  const weapons = read('weapons.json');
++  const weaponById = new Map(weapons.map((w) => [w.id, w]));
++
++  const limbs = [
++    ...heads.map((e) => buildLimb(e, 'head')),
++    ...bodies.map((e) => buildLimb(e, 'body')),
++    ...arms.filter((e) => e.canHoldWeapons === true || hasDR(e)).map((e) => buildLimb(e, 'arm')),
++    ...movers.map((e) => buildLimb(e, 'mover')),
++  ].sort((a, b) => {
++    const byType = LIMB_TYPE_ORDER.indexOf(a.limbType) - LIMB_TYPE_ORDER.indexOf(b.limbType);
++    return byType !== 0 ? byType : a.id.localeCompare(b.id);
++  });
++
++  const weaponAsLimb = arms
++    .filter((e) => e.canHoldWeapons === false && !hasDR(e))
++    .map((e) => buildWeaponAsLimb(e, weaponById))
++    .sort((a, b) => a.id.localeCompare(b.id));
++
++  // Робо-оружие: можно ли держать в ладони.
++  // Критерий: запись есть в limbs.json, это манипулятор (canHoldWeapons) и
++  // её встроенная атака — само это оружие.
++  const limbById = new Map(limbs.map((l) => [l.id, l]));
++  const handheldIds = new Set(
++    [...limbById.values()]
++      .filter((l) => l.canHoldWeapons === true && l.builtinWeaponId === l.id)
++      .map((l) => l.id),
++  );
++
++  const nextWeapons = weapons.map((w) => ({
++    ...w,
++    handheld: handheldIds.has(w.id),
++  }));
++
++  const armorFiles = [
++    { file: 'armor.json', key: 'armor' },
++    { file: 'armor_plating.json', key: 'plating' },
++    { file: 'frames.json', key: 'frames' },
++  ];
++
++  const nextArmor = armorFiles.map(({ file, key }) => {
++    const data = read(file);
++    return {
++      file,
++      data: {
++        ...data,
++        [key]: (data[key] || []).map((entry) => ({
++          ...entry,
++          limbType: LOCATION_TO_LIMB_TYPE[entry.robotLocation] ?? null,
++        })),
++      },
++    };
++  });
++
++  return { limbs, weaponAsLimb, weapons: nextWeapons, armor: nextArmor };
++}
++
++// ---------------------------------------------------------------------------
++// CLI
++// ---------------------------------------------------------------------------
++
++const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
++if (isMain) {
++  const checkOnly = process.argv.includes('--check');
++  const result = migrate();
++
++  const target = (name, data) => {
++    if (checkOnly) {
++      const p = path.join(ROBOT_DIR, name);
++      if (!fs.existsSync(p)) return false;
++      const current = JSON.stringify(JSON.parse(fs.readFileSync(p, 'utf8')));
++      return current === JSON.stringify(JSON.parse(JSON.stringify(data)));
++    }
++    write(name, data);
++    return true;
++  };
++
++  const results = [
++    ['limbs.json', target('limbs.json', result.limbs)],
++    ['weaponAsLimb.json', target('weaponAsLimb.json', result.weaponAsLimb)],
++    ['weapons.json', target('weapons.json', result.weapons)],
++    ...result.armor.map(({ file, data }) => [file, target(file, data)]),
++  ];
++
++  if (checkOnly) {
++    const stale = results.filter(([, ok]) => !ok).map(([name]) => name);
++    if (stale.length > 0) {
++      console.error('Устарели (нужен запуск миграции):', stale.join(', '));
++      process.exit(1);
++    }
++    console.log('Каталоги актуальны.');
++  } else {
++    console.log('Записано:');
++    console.log(`  limbs.json        — ${result.limbs.length} записей`);
++    console.log(`  weaponAsLimb.json — ${result.weaponAsLimb.length} записей`);
++    console.log(`  weapons.json      — handheld: ${result.weapons.filter((w) => w.handheld).length}`);
++    for (const { file, data } of result.armor) {
++      const key = file === 'armor.json' ? 'armor' : file === 'frames.json' ? 'frames' : 'plating';
++      console.log(`  ${file.padEnd(18)}— limbType у ${data[key].length} записей`);
++    }
++  }
++}
+diff --git a/scripts/validate-robot-data.mjs b/scripts/validate-robot-data.mjs
+new file mode 100644
+index 0000000..3c4cd56
+--- /dev/null
++++ b/scripts/validate-robot-data.mjs
+@@ -0,0 +1,265 @@
++#!/usr/bin/env node
++/**
++ * Валидатор новых каталогов данных роботов (этап 1).
++ *
++ * Проверяет целостность ДАННЫХ, а не поведение кода:
++ *   - уникальность id внутри каждого каталога и отсутствие пересечений
++ *     между limbs.json и weaponAsLimb.json (коллизия 13 id снимается
++ *     itemCategory, а не переименованием — решение А1);
++ *   - обязательные поля и допустимые значения limbType;
++ *   - оружие вместо конечности не несёт ни защиты, ни хватки (10.5);
++ *   - ссылки (builtinWeaponId / attackId) разрешаются в weapons.json;
++ *   - броня адресуется типом конечности, а не именем слота;
++ *   - hitTable непрерывно покрывает 1..20 без дыр и наложений;
++ *   - defaults плана тела существуют и подходят по типу.
++ *
++ * Одна реализация на два входа: CLI и тест (__tests__/robot/robot-data-catalogs.test.js).
++ *
++ * Запуск:  node scripts/validate-robot-data.mjs
++ */
++
++import fs from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++export const LIMB_TYPES = ['head', 'body', 'arm', 'mover'];
++export const LAYERS = ['frame', 'plating', 'armor'];
++
++const ROBOT_REL = 'modules/fallout/data/equipment/robot';
++const BODYPLANS_REL = 'modules/fallout/data/bodyplans/bodyplans.json';
++
++const LOCATION_TO_LIMB_TYPE = {
++  Optics: 'head',
++  'Main Body': 'body',
++  Arms: 'arm',
++  Thruster: 'mover',
++};
++
++const readJson = (root, rel) => JSON.parse(fs.readFileSync(path.join(root, rel), 'utf8'));
++
++const collectDuplicates = (ids) => {
++  const seen = new Set();
++  const dups = new Set();
++  for (const id of ids) {
++    if (seen.has(id)) dups.add(id);
++    seen.add(id);
++  }
++  return [...dups];
++};
++
++/**
++ * @param {string} root — корень репозитория
++ * @returns {{ errors: string[], warnings: string[], stats: object }}
++ */
++export function validateAll(root) {
++  const errors = [];
++  const warnings = [];
++  const err = (msg) => errors.push(msg);
++  const warn = (msg) => warnings.push(msg);
++
++  const robotDir = path.join(root, ROBOT_REL);
++  const limbs = readJson(root, `${ROBOT_REL}/limbs.json`);
++  const weaponAsLimb = readJson(root, `${ROBOT_REL}/weaponAsLimb.json`);
++  const weapons = readJson(root, `${ROBOT_REL}/weapons.json`);
++  const armorFiles = [
++    { file: 'armor.json', key: 'armor' },
++    { file: 'armor_plating.json', key: 'plating' },
++    { file: 'frames.json', key: 'frames' },
++  ].map((entry) => ({ ...entry, data: readJson(root, `${ROBOT_REL}/${entry.file}`) }));
++
++  const bodyplans = readJson(root, BODYPLANS_REL);
++  const weaponIds = new Set(weapons.map((w) => w.id));
++
++  // --- limbs.json -----------------------------------------------------------
++  const limbIds = limbs.map((l) => l.id);
++  for (const dup of collectDuplicates(limbIds)) {
++    err(`limbs.json: id "${dup}" встречается более одного раза`);
++  }
++  for (const limb of limbs) {
++    const where = `limbs.json:${limb.id}`;
++    if (limb.itemCategory !== 'limb') err(`${where}: itemCategory должна быть "limb"`);
++    if (!LIMB_TYPES.includes(limb.limbType)) {
++      err(`${where}: limbType "${limb.limbType}" не из списка ${LIMB_TYPES.join('/')}`);
++    }
++    if (limb.canHoldWeapons === true && limb.weaponSlots === undefined) {
++      warn(`${where}: canHoldWeapons без weaponSlots — считаем вместимость 1`);
++    }
++    if (limb.builtinWeaponId && !weaponIds.has(limb.builtinWeaponId)) {
++      err(`${where}: builtinWeaponId "${limb.builtinWeaponId}" не найден в weapons.json`);
++    }
++  }
++
++  // --- weaponAsLimb.json ----------------------------------------------------
++  const weaponLimbIds = weaponAsLimb.map((l) => l.id);
++  for (const dup of collectDuplicates(weaponLimbIds)) {
++    err(`weaponAsLimb.json: id "${dup}" встречается более одного раза`);
++  }
++  const FORBIDDEN_IN_WEAPON_LIMB = [
++    'physicalDR',
++    'energyDR',
++    'radDR',
++    'canHoldWeapons',
++    'weaponSlots',
++  ];
++  for (const entry of weaponAsLimb) {
++    const where = `weaponAsLimb.json:${entry.id}`;
++    if (entry.itemCategory !== 'weaponAsLimb') {
++      err(`${where}: itemCategory должна быть "weaponAsLimb"`);
++    }
++    if (!LIMB_TYPES.includes(entry.limbType)) {
++      err(`${where}: limbType "${entry.limbType}" не из списка ${LIMB_TYPES.join('/')}`);
++    }
++    for (const field of FORBIDDEN_IN_WEAPON_LIMB) {
++      if (field in entry) {
++        err(`${where}: поле ${field} должно ОТСУТСТВОВАТЬ, а не быть 0/false`);
++      }
++    }
++    if (!entry.attackId) err(`${where}: нет attackId`);
++    else if (!weaponIds.has(entry.attackId)) {
++      err(`${where}: attackId "${entry.attackId}" не найден в weapons.json`);
++    }
++  }
++
++  // --- пересечения ----------------------------------------------------------
++  const limbIdSet = new Set(limbIds);
++  for (const id of weaponLimbIds) {
++    if (limbIdSet.has(id)) err(`id "${id}" есть и в limbs.json, и в weaponAsLimb.json`);
++  }
++
++  // --- weapons.json ---------------------------------------------------------
++  for (const dup of collectDuplicates(weapons.map((w) => w.id))) {
++    err(`weapons.json: id "${dup}" встречается более одного раза`);
++  }
++  for (const weapon of weapons) {
++    if (typeof weapon.handheld !== 'boolean') {
++      err(`weapons.json:${weapon.id}: нет булева поля handheld`);
++    }
++  }
++
++  // --- броня: limbType вместо локации --------------------------------------
++  for (const { file, key, data } of armorFiles) {
++    const entries = data[key] || [];
++    for (const entry of entries) {
++      const where = `${file}:${entry.id}`;
++      if (!LAYERS.includes(entry.layer)) err(`${where}: слой "${entry.layer}" неизвестен`);
++      if (!LIMB_TYPES.includes(entry.limbType)) {
++        err(`${where}: limbType "${entry.limbType}" не из списка ${LIMB_TYPES.join('/')}`);
++      }
++      const expected = LOCATION_TO_LIMB_TYPE[entry.robotLocation];
++      if (expected && entry.limbType !== expected) {
++        err(`${where}: robotLocation "${entry.robotLocation}" → ожидался limbType "${expected}"`);
++      }
++    }
++  }
++
++  // --- планы тел ------------------------------------------------------------
++  for (const [planId, plan] of Object.entries(bodyplans)) {
++    const where = `bodyplans.json:${planId}`;
++    const slots = plan.slots || [];
++    const slotDefs = slots.map((s) => (typeof s === 'string' ? { id: s } : s));
++    const slotIds = slotDefs.map((s) => s.id);
++
++    for (const dup of collectDuplicates(slotIds)) {
++      err(`${where}: слот "${dup}" описан более одного раза`);
++    }
++
++    for (const slot of slotDefs) {
++      if (!slot.accepts || slot.accepts.length === 0) {
++        err(`${where}.${slot.id}: не указано accepts`);
++      } else {
++        for (const type of slot.accepts) {
++          if (!LIMB_TYPES.includes(type)) {
++            err(`${where}.${slot.id}: accepts содержит неизвестный тип "${type}"`);
++          }
++        }
++      }
++      if (typeof slot.swappable !== 'boolean') {
++        err(`${where}.${slot.id}: swappable должен быть булевым`);
++      }
++      if (slot.accepts?.includes('head') && slot.swappable !== false) {
++        err(`${where}.${slot.id}: слот головы должен быть swappable: false`);
++      }
++    }
++
++    // hitTable: непрерывное покрытие 1..20, без дыр и наложений.
++    if (plan.hitTable) {
++      const covered = [];
++      for (const row of plan.hitTable) {
++        const [from, to] = row.range || [];
++        if (!Number.isInteger(from) || !Number.isInteger(to) || from > to) {
++          err(`${where}: кривой диапазон ${JSON.stringify(row.range)}`);
++          continue;
++        }
++        if (!slotIds.includes(row.slotId)) {
++          err(`${where}: hitTable ссылается на несуществующий слот "${row.slotId}"`);
++        }
++        for (let n = from; n <= to; n += 1) covered.push(n);
++      }
++      const unique = new Set(covered);
++      if (unique.size !== covered.length) err(`${where}: в hitTable есть наложения`);
++      for (let n = 1; n <= 20; n += 1) {
++        if (!unique.has(n)) {
++          err(`${where}: hitTable не покрывает значение ${n}`);
++          break;
++        }
++      }
++    }
++
++    // defaults: существуют и подходят по типу.
++    const limbByType = new Map();
++    for (const l of limbs) limbByType.set(l.id, l);
++    for (const l of weaponAsLimb) limbByType.set(l.id, l);
++
++    for (const [slotId, defaultId] of Object.entries(plan.defaults || {})) {
++      if (defaultId === null) continue;
++      if (!slotIds.includes(slotId)) {
++        err(`${where}: defaults ссылается на несуществующий слот "${slotId}"`);
++        continue;
++      }
++      const entry = limbByType.get(defaultId);
++      if (!entry) {
++        err(`${where}.${slotId}: конечность "${defaultId}" не найдена в новых каталогах`);
++        continue;
++      }
++      const accepts = slotDefs.find((s) => s.id === slotId)?.accepts || [];
++      if (!accepts.includes(entry.limbType)) {
++        err(
++          `${where}.${slotId}: конечность "${defaultId}" типа "${entry.limbType}" `
++          + `не подходит в слот, принимающий ${accepts.join('/')}`,
++        );
++      }
++    }
++  }
++
++  return {
++    errors,
++    warnings,
++    stats: {
++      limbs: limbs.length,
++      weaponAsLimb: weaponAsLimb.length,
++      weapons: weapons.length,
++      armorEntries: armorFiles.reduce((sum, f) => sum + (f.data[f.key] || []).length, 0),
++      plans: Object.keys(bodyplans).length,
++      slots: Object.values(bodyplans).reduce((sum, p) => sum + (p.slots?.length || 0), 0),
++      sharedIds: weapons.filter((w) => limbIdSet.has(w.id) || weaponLimbIds.includes(w.id)).length,
++    },
++  };
++}
++
++const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
++if (isMain) {
++  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
++  const { errors, warnings, stats } = validateAll(root);
++  console.log('Проверка каталогов данных роботов:');
++  for (const [key, value] of Object.entries(stats)) console.log(`  ${key}: ${value}`);
++  if (warnings.length > 0) {
++    console.log(`\nПредупреждения (${warnings.length}):`);
++    for (const w of warnings) console.log(`  ! ${w}`);
++  }
++  if (errors.length > 0) {
++    console.log(`\nОшибки (${errors.length}):`);
++    for (const e of errors) console.log(`  x ${e}`);
++    process.exit(1);
++  }
++  console.log('\nОшибок нет.');
++}
+
+-- 
+2.47.3
+

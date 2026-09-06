@@ -1,0 +1,645 @@
+From 0000000000000000000000000000001788546393 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 18:26:33 +0000
+Subject: [PATCH] robot kit assembly uses the unified limb catalog
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Движок собирал комплекты по старым файлам, хотя работал по новым: каталог
+конечностей был раздвоен.
+
+- domain/robotEquip.js (initRobotSlots): конечности ищутся в robotCatalog.limbs
+  + weaponAsLimb вместо robotCatalog.arms. Слот для оружия-конечности теперь
+  даёт план тела по limbType, а не поле compatibleSlots внутри самой
+  конечности. Автозаполнение из bodyPlan.defaults берёт конечности из единого
+  каталога и выбирает слот по типам, которые слот принимает (accepts) — вместо
+  перечисления имён слотов в коде (head/body/leg/chassis/thruster/wheel).
+- Признак конечности — itemCategory (limb|weaponAsLimb) плюс limbType: один
+  limbType есть и у защиты (обшивка для рук, рама для корпуса), поэтому по
+  нему конечность не определить. Для записей кита, где категории нет, оставлен
+  маппинг старых пометок (robotArm → arm, robotLegs → mover).
+- EquipmentKitModal: в каталог для initRobotSlots передаются limbs и
+  weaponAsLimb.
+- Тесты переведены на единый каталог; добавлена проверка: конечности берутся
+  только из переданного каталога (без него слоты остаются пустыми — фолбэков
+  в движке нет).
+
+297 тестов / 25 файлов — зелёные.
+
+Старые файлы (robotarms/robotheads/robotlegs/robotbody.json) пока остаются
+источником для витрины оборудования и экранов — это следующий шаг.
+
+---
+ 7 files changed, 181 insertions(+), 125 deletions(-)
+
+diff --git a/__tests__/robot/assaultron-kits.test.js b/__tests__/robot/assaultron-kits.test.js
+index 3cbbee3..2395236 100644
+--- a/__tests__/robot/assaultron-kits.test.js
++++ b/__tests__/robot/assaultron-kits.test.js
+@@ -9,10 +9,8 @@ import { describe, it, expect } from 'vitest';
+ 
+ import kits from '../../modules/fallout/data/equipmentKits/index.js';
+ import origins from '../../modules/fallout/data/origins/origins.json';
+-import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
+-import bodies from '../../modules/fallout/data/equipment/robot/robotbody.json';
+-import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
+-import legs from '../../modules/fallout/data/equipment/robot/robotlegs.json';
++import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+ import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
+ import ruKits from '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+ import enKits from '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+@@ -24,7 +22,7 @@ const ASSAULTRON_KIT_IDS = [
+   'assaultron_caravan_guard',
+ ];
+ 
+-const robotCatalog = { heads, bodies, arms, legs, weapons: robotWeapons };
++const robotCatalog = { limbs, weaponAsLimb, weapons: robotWeapons };
+ 
+ const byId = (list, id) => list.find((entry) => entry.id === id);
+ 
+@@ -55,7 +53,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
+   });
+ 
+   it('у головы с лазером есть встроенное оружие (лазер головы)', () => {
+-    const head = byId(heads, 'robot_head_assaultron_laser');
++    const head = byId(limbs, 'robot_head_assaultron_laser');
+     expect(head.builtinWeaponId).toBe('robot_weapon_assaultron_head_laser');
+     const laser = byId(robotWeapons, 'robot_weapon_assaultron_head_laser');
+     expect(laser.damage).toBeGreaterThan(0);
+@@ -63,7 +61,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
+   });
+ 
+   it('initRobotSlots: голова из комплекта даёт карточку лазера со статами', () => {
+-    const head = byId(heads, 'robot_head_assaultron_laser');
++    const head = byId(limbs, 'robot_head_assaultron_laser');
+     const { slots } = initRobotSlots('assaultron', [{ ...head }], robotCatalog);
+     const weapons = getBuiltinWeaponsFromSlots(slots);
+     const laser = weapons.find((w) => w.id === 'robot_weapon_assaultron_head_laser');
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+index 92853f7..2d2a6f7 100644
+--- a/__tests__/robot/mister-handy.test.js
++++ b/__tests__/robot/mister-handy.test.js
+@@ -20,10 +20,8 @@
+ import { describe, it, expect } from 'vitest';
+ 
+ import kits from '../../modules/fallout/data/equipmentKits/index.js';
+-import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
+-import bodies from '../../modules/fallout/data/equipment/robot/robotbody.json';
+-import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
+-import legs from '../../modules/fallout/data/equipment/robot/robotlegs.json';
++import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+ import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
+ import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
+ import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
+@@ -41,17 +39,15 @@ const PLATING = platingFile.plating || [];
+ const FRAMES = framesFile.frames || [];
+ 
+ const robotCatalog = {
+-  heads,
+-  bodies,
+-  arms,
+-  legs,
++  limbs,
++  weaponAsLimb,
+   weapons: robotWeapons,
+   plating: PLATING,
+   frames: FRAMES,
+ };
+ 
+ const CATALOG_BY_ID = new Map(
+-  [...heads, ...bodies, ...arms, ...legs, ...robotWeapons, ...PLATING, ...FRAMES]
++  [...limbs, ...weaponAsLimb, ...robotWeapons, ...PLATING, ...FRAMES]
+     .map((entry) => [entry.id, entry]),
+ );
+ 
+@@ -102,6 +98,24 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+   // Регрессионные страховки (зелёные сейчас, должны остаться зелёными)
+   // -------------------------------------------------------------------------
+ 
++  it('конечности берутся из единого каталога, а не из старых файлов', () => {
++    // Каталог конечностей один: limbs.json + weaponAsLimb.json. Старых ключей
++    // (heads/bodies/arms/legs) движок больше не знает — данные импортируются
++    // в его вызове, скрытых источников нет.
++    const { slots } = emptyHandy();
++    for (const key of Object.keys(slots)) {
++      expect(slots[key].limb, `слот ${key} остался пустым`).toBeTruthy();
++    }
++    expect(slots.thruster.limb?.limbType).toBe('mover');
++    expect(slots.arm1.limb?.limbType).toBe('arm');
++
++    // Каталога нет — конечности не берутся ниоткуда: фолбэков в движке нет.
++    const bare = initRobotSlots('misterHandy', [], {});
++    for (const key of Object.keys(bare.slots)) {
++      expect(bare.slots[key].limb, `слот ${key} заполнился без каталога`).toBeNull();
++    }
++  });
++
+   it('три слота рук и движитель заполняются из комплекта, arm3 не теряется', () => {
+     const { slots } = initRobotSlots(
+       'misterHandy',
+diff --git a/__tests__/robot/robot-kit-installed-weapons.test.js b/__tests__/robot/robot-kit-installed-weapons.test.js
+index 6a591c6..cb329e3 100644
+--- a/__tests__/robot/robot-kit-installed-weapons.test.js
++++ b/__tests__/robot/robot-kit-installed-weapons.test.js
+@@ -10,16 +10,14 @@
+ 
+ import { describe, it, expect } from 'vitest';
+ 
+-import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
+-import bodies from '../../modules/fallout/data/equipment/robot/robotbody.json';
+-import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
+-import legs from '../../modules/fallout/data/equipment/robot/robotlegs.json';
++import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+ import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
+ import generalWeapons from '../../modules/fallout/data/equipment/weapons.json';
+ import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
+ import { serializeSlot, collectAttacks } from '../../domain/robotSlots';
+ 
+-const robotCatalog = { heads, bodies, arms, legs, weapons: robotWeapons };
++const robotCatalog = { limbs, weaponAsLimb, weapons: robotWeapons };
+ const byId = (list, id) => list.find((entry) => entry.id === id);
+ const asKitWeapon = (weapon, extra = {}) => ({ ...weapon, itemType: 'weapon', weaponId: weapon.id, ...extra });
+ 
+@@ -30,9 +28,9 @@ describe('данные: обратных ссылок из оружия на к
+   });
+ 
+   it('лазер головы и месметрон принадлежат головам через builtinWeaponId', () => {
+-    expect(byId(heads, 'robot_head_assaultron_laser').builtinWeaponId)
++    expect(byId(limbs, 'robot_head_assaultron_laser').builtinWeaponId)
+       .toBe('robot_weapon_assaultron_head_laser');
+-    expect(byId(heads, 'robot_head_robobrain').builtinWeaponId)
++    expect(byId(limbs, 'robot_head_robobrain').builtinWeaponId)
+       .toBe('robot_weapon_mesmetron');
+   });
+ 
+@@ -40,9 +38,9 @@ describe('данные: обратных ссылок из оружия на к
+     // Раньше weapon.builtinToArm указывал на несуществующую robot_arm_robobrain.
+     const claws = byId(robotWeapons, 'robot_weapon_smoke_claws');
+     expect(claws.builtinToArm).toBeUndefined();
+-    expect(byId(arms, 'robot_arm_smoke_manipulator').builtinWeaponId)
++    expect(byId(limbs, 'robot_arm_smoke_manipulator').builtinWeaponId)
+       .toBe('robot_weapon_smoke_claws');
+-    expect(byId(arms, 'robot_arm_robobrain')).toBeTruthy(); // рука без своей атаки — это нормально
++    expect(byId(limbs, 'robot_arm_robobrain')).toBeTruthy(); // рука без своей атаки — это нормально
+   });
+ });
+ 
+diff --git a/__tests__/robot/robot-slot-behaviour.test.js b/__tests__/robot/robot-slot-behaviour.test.js
+index af3f98f..13d1fe6 100644
+--- a/__tests__/robot/robot-slot-behaviour.test.js
++++ b/__tests__/robot/robot-slot-behaviour.test.js
+@@ -32,17 +32,22 @@ import {
+ } from '../../domain/robotSlots';
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ 
++import limbsCatalog from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimbCatalog from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++// Модалка замены конечности пока читает каталог оборудования (старые файлы) —
++// источник для неё один с движком после следующего патча.
+ import armsCatalog from '../../modules/fallout/data/equipment/robot/robotarms.json';
+ import headsCatalog from '../../modules/fallout/data/equipment/robot/robotheads.json';
+ import bodiesCatalog from '../../modules/fallout/data/equipment/robot/robotbody.json';
+ import legsCatalog from '../../modules/fallout/data/equipment/robot/robotlegs.json';
+ import weaponsCatalog from '../../modules/fallout/data/equipment/robot/weapons.json';
+ 
++// Единый каталог конечностей: обычные конечности + конечности-оружие.
++const allLimbs = [...limbsCatalog, ...weaponAsLimbCatalog];
++
+ const robotCatalog = {
+-  arms: armsCatalog,
+-  heads: headsCatalog,
+-  bodies: bodiesCatalog,
+-  legs: legsCatalog,
++  limbs: limbsCatalog,
++  weaponAsLimb: weaponAsLimbCatalog,
+   weapons: weaponsCatalog,
+ };
+ 
+@@ -60,13 +65,13 @@ const frameFor = (limbType) => {
+   if (!found) throw new Error(`нет рамы для типа конечности ${limbType}`);
+   return { ...found, itemType: 'frame' };
+ };
+-const kit = (...ids) => ids.map((id) => ({ ...byId(armsCatalog, id) ?? byId(headsCatalog, id), itemType: 'robotArm' }));
++const kit = (...ids) => ids.map((id) => ({ ...byId(allLimbs, id) ?? byId(allLimbs, id), itemType: 'robotArm' }));
+ 
+ // Комплект «Няня»: две одинаковые руки-манипулятора и огнемёт между ними.
+ const handyNanny = () => initRobotSlots('misterHandy', [
+-  { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+-  { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+-  { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++  { ...byId(allLimbs, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++  { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++  { ...byId(allLimbs, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+ ], robotCatalog);
+ 
+ describe('сбор атак', () => {
+@@ -128,7 +133,7 @@ describe('сбор атак', () => {
+ 
+ describe('регрессии', () => {
+   it('лазер головы ассультрон сохраняет боевые характеристики', () => {
+-    const head = byId(headsCatalog, 'robot_head_assaultron_laser');
++    const head = byId(allLimbs, 'robot_head_assaultron_laser');
+     const { slots } = initRobotSlots('assaultron', [{ ...head }], robotCatalog);
+     const weapons = getBuiltinWeaponsFromSlots(slots);
+     const laser = weapons.find((w) => w.id === 'robot_weapon_assaultron_head_laser');
+@@ -177,9 +182,9 @@ describe('защита: раскладка по слотам', () => {
+   // Комплект «Помощник»: arm1 — рука-манипулятор, arm2 — огнемёт,
+   // arm3 — циркулярная пила (обе — оружие вместо руки).
+   const handyAssistant = () => [
+-    { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+-    { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+-    { ...byId(armsCatalog, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
++    { ...byId(allLimbs, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++    { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++    { ...byId(allLimbs, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
+   ];
+ 
+   it('обшивка ложится только на настоящую конечность', () => {
+@@ -225,7 +230,7 @@ describe('защита: раскладка по слотам', () => {
+ describe('canEquipRobotArmor', () => {
+   const handySlots = () => {
+     const { slots } = initRobotSlots('misterHandy', [], robotCatalog);
+-    slots.arm2.limb = { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' };
++    slots.arm2.limb = { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm' };
+     return slots;
+   };
+ 
+@@ -390,7 +395,7 @@ describe('замена конечностей', () => {
+ 
+   it('замена меняет ровно один слот', () => {
+     const slots = pairedProtectron();
+-    const replacement = { ...byId(armsCatalog, 'robot_arm_assaultron'), itemType: 'robotArm' };
++    const replacement = { ...byId(allLimbs, 'robot_arm_assaultron'), itemType: 'robotArm' };
+     const { slots: next } = applyLimbReplacement(slots, 'leftArm', replacement, weaponsCatalog);
+ 
+     expect(next.leftArm.limb?.id).toBe('robot_arm_assaultron');
+@@ -400,9 +405,9 @@ describe('замена конечностей', () => {
+ 
+   it('Хэнди: замена arm3 не трогает arm1 и arm2', () => {
+         const { slots } = initRobotSlots('misterHandy', [
+-      { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+-      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+-      { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++      { ...byId(allLimbs, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++      { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      { ...byId(allLimbs, 'robot_arm_mister_handy'), itemType: 'robotArm' },
+     ], robotCatalog);
+     const before1 = slots.arm1.limb?.id;
+     const before2 = slots.arm2.limb?.id;
+@@ -410,7 +415,7 @@ describe('замена конечностей', () => {
+     const { slots: next } = applyLimbReplacement(
+       slots,
+       'arm3',
+-      { ...byId(armsCatalog, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
++      { ...byId(allLimbs, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
+       weaponsCatalog,
+     );
+ 
+@@ -429,7 +434,7 @@ describe('замена конечностей', () => {
+     const next = applyLimbReplacement(
+       prepare(),
+       'leftArm',
+-      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+       weaponsCatalog,
+     ).slots;
+     expect(next.leftArm.limb?.id).toBe('robot_weapon_flamethrower');
+@@ -447,7 +452,7 @@ describe('замена конечностей', () => {
+     const { slots: next } = applyLimbReplacement(
+       slots,
+       'leftArm',
+-      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
+       weaponsCatalog,
+     );
+     expect(next.leftArm.heldWeapon).toBeFalsy();
+@@ -459,7 +464,7 @@ describe('съёмность слота (swappable)', () => {
+   // Голова, совместимая с планом Хэнди (иначе проверка упадёт на плане,
+   // а не на съёмности).
+   const newHead = {
+-    ...byId(headsCatalog, 'robot_head_mister_handy_eye_stalk'),
++    ...byId(allLimbs, 'robot_head_mister_handy_eye_stalk'),
+     itemType: 'robotHead',
+   };
+ 
+@@ -468,7 +473,7 @@ describe('съёмность слота (swappable)', () => {
+     expect(allowed).toBe(false);
+     expect(reason).toBe('equip.error.slotNotSwappable');
+     // Руку менять можно.
+-    expect(canReplaceLimb('arm1', { ...byId(armsCatalog, 'robot_arm_assaultron') }, character).allowed)
++    expect(canReplaceLimb('arm1', { ...byId(allLimbs, 'robot_arm_assaultron') }, character).allowed)
+       .toBe(true);
+   });
+ });
+@@ -495,8 +500,8 @@ describe('сторона комплекта: порядок, а не имя сл
+ 
+   it('комплект со сторонами раскладывается одинаково в обеих моделях', () => {
+     const kitItems = () => [
+-      { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm', slot: 'left' },
+-      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm', slot: 'right' },
++      { ...byId(allLimbs, 'robot_arm_mister_handy'), itemType: 'robotArm', slot: 'left' },
++      { ...byId(allLimbs, 'robot_weapon_flamethrower'), itemType: 'robotArm', slot: 'right' },
+     ];
+         const { slots } = initRobotSlots('misterHandy', kitItems(), robotCatalog);
+     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index ef167c6..acf866f 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -660,14 +660,40 @@
+ |---|---|---|
+ | по умолчанию | 296 | **296** |
+ 
++### Этап 6, шаг 4 (патч 181): у движка один каталог конечностей
++
++Движок собирал комплекты по старым файлам, хотя работал по новым:
++
++| Что | Было | Стало |
++|---|---|---|
++| каталог для сборки | `robotCatalog.arms` (`robotarms.json`) | `robotCatalog.limbs` + `weaponAsLimb` |
++| слот для оружия-конечности | `armEntry.compatibleSlots` (поле в данных конечности) | `slotsForLimbType(bodyPlan, limbType)` — план тела |
++| автозаполнение из `defaults` | `robotCatalog.heads/bodies/arms/legs`, выбор по имени слота | единый каталог, выбор по `accepts` слота |
++| «это конечность?» | `itemType ∈ {robotArm, robotHead, …}` | `itemCategory ∈ {limb, weaponAsLimb}` + `limbType`; у записей кита категории нет, для них оставлен маппинг `LIMB_TYPE_BY_KIT_ITEM_TYPE` |
++
++Ловушка, из-за которой правка дважды падала тестами: `limbType` есть и у
++защиты (обшивка для рук, рама для корпуса), поэтому по одному `limbType`
++конечность не определить — нужен `itemCategory`. Вторая ловушка: инвариант
++«защита живёт только на настоящей конечности» стирает слои у слотов без
++конечности, поэтому сломанное автозаполнение выглядит как «обшивка пропала».
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 297 | **297** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Этап 6 закрыт. Из крупного остался открытый вопрос №1 — таблицы попаданий для
+- четырёх планов тела (нужны числа из книги).
++Этап 6 закрыт для движка. Вне его осталось то же самое дублирование, но в
++витрине оборудования: `i18n/equipmentCatalog.js`, `LimbUpgradeModal` и
++`InventoryScreen` читают конечности из старых файлов (`robotarms/heads/legs/
++body.json`) и старых полей (`itemType`, `compatibleSlots`, `complexity`).
++
++Из крупного остался открытый вопрос №1 — таблицы попаданий для четырёх планов
++тела (нужны числа из книги).
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 2525b0d..0c225db 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -183,6 +183,16 @@ function armorSlotsByLimbType({ slots, slotKeys, bodyPlan, armorData }) {
+     });
+ }
+ 
++// Как комплекты называют конечности: kitResolver отдаёт запись кита, где тип
++// назван по-старому. Единый каталог конечностей пишет limbType.
++const LIMB_TYPE_BY_KIT_ITEM_TYPE = Object.freeze({
++  robotArm: 'arm',
++  robotHead: 'head',
++  robotBody: 'body',
++  robotLeg: 'mover',
++  robotLegs: 'mover',
++});
++
+ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {}) {
+   const slots = createEmptyRobotSlots(bodyPlan);
+   const slotKeys = getRobotSlotKeys(bodyPlan);
+@@ -191,10 +201,12 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+   const pendingHeadBuiltinWeapons = [];
+   const pendingArmBuiltinWeapons = [];
+ 
+-  const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
+-
+-  // Lookup helpers for robotarms catalog and weapons catalog
+-  const armscatalog = Array.isArray(robotCatalog.arms) ? robotCatalog.arms : [];
++  // Единый каталог конечностей: обычные конечности и конечности-оружие.
++  // Старых robotarms/robotheads/robotlegs здесь больше нет — источник один.
++  const limbsCatalog = [
++    ...(Array.isArray(robotCatalog.limbs) ? robotCatalog.limbs : []),
++    ...(Array.isArray(robotCatalog.weaponAsLimb) ? robotCatalog.weaponAsLimb : []),
++  ];
+   const weaponsCatalog = Array.isArray(robotCatalog.weapons) ? robotCatalog.weapons : [];
+ 
+   // Resolve a weapon's stats from weapons catalog by id
+@@ -203,19 +215,20 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     return weaponsCatalog.find((w) => w.id === weaponId) || null;
+   };
+ 
+-  // Resolve arm entry from robotarms catalog by id
+-  const resolveArmEntry = (id) => {
++  // Конечность из единого каталога по id
++  const resolveLimbEntry = (id) => {
+     if (!id) return null;
+-    return armscatalog.find((a) => a.id === id) || null;
++    return limbsCatalog.find((l) => l.id === id) || null;
+   };
+ 
+-  // Find a free compatible slot for an arm entry
+-  const findFreeCompatibleSlot = (armEntry) => {
+-    const compatible = Array.isArray(armEntry?.compatibleSlots) ? armEntry.compatibleSlots : armSlotKeys;
+-    return compatible.find((s) => slotKeys.includes(s) && slots[s]?.limb === null) || null;
++  // Свободный слот под конечность: их даёт план тела по типу конечности,
++  // а не список совместимых слотов внутри самой конечности.
++  const findFreeSlotForLimb = (limbEntry) => {
++    const candidates = limbEntry?.limbType ? slotsForLimbType(bodyPlan, limbEntry.limbType) : [];
++    return candidates.find((s) => slotKeys.includes(s) && slots[s]?.limb === null) || null;
+   };
+ 
+-  // Build a limb object from a robotarms entry + its weapon stats
++  // Build a limb object from a limb entry + its weapon stats
+   const buildLimbFromArmEntry = (armEntry) => buildArmLimb(armEntry, weaponsCatalog);
+ 
+   const buildBuiltinWeapons = (weaponData) => {
+@@ -237,29 +250,35 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+     const itype = item.itemType;
+ 
+     // Конечности
+-    if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs'].includes(itype)) {
++    // Конечность узнаётся по категории из данных (itemCategory); тип конечности
++    // — limbType. limbType один есть и у защиты (обшивка для рук), поэтому по
++    // нему одному конечность не определить.
++    // У предметов комплекта категории нет: kitResolver отдаёт запись кита, где
++    // конечность названа по-старому (robotArm, robotHead, ...).
++    const isLimb = item.itemCategory === 'limb' || item.itemCategory === 'weaponAsLimb';
++    const limbType = isLimb || LIMB_TYPE_BY_KIT_ITEM_TYPE[itype]
++      ? (item.limbType ?? LIMB_TYPE_BY_KIT_ITEM_TYPE[itype] ?? null)
++      : null;
++
++    if (limbType) {
+       let targetKey = null;
+ 
+       // Слот ищется по типу конечности из плана тела, а не по имени.
+-      if (itype === 'robotHead') {
+-        targetKey = slotsForLimbType(bodyPlan, 'head')[0] ?? null;
+-      } else if (itype === 'robotBody') {
+-        targetKey = slotsForLimbType(bodyPlan, 'body')[0] ?? null;
+-      } else if (itype === 'robotLeg' || itype === 'robotLegs') {
+-        targetKey = slotsForLimbType(bodyPlan, 'mover')[0] ?? null;
+-      } else if (itype === 'robotArm') {
++      if (limbType === 'arm') {
+         // Сторона — порядок слота; без стороны — первый свободный.
+         const armSlots = slotsForLimbType(bodyPlan, 'arm');
+         if (item.slot === 'left') targetKey = armSlots[0] ?? null;
+         else if (item.slot === 'right') targetKey = armSlots[1] ?? null;
+-        else targetKey = armSlots.find(k => slots[k].limb === null) ?? null;
++        else targetKey = armSlots.find((k) => slots[k].limb === null) ?? null;
++      } else {
++        targetKey = slotsForLimbType(bodyPlan, limbType)[0] ?? null;
+       }
+ 
+       if (targetKey && slots[targetKey] !== undefined) {
+-        if (itype === 'robotArm') {
++        if (limbType === 'arm') {
+           // Build the limb so that builtinWeaponId is resolved into builtinWeapons.
+           // Preserve any kit-level overrides (e.g. slot, name) that came on `item`.
+-          const armEntry = resolveArmEntry(item.id) || item;
++          const armEntry = resolveLimbEntry(item.id) || item;
+           const limbFromArm = buildLimbFromArmEntry(armEntry);
+           const normalizedBuiltin = normalizeBuiltinWeapons({ ...limbFromArm, ...item }, weaponsCatalog);
+           slots[targetKey].limb = {
+@@ -338,9 +357,9 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+         if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
+         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
+       }
+-      const armEntry = resolveArmEntry(weaponData.id ?? item.weaponId);
++      const armEntry = resolveLimbEntry(weaponData.id ?? item.weaponId);
+       if (armEntry) {
+-        const targetKey = findFreeCompatibleSlot(armEntry);
++        const targetKey = findFreeSlotForLimb(armEntry);
+         if (targetKey && slots[targetKey] !== undefined) {
+           const limbFromArm = buildLimbFromArmEntry(armEntry);
+           slots[targetKey].limb = {
+@@ -428,59 +447,57 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+ 
+   // Автозаполнение недостающих конечностей — строго из данных bodyPlan.defaults, без фолбэков
+   // 1 предмет = 1 слот: каждый слот заполняется своей конечностью из defaults[slotKey]
+-  const { heads = [], bodies = [], arms = [], legs = [] } = robotCatalog;
+   const planDefaults = getDefaultLimbs(bodyPlan);
+-  const defaultHead = heads.find((h) => h.id === planDefaults.head)
+-    || heads.find((h) => h.defaultForBodyPlan === bodyPlan);
+-  const defaultBody = bodies.find((b) => b.id === planDefaults.body)
+-    || bodies.find((b) => b.robotBodyPlan === bodyPlan);
+-  const defaultLeg = legs.find((l) => l.id === planDefaults.legs || l.id === planDefaults.leg)
+-    || legs.find((l) => l.compatibleBodyPlans?.includes(bodyPlan) || l.defaultForBodyPlan === bodyPlan);
++
++  const limbById = (id) => (id ? limbsCatalog.find((l) => l.id === id) || null : null);
++
++  // Конечность «по умолчанию для этого плана тела»: пометка в данных самой
++  // конечности (defaultForBodyPlan / robotBodyPlan / compatibleBodyPlans).
++  const limbDefaultForPlan = (limbType) => limbsCatalog.find((l) => l.limbType === limbType && (
++    l.defaultForBodyPlan === bodyPlan
++    || l.robotBodyPlan === bodyPlan
++    || (Array.isArray(l.compatibleBodyPlans) && l.compatibleBodyPlans.includes(bodyPlan))
++  )) || null;
++
++  const defaultByType = {
++    head: limbById(planDefaults.head) || limbDefaultForPlan('head'),
++    body: limbById(planDefaults.body) || limbDefaultForPlan('body'),
++    mover: limbById(planDefaults.legs || planDefaults.leg) || limbDefaultForPlan('mover'),
++  };
+ 
+   for (const k of slotKeys) {
+     if (slots[k].limb !== null) continue;
+ 
+-    // Проверяем конкретный слот в defaults (например, leftArm, rightLeg и т.д.)
+-    const specificDefaultId = planDefaults[k];
+-    if (specificDefaultId) {
+-      // Ищем в соответствующем каталоге по ID
+-      let specificLimb = null;
+-      if (k === 'head') {
+-        specificLimb = heads.find((h) => h.id === specificDefaultId);
+-      } else if (k === 'body') {
+-        specificLimb = bodies.find((b) => b.id === specificDefaultId);
+-      } else if (k.toLowerCase().includes('arm')) {
+-        specificLimb = arms.find((a) => a.id === specificDefaultId);
+-      } else if (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') {
+-        specificLimb = legs.find((l) => l.id === specificDefaultId);
+-      }
+-      if (specificLimb) {
+-        if (k.toLowerCase().includes('arm')) {
+-          const limbFromArm = buildLimbFromArmEntry(specificLimb);
+-          const builtinWeapons = normalizeBuiltinWeapons(limbFromArm, weaponsCatalog);
+-          slots[k].limb = builtinWeapons.length > 0 ? { ...limbFromArm, builtinWeapons } : limbFromArm;
+-        } else {
+-          const builtinWeapons = normalizeBuiltinWeapons(specificLimb, weaponsCatalog);
+-          slots[k].limb = builtinWeapons.length > 0 ? { ...specificLimb, builtinWeapons } : specificLimb;
+-        }
+-        continue;
++    // Типы, которые принимает слот, — из плана тела: thruster, chassis и
++    // колесо попадают сюда сами, без перечисления имён слотов в коде.
++    const acceptedTypes = getSlotDef(bodyPlan, k)?.accepts ?? [];
++
++    const placeLimb = (limbEntry) => {
++      if (limbEntry.limbType === 'arm') {
++        const limbFromArm = buildLimbFromArmEntry(limbEntry);
++        const builtinWeapons = normalizeBuiltinWeapons(limbFromArm, weaponsCatalog);
++        slots[k].limb = builtinWeapons.length > 0 ? { ...limbFromArm, builtinWeapons } : limbFromArm;
++        return;
+       }
++      const builtinWeapons = normalizeBuiltinWeapons(limbEntry, weaponsCatalog);
++      slots[k].limb = builtinWeapons.length > 0 ? { ...limbEntry, builtinWeapons } : limbEntry;
++    };
++
++    // Конкретный слот в defaults (например, leftArm, rightLeg) — по id
++    const specificLimb = limbById(planDefaults[k]);
++    if (specificLimb && acceptedTypes.includes(specificLimb.limbType)) {
++      placeLimb(specificLimb);
++      continue;
+     }
+ 
+-    if (k === 'head' && defaultHead) {
+-      const builtinWeapons = normalizeBuiltinWeapons(defaultHead, weaponsCatalog);
+-      const headLimb = builtinWeapons.length > 0 ? { ...defaultHead, builtinWeapons } : defaultHead;
+-      slots[k].limb = headLimb;
+-    } else if (k === 'body' && defaultBody) {
+-      slots[k].limb = defaultBody;
+-    } else if (
+-      (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') &&
+-      defaultLeg
+-    ) {
+-      slots[k].limb = defaultLeg;
+-    }
+-    // Для рук, если нет specificDefaultId, но есть default для bodyPlan — не автозаполняем,
+-    // так как у разных роботов разное количество рук, и defaults должны быть явными
++    // Иначе — конечность по умолчанию для плана тела подходящего типа.
++    // Для рук fallback не применяем: у разных роботов разное количество рук,
++    // и defaults должны быть явными.
++    const fallback = acceptedTypes
++      .filter((type) => type !== 'arm')
++      .map((type) => defaultByType[type])
++      .find(Boolean) || null;
++    if (fallback) placeLimb(fallback);
+   }
+ 
+   // Автозаполнение стандартной обшивки из bodyPlan.defaultPlating — на основании данных, без обогатителя
+diff --git a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+index 2068a0c..b99507f 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/EquipmentKitModal.js
+@@ -12,10 +12,8 @@ import { tCharacterScreen } from '../logic/characterScreenI18n';
+ 
+ // Lazy-load robot catalog data — на основании данных, без обогатителя
+ const loadRobotCatalog = () => ({
+-  heads: require('../../../data/equipment/robot/robotheads.json'),
+-  bodies: require('../../../data/equipment/robot/robotbody.json'),
+-  arms: require('../../../data/equipment/robot/robotarms.json'),
+-  legs: require('../../../data/equipment/robot/robotlegs.json'),
++  limbs: require('../../../data/equipment/robot/limbs.json'),
++  weaponAsLimb: require('../../../data/equipment/robot/weaponAsLimb.json'),
+   weapons: require('../../../data/equipment/robot/weapons.json'),
+   plating: require('../../../data/equipment/robot/armor_plating.json').plating || [],
+   frames: require('../../../data/equipment/robot/frames.json').frames || [],
+
+-- 
+2.47.3
+

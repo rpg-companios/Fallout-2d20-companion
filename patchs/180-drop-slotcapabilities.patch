@@ -1,0 +1,274 @@
+From 0000000000000000000000000000001788543943 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 17:45:43 +0000
+Subject: [PATCH] drop slotCapabilities: capabilities are derived, not stored
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 6, шаг 3 — последнее мёртвое поле.
+
+План тела хранил статические возможности слота (canEquipWeapon / canEquipArmor).
+Читателя у поля не было: capabilities в состоянии слота только записывалась
+(createSlotsFromBodyPlan) и никогда не читалась. К тому же данные врали — у
+Робомозга и Штурмотрона «может держать оружие» было выставлено голове.
+
+Движок выводит способность сам: canHoldWeapons у конечности и slotAcceptsArmor
+у слота. Второй источник правды не нужен.
+
+- bodyplans.json: slotCapabilities удалён у всех семи планов.
+- domain/bodyplan.js: запись capabilities в createSlotsFromBodyPlan убрана.
+- Комментарии в robotDamageResistance.js и robotSlice.js обновлены.
+- Тест: в планах тел нет slotCapabilities.
+
+Этап 6 закрыт: capabilities, robotLocation, builtinTo*, hitLocations,
+slotCapabilities — удалены.
+
+296 тестов / 25 файлов — зелёные.
+
+---
+ 6 files changed, 49 insertions(+), 77 deletions(-)
+
+diff --git a/__tests__/robot/robot-data-catalogs.test.js b/__tests__/robot/robot-data-catalogs.test.js
+index 033c169..d5f88d2 100644
+--- a/__tests__/robot/robot-data-catalogs.test.js
++++ b/__tests__/robot/robot-data-catalogs.test.js
+@@ -135,6 +135,16 @@ describe('новые каталоги данных роботов', () => {
+     }
+   });
+ 
++  it('слоты планов тел: статических возможностей слота (slotCapabilities) нет', () => {
++    // Раньше план хранил capabilities: { canEquipWeapon, canEquipArmor } —
++    // второй источник правды рядом с данными конечностей. Теперь способность
++    // выводится движком: может ли конечность держать (canHoldWeapons) и
++    // принимает ли слой защиту (slotAcceptsArmor).
++    for (const [planId, plan] of Object.entries(bodyplans)) {
++      expect('slotCapabilities' in plan, `${planId}`).toBe(false);
++    }
++  });
++
+   it('слоты планов тел: имена не изменились, голова несъёмная', () => {
+     const expectedSlots = {
+       humanoid: ['head', 'torso', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'],
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 1dbbec3..ef167c6 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -629,14 +629,45 @@
+ |---|---|---|
+ | по умолчанию | 295 | **295** |
+ 
++### Этап 6, шаг 3 (патч 180): `slotCapabilities` удалён — этап закрыт
++
++План тела хранил статические возможности слота:
++
++```json
++"slotCapabilities": { "leftArm": { "canEquipWeapon": true } }
++```
++
++Это второй источник правды рядом с данными конечностей, и к тому же
++врущий: у Робомозга и Штурмотрона «может держать оружие» было выставлено и
++голове. Ни одного читателя у поля не было — `capabilities` в состоянии слота
++только записывалась (`createSlotsFromBodyPlan`) и никогда не читалась: способность
++движок выводит сам — `canHoldWeapons` у конечности и `slotAcceptsArmor` у слота.
++
++Удалено: поле у всех семи планов, запись `capabilities` в
++`createSlotsFromBodyPlan`, упоминания в комментариях.
++
++**Итог этапа 6 — все мёртвые поля убраны:**
++
++| Поле | Где | Статус |
++|---|---|---|
++| `capabilities` | состояние слота | не пишется (175), запись удалена (180) |
++| `robotLocation` | данные защиты | удалён (179) |
++| `builtinTo*` | данные оружия и комплекты | удалён (178) |
++| `hitLocations` | `bodyplans.json` | удалён (179) |
++| `slotCapabilities` | `bodyplans.json` | удалён (180) |
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 296 | **296** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Этап 6 закрыт, кроме `slotCapabilities` (жив: `domain/bodyplan.js` считает по
+-нему возможности слота — убрать можно вместе с переходом на `getSlotDef`).
++Этап 6 закрыт. Из крупного остался открытый вопрос №1 — таблицы попаданий для
++ четырёх планов тела (нужны числа из книги).
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/bodyplan.js b/domain/bodyplan.js
+index 6e383dd..a8ee819 100644
+--- a/domain/bodyplan.js
++++ b/domain/bodyplan.js
+@@ -49,10 +49,6 @@ export function createSlotsFromBodyPlan(planId) {
+       plating: null,
+       frame: null,
+       heldWeapon: null,
+-      capabilities: {
+-        canEquipWeapon: plan.slotCapabilities?.[slotKey]?.canEquipWeapon === true,
+-        canEquipArmor: plan.slotCapabilities?.[slotKey]?.canEquipArmor !== false,
+-      },
+     };
+     return acc;
+   }, {});
+diff --git a/domain/robotDamageResistance.js b/domain/robotDamageResistance.js
+index e930ba2..401a4bd 100644
+--- a/domain/robotDamageResistance.js
++++ b/domain/robotDamageResistance.js
+@@ -3,7 +3,7 @@
+ // Pure functions — no React, no UI, no modules/fallout зависимости.
+ //
+ // МОДЕЛЬ ДАННЫХ СЛОТА:
+-//   slot = { limb, armor, plating, frame, heldWeapon, capabilities }
++//   slot = { limb, armor, plating, frame, heldWeapon }
+ //   - limb   (конечность): physicalDR / energyDR / radDR  (числа; может не быть)
+ //   - armor / plating / frame (защитные слои): damageResistance = { physical, energy }
+ //     и собственный incompatibleLayers (массив слоёв, с которыми НЕ совместим).
+diff --git a/modules/fallout/data/bodyplans/bodyplans.json b/modules/fallout/data/bodyplans/bodyplans.json
+index 675a703..fd942f6 100644
+--- a/modules/fallout/data/bodyplans/bodyplans.json
++++ b/modules/fallout/data/bodyplans/bodyplans.json
+@@ -57,14 +57,6 @@
+       "rightArm": null,
+       "leftLeg": null,
+       "rightLeg": null
+-    },
+-    "slotCapabilities": {
+-      "leftArm": {
+-        "canEquipWeapon": true
+-      },
+-      "rightArm": {
+-        "canEquipWeapon": true
+-      }
+     }
+   },
+   "robobrain": {
+@@ -117,18 +109,7 @@
+       "rightArm": "robot_arm_robobrain",
+       "chassis": "robot_legs_robobrain_treads"
+     },
+-    "defaultPlating": {},
+-    "slotCapabilities": {
+-      "leftArm": {
+-        "canEquipWeapon": true
+-      },
+-      "rightArm": {
+-        "canEquipWeapon": true
+-      },
+-      "head": {
+-        "canEquipWeapon": true
+-      }
+-    }
++    "defaultPlating": {}
+   },
+   "misterHandy": {
+     "slots": [
+@@ -189,18 +170,7 @@
+       "arm3": "robot_arm_mister_handy",
+       "thruster": "robot_legs_mister_handy_thruster"
+     },
+-    "defaultPlating": {},
+-    "slotCapabilities": {
+-      "arm1": {
+-        "canEquipWeapon": true
+-      },
+-      "arm2": {
+-        "canEquipWeapon": true
+-      },
+-      "arm3": {
+-        "canEquipWeapon": true
+-      }
+-    }
++    "defaultPlating": {}
+   },
+   "protectron": {
+     "slots": [
+@@ -262,14 +232,6 @@
+       "rightLeg": "robot_legs_protectron"
+     },
+     "defaultPlating": {},
+-    "slotCapabilities": {
+-      "leftArm": {
+-        "canEquipWeapon": true
+-      },
+-      "rightArm": {
+-        "canEquipWeapon": true
+-      }
+-    },
+     "hitTable": [
+       {
+         "range": [
+@@ -366,14 +328,6 @@
+       "wheel": "robot_legs_securitron"
+     },
+     "defaultPlating": {},
+-    "slotCapabilities": {
+-      "leftArm": {
+-        "canEquipWeapon": true
+-      },
+-      "rightArm": {
+-        "canEquipWeapon": true
+-      }
+-    },
+     "layout": [
+       [
+         "head"
+@@ -484,18 +438,7 @@
+       "body": "robot_body_assaultron",
+       "rightLeg": "robot_legs_assaultron"
+     },
+-    "defaultPlating": {},
+-    "slotCapabilities": {
+-      "leftArm": {
+-        "canEquipWeapon": true
+-      },
+-      "rightArm": {
+-        "canEquipWeapon": true
+-      },
+-      "head": {
+-        "canEquipWeapon": true
+-      }
+-    }
++    "defaultPlating": {}
+   },
+   "sentryBot": {
+     "slots": [
+@@ -556,14 +499,6 @@
+       "body": "robot_body_sentry_bot",
+       "rightLeg": "robot_legs_sentry_bot"
+     },
+-    "defaultPlating": {},
+-    "slotCapabilities": {
+-      "leftArm": {
+-        "canEquipWeapon": true
+-      },
+-      "rightArm": {
+-        "canEquipWeapon": true
+-      }
+-    }
++    "defaultPlating": {}
+   }
+ }
+diff --git a/src/store/robotSlice.js b/src/store/robotSlice.js
+index 0ebf8c7..9e5e0b6 100644
+--- a/src/store/robotSlice.js
++++ b/src/store/robotSlice.js
+@@ -13,7 +13,7 @@
+  * State shape:
+  *   robot: {
+  *     bodyPlan : string | null            // e.g. 'protectron'
+- *     slots    : { [slotKey]: SlotData }  // { limb, armor, plating, frame, heldWeapon, capabilities }
++ *     slots    : { [slotKey]: SlotData }  // { limb, armor, plating, frame, heldWeapon }
+  *     modules  : object[]                 // installed robot modules
+  *   }
+  */
+
+-- 
+2.47.3
+
