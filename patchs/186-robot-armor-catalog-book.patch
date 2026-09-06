@@ -1,0 +1,987 @@
+From 0000000000000000000000000000001788697290 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 06 Sep 2026 12:21:30 +0000
+Subject: [PATCH] robot armor catalog aligned with the book: plating, frames, armor
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Каталог защитных слоёв сверен с таблицами из книги (патч 186).
+
+Что поправлено:
+- удалена «Заводская обшивка» (4 записи) — в книге её нет, стандартная есть;
+- у «Заводской брони» убрана приписанная грузоподъёмность (+10/+20 вместо «–»)
+  и возвращена цена корпуса 20 вместо 10;
+- рамы: у «Рамы с приводом» для корпуса ГП +20 вместо +10, у вольтовой
+  (электризованной) для рук и ходовой ГП +10 вместо +20;
+- у примитивной/зазубренной/пагубной/токсичной обшивки цена корпуса
+  20/30/30/30 вместо 10/15/15/15;
+- названия приведены к книге: Примитивная, Зазубренная, Пагубная, Токсичная
+  обшивка; Рама с приводом, Электризованная рама.
+
+Удаление обшивки задело старые сейвы: добавлена миграция v20 -> v21
+(migrateRobotPlatingIds), иначе слой не разрешился бы каталогом и персонаж
+молча потерял бы защиту. Комплект защитрона переведён на стандартную обшивку.
+
+Тесты: __tests__/robot/robot-armor-catalog-book.test.js (+4) сверяет весь
+каталог слоёв с книгой построчно; миграция (+4). Итого 320/28.
+
+---
+ 12 files changed, 388 insertions(+), 178 deletions(-)
+
+diff --git a/__tests__/robot/robot-armor-catalog-book.test.js b/__tests__/robot/robot-armor-catalog-book.test.js
+new file mode 100644
+index 0000000..484298d
+--- /dev/null
++++ b/__tests__/robot/robot-armor-catalog-book.test.js
+@@ -0,0 +1,112 @@
++// __tests__/robot/robot-armor-catalog-book.test.js
++//
++// Каталог защитных слоёв сверен с таблицей из книги (референс владельца).
++// Строка таблицы: [шаблон, тип конечности, ФЗ, ЭЗ, грузоподъёмность, цена, требование].
++//
++// Локации в книге: Оптика (head), Корпус (body), Руки (arm), Двигатель (mover).
++// Универсальные обшивки («Все») размножены по локациям — это решение каталога,
++// чтобы фильтр по типу конечности работал как есть.
++import { describe, it, expect } from 'vitest';
++
++import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
++import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
++import armorFile from '../../modules/fallout/data/equipment/robot/armor.json';
++import weaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++
++const ARMORER = (rank) => `Armorer ${rank}`;
++
++// ── Обшивка: 6 типов × 4 локации ────────────────────────────────────────────
++const plating = (template, phys, energy, carry, cost, perk) => ([
++  [template, 'head', phys, energy, carry.head, cost.head, perk],
++  [template, 'body', phys, energy, carry.body, cost.body, perk],
++  [template, 'arm', phys, energy, carry.arm, cost.arm, perk],
++  [template, 'mover', phys, energy, carry.mover, cost.mover, perk],
++]);
++
++const LOCATION_10_20 = { head: -10, body: -20, arm: -10, mover: -10 };
++// Обшивка Мистера Храбреца в книге одна на все локации — модификатор везде -10.
++const ALL_NEG_10 = { head: -10, body: -10, arm: -10, mover: -10 };
++const COST_10_20 = { head: 10, body: 20, arm: 10, mover: 10 };
++const COST_15_30 = { head: 15, body: 30, arm: 15, mover: 15 };
++
++const BOOK_PLATING = [
++  ...plating('robot_plating_standard', 2, 0,
++    { head: 0, body: 0, arm: 0, mover: 0 }, { head: 0, body: 0, arm: 0, mover: 0 }, null),
++  ...plating('robot_plating_mister_gutsy', 2, 2, ALL_NEG_10,
++    { head: 0, body: 0, arm: 0, mover: 0 }, null),
++  ...plating('robot_plating_primal', 2, 0, LOCATION_10_20, COST_10_20, null),
++  ...plating('robot_plating_serrated', 2, 0, LOCATION_10_20, COST_15_30, ARMORER(1)),
++  ...plating('robot_plating_noxious', 2, 0, LOCATION_10_20, COST_15_30, ARMORER(1)),
++  ...plating('robot_plating_toxic', 2, 0, LOCATION_10_20, COST_15_30, ARMORER(3)),
++];
++
++// ── Ра́мы: 3 типа × 4 локации ───────────────────────────────────────────────
++const BOOK_FRAMES = [
++  ...plating('robot_frame_actuated', 1, 1,
++    { head: 10, body: 20, arm: 10, mover: 10 }, { head: 15, body: 30, arm: 15, mover: 15 }, null),
++  ...plating('robot_frame_voltaic', 2, 2,
++    { head: 10, body: 20, arm: 10, mover: 10 }, { head: 20, body: 40, arm: 20, mover: 20 }, ARMORER(2)),
++  ...plating('robot_frame_hydraulic', 3, 3,
++    { head: 5, body: 10, arm: 5, mover: 5 }, { head: 30, body: 60, arm: 30, mover: 30 }, ARMORER(3)),
++];
++
++// ── Броня: «Заводская броня» на все четыре локации + складская на корпус ────
++const BOOK_ARMOR = [
++  ['robot_armor_factory', 'head', 1, 1, 0, 10, null],
++  ['robot_armor_factory', 'body', 1, 1, 0, 20, null],
++  ['robot_armor_factory', 'arm', 1, 1, 0, 10, null],
++  ['robot_armor_factory', 'mover', 1, 1, 0, 10, null],
++  ['robot_armor_factory_storage', 'body', 1, 1, 20, 25, ARMORER(1)],
++];
++
++// ── Навесы на руки (ARM ATTACHMENTS): сложность, перки, навык ───────────────
++const BOOK_ATTACHMENTS = [
++  ['robot_weapon_circular_saw', 3, ['Blacksmith 1'], 'REPAIR'],
++  ['robot_weapon_construction_claw', 3, ['Blacksmith 1'], 'REPAIR'],
++  ['robot_weapon_cryojet', 4, ['Robotics Expert 1', 'Science! 1'], 'SCIENCE'],
++  ['robot_weapon_drill', 3, ['Blacksmith 2'], 'REPAIR'],
++  ['robot_weapon_vice_grip', 4, ['Blacksmith 3'], 'REPAIR'],
++];
++
++const row = (entry) => {
++  const dr = entry.damageResistance || {};
++  return [
++    entry.templateId,
++    entry.limbType,
++    dr.physical,
++    dr.energy,
++    entry.carryWeightModifier,
++    entry.cost,
++    entry.perkRequired ?? null,
++  ];
++};
++
++const sortRows = (rows) => [...rows].sort((a, b) => String(a).localeCompare(String(b)));
++
++describe('каталог защитных слоёв сверен с книгой', () => {
++  it('обшивка: 24 записи, все цифры по таблице', () => {
++    const rows = platingFile.plating.map(row);
++    expect(rows).toHaveLength(24);
++    expect(sortRows(rows)).toEqual(sortRows(BOOK_PLATING));
++  });
++
++  it('ра́мы: 12 записей, все цифры по таблице', () => {
++    const rows = framesFile.frames.map(row);
++    expect(sortRows(rows)).toEqual(sortRows(BOOK_FRAMES));
++  });
++
++  it('броня: 5 записей, все цифры по таблице', () => {
++    const rows = armorFile.armor.map(row);
++    expect(sortRows(rows)).toEqual(sortRows(BOOK_ARMOR));
++  });
++
++  it('навесы на руки: сложность, перки и навык по таблице', () => {
++    const entries = weaponAsLimbFile.weaponAsLimb || weaponAsLimbFile;
++    for (const [id, complexity, perks, skill] of BOOK_ATTACHMENTS) {
++      const entry = entries.find((candidate) => candidate.id === id);
++      expect(entry, `${id} должен быть в каталоге`).toBeTruthy();
++      expect([entry.id, entry.installComplexity, entry.installPerksRequired, entry.installSkill])
++        .toEqual([id, complexity, perks, skill]);
++    }
++  });
++});
+diff --git a/__tests__/saves/robot-slot-slim-roundtrip.test.js b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+index 30ab3e8..6896681 100644
+--- a/__tests__/saves/robot-slot-slim-roundtrip.test.js
++++ b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+@@ -17,6 +17,7 @@ import {
+   totalDR,
+ } from '../../domain/robotSlots';
+ import { slimSaveData, slimRobotSlots, restoreSaveData } from '../../domain/saveSlimming';
++import { migrateRobotPlatingIds } from '../../src/store/migrations';
+ import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import fixtures from '../fixtures/robot-slots-from-saves.json';
+@@ -90,19 +91,24 @@ describe('ужимка слота: что остаётся в сейве', () =>
+   });
+ });
+ 
++// Тот же путь, что в приложении: slimSaveData перед записью в базу и
++// restoreSaveData на загрузке (components/CharacterContext.js).
++const catalog = getEquipmentCatalog();
++const getEntry = (id, itemType) => {
++  try { return findCatalogEntry(catalog, id, itemType); } catch { return null; }
++};
++const resolve = (item) => {
++  try { return resolveItem(item, catalog); } catch { return item; }
++};
++
+ describe('полный круг «записали — загрузили» на настоящем каталоге', () => {
+-  // Тот же путь, что в приложении: slimSaveData перед записью в базу и
+-  // restoreSaveData на загрузке (components/CharacterContext.js).
+-  const catalog = getEquipmentCatalog();
+-  const getEntry = (id, itemType) => {
+-    try { return findCatalogEntry(catalog, id, itemType); } catch { return null; }
+-  };
+-  const resolve = (item) => {
+-    try { return resolveItem(item, catalog); } catch { return item; }
+-  };
+-  const allSlots = () => Object.fromEntries(
+-    Object.entries(fixtures).map(([key, value]) => [key.replace('.', '__'), JSON.parse(JSON.stringify(value))]),
+-  );
++  // Как в приложении: сначала миграция сейва (v20 → v21 переименовывает
++  // удалённую из каталога «заводскую обшивку»), потом ужимка.
++  const allSlots = () => migrateRobotPlatingIds({
++    equippedRobotSlots: Object.fromEntries(
++      Object.entries(fixtures).map(([key, value]) => [key.replace('.', '__'), JSON.parse(JSON.stringify(value))]),
++    ),
++  }).equippedRobotSlots;
+   const written = () => slimSaveData({ schemaVersion: 20, equippedRobotSlots: allSlots() }, { getEntry });
+   const loaded = () => restoreSaveData(written(), { resolve });
+ 
+@@ -146,6 +152,20 @@ describe('полный круг «записали — загрузили» на
+ describe('круг «ужали — развернули» ничего не теряет', () => {
+   const keys = Object.keys(fixtures);
+ 
++  // Слот в том виде, в каком его держит приложение после загрузки: миграция
++  // сейва (v20 → v21 переименовывает удалённую из каталога «заводскую
++  // обшивку»), ужимка на экспорте и разворот по каталогам на импорте.
++  // Сравнивать «сырой» слот из сейва с восстановленным нельзя: в сейве слой
++  // лежит объектом со старыми характеристиками, а после загрузки берётся из
++  // каталога.
++  const asLoaded = (key) => restoreSaveData(
++    slimSaveData(
++      migrateRobotPlatingIds({ schemaVersion: 21, equippedRobotSlots: { x: slot(key) } }),
++      { getEntry },
++    ),
++    { resolve },
++  ).equippedRobotSlots.x;
++
+   it('атаки после ужимки те же, что до неё', () => {
+     for (const key of keys) {
+       const before = collectAttacks({ x: slot(key) }).map((a) => `${a.id}@${a.source}`);
+@@ -156,8 +176,9 @@ describe('круг «ужали — развернули» ничего не т
+ 
+   it('СУ после ужимки не ниже, чем была (мёртвые слои не считались и так)', () => {
+     for (const key of keys) {
+-      const before = totalDR(slot(key));
+-      const after = totalDR(slimOf(key));
++      const loaded = asLoaded(key);
++      const before = totalDR(loaded);
++      const after = totalDR(serializeSlot(loaded));
+       expect(after.physical, key).toBe(before.physical);
+       expect(after.energy, key).toBe(before.energy);
+       expect(after.rad, key).toBe(before.rad);
+@@ -189,7 +210,7 @@ describe('круг «ужали — развернули» ничего не т
+ 
+   it('ужимка идемпотентна', () => {
+     for (const key of keys) {
+-      const once = slimOf(key);
++      const once = serializeSlot(asLoaded(key));
+       const twice = serializeSlot(once);
+       expect(twice, key).toEqual(once);
+     }
+@@ -232,3 +253,44 @@ describe('круг «ужали — развернули» ничего не т
+     expect(wide.heldWeapon?.itemType).toBe('weapon');
+   });
+ });
++
++describe('миграция v20 → v21: «заводская обшивка» → стандартная', () => {
++  // Заводской обшивки в книге нет — каталог её больше не содержит, но старые
++  // сейвы (и комплект защитрона) на неё ссылались. Слой обязан сохраниться.
++  it('слой-объект в толстом слоте переименован', () => {
++    const state = {
++      equippedRobotSlots: {
++        body: { limb: { id: 'robot_body_protectron' }, plating: { id: 'robot_plating_factory_body' } },
++      },
++    };
++    const next = migrateRobotPlatingIds(state);
++    expect(next.equippedRobotSlots.body.plating.id).toBe('robot_plating_standard_body');
++    expect(next.equippedRobotSlots.body.limb.id).toBe('robot_body_protectron');
++  });
++
++  it('id в armorLayers нового слота переименован', () => {
++    const state = {
++      equippedRobotSlots: {
++        body: { content: 'robot_body_protectron', armorLayers: { plating: 'robot_plating_factory_body', armor: null, frame: null } },
++      },
++    };
++    expect(migrateRobotPlatingIds(state).equippedRobotSlots.body.armorLayers.plating)
++      .toBe('robot_plating_standard_body');
++  });
++
++  it('инвентарь тоже правится', () => {
++    const state = { equipment: { items: [{ id: 'robot_plating_factory_arms', quantity: 1 }, { id: 'weapon_10mm_pistol' }] } };
++    expect(migrateRobotPlatingIds(state).equipment.items.map((i) => i.id))
++      .toEqual(['robot_plating_standard_arms', 'weapon_10mm_pistol']);
++  });
++
++  it('идемпотентна и не трогает сейвы без старой обшивки', () => {
++    const once = migrateRobotPlatingIds({
++      equippedRobotSlots: { body: { armorLayers: { plating: 'robot_plating_factory_body' } } },
++    });
++    expect(migrateRobotPlatingIds(once)).toBe(once);
++
++    const clean = { equippedRobotSlots: { body: { armorLayers: { plating: 'robot_plating_serrated_body' } } } };
++    expect(migrateRobotPlatingIds(clean)).toBe(clean);
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 601a840..ad8b7e3 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -885,3 +885,67 @@ armor }`) и новый (`{ content, armorLayers }`), причём в новом
+ слота движком не видна.
+ 
+ **Итог:** 312 тестов / 27 файлов, все зелёные.
++
++---
++
++## Сверка каталога защитных слоёв с книгой (патч 186)
++
++Владелец прислал таблицы из книги: навесы на руки (ARM ATTACHMENTS) и всё,
++что можно установить на конечности (обшивка / броня / ра́мы). Колонки таблицы
++слоёв: **название · ФЗ · ЭЗ · локация · грузоподъёмность · цена · требование**
++(Оптика = head, Корпус = body, Руки = arm, Двигатель = mover).
++
++### Навесы на руки — совпали полностью
++
++Сложность установки, перки и навык у всех пяти совпали с каталогом;
++
++| Книга | У нас |
++|---|---|
++| Buzz Saw · 3 · Blacksmith 1 · Repair | `robot_weapon_circular_saw` · 3 · Blacksmith 1 · REPAIR |
++| Construction Claw · 3 · Blacksmith 1 · Repair | `robot_weapon_construction_claw` · 3 · Blacksmith 1 · REPAIR |
++| Cryojet · 4 · Robotics Expert 1, Science! 1 · Science | `robot_weapon_cryojet` · 4 · те же · SCIENCE |
++| Drill · 3 · Blacksmith 2 · Repair | `robot_weapon_drill` · 3 · Blacksmith 2 · REPAIR |
++| Vice Grip · 4 · Blacksmith 3 · Repair | `robot_weapon_vice_grip` · 4 · Blacksmith 3 · REPAIR |
++
++Не хранится: раритет навеса (по книге все пять Uncommon) — поля `rarity` у
++`weaponAsLimb` нет. Вопрос открыт.
++
++### Что поправлено по книге
++
++| Правка | Было | Стало |
++|---|---|---|
++| «Заводская обшивка» (4 записи) | есть в каталоге | **удалена** — в книге её нет, стандартная есть |
++| Заводская броня: грузоподъёмность | +10 (голова/руки/ходовая), +20 (корпус) | 0 — по книге «–» (значения оказались ценой, уехавшей в соседнюю колонку) |
++| Заводская броня: цена корпуса | 10 | 20 |
++| Рама с приводом: корпус | ГП +10 | +20 |
++| Электризованная (вольтовая) рама: руки и ходовая | ГП +20 | +10 |
++| Примитивная / зазубренная / пагубная / токсичная обшивка: цена корпуса | 10 / 15 / 15 / 15 | 20 / 30 / 30 / 30 |
++| Названия обшивок | Первобытная, Зубчатая, Ядовитая, Радиоактивная **плита** | Примитивная, Зазубренная, Пагубная, Токсичная **обшивка** |
++| Названия рам | Раздвижная, Вольтовая | Рама с приводом, Электризованная рама |
++
++Универсальные обшивки (Стандартная и Мистера Храбреца — в книге по одной
++записи на локацию «Все») **оставлены размноженными по локациям**: фильтр
++модалки работает по типу конечности, и это решение владельца.
++
++### Последствия удаления «заводской обшивки»
++
++На неё ссылались комплект защитрона и реальный сейв владельца
++(`__tests__/fixtures/robot-slots-from-saves.json`, `protectron.body`).
++
++- Комплект защитрона переведён на `robot_plating_standard_body`.
++- Добавлена миграция **v20 → v21** (`migrateRobotPlatingIds`): ссылки
++  `robot_plating_factory_*` → `robot_plating_standard_*` в слотах (оба вида —
++  «толстый» и `armorLayers`) и в инвентаре. Без неё слой не разрешился бы
++  каталогом, и персонаж **молча потерял бы защиту** при загрузке.
++- Тест полного круга ужимки сравнивает теперь не «сырой» слот из сейва, а
++  состояние после загрузки (миграция → ужимка → разворот): в сейве слой лежит
++  объектом со старыми характеристиками, а после загрузки берётся из каталога.
++
++### Тесты
++
++`__tests__/robot/robot-armor-catalog-book.test.js` (+4) — весь каталог слоёв
++(24 обшивки, 12 рам, 5 брони) сверен с таблицей из книги по строкам: ФЗ, ЭЗ,
++грузоподъёмность, цена, требование; плюс пять навесов на руки. Расхождение с
++книгой теперь падает тестом.
++
++**Итог:** 320 тестов / 28 файлов, все зелёные.
+diff --git a/modules/fallout/data/equipment/robot/armor.json b/modules/fallout/data/equipment/robot/armor.json
+index 9b4be14..90d6511 100644
+--- a/modules/fallout/data/equipment/robot/armor.json
++++ b/modules/fallout/data/equipment/robot/armor.json
+@@ -8,7 +8,7 @@
+         "physical": 1,
+         "energy": 1
+       },
+-      "carryWeightModifier": 10,
++      "carryWeightModifier": 0,
+       "cost": 10,
+       "perkRequired": null,
+       "limbType": "head"
+@@ -21,8 +21,8 @@
+         "physical": 1,
+         "energy": 1
+       },
+-      "carryWeightModifier": 20,
+-      "cost": 10,
++      "carryWeightModifier": 0,
++      "cost": 20,
+       "perkRequired": null,
+       "limbType": "body"
+     },
+@@ -34,7 +34,7 @@
+         "physical": 1,
+         "energy": 1
+       },
+-      "carryWeightModifier": 10,
++      "carryWeightModifier": 0,
+       "cost": 10,
+       "perkRequired": null,
+       "limbType": "arm"
+@@ -47,7 +47,7 @@
+         "physical": 1,
+         "energy": 1
+       },
+-      "carryWeightModifier": 10,
++      "carryWeightModifier": 0,
+       "cost": 10,
+       "perkRequired": null,
+       "limbType": "mover"
+diff --git a/modules/fallout/data/equipment/robot/armor_plating.json b/modules/fallout/data/equipment/robot/armor_plating.json
+index 3cbdfa2..06c3b43 100644
+--- a/modules/fallout/data/equipment/robot/armor_plating.json
++++ b/modules/fallout/data/equipment/robot/armor_plating.json
+@@ -136,74 +136,6 @@
+       "perkRequired": null,
+       "limbType": "mover"
+     },
+-    {
+-      "id": "robot_plating_factory_optics",
+-      "templateId": "robot_plating_factory",
+-      "layer": "plating",
+-      "incompatibleLayers": [
+-        "armor",
+-        "frame"
+-      ],
+-      "damageResistance": {
+-        "physical": 1,
+-        "energy": 1
+-      },
+-      "carryWeightModifier": 0,
+-      "cost": 5,
+-      "perkRequired": null,
+-      "limbType": "head"
+-    },
+-    {
+-      "id": "robot_plating_factory_body",
+-      "templateId": "robot_plating_factory",
+-      "layer": "plating",
+-      "incompatibleLayers": [
+-        "armor",
+-        "frame"
+-      ],
+-      "damageResistance": {
+-        "physical": 1,
+-        "energy": 1
+-      },
+-      "carryWeightModifier": 0,
+-      "cost": 5,
+-      "perkRequired": null,
+-      "limbType": "body"
+-    },
+-    {
+-      "id": "robot_plating_factory_arms",
+-      "templateId": "robot_plating_factory",
+-      "layer": "plating",
+-      "incompatibleLayers": [
+-        "armor",
+-        "frame"
+-      ],
+-      "damageResistance": {
+-        "physical": 1,
+-        "energy": 1
+-      },
+-      "carryWeightModifier": 0,
+-      "cost": 5,
+-      "perkRequired": null,
+-      "limbType": "arm"
+-    },
+-    {
+-      "id": "robot_plating_factory_thruster",
+-      "templateId": "robot_plating_factory",
+-      "layer": "plating",
+-      "incompatibleLayers": [
+-        "armor",
+-        "frame"
+-      ],
+-      "damageResistance": {
+-        "physical": 1,
+-        "energy": 1
+-      },
+-      "carryWeightModifier": 0,
+-      "cost": 5,
+-      "perkRequired": null,
+-      "limbType": "mover"
+-    },
+     {
+       "id": "robot_plating_primal_optics",
+       "templateId": "robot_plating_primal",
+@@ -234,7 +166,7 @@
+         "energy": 0
+       },
+       "carryWeightModifier": -20,
+-      "cost": 10,
++      "cost": 20,
+       "perkRequired": null,
+       "limbType": "body"
+     },
+@@ -302,7 +234,7 @@
+         "energy": 0
+       },
+       "carryWeightModifier": -20,
+-      "cost": 15,
++      "cost": 30,
+       "perkRequired": "Armorer 1",
+       "limbType": "body"
+     },
+@@ -370,7 +302,7 @@
+         "energy": 0
+       },
+       "carryWeightModifier": -20,
+-      "cost": 15,
++      "cost": 30,
+       "perkRequired": "Armorer 1",
+       "limbType": "body"
+     },
+@@ -438,7 +370,7 @@
+         "energy": 0
+       },
+       "carryWeightModifier": -20,
+-      "cost": 15,
++      "cost": 30,
+       "perkRequired": "Armorer 3",
+       "limbType": "body"
+     },
+diff --git a/modules/fallout/data/equipment/robot/frames.json b/modules/fallout/data/equipment/robot/frames.json
+index bdd288a..7b07be2 100644
+--- a/modules/fallout/data/equipment/robot/frames.json
++++ b/modules/fallout/data/equipment/robot/frames.json
+@@ -21,7 +21,7 @@
+         "physical": 1,
+         "energy": 1
+       },
+-      "carryWeightModifier": 10,
++      "carryWeightModifier": 20,
+       "cost": 30,
+       "perkRequired": null,
+       "limbType": "body"
+@@ -86,7 +86,7 @@
+         "physical": 2,
+         "energy": 2
+       },
+-      "carryWeightModifier": 20,
++      "carryWeightModifier": 10,
+       "cost": 20,
+       "perkRequired": "Armorer 2",
+       "limbType": "arm"
+@@ -99,7 +99,7 @@
+         "physical": 2,
+         "energy": 2
+       },
+-      "carryWeightModifier": 20,
++      "carryWeightModifier": 10,
+       "cost": 20,
+       "perkRequired": "Armorer 2",
+       "limbType": "mover"
+diff --git a/modules/fallout/data/equipmentKits/protectron.json b/modules/fallout/data/equipmentKits/protectron.json
+index dbbd03e..4793455 100644
+--- a/modules/fallout/data/equipmentKits/protectron.json
++++ b/modules/fallout/data/equipmentKits/protectron.json
+@@ -313,7 +313,7 @@
+       },
+       {
+         "type": "fixed",
+-        "armorId": "robot_plating_factory_body",
++        "armorId": "robot_plating_standard_body",
+         "itemType": "plating"
+       },
+       {
+@@ -423,7 +423,7 @@
+             "group": [
+               {
+                 "type": "fixed",
+-                "armorId": "robot_plating_factory_body",
++                "armorId": "robot_plating_standard_body",
+                 "itemType": "plating"
+               }
+             ]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/robot/plating.json b/modules/fallout/i18n/en-EN/data/equipment/robot/plating.json
+index a8f6cdc..79f5478 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/robot/plating.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/robot/plating.json
+@@ -39,104 +39,84 @@
+     "name": "Mister Gutsy Plating for Locomotion",
+     "special": "Default for Mister Gutsy starting package"
+   },
+-  {
+-    "id": "robot_plating_factory_optics",
+-    "name": "Factory Plating for the Head (Optics)",
+-    "special": "Standard factory-made plating"
+-  },
+-  {
+-    "id": "robot_plating_factory_body",
+-    "name": "Factory Plating for the Body",
+-    "special": "Standard factory-made plating"
+-  },
+-  {
+-    "id": "robot_plating_factory_arms",
+-    "name": "Factory Plating for the Arm",
+-    "special": "Standard factory-made plating"
+-  },
+-  {
+-    "id": "robot_plating_factory_thruster",
+-    "name": "Factory Plating for Locomotion",
+-    "special": "Standard factory-made plating"
+-  },
+   {
+     "id": "robot_plating_primal_optics",
+-    "name": "Primal Plate for the Head (Optics)",
++    "name": "Primitive Plating for the Head (Optics)",
+     "special": "Makeshift armor, reduces carrying capacity"
+   },
+   {
+     "id": "robot_plating_primal_body",
+-    "name": "Primal Plate for the Body",
++    "name": "Primitive Plating for the Body",
+     "special": "Makeshift armor, reduces carrying capacity"
+   },
+   {
+     "id": "robot_plating_primal_arms",
+-    "name": "Primal Plate for the Arm",
++    "name": "Primitive Plating for the Arm",
+     "special": "Makeshift armor, reduces carrying capacity"
+   },
+   {
+     "id": "robot_plating_primal_thruster",
+-    "name": "Primal Plate for Locomotion",
++    "name": "Primitive Plating for Locomotion",
+     "special": "Makeshift armor, reduces carrying capacity"
+   },
+   {
+     "id": "robot_plating_serrated_optics",
+-    "name": "Serrated Plate for the Head (Optics)",
++    "name": "Serrated Plating for the Head (Optics)",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)"
+   },
+   {
+     "id": "robot_plating_serrated_body",
+-    "name": "Serrated Plate for the Body",
++    "name": "Serrated Plating for the Body",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)"
+   },
+   {
+     "id": "robot_plating_serrated_arms",
+-    "name": "Serrated Plate for the Arm",
++    "name": "Serrated Plating for the Arm",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)"
+   },
+   {
+     "id": "robot_plating_serrated_thruster",
+-    "name": "Serrated Plate for Locomotion",
++    "name": "Serrated Plating for Locomotion",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Physical); Arms attacks gain Persistent (Physical)"
+   },
+   {
+     "id": "robot_plating_noxious_optics",
+-    "name": "Noxious Plate for the Head (Optics)",
++    "name": "Noxious Plating for the Head (Optics)",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)"
+   },
+   {
+     "id": "robot_plating_noxious_body",
+-    "name": "Noxious Plate for the Body",
++    "name": "Noxious Plating for the Body",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)"
+   },
+   {
+     "id": "robot_plating_noxious_arms",
+-    "name": "Noxious Plate for the Arm",
++    "name": "Noxious Plating for the Arm",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)"
+   },
+   {
+     "id": "robot_plating_noxious_thruster",
+-    "name": "Noxious Plate for Locomotion",
++    "name": "Noxious Plating for Locomotion",
+     "special": "On melee complication: attacker takes 2 {/CD} Persistent (Poison); Arms attacks gain Persistent (Poison)"
+   },
+   {
+     "id": "robot_plating_toxic_optics",
+-    "name": "Toxic Plate for the Head (Optics)",
++    "name": "Toxic Plating for the Head (Optics)",
+     "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive"
+   },
+   {
+     "id": "robot_plating_toxic_body",
+-    "name": "Toxic Plate for the Body",
++    "name": "Toxic Plating for the Body",
+     "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive"
+   },
+   {
+     "id": "robot_plating_toxic_arms",
+-    "name": "Toxic Plate for the Arm",
++    "name": "Toxic Plating for the Arm",
+     "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive"
+   },
+   {
+     "id": "robot_plating_toxic_thruster",
+-    "name": "Toxic Plate for Locomotion",
++    "name": "Toxic Plating for Locomotion",
+     "special": "On melee complication: attacker takes 2 {/CD} Radiation; Arms attacks gain Radioactive"
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json b/modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json
+index a8b152b..008ad72 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json
+@@ -1,42 +1,42 @@
+ [
+   {
+     "id": "robot_frame_actuated_optics",
+-    "name": "Раздвижная рама для головы (оптики)",
++    "name": "Рама с приводом для головы (оптики)",
+     "special": "Руки: +1 урон в ближнем бою; Тяга: Движение (небольшое) + Бег (крупное) в одном ходу"
+   },
+   {
+     "id": "robot_frame_actuated_body",
+-    "name": "Раздвижная рама для корпуса",
++    "name": "Рама с приводом для корпуса",
+     "special": "Руки: +1 урон в ближнем бою; Тяга: Движение (небольшое) + Бег (крупное) в одном ходу"
+   },
+   {
+     "id": "robot_frame_actuated_arms",
+-    "name": "Раздвижная рама для руки",
++    "name": "Рама с приводом для руки",
+     "special": "Руки: +1 урон в ближнем бою; Тяга: Движение (небольшое) + Бег (крупное) в одном ходу"
+   },
+   {
+     "id": "robot_frame_actuated_thruster",
+-    "name": "Раздвижная рама для ходовой части",
++    "name": "Рама с приводом для ходовой части",
+     "special": "Руки: +1 урон в ближнем бою; Тяга: Движение (небольшое) + Бег (крупное) в одном ходу"
+   },
+   {
+     "id": "robot_frame_voltaic_optics",
+-    "name": "Вольтовая рама для головы (оптики)",
++    "name": "Электризованная рама для головы (оптики)",
+     "special": "Энергетические атаки: +1 урон за каждый элемент (+2 за 3 элемента, +3 за 5+)"
+   },
+   {
+     "id": "robot_frame_voltaic_body",
+-    "name": "Вольтовая рама для корпуса",
++    "name": "Электризованная рама для корпуса",
+     "special": "Энергетические атаки: +1 урон за каждый элемент (+2 за 3 элемента, +3 за 5+)"
+   },
+   {
+     "id": "robot_frame_voltaic_arms",
+-    "name": "Вольтовая рама для руки",
++    "name": "Электризованная рама для руки",
+     "special": "Энергетические атаки: +1 урон за каждый элемент (+2 за 3 элемента, +3 за 5+)"
+   },
+   {
+     "id": "robot_frame_voltaic_thruster",
+-    "name": "Вольтовая рама для ходовой части",
++    "name": "Электризованная рама для ходовой части",
+     "special": "Энергетические атаки: +1 урон за каждый элемент (+2 за 3 элемента, +3 за 5+)"
+   },
+   {
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json b/modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json
+index 3dba9ac..7b0f6f3 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json
+@@ -39,104 +39,84 @@
+     "name": "Обшивка Мистера Храбреца для ходовой части",
+     "special": "Стандартное для набора Мистера Храбреца"
+   },
+-  {
+-    "id": "robot_plating_factory_optics",
+-    "name": "Заводская обшивка для головы (оптики)",
+-    "special": "Стандартная заводская обшивка"
+-  },
+-  {
+-    "id": "robot_plating_factory_body",
+-    "name": "Заводская обшивка для корпуса",
+-    "special": "Стандартная заводская обшивка"
+-  },
+-  {
+-    "id": "robot_plating_factory_arms",
+-    "name": "Заводская обшивка для руки",
+-    "special": "Стандартная заводская обшивка"
+-  },
+-  {
+-    "id": "robot_plating_factory_thruster",
+-    "name": "Заводская обшивка для ходовой части",
+-    "special": "Стандартная заводская обшивка"
+-  },
+   {
+     "id": "robot_plating_primal_optics",
+-    "name": "Первобытная плита для головы (оптики)",
++    "name": "Примитивная обшивка для головы (оптики)",
+     "special": "Самодельная броня, снижает грузоподъемность"
+   },
+   {
+     "id": "robot_plating_primal_body",
+-    "name": "Первобытная плита для корпуса",
++    "name": "Примитивная обшивка для корпуса",
+     "special": "Самодельная броня, снижает грузоподъемность"
+   },
+   {
+     "id": "robot_plating_primal_arms",
+-    "name": "Первобытная плита для руки",
++    "name": "Примитивная обшивка для руки",
+     "special": "Самодельная броня, снижает грузоподъемность"
+   },
+   {
+     "id": "robot_plating_primal_thruster",
+-    "name": "Первобытная плита для ходовой части",
++    "name": "Примитивная обшивка для ходовой части",
+     "special": "Самодельная броня, снижает грузоподъемность"
+   },
+   {
+     "id": "robot_plating_serrated_optics",
+-    "name": "Зубчатая плита для головы (оптики)",
++    "name": "Зазубренная обшивка для головы (оптики)",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (физического); атаки руками получают эффект стойкого (физического)"
+   },
+   {
+     "id": "robot_plating_serrated_body",
+-    "name": "Зубчатая плита для корпуса",
++    "name": "Зазубренная обшивка для корпуса",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (физического); атаки руками получают эффект стойкого (физического)"
+   },
+   {
+     "id": "robot_plating_serrated_arms",
+-    "name": "Зубчатая плита для руки",
++    "name": "Зазубренная обшивка для руки",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (физического); атаки руками получают эффект стойкого (физического)"
+   },
+   {
+     "id": "robot_plating_serrated_thruster",
+-    "name": "Зубчатая плита для ходовой части",
++    "name": "Зазубренная обшивка для ходовой части",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (физического); атаки руками получают эффект стойкого (физического)"
+   },
+   {
+     "id": "robot_plating_noxious_optics",
+-    "name": "Ядовитая плита для головы (оптики)",
++    "name": "Пагубная обшивка для головы (оптики)",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (яд); атаки руками получают эффект стойкого (яд)"
+   },
+   {
+     "id": "robot_plating_noxious_body",
+-    "name": "Ядовитая плита для корпуса",
++    "name": "Пагубная обшивка для корпуса",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (яд); атаки руками получают эффект стойкого (яд)"
+   },
+   {
+     "id": "robot_plating_noxious_arms",
+-    "name": "Ядовитая плита для руки",
++    "name": "Пагубная обшивка для руки",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (яд); атаки руками получают эффект стойкого (яд)"
+   },
+   {
+     "id": "robot_plating_noxious_thruster",
+-    "name": "Ядовитая плита для ходовой части",
++    "name": "Пагубная обшивка для ходовой части",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от стойкого (яд); атаки руками получают эффект стойкого (яд)"
+   },
+   {
+     "id": "robot_plating_toxic_optics",
+-    "name": "Радиоактивная плита для головы (оптики)",
++    "name": "Токсичная обшивка для головы (оптики)",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от радиации; атаки руками получают эффект радиоактивности"
+   },
+   {
+     "id": "robot_plating_toxic_body",
+-    "name": "Радиоактивная плита для корпуса",
++    "name": "Токсичная обшивка для корпуса",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от радиации; атаки руками получают эффект радиоактивности"
+   },
+   {
+     "id": "robot_plating_toxic_arms",
+-    "name": "Радиоактивная плита для руки",
++    "name": "Токсичная обшивка для руки",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от радиации; атаки руками получают эффект радиоактивности"
+   },
+   {
+     "id": "robot_plating_toxic_thruster",
+-    "name": "Радиоактивная плита для ходовой части",
++    "name": "Токсичная обшивка для ходовой части",
+     "special": "При неудаче в ближнем бою: атакующий получает 2 урона от радиации; атаки руками получают эффект радиоактивности"
+   }
+ ]
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 5a49fa8..d34cae3 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -452,6 +452,76 @@ const _migrateEquippedEntryV0V1 = (entry) => {
+   return out;
+ };
+ 
++/**
++ * v20 -> v21: «Заводская обшивка» удалена из каталога — в книге её нет, есть
++ * только стандартная обшивка. Старые сейвы (и комплект защитрона) ссылались на
++ * robot_plating_factory_*; без переименования слой не разрешится каталогом, и
++ * персонаж молча потеряет защиту при загрузке.
++ *
++ * Правит и «толстый» вид слота (слои объектами на верхнем уровне), и новый
++ * (armorLayers с id), и инвентарь. Идемпотентна: после подмены id больше не
++ * начинается с robot_plating_factory_.
++ */
++export const migrateRobotPlatingIds = (state) => {
++  if (!state || typeof state !== 'object') return state;
++
++  const remapId = (id) => (typeof id === 'string' && id.startsWith('robot_plating_factory_')
++    ? id.replace('robot_plating_factory_', 'robot_plating_standard_')
++    : id);
++
++  const remapLayer = (layer) => {
++    if (typeof layer === 'string') return remapId(layer);
++    if (layer && typeof layer === 'object' && typeof layer.id === 'string') {
++      const id = remapId(layer.id);
++      return id === layer.id ? layer : { ...layer, id };
++    }
++    return layer;
++  };
++
++  const LAYER_KEYS = ['plating', 'armor', 'frame'];
++  let changed = false;
++  const next = { ...state };
++
++  if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
++    const slots = {};
++    let slotsChanged = false;
++    for (const [key, slot] of Object.entries(next.equippedRobotSlots)) {
++      if (!slot || typeof slot !== 'object') { slots[key] = slot; continue; }
++      const patched = { ...slot };
++      for (const layerKey of LAYER_KEYS) {
++        if (patched[layerKey] === undefined || patched[layerKey] === null) continue;
++        const mapped = remapLayer(patched[layerKey]);
++        if (mapped !== patched[layerKey]) { patched[layerKey] = mapped; slotsChanged = true; }
++      }
++      if (patched.armorLayers && typeof patched.armorLayers === 'object') {
++        const layers = { ...patched.armorLayers };
++        for (const layerKey of LAYER_KEYS) {
++          if (layers[layerKey] === undefined || layers[layerKey] === null) continue;
++          const mapped = remapLayer(layers[layerKey]);
++          if (mapped !== layers[layerKey]) { layers[layerKey] = mapped; slotsChanged = true; }
++        }
++        patched.armorLayers = layers;
++      }
++      slots[key] = patched;
++    }
++    if (slotsChanged) { next.equippedRobotSlots = slots; changed = true; }
++  }
++
++  if (Array.isArray(next.equipment?.items)) {
++    let itemsChanged = false;
++    const items = next.equipment.items.map((item) => {
++      if (!item || typeof item !== 'object') return item;
++      const id = remapId(item.id);
++      if (id === item.id) return item;
++      itemsChanged = true;
++      return { ...item, id };
++    });
++    if (itemsChanged) { next.equipment = { ...next.equipment, items }; changed = true; }
++  }
++
++  return changed ? next : state;
++};
++
+ const MIGRATIONS = [
+   // v0 -> v1: разделить эффекты/качества в экипированном оружии.
+   (state) => {
+@@ -1093,6 +1163,12 @@ const MIGRATIONS = [
+   // только бамп версии: данные не меняются, миграция идемпотентна.
+   (state) => state,
+ 
++  // v20 -> v21: «Заводская обшивка» убрана из каталога (в книге её нет).
++  // Ссылки robot_plating_factory_* в слотах и инвентаре переименовываются в
++  // robot_plating_standard_* — иначе слой не разрешится и персонаж потеряет
++  // защиту. Идемпотентна.
++  migrateRobotPlatingIds,
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index c5d4f92..5a9753c 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -52,7 +52,11 @@
+ //       совместимость: старые «жирные» сейвы (v18 и ниже) при загрузке
+ //       восстанавливаются (restoreSaveData), а при сохранении становятся
+ //       «худыми» (slimSaveData). Миграция v18→v19 — только бамп версии.
+-export const CURRENT_SCHEMA_VERSION = 20;
++// v21 — «Заводская обшивка» убрана из каталога (в книге её нет, есть только
++//       стандартная): ссылки robot_plating_factory_* в слотах робота и в
++//       инвентаре переименованы в robot_plating_standard_* (миграция
++//       migrateRobotPlatingIds в migrations.js).
++export const CURRENT_SCHEMA_VERSION = 21;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+
+-- 
+2.47.3
+
