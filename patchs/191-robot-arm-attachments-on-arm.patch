@@ -1,0 +1,1229 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 6 Sep 2026 18:38:38 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20191:=20=D0=BD=D0=B0?=
+ =?UTF-8?q?=D0=B2=D0=B5=D1=81=D1=8B=20=D1=80=D1=83=D0=BA=20=E2=80=94=20?=
+ =?UTF-8?q?=D0=BE=D1=80=D1=83=D0=B6=D0=B8=D0=B5=20=D0=BD=D0=B0=20=D1=80?=
+ =?UTF-8?q?=D1=83=D0=BA=D0=B5,=20=D1=81=D1=82=D1=80=D0=BE=D0=B3=D0=B0?=
+ =?UTF-8?q?=D1=8F=20=D0=B7=D0=B0=D0=BC=D0=B5=D0=BD=D0=B0,=20=D0=BD=D0=B0?=
+ =?UTF-8?q?=D1=81=D1=82=D1=80=D0=BE=D0=B9=D0=BA=D0=B0,=20=D0=BC=D0=B8?=
+ =?UTF-8?q?=D0=B3=D1=80=D0=B0=D1=86=D0=B8=D1=8F=20v22?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Навес (arm attachment) — оружие, крепящееся К руке, а не конечность:
+- навес нельзя получить без руки робота; занимает ладонь руки (heldWeapon),
+  одна рука несёт один предмет: навес ИЛИ обычное оружие;
+- навес заменяем: строгий режим (настройка «прикрепляемые части рук», вкл.
+  по умолчанию) — навес только на навес, оружие только на оружие;
+  выключен — любые руки/оружие;
+- встроенное оружие руки не сменить без замены самой руки;
+- все конечности (включая руки) принимают обшивку/броню/раму;
+- сборка комплекта: навес без руки получает стандартную руку плана тела;
+- миграция сейвов v21→v22: навесы из слотов рук пересаживаются в ладони
+  стандартных рук; в пикере замены руки навесов больше нет.
+
+Тесты: robot-arm-attachment-mode.test.js (17) + обновлены под новую модель
+8 старых. Итого 336/29.
+---
+ __tests__/robot/assaultron-kits.test.js       |  15 +-
+ __tests__/robot/mister-handy.test.js          |  35 +--
+ .../robot/robot-arm-attachment-mode.test.js   | 259 ++++++++++++++++++
+ __tests__/robot/robot-kit-assembly.test.js    |   9 +-
+ __tests__/robot/robot-slot-behaviour.test.js  |  18 +-
+ __tests__/robot/robot-slot-model.test.js      |  39 ++-
+ .../InventoryScreen/InventoryScreen.js        | 111 +++++++-
+ docs/robot-rules.md                           |  14 +-
+ domain/robotEquip.js                          |  64 +++--
+ domain/robotSlots.js                          |  93 ++++++-
+ .../i18n/en-EN/data/system/settings.json      |   7 +-
+ .../i18n/en-EN/screens/inventory/screen.json  |   8 +-
+ .../i18n/ru-RU/data/system/settings.json      |   7 +-
+ .../i18n/ru-RU/screens/inventory/screen.json  |   8 +-
+ modules/fallout/settings.json                 |   9 +
+ package-lock.json                             |   2 +-
+ src/store/appSettingsStore.js                 |   1 +
+ src/store/migrations.js                       |  57 ++++
+ src/store/saveSchema.js                       |   5 +-
+ 19 files changed, 671 insertions(+), 90 deletions(-)
+ create mode 100644 __tests__/robot/robot-arm-attachment-mode.test.js
+
+diff --git a/__tests__/robot/assaultron-kits.test.js b/__tests__/robot/assaultron-kits.test.js
+index 2395236..363d80a 100644
+--- a/__tests__/robot/assaultron-kits.test.js
++++ b/__tests__/robot/assaultron-kits.test.js
+@@ -72,7 +72,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
+     expect(laser.isBuiltin).toBe(true);
+   });
+ 
+-  it('initRobotSlots: строительные когти — оружие со статами в слотах рук', () => {
++  it('initRobotSlots: строительные когти — навесы в ладонях стандартных рук (патч 191)', () => {
+     const clawWeapon = byId(robotWeapons, 'robot_weapon_construction_claw');
+     const kitItems = [
+       { ...clawWeapon, itemType: 'weapon', weaponId: clawWeapon.id, slot: 'left' },
+@@ -80,16 +80,19 @@ describe('комплекты снаряжения Штурмотрона', () =>
+     ];
+     const { slots } = initRobotSlots('assaultron', kitItems, robotCatalog);
+ 
+-    expect(slots.leftArm.limb?.id).toBe('robot_weapon_construction_claw');
+-    expect(slots.rightArm.limb?.id).toBe('robot_weapon_construction_claw');
++    // В слоте — стандартная рука штурмотрона, навес — в её ладони.
++    expect(slots.leftArm.limb?.id).toBe('robot_arm_assaultron');
++    expect(slots.rightArm.limb?.id).toBe('robot_arm_assaultron');
++    expect(slots.leftArm.heldWeapon?.id).toBe('robot_weapon_construction_claw');
++    expect(slots.rightArm.heldWeapon?.id).toBe('robot_weapon_construction_claw');
+ 
+     const weapons = getBuiltinWeaponsFromSlots(slots);
+-    const claw = weapons.find((w) => w.id === 'robot_weapon_construction_claw');
+-    expect(claw, 'коготь не попал в оружие').toBeTruthy();
++    const claws = weapons.filter((w) => w.id === 'robot_weapon_construction_claw');
++    expect(claws, 'когти не попали в оружие').toHaveLength(2);
++    const claw = claws[0];
+     expect(claw.damage).toBe(4);
+     expect(claw.damageType).toBe('physical');
+     expect(claw.mainSkill).toBe('UNARMED');
+-    expect(claw.isBuiltin).toBe(true);
+   });
+ 
+   it('initRobotSlots: рамы и обшивка — 1 предмет = 1 слот (включая ноги)', () => {
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+index 2d2a6f7..fe899ee 100644
+--- a/__tests__/robot/mister-handy.test.js
++++ b/__tests__/robot/mister-handy.test.js
+@@ -124,9 +124,13 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+     );
+ 
+     expect(Object.keys(slots)).toEqual(['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster']);
++    // Патч 191: навесы крепятся К рукам — во всех трёх слотах руки-манипуляторы,
++    // огнемёт и пила — в ладонях.
+     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
+-    expect(slots.arm3.limb?.id).toBe('robot_weapon_circular_saw');
++    expect(slots.arm1.heldWeapon?.id).toBe('robot_weapon_flamethrower');
++    expect(slots.arm2.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm2.heldWeapon?.id).toBe('robot_weapon_circular_saw');
++    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
+     // Движитель: thruster, а не leftLeg/rightLeg.
+     expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
+   });
+@@ -206,8 +210,8 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+   });
+ 
+   it('arm3 не теряется: каждая рука-манипулятор даёт собственную атаку', () => {
+-    // Комплект «Няня»: arm1 — рука-манипулятор, arm2 — огнемёт,
+-    // arm3 — рука-манипулятор (первый вариант выбора).
++    // Комплект «Няня»: arm1 — рука-манипулятор, arm2 — огнемёт (навес в ладони,
++    // патч 191), arm3 — рука-манипулятор (первый вариант выбора).
+     const { slots } = initRobotSlots(
+       'misterHandy',
+       resolveKit('mister_handy_nanny'),
+@@ -217,17 +221,18 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+     expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
+ 
+-    // Три источника атак: манипулятор arm1, огнемёт arm2, манипулятор arm3.
+-    // Сейчас getItem-дедуп по id оружия съедает второй манипулятор.
+-    expect(attacksOfSlot(slots, 'arm1')).toHaveLength(1);
++    // Четыре источника атак: манипулятор arm1 + огнемёт в его ладони (навес
++    // не глушит собственную атаку руки), манипуляторы arm2 и arm3.
++    // Дедуп по id оружия второй манипулятор не съедает.
++    expect(attacksOfSlot(slots, 'arm1')).toHaveLength(2);
+     expect(attacksOfSlot(slots, 'arm2')).toHaveLength(1);
+     expect(attacksOfSlot(slots, 'arm3')).toHaveLength(1);
+-    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(3);
++    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(4);
+   });
+ 
+-  it('оружие вместо руки не принимает обшивку (броня — только на конечность)', () => {
+-    // Комплект «Помощник»: arm1 — рука-манипулятор, arm2 — огнемёт,
+-    // arm3 — циркулярная пила (обе — оружие вместо руки).
++  it('рука с навесом принимает обшивку: броня — на любую конечность (патч 191)', () => {
++    // Комплект «Помощник»: во всех трёх слотах — руки-манипуляторы; огнемёт
++    // и пила — навесы в ладонях, а не «оружие вместо руки».
+     const { slots } = initRobotSlots(
+       'misterHandy',
+       [
+@@ -239,12 +244,10 @@ describe('Мистер Хэнди — acceptance-критерий новой м
+       robotCatalog,
+     );
+ 
+-    // Обшивка ложится только на настоящую конечность.
++    // Обшивка ложится на каждую руку: навес в ладони ей не мешает.
+     expect(slots.arm1.plating?.id).toBeTruthy();
+-    // Слот, занятый оружием вместо руки, защиты не принимает: у него нет своей
+-    // СУ и нет куда её надевать — только характеристики самого оружия.
+-    expect(slots.arm2.plating).toBeFalsy();
+-    expect(slots.arm3.plating).toBeFalsy();
++    expect(slots.arm2.plating?.id).toBeTruthy();
++    expect(slots.arm3.plating?.id).toBeTruthy();
+   });
+ 
+ });
+diff --git a/__tests__/robot/robot-arm-attachment-mode.test.js b/__tests__/robot/robot-arm-attachment-mode.test.js
+new file mode 100644
+index 0000000..b5e68c8
+--- /dev/null
++++ b/__tests__/robot/robot-arm-attachment-mode.test.js
+@@ -0,0 +1,259 @@
++// __tests__/robot/robot-arm-attachment-mode.test.js
++//
++// Новая модель навесов (arm attachments, патч 191):
++//   1. Навес — оружие, крепящееся К руке: занимает ладонь (heldWeapon),
++//      а не слот конечности. Без руки его получить нельзя.
++//   2. Замена — «аналогичное на аналогичное» в строгом режиме настройки
++//      robotArmPartsStrictReplace (по умолчанию включён): навес меняется
++//      навесом, оружие — оружием. Выключена — что угодно.
++//   3. Все конечности (включая руки) принимают слои защиты.
++//   4. Сборка комплекта: навес без руки получает стандартную руку плана
++//      тела и крепится уже к ней.
++//   5. Миграция v21→v22: навес, стоявший вместо руки, пересаживается в
++//      ладонь стандартной руки плана.
++
++import { describe, it, expect } from 'vitest';
++import limbsFile from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++import moduleSettings from '../../modules/fallout/settings.json';
++import ruSettings from '../../modules/fallout/i18n/ru-RU/data/system/settings.json';
++import enSettings from '../../modules/fallout/i18n/en-EN/data/system/settings.json';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++import { migrateRobotArmAttachments } from '../../src/store/migrations';
++import {
++  isArmAttachment,
++  canReplaceArmWeapon,
++  canEquip,
++  limbOptionsForSlot,
++} from '../../domain/robotSlots';
++import { initRobotSlots } from '../../domain/robotEquip';
++import { getRobotLimbCatalog } from '../../domain/registry';
++
++const LIMBS = limbsFile;
++const WEAPONS_AS_LIMB = weaponAsLimbFile;
++
++const armById = (id) => LIMBS.find((l) => l.id === id);
++const attachmentById = (id) => WEAPONS_AS_LIMB.find((l) => l.id === id);
++
++const ROBOT_CATALOG = {
++  limbs: LIMBS,
++  weaponAsLimb: WEAPONS_AS_LIMB,
++  weapons: [],
++  generalWeapons: [],
++  weaponMods: [],
++};
++
++const makeSlot = ({ limb = null, heldWeapon = null } = {}) => ({ limb, heldWeapon });
++
++describe('патч 191: навес — оружие на руке, а не конечность', () => {
++  // ------------------------------------------------------------------ isArmAttachment
++  it('isArmAttachment: узнаёт навес по записи каталога и по id-предмету', () => {
++    expect(isArmAttachment(attachmentById('robot_weapon_circular_saw'), ROBOT_CATALOG)).toBe(true);
++    expect(isArmAttachment({ id: 'robot_weapon_drill' }, ROBOT_CATALOG)).toBe(true);
++    expect(isArmAttachment({ weaponId: 'robot_weapon_drill' }, ROBOT_CATALOG)).toBe(true);
++    expect(isArmAttachment(armById('robot_arm_mister_handy'), ROBOT_CATALOG)).toBe(false);
++    expect(isArmAttachment({ id: 'weapon_10mm_pistol' }, ROBOT_CATALOG)).toBe(false);
++    expect(isArmAttachment(null, ROBOT_CATALOG)).toBe(false);
++  });
++
++  // ------------------------------------------------------------------ canEquip
++  it('навес ставится в ладонь руки, но не без руки', () => {
++    const misterHandy = armById('robot_arm_mister_handy');
++    const saw = attachmentById('robot_weapon_circular_saw');
++
++    const withArm = canEquip(
++      makeSlot({ limb: misterHandy }),
++      { id: saw.id, weaponId: saw.id },
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG }
++    );
++    expect(withArm.allowed).toBe(true);
++
++    const noArm = canEquip(
++      makeSlot({ limb: null }),
++      { id: saw.id, weaponId: saw.id },
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG }
++    );
++    expect(noArm.allowed).toBe(false);
++  });
++
++  it('строгая замена: навес меняется только на навес, оружие — только на оружие', () => {
++    const misterHandy = armById('robot_arm_mister_handy');
++    const saw = attachmentById('robot_weapon_circular_saw');
++    const drill = attachmentById('robot_weapon_drill');
++    const pistol = { id: 'weapon_10mm_pistol', itemType: 'weapon', weight: 2 };
++
++    // навес → навес: можно
++    expect(canEquip(
++      makeSlot({ limb: misterHandy, heldWeapon: { id: saw.id } }),
++      { id: drill.id, weaponId: drill.id },
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG, armPartsStrict: true }
++    ).allowed).toBe(true);
++
++    // навес → обычное оружие: нельзя (строгий режим)
++    const strictDeny = canEquip(
++      makeSlot({ limb: misterHandy, heldWeapon: { id: saw.id } }),
++      pistol,
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG, armPartsStrict: true }
++    );
++    expect(strictDeny.allowed).toBe(false);
++    expect(strictDeny.reason).toBe('equip.error.armPartReplaceStrict');
++
++    // навес → обычное оружие: можно при выключенной настройке
++    expect(canEquip(
++      makeSlot({ limb: misterHandy, heldWeapon: { id: saw.id } }),
++      pistol,
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG, armPartsStrict: false }
++    ).allowed).toBe(true);
++
++    // оружие → навес: нельзя в строгом, можно в свободном
++    expect(canEquip(
++      makeSlot({ limb: misterHandy, heldWeapon: pistol }),
++      { id: drill.id, weaponId: drill.id },
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG, armPartsStrict: true }
++    ).allowed).toBe(false);
++    expect(canEquip(
++      makeSlot({ limb: misterHandy, heldWeapon: pistol }),
++      { id: drill.id, weaponId: drill.id },
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG, armPartsStrict: false }
++    ).allowed).toBe(true);
++  });
++
++  it('навес нельзя установить как конечность — только в ладонь руки', () => {
++    const saw = attachmentById('robot_weapon_circular_saw');
++    const check = canEquip(
++      makeSlot({ limb: null }),
++      saw,
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG }
++    );
++    expect(check.allowed).toBe(false);
++    expect(check.reason).toBe('equip.error.attachmentNotALimb');
++  });
++
++  it('canReplaceArmWeapon: свободный режим разрешает любую замену', () => {
++    const saw = attachmentById('robot_weapon_circular_saw');
++    expect(canReplaceArmWeapon({ id: saw.id }, { id: 'weapon_10mm_pistol' }, { strict: false }).allowed).toBe(true);
++    expect(canReplaceArmWeapon({ id: saw.id }, { id: 'robot_weapon_drill' }, { strict: true }).allowed).toBe(true);
++    expect(canReplaceArmWeapon({ id: saw.id }, { id: 'weapon_10mm_pistol' }, { strict: true }).reason)
++      .toBe('equip.error.armPartReplaceStrict');
++  });
++
++  // ------------------------------------------------------------------ пикер конечностей
++  it('в пикер замены руки навесы не попадают', () => {
++    const runtimeCatalog = {
++      robotArms: [
++        ...LIMBS.filter((l) => l.limbType === 'arm'),
++        ...WEAPONS_AS_LIMB,
++      ],
++      robotHeads: [],
++      robotBody: [],
++      robotLegs: [],
++    };
++    const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'arm1');
++    const optionIds = options.map((entry) => entry.id);
++    // руки — есть, навесы — нет
++    expect(optionIds).toContain('robot_arm_mister_handy');
++    for (const attachment of WEAPONS_AS_LIMB) {
++      expect(optionIds).not.toContain(attachment.id);
++    }
++  });
++
++  // ------------------------------------------------------------------ броня
++  it('рука с навесом в ладони принимает слои защиты', () => {
++    const misterHandy = armById('robot_arm_mister_handy');
++    const saw = attachmentById('robot_weapon_circular_saw');
++    const plating = {
++      layer: 'plating',
++      limbType: 'arm',
++      incompatibleLayers: ['armor', 'frame'],
++      damageResistance: { physical: 2, energy: 0 },
++    };
++    const check = canEquip(
++      makeSlot({ limb: misterHandy, heldWeapon: { id: saw.id } }),
++      plating,
++      { bodyPlan: 'misterHandy', slotId: 'arm1', catalog: ROBOT_CATALOG }
++    );
++    expect(check.allowed).toBe(true);
++  });
++
++  // ------------------------------------------------------------------ сборка комплекта
++  it('сборка комплекта: навес без руки получает стандартную руку плана и крепится к ней', () => {
++    const resolvedKitItems = [
++      { itemType: 'weapon', id: 'robot_weapon_circular_saw', weaponId: 'robot_weapon_circular_saw', name: 'Пила' },
++    ];
++    const result = initRobotSlots('misterHandy', resolvedKitItems, ROBOT_CATALOG);
++    const slot = result.slots.arm1 ?? Object.values(result.slots)[0];
++    // рука — стандартная рука мистера-помощника, не навес
++    expect(slot.limb?.id ?? slot.limb).toBe('robot_arm_mister_handy');
++    // навес — в ладони
++    const heldId = slot.heldWeapon?.id ?? slot.heldWeapon?.weaponId;
++    expect(heldId).toBe('robot_weapon_circular_saw');
++  });
++
++  // ------------------------------------------------------------------ миграция v21→v22
++  it('миграция v22: навес вместо руки пересаживается в стандартную руку плана', () => {
++    const state = {
++      origin: { bodyPlan: 'misterHandy' },
++      equippedRobotSlots: {
++        arm1: {
++          limb: { id: 'robot_weapon_circular_saw', itemType: 'robotArm', canHoldWeapons: false },
++          heldWeapon: null,
++        },
++        arm2: { limb: { id: 'robot_arm_mister_handy' }, heldWeapon: null },
++      },
++    };
++    const migrated = migrateRobotArmAttachments(state);
++    expect(migrated.equippedRobotSlots.arm1.limb).toEqual({ id: 'robot_arm_mister_handy' });
++    expect(migrated.equippedRobotSlots.arm1.heldWeapon).toMatchObject({
++      id: 'robot_weapon_circular_saw',
++      weaponId: 'robot_weapon_circular_saw',
++      itemType: 'weapon',
++    });
++    // незатронутый слот не меняется
++    expect(migrated.equippedRobotSlots.arm2).toBe(state.equippedRobotSlots.arm2);
++    // идемпотентность
++    expect(migrateRobotArmAttachments(migrated)).toBe(migrated);
++  });
++
++  it('миграция v22 понимает «худой» вид слота (id навеса строкой)', () => {
++    const state = {
++      origin: { bodyPlan: 'protectron' },
++      equippedRobotSlots: {
++        leftArm: { limb: 'robot_weapon_drill', heldWeapon: null },
++      },
++    };
++    const migrated = migrateRobotArmAttachments(state);
++    expect(migrated.equippedRobotSlots.leftArm.limb).toEqual({ id: 'robot_arm_protectron' });
++    expect(migrated.equippedRobotSlots.leftArm.heldWeapon).toMatchObject({ id: 'robot_weapon_drill' });
++  });
++
++  it('версия схемы — 22', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(22);
++  });
++
++  // ------------------------------------------------------------------ настройка
++  it('настройка объявлена: раздел robots, по умолчанию строгая замена', () => {
++    const setting = moduleSettings.find((s) => s.id === 'robotArmPartsStrictReplace');
++    expect(setting).toBeTruthy();
++    expect(setting.type).toBe('boolean');
++    expect(setting.sectionKey).toBe('robots');
++    expect(setting.controlSurface).toBe('settings');
++    expect(setting.defaultValue).toBe(true);
++  });
++
++  it('строки настройки есть в ru и en i18n', () => {
++    for (const dict of [ruSettings, enSettings]) {
++      expect(typeof dict.robots).toBe('string');
++      expect(typeof dict.robotArmsStrictTitle).toBe('string');
++      expect(typeof dict.robotArmsStrictDescription).toBe('string');
++    }
++  });
++
++  // ------------------------------------------------------------------ каталог
++  it('навесы не числятся конечностями в едином каталоге', () => {
++    const catalog = getRobotLimbCatalog();
++    for (const attachment of WEAPONS_AS_LIMB) {
++      expect(LIMBS.some((l) => l.id === attachment.id)).toBe(false);
++      expect(isArmAttachment({ id: attachment.id }, catalog)).toBe(true);
++    }
++  });
++});
+diff --git a/__tests__/robot/robot-kit-assembly.test.js b/__tests__/robot/robot-kit-assembly.test.js
+index d02fbe7..66cedb4 100644
+--- a/__tests__/robot/robot-kit-assembly.test.js
++++ b/__tests__/robot/robot-kit-assembly.test.js
+@@ -54,9 +54,14 @@ describe('комплект снаряжения собирает робота (
+     expect(slots.head.limb?.id).toBe('robot_head_mister_handy_eye_stalk');
+     expect(slots.body.limb?.id).toBe('robot_body_mister_handy');
+     expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
++    // Патч 191: во всех слотах — руки, навесы (огнемёт, пила) — в ладонях.
+     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
+-    expect(slots.arm3.limb?.id).toBe('robot_weapon_circular_saw');
++    expect(slots.arm2.limb?.id).toBe('robot_arm_mister_handy');
++    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
++    expect(
++      [slots.arm1.heldWeapon?.id, slots.arm2.heldWeapon?.id, slots.arm3.heldWeapon?.id]
++        .filter(Boolean).sort()
++    ).toEqual(['robot_weapon_circular_saw', 'robot_weapon_flamethrower']);
+   });
+ 
+   it('конечности приходят из каталога, а не заглушками из кита', async () => {
+diff --git a/__tests__/robot/robot-slot-behaviour.test.js b/__tests__/robot/robot-slot-behaviour.test.js
+index e625bf6..e732f0f 100644
+--- a/__tests__/robot/robot-slot-behaviour.test.js
++++ b/__tests__/robot/robot-slot-behaviour.test.js
+@@ -143,15 +143,16 @@ describe('регрессии', () => {
+     expect(laser.isBuiltin).toBe(true);
+   });
+ 
+-  it('строительные когти: одинаковые руки дают две карточки', () => {
++  it('строительные когти: одинаковые навесы в ладонях дают две карточки', () => {
+     const claw = byId(weaponsCatalog, 'robot_weapon_construction_claw');
+     const { slots } = initRobotSlots('assaultron', [
+       { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'left' },
+       { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'right' },
+     ], robotCatalog);
+ 
+-    expect(slots.leftArm.limb?.id).toBe('robot_weapon_construction_claw');
+-    expect(slots.rightArm.limb?.id).toBe('robot_weapon_construction_claw');
++    // Патч 191: навес крепится к руке — в слоте стандартная рука, навес в ладони.
++    expect(slots.leftArm.limb?.id).toBe('robot_arm_assaultron');
++    expect(slots.rightArm.limb?.id).toBe('robot_arm_assaultron');
+     const claws = getBuiltinWeaponsFromSlots(slots).filter((w) => w.id === 'robot_weapon_construction_claw');
+     expect(claws).toHaveLength(2);
+     expect(claws.map((w) => w.sourceSlot).sort()).toEqual(['leftArm', 'rightArm']);
+@@ -528,12 +529,14 @@ describe('каталог конечностей для слота', () => {
+   };
+   const ids = (list) => list.map((l) => l.id).sort();
+ 
+-  it('слот руки предлагает только руки (включая оружие вместо руки)', () => {
++  it('слот руки предлагает только руки (навесы — не конечности, патч 191)', () => {
+     const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'arm1');
+     expect(options.length).toBeGreaterThan(0);
+-    // Все кандидаты — конечности типа arm: и руки, и оружие-руки.
++    // Все кандидаты — конечности типа arm; навесы (weaponAsLimb) в пикер
++    // замены руки не попадают: они крепятся к руке, а не заменяют её.
+     for (const limb of options) {
+       expect(limb.itemType).toBe('robotArm');
++      expect(weaponAsLimbCatalog.some((w) => w.id === limb.id)).toBe(false);
+     }
+     // Головы, корпуса и движители в список руки не попадают.
+     expect(ids(options)).not.toContain('robot_head_protectron');
+@@ -555,9 +558,12 @@ describe('каталог конечностей для слота', () => {
+ 
+   it('для привычных слотов набор совпадает с каталогом нужного типа', () => {
+     const options = (slot, plan) => ids(limbOptionsForSlot(runtimeCatalog, plan, slot));
++    // Для рук ожидание — каталог рук БЕЗ навесов: навес не конечность.
+     const catalog = (slot) => ids(slot === 'head' ? runtimeCatalog.robotHeads
+       : slot === 'body' ? runtimeCatalog.robotBody
+-        : slot.toLowerCase().includes('arm') ? runtimeCatalog.robotArms : runtimeCatalog.robotLegs);
++        : slot.toLowerCase().includes('arm')
++          ? runtimeCatalog.robotArms.filter((l) => !weaponAsLimbCatalog.some((w) => w.id === l.id))
++          : runtimeCatalog.robotLegs);
+ 
+     expect(options('leftArm', 'protectron')).toEqual(catalog('leftArm'));
+     expect(options('head', 'protectron')).toEqual(catalog('head'));
+diff --git a/__tests__/robot/robot-slot-model.test.js b/__tests__/robot/robot-slot-model.test.js
+index ee7cf24..7395700 100644
+--- a/__tests__/robot/robot-slot-model.test.js
++++ b/__tests__/robot/robot-slot-model.test.js
+@@ -198,10 +198,12 @@ describe('canEquip: конечности', () => {
+     }).allowed).toBe(true);
+   });
+ 
+-  it('оружие вместо руки ставится в слот руки', () => {
+-    expect(canEquip({}, weaponLimbById('robot_weapon_flamethrower'), {
++  it('навес не ставится в слот руки — только в ладонь (патч 191)', () => {
++    const { allowed, reason } = canEquip({}, weaponLimbById('robot_weapon_flamethrower'), {
+       bodyPlan: 'misterHandy', slotId: 'arm2',
+-    }).allowed).toBe(true);
++    });
++    expect(allowed).toBe(false);
++    expect(reason).toBe('equip.error.attachmentNotALimb');
+   });
+ });
+ 
+@@ -213,13 +215,19 @@ describe('canEquip: оружие в ладонь', () => {
+     expect(allowed).toBe(true);
+   });
+ 
+-  it('занятая ладонь — отказ, а не потеря вложенного оружия', () => {
++  it('занятая ладонь — замена по правилу, а не потеря вложенного оружия', () => {
+     const busy = { content: 'robot_arm_mister_handy', heldWeaponId: 'robot_weapon_manipulator' };
+-    const { allowed, reason } = canEquip(busy, weaponById('robot_weapon_circular_saw'), {
++    // манипулятор → навес: строгий режим запрещает (не аналогичное)
++    const toAttachment = canEquip(busy, weaponById('robot_weapon_circular_saw'), {
+       bodyPlan: 'misterHandy', slotId: 'arm1',
+     });
+-    expect(allowed).toBe(false);
+-    expect(reason).toBe('equip.error.slotOccupied');
++    expect(toAttachment.allowed).toBe(false);
++    expect(toAttachment.reason).toBe('equip.error.armPartReplaceStrict');
++    // манипулятор → манипулятор: замена оружия на оружие разрешена
++    const toWeapon = canEquip(busy, weaponById('robot_weapon_manipulator'), {
++      bodyPlan: 'misterHandy', slotId: 'arm1',
++    });
++    expect(toWeapon.allowed).toBe(true);
+   });
+ 
+   it('оружие вместо руки ничего в ладонь не берёт', () => {
+@@ -230,13 +238,14 @@ describe('canEquip: оружие в ладонь', () => {
+     expect(reason).toBe('equip.error.limbCannotHoldWeapons');
+   });
+ 
+-  it('встроенная атака (handheld: false) в ладонь не кладётся', () => {
+-    const { allowed, reason } = canEquip(handyArmSlot(), weaponById('robot_weapon_flamethrower'), {
++  it('обычная недержабельная атака (handheld: false) в ладонь не кладётся, навес — кладётся', () => {
++    // Огнемёт — навес: в ладонь руки кладётся (патч 191), handheld:false
++    // его не бракует — это оружие, крепящееся к руке, а не ручное.
++    const flamer = canEquip(handyArmSlot(), weaponById('robot_weapon_flamethrower'), {
+       bodyPlan: 'misterHandy', slotId: 'arm1',
+     });
+     expect(weaponById('robot_weapon_flamethrower').handheld).toBe(false);
+-    expect(allowed).toBe(false);
+-    expect(reason).toBe('equip.error.weaponNotHandheld');
++    expect(flamer.allowed).toBe(true);
+   });
+ });
+ 
+@@ -343,14 +352,14 @@ describe('attacksFromSlot', () => {
+     ].sort());
+   });
+ 
+-  it('недержабельное оружие в ладони не считается атакой', () => {
+-    // Пила handheld: false — она сама конечность, а не предмет в ладони.
++  it('навес в ладони считается атакой руки (патч 191)', () => {
++    // Пила handheld: false, но она навес — крепится к руке и атакует из ладони.
+     const attacks = attacksFromSlot({
+       content: 'robot_arm_mister_handy',
+       heldWeaponId: 'robot_weapon_circular_saw',
+     }, { slotId: 'arm1' });
+-    expect(attacks).toHaveLength(1);
+-    expect(attacks[0].id).toBe('robot_weapon_manipulator');
++    const ids = attacks.map((w) => w.id).sort();
++    expect(ids).toEqual(['robot_weapon_circular_saw', 'robot_weapon_manipulator']);
+   });
+ 
+   it('оружие вместо руки даёт свою атаку и не держит чужую', () => {
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 826f960..767c253 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -22,7 +22,7 @@ import {
+ } from '../../../domain/powerArmor';
+ import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+-import { slotsForLimbType } from '../../../domain/robotSlots';
++import { slotsForLimbType, isArmAttachment, canReplaceArmWeapon } from '../../../domain/robotSlots';
+ import { rerollConsumableRadiationRoll } from '../../../domain/effects';
+ import { buildConsumableResultReport } from './logic/consumableResultReport';
+ import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
+@@ -38,7 +38,7 @@ import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../..
+ import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
+ import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
+ import styles from '../../../styles/InventoryScreen.styles';
+-import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled } from '../../../src/store/appSettingsStore';
++import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled, selectRobotArmPartsStrictReplace } from '../../../src/store/appSettingsStore';
+ import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
+ 
+ const PARAM_FIELDS = [
+@@ -111,6 +111,7 @@ const InventoryScreen = () => {
+   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
+   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
++  const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
+ 
+   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
+     if (!stackKey) return undefined;
+@@ -695,6 +696,78 @@ const InventoryScreen = () => {
+       if (!armDef) return;
+       const slots = equippedRobotSlots || {};
+       const slotKeys = Object.keys(slots);
++
++      // Навес (arm attachment) — оружие, крепящееся К руке: без руки его
++      // получить нельзя, занимает ладонь и меняется на аналогичный навес
++      // (строгий режим — настройка «прикрепляемые части рук»).
++      if (isArmAttachment(displayWeapon)) {
++        const armEntries = slotKeys
++          .map((key) => [key, slots[key]])
++          .filter(([, slotData]) => slotData?.limb?.canHoldWeapons === true);
++        if (armEntries.length === 0) {
++          showAlert(
++            tInventory('screen.alerts.robotArmRequiredTitle'),
++            tInventory('screen.alerts.robotArmRequiredMessage')
++          );
++          return;
++        }
++        // Свободная ладонь → первая установка; занятая → замена по правилу.
++        let target = armEntries.find(([, slotData]) => slotData?.heldWeapon == null);
++        let replaced = null;
++        if (!target) {
++          for (const entry of armEntries) {
++            const check = canReplaceArmWeapon(entry[1].heldWeapon, displayWeapon, {
++              strict: robotArmPartsStrict,
++            });
++            if (check.allowed) { target = entry; replaced = entry[1].heldWeapon; break; }
++          }
++          if (!target) {
++            showAlert(
++              tInventory('screen.alerts.armPartStrictTitle'),
++              tInventory('screen.alerts.armPartStrictMessage')
++            );
++            return;
++          }
++        }
++        const [targetKey] = target;
++        const sourceStackKey = weaponToEquip.stackKey || getStackKey(displayWeapon);
++        const totalOwned = findUnequippedStoreItemByStackKey(sourceStackKey)?.quantity || 0;
++        if (totalOwned <= 0) {
++          showAlert(tInventory('screen.alerts.noItemsTitle'), tInventory('screen.alerts.noItemsMessage'));
++          return;
++        }
++        const weaponEntry = {
++          ...displayWeapon,
++          itemType: 'weapon',
++          stackKey: sourceStackKey,
++          uniqueId: displayWeapon.uniqueId || createWeaponInstanceId(),
++          sourceSlot: targetKey,
++        };
++        const updatedSlots = {
++          ...slots,
++          [targetKey]: { ...slots[targetKey], heldWeapon: weaponEntry },
++        };
++        setEquippedRobotSlots(updatedSlots);
++        // Снятый предмет возвращается в инвентарь (как при снятии из ладони).
++        if (replaced) {
++          const replacedStackKey = replaced.stackKey || getStackKey(replaced);
++          const stackMate = findUnequippedStoreItemByStackKey(replacedStackKey);
++          if (stackMate) adjustStoreItemQuantity(stackMate.id, 1);
++          else {
++            addNewItem({
++              ...flattenItemParams(replaced),
++              itemType: 'weapon',
++              stackKey: replacedStackKey,
++              equipped: false,
++              quantity: 1,
++            });
++          }
++        }
++        const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
++        if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
++        return;
++      }
++
+       // Слоты под конечность даёт план тела по типу конечности — раньше их
+       // список лежал внутри самой конечности (compatibleSlots).
+       const compatibleSlots = slotsForLimbType(robotBodyPlan, armDef.limbType ?? 'arm');
+@@ -752,6 +825,25 @@ const InventoryScreen = () => {
+       // Validate weight / two-handed against the arm (Requirement 7.6)
+       const [armSlotKey, armSlotData] = armWithHoldCapability;
+       const armLimb = armSlotData.limb;
++
++      // Ладонь занята — это замена, а не первая установка: строгий режим
++      // требует «аналогичное на аналогичное» (навес меняется навесом, оружие —
++      // оружием). Снятый предмет возвращается в инвентарь, а не пропадает.
++      let replacedPalmItem = null;
++      if (armSlotData?.heldWeapon) {
++        const replaceCheck = canReplaceArmWeapon(armSlotData.heldWeapon, displayWeapon, {
++          strict: robotArmPartsStrict,
++        });
++        if (!replaceCheck.allowed) {
++          showAlert(
++            tInventory('screen.alerts.armPartStrictTitle'),
++            tInventory('screen.alerts.armPartStrictMessage')
++          );
++          return;
++        }
++        replacedPalmItem = armSlotData.heldWeapon;
++      }
++
+       const candidateWeight = toWeight(displayWeapon.weight);
+       const excludeTwoHanded = Boolean(armLimb?.excludeTwoHanded);
+       if (excludeTwoHanded && isTwoHandedWeapon) {
+@@ -799,6 +891,21 @@ const InventoryScreen = () => {
+         [armSlotKey]: { ...slots[armSlotKey], heldWeapon: weaponEntry },
+       };
+       setEquippedRobotSlots(updatedSlots);
++      // Заменённый предмет ладони возвращается в инвентарь (как при снятии).
++      if (replacedPalmItem) {
++        const replacedStackKey = replacedPalmItem.stackKey || getStackKey(replacedPalmItem);
++        const stackMate = findUnequippedStoreItemByStackKey(replacedStackKey);
++        if (stackMate) adjustStoreItemQuantity(stackMate.id, 1);
++        else {
++          addNewItem({
++            ...flattenItemParams(replacedPalmItem),
++            itemType: 'weapon',
++            stackKey: replacedStackKey,
++            equipped: false,
++            quantity: 1,
++          });
++        }
++      }
+       const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
+       if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
+       return;
+diff --git a/docs/robot-rules.md b/docs/robot-rules.md
+index 6eca8b0..b3e3d38 100644
+--- a/docs/robot-rules.md
++++ b/docs/robot-rules.md
+@@ -59,12 +59,20 @@ Engine in `domain/allowlist.js` maps categories via `CATEGORY_ALIASES` (robotPla
+ 
+ ## 4. Robot Arms & Weapon Equipping
+ - BodyPlan defines slots: `leftArm`, `rightArm`, `arm1` etc, each with `canHoldWeapons`, `weaponSlots`
+-- Arm catalog `robotarms.json`:
++- Unified limb catalog `robot/limbs.json` (arms have `limbType: "arm"`):
+   - `canHoldWeapons: true` → arm can hold a weapon from inventory
+-  - `builtinWeaponId` → arm has built-in weapon (e.g. `robot_arm_assaultron` → `robot_weapon_claw` 3 dmg, `robot_arm_mister_handy` → manipulator 2 dmg)
+-  - Arms that are weapons themselves (e.g. `robot_weapon_construction_claw`) have `itemType: robotArm` + `builtinWeaponId` same id
++  - `builtinWeaponId` → arm has built-in weapon (e.g. `robot_arm_assaultron` → `robot_weapon_claw`); it CANNOT be replaced without replacing the arm itself
++- **Arm attachments** (`robot/weaponAsLimb.json`, `itemCategory: "weaponAsLimb"`) are WEAPONS mounted ON an arm, not limbs:
++  - cannot be obtained without a robot arm in the slot (alert `robotArmRequired`)
++  - occupy the arm's weapon slot (heldWeapon) like any weapon; ONE item per arm: attachment OR weapon
++  - replaceable: strict mode (setting `robotArmPartsStrictReplace`, default ON) — attachment↔attachment, weapon↔weapon only; OFF — anything (`canReplaceArmWeapon`)
++  - install requirements (`installComplexity/PerksRequired/Skill`) exist only for the five book attachments (Buzz Saw, Construction Claw, Cryojet, Drill, Vice Grip)
++- All limbs (incl. arms) accept armor layers (plating/armor/frame) — `slotAcceptsArmor`
++- Default/standard arm per body plan comes from `bodyplans.json → defaults` (each robot has its own: misterHandy → `robot_arm_mister_handy`, securitron → `robot_arm_securitron`, assaultron → `robot_arm_assaultron`, protectron → `robot_arm_protectron`, …); kit assembly plants it before attaching an attachment to an empty arm slot
++- Migration v21→v22 (`migrateRobotArmAttachments`): slots where an attachment stood INSTEAD of an arm get the plan's standard arm; the attachment is re-planted into its palm
+ - Inventory equip flow for robots:
+   - `findFreeWeaponHand(slots, occupiedSourceSlots)` → first free arm with `canHoldWeapons=true` and no `heldWeapon`
++  - occupied palm → replacement via `canReplaceArmWeapon` (strict typing), replaced item returns to inventory
+   - `canEquipWeaponToSlot()` checks weight and two-handed
+   - If no arm with `canHoldWeapons` → alert `manipulatorRequired`, no equip button
+ - If arm can hold weapon, robot can equip weapon via inventory. If not, cannot.
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 807873c..f357566 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -359,40 +359,62 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
+         if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
+         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
+       }
+-      const armEntry = resolveLimbEntry(weaponData.id ?? item.weaponId);
+-      if (armEntry) {
+-        const targetKey = findFreeSlotForLimb(armEntry);
++      // Навес (arm attachment): оружие крепится К руке, а не вместо неё.
++      // Рука уже стоит — занимаем её ладонь. Руки нет — ставим стандартную
++      // руку плана тела (у каждого робота своя), навес — уже в неё. Получить
++      // навес без руки нельзя: если и стандартную руку поставить некуда —
++      // предмет уходит в инвентарь.
++      const attachmentEntry = (robotCatalog.weaponAsLimb || []).find(
++        (entry) => entry.id === (weaponData.id ?? item.weaponId)
++      );
++      if (attachmentEntry) {
++        const armKeys = slotKeys.filter((k) => k.toLowerCase().includes('arm'));
++        let targetKey = armKeys.find(
++          (k) => slots[k]?.limb?.canHoldWeapons === true && !slots[k]?.heldWeapon
++        );
++        if (!targetKey) {
++          const emptyKey = armKeys.find((k) => slots[k]?.limb == null);
++          const planDefaults = getDefaultLimbs(getBodyPlan(bodyPlan)?.id ?? bodyPlan);
++          const defaultArmId = emptyKey ? planDefaults[emptyKey] : null;
++          const defaultEntry = defaultArmId
++            ? (robotCatalog.limbs || []).find((l) => l.id === defaultArmId)
++            : null;
++          if (emptyKey && defaultEntry) {
++            slots[emptyKey] = {
++              ...slots[emptyKey],
++              limb: buildLimbFromArmEntry(defaultEntry),
++            };
++            targetKey = emptyKey;
++          }
++        }
+         if (targetKey && slots[targetKey] !== undefined) {
+-          const limbFromArm = buildLimbFromArmEntry(armEntry);
+-          slots[targetKey].limb = {
+-            ...limbFromArm,
+-            name: weaponData.name || limbFromArm.name || limbFromArm.id,
++          slots[targetKey].heldWeapon = {
++            ...(resolveWeaponStats(attachmentEntry.id) ?? weaponData),
++            itemType: 'weapon',
+           };
+-          slots[targetKey].heldWeapon = null;
+-          continue;
++        } else {
++          inventoryItems.push(item);
+         }
++        continue;
+       }
+ 
+-      // Fallback: robot weapon as limb even without explicit arms catalog entry.
+-      if (String(weaponData.id || item.weaponId || '').startsWith('robot_weapon_')) {
+-        const preferred = item.limbSlot;
+-        const targetKey = (preferred && slotKeys.includes(preferred) && slots[preferred]?.limb == null)
+-          ? preferred
+-          : slotKeys.find((k) => k.toLowerCase().includes('arm') && slots[k]?.limb == null);
++      const armEntry = resolveLimbEntry(weaponData.id ?? item.weaponId);
++      if (armEntry && armEntry.itemCategory !== 'weaponAsLimb') {
++        const targetKey = findFreeSlotForLimb(armEntry);
+         if (targetKey && slots[targetKey] !== undefined) {
++          const limbFromArm = buildLimbFromArmEntry(armEntry);
+           slots[targetKey].limb = {
+-            ...weaponData,
+-            itemType: 'robotArm',
+-            canHoldWeapons: false,
+-            weaponSlots: 0,
+-            builtinWeapons: buildBuiltinWeapons(weaponData).map((w) => ({ ...w, isBuiltin: true })),
++            ...limbFromArm,
++            name: weaponData.name || limbFromArm.name || limbFromArm.id,
+           };
+           slots[targetKey].heldWeapon = null;
+           continue;
+         }
+       }
+ 
+-      // Иначе как обычное оружие в руке.
++      // Иначе как обычное оружие в руке. Ветку «робо-оружие вместо конечности»
++      // сняли: навесы крепятся к руке выше, прочее робо-оружие (лазер, кувалда
++      // робомозга) встаёт в ладонь как любое другое.
+       const targetKey = slotKeys.find((k) =>
+         k.toLowerCase().includes('arm') && slots[k].limb?.canHoldWeapons && slots[k].heldWeapon == null
+       );
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 30ad314..c52491a 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -227,6 +227,50 @@ const resolveMods = (catalog, ids = []) => (ids || [])
+   .map((id) => (catalog?.weaponMods || []).find((m) => m.id === id))
+   .filter(Boolean);
+ 
++// ---------------------------------------------------------------------------
++// Навесы (arm attachments): оружие, крепящееся К руке, а не вместо неё.
++// ---------------------------------------------------------------------------
++
++/**
++ * Навес ли предмет: запись каталога weaponAsLimb или предмет с id такого
++ * навеса (в том числе «худой» вид из сейва — { id } / { weaponId }).
++ *
++ * @param {object|null} item
++ * @param {object} catalog — каталог конечностей (по умолчанию реестр).
++ * @returns {boolean}
++ */
++export function isArmAttachment(item, catalog = getRobotLimbCatalog()) {
++  const id = item?.itemCategory === 'weaponAsLimb'
++    ? item.id
++    : (item?.weaponId ?? item?.id);
++  if (!id) return false;
++  return (catalog?.weaponAsLimb || []).some((entry) => entry.id === id);
++}
++
++/**
++ * Можно ли заменить предмет в ладони руки.
++ *
++ * Строгий режим (настройка «прикрепляемые части рук — только на аналогичные»):
++ * навес меняется только на другой навес, обычное оружие — только на оружие.
++ * Свободный режим разрешает любую замену. Первая установка в пустую ладонь
++ * ограничением не является — правило про ЗАМЕНУ.
++ *
++ * @param {object|null} existingItem — предмет в ладони (или его id-запись)
++ * @param {object|null} incomingItem — кандидат
++ * @param {object} options — { strict?: boolean, catalog? }
++ * @returns {{ allowed: boolean, reason: string|null }}
++ */
++export function canReplaceArmWeapon(existingItem, incomingItem, options = {}) {
++  const { strict = true, catalog = getRobotLimbCatalog() } = options;
++  if (!strict) return allow();
++  const existingIsAttachment = isArmAttachment(existingItem, catalog);
++  const incomingIsAttachment = isArmAttachment(incomingItem, catalog);
++  return existingIsAttachment === incomingIsAttachment
++    ? allow()
++    : deny('equip.error.armPartReplaceStrict');
++}
++
++
+ /**
+  * Карта применённых модов { слот: id } — вид, который ждут экраны и отпечаток
+  * карточки. Восстанавливается из списка id: каждый мод знает свой слот.
+@@ -616,7 +660,7 @@ export function slotAcceptsArmor(slot, options = {}) {
+  * @returns {{ allowed: boolean, reason: string|null }}
+  */
+ export function canEquip(slot, item, options = {}) {
+-  const { bodyPlan, slotId, catalog = getRobotLimbCatalog() } = options;
++  const { bodyPlan, slotId, catalog = getRobotLimbCatalog(), armPartsStrict = true } = options;
+   const state = normalizeSlot(slot);
+   const def = getSlotDef(bodyPlan, slotId);
+   const kind = classifyItem(item);
+@@ -627,6 +671,11 @@ export function canEquip(slot, item, options = {}) {
+   // --- Конечность или оружие вместо конечности ---
+   if (kind === 'limb') {
+     const entry = resolveLimb(catalog, item);
++    // Навес — не конечность: он крепится К руке и живёт в её ладони
++    // (ветка «оружие или навес в ладонь» ниже).
++    if (item?.itemCategory === 'weaponAsLimb' || entry?.itemCategory === 'weaponAsLimb') {
++      return deny('equip.error.attachmentNotALimb');
++    }
+     const limbType = item.limbType || entry?.limbType;
+     if (!limbType) return deny('equip.error.limbTypeMismatch');
+     if (!def.accepts.includes(limbType)) return deny('equip.error.limbTypeMismatch');
+@@ -640,24 +689,41 @@ export function canEquip(slot, item, options = {}) {
+     return slotAcceptsArmor(slot, { ...options, item });
+   }
+ 
+-  // --- Оружие в ладонь ---
++  // --- Оружие или навес в ладонь ---
++  // Навес (arm attachment) — оружие, которое крепится К руке: без руки его
++  // получить нельзя (ветка limb выше это гарантирует), занимает ладонь наравне
++  // с обычным оружием и меняется по правилу «аналогичное на аналогичное»
++  // (строгий режим, настройка «прикрепляемые части рук»).
+   const limb = resolveLimb(catalog, state.content);
+   if (!limb || limb.itemCategory !== 'limb' || limb.canHoldWeapons !== true) {
+     return deny('equip.error.limbCannotHoldWeapons');
+   }
+   const weaponSlots = limb.weaponSlots ?? 1;
+   if (weaponSlots <= 0) return deny('equip.error.limbCannotHoldWeapons');
+-  if (state.heldWeaponId) return deny('equip.error.slotOccupied');
++
++  const incomingIsAttachment = isArmAttachment(item, catalog);
++
++  if (state.heldWeaponId) {
++    // В ладони уже что-то есть — это замена, а не первая установка.
++    const replaceCheck = canReplaceArmWeapon(slot?.heldWeapon ?? { id: state.heldWeaponId }, item, {
++      strict: armPartsStrict,
++      catalog,
++    });
++    if (!replaceCheck.allowed) return replaceCheck;
++  }
+ 
+   const weapon = resolveWeapon(catalog, item?.weaponId || item?.id);
+-  if (weapon && weapon.handheld === false) return deny('equip.error.weaponNotHandheld');
++  if (weapon && weapon.handheld === false && !incomingIsAttachment) {
++    return deny('equip.error.weaponNotHandheld');
++  }
+ 
+-  // Вес и двуручность — как в старой модели, поля те же.
++  // Вес и двуручность — как в старой модели, поля те же. Навес весит как
++  // рука, которой он крепится, — отдельных ограничений по весу у него нет.
+   const maxWeight = limb.maxHandelWeaponWeight;
+-  if (maxWeight != null && (item?.weight ?? 0) > maxWeight) {
++  if (!incomingIsAttachment && maxWeight != null && (item?.weight ?? 0) > maxWeight) {
+     return deny('equip.error.weaponTooHeavyForLimb');
+   }
+-  if (limb.excludeTwoHanded && item?.twoHanded) {
++  if (!incomingIsAttachment && limb.excludeTwoHanded && item?.twoHanded) {
+     return deny('equip.error.limbExcludesTwoHandedWeapons');
+   }
+   return allow();
+@@ -717,7 +783,10 @@ export function attacksFromSlot(slot, options = {}) {
+ 
+   if (state.heldWeaponId && canHold) {
+     const held = resolveWeapon(catalog, state.heldWeaponId);
+-    if (!held || held.handheld !== false) {
++    // Навес в ладони законен даже при handheld === false: это не ручное
++    // оружие человека, а оружие, крепящееся к руке (arm attachment).
++    const heldIsAttachment = isArmAttachment({ id: state.heldWeaponId }, catalog);
++    if (!held || held.handheld !== false || heldIsAttachment) {
+       push(held || { id: state.heldWeaponId }, 'held', state.heldWeaponMods);
+     }
+   }
+@@ -872,7 +941,13 @@ export function limbOptionsForSlot(runtimeCatalog, bodyPlan, slotId) {
+     ...(runtimeCatalog?.robotBody || []),
+     ...(runtimeCatalog?.robotLegs || []),
+   ];
+-  return pool.filter((limb) => accepts.includes(resolveLimb(catalog, limb)?.limbType));
++  return pool.filter((limb) => {
++    const entry = resolveLimb(catalog, limb);
++    // Навес — не конечность: в пикер замены руки он не попадает,
++    // крепится к руке и меняется из инвентаря (правило «arm attachment»).
++    if (entry?.itemCategory === 'weaponAsLimb') return false;
++    return accepts.includes(entry?.limbType);
++  });
+ }
+ 
+ /**
+diff --git a/modules/fallout/i18n/en-EN/data/system/settings.json b/modules/fallout/i18n/en-EN/data/system/settings.json
+index 39956af..3620867 100644
+--- a/modules/fallout/i18n/en-EN/data/system/settings.json
++++ b/modules/fallout/i18n/en-EN/data/system/settings.json
+@@ -21,5 +21,8 @@
+   "language": {
+     "ru": "Russian",
+     "en": "English"
+-  }
+-}
++  },
++  "robots": "Robots",
++  "robotArmsStrictTitle": "Arm attachments: like-for-like only",
++  "robotArmsStrictDescription": "On: an arm attachment can only be replaced by another attachment, a held weapon by another weapon; a limb’s built-in weapon requires replacing the limb itself. Off: any arms and weapons may be installed."
++}
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/screen.json b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+index 8dea1e6..f4d6e5e 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+@@ -43,7 +43,11 @@
+     "leadBellyRerollTitle": "Lead Belly",
+     "leadBellyRerollMessage": "You may take {radiationAmount} radiation damage. Reroll the value?",
+     "leadBellyRerollConfirm": "Reroll",
+-    "leadBellyRerollKeep": "Keep"
++    "leadBellyRerollKeep": "Keep",
++    "robotArmRequiredTitle": "Robot arm required",
++    "robotArmRequiredMessage": "An arm attachment is mounted on a robot arm: install an arm (manipulator) first.",
++    "armPartStrictTitle": "Like-for-like replacement only",
++    "armPartStrictMessage": "The “arm attachments: like-for-like only” setting is on: an attachment can only be replaced by another attachment, a held weapon by another weapon. It can be disabled in settings."
+   },
+   "foundItemTypes": {
+     "caps": "caps"
+@@ -65,4 +69,4 @@
+       "rightLeg": "right leg"
+     }
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU/data/system/settings.json b/modules/fallout/i18n/ru-RU/data/system/settings.json
+index dd22acd..e3a70b2 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/settings.json
++++ b/modules/fallout/i18n/ru-RU/data/system/settings.json
+@@ -21,5 +21,8 @@
+   "language": {
+     "ru": "Русский",
+     "en": "English"
+-  }
+-}
++  },
++  "robots": "Роботы",
++  "robotArmsStrictTitle": "Прикрепляемые части рук — только на аналогичные",
++  "robotArmsStrictDescription": "Включено: навес руки заменяется только другим навесом, оружие в ладони — только оружием; встроенное оружие руки не сменить без замены самой руки. Выключено: в руку можно устанавливать любые руки и оружие."
++}
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+index 22f433e..8179a40 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+@@ -43,7 +43,11 @@
+     "leadBellyRerollTitle": "Свинцовое брюхо",
+     "leadBellyRerollMessage": "Вы можете получить {radiationAmount} урона радиацией. Хотите перебросить значение?",
+     "leadBellyRerollConfirm": "Перебросить",
+-    "leadBellyRerollKeep": "Оставить"
++    "leadBellyRerollKeep": "Оставить",
++    "robotArmRequiredTitle": "Требуется рука робота",
++    "robotArmRequiredMessage": "Навес крепится к руке робота: сначала установите руку (манипулятор).",
++    "armPartStrictTitle": "Замена только на аналогичные",
++    "armPartStrictMessage": "Включена настройка «прикрепляемые части рук — только на аналогичные»: навес заменяется другим навесом, оружие в ладони — другим оружием. Её можно отключить в настройках."
+   },
+   "foundItemTypes": {
+     "caps": "крышек"
+@@ -65,4 +69,4 @@
+       "rightLeg": "правая нога"
+     }
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
+index 66043d8..d4d227a 100644
+--- a/modules/fallout/settings.json
++++ b/modules/fallout/settings.json
+@@ -51,5 +51,14 @@
+       { "value": "cards", "labelKey": "settings.cards.cards" },
+       { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
+     ]
++  },
++  {
++    "id": "robotArmPartsStrictReplace",
++    "type": "boolean",
++    "controlSurface": "settings",
++    "sectionKey": "robots",
++    "labelKey": "settings.robotArmsStrictTitle",
++    "descriptionKey": "settings.robotArmsStrictDescription",
++    "defaultValue": true
+   }
+ ]
+diff --git a/package-lock.json b/package-lock.json
+index 1056e15..de3c3e8 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,5 +1,5 @@
+ {
+-  "name": "workspace",
++  "name": "robot-study",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 6b1a035..f17a442 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -236,3 +236,4 @@ export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValu
+ export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingValue('weaponDurabilityLossPer10Shots');
+ export const selectRandomWeaponQualityEnabled = (state) => state.getSettingValue('randomWeaponQualityEnabled');
+ export const selectUnarmedAttackVisible = (state) => state.getSettingValue('unarmedAttackVisible');
++export const selectRobotArmPartsStrictReplace = (state) => state.getSettingValue('robotArmPartsStrictReplace');
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index d34cae3..3b1eaae 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -9,6 +9,9 @@ import { getPerks, getUniqQualityName } from '../../domain/registry';
+ import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
+ import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+ import { debugLog } from '../debug/falloutDebug';
++import { getDefaultLimbs } from '../../domain/bodyplan';
++import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++import robotLimbsFile from '../../modules/fallout/data/equipment/robot/limbs.json';
+ 
+ const PERK_ID_REMAP_V18 = {
+   triggerRush: 'scrounger',
+@@ -522,6 +525,55 @@ export const migrateRobotPlatingIds = (state) => {
+   return changed ? next : state;
+ };
+ 
++/**
++ * v21 -> v22: навесы (arm attachments) перестали быть конечностями.
++ *
++ * Новая модель: навес — оружие, которое крепится К руке и живёт в её ладони
++ * (heldWeapon). Слот, где навес стоял ВМЕСТО руки, получает стандартную руку
++ * плана тела (у каждого робота своя: мистер-помощник, секьюритрон, штурмотрон,
++ * протектрон…), а сам навес пересаживается в ладонь. Если у плана нет
++ * стандартной руки для слота, слот освобождается — навес сохраняется в
++ * ладони и ждёт установки руки.
++ *
++ * Понимает и «толстый» вид (объект конечности), и «худой» (id из v20+).
++ * Идемпотентна: после пересадки в limb не остаётся навесов.
++ */
++export const migrateRobotArmAttachments = (state) => {
++  if (!state || typeof state !== 'object') return state;
++  if (!state.equippedRobotSlots || typeof state.equippedRobotSlots !== 'object') return state;
++
++  const attachmentIds = new Set(
++    (Array.isArray(robotWeaponAsLimbFile) ? robotWeaponAsLimbFile : []).map((entry) => entry.id)
++  );
++  const limbsById = new Map(
++    (Array.isArray(robotLimbsFile) ? robotLimbsFile : []).map((entry) => [entry.id, entry])
++  );
++  const planDefaults = getDefaultLimbs(state?.origin?.bodyPlan) || {};
++
++  let changed = false;
++  const slots = {};
++  for (const [key, slot] of Object.entries(state.equippedRobotSlots)) {
++    if (!slot || typeof slot !== 'object') { slots[key] = slot; continue; }
++    const limb = slot.limb;
++    const limbId = typeof limb === 'string' ? limb : limb?.id;
++    if (!limbId) { slots[key] = slot; continue; }
++    const isAttachment = attachmentIds.has(limbId)
++      || (limb?.itemType === 'robotArm' && limb?.canHoldWeapons === false);
++    if (!isAttachment) { slots[key] = slot; continue; }
++
++    const defaultArmId = planDefaults[key];
++    const defaultArm = defaultArmId ? limbsById.get(defaultArmId) : null;
++    slots[key] = {
++      ...slot,
++      limb: defaultArm ? { id: defaultArm.id } : null,
++      heldWeapon: { ...(slot.heldWeapon || {}), id: limbId, weaponId: limbId, itemType: 'weapon' },
++    };
++    changed = true;
++  }
++
++  return changed ? { ...state, equippedRobotSlots: slots } : state;
++};
++
+ const MIGRATIONS = [
+   // v0 -> v1: разделить эффекты/качества в экипированном оружии.
+   (state) => {
+@@ -1169,6 +1221,11 @@ const MIGRATIONS = [
+   // защиту. Идемпотентна.
+   migrateRobotPlatingIds,
+ 
++  // v21 -> v22: навес — оружие, крепящееся К руке, а не конечность. Слоты,
++  // где навес стоял вместо руки, получают стандартную руку плана тела, навес
++  // пересаживается в ладонь (heldWeapon). Идемпотентна.
++  migrateRobotArmAttachments,
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 5a9753c..2821973 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -56,7 +56,10 @@
+ //       стандартная): ссылки robot_plating_factory_* в слотах робота и в
+ //       инвентаре переименованы в robot_plating_standard_* (миграция
+ //       migrateRobotPlatingIds в migrations.js).
+-export const CURRENT_SCHEMA_VERSION = 21;
++// v22 — навесы (arm attachments) — оружие, крепящееся к руке: слоты, где
++//       навес стоял вместо руки, получают стандартную руку плана тела,
++//       навес пересаживается в ладонь (миграция migrateRobotArmAttachments).
++export const CURRENT_SCHEMA_VERSION = 22;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+-- 
+2.39.5
+
