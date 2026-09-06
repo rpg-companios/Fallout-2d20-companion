@@ -2751,7 +2751,7 @@
     "weight": "24",
     "cost": 870,
     "rarity": 5,
-    "ammoId": "ammo_fusion_core",
+    "ammoId": "ammo_energy_cell",
     "range": "L",
     "imageName": "Tesla Cannon",
     "mainAttr": "STR",
@@ -2760,17 +2760,28 @@
     "damageType": "energy",
     "qualities": [
       {
-        "qualityId": "quality_two-handed"
+        "qualityId": "quality_accurate"
       },
       {
-        "qualityId": "quality_blast"
+        "qualityId": "quality_ammo-hungry_x",
+        "value": 5
+      },
+      {
+        "qualityId": "quality_surge"
+      },
+      {
+        "qualityId": "quality_two-handed"
       }
     ],
     "weaponType": "Energy",
     "withoutMods": true,
     "effects": [
       {
-        "effectId": "effect_burst"
+        "effectId": "effect_arc"
+      },
+      {
+        "effectId": "effect_piercing_x",
+        "value": 2
       }
     ]
   },

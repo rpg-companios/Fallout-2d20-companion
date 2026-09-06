@@ -1,0 +1,105 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 6 Sep 2026 14:03:28 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20189:=20=D0=BF=D1=83?=
+ =?UTF-8?q?=D1=88=D0=BA=D0=B0=20=D0=A2=D0=B5=D1=81=D0=BB=D1=8B=20=D0=BF?=
+ =?UTF-8?q?=D0=BE=20=D0=BA=D0=BD=D0=B8=D0=B3=D0=B5=20(=D0=94=D1=83=D0=B3?=
+ =?UTF-8?q?=D0=B0+=D0=9F=D1=80=D0=BE=D0=BD=D0=B8=D0=BA=D0=B0=D1=8E=D1=89?=
+ =?UTF-8?q?=D0=B8=D0=B9=202;=20=D0=A2=D0=BE=D1=87=D0=BD=D0=BE=D0=B5,=20?=
+ =?UTF-8?q?=D0=9F=D0=BE=D0=B6=D0=B8=D1=80=D0=B0=D1=82=D0=B5=D0=BB=D1=8C=20?=
+ =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=80=D0=BE=D0=BD=D0=BE=D0=B2=205,=20=D0=98?=
+ =?UTF-8?q?=D0=BC=D0=BF=D1=83=D0=BB=D1=8C=D1=81,=20=D0=94=D0=B2=D1=83?=
+ =?UTF-8?q?=D1=80=D1=83=D1=87=D0=BD=D0=BE=D0=B5;=20=D1=8D=D0=BD=D0=B5?=
+ =?UTF-8?q?=D1=80=D0=B3=D0=BE=D1=8F=D1=87=D0=B5=D0=B9=D0=BA=D0=B0)=20+=20?=
+ =?UTF-8?q?=D1=82=D0=B5=D1=80=D0=BC=D0=B8=D0=BD=D1=8B=20=D0=BA=D0=B0=D1=87?=
+ =?UTF-8?q?=D0=B5=D1=81=D1=82=D0=B2?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ modules/fallout/data/equipment/weapons.json   | 19 +++++++++++++++----
+ .../i18n/en-EN/data/system/qualities.json     |  2 +-
+ .../i18n/ru-RU/data/system/qualities.json     |  4 ++--
+ 3 files changed, 18 insertions(+), 7 deletions(-)
+
+diff --git a/modules/fallout/data/equipment/weapons.json b/modules/fallout/data/equipment/weapons.json
+index 6d3f9be..1cd86b7 100644
+--- a/modules/fallout/data/equipment/weapons.json
++++ b/modules/fallout/data/equipment/weapons.json
+@@ -2751,7 +2751,7 @@
+     "weight": "24",
+     "cost": 870,
+     "rarity": 5,
+-    "ammoId": "ammo_fusion_core",
++    "ammoId": "ammo_energy_cell",
+     "range": "L",
+     "imageName": "Tesla Cannon",
+     "mainAttr": "STR",
+@@ -2760,17 +2760,28 @@
+     "damageType": "energy",
+     "qualities": [
+       {
+-        "qualityId": "quality_two-handed"
++        "qualityId": "quality_accurate"
+       },
+       {
+-        "qualityId": "quality_blast"
++        "qualityId": "quality_ammo-hungry_x",
++        "value": 5
++      },
++      {
++        "qualityId": "quality_surge"
++      },
++      {
++        "qualityId": "quality_two-handed"
+       }
+     ],
+     "weaponType": "Energy",
+     "withoutMods": true,
+     "effects": [
+       {
+-        "effectId": "effect_burst"
++        "effectId": "effect_arc"
++      },
++      {
++        "effectId": "effect_piercing_x",
++        "value": 2
+       }
+     ]
+   },
+diff --git a/modules/fallout/i18n/en-EN/data/system/qualities.json b/modules/fallout/i18n/en-EN/data/system/qualities.json
+index 6e63696..8044cc0 100644
+--- a/modules/fallout/i18n/en-EN/data/system/qualities.json
++++ b/modules/fallout/i18n/en-EN/data/system/qualities.json
+@@ -101,7 +101,7 @@
+   },
+   {
+     "id": "quality_ammo-hungry_x",
+-    "name": "Ammo-Hungry X"
++    "name": "Ammo-Hungry"
+   },
+   {
+     "id": "quality_surge",
+diff --git a/modules/fallout/i18n/ru-RU/data/system/qualities.json b/modules/fallout/i18n/ru-RU/data/system/qualities.json
+index c1bde12..acdfd04 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/qualities.json
++++ b/modules/fallout/i18n/ru-RU/data/system/qualities.json
+@@ -101,11 +101,11 @@
+   },
+   {
+     "id": "quality_ammo-hungry_x",
+-    "name": "Пожиратель патронов X"
++    "name": "Пожиратель патронов"
+   },
+   {
+     "id": "quality_surge",
+-    "name": "Импульсный"
++    "name": "Импульс"
+   },
+   {
+     "id": "quality_bombard",
+-- 
+2.39.5
+
