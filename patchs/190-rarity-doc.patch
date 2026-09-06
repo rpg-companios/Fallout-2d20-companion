@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 6 Sep 2026 14:03:28 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20190:=20=D0=BF=D1=80?=
+ =?UTF-8?q?=D0=B0=D0=B2=D0=B8=D0=BB=D0=BE=20=D1=80=D0=B5=D0=B4=D0=BA=D0=BE?=
+ =?UTF-8?q?=D1=81=D1=82=D0=B8=20=D0=B2=20=D1=81=D0=BF=D1=80=D0=B0=D0=B2?=
+ =?UTF-8?q?=D0=BE=D1=87=D0=BD=D0=B8=D0=BA=20=E2=80=94=20=D1=82=D0=BE=D0=BB?=
+ =?UTF-8?q?=D1=8C=D0=BA=D0=BE=20=D1=87=D0=B8=D1=81=D0=BB=D0=BE=200-5;=20?=
+ =?UTF-8?q?=D1=81=D0=BB=D0=BE=D0=B2=D0=BE=20=D0=B2=20=D0=BA=D0=BD=D0=B8?=
+ =?UTF-8?q?=D0=B3=D0=B5=20=3D=20=D0=BF=D1=80=D1=8F=D0=BC=D0=B0=D1=8F=20?=
+ =?UTF-8?q?=D1=80=D0=B5=D0=B4=D0=BA=D0=BE=D1=81=D1=82=D1=8C=20(=D1=87?=
+ =?UTF-8?q?=D0=B0=D1=81=D1=82=D0=BD=D1=8B=D0=B9=20=D1=81=D0=BB=D1=83=D1=87?=
+ =?UTF-8?q?=D0=B0=D0=B9)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ docs/weapon-comparison-doc-vs-program.md | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/docs/weapon-comparison-doc-vs-program.md b/docs/weapon-comparison-doc-vs-program.md
+index 6c4d6ec..94e06e7 100644
+--- a/docs/weapon-comparison-doc-vs-program.md
++++ b/docs/weapon-comparison-doc-vs-program.md
+@@ -1,5 +1,9 @@
+ # Сравнение оружия: документ «Справочник оружия» vs программа
+ 
++## Редкость
++
++Редкость — число 0–5 (0 повседневная, 1 обычная, 2 необычная, 3 редкая, 4 очень редкая, 5 очень высокая). Словесного обозначения в программе нет — только число. Если в книге у предмета редкость написана словом (например, «Уникальное») — это и есть его редкость: частный случай, вне числовой шкалы.
++
+ - **Оружий в документе:** 83
+ - **Оружий в программе** (реальных, без встроенных рукопашных): **116**
+ - **Из документа есть в программе:** 83 (все)
+@@ -87,7 +91,7 @@
+ | 67 | ГАММА-ПУШКА | `weapon_gamma_gun` | Гамма-пушка |
+ | 68 | ГИПНОТРОН | `weapon_mesmetron` | Гипнотрон |
+ | 69 | ЛАЗЕРНОЕ РУЖЬЁ WATTZ 2000 | `weapon_wattz_2000` | Лазерное ружьё Wattz 2000 |
+-| 70 | КАРАБИН ТЕСЛЫ | `weapon_tesla_rifle` | Винтовка Теслы |
++| 70 | КАРАБИН ТЕСЛЫ | `weapon_tesla_rifle` | Карабин Теслы |
+ | 71 | КИСЛОПЛЮЙ | `weapon_acid_soaker` | Кислоплюй |
+ | 72 | АТОМАЙЗЕР ПРИШЕЛЬЦЕВ | `weapon_alien_atomizer` | Атомайзер пришельцев |
+ | 73 | ДЕЗИНТЕГРАТОР ПРИШЕЛЬЦЕВ | `weapon_alien_disintegrator` | Дезинтегратор пришельцев |
+-- 
+2.39.5
+
