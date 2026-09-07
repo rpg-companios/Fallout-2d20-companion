@@ -34,6 +34,9 @@ const styles = StyleSheet.create({
   statBoxValueContainer: {
     flex: 1,
     paddingVertical: 8,
+    // Отступы от краёв области: длинные текстовые значения (названия
+    // состояний выживания) не упираются в рамку (владелец, 0.3.7).
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
@@ -154,7 +157,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     color: '#fff',
     fontWeight: 'bold',
-    flex: 1,
+    // Фиксированная доля ячейки-лейбла — одинакова во всех карточках:
+    // длинное значение («Энергетический») больше не сжимает первую ячейку
+    // (владелец, 0.3.7). Ячейка значения забирает остальное (flex: 1).
+    width: '42%',
     padding: 8,
     fontSize: 12,
   },
