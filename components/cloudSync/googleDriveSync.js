@@ -4,6 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
 import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
 import { getActiveModuleId } from '../../domain/moduleLocale';
+import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
+import { validateAvatarDataUrl } from '../../domain/characterAvatar';
+import * as avatarCache from '../../db/avatarCache';
 
 // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
 // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
@@ -234,6 +237,108 @@ const makeRemoteFilename = (character) => {
   return `${character.id}__${safeName}.json`;
 };
 
+// ─── Аватары персонажей (задел премиум-фичи, патч 193; UI нет) ───────────────
+// Файлы лежат РЯДОМ с сейвами: appDataFolder/<сеттинг>/avatars/<characterId>.jpg.
+// Синк редкий: только полная синхронизация и (в будущем) первая загрузка
+// персонажа на устройстве. Автосейв аватары не трогает.
+
+const findAvatarsFolderId = async (token, moduleFolderId) => {
+  const q = encodeURIComponent(
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${AVATARS_FOLDER_NAME}' and '${moduleFolderId}' in parents`,
+  );
+  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
+  const listData = await listResp.json();
+  return listData.files?.[0]?.id ?? null;
+};
+
+const getAvatarsFolderId = async (token, moduleFolderId) => {
+  const existingId = await findAvatarsFolderId(token, moduleFolderId);
+  if (existingId) return existingId;
+
+  const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: AVATARS_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [moduleFolderId],
+    }),
+  });
+  const created = await createResp.json();
+  if (!created.id) {
+    throw new Error('Не удалось создать подпапку avatars в appDataFolder');
+  }
+  return created.id;
+};
+
+const listAvatarFiles = async (token, avatarsFolderId) => {
+  const q = encodeURIComponent(`'${avatarsFolderId}' in parents and trashed=false`);
+  const resp = await driveFetch(
+    token,
+    `${DRIVE_API}/files?q=${q}&fields=files(id,name,md5Checksum,modifiedTime)&spaces=appDataFolder&pageSize=200`,
+  );
+  const data = await resp.json();
+  return data.files || [];
+};
+
+// Контент файла — data URL текстом (масштабируется теми же лимитами, что и
+// локальный кэш; multipart как у сейвов, но MIME image/jpeg).
+const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl }) => {
+  const metadata = fileId ? null : { name: avatarFileName(characterId), parents: [folderId], mimeType: 'image/jpeg' };
+  const delimiter = '-------fallout2d20avatar';
+  const multipartBody = [
+    `--${delimiter}`,
+    'Content-Type: application/json; charset=UTF-8',
+    '',
+    JSON.stringify(metadata || {}),
+    `--${delimiter}`,
+    'Content-Type: image/jpeg',
+    '',
+    dataUrl,
+    `--${delimiter}--`,
+  ].join('\r\n');
+
+  const endpoint = fileId
+    ? `${UPLOAD_API}/files/${fileId}?uploadType=multipart`
+    : `${UPLOAD_API}/files?uploadType=multipart`;
+  const resp = await driveFetch(token, endpoint, {
+    method: fileId ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${delimiter}` },
+    body: multipartBody,
+  });
+  const parsed = await resp.json();
+  return { id: parsed.id ?? null, md5Checksum: parsed.md5Checksum ?? null };
+};
+
+const downloadAvatarFile = async (token, fileId) => {
+  const resp = await driveFetch(token, `${DRIVE_API}/files/${fileId}?alt=media`);
+  return resp.text();
+};
+
+const deleteAvatarFile = async (token, fileId) => {
+  await driveFetch(token, `${DRIVE_API}/files/${fileId}`, { method: 'DELETE' });
+};
+
+// Редкий синк аватаров внутри уже открытой сессии (token/folder есть).
+// Падение аватаров не должно ронять синк персонажей — вызывающий ловит.
+const syncAvatarsInSession = async (token, moduleFolderId) => {
+  return syncAvatars({
+    token,
+    driveOps: { listAvatarFiles, uploadAvatarFile, downloadAvatarFile, deleteAvatarFile },
+    cacheOps: {
+      list: avatarCache.listAvatarCache,
+      get: avatarCache.getAvatarCache,
+      setFromRemote: avatarCache.setAvatarCacheFromRemote,
+      updateMd5: avatarCache.updateAvatarCacheMd5,
+      delete: avatarCache.deleteAvatarCache,
+    },
+    listCharacterIds: async () => (await db.getCharactersList()).map((c) => c.id),
+    findFolder: () => findAvatarsFolderId(token, moduleFolderId),
+    ensureFolder: () => getAvatarsFolderId(token, moduleFolderId),
+    validateDataUrl: validateAvatarDataUrl,
+  });
+};
+
 export const isCloudSyncConfigured = async () => (await AsyncStorage.getItem(SYNC_KEY)) === '1';
 
 export const setCloudSyncConfigured = async (enabled) => {
@@ -338,6 +443,16 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
   }
 
   await setCloudSyncConfigured(true);
+
+  // Аватары (задел премиум-фичы, UI пока нет): редкий синк — ровно здесь.
+  // Пустой кэш → ни одного запроса; сбой аватаров не роняет синк персонажей.
+  try {
+    const avatarStats = await syncAvatarsInSession(token, folderId);
+    debugLog('sync.avatars:done', avatarStats);
+  } catch (e) {
+    debugLog('sync.avatars:failed', { message: e?.message });
+  }
+
   report('done');
   debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
   return { uploaded: uploads.length, downloaded: downloadedCount };
@@ -375,6 +490,19 @@ export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
 
     await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
     debugLog('sync.delete:done', { characterId, fileId: remote.id });
+
+    // Аватар этого персонажа (если был) удаляем лучшими усилиями: сбой
+    // удаления фото не должен отменять уже удалённый сейв.
+    try {
+      const avatarsFolderId = await getAvatarsFolderId(token, folderId);
+      const avatarFiles = await listAvatarFiles(token, avatarsFolderId);
+      const avatar = avatarFiles.find((file) => file.name === avatarFileName(characterId));
+      if (avatar) await deleteAvatarFile(token, avatar.id);
+      await avatarCache.deleteAvatarCache(characterId);
+    } catch (e) {
+      debugLog('sync.delete:avatar-failed', { characterId, message: e?.message });
+    }
+
     return { removed: true };
   } catch (e) {
     const message = e?.message || String(e);

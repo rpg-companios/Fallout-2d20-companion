@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useCharacter } from '../../../../../components/CharacterContext';
 import { applyLimbReplacement } from '../../../../../domain/robotEquip';
+import { limbOptionsForSlot } from '../../../../../domain/robotSlots';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
@@ -17,30 +18,6 @@ import { tCharacterScreen } from '../logic/characterScreenI18n';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Returns a localized limb catalog from the active setting catalog. */
-const getLimbCatalogForSlot = (catalog, slotKey) => {
-  if (slotKey === 'head') return catalog.robotHeads || [];
-  if (slotKey === 'body') return catalog.robotBody || [];
-  if (
-    slotKey === 'leftArm' ||
-    slotKey === 'rightArm' ||
-    slotKey.startsWith('arm')
-  ) {
-    return catalog.robotArms || [];
-  }
-  return catalog.robotLegs || [];
-};
-
-/**
- * Returns the itemType that should be used to filter limbs for a given slotKey.
- */
-const getItemTypeForSlot = (slotKey) => {
-  if (slotKey === 'head') return 'robotHead';
-  if (slotKey === 'body') return 'robotBody';
-  if (slotKey === 'leftArm' || slotKey === 'rightArm' || slotKey.startsWith('arm')) return 'robotArm';
-  return 'robotLegs';
-};
 
 /**
  * Maps bodyPlan to the arm slot names used in robot arms catalog `slots` field.
@@ -59,7 +36,7 @@ const BODY_PLAN_ARM_SLOTS = {
  * A limb is compatible if:
  *   - limb.compatibleBodyPlans includes bodyPlan, OR
  *   - limb.defaultForBodyPlan === bodyPlan, OR
- *   - limb.robotBodyPlan === bodyPlan (used in robotbody.json), OR
+ *   - limb.robotBodyPlan === bodyPlan (пометка в данных конечности), OR
  *   - limb.slots intersects with the expected arm slots for the bodyPlan (arms fallback)
  * If no limbs match any of the above, all limbs are returned (graceful fallback).
  */
@@ -115,11 +92,11 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
       {limb.body    !== undefined && <StatRow label={tCharacterScreen("labels.body")}      value={limb.body} />}
       {limb.carryWeight !== undefined && <StatRow label={tCharacterScreen("labels.carryWeight")} value={limb.carryWeight} />}
       {limb.rarity  !== undefined && <StatRow label={tCharacterScreen("labels.rarity")}    value={limb.rarity} />}
-      {limb.complexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity")} value={limb.complexity} />}
+      {limb.installComplexity !== undefined && <StatRow label={tCharacterScreen("labels.complexity")} value={limb.installComplexity} />}
     </View>
-    {Array.isArray(limb.perksRequired) && limb.perksRequired.length > 0 && (
+    {Array.isArray(limb.installPerksRequired) && limb.installPerksRequired.length > 0 && (
       <Text style={styles.perksRequired}>
-        {tCharacterScreen("labels.requires")}{limb.perksRequired.join(', ')}
+        {tCharacterScreen("labels.requires")}{limb.installPerksRequired.join(', ')}
       </Text>
     )}
   </TouchableOpacity>
@@ -150,10 +127,9 @@ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) 
   // Build filtered limb list
   const compatibleLimbs = useMemo(() => {
     if (!slotKey) return [];
-    const catalog = getLimbCatalogForSlot(equipmentCatalog, slotKey);
-    const itemType = getItemTypeForSlot(slotKey);
-    const byType = catalog.filter((l) => l.itemType === itemType);
-    return filterByBodyPlan(byType, bodyPlan);
+    // Кандидаты отбираются по типу конечности, который слот принимает по
+    // плану тела, а не по имени слота и itemType.
+    return filterByBodyPlan(limbOptionsForSlot(equipmentCatalog, bodyPlan, slotKey), bodyPlan);
   }, [equipmentCatalog, slotKey, bodyPlan]);
 
   const handleSelect = (newLimb) => {

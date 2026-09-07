@@ -43,7 +43,11 @@
     "leadBellyRerollTitle": "Свинцовое брюхо",
     "leadBellyRerollMessage": "Вы можете получить {radiationAmount} урона радиацией. Хотите перебросить значение?",
     "leadBellyRerollConfirm": "Перебросить",
-    "leadBellyRerollKeep": "Оставить"
+    "leadBellyRerollKeep": "Оставить",
+    "robotArmRequiredTitle": "Требуется рука робота",
+    "robotArmRequiredMessage": "Навес крепится к руке робота: сначала установите руку (манипулятор).",
+    "armPartStrictTitle": "Замена только на аналогичные",
+    "armPartStrictMessage": "Включена настройка «прикрепляемые части рук — только на аналогичные»: навес заменяется другим навесом, оружие в ладони — другим оружием. Её можно отключить в настройках."
   },
   "foundItemTypes": {
     "caps": "крышек"

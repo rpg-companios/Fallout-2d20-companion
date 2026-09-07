@@ -9,6 +9,9 @@ import { getPerks, getUniqQualityName } from '../../domain/registry';
 import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { debugLog } from '../debug/falloutDebug';
+import { getDefaultLimbs } from '../../domain/bodyplan';
+import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+import robotLimbsFile from '../../modules/fallout/data/equipment/robot/limbs.json';
 
 const PERK_ID_REMAP_V18 = {
   triggerRush: 'scrounger',
@@ -450,6 +453,125 @@ const _migrateEquippedEntryV0V1 = (entry) => {
   delete out.damageEffects;
   delete out.damage_effects;
   return out;
+};
+
+/**
+ * v20 -> v21: «Заводская обшивка» удалена из каталога — в книге её нет, есть
+ * только стандартная обшивка. Старые сейвы (и комплект защитрона) ссылались на
+ * robot_plating_factory_*; без переименования слой не разрешится каталогом, и
+ * персонаж молча потеряет защиту при загрузке.
+ *
+ * Правит и «толстый» вид слота (слои объектами на верхнем уровне), и новый
+ * (armorLayers с id), и инвентарь. Идемпотентна: после подмены id больше не
+ * начинается с robot_plating_factory_.
+ */
+export const migrateRobotPlatingIds = (state) => {
+  if (!state || typeof state !== 'object') return state;
+
+  const remapId = (id) => (typeof id === 'string' && id.startsWith('robot_plating_factory_')
+    ? id.replace('robot_plating_factory_', 'robot_plating_standard_')
+    : id);
+
+  const remapLayer = (layer) => {
+    if (typeof layer === 'string') return remapId(layer);
+    if (layer && typeof layer === 'object' && typeof layer.id === 'string') {
+      const id = remapId(layer.id);
+      return id === layer.id ? layer : { ...layer, id };
+    }
+    return layer;
+  };
+
+  const LAYER_KEYS = ['plating', 'armor', 'frame'];
+  let changed = false;
+  const next = { ...state };
+
+  if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
+    const slots = {};
+    let slotsChanged = false;
+    for (const [key, slot] of Object.entries(next.equippedRobotSlots)) {
+      if (!slot || typeof slot !== 'object') { slots[key] = slot; continue; }
+      const patched = { ...slot };
+      for (const layerKey of LAYER_KEYS) {
+        if (patched[layerKey] === undefined || patched[layerKey] === null) continue;
+        const mapped = remapLayer(patched[layerKey]);
+        if (mapped !== patched[layerKey]) { patched[layerKey] = mapped; slotsChanged = true; }
+      }
+      if (patched.armorLayers && typeof patched.armorLayers === 'object') {
+        const layers = { ...patched.armorLayers };
+        for (const layerKey of LAYER_KEYS) {
+          if (layers[layerKey] === undefined || layers[layerKey] === null) continue;
+          const mapped = remapLayer(layers[layerKey]);
+          if (mapped !== layers[layerKey]) { layers[layerKey] = mapped; slotsChanged = true; }
+        }
+        patched.armorLayers = layers;
+      }
+      slots[key] = patched;
+    }
+    if (slotsChanged) { next.equippedRobotSlots = slots; changed = true; }
+  }
+
+  if (Array.isArray(next.equipment?.items)) {
+    let itemsChanged = false;
+    const items = next.equipment.items.map((item) => {
+      if (!item || typeof item !== 'object') return item;
+      const id = remapId(item.id);
+      if (id === item.id) return item;
+      itemsChanged = true;
+      return { ...item, id };
+    });
+    if (itemsChanged) { next.equipment = { ...next.equipment, items }; changed = true; }
+  }
+
+  return changed ? next : state;
+};
+
+/**
+ * v21 -> v22: навесы (arm attachments) перестали быть конечностями.
+ *
+ * Новая модель: навес — оружие, которое крепится К руке и живёт в её ладони
+ * (heldWeapon). Слот, где навес стоял ВМЕСТО руки, получает стандартную руку
+ * плана тела (у каждого робота своя: мистер-помощник, секьюритрон, штурмотрон,
+ * протектрон…), а сам навес пересаживается в ладонь. Если у плана нет
+ * стандартной руки для слота, слот освобождается — навес сохраняется в
+ * ладони и ждёт установки руки.
+ *
+ * Понимает и «толстый» вид (объект конечности), и «худой» (id из v20+).
+ * Идемпотентна: после пересадки в limb не остаётся навесов.
+ */
+export const migrateRobotArmAttachments = (state) => {
+  if (!state || typeof state !== 'object') return state;
+  if (!state.equippedRobotSlots || typeof state.equippedRobotSlots !== 'object') return state;
+
+  const attachmentIds = new Set(
+    (Array.isArray(robotWeaponAsLimbFile) ? robotWeaponAsLimbFile : []).map((entry) => entry.id)
+  );
+  const limbsById = new Map(
+    (Array.isArray(robotLimbsFile) ? robotLimbsFile : []).map((entry) => [entry.id, entry])
+  );
+  const planDefaults = getDefaultLimbs(state?.origin?.bodyPlan) || {};
+
+  let changed = false;
+  const slots = {};
+  for (const [key, slot] of Object.entries(state.equippedRobotSlots)) {
+    if (!slot || typeof slot !== 'object') { slots[key] = slot; continue; }
+    const limb = slot.limb;
+    const limbId = typeof limb === 'string' ? limb : limb?.id;
+    if (!limbId) { slots[key] = slot; continue; }
+    const isAttachment = attachmentIds.has(limbId)
+      || (limb?.itemType === 'robotArm' && limb?.canHoldWeapons === false);
+    if (!isAttachment) { slots[key] = slot; continue; }
+
+    const defaultArmId = planDefaults[key];
+    const defaultArm = defaultArmId ? limbsById.get(defaultArmId) : null;
+    slots[key] = {
+      ...slot,
+      limb: defaultArm ? { id: defaultArm.id } : null,
+      heldWeapon: { ...(slot.heldWeapon || {}), id: limbId, weaponId: limbId, itemType: 'weapon' },
+    };
+    changed = true;
+  }
+
+  return changed ? { ...state, equippedRobotSlots: slots } : state;
 };
 
 const MIGRATIONS = [
@@ -1085,6 +1207,24 @@ const MIGRATIONS = [
   // restore дообогатит их теми же каталожными данными, а повторный экспорт
   // приведёт к «худому» виду. Идемпотентна.
   (state) => state,
+
+  // v19 -> v20: «худой» сейв для слотов робота. Конечность, слои защиты и
+  // оружие в ладони хранятся id (+ id установленных модов); характеристики
+  // восстанавливаются из каталогов. Как и в v19, сама ужимка делается на
+  // экспорте (slimRobotSlots), разворот — на импорте (restoreSaveData), а тут
+  // только бамп версии: данные не меняются, миграция идемпотентна.
+  (state) => state,
+
+  // v20 -> v21: «Заводская обшивка» убрана из каталога (в книге её нет).
+  // Ссылки robot_plating_factory_* в слотах и инвентаре переименовываются в
+  // robot_plating_standard_* — иначе слой не разрешится и персонаж потеряет
+  // защиту. Идемпотентна.
+  migrateRobotPlatingIds,
+
+  // v21 -> v22: навес — оружие, крепящееся К руке, а не конечность. Слоты,
+  // где навес стоял вместо руки, получают стандартную руку плана тела, навес
+  // пересаживается в ладонь (heldWeapon). Идемпотентна.
+  migrateRobotArmAttachments,
 
 ];
 /**

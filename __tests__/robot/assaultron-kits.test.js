@@ -9,10 +9,8 @@ import { describe, it, expect } from 'vitest';
 
 import kits from '../../modules/fallout/data/equipmentKits/index.js';
 import origins from '../../modules/fallout/data/origins/origins.json';
-import heads from '../../modules/fallout/data/equipment/robot/robotheads.json';
-import bodies from '../../modules/fallout/data/equipment/robot/robotbody.json';
-import arms from '../../modules/fallout/data/equipment/robot/robotarms.json';
-import legs from '../../modules/fallout/data/equipment/robot/robotlegs.json';
+import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
+import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
 import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
 import ruKits from '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
 import enKits from '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
@@ -24,7 +22,7 @@ const ASSAULTRON_KIT_IDS = [
   'assaultron_caravan_guard',
 ];
 
-const robotCatalog = { heads, bodies, arms, legs, weapons: robotWeapons };
+const robotCatalog = { limbs, weaponAsLimb, weapons: robotWeapons };
 
 const byId = (list, id) => list.find((entry) => entry.id === id);
 
@@ -55,7 +53,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
   });
 
   it('у головы с лазером есть встроенное оружие (лазер головы)', () => {
-    const head = byId(heads, 'robot_head_assaultron_laser');
+    const head = byId(limbs, 'robot_head_assaultron_laser');
     expect(head.builtinWeaponId).toBe('robot_weapon_assaultron_head_laser');
     const laser = byId(robotWeapons, 'robot_weapon_assaultron_head_laser');
     expect(laser.damage).toBeGreaterThan(0);
@@ -63,7 +61,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
   });
 
   it('initRobotSlots: голова из комплекта даёт карточку лазера со статами', () => {
-    const head = byId(heads, 'robot_head_assaultron_laser');
+    const head = byId(limbs, 'robot_head_assaultron_laser');
     const { slots } = initRobotSlots('assaultron', [{ ...head }], robotCatalog);
     const weapons = getBuiltinWeaponsFromSlots(slots);
     const laser = weapons.find((w) => w.id === 'robot_weapon_assaultron_head_laser');
@@ -74,7 +72,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
     expect(laser.isBuiltin).toBe(true);
   });
 
-  it('initRobotSlots: строительные когти — оружие со статами в слотах рук', () => {
+  it('initRobotSlots: строительные когти — навесы в ладонях стандартных рук (патч 191)', () => {
     const clawWeapon = byId(robotWeapons, 'robot_weapon_construction_claw');
     const kitItems = [
       { ...clawWeapon, itemType: 'weapon', weaponId: clawWeapon.id, slot: 'left' },
@@ -82,16 +80,19 @@ describe('комплекты снаряжения Штурмотрона', () =>
     ];
     const { slots } = initRobotSlots('assaultron', kitItems, robotCatalog);
 
-    expect(slots.leftArm.limb?.id).toBe('robot_weapon_construction_claw');
-    expect(slots.rightArm.limb?.id).toBe('robot_weapon_construction_claw');
+    // В слоте — стандартная рука штурмотрона, навес — в её ладони.
+    expect(slots.leftArm.limb?.id).toBe('robot_arm_assaultron');
+    expect(slots.rightArm.limb?.id).toBe('robot_arm_assaultron');
+    expect(slots.leftArm.heldWeapon?.id).toBe('robot_weapon_construction_claw');
+    expect(slots.rightArm.heldWeapon?.id).toBe('robot_weapon_construction_claw');
 
     const weapons = getBuiltinWeaponsFromSlots(slots);
-    const claw = weapons.find((w) => w.id === 'robot_weapon_construction_claw');
-    expect(claw, 'коготь не попал в оружие').toBeTruthy();
+    const claws = weapons.filter((w) => w.id === 'robot_weapon_construction_claw');
+    expect(claws, 'когти не попали в оружие').toHaveLength(2);
+    const claw = claws[0];
     expect(claw.damage).toBe(4);
     expect(claw.damageType).toBe('physical');
     expect(claw.mainSkill).toBe('UNARMED');
-    expect(claw.isBuiltin).toBe(true);
   });
 
   it('initRobotSlots: рамы и обшивка — 1 предмет = 1 слот (включая ноги)', () => {
@@ -100,21 +101,21 @@ describe('комплекты снаряжения Штурмотрона', () =>
         id: 'robot_frame_actuated_body',
         itemType: 'robotFrame',
         layer: 'frame',
-        robotLocation: 'Main Body',
+        limbType: 'body',
         damageResistance: { physical: 1, energy: 1 },
       },
       {
         id: 'robot_plating_standard_thruster',
         itemType: 'plating',
         layer: 'plating',
-        robotLocation: 'Thruster',
+        limbType: 'mover',
         damageResistance: { physical: 2, energy: 0 },
       },
       {
         id: 'robot_plating_standard_thruster_2',
         itemType: 'plating',
         layer: 'plating',
-        robotLocation: 'Thruster',
+        limbType: 'mover',
         damageResistance: { physical: 2, energy: 0 },
       },
     ];
@@ -133,7 +134,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
         id: 'robot_frame_actuated_arms',
         itemType: 'robotFrame',
         layer: 'frame',
-        robotLocation: 'Arms',
+        limbType: 'arm',
         damageResistance: { physical: 1, energy: 1 },
       },
     ];
@@ -154,8 +155,8 @@ describe('комплекты снаряжения Штурмотрона', () =>
     const { slots: emptySlots } = initRobotSlots('assaultron', [], {
       ...robotCatalog,
       plating: [
-        { id: 'robot_plating_standard_optics', layer: 'plating', robotLocation: 'Optics', damageResistance: { physical: 2, energy: 0 } },
-        { id: 'robot_plating_standard_body', layer: 'plating', robotLocation: 'Main Body', damageResistance: { physical: 2, energy: 0 } },
+        { id: 'robot_plating_standard_optics', layer: 'plating', limbType: 'head', damageResistance: { physical: 2, energy: 0 } },
+        { id: 'robot_plating_standard_body', layer: 'plating', limbType: 'body', damageResistance: { physical: 2, energy: 0 } },
       ],
       frames: [],
     });

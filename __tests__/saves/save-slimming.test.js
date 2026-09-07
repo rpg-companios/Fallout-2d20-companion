@@ -224,8 +224,13 @@ describe('slimSaveData / restoreSaveData (round-trip)', () => {
     expect(slim.equippedArmor.head.clothing.name).toBe('Заглючивший голодиск');
     // equippedPowerArmor frame/пиксели обработаны
     expect('name' in slim.equippedPowerArmor.frame).toBe(false);
-    // robot heldWeapon обработано
-    expect('name' in slim.equippedRobotSlots.rightArm.heldWeapon).toBe(false);
+    // слоты робота ужаты до id + модов: ни предметов, ни их копии в сейве
+    expect(slim.equippedRobotSlots.rightArm.content).toBe('robot_arm_smoke');
+    expect(slim.equippedRobotSlots.rightArm.heldWeaponId).toBe('weapon_combat_shotgun');
+    expect(slim.equippedRobotSlots.rightArm.heldWeapon).toBeUndefined();
+    expect(slim.equippedRobotSlots.rightArm.limb).toBeUndefined();
+    // пустой слот не превращается в мусор
+    expect(slim.equippedRobotSlots.leftArm).toBeNull();
 
     // restore возвращает каталогные поля
     const restored = restoreSaveData(slim, { resolve });
@@ -237,7 +242,9 @@ describe('slimSaveData / restoreSaveData (round-trip)', () => {
     expect(restored.equipment.items[2]).toEqual(makeCustom());
     expect(restored.equippedWeapons[0].name).toBe('Боевой дробовик');
     expect(restored.equippedPowerArmor.frame.cost).toBe(87);
+    // разворот: оружие в ладони снова предмет с каталожными полями
     expect(restored.equippedRobotSlots.rightArm.heldWeapon.cost).toBe(87);
+    expect(restored.equippedRobotSlots.rightArm.heldWeapon.id).toBe('weapon_combat_shotgun');
   });
 
   it('идемпотентна: slim(slim(x)) === slim(x) и restore(restore(x)) стабилен', () => {

@@ -1,0 +1,105 @@
+[
+  {
+    "id": "robot_weapon_auto_10mm",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_auto_10mm",
+    "name": "robot_weapon_auto_10mm"
+  },
+  {
+    "id": "robot_weapon_circular_saw",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_circular_saw",
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Blacksmith 1"
+    ],
+    "installSkill": "REPAIR",
+    "name": "robot_weapon_circular_saw"
+  },
+  {
+    "id": "robot_weapon_claw",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_claw",
+    "name": "robot_weapon_claw"
+  },
+  {
+    "id": "robot_weapon_construction_claw",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_construction_claw",
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Blacksmith 1"
+    ],
+    "installSkill": "REPAIR",
+    "name": "robot_weapon_construction_claw"
+  },
+  {
+    "id": "robot_weapon_cryojet",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_cryojet",
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Robotics Expert 1",
+      "Science! 1"
+    ],
+    "installSkill": "SCIENCE",
+    "name": "robot_weapon_cryojet"
+  },
+  {
+    "id": "robot_weapon_drill",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_drill",
+    "installComplexity": 3,
+    "installPerksRequired": [
+      "Blacksmith 2"
+    ],
+    "installSkill": "REPAIR",
+    "name": "robot_weapon_drill"
+  },
+  {
+    "id": "robot_weapon_flamethrower",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_flamethrower",
+    "name": "robot_weapon_flamethrower"
+  },
+  {
+    "id": "robot_weapon_laser_cutter",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_laser_cutter",
+    "name": "robot_weapon_laser_cutter"
+  },
+  {
+    "id": "robot_weapon_shocker_arms",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_shocker_arms",
+    "name": "robot_weapon_shocker_arms"
+  },
+  {
+    "id": "robot_weapon_tesla_arm",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_tesla_arm",
+    "name": "robot_weapon_tesla_arm"
+  },
+  {
+    "id": "robot_weapon_vice_grip",
+    "itemCategory": "weaponAsLimb",
+    "limbType": "arm",
+    "attackId": "robot_weapon_vice_grip",
+    "installComplexity": 4,
+    "installPerksRequired": [
+      "Blacksmith 3"
+    ],
+    "installSkill": "REPAIR",
+    "name": "robot_weapon_vice_grip"
+  }
+]

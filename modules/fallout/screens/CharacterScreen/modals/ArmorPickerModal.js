@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -8,6 +8,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { normalizeSlot } from '../../../../../domain/robotSlots';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import ArmorLayerModal from './ArmorLayerModal';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
@@ -28,13 +29,31 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) => 
   );
   const [activeLayer, setActiveLayer] = useState(null);
 
+  // Пикер закрывали по фону или кнопкой OK, не закрыв модалку слоя —
+  // выбор слоя оставался в состоянии, и при следующем открытии модалка слоя
+  // вылетала сразу, не давая выбрать слой (обшивка / броня / рама).
+  useEffect(() => {
+    setActiveLayer(null);
+  }, [visible, slotKey]);
+
   const handleLayerClose = () => {
     setActiveLayer(null);
   };
 
-  const currentPlating = slotKey ? equippedRobotSlots?.[slotKey]?.plating : null;
-  const currentArmor   = slotKey ? equippedRobotSlots?.[slotKey]?.armor   : null;
-  const currentFrame   = slotKey ? equippedRobotSlots?.[slotKey]?.frame   : null;
+  // Слои читаются через движок: в новом виде сейва они лежат в armorLayers и
+  // могут храниться одним id, в старом — объектами на верхнем уровне.
+  const slotLayers = slotKey
+    ? normalizeSlot(equippedRobotSlots?.[slotKey]).armorLayers
+    : { frame: null, plating: null, armor: null };
+  const asItem = (catalogItems, raw) => {
+    if (!raw) return null;
+    return typeof raw === 'string'
+      ? (catalogItems || []).find((entry) => entry.id === raw) || null
+      : raw;
+  };
+  const currentPlating = asItem(equipmentCatalog.robotPlating || [], slotLayers.plating);
+  const currentArmor   = asItem(equipmentCatalog.robotArmorLayer || [], slotLayers.armor);
+  const currentFrame   = asItem(equipmentCatalog.robotFrames || [], slotLayers.frame);
 
   const localizedName = (item, catalogItems) => {
     if (!item) return null;

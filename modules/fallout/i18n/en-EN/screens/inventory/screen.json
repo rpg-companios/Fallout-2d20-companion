@@ -43,7 +43,11 @@
     "leadBellyRerollTitle": "Lead Belly",
     "leadBellyRerollMessage": "You may take {radiationAmount} radiation damage. Reroll the value?",
     "leadBellyRerollConfirm": "Reroll",
-    "leadBellyRerollKeep": "Keep"
+    "leadBellyRerollKeep": "Keep",
+    "robotArmRequiredTitle": "Robot arm required",
+    "robotArmRequiredMessage": "An arm attachment is mounted on a robot arm: install an arm (manipulator) first.",
+    "armPartStrictTitle": "Like-for-like replacement only",
+    "armPartStrictMessage": "The “arm attachments: like-for-like only” setting is on: an attachment can only be replaced by another attachment, a held weapon by another weapon. It can be disabled in settings."
   },
   "foundItemTypes": {
     "caps": "caps"

@@ -11,6 +11,12 @@
 
 // ── Модуль сеттинга (modules/fallout) ──────────────────────────────────────
 import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
+import robotLimbsJson from '../modules/fallout/data/equipment/robot/limbs.json';
+import robotWeaponAsLimbJson from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+import robotWeaponsJson from '../modules/fallout/data/equipment/robot/weapons.json';
+import robotArmorJson from '../modules/fallout/data/equipment/robot/armor.json';
+import robotArmorPlatingJson from '../modules/fallout/data/equipment/robot/armor_plating.json';
+import robotFramesJson from '../modules/fallout/data/equipment/robot/frames.json';
 
 import moduleOrigins from '../modules/fallout/data/origins/origins.json';
 import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
@@ -18,6 +24,7 @@ import moduleCategories from '../modules/fallout/data/equipment/categories.json'
 import moduleTraits from '../modules/fallout/data/traits/traits.json';
 import modulePerks from '../modules/fallout/data/perks/perks.json';
 import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
 import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
 import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
 import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
@@ -104,6 +111,37 @@ export function getPerks() {
  */
 export function getBodyPlans() {
   return bodyplansJson;
+}
+
+/**
+ * Каталоги конечностей роботов новой модели (этап 1): конечности, оружие
+ * вместо конечности, атаки, слои защиты.
+ *
+ * Собирается один раз: JSON импортируются статически, объект неизменяем
+ * для потребителей (не мутируйте его).
+ */
+const ROBOT_LIMB_CATALOG = Object.freeze({
+  limbs: robotLimbsJson,
+  weaponAsLimb: robotWeaponAsLimbJson,
+  weapons: robotWeaponsJson,
+  // Общий каталог оружия сеттинга: то, что робот может держать в ладони и что
+  // в конечность устанавливается (человеческое оружие — рельсотрон, дробовик,
+  // лазерный пистолет). Боевые характеристики оружия живут только здесь и в
+  // robot/weapons.json; в сейве хранится один id.
+  generalWeapons: moduleWeapons,
+  // Моды оружия: сейв хранит id установленных модов, характеристики
+  // восстанавливаются применением модов к базе (domain/enrichItem.js).
+  weaponMods: moduleWeaponMods,
+  // Слои защиты плоским списком; принадлежность слою — в поле layer.
+  armorLayers: [
+    ...(robotArmorJson.armor || []),
+    ...(robotArmorPlatingJson.plating || []),
+    ...(robotFramesJson.frames || []),
+  ],
+});
+
+export function getRobotLimbCatalog() {
+  return ROBOT_LIMB_CATALOG;
 }
 
 /**

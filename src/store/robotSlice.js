@@ -13,7 +13,7 @@
  * State shape:
  *   robot: {
  *     bodyPlan : string | null            // e.g. 'protectron'
- *     slots    : { [slotKey]: SlotData }  // { limb, armor, plating, frame, heldWeapon, capabilities }
+ *     slots    : { [slotKey]: SlotData }  // { limb, armor, plating, frame, heldWeapon }
  *     modules  : object[]                 // installed robot modules
  *   }
  */

@@ -39,4 +39,15 @@ export const CREATE_TABLES = [
   `CREATE TABLE IF NOT EXISTS character_rename_requests (
     character_id TEXT PRIMARY KEY
   )`,
+
+  // Аватары персонажей (патч 193, задел премиум-фичы без UI): локальная копия
+  // фото, облачная лежит рядом с сейвом в appDataFolder/<сеттинг>/avatars/.
+  // В сейве персонажа — только метаданные (md5/updatedAt), не само фото.
+  // CREATE TABLE IF NOT EXISTS идемпотентен: бамп SCHEMA_VERSION не нужен.
+  `CREATE TABLE IF NOT EXISTS character_avatars (
+    character_id TEXT PRIMARY KEY,
+    data_url TEXT NOT NULL,
+    md5 TEXT,
+    updated_at INTEGER NOT NULL
+  )`,
 ];

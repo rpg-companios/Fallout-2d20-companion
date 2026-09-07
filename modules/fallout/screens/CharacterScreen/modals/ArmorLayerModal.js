@@ -8,8 +8,9 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { useCharacter } from '../../../../../components/CharacterContext';
+import { useCharacter, useRobotBodyPlan } from '../../../../../components/CharacterContext';
 import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
+import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
@@ -23,30 +24,11 @@ const LAYER_COLORS = {
   frame:   '#27ae60',
 };
 
-// ---------------------------------------------------------------------------
-// Slot → robotLocation mapping
-// ---------------------------------------------------------------------------
-const SLOT_LOCATION_MAP = {
-  head:      'Optics',
-  body:      'Main Body',
-  leftArm:   'Arms',
-  rightArm:  'Arms',
-  arm1:      'Arms',
-  arm2:      'Arms',
-  arm3:      'Arms',
-  leftLeg:   'Thruster',
-  rightLeg:  'Thruster',
-  thruster:  'Thruster',
-  chassis:   'Thruster',
-  wheel:     'Thruster',
-};
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Maps slotKey to robotLocation string */
-const getSlotLocation = (slotKey) => SLOT_LOCATION_MAP[slotKey] ?? null;
 
 /** Returns localized robot armor from the active setting catalog. */
 const getArmorCatalogForLayer = (catalog, layer) => {
@@ -127,6 +109,7 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
  */
 const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
   const { equippedRobotSlots, setEquippedRobotSlots } = useCharacter();
+  const bodyPlan = useRobotBodyPlan();
   useLocale();
   const moduleLocale = useModuleLocale();
   const equipmentCatalog = useMemo(
@@ -146,25 +129,24 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
 
   const compatibleItems = useMemo(() => {
     if (!slotKey || !layer || !equippedRobotSlots) return [];
-    const location = getSlotLocation(slotKey);
-    if (!location) return [];
+    // Слой подходит по ТИПУ конечности, который принимает слот плана тела.
+    // Никаких строковых локаций («Arms», «Optics») — только данные.
+    const limbType = getSlotDef(bodyPlan, slotKey)?.accepts?.[0] ?? null;
+    if (!limbType) return [];
 
     const catalog = getArmorCatalogForLayer(equipmentCatalog, layer);
     return catalog.filter((item) => {
-      if (item.robotLocation !== location) return false;
+      if (item.limbType !== limbType) return false;
       const { allowed } = canEquipRobotArmor(item, slotKey, layer, equippedRobotSlots);
       return allowed;
     });
-  }, [slotKey, layer, equippedRobotSlots, equipmentCatalog]);
+  }, [slotKey, layer, equippedRobotSlots, equipmentCatalog, bodyPlan]);
 
   const handleApply = () => {
     if (!equippedRobotSlots || !slotKey) return;
     setEquippedRobotSlots((prev) => ({
       ...prev,
-      [slotKey]: {
-        ...prev[slotKey],
-        [layer]: selectedItem || null,
-      },
+      [slotKey]: withArmorLayer(prev[slotKey], layer, selectedItem || null),
     }));
     onClose();
   };

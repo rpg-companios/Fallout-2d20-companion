@@ -59,12 +59,20 @@ Engine in `domain/allowlist.js` maps categories via `CATEGORY_ALIASES` (robotPla
 
 ## 4. Robot Arms & Weapon Equipping
 - BodyPlan defines slots: `leftArm`, `rightArm`, `arm1` etc, each with `canHoldWeapons`, `weaponSlots`
-- Arm catalog `robotarms.json`:
+- Unified limb catalog `robot/limbs.json` (arms have `limbType: "arm"`):
   - `canHoldWeapons: true` → arm can hold a weapon from inventory
-  - `builtinWeaponId` → arm has built-in weapon (e.g. `robot_arm_assaultron` → `robot_weapon_claw` 3 dmg, `robot_arm_mister_handy` → manipulator 2 dmg)
-  - Arms that are weapons themselves (e.g. `robot_weapon_construction_claw`) have `itemType: robotArm` + `builtinWeaponId` same id
+  - `builtinWeaponId` → arm has built-in weapon (e.g. `robot_arm_assaultron` → `robot_weapon_claw`); it CANNOT be replaced without replacing the arm itself
+- **Arm attachments** (`robot/weaponAsLimb.json`, `itemCategory: "weaponAsLimb"`) are WEAPONS mounted ON an arm, not limbs:
+  - cannot be obtained without a robot arm in the slot (alert `robotArmRequired`)
+  - occupy the arm's weapon slot (heldWeapon) like any weapon; ONE item per arm: attachment OR weapon
+  - replaceable: strict mode (setting `robotArmPartsStrictReplace`, default ON) — attachment↔attachment, weapon↔weapon only; OFF — anything (`canReplaceArmWeapon`)
+  - install requirements (`installComplexity/PerksRequired/Skill`) exist only for the five book attachments (Buzz Saw, Construction Claw, Cryojet, Drill, Vice Grip)
+- All limbs (incl. arms) accept armor layers (plating/armor/frame) — `slotAcceptsArmor`
+- Default/standard arm per body plan comes from `bodyplans.json → defaults` (each robot has its own: misterHandy → `robot_arm_mister_handy`, securitron → `robot_arm_securitron`, assaultron → `robot_arm_assaultron`, protectron → `robot_arm_protectron`, …); kit assembly plants it before attaching an attachment to an empty arm slot
+- Migration v21→v22 (`migrateRobotArmAttachments`): slots where an attachment stood INSTEAD of an arm get the plan's standard arm; the attachment is re-planted into its palm
 - Inventory equip flow for robots:
   - `findFreeWeaponHand(slots, occupiedSourceSlots)` → first free arm with `canHoldWeapons=true` and no `heldWeapon`
+  - occupied palm → replacement via `canReplaceArmWeapon` (strict typing), replaced item returns to inventory
   - `canEquipWeaponToSlot()` checks weight and two-handed
   - If no arm with `canHoldWeapons` → alert `manipulatorRequired`, no equip button
 - If arm can hold weapon, robot can equip weapon via inventory. If not, cannot.

@@ -1,12 +1,54 @@
 {
   "humanoid": {
     "slots": [
-      "head",
-      "torso",
-      "leftArm",
-      "rightArm",
-      "leftLeg",
-      "rightLeg"
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "torso",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "leftArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "rightArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "leftLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "rightLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "head": null,
@@ -16,22 +58,93 @@
       "leftLeg": null,
       "rightLeg": null
     },
-    "slotCapabilities": {
-      "leftArm": {
-        "canEquipWeapon": true
+    "hitTable": [
+      {
+        "range": [
+          1,
+          2
+        ],
+        "slotId": "head"
       },
-      "rightArm": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          3,
+          8
+        ],
+        "slotId": "torso"
+      },
+      {
+        "range": [
+          9,
+          11
+        ],
+        "slotId": "leftArm"
+      },
+      {
+        "range": [
+          12,
+          14
+        ],
+        "slotId": "rightArm"
+      },
+      {
+        "range": [
+          15,
+          17
+        ],
+        "slotId": "leftLeg"
+      },
+      {
+        "range": [
+          18,
+          20
+        ],
+        "slotId": "rightLeg"
       }
-    }
+    ]
   },
   "robobrain": {
     "slots": [
-      "leftArm",
-      "head",
-      "rightArm",
-      "body",
-      "chassis"
+      {
+        "id": "leftArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "rightArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "body",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "chassis",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "head": "robot_head_robobrain",
@@ -41,26 +154,94 @@
       "chassis": "robot_legs_robobrain_treads"
     },
     "defaultPlating": {},
-    "slotCapabilities": {
-      "leftArm": {
-        "canEquipWeapon": true
+    "hitTable": [
+      {
+        "range": [
+          1,
+          2
+        ],
+        "slotId": "head"
       },
-      "rightArm": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          3,
+          8
+        ],
+        "slotId": "body"
       },
-      "head": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          9,
+          11
+        ],
+        "slotId": "leftArm"
+      },
+      {
+        "range": [
+          12,
+          14
+        ],
+        "slotId": "rightArm"
+      },
+      {
+        "range": [
+          15,
+          20
+        ],
+        "slotId": "chassis"
       }
-    }
+    ]
   },
   "misterHandy": {
     "slots": [
-      "head",
-      "body",
-      "arm1",
-      "arm2",
-      "arm3",
-      "thruster"
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "body",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "arm1",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "arm2",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "arm3",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "thruster",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "head": "robot_head_mister_handy_eye_stalk",
@@ -71,26 +252,101 @@
       "thruster": "robot_legs_mister_handy_thruster"
     },
     "defaultPlating": {},
-    "slotCapabilities": {
-      "arm1": {
-        "canEquipWeapon": true
+    "hitTable": [
+      {
+        "range": [
+          1,
+          2
+        ],
+        "slotId": "head"
       },
-      "arm2": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          3,
+          4
+        ],
+        "slotId": "body"
       },
-      "arm3": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          5,
+          8
+        ],
+        "slotId": "arm1"
+      },
+      {
+        "range": [
+          9,
+          12
+        ],
+        "slotId": "arm2"
+      },
+      {
+        "range": [
+          13,
+          16
+        ],
+        "slotId": "arm3"
+      },
+      {
+        "range": [
+          17,
+          20
+        ],
+        "slotId": "thruster"
       }
-    }
+    ]
   },
   "protectron": {
     "slots": [
-      "leftArm",
-      "head",
-      "rightArm",
-      "leftLeg",
-      "body",
-      "rightLeg"
+      {
+        "id": "leftArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "rightArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "leftLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "body",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "rightLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "leftArm": "robot_arm_protectron",
@@ -101,22 +357,93 @@
       "rightLeg": "robot_legs_protectron"
     },
     "defaultPlating": {},
-    "slotCapabilities": {
-      "leftArm": {
-        "canEquipWeapon": true
+    "hitTable": [
+      {
+        "range": [
+          1,
+          3
+        ],
+        "slotId": "head"
       },
-      "rightArm": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          4,
+          7
+        ],
+        "slotId": "leftArm"
+      },
+      {
+        "range": [
+          8,
+          11
+        ],
+        "slotId": "rightArm"
+      },
+      {
+        "range": [
+          12,
+          15
+        ],
+        "slotId": "body"
+      },
+      {
+        "range": [
+          16,
+          18
+        ],
+        "slotId": "leftLeg"
+      },
+      {
+        "range": [
+          19,
+          20
+        ],
+        "slotId": "rightLeg"
       }
-    }
+    ]
   },
   "securitron": {
     "slots": [
-      "head",
-      "leftArm",
-      "body",
-      "rightArm",
-      "wheel"
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "leftArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "body",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "rightArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "wheel",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "head": "robot_head_securitron",
@@ -126,14 +453,6 @@
       "wheel": "robot_legs_securitron"
     },
     "defaultPlating": {},
-    "slotCapabilities": {
-      "leftArm": {
-        "canEquipWeapon": true
-      },
-      "rightArm": {
-        "canEquipWeapon": true
-      }
-    },
     "layout": [
       [
         "head"
@@ -147,22 +466,94 @@
         "wheel"
       ]
     ],
-    "hitLocations": {
-      "head": "1-2",
-      "body": "3-11",
-      "leftArm": "12-14",
-      "rightArm": "15-17",
-      "wheel": "18-20"
-    }
+    "hitTable": [
+      {
+        "range": [
+          1,
+          2
+        ],
+        "slotId": "head"
+      },
+      {
+        "range": [
+          3,
+          11
+        ],
+        "slotId": "body"
+      },
+      {
+        "range": [
+          12,
+          14
+        ],
+        "slotId": "leftArm"
+      },
+      {
+        "range": [
+          15,
+          17
+        ],
+        "slotId": "rightArm"
+      },
+      {
+        "range": [
+          18,
+          20
+        ],
+        "slotId": "wheel"
+      }
+    ]
   },
   "assaultron": {
     "slots": [
-      "leftArm",
-      "head",
-      "rightArm",
-      "leftLeg",
-      "body",
-      "rightLeg"
+      {
+        "id": "leftArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "rightArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "leftLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "body",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "rightLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "leftArm": "robot_arm_assaultron",
@@ -173,26 +564,101 @@
       "rightLeg": "robot_legs_assaultron"
     },
     "defaultPlating": {},
-    "slotCapabilities": {
-      "leftArm": {
-        "canEquipWeapon": true
+    "hitTable": [
+      {
+        "range": [
+          1,
+          2
+        ],
+        "slotId": "head"
       },
-      "rightArm": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          3,
+          8
+        ],
+        "slotId": "body"
       },
-      "head": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          9,
+          11
+        ],
+        "slotId": "leftArm"
+      },
+      {
+        "range": [
+          12,
+          14
+        ],
+        "slotId": "rightArm"
+      },
+      {
+        "range": [
+          15,
+          17
+        ],
+        "slotId": "leftLeg"
+      },
+      {
+        "range": [
+          18,
+          20
+        ],
+        "slotId": "rightLeg"
       }
-    }
+    ]
   },
   "sentryBot": {
     "slots": [
-      "leftArm",
-      "head",
-      "rightArm",
-      "leftLeg",
-      "body",
-      "rightLeg"
+      {
+        "id": "leftArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "head",
+        "accepts": [
+          "head"
+        ],
+        "capacity": 1,
+        "swappable": false
+      },
+      {
+        "id": "rightArm",
+        "accepts": [
+          "arm"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "leftLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "body",
+        "accepts": [
+          "body"
+        ],
+        "capacity": 1,
+        "swappable": true
+      },
+      {
+        "id": "rightLeg",
+        "accepts": [
+          "mover"
+        ],
+        "capacity": 1,
+        "swappable": true
+      }
     ],
     "defaults": {
       "leftArm": "robot_arm_sentry_bot",
@@ -203,13 +669,49 @@
       "rightLeg": "robot_legs_sentry_bot"
     },
     "defaultPlating": {},
-    "slotCapabilities": {
-      "leftArm": {
-        "canEquipWeapon": true
+    "hitTable": [
+      {
+        "range": [
+          1,
+          2
+        ],
+        "slotId": "head"
       },
-      "rightArm": {
-        "canEquipWeapon": true
+      {
+        "range": [
+          3,
+          8
+        ],
+        "slotId": "body"
+      },
+      {
+        "range": [
+          9,
+          11
+        ],
+        "slotId": "leftArm"
+      },
+      {
+        "range": [
+          12,
+          14
+        ],
+        "slotId": "rightArm"
+      },
+      {
+        "range": [
+          15,
+          17
+        ],
+        "slotId": "leftLeg"
+      },
+      {
+        "range": [
+          18,
+          20
+        ],
+        "slotId": "rightLeg"
       }
-    }
+    ]
   }
 }

@@ -86,14 +86,17 @@ export const restoreItem = (instance, resolve) => {
   return { ...instance, ...resolved };
 };
 
+import { deserializeSlot, isSlimSlot, serializeSlot } from './robotSlots';
+
 const mapArray = (arr, fn) => (Array.isArray(arr) ? arr.map(fn) : arr);
 
 /**
  * Обход всех контейнеров предметов в data + применение fn к каждому инстансу.
  * Контейнеры: equipment.items, equippedWeapons, equippedArmor.*.{armor,clothing},
- * equippedPowerArmor.{frame,pieces.*}, equippedRobotSlots.*.heldWeapon.
- * Слои роботов (limb/armor/plating/frame) на этом шаге НЕ трогаются — их
- * восстановление требует отдельной проверки каталога робочастей (см. доки).
+ * equippedPowerArmor.{frame,pieces.*}, equippedRobotSlots.*.{heldWeapon,limb,
+ * armor,plating,frame}.
+ * Слоты робота в худой форме (content/armorLayers/heldWeaponId) разворачиваются
+ * в объекты, после чего их содержимое восстанавливается каталогом как обычно.
  */
 const mapItemContainers = (data, fn) => {
   if (!data || typeof data !== 'object') return data;
@@ -138,13 +141,19 @@ const mapItemContainers = (data, fn) => {
     next.equippedPowerArmor = pa;
   }
 
-  // equippedRobotSlots — ужимаем только heldWeapon (оружие в «руке»)
+  // equippedRobotSlots — худая форма (id + моды) разворачивается обратно в
+  // объекты, после чего предметы (конечность, слои защиты, оружие в ладони)
+  // обогащаются каталогом как обычно.
   if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
     const slots = next.equippedRobotSlots;
     const out = {};
     for (const [k, slot] of Object.entries(slots)) {
       if (!slot || typeof slot !== 'object') { out[k] = slot; continue; }
-      const s = { ...slot };
+      const s = isSlimSlot(slot) ? deserializeSlot(slot) : { ...slot };
+      if (s.limb) s.limb = fn(s.limb);
+      if (s.armor) s.armor = fn(s.armor);
+      if (s.plating) s.plating = fn(s.plating);
+      if (s.frame) s.frame = fn(s.frame);
       if (s.heldWeapon) s.heldWeapon = fn(s.heldWeapon);
       out[k] = s;
     }
@@ -155,6 +164,27 @@ const mapItemContainers = (data, fn) => {
 };
 
 /**
+ * Слоты робота → худая форма (только id и моды).
+ *
+ * Отдельно от mapItemContainers: здесь меняется сама структура слота, а не
+ * начинка предметов. На импорте это разворачивается в mapItemContainers.
+ *
+ * @param {object} data
+ * @returns {object}
+ */
+export const slimRobotSlots = (data) => {
+  if (!data || typeof data !== 'object' || !data.equippedRobotSlots
+      || typeof data.equippedRobotSlots !== 'object') {
+    return data;
+  }
+  const out = {};
+  for (const [key, slot] of Object.entries(data.equippedRobotSlots)) {
+    out[key] = slot && typeof slot === 'object' ? serializeSlot(slot) : slot;
+  }
+  return { ...data, equippedRobotSlots: out };
+};
+
+/**
  * Ужать тело сейва на экспорте.
  * @param {object} data      — character.data (или уже сериализованный объект).
  * @param {object} deps      — { getEntry(id, itemType): catalogEntry|null }.
@@ -162,12 +192,15 @@ const mapItemContainers = (data, fn) => {
  */
 export const slimSaveData = (data, { getEntry } = {}) => {
   const lookup = typeof getEntry === 'function' ? getEntry : () => null;
-  return mapItemContainers(data, (item) => {
+  const slimmed = mapItemContainers(data, (item) => {
     if (!item || typeof item !== 'object') return item;
     const id = item.weaponId || item.id;
     const entry = id ? lookup(id, item.itemType) : null;
     return slimItem(item, entry);
   });
+  // Слоты робота ужимаются последними: предметы внутри них уже приведены к
+  // ссылкам, поэтому от оружия в ладони остаётся id да список модов.
+  return slimRobotSlots(slimmed);
 };
 
 /**

@@ -18,7 +18,8 @@
         "qualityId": "quality_close_quarters"
       }
     ],
-    "effects": []
+    "effects": [],
+    "handheld": true
   },
   {
     "id": "robot_weapon_protectron_manipulator",
@@ -39,7 +40,8 @@
         "qualityId": "quality_close_quarters"
       }
     ],
-    "effects": []
+    "effects": [],
+    "handheld": true
   },
   {
     "id": "robot_weapon_flamethrower",
@@ -67,7 +69,8 @@
       {
         "effectId": "effect_spread"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_circular_saw",
@@ -100,7 +103,8 @@
       {
         "effectId": "effect_piercing_x"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_laser_cutter",
@@ -125,7 +129,8 @@
       {
         "effectId": "effect_piercing_x"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_auto_10mm",
@@ -154,7 +159,8 @@
       {
         "effectId": "effect_burst"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_cryojet",
@@ -188,7 +194,8 @@
       {
         "effectId": "effect_freeze"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_shocker_arms",
@@ -215,7 +222,8 @@
       {
         "effectId": "effect_stun"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_self_destruct",
@@ -238,7 +246,8 @@
         "qualityId": "quality_blast"
       }
     ],
-    "effects": []
+    "effects": [],
+    "handheld": false
   },
   {
     "id": "robot_weapon_construction_claw",
@@ -267,7 +276,8 @@
       {
         "effectId": "effect_breaking"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_drill",
@@ -299,7 +309,8 @@
       {
         "effectId": "effect_vicious"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_vice_grip",
@@ -331,7 +342,8 @@
       {
         "effectId": "effect_breaking"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_mod_shock",
@@ -357,7 +369,8 @@
       {
         "effectId": "effect_stun"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_mod_stun",
@@ -383,7 +396,8 @@
       {
         "effectId": "effect_stun"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_assaultron_head_laser",
@@ -398,7 +412,6 @@
     "weight": 8,
     "cost": 115,
     "rarity": 4,
-    "builtinToHead": "robot_head_assaultron_laser",
     "installComplexity": null,
     "installPerksRequired": null,
     "installSkill": null,
@@ -414,7 +427,8 @@
       {
         "effectId": "effect_piercing_x"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_mesmetron",
@@ -429,7 +443,6 @@
     "weight": 2,
     "cost": 120,
     "rarity": 4,
-    "builtinToHead": true,
     "installComplexity": null,
     "installPerksRequired": null,
     "installSkill": null,
@@ -439,7 +452,8 @@
       {
         "effectId": "effect_stun"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_claw",
@@ -462,7 +476,8 @@
         "qualityId": "quality_close_quarters"
       }
     ],
-    "effects": []
+    "effects": [],
+    "handheld": false
   },
   {
     "id": "robot_weapon_tesla_arm",
@@ -479,18 +494,13 @@
     "cost": 0,
     "rarity": 0,
     "ammoId": "ammo_fusion_core",
-    "installComplexity": 4,
-    "installPerksRequired": [
-      "Robotics Expert 1",
-      "Science! 1"
-    ],
-    "installSkill": "Science",
     "qualities": [],
     "effects": [
       {
         "effectId": "effect_burst"
       }
-    ]
+    ],
+    "handheld": false
   },
   {
     "id": "robot_weapon_smoke_claws",
@@ -505,7 +515,6 @@
     "weight": 0,
     "cost": 0,
     "rarity": 0,
-    "builtinToArm": "robot_arm_robobrain",
     "installComplexity": null,
     "installPerksRequired": null,
     "installSkill": null,
@@ -522,6 +531,7 @@
       {
         "effectId": "effect_persistent"
       }
-    ]
+    ],
+    "handheld": false
   }
 ]

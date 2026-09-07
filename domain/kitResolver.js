@@ -222,8 +222,10 @@ export async function resolveWeaponItem(item) {
     // baseName только у вариантов: у обычного оружия имя — из каталога.
     baseName: trueItemId ? baseName : undefined,
     _weapon: weaponData,
-    builtinToHead: item.builtinToHead ?? weaponData.builtinToHead,
-    builtinToArm: item.builtinToArm ?? weaponData.builtinToArm,
+    // Куда оружие устанавливается, а не что оно такое: объявляет комплект
+    // (installTo: 'arm' | 'head'). Из каталога оружия это больше не приходит —
+    // свою встроенную атаку конечность объявляет сама (builtinWeaponId).
+    installTo: item.installTo ?? null,
     _mods: mods,
     appliedMods,
     displayName,

@@ -34,7 +34,7 @@
         "itemType": "weapon",
         "weight": 0,
         "slot": "left",
-        "builtinToArm": true,
+        "installTo": "arm",
         "requiresWeaponId": "robot_arm_securitron",
         "modIds": [
           "mod_053"
@@ -55,7 +55,7 @@
         "itemType": "weapon",
         "weight": 0,
         "slot": "right",
-        "builtinToArm": true,
+        "installTo": "arm",
         "requiresWeaponId": "robot_arm_securitron",
         "ammo": {
           "ammoId": "ammo_45",

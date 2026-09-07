@@ -1,5 +1,19 @@
-import { getBodyPlan, createSlotsFromBodyPlan, getDefaultLimbs, getDefaultPlating } from './bodyplan';
+import {
+  getBodyPlan,
+  getBodyPlanSlotIds,
+  createSlotsFromBodyPlan,
+  getDefaultLimbs,
+  getDefaultPlating,
+} from './bodyplan';
 import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
+import {
+  collectAttacks,
+  slotsForLimbType,
+  slotAcceptsArmor,
+  canEquip,
+  getSlotDef,
+  slotForDirection,
+} from './robotSlots';
 
 // domain/robotEquip.js
 // Pure functions for robot equipment logic — IRON RULES (see docs/robot-rules.md).
@@ -30,7 +44,9 @@ import { applyWeaponMods as applyWeaponModsPipeline } from './enrichItem';
 
 export function getRobotSlotKeys(bodyPlan) {
   const plan = getBodyPlan(bodyPlan) || getBodyPlan('humanoid');
-  return Array.isArray(plan?.slots) ? [...plan.slots] : [];
+  // Слоты в данных — объекты { id, accepts, capacity, swappable }; имена
+  // достаём через getBodyPlanSlotIds, который понимает и старые строки.
+  return getBodyPlanSlotIds(plan);
 }
 
 export function createEmptyRobotSlots(bodyPlan) {
@@ -65,15 +81,6 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
     pushWeapon(byId ? { ...byId } : { id: limb.builtinWeaponId });
   }
 
-  // Reverse lookup: weapon.builtinToHead == limb.id (e.g. assaultron head laser)
-  if (limb.id) {
-    for (const w of catalog) {
-      if (w.builtinToHead === limb.id) {
-        pushWeapon(w);
-      }
-    }
-  }
-
   if (normalized.length === 0 && limb.builtinManipulator) {
     pushWeapon({ ...limb, isManipulator: true });
   }
@@ -82,11 +89,8 @@ function normalizeBuiltinWeapons(limb, weaponsCatalog = []) {
 }
 
 export function getSlotForDirection(bodyPlan, direction) {
-  const slotKeys = getRobotSlotKeys(bodyPlan);
-  if (direction === 'left') return slotKeys.find((k) => k === 'leftArm' || k === 'arm1') ?? null;
-  if (direction === 'right') return slotKeys.find((k) => k === 'rightArm' || k === 'arm2') ?? null;
-  if (direction === 'center') return slotKeys.find((k) => k === 'arm3') ?? null;
-  return null;
+  // Сторона — это порядок слота нужного типа, а не его имя.
+  return slotForDirection(bodyPlan, direction, 'arm');
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +103,9 @@ export function getSlotForDirection(bodyPlan, direction) {
  * in a slot. Resolves `builtinWeaponId` against `weaponsCatalog` so that
  * `getBuiltinWeaponsFromSlots` can produce attack cards.
  *
- * @param {object} armEntry        - entry from modules/fallout/data/equipment/robot/robotarms.json (optionally merged with i18n)
+ * @param {object} armEntry        - запись конечности из единого каталога
+ *                                  (modules/fallout/data/equipment/robot/limbs.json,
+ *                                  возможно объединённая с локализацией)
  * @param {object[]} weaponsCatalog - entries from modules/fallout/data/equipment/robot/weapons.json (optionally merged with i18n)
  * @returns {object} normalized limb object
  */
@@ -156,6 +162,39 @@ const applyWeaponMods = (weapon, mods = []) => {
  * @param {object} robotCatalog - { heads, bodies, arms, legs } arrays of limb catalog entries
  * @returns {{ slots: object, weapons: object[], modules: object[], inventoryItems: object[] }}
  */
+/**
+ * Слоты, куда можно положить защитный слой, — по НОВОЙ модели:
+ * тип конечности берётся из данных (limbType), кандидаты — из плана тела,
+ * а решение «принимает ли слой» отдаётся canEquip.
+ *
+ * @param {object} args — { slots, slotKeys, bodyPlan, armorData }
+ * @returns {string[]} — ключи слотов в порядке плана тела
+ */
+function armorSlotsByLimbType({ slots, slotKeys, bodyPlan, armorData }) {
+  const limbType = armorData?.limbType ?? null;
+  if (!limbType) return [];
+
+  return slotsForLimbType(bodyPlan, limbType)
+    .filter((key) => slotKeys.includes(key) && slots[key])
+    .filter((key) => {
+      // На этапе раскладки комплекта конечности ещё не проставлены —
+      // они заполняются автозаполнением ниже, после цикла по предметам.
+      // Поэтому пустой слот подходящего типа защиту принимает.
+      if (!slots[key].limb) return true;
+      return canEquip(slots[key], armorData, { bodyPlan, slotId: key }).allowed;
+    });
+}
+
+// Как комплекты называют конечности: kitResolver отдаёт запись кита, где тип
+// назван по-старому. Единый каталог конечностей пишет limbType.
+const LIMB_TYPE_BY_KIT_ITEM_TYPE = Object.freeze({
+  robotArm: 'arm',
+  robotHead: 'head',
+  robotBody: 'body',
+  robotLeg: 'mover',
+  robotLegs: 'mover',
+});
+
 export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {}) {
   const slots = createEmptyRobotSlots(bodyPlan);
   const slotKeys = getRobotSlotKeys(bodyPlan);
@@ -164,10 +203,12 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
   const pendingHeadBuiltinWeapons = [];
   const pendingArmBuiltinWeapons = [];
 
-  const armSlotKeys = slotKeys.filter((key) => key.toLowerCase().includes('arm'));
-
-  // Lookup helpers for robotarms catalog and weapons catalog
-  const armscatalog = Array.isArray(robotCatalog.arms) ? robotCatalog.arms : [];
+  // Единый каталог конечностей: обычные конечности и конечности-оружие.
+  // Старых robotarms/robotheads/robotlegs здесь больше нет — источник один.
+  const limbsCatalog = [
+    ...(Array.isArray(robotCatalog.limbs) ? robotCatalog.limbs : []),
+    ...(Array.isArray(robotCatalog.weaponAsLimb) ? robotCatalog.weaponAsLimb : []),
+  ];
   const weaponsCatalog = Array.isArray(robotCatalog.weapons) ? robotCatalog.weapons : [];
 
   // Resolve a weapon's stats from weapons catalog by id
@@ -176,19 +217,20 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     return weaponsCatalog.find((w) => w.id === weaponId) || null;
   };
 
-  // Resolve arm entry from robotarms catalog by id
-  const resolveArmEntry = (id) => {
+  // Конечность из единого каталога по id
+  const resolveLimbEntry = (id) => {
     if (!id) return null;
-    return armscatalog.find((a) => a.id === id) || null;
+    return limbsCatalog.find((l) => l.id === id) || null;
   };
 
-  // Find a free compatible slot for an arm entry
-  const findFreeCompatibleSlot = (armEntry) => {
-    const compatible = Array.isArray(armEntry?.compatibleSlots) ? armEntry.compatibleSlots : armSlotKeys;
-    return compatible.find((s) => slotKeys.includes(s) && slots[s]?.limb === null) || null;
+  // Свободный слот под конечность: их даёт план тела по типу конечности,
+  // а не список совместимых слотов внутри самой конечности.
+  const findFreeSlotForLimb = (limbEntry) => {
+    const candidates = limbEntry?.limbType ? slotsForLimbType(bodyPlan, limbEntry.limbType) : [];
+    return candidates.find((s) => slotKeys.includes(s) && slots[s]?.limb === null) || null;
   };
 
-  // Build a limb object from a robotarms entry + its weapon stats
+  // Build a limb object from a limb entry + its weapon stats
   const buildLimbFromArmEntry = (armEntry) => buildArmLimb(armEntry, weaponsCatalog);
 
   const buildBuiltinWeapons = (weaponData) => {
@@ -210,35 +252,35 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     const itype = item.itemType;
 
     // Конечности
-    if (['robotArm', 'robotHead', 'robotBody', 'robotLeg', 'robotLegs'].includes(itype)) {
+    // Конечность узнаётся по категории из данных (itemCategory); тип конечности
+    // — limbType. limbType один есть и у защиты (обшивка для рук), поэтому по
+    // нему одному конечность не определить.
+    // У предметов комплекта категории нет: kitResolver отдаёт запись кита, где
+    // конечность названа по-старому (robotArm, robotHead, ...).
+    const isLimb = item.itemCategory === 'limb' || item.itemCategory === 'weaponAsLimb';
+    const limbType = isLimb || LIMB_TYPE_BY_KIT_ITEM_TYPE[itype]
+      ? (item.limbType ?? LIMB_TYPE_BY_KIT_ITEM_TYPE[itype] ?? null)
+      : null;
+
+    if (limbType) {
       let targetKey = null;
 
-      if (itype === 'robotHead') {
-        targetKey = 'head';
-      } else if (itype === 'robotBody') {
-        targetKey = 'body';
-      } else if (itype === 'robotLeg' || itype === 'robotLegs') {
-        targetKey = slotKeys.find(k =>
-          k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel'
-        );
-      } else if (itype === 'robotArm') {
-        // Просто: left/right или первый свободный
-        if (item.slot === 'left') {
-          targetKey = slotKeys.find(k => k === 'leftArm' || k === 'arm1');
-        } else if (item.slot === 'right') {
-          targetKey = slotKeys.find(k => k === 'rightArm' || k === 'arm2');
-        } else {
-          targetKey = slotKeys.find(k =>
-            k.toLowerCase().includes('arm') && slots[k].limb === null
-          );
-        }
+      // Слот ищется по типу конечности из плана тела, а не по имени.
+      if (limbType === 'arm') {
+        // Сторона — порядок слота; без стороны — первый свободный.
+        const armSlots = slotsForLimbType(bodyPlan, 'arm');
+        if (item.slot === 'left') targetKey = armSlots[0] ?? null;
+        else if (item.slot === 'right') targetKey = armSlots[1] ?? null;
+        else targetKey = armSlots.find((k) => slots[k].limb === null) ?? null;
+      } else {
+        targetKey = slotsForLimbType(bodyPlan, limbType)[0] ?? null;
       }
 
       if (targetKey && slots[targetKey] !== undefined) {
-        if (itype === 'robotArm') {
+        if (limbType === 'arm') {
           // Build the limb so that builtinWeaponId is resolved into builtinWeapons.
           // Preserve any kit-level overrides (e.g. slot, name) that came on `item`.
-          const armEntry = resolveArmEntry(item.id) || item;
+          const armEntry = resolveLimbEntry(item.id) || item;
           const limbFromArm = buildLimbFromArmEntry(armEntry);
           const normalizedBuiltin = normalizeBuiltinWeapons({ ...limbFromArm, ...item }, weaponsCatalog);
           slots[targetKey].limb = {
@@ -262,8 +304,10 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     if (itype === 'weapon') {
       const weaponData = item._weapon ?? item;
       const weaponId = weaponData.id || item.weaponId;
-      // Resolve from catalog to pick up flags like builtinToHead that live only in catalog data
       const resolvedWeapon = weaponId ? resolveWeaponStats(weaponId) : null;
+      // Куда оружие устанавливается — говорит комплект (kitResolver кладёт в
+      // installTo). Без пометки оружие просто носят в ладони.
+      const installTo = item.installTo ?? null;
 
       // Нерабочее встроенное оружие (например, ракетница и гранатомёт
       // Секьюритрона до установки ОС Mk II): не занимает слоты и руки,
@@ -278,7 +322,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       // item.slot задаёт сторону: left → leftArm, right → rightArm.
       // Если руки ещё нет (базовая модель ещё не заполнена из defaults), откладываем
       // в pendingArmBuiltinWeapons — после автозаполнения конечностей прикрепим.
-      if (item.builtinToArm || weaponData.builtinToArm || resolvedWeapon?.builtinToArm) {
+      if (installTo === 'arm') {
         const direction = item.slot === 'right' ? 'right' : item.slot === 'left' ? 'left' : null;
         const targetKey = direction ? getSlotForDirection(bodyPlan, direction) : null;
         const base = applyWeaponMods(resolvedWeapon || weaponData, item._mods || []);
@@ -291,7 +335,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
           name: item.displayName || weaponData.name || weaponId,
           baseWeaponName: weaponData.name,
           isBuiltin: true,
-          builtinToArm: true,
+          installTo: 'arm',
           locked: true,
           _sourceSlot: targetKey,
           _sourceItem: item,
@@ -310,14 +354,53 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
       }
 
       // Встроенное оружие в голову
-      if (weaponData.builtinToHead || item.builtinToHead || resolvedWeapon?.builtinToHead) {
+      if (installTo === 'head') {
         const weaponStats = resolvedWeapon || resolveWeaponStats(weaponId);
         if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
       }
-      const armEntry = resolveArmEntry(weaponData.id ?? item.weaponId);
-      if (armEntry) {
-        const targetKey = findFreeCompatibleSlot(armEntry);
+      // Навес (arm attachment): оружие крепится К руке, а не вместо неё.
+      // Рука уже стоит — занимаем её ладонь. Руки нет — ставим стандартную
+      // руку плана тела (у каждого робота своя), навес — уже в неё. Получить
+      // навес без руки нельзя: если и стандартную руку поставить некуда —
+      // предмет уходит в инвентарь.
+      const attachmentEntry = (robotCatalog.weaponAsLimb || []).find(
+        (entry) => entry.id === (weaponData.id ?? item.weaponId)
+      );
+      if (attachmentEntry) {
+        const armKeys = slotKeys.filter((k) => k.toLowerCase().includes('arm'));
+        let targetKey = armKeys.find(
+          (k) => slots[k]?.limb?.canHoldWeapons === true && !slots[k]?.heldWeapon
+        );
+        if (!targetKey) {
+          const emptyKey = armKeys.find((k) => slots[k]?.limb == null);
+          const planDefaults = getDefaultLimbs(getBodyPlan(bodyPlan)?.id ?? bodyPlan);
+          const defaultArmId = emptyKey ? planDefaults[emptyKey] : null;
+          const defaultEntry = defaultArmId
+            ? (robotCatalog.limbs || []).find((l) => l.id === defaultArmId)
+            : null;
+          if (emptyKey && defaultEntry) {
+            slots[emptyKey] = {
+              ...slots[emptyKey],
+              limb: buildLimbFromArmEntry(defaultEntry),
+            };
+            targetKey = emptyKey;
+          }
+        }
+        if (targetKey && slots[targetKey] !== undefined) {
+          slots[targetKey].heldWeapon = {
+            ...(resolveWeaponStats(attachmentEntry.id) ?? weaponData),
+            itemType: 'weapon',
+          };
+        } else {
+          inventoryItems.push(item);
+        }
+        continue;
+      }
+
+      const armEntry = resolveLimbEntry(weaponData.id ?? item.weaponId);
+      if (armEntry && armEntry.itemCategory !== 'weaponAsLimb') {
+        const targetKey = findFreeSlotForLimb(armEntry);
         if (targetKey && slots[targetKey] !== undefined) {
           const limbFromArm = buildLimbFromArmEntry(armEntry);
           slots[targetKey].limb = {
@@ -329,26 +412,9 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         }
       }
 
-      // Fallback: robot weapon as limb even without explicit arms catalog entry.
-      if (String(weaponData.id || item.weaponId || '').startsWith('robot_weapon_')) {
-        const preferred = item.limbSlot;
-        const targetKey = (preferred && slotKeys.includes(preferred) && slots[preferred]?.limb == null)
-          ? preferred
-          : slotKeys.find((k) => k.toLowerCase().includes('arm') && slots[k]?.limb == null);
-        if (targetKey && slots[targetKey] !== undefined) {
-          slots[targetKey].limb = {
-            ...weaponData,
-            itemType: 'robotArm',
-            canHoldWeapons: false,
-            weaponSlots: 0,
-            builtinWeapons: buildBuiltinWeapons(weaponData).map((w) => ({ ...w, isBuiltin: true })),
-          };
-          slots[targetKey].heldWeapon = null;
-          continue;
-        }
-      }
-
-      // Иначе как обычное оружие в руке.
+      // Иначе как обычное оружие в руке. Ветку «робо-оружие вместо конечности»
+      // сняли: навесы крепятся к руке выше, прочее робо-оружие (лазер, кувалда
+      // робомозга) встаёт в ладонь как любое другое.
       const targetKey = slotKeys.find((k) =>
         k.toLowerCase().includes('arm') && slots[k].limb?.canHoldWeapons && slots[k].heldWeapon == null
       );
@@ -363,42 +429,30 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     // у протектрона/штурмотрона — ноги, у секьюритрона — колесо. Это не фолбэк, а маппинг типов шасси.
     if (['plating', 'armor', 'frame', 'robotArmor', 'robotFrame'].includes(itype)) {
       const armorData = item._armor ?? item;
-      const location = armorData.robotLocation ?? item.robotLocation;
       const layer = armorData.layer ?? itype;
 
-      // Определяем, какие слоты подходят для этой локации
-      const isMatchingSlot = (slotKey) => {
-        if (location === 'Main Body' && slotKey === 'body') return true;
-        if (location === 'Optics' && slotKey === 'head') return true;
-        if (location === 'Arms' && slotKey.toLowerCase().includes('arm')) return true;
-        if ((location === 'Legs' || location === 'Wheel') && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
-        if (location === 'Thruster' && (slotKey.toLowerCase().includes('leg') || slotKey === 'chassis' || slotKey === 'thruster' || slotKey === 'wheel')) return true;
-        // Точные совпадения для новых per-slot локаций (если появятся leftArm/rightArm и т.д.)
-        if (location === slotKey) return true;
-        if (location === 'Head' && slotKey === 'head') return true;
-        if (location === 'Left Arm' && slotKey === 'leftArm') return true;
-        if (location === 'Right Arm' && slotKey === 'rightArm') return true;
-        if (location === 'Left Leg' && slotKey === 'leftLeg') return true;
-        if (location === 'Right Leg' && slotKey === 'rightLeg') return true;
-        return false;
-      };
+      // Слот ищется по ТИПУ конечности из данных плана тела, а не по
+      // строковому совпадению имени слота с локацией. Оружие вместо руки
+      // защиту не принимает, пустой слот — тоже.
+      const matchingSlotKeys = armorSlotsByLimbType({ slots, slotKeys, bodyPlan, armorData });
 
       // 1 предмет = 1 слот: ищем первый подходящий слот, где слой свободен
       // Если указан конкретный слот в item.slot — используем его
       let targetSlot = null;
-      if (item.slot && slotKeys.includes(item.slot) && isMatchingSlot(item.slot)) {
+      if (item.slot && matchingSlotKeys.includes(item.slot)) {
         targetSlot = item.slot;
       } else {
-        // Ищем первый свободный слот из подходящих
-        targetSlot = slotKeys.find((k) => isMatchingSlot(k) && slots[k][layer] == null) || null;
-        // Если все подходящие слоты заняты — заменяем первый подходящий (для frame/plating, которые конфликтуют)
-        if (!targetSlot) {
-          targetSlot = slotKeys.find((k) => isMatchingSlot(k)) || null;
-        }
+        // Ищем первый свободный слот из подходящих. Свободного слота нет —
+        // предмет уходит в инвентарь, а не стирает уже надетую защиту.
+        targetSlot = matchingSlotKeys.find((k) => slots[k][layer] == null) || null;
       }
 
       if (targetSlot && slots[targetSlot] !== undefined) {
         slots[targetSlot][layer] = armorData;
+      } else {
+        // Слотов, принимающих эту защиту, нет (например, все руки — оружие
+        // вместо конечностей). Предмет не пропадает: он уходит в инвентарь.
+        inventoryItems.push(item);
       }
       continue;
     }
@@ -417,59 +471,57 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
 
   // Автозаполнение недостающих конечностей — строго из данных bodyPlan.defaults, без фолбэков
   // 1 предмет = 1 слот: каждый слот заполняется своей конечностью из defaults[slotKey]
-  const { heads = [], bodies = [], arms = [], legs = [] } = robotCatalog;
   const planDefaults = getDefaultLimbs(bodyPlan);
-  const defaultHead = heads.find((h) => h.id === planDefaults.head)
-    || heads.find((h) => h.defaultForBodyPlan === bodyPlan);
-  const defaultBody = bodies.find((b) => b.id === planDefaults.body)
-    || bodies.find((b) => b.robotBodyPlan === bodyPlan);
-  const defaultLeg = legs.find((l) => l.id === planDefaults.legs || l.id === planDefaults.leg)
-    || legs.find((l) => l.compatibleBodyPlans?.includes(bodyPlan) || l.defaultForBodyPlan === bodyPlan);
+
+  const limbById = (id) => (id ? limbsCatalog.find((l) => l.id === id) || null : null);
+
+  // Конечность «по умолчанию для этого плана тела»: пометка в данных самой
+  // конечности (defaultForBodyPlan / robotBodyPlan / compatibleBodyPlans).
+  const limbDefaultForPlan = (limbType) => limbsCatalog.find((l) => l.limbType === limbType && (
+    l.defaultForBodyPlan === bodyPlan
+    || l.robotBodyPlan === bodyPlan
+    || (Array.isArray(l.compatibleBodyPlans) && l.compatibleBodyPlans.includes(bodyPlan))
+  )) || null;
+
+  const defaultByType = {
+    head: limbById(planDefaults.head) || limbDefaultForPlan('head'),
+    body: limbById(planDefaults.body) || limbDefaultForPlan('body'),
+    mover: limbById(planDefaults.legs || planDefaults.leg) || limbDefaultForPlan('mover'),
+  };
 
   for (const k of slotKeys) {
     if (slots[k].limb !== null) continue;
 
-    // Проверяем конкретный слот в defaults (например, leftArm, rightLeg и т.д.)
-    const specificDefaultId = planDefaults[k];
-    if (specificDefaultId) {
-      // Ищем в соответствующем каталоге по ID
-      let specificLimb = null;
-      if (k === 'head') {
-        specificLimb = heads.find((h) => h.id === specificDefaultId);
-      } else if (k === 'body') {
-        specificLimb = bodies.find((b) => b.id === specificDefaultId);
-      } else if (k.toLowerCase().includes('arm')) {
-        specificLimb = arms.find((a) => a.id === specificDefaultId);
-      } else if (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') {
-        specificLimb = legs.find((l) => l.id === specificDefaultId);
+    // Типы, которые принимает слот, — из плана тела: thruster, chassis и
+    // колесо попадают сюда сами, без перечисления имён слотов в коде.
+    const acceptedTypes = getSlotDef(bodyPlan, k)?.accepts ?? [];
+
+    const placeLimb = (limbEntry) => {
+      if (limbEntry.limbType === 'arm') {
+        const limbFromArm = buildLimbFromArmEntry(limbEntry);
+        const builtinWeapons = normalizeBuiltinWeapons(limbFromArm, weaponsCatalog);
+        slots[k].limb = builtinWeapons.length > 0 ? { ...limbFromArm, builtinWeapons } : limbFromArm;
+        return;
       }
-      if (specificLimb) {
-        if (k.toLowerCase().includes('arm')) {
-          const limbFromArm = buildLimbFromArmEntry(specificLimb);
-          const builtinWeapons = normalizeBuiltinWeapons(limbFromArm, weaponsCatalog);
-          slots[k].limb = builtinWeapons.length > 0 ? { ...limbFromArm, builtinWeapons } : limbFromArm;
-        } else {
-          const builtinWeapons = normalizeBuiltinWeapons(specificLimb, weaponsCatalog);
-          slots[k].limb = builtinWeapons.length > 0 ? { ...specificLimb, builtinWeapons } : specificLimb;
-        }
-        continue;
-      }
+      const builtinWeapons = normalizeBuiltinWeapons(limbEntry, weaponsCatalog);
+      slots[k].limb = builtinWeapons.length > 0 ? { ...limbEntry, builtinWeapons } : limbEntry;
+    };
+
+    // Конкретный слот в defaults (например, leftArm, rightLeg) — по id
+    const specificLimb = limbById(planDefaults[k]);
+    if (specificLimb && acceptedTypes.includes(specificLimb.limbType)) {
+      placeLimb(specificLimb);
+      continue;
     }
 
-    if (k === 'head' && defaultHead) {
-      const builtinWeapons = normalizeBuiltinWeapons(defaultHead, weaponsCatalog);
-      const headLimb = builtinWeapons.length > 0 ? { ...defaultHead, builtinWeapons } : defaultHead;
-      slots[k].limb = headLimb;
-    } else if (k === 'body' && defaultBody) {
-      slots[k].limb = defaultBody;
-    } else if (
-      (k.toLowerCase().includes('leg') || k === 'chassis' || k === 'thruster' || k === 'wheel') &&
-      defaultLeg
-    ) {
-      slots[k].limb = defaultLeg;
-    }
-    // Для рук, если нет specificDefaultId, но есть default для bodyPlan — не автозаполняем,
-    // так как у разных роботов разное количество рук, и defaults должны быть явными
+    // Иначе — конечность по умолчанию для плана тела подходящего типа.
+    // Для рук fallback не применяем: у разных роботов разное количество рук,
+    // и defaults должны быть явными.
+    const fallback = acceptedTypes
+      .filter((type) => type !== 'arm')
+      .map((type) => defaultByType[type])
+      .find(Boolean) || null;
+    if (fallback) placeLimb(fallback);
   }
 
   // Автозаполнение стандартной обшивки из bodyPlan.defaultPlating — на основании данных, без обогатителя
@@ -496,7 +548,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     }
   }
 
-  // Прикрепляем отложенные builtinToArm оружия после автозаполнения конечностей из defaults
+  // Прикрепляем отложенные установки (installTo) после автозаполнения конечностей из defaults
   // (базовая модель даёт руки, а лазер-ган из кита должен встать в них)
   if (pendingArmBuiltinWeapons.length > 0) {
     for (const builtin of pendingArmBuiltinWeapons) {
@@ -513,7 +565,7 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         }
       } else {
         // Всё ещё нет руки — в инвентарь как fallback
-        inventoryItems.push({ ...(sourceItem || {}), builtinToArm: true, _weapon: builtin });
+        inventoryItems.push({ ...(sourceItem || {}), installTo: 'arm', _weapon: builtin });
       }
     }
   }
@@ -530,6 +582,17 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
     slots.head.limb = { ...headLimb, builtinWeapons: mergedBuiltin };
   }
 
+  // Защита живёт только на настоящей конечности. Проверяем инвариант после
+  // автозаполнения — слот, где осталось оружие вместо руки или нет конечности
+  // вовсе, защиту не держит.
+  for (const key of slotKeys) {
+    const slot = slots[key];
+    if (!slot || slotAcceptsArmor(slot).allowed) continue;
+    slot.plating = null;
+    slot.armor = null;
+    slot.frame = null;
+  }
+
   // Собираем оружия
   const weapons = getBuiltinWeaponsFromSlots(slots);
 
@@ -541,61 +604,18 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds the equippedWeapons array from the current robot slot state.
- * Sources:
- *  - limb.builtinWeapons  → встроенные оружия
- *  - slot.heldWeapon      → оружие в руке
+ * Карточки атак персонажа-робота: встроенные атаки конечностей плюс оружие,
+ * зажатое в ладонях. Единственный источник — состояние слотов; сам список
+ * считает collectAttacks() (domain/robotSlots.js).
+ *
+ * Имя оставлено историческим: на него опираются экраны, стор и сейвы.
  *
  * @param {object} slots - RobotSlotsObject
+ * @param {object} options - { catalog? }
  * @returns {object[]}
  */
-export function getBuiltinWeaponsFromSlots(slots) {
-  if (!slots || typeof slots !== 'object') return [];
-
-  const weapons = [];
-  const seenIds = new Set();
-
-  const pushWeapon = (weapon, slotKey, limb, extra = {}) => {
-    if (!weapon) return;
-    const id = weapon.id;
-    if (id && seenIds.has(id)) return;
-    if (id) seenIds.add(id);
-    weapons.push({
-      ...weapon,
-      sourceSlot: slotKey,
-      sourceLimb: limb?.id,
-      ...extra,
-    });
-  };
-
-  for (const [slotKey, slotData] of Object.entries(slots)) {
-    if (!slotData) continue;
-    const { limb, heldWeapon } = slotData;
-
-    if (heldWeapon) {
-      pushWeapon(heldWeapon, slotKey, limb);
-      // Встроенное оружие конечности (например, манипулятор) остаётся доступным
-      // и когда в руке зажато оружие — карточки не должны исчезать.
-    }
-
-    if (Array.isArray(limb?.builtinWeapons) && limb.builtinWeapons.length > 0) {
-      limb.builtinWeapons.forEach((weapon) => {
-        pushWeapon(weapon, slotKey, limb, { isBuiltin: true, ...(limb._builtinWeapon ?? {}) });
-      });
-      continue;
-    }
-
-    if (limb?.builtinWeaponId) {
-      pushWeapon({ id: limb.builtinWeaponId }, slotKey, limb, { isBuiltin: true });
-      continue;
-    }
-
-    if (limb?.builtinManipulator) {
-      pushWeapon({ id: limb.id }, slotKey, limb, { isManipulator: true, isBuiltin: true });
-    }
-  }
-
-  return weapons;
+export function getBuiltinWeaponsFromSlots(slots, options = {}) {
+  return collectAttacks(slots, options);
 }
 
 // ---------------------------------------------------------------------------
@@ -618,19 +638,9 @@ export function canEquipRobotArmor(armorItem, slotKey, layer, slots) {
     return { allowed: false, reason: 'equip.error.invalidSlot' };
   }
 
-  const incompatible = armorItem?.incompatibleLayers ?? [];
-
-  for (const blockedLayer of incompatible) {
-    if (slotData[blockedLayer] != null) {
-      return {
-        allowed: false,
-        reason: 'equip.error.armorLayerIncompatible',
-      };
-    }
-  }
-
-  // Also check: if the slot already has this layer occupied, it will be replaced (allowed)
-  return { allowed: true, reason: null };
+  // Защиту принимает только слот с настоящей конечностью. Пустой слот и
+  // оружие вместо руки защиты не принимают.
+  return slotAcceptsArmor(slotData, { item: armorItem });
 }
 
 // ---------------------------------------------------------------------------
@@ -652,6 +662,13 @@ export function canReplaceLimb(slotKey, newLimb, character) {
   }
 
   const bodyPlan = character?.origin?.bodyPlan;
+
+  // Съёмность слота задана данными плана тела, а не именем.
+  // Голова не снимается ни у одного плана (решение владельца).
+  const def = getSlotDef(bodyPlan, slotKey);
+  if (def && def.swappable === false) {
+    return { allowed: false, reason: 'equip.error.slotNotSwappable' };
+  }
 
   const compatiblePlans = newLimb.compatibleBodyPlans;
   const defaultPlan = newLimb.defaultForBodyPlan;
@@ -711,12 +728,15 @@ export function applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog = [
     },
   };
 
-  if ((slotKey === 'leftArm' || slotKey === 'rightArm') && slots.leftArm && slots.rightArm) {
-    const siblingKey = slotKey === 'leftArm' ? 'rightArm' : 'leftArm';
-    const oldLimb = slots[slotKey]?.limb;
-    if (oldLimb && slots[siblingKey]?.limb === oldLimb) {
-      updatedSlots[siblingKey] = { ...updatedSlots[siblingKey], limb: null, heldWeapon: null };
-    }
+  // Пар конечностей нет: замена меняет РОВНО ОДИН слот. Сбрасывать соседа
+  // за компанию — значит отбирать у игрока конечность, которую он не трогал
+  // (для Хэнди это была бы потеря arm3).
+
+  // Инвариант: защита живёт только на настоящей конечности. Поставили вместо
+  // руки огнемёт — броня, обшивка и рама снимаются.
+  const target = updatedSlots[slotKey];
+  if (target && !slotAcceptsArmor(target).allowed) {
+    updatedSlots[slotKey] = { ...target, armor: null, plating: null, frame: null };
   }
 
   const weapons = getBuiltinWeaponsFromSlots(updatedSlots);

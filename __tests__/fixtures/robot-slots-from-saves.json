@@ -1,0 +1,530 @@
+{
+  "protectron.head": {
+    "limb": {
+      "id": "robot_head_protectron",
+      "itemType": "robotHead",
+      "physicalDR": 2,
+      "energyDR": 1,
+      "radDR": 0,
+      "name": "Голова Протектрона"
+    },
+    "armor": {
+      "id": "robot_armor_factory_optics",
+      "layer": "armor",
+      "damageResistance": {
+        "physical": 1,
+        "energy": 1
+      },
+      "name": "Заводская броня для головы (оптики)",
+      "itemType": "robotArmor"
+    },
+    "plating": {
+      "id": "robot_plating_primal_optics",
+      "layer": "plating",
+      "incompatibleLayers": [
+        "armor",
+        "frame"
+      ],
+      "damageResistance": {
+        "physical": 2,
+        "energy": 0
+      },
+      "name": "Первобытная плита для головы (оптики)",
+      "itemType": "plating"
+    },
+    "frame": {
+      "id": "robot_frame_hydraulic_optics",
+      "layer": "frame",
+      "damageResistance": {
+        "physical": 3,
+        "energy": 3
+      },
+      "name": "Гидравлическая рама для головы (оптики)",
+      "itemType": "robotFrame"
+    },
+    "heldWeapon": null
+  },
+  "protectron.rightArm": {
+    "limb": {
+      "id": "robot_arm_protectron",
+      "itemType": "robotArm",
+      "physicalDR": 2,
+      "energyDR": 1,
+      "radDR": 0,
+      "weaponSlots": 1,
+      "canHoldWeapons": true,
+      "name": "Рука Протектрона",
+      "builtinWeapons": []
+    },
+    "armor": null,
+    "plating": null,
+    "frame": null,
+    "heldWeapon": {
+      "id": "weapon_railway_rifle",
+      "name": "Железнодорожная винтовка",
+      "damage": 10,
+      "damageType": "physical",
+      "fireRate": "0",
+      "ammoId": "ammo_railway_spike"
+    }
+  },
+  "protectron.body": {
+    "limb": {
+      "id": "robot_body_protectron",
+      "itemType": "robotBody",
+      "physicalDR": 3,
+      "energyDR": 1,
+      "radDR": 0,
+      "name": "Корпус Протектрона"
+    },
+    "armor": null,
+    "plating": {
+      "id": "robot_plating_factory_body",
+      "layer": "plating",
+      "incompatibleLayers": [
+        "armor",
+        "frame"
+      ],
+      "damageResistance": {
+        "physical": 1,
+        "energy": 1
+      },
+      "name": "Заводская обшивка для корпуса",
+      "itemType": "plating"
+    },
+    "frame": null,
+    "heldWeapon": null
+  },
+  "securitron.leftArm": {
+    "limb": {
+      "id": "robot_arm_securitron",
+      "itemType": "robotArm",
+      "physicalDR": 2,
+      "energyDR": 1,
+      "radDR": 0,
+      "weaponSlots": 1,
+      "canHoldWeapons": true,
+      "builtinWeaponId": "robot_weapon_manipulator",
+      "name": "Рука Секьюритрона",
+      "builtinWeapons": [
+        {
+          "id": "robot_weapon_manipulator",
+          "itemType": "weapon",
+          "damage": {
+            "base": 2,
+            "modifiers": [],
+            "total": 2
+          },
+          "damageType": "physical",
+          "mainSkill": "UNARMED",
+          "meleeBonusApplies": true,
+          "qualities": [
+            {
+              "qualityId": "quality_close_quarters"
+            }
+          ],
+          "effects": [],
+          "isBuiltin": true,
+          "weaponId": "robot_weapon_manipulator"
+        },
+        {
+          "id": "weapon_laser_gun",
+          "damage": {
+            "base": 3,
+            "modifiers": [],
+            "total": 3
+          },
+          "damageType": "energy",
+          "qualities": [],
+          "effects": [],
+          "fireRate": {
+            "base": 3,
+            "modifiers": [],
+            "total": 3
+          },
+          "weaponId": "weapon_laser_gun",
+          "isBuiltin": true,
+          "builtinToArm": true
+        }
+      ]
+    },
+    "armor": {
+      "id": "robot_armor_factory_arms",
+      "layer": "armor",
+      "damageResistance": {
+        "physical": 1,
+        "energy": 1
+      },
+      "name": "Заводская броня для руки",
+      "itemType": "robotArmor"
+    },
+    "plating": null,
+    "frame": null,
+    "heldWeapon": null
+  },
+  "securitron.rightArm": {
+    "limb": {
+      "id": "robot_arm_securitron",
+      "itemType": "robotArm",
+      "physicalDR": 2,
+      "energyDR": 1,
+      "radDR": 0,
+      "weaponSlots": 1,
+      "canHoldWeapons": true,
+      "builtinWeaponId": "robot_weapon_manipulator",
+      "name": "Рука Секьюритрона",
+      "builtinWeapons": [
+        {
+          "id": "robot_weapon_manipulator",
+          "itemType": "weapon",
+          "damage": {
+            "base": 2,
+            "modifiers": [],
+            "total": 2
+          },
+          "damageType": "physical",
+          "mainSkill": "UNARMED",
+          "meleeBonusApplies": true,
+          "qualities": [
+            {
+              "qualityId": "quality_close_quarters"
+            }
+          ],
+          "effects": [],
+          "isBuiltin": true,
+          "weaponId": "robot_weapon_manipulator"
+        },
+        {
+          "id": "weapon_submachine_gun",
+          "damage": {
+            "base": 3,
+            "modifiers": [],
+            "total": 3
+          },
+          "damageType": "physical",
+          "qualities": "[{\"qualityId\":\"quality_two-handed\"},{\"qualityId\":\"quality_inaccurate\"}]",
+          "effects": "[{\"effectId\":\"effect_burst\"}]",
+          "fireRate": {
+            "base": 3,
+            "modifiers": [],
+            "total": 3
+          },
+          "weaponId": "weapon_submachine_gun",
+          "isBuiltin": true,
+          "builtinToArm": true
+        }
+      ]
+    },
+    "armor": {
+      "id": "robot_armor_factory_arms",
+      "layer": "armor",
+      "damageResistance": {
+        "physical": 1,
+        "energy": 1
+      },
+      "name": "Заводская броня для руки",
+      "itemType": "robotArmor"
+    },
+    "plating": null,
+    "frame": null,
+    "heldWeapon": null
+  },
+  "robobrain.leftArm": {
+    "limb": {
+      "id": "robot_weapon_tesla_arm",
+      "itemType": "robotArm",
+      "weaponSlots": 0,
+      "canHoldWeapons": false,
+      "builtinWeaponId": "robot_weapon_tesla_arm",
+      "name": "Карабин Теслы",
+      "builtinWeapons": [
+        {
+          "id": "robot_weapon_tesla_arm",
+          "itemType": "weapon",
+          "damage": 4,
+          "damageType": "energy",
+          "fireRate": 2,
+          "mainSkill": "SMALL_GUNS",
+          "ammoId": "ammo_fusion_core",
+          "qualities": [],
+          "effects": [
+            {
+              "effectId": "effect_burst"
+            }
+          ],
+          "isBuiltin": true
+        }
+      ]
+    },
+    "armor": null,
+    "plating": {
+      "id": "robot_plating_toxic_arms",
+      "layer": "plating",
+      "incompatibleLayers": [
+        "armor",
+        "frame"
+      ],
+      "damageResistance": {
+        "physical": 2,
+        "energy": 0
+      },
+      "name": "Радиоактивная плита для руки",
+      "itemType": "plating"
+    },
+    "frame": {
+      "id": "robot_frame_hydraulic_arms",
+      "layer": "frame",
+      "damageResistance": {
+        "physical": 3,
+        "energy": 3
+      },
+      "name": "Гидравлическая рама для руки",
+      "itemType": "robotFrame"
+    },
+    "heldWeapon": null
+  },
+  "robobrain.rightArm": {
+    "limb": {
+      "id": "robot_arm_smoke_manipulator",
+      "itemType": "robotArm",
+      "physicalDR": 2,
+      "energyDR": 3,
+      "radDR": 0,
+      "weaponSlots": 1,
+      "canHoldWeapons": true,
+      "builtinWeaponId": "robot_weapon_smoke_claws",
+      "name": "Экстендер с зажимом",
+      "builtinWeapons": [
+        {
+          "id": "robot_weapon_smoke_claws",
+          "itemType": "weapon",
+          "damage": 4,
+          "damageType": "poison",
+          "fireRate": 0,
+          "mainSkill": "SMALL_GUNS",
+          "builtinToArm": "robot_arm_robobrain",
+          "ammoId": "ammo_gas_grenade",
+          "qualities": [
+            {
+              "qualityId": "quality_blast"
+            },
+            {
+              "qualityId": "quality_inaccurate"
+            }
+          ],
+          "effects": [
+            {
+              "effectId": "effect_persistent"
+            }
+          ],
+          "isBuiltin": true,
+          "weaponId": "robot_weapon_smoke_claws"
+        }
+      ]
+    },
+    "armor": {
+      "id": "robot_armor_factory_arms",
+      "layer": "armor",
+      "damageResistance": {
+        "physical": 1,
+        "energy": 1
+      },
+      "name": "Заводская броня для руки",
+      "itemType": "robotArmor"
+    },
+    "plating": {
+      "id": "robot_plating_toxic_arms",
+      "layer": "plating",
+      "incompatibleLayers": [
+        "armor",
+        "frame"
+      ],
+      "damageResistance": {
+        "physical": 2,
+        "energy": 0
+      },
+      "name": "Радиоактивная плита для руки",
+      "itemType": "plating"
+    },
+    "frame": {
+      "id": "robot_frame_hydraulic_arms",
+      "layer": "frame",
+      "damageResistance": {
+        "physical": 3,
+        "energy": 3
+      },
+      "name": "Гидравлическая рама для руки",
+      "itemType": "robotFrame"
+    },
+    "heldWeapon": {
+      "id": "weapon_combat_shotgun",
+      "weaponId": "weapon_combat_shotgun",
+      "name": "Боевой дробовик",
+      "itemType": "weapon",
+      "appliedMods": {},
+      "damage": 5,
+      "fireRate": 2,
+      "damageType": "physical",
+      "ammoId": "ammo_shotgun_shell"
+    }
+  },
+  "robobrain.body": {
+    "limb": {
+      "id": "robot_body_robobrain",
+      "itemType": "robotBody",
+      "physicalDR": 3,
+      "energyDR": 3,
+      "radDR": 0,
+      "name": "robot_body_robobrain"
+    },
+    "armor": null,
+    "plating": {
+      "id": "robot_plating_serrated_body",
+      "layer": "plating",
+      "incompatibleLayers": [
+        "armor",
+        "frame"
+      ],
+      "damageResistance": {
+        "physical": 2,
+        "energy": 0
+      },
+      "name": "Зубчатая плита для корпуса",
+      "itemType": "plating"
+    },
+    "frame": null,
+    "heldWeapon": null
+  },
+  "misterHandy.arm1": {
+    "limb": {
+      "id": "robot_arm_mister_handy",
+      "itemType": "robotArm",
+      "physicalDR": 2,
+      "energyDR": 2,
+      "radDR": 0,
+      "weaponSlots": 1,
+      "canHoldWeapons": true,
+      "builtinWeaponId": "robot_weapon_manipulator",
+      "name": "Рука Мистера Помощника",
+      "builtinWeapons": [
+        {
+          "id": "robot_weapon_manipulator",
+          "itemType": "weapon",
+          "damage": 2,
+          "damageType": "physical",
+          "mainSkill": "UNARMED",
+          "meleeBonusApplies": true,
+          "qualities": [
+            {
+              "qualityId": "quality_close_quarters"
+            }
+          ],
+          "effects": [],
+          "isBuiltin": true
+        }
+      ]
+    },
+    "armor": null,
+    "plating": null,
+    "frame": null,
+    "heldWeapon": {
+      "id": "weapon_10mm_smg",
+      "weaponId": "weapon_10mm_smg",
+      "itemType": "weapon",
+      "appliedMods": {}
+    }
+  },
+  "misterHandy.body": {
+    "limb": {
+      "id": "robot_body_mister_handy",
+      "itemType": "robotBody",
+      "physicalDR": 3,
+      "energyDR": 2,
+      "radDR": 0,
+      "name": "Корпус Мистера Помощника"
+    },
+    "armor": {
+      "id": "robot_armor_storage_body",
+      "layer": "armor",
+      "damageResistance": {
+        "physical": 1,
+        "energy": 1
+      },
+      "name": "Заводская броня с хранилищем",
+      "itemType": "robotArmor"
+    },
+    "plating": {
+      "id": "robot_plating_gutsy_body",
+      "layer": "plating",
+      "incompatibleLayers": [
+        "armor",
+        "frame"
+      ],
+      "damageResistance": {
+        "physical": 2,
+        "energy": 2
+      },
+      "name": "Обшивка Мистера Храбреца для корпуса",
+      "itemType": "plating"
+    },
+    "frame": {
+      "id": "robot_frame_hydraulic_body",
+      "layer": "frame",
+      "damageResistance": {
+        "physical": 3,
+        "energy": 3
+      },
+      "name": "Гидравлическая рама для корпуса",
+      "itemType": "robotFrame"
+    },
+    "heldWeapon": null
+  },
+  "assaultron.leftArm": {
+    "limb": {
+      "id": "robot_arm_assaultron",
+      "itemType": "robotArm",
+      "physicalDR": 3,
+      "energyDR": 3,
+      "radDR": 0,
+      "weaponSlots": 1,
+      "canHoldWeapons": true,
+      "builtinWeaponId": "robot_weapon_claw",
+      "name": "robot_arm_assaultron",
+      "builtinWeapons": [
+        {
+          "id": "robot_weapon_claw",
+          "itemType": "weapon",
+          "damage": 3,
+          "damageType": "physical",
+          "mainSkill": "UNARMED",
+          "meleeBonusApplies": true,
+          "qualities": [
+            {
+              "qualityId": "quality_close_quarters"
+            }
+          ],
+          "effects": [],
+          "isBuiltin": true,
+          "weaponId": "robot_weapon_claw"
+        },
+        {
+          "id": "weapon_laser_gun",
+          "damage": 4,
+          "damageType": "energy",
+          "fireRate": 2,
+          "qualities": "[{\"qualityId\":\"quality_close_quarters\"}]",
+          "effects": "[{\"effectId\":\"effect_piercing_x\"}]",
+          "ammoId": "ammo_energy_cell",
+          "mainSkill": "ENERGY_WEAPONS",
+          "weaponId": "weapon_laser_gun",
+          "isBuiltin": true,
+          "builtinToArm": true
+        }
+      ]
+    },
+    "armor": null,
+    "plating": null,
+    "frame": null,
+    "heldWeapon": null
+  }
+}
