@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SURVIVAL_RULES, addFatigue, createSurvivalState, survivalEffectRows } from '../../domain/survival';
+import { SURVIVAL_RULES, addFatigue, createSurvivalState, survivalEffectRows } from '../../modules/fallout/survival/survival';
 import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
 import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
 
@@ -57,7 +57,9 @@ describe('survival: i18n шкал (ru/en)', () => {
             2: 'Мучает жажда',
             1: 'Обезвожен',
         });
-        expect(ruScreen.survival.sleep).toEqual({
+        // С патча 206 survival.sleep кроме названий секций несёт ключи
+        // модалки сна — проверяем секции частичным совпадением.
+        expect(ruScreen.survival.sleep).toMatchObject({
             5: 'Прекрасно отдохнувший',
             4: 'Отдохнувший',
             3: 'Усталый',

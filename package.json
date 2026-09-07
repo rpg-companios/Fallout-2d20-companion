@@ -8,7 +8,8 @@
     "web": "expo start --web",
     "build": "expo export --platform web",
     "serve": "npx serve -s dist -l 5000",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",

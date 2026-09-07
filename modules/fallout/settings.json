@@ -1,9 +1,31 @@
 [
   {
+    "id": "survivalModeEnabled",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "survival",
+    "labelKey": "settings.survivalSystemTitle",
+    "descriptionKey": "settings.survivalSystemDescription",
+    "defaultValue": false
+  },
+  {
+    "id": "survivalTimeCourseMinutes",
+    "type": "number",
+    "controlSurface": "settings",
+    "sectionKey": "survival",
+    "labelKey": "settings.survivalTimeCourseTitle",
+    "descriptionKey": "settings.survivalTimeCourseDescription",
+    "defaultValue": 30,
+    "min": 1,
+    "max": 1440,
+    "freeInput": true,
+    "dependsOn": "survivalModeEnabled"
+  },
+  {
     "id": "weaponDurabilityLossEnabled",
     "type": "boolean",
     "controlSurface": "settings",
-    "sectionKey": "survivalMode",
+    "sectionKey": "survival",
     "labelKey": "settings.durabilityTitle",
     "descriptionKey": "settings.durabilityDescription",
     "defaultValue": false
@@ -12,7 +34,7 @@
     "id": "weaponDurabilityLossPer10Shots",
     "type": "number",
     "controlSurface": "settings",
-    "sectionKey": "survivalMode",
+    "sectionKey": "survival",
     "labelKey": "settings.lossTitle",
     "descriptionKey": "settings.lossDescription",
     "defaultValue": 1,
@@ -24,7 +46,7 @@
     "id": "randomWeaponQualityEnabled",
     "type": "boolean",
     "controlSurface": "settings",
-    "sectionKey": "survivalMode",
+    "sectionKey": "survival",
     "labelKey": "settings.qualityTitle",
     "descriptionKey": "settings.qualityDescription",
     "defaultValue": false,

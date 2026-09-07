@@ -15,6 +15,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'stretch',
   },
+  // Кнопки модалок выживания — под областями Голод/Жажда/Сон (§7 дока).
+  survivalActionCell: {
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  survivalActionButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    backgroundColor: '#2c2c2c',
+    borderWidth: 1,
+    borderColor: '#e8a33d',
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  survivalActionText: {
+    color: '#e8a33d',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   statBoxContainer: {
     flex: 1,
     marginHorizontal: 4,

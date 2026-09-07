@@ -88,9 +88,13 @@ export const confirmAlert = (alertId, params = {}) =>
  * Для всего остального пользуйтесь showAlert с ключом.
  */
 export const showRawAlert = ({ title, message = '', kind = 'info', buttons }) => {
+  // scope: 'app' — подписи кнопок сырых алертов (например, «Ок») берутся из
+  // общего словаря приложения (i18n/*/App.json, buttons.*), а не из словаря
+  // конкретного экрана (патч 208). Раньше scope отсутствовал, и AlertHost
+  // показывал сам путь «buttons.ok» вместо перевода.
   const request = {
     id: '__raw__',
-    entry: { kind, buttons },
+    entry: { kind, buttons, scope: 'app' },
     params: {},
     raw: { title, message },
   };

@@ -1,5 +1,14 @@
-import React from 'react';
-import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
 import {
   ENGINE_SETTINGS,
@@ -51,6 +60,60 @@ const tSection = (section) => (
 
 const SETTINGS_SCREEN_SETTINGS = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS);
 
+// Число со свободным вводом (флаг freeInput в данных настройки, например
+// курс времени выживания): ввод с клавиатуры + −/+, фиксация при потере
+// фокуса/Enter с клампом в min/max.
+const FreeNumberRow = ({ setting, min, max }) => {
+  const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
+  const setValue = useAppSettingsStore((state) => state.setValue);
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = Number.parseInt(draft, 10);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const clamped = Math.min(max, Math.max(min, parsed));
+    setDraft(String(clamped));
+    setValue(setting.id, clamped);
+  };
+
+  return (
+    <View style={styles.loss}>
+      <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
+      <View style={styles.counter}>
+        <TouchableOpacity
+          disabled={Number(value) <= min}
+          onPress={() => setValue(setting.id, Number(value) - 1)}
+        >
+          <Text style={styles.button}>−</Text>
+        </TouchableOpacity>
+        <TextInput
+          style={styles.input}
+          value={draft}
+          onChangeText={(text) => setDraft(text.replace(/[^0-9]/g, ''))}
+          onBlur={commit}
+          onSubmitEditing={commit}
+          keyboardType="numeric"
+          maxLength={4}
+        />
+        <TouchableOpacity
+          disabled={Number(value) >= max}
+          onPress={() => setValue(setting.id, Number(value) + 1)}
+        >
+          <Text style={styles.button}>+</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
+    </View>
+  );
+};
+
 const SettingRow = ({ setting }) => {
   const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
   const setValue = useAppSettingsStore((state) => state.setValue);
@@ -58,6 +121,9 @@ const SettingRow = ({ setting }) => {
   if (setting.type === 'number') {
     const min = setting.min ?? 0;
     const max = setting.max ?? 100;
+    if (setting.freeInput) {
+      return <FreeNumberRow setting={setting} min={min} max={max} />;
+    }
     return (
       <View style={styles.loss}>
         <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
@@ -142,16 +208,24 @@ export default function SettingsModal({ visible, onClose }) {
         <View style={styles.modal}>
           <Text style={styles.title}>{tHomeScreen('settings.title')}</Text>
 
-          {sections.map((section) => (
-            <View key={section.key}>
-              <Text style={styles.sectionTitle}>{tSection(section)}</Text>
-              {section.settings.map((setting) => <SettingRow key={setting.id} setting={setting} />)}
-              <View style={styles.separator} />
-            </View>
-          ))}
+          {/* Секции настроек прокручиваются: при включённых разделах строк
+              больше высоты окна (узкие экраны, предпросмотры), заголовок и
+              кнопка закрытия остаются на месте (патч 211). */}
+          <ScrollView
+            style={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {sections.map((section) => (
+              <View key={section.key}>
+                <Text style={styles.sectionTitle}>{tSection(section)}</Text>
+                {section.settings.map((setting) => <SettingRow key={setting.id} setting={setting} />)}
+                <View style={styles.separator} />
+              </View>
+            ))}
+          </ScrollView>
 
           <TouchableOpacity onPress={onClose} style={styles.close}>
-            <Text>OK</Text>
+            <Text>{tHomeScreen('buttons.ok')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -161,7 +235,13 @@ export default function SettingsModal({ visible, onClose }) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,.6)', justifyContent: 'center', padding: 20 },
-  modal: { backgroundColor: '#fff', borderRadius: 12, padding: 20 },
+  modal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    maxHeight: '92%', // окно не вылезает за экран: контент уходит в прокрутку
+  },
+  scroll: { flexShrink: 1 },
   title: { fontSize: 22, fontWeight: '700', marginBottom: 18 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12 },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
@@ -175,6 +255,14 @@ const styles = StyleSheet.create({
   counter: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 20 },
   button: { fontSize: 28, fontWeight: '700', paddingHorizontal: 12 },
   value: { fontSize: 22, minWidth: 45, textAlign: 'center' },
+  input: {
+    fontSize: 22,
+    minWidth: 64,
+    textAlign: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#999',
+    paddingVertical: 4,
+  },
   close: { alignSelf: 'flex-end', marginTop: 18, padding: 10 },
   selectButtons: { flexDirection: 'row', gap: 6 },
   selectButtonsColumn: { flex: 2, flexDirection: 'column' },

@@ -1,7 +1,11 @@
 {
-  "survivalMode": "Survival mode settings",
+  "survival": "Survival",
   "combat": "Combat",
   "interface": "Interface",
+  "survivalSystemTitle": "Hunger, thirst, sleep",
+  "survivalSystemDescription": "Hunger/thirst/sleep scales, fatigue and hourly HP loss. When off — the scales are hidden and time tracking is frozen; the character's state is kept in the save.",
+  "survivalTimeCourseTitle": "Time course",
+  "survivalTimeCourseDescription": "How many real minutes make one survival in-game hour (default 30). Time only accumulates while the app is open with a loaded character.",
   "durabilityTitle": "Weapon wear on shots",
   "durabilityDescription": "Enable weapon wear mechanics on shots.",
   "lossTitle": "Durability loss per 10 shots",

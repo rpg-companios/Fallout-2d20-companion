@@ -488,6 +488,32 @@ export const advanceEffectsByScene = (currentEffects = []) => {
     };
 };
 
+// Массовое продвижение таймеров эффектов на N сцен одним проходом.
+// Сон — мост контуров (док выживания §5): N часов сна = N × 12 сцен
+// (1 игровой час = 60 минут = 12 сцен по 5 минут). Применяется модалкой
+// сна; счётчик сцен персонажа при этом не меняется.
+export const advanceEffectsByScenes = (currentEffects = [], scenes = 0) => {
+    if (!Number.isInteger(scenes) || scenes < 0) {
+        throw new Error(`[effects] advanceEffectsByScenes: некорректное число сцен: ${scenes}`);
+    }
+    const nowMs = Date.now() + scenes * SCENE_DURATION_MS;
+    const expired = [];
+    const nextEffects = currentEffects.reduce((acc, effect) => {
+        const normalized = normalizeTimedEffectWithClock(effect, nowMs);
+        if (normalized.expired) {
+            expired.push(normalized.normalized);
+            return acc;
+        }
+        acc.push(normalized.normalized);
+        return acc;
+    }, []);
+
+    return {
+        effects: nextEffects,
+        expired,
+    };
+};
+
 export const pruneExpiredTimedEffects = (currentEffects = [], nowMs = Date.now()) => {
     let changed = false;
     const expired = [];
@@ -744,6 +770,9 @@ export const getTimedApBonus = (activeEffects = []) =>
 
 export const SCENE_RULES = {
     SCENE_DURATION_MINUTES,
+    // Сцен в одном игровом часу (60 минут / 5 минут на сцену) — мост
+    // между контуром эффектов и сном (док выживания §5).
+    SCENES_PER_GAME_HOUR: Math.round(60 / SCENE_DURATION_MINUTES),
 };
 
 export default {
@@ -754,6 +783,7 @@ export default {
     checkAddiction,
     applyRemoveConditions,
     advanceEffectsByScene,
+    advanceEffectsByScenes,
     pruneExpiredTimedEffects,
     getTimedAttributeModifiers,
     getTimedMaxHpBonus,

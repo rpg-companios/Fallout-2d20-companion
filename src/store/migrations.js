@@ -8,8 +8,7 @@ import { generateItemId } from '../../domain/itemIdentity';
 import { getPerks, getUniqQualityName } from '../../domain/registry';
 import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
-import { createSurvivalState } from '../../domain/survival';
-import originsFile from '../../modules/fallout/data/origins/origins.json';
+import { getRegisteredStateMigrations } from './stateExtensions';
 import { debugLog } from '../debug/falloutDebug';
 import { getDefaultLimbs } from '../../domain/bodyplan';
 import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
@@ -371,6 +370,11 @@ export const denormalizeCharacterState = (storeState = {}) => {
  * Последовательно применяет миграции, пока состояние не достигнет
  * CURRENT_SCHEMA_VERSION. Сохранения с неизвестной/будущей версией
  * не трогаются (вернём как есть), чтобы не повредить данные.
+ *
+ * Сеттинги могут встраивать свои миграции в цепочку через
+ * registerStateMigration (реестр stateExtensions): их переход встаёт на
+ * указанный индекс — то есть между теми же версиями, что и раньше —
+ * без поднятия CURRENT_SCHEMA_VERSION. Сейвы остаются совместимыми.
  */
 export function migrateCharacterState(data) {
   if (!data || typeof data !== 'object') return data;
@@ -384,9 +388,10 @@ export function migrateCharacterState(data) {
     return state;
   }
 
+  const chain = migrationsWithExtensions();
   let version = fromVersion;
   while (version < CURRENT_SCHEMA_VERSION) {
-    const migrate = MIGRATIONS[version];
+    const migrate = chain[version];
     if (typeof migrate !== 'function') {
       // Нет миграции для этой версии — не знаем, как преобразовать. Не ломаем данные.
       break;
@@ -398,6 +403,18 @@ export function migrateCharacterState(data) {
 
   return state;
 }
+
+// Цепочка движковых миграций + вставки сеттингов (по индексу перехода,
+// из которого они переводят: index = версия «до»). Вставки на один индекс
+// идут в порядке регистрации после движковой миграции того же перехода,
+// если она есть — на практике они не пересекаются.
+const migrationsWithExtensions = () => {
+  const chain = [...MIGRATIONS];
+  for (const { migration, index } of getRegisteredStateMigrations()) {
+    chain.splice(Math.min(index, chain.length), 0, migration);
+  }
+  return chain;
+};
 
 /**
  * Реестр миграций по версиям.
@@ -576,33 +593,10 @@ export const migrateRobotArmAttachments = (state) => {
   return changed ? { ...state, equippedRobotSlots: slots } : state;
 };
 
-// Тип персонажа для инициализации выживания: ориджин в сейве может быть
-// «худым» ({id}) или «толстым» (объект с characterType); остальное — каталог.
-const _ORIGINS_BY_ID = new Map(
-  (Array.isArray(originsFile) ? originsFile : []).map((entry) => [entry.id, entry])
-);
-const _survivalCharacterType = (origin) => {
-  if (origin && typeof origin === 'object' && origin.characterType) {
-    return origin.characterType;
-  }
-  const id = typeof origin === 'string' ? origin : origin?.id;
-  return (id && _ORIGINS_BY_ID.get(id)?.characterType) || 'human';
-};
-
-/**
- * v22 -> v23: выживание. Всем сейвам добавляется поле survival:
- * органики получают начальное состояние (все шкалы на максимуме,
- * усталости нет), роботы и киборги — null. Существующее поле не
- * перезаписывается (идемпотентна). Правила — docs/survival-system-design.md.
- */
-export const migrateSurvivalField = (state) => {
-  if (!state || typeof state !== 'object') return state;
-  if (state.survival !== undefined) return state;
-  return {
-    ...state,
-    survival: createSurvivalState(_survivalCharacterType(state.origin)),
-  };
-};
+// Миграции сеттинговых полей состояния (например, v22 -> v23: выживание
+// Fallout) регистрируются сетеингом через registerStateMigration
+// (src/store/stateExtensions.js) и встраиваются в цепочку без поднятия
+// CURRENT_SCHEMA_VERSION. Движок правил сеттинга не знает.
 
 const MIGRATIONS = [
   // v0 -> v1: разделить эффекты/качества в экипированном оружии.
@@ -1256,9 +1250,11 @@ const MIGRATIONS = [
   // пересаживается в ладонь (heldWeapon). Идемпотентна.
   migrateRobotArmAttachments,
 
-  // v22 -> v23: выживание — поле survival (шкалы еды/воды/сна, Усталость).
-  // Органики — начальные максимумы, роботы/киборги — null. Идемпотентна.
-  migrateSurvivalField,
+  // v22 -> v23: слот зарезервирован за сеттинговым расширением состояния —
+  // переход регистрируется модулем (registerStateMigration в stateExtensions).
+  // Движковых изменений в этой версии нет. Если ни одно расширение переход
+  // не зарегистрировало, состояние останется v22 без потери данных.
+  (state) => state,
 
 ];
 /**

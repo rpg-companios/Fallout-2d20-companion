@@ -202,6 +202,14 @@ const useCharacterStore = create(devtools(
       skills: {},
       items: {},
       effects: {},
+      // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
+      // патчи 207–209): движок хранит их как непрозрачный словарь
+      // { [fieldKey]: value } — например, { survival } у Fallout. Единый
+      // источник истины: мутации только через действия стора
+      // (setStateExtensions / setStateExtension), экраны подписаны
+      // селекторами. В сейв поля идут под своими ключами верхнего уровня
+      // (buildSnapshot контекста раскладывает словарь).
+      stateExtensions: {},
       selectedPerks: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
@@ -990,6 +998,18 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Поля расширений состояния (stateExtensions.js, патч 209): движок
+       * хранит непрозрачный словарь, сеттинг сам кладёт/читает своё поле.
+       */
+      setStateExtensions: (dict = {}) => {
+        set({ stateExtensions: dict });
+      },
+
+      setStateExtension: (fieldKey, value) => set((state) => ({
+        stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
+      })),
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1005,6 +1025,7 @@ const useCharacterStore = create(devtools(
           skills: normalizedDefaults.skills || {},
           items: {},
           effects: {},
+          stateExtensions: {},
           selectedPerks: legacyDefaults?.selectedPerks || [],
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
@@ -1058,6 +1079,7 @@ const useCharacterStore = create(devtools(
         selectedPerks: state.selectedPerks,
         rewardedSkills: state.rewardedSkills,
         robot: state.robot,
+        stateExtensions: state.stateExtensions,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

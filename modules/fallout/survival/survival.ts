@@ -1,4 +1,7 @@
-// Система выживания — домен (редакция правил 0.3 дизайн-дока).
+// Система выживания — домен сеттинга Fallout (редакция правил 0.4 дизайн-дока).
+// Модуль сеттинга: modules/fallout/survival/ (патч 207 — выживание вынесено
+// из движка; движок применяет его через реестр расширений
+// src/store/stateExtensions.js и правил не знает).
 //
 // Чистые функции без React и без обращения к часам: время передаётся
 // явно (игровые часы / реальные минуты). Состояние хранится в сейве
@@ -8,8 +11,59 @@
 //   1) шаг лестниц (еда/вода/сон) + начисление Усталости за переходы;
 //   2) снятие Усталости: −1, если еда ≥ 2, вода ≥ 2, сон ≥ 3;
 //   3) дрен ОЗ ⌊N/2⌋ по итоговому N, без сопротивлений.
+//
+// Файл переведён на TypeScript патчем 206 (модалки еды/питья/сна):
+// тронутая логика переходит в .ts, сейв-формат не меняется.
 
-export const SURVIVAL_RULES = {
+export type SurvivalLadder = 'food' | 'water' | 'sleep';
+export type FatigueSource = 'food' | 'water' | 'sleep' | string;
+export type SleepPlace = 'bed' | 'wasteland';
+
+export interface FatigueEntry {
+    source: FatigueSource;
+    amount: number;
+}
+
+export interface SurvivalState {
+    food: number;
+    water: number;
+    sleep: number;
+    fatigue: FatigueEntry[];
+    acc: { food: number; water: number; sleep: number };
+    timeCarried: number;
+    hpBonus: number;
+}
+
+// Признаки расходника, которые читает домен выживания (данные сеттинга:
+// food.json / drinks.json). Прочие поля предмета домену не важны.
+export interface SurvivalConsumable {
+    itemType?: string;
+    soup?: boolean;
+    state?: string;
+    preserved?: boolean;
+    purified?: boolean;
+}
+
+export interface SurvivalRules {
+    capableTypes: string[];
+    max: Record<SurvivalLadder, number>;
+    stepHours: Record<SurvivalLadder, Record<number, number>>;
+    bottomPeriodHours: Record<SurvivalLadder, number>;
+    fatigueOnStep: Record<SurvivalLadder, Record<number, number>>;
+    removalMin: Record<SurvivalLadder, number>;
+    sleep: {
+        capShort: number;
+        longHours: number;
+        perfectHours: number;
+        perfectPlace: SleepPlace;
+        hpBonus: number;
+        fatigueClearHours: number;
+    };
+    defaultCourseMinutesPerHour: number;
+    maxSleepHours: number;
+}
+
+export const SURVIVAL_RULES: SurvivalRules = {
     // Шкалы есть только у органиков (origins.json → characterType).
     capableTypes: ['human', 'ghoul', 'mutant'],
     // Максимум секций: еда 5, вода 4, сон 5.
@@ -46,15 +100,27 @@ export const SURVIVAL_RULES = {
     maxSleepHours: 24,
 };
 
-const LADDERS = ['food', 'water', 'sleep'];
+const LADDERS: SurvivalLadder[] = ['food', 'water', 'sleep'];
 
-export function isSurvivalCapable(characterType) {
-    return SURVIVAL_RULES.capableTypes.includes(characterType);
+export interface ConsumeGain {
+    food: number;
+    water: number;
+}
+
+export interface ConsumeResult {
+    ok: boolean;
+    reason?: 'notFood' | 'full' | 'notDrink';
+    state: SurvivalState;
+    gained: ConsumeGain;
+}
+
+export function isSurvivalCapable(characterType: string | undefined | null): boolean {
+    return SURVIVAL_RULES.capableTypes.includes(characterType ?? '');
 }
 
 // Начальное состояние — все шкалы на максимуме (решение владельца).
 // Роботам/киборгам шкалы не положены — null.
-export function createSurvivalState(characterType) {
+export function createSurvivalState(characterType: string | undefined | null): SurvivalState | null {
     if (!isSurvivalCapable(characterType)) return null;
     return {
         food: SURVIVAL_RULES.max.food,
@@ -67,7 +133,7 @@ export function createSurvivalState(characterType) {
     };
 }
 
-function cloneState(state) {
+function cloneState(state: SurvivalState): SurvivalState {
     return {
         ...state,
         fatigue: state.fatigue.map((f) => ({ ...f })),
@@ -75,16 +141,16 @@ function cloneState(state) {
     };
 }
 
-export function totalFatigue(state) {
+export function totalFatigue(state: SurvivalState): number {
     return state.fatigue.reduce((sum, f) => sum + f.amount, 0);
 }
 
-export function fatigueFromSource(state, source) {
+export function fatigueFromSource(state: SurvivalState, source: FatigueSource): number {
     const entry = state.fatigue.find((f) => f.source === source);
     return entry ? entry.amount : 0;
 }
 
-export function addFatigue(state, source, amount) {
+export function addFatigue(state: SurvivalState, source: FatigueSource, amount: number): void {
     const entry = state.fatigue.find((f) => f.source === source);
     if (entry) entry.amount += amount;
     else state.fatigue.push({ source, amount });
@@ -92,10 +158,10 @@ export function addFatigue(state, source, amount) {
 
 // Списание из общей кучи: сначала с наибольшего источника
 // (детерминированная деталь реализации, §6 дока).
-export function removeFatigueTotal(state, amount) {
+export function removeFatigueTotal(state: SurvivalState, amount: number): void {
     let left = amount;
     while (left > 0) {
-        let biggest = null;
+        let biggest: FatigueEntry | null = null;
         for (const f of state.fatigue) {
             if (f.amount > 0 && (!biggest || f.amount > biggest.amount)) biggest = f;
         }
@@ -106,18 +172,18 @@ export function removeFatigueTotal(state, amount) {
     }
 }
 
-export function clearFatigueSource(state, source) {
+export function clearFatigueSource(state: SurvivalState, source: FatigueSource): void {
     const entry = state.fatigue.find((f) => f.source === source);
     if (entry) entry.amount = 0;
 }
 
 // 1 ОЗ за каждые 2 очка Усталости, без сопротивлений.
-export function hpDrainForFatigue(fatigueTotal) {
+export function hpDrainForFatigue(fatigueTotal: number): number {
     return Math.floor(fatigueTotal / 2);
 }
 
 // Смена секции (в любую сторону) — счётчик времени в состоянии с нуля.
-function bumpLadder(state, key, delta) {
+function bumpLadder(state: SurvivalState, key: SurvivalLadder, delta: number): number {
     const max = SURVIVAL_RULES.max[key];
     const before = state[key];
     if (before >= max && delta > 0) return 0; // на потолке подъём не меняет шкалу
@@ -130,8 +196,14 @@ function bumpLadder(state, key, delta) {
     return 0;
 }
 
+export interface SurvivalEvent {
+    hour?: number;
+    type: string;
+    [key: string]: unknown;
+}
+
 // Шаг одной лестницы по накопленным часам. Возвращает события.
-function stepLadder(state, key, events) {
+function stepLadder(state: SurvivalState, key: SurvivalLadder, events: SurvivalEvent[]): void {
     const cur = state[key];
     if (cur <= 1) {
         const period = SURVIVAL_RULES.bottomPeriodHours[key];
@@ -156,10 +228,14 @@ function stepLadder(state, key, events) {
     }
 }
 
+export interface TickOptions {
+    sleepMode?: boolean;
+}
+
 // Один часовой тик (три шага, §5). Мутирует рабочую копию.
 // options.sleepMode — часы сна: лестница сна заморожена (сон лечит).
-function tickHour(state, options = {}) {
-    const events = [];
+function tickHour(state: SurvivalState, options: TickOptions = {}): { drain: number; events: SurvivalEvent[] } {
+    const events: SurvivalEvent[] = [];
     // 1. Лестницы + начисление Усталости.
     for (const key of LADDERS) {
         if (options.sleepMode && key === 'sleep') continue;
@@ -185,9 +261,15 @@ function tickHour(state, options = {}) {
     return { drain, events };
 }
 
+export interface AdvanceResult {
+    state: SurvivalState;
+    hpLost: number;
+    events: SurvivalEvent[];
+}
+
 // Продвижение игровых часов контура выживания (реальный тик, сон —
 // для еды/воды). Дробные часы копятся в timeCarried, тик — по целым.
-export function advanceHours(state, hours, options = {}) {
+export function advanceHours(state: SurvivalState, hours: number, options: TickOptions = {}): AdvanceResult {
     if (!Number.isFinite(hours) || hours < 0) {
         throw new Error(`advanceHours: некорректные часы: ${hours}`);
     }
@@ -196,7 +278,7 @@ export function advanceHours(state, hours, options = {}) {
     const whole = Math.floor(carried);
     wk.timeCarried = carried - whole;
     let hpLost = 0;
-    const events = [];
+    const events: SurvivalEvent[] = [];
     for (let i = 0; i < whole; i += 1) {
         const r = tickHour(wk, options);
         hpLost += r.drain;
@@ -206,16 +288,38 @@ export function advanceHours(state, hours, options = {}) {
 }
 
 // Реальный тик: X реальных минут = 1 игровой час (курс из настроек).
-export function advanceRealMinutes(state, realMinutes, courseMinutesPerHour = SURVIVAL_RULES.defaultCourseMinutesPerHour) {
+export function advanceRealMinutes(
+    state: SurvivalState,
+    realMinutes: number,
+    courseMinutesPerHour: number = SURVIVAL_RULES.defaultCourseMinutesPerHour,
+): AdvanceResult {
     if (!(courseMinutesPerHour > 0)) {
         throw new Error(`advanceRealMinutes: некорректный курс: ${courseMinutesPerHour}`);
     }
     return advanceHours(state, realMinutes / courseMinutesPerHour);
 }
 
-// Еда. Возвращает { ok, reason?, state, gained: { food, water } }.
+// Подъём шкал от еды — чисто по данным предмета (§2, §11): суп всегда
+// +1 еда и +1 вода (замещает категорию приготовленного); приготовленное
+// не консервированное — +2 еды; сырое/консервированное — +1 еда.
+export function foodGain(item: SurvivalConsumable | null | undefined): ConsumeGain {
+    if (item?.soup) {
+        return { food: 1, water: 1 };
+    }
+    if (item?.state === 'cooked' && !item?.preserved) {
+        return { food: 2, water: 0 };
+    }
+    return { food: 1, water: 0 };
+}
+
+// Подъём шкалы воды от напитка (§3, §11): очищенная вода +2, остальное +1.
+export function drinkGain(item: SurvivalConsumable | null | undefined): ConsumeGain {
+    return { food: 0, water: item?.purified ? 2 : 1 };
+}
+
+// Еда. Возвращает { ok, reason?, state, gained }.
 // На секции 5 есть нельзя («не можете больше есть») — суп тоже.
-export function consumeFood(state, item) {
+export function consumeFood(state: SurvivalState, item: SurvivalConsumable | null | undefined): ConsumeResult {
     if (!item || item.itemType !== 'food') {
         return { ok: false, reason: 'notFood', state, gained: { food: 0, water: 0 } };
     }
@@ -223,35 +327,41 @@ export function consumeFood(state, item) {
         return { ok: false, reason: 'full', state, gained: { food: 0, water: 0 } };
     }
     const wk = cloneState(state);
-    let foodSteps = 0;
-    let waterSteps = 0;
-    if (item.soup) {
-        // Суп — всегда +1 еда и +1 вода, замещает категорию приготовленного.
-        foodSteps = bumpLadder(wk, 'food', 1);
-        waterSteps = bumpLadder(wk, 'water', 1);
-    } else if (item.state === 'cooked' && !item.preserved) {
-        foodSteps = bumpLadder(wk, 'food', 2); // приготовленная еда
-    } else {
-        foodSteps = bumpLadder(wk, 'food', 1); // сырая или консервированная
-    }
+    const gain = foodGain(item);
+    const foodSteps = bumpLadder(wk, 'food', gain.food);
+    const waterSteps = gain.water > 0 ? bumpLadder(wk, 'water', gain.water) : 0;
     return { ok: true, state: wk, gained: { food: foodSteps, water: waterSteps } };
 }
 
 // Питьё. На потолке пить МОЖНО — шкала не двигается, эффекты работают.
-export function consumeDrink(state, item) {
+export function consumeDrink(state: SurvivalState, item: SurvivalConsumable | null | undefined): ConsumeResult {
     if (!item || item.itemType !== 'drinks') {
-        return { ok: false, reason: 'notDrink', state, gained: { water: 0 } };
+        return { ok: false, reason: 'notDrink', state, gained: { food: 0, water: 0 } };
     }
     const wk = cloneState(state);
-    const steps = item.purified ? 2 : 1; // очищенная вода +2, остальное +1
-    const waterSteps = bumpLadder(wk, 'water', steps);
-    return { ok: true, state: wk, gained: { water: waterSteps } };
+    const waterSteps = bumpLadder(wk, 'water', drinkGain(item).water);
+    return { ok: true, state: wk, gained: { food: 0, water: waterSteps } };
+}
+
+export interface RestOptions {
+    place: SleepPlace;
+    hours: number;
+    currentHp?: number | null;
+}
+
+export interface RestResult {
+    state: SurvivalState;
+    hpLost: number;
+    events: SurvivalEvent[];
+    hpEnd?: number;
+    hitsZero?: boolean;
+    zeroAtHour?: number | null;
 }
 
 // Сон. place: 'bed' | 'wasteland', часы 1–24.
 // currentHp (число) — включает прогноз: hpEnd / hitsZero / zeroAtHour
 // (алерт в модали до подтверждения, §6).
-export function rest(state, { place, hours, currentHp = null }) {
+export function rest(state: SurvivalState, { place, hours, currentHp = null }: RestOptions): RestResult {
     const rules = SURVIVAL_RULES.sleep;
     if (!['bed', 'wasteland'].includes(place)) {
         throw new Error(`rest: некорректное место сна: ${place}`);
@@ -261,11 +371,11 @@ export function rest(state, { place, hours, currentHp = null }) {
     }
     const wk = cloneState(state);
     wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
-    const events = [];
+    const events: SurvivalEvent[] = [];
     let hpLost = 0;
-    let hp = currentHp;
+    let hp: number | null = currentHp != null ? Number(currentHp) : null;
     let hitsZero = false;
-    let zeroAtHour = null;
+    let zeroAtHour: number | null = null;
     for (let h = 1; h <= hours; h += 1) {
         const r = tickHour(wk, { sleepMode: true });
         hpLost += r.drain;
@@ -304,7 +414,7 @@ export function rest(state, { place, hours, currentHp = null }) {
         place,
         hpBonus: wk.hpBonus,
     });
-    const result = { state: wk, hpLost, events };
+    const result: RestResult = { state: wk, hpLost, events };
     if (hp != null) {
         result.hpEnd = hitsZero ? 0 : hp;
         result.hitsZero = hitsZero;
@@ -314,14 +424,16 @@ export function rest(state, { place, hours, currentHp = null }) {
 }
 
 // Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
-export function forecastSleep(state, opts) {
+export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResult {
     return rest(state, opts);
 }
 
 // Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
 // «Усталость N» и «Количество получаемых ОД −N» (M = N). Возвращает данные;
 // тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty).
-export function survivalEffectRows(survival) {
+export function survivalEffectRows(
+    survival: SurvivalState | null | undefined,
+): Array<{ key: string; n: number }> {
     if (!survival) return [];
     const n = totalFatigue(survival);
     if (n <= 0) return [];

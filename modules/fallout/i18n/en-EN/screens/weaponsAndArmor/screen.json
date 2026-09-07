@@ -214,12 +214,53 @@
       "4": "Rested",
       "3": "Tired",
       "2": "Exhausted",
-      "1": "Wrecked"
+      "1": "Wrecked",
+      "title": "Sleep",
+      "placeBed": "Bed",
+      "placeWasteland": "Wasteland",
+      "hours": "Hours: {n}",
+      "wastelandNote": "Sleeping in the wasteland: disease check (Endurance + Survival)",
+      "forecastTitle": "Forecast",
+      "forecastState": "Result: {state}",
+      "forecastHpLost": "HP lost: {n}",
+      "forecastHpEnd": "HP after sleep: {n}",
+      "forecastZeroWarning": "HP will reach 0 during this sleep",
+      "forecastFatigueCleared": "Fatigue (sleep) removed: {n}",
+      "forecastFoodDown": "Hunger: −{n}",
+      "forecastWaterDown": "Thirst: −{n}",
+      "forecastHpBonus": "+2 max HP until your next sleep",
+      "confirm": "Sleep",
+      "cancel": "Cancel",
+      "reportTitle": "Sleep: {hours} h",
+      "reportState": "Result: {state}",
+      "reportHp": "HP: {n}",
+      "reportHpLost": "HP lost: {n}",
+      "reportHpBonus": "+2 max HP until your next sleep",
+      "reportFatigueCleared": "Fatigue (sleep) removed: {n}"
     },
     "fatigue": "Fatigue {n}",
     "apPenalty": "Action Points gained −{n}",
     "foodTitle": "Hunger",
     "waterTitle": "Thirst",
-    "sleepTitle": "Sleep"
+    "sleepTitle": "Sleep",
+    "actions": {
+      "eat": "Eat",
+      "drink": "Drink",
+      "sleep": "Sleep"
+    },
+    "gain": {
+      "food": "Food +{n}",
+      "water": "Water +{n}"
+    },
+    "consumeNotAllowed": "Cannot be used on yourself",
+    "eat": {
+      "title": "Food",
+      "blocked": "You cannot eat any more",
+      "empty": "No food in inventory"
+    },
+    "drink": {
+      "title": "Drinks",
+      "empty": "No drinks in inventory"
+    }
   }
 }

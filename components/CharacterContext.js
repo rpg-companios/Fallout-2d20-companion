@@ -31,10 +31,10 @@ const migrateSkillsToCanonical = (rawSkills) => {
     return canonical ? { ...s, name: canonical } : s;
   });
 };
-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterType } from '../domain/origins';
-import { createSurvivalState } from '../domain/survival';
+import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConsumableApplied } from '../src/store/stateExtensions';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
-import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
 import { isSkillTagged } from '../domain/d20Checks';
@@ -262,17 +262,39 @@ export const CharacterProvider = ({ children }) => {
   const [equippedWeapons, setEquippedWeapons] = useState([]);
   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
-  // Выживание (docs/survival-system-design.md): null = ещё не создан или
-  // робот/киборг (шкал нет). Инициализируется при выборе ориджина.
-  const [survival, setSurvival] = useState(null);
+  // Расширения состояния персонажа (src/store/stateExtensions.js): поля сейва,
+  // которыми владеют сеттинги (например, survival у Fallout). Движок правил
+  // не знает — применяет фабрики/hydrate/reset из реестра.
+  // С патча 209 хранилище — слайс `stateExtensions` зустанд-стора (как
+  // items/effects): единственный источник истины, все экраны подписаны,
+  // мутации — только действия стора. Контекст читает слайс селектором и
+  // раскладывает его в снапшот сейва под теми же ключами.
+  const stateExtensions = useCharacterStore((s) => s.stateExtensions);
 
-  // Новый персонаж: как только выбран ориджин — стартовые шкалы (максимумы
-  // для органиков, null роботам/киборгам). При загрузке сейва поле уже
-  // задано миграцией v23, эффект — no-op.
+  // Новый персонаж: как только выбран ориджин — сеттинговые фабрики
+  // заполняют ещё не созданные поля (null = «не создано»). При загрузке
+  // сейва поля заданы миграцией/гидратацией — эффект их не трогает.
   useEffect(() => {
-    if (!origin || survival !== null) return;
-    setSurvival(createSurvivalState(getCharacterType({ origin })));
-  }, [origin, survival]);
+    if (!origin) return;
+    const created = createStateExtensionFields({ origin, trait });
+    let changed = false;
+    const merged = { ...stateExtensions };
+    for (const [fieldKey, value] of Object.entries(created)) {
+      if (merged[fieldKey] === undefined || merged[fieldKey] === null) {
+        if (merged[fieldKey] === value) continue; // null → null: менять нечего
+        merged[fieldKey] = value;
+        changed = true;
+      }
+    }
+    if (changed) useCharacterStore.getState().setStateExtensions(merged);
+  }, [origin, trait, stateExtensions]);
+
+  // Запись поля расширения — стабильная функция, делегирует действию стора:
+  // используется и в значении контекста, и в уведомлениях расширений
+  // (расходники, патч 208).
+  const setStateExtension = useCallback((fieldKey, value) => {
+    useCharacterStore.getState().setStateExtension(fieldKey, value);
+  }, []);
 
   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
   // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
@@ -780,7 +802,7 @@ export const CharacterProvider = ({ children }) => {
     conditions,
     chemDosesLog,
     sceneRiskStates,
-    survival,
+    ...stateExtensions,
   }), [
     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
@@ -788,7 +810,7 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, attributesSaved, skillsSaved, selectedPerks,
-    conditions, chemDosesLog, sceneRiskStates, survival,
+    conditions, chemDosesLog, sceneRiskStates, stateExtensions,
   ]);
 
   // Realtime save for already persisted characters.
@@ -905,7 +927,13 @@ export const CharacterProvider = ({ children }) => {
       setSceneCounter(data.sceneCounter ?? 0);
       sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
       setSceneRiskStates(data.sceneRiskStates);
-      setSurvival(data.survival ?? null);
+      // Поля сеттинговых расширений: hydrate расширения сам решает, как
+      // нормализовать своё поле (идемпотентно, без подъёма версии схемы).
+      // Хранилище — слайс stateExtensions стора (патч 209).
+      useCharacterStore.getState().setStateExtensions(hydrateStateExtensionFields(data, {
+        origin: resolveOrigin(data.origin),
+        trait: data.trait || null,
+      }));
       // Migrate old [null, null] format to dynamic array
       const rawWeapons = data.equippedWeapons || [];
       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
@@ -1076,19 +1104,18 @@ export const CharacterProvider = ({ children }) => {
     return result.doseCount;
   };
 
-  const applyDiseaseExposureForConsumable = (item) => {
-    if (
-      item?.id === 'drink_dirty_water'
-      && Boolean(useCharacterStore.getState().perkBonuses?.dirtyWaterDiseaseImmune)
-    ) {
-      return null;
-    }
+  const applyDiseaseExposureEvent = (eventId) => {
     const ruleMatches = getSceneRiskRules()
-      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
+      .map((rule) => ({
+        rule,
+        event: Array.isArray(rule.eventTypes) && rule.eventTypes.includes(eventId)
+          ? { eventId }
+          : null,
+      }))
       .filter(({ event }) => event !== null);
     if (ruleMatches.length === 0) return null;
     if (ruleMatches.length > 1) {
-      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
+      throw new Error(`[CharacterContext] Событие риска "${eventId}" объявлено несколькими правилами`);
     }
 
     const { rule, event } = ruleMatches[0];
@@ -1149,6 +1176,46 @@ export const CharacterProvider = ({ children }) => {
       disease,
       infectionStatus: applied.added ? 'infected' : 'duplicate',
     };
+  };
+
+  const applyDiseaseExposureForConsumable = (item) => {
+    if (
+      item?.id === 'drink_dirty_water'
+      && Boolean(useCharacterStore.getState().perkBonuses?.dirtyWaterDiseaseImmune)
+    ) {
+      return null;
+    }
+    const ruleMatches = getSceneRiskRules()
+      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
+      .filter(({ event }) => event !== null);
+    if (ruleMatches.length === 0) return null;
+    if (ruleMatches.length > 1) {
+      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
+    }
+
+    // Единая механика проверки болезни (§7 дока): событие расходника
+    // (rawFood / dirtyWater) разрешается тем же кодом, что и sleepOnGround.
+    return applyDiseaseExposureEvent(ruleMatches[0].event.eventId);
+  };
+
+  /**
+   * Родовой мост времени и эффектов: продвигает таймеры временных эффектов
+   * на N игровых часов (N × 12 сцен). Используется расширениями сеттингов
+   * (например, сон выживания Fallout: docs/survival-system-design.md §5).
+   * Возвращает { effects, expired }.
+   */
+  const advanceEffectsByGameHours = (hours) => {
+    const store = useCharacterStore.getState();
+    const currentLegacy = effectsDictToLegacyArray(store.effects);
+    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+    const { effects: nextEffects, expired } = advanceEffectsByScenes(
+      normalizedCurrent.effects,
+      hours * SCENE_RULES.SCENES_PER_GAME_HOUR,
+    );
+    syncTimedEffectsToStore(nextEffects, store);
+    setActiveTimedEffects(nextEffects);
+    return { effects: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
   };
 
   /**
@@ -1316,10 +1383,20 @@ export const CharacterProvider = ({ children }) => {
 
     const diseaseRiskResult = applyDiseaseExposureForConsumable(item);
 
+    // Расходник применён на себя — уведомляем расширения сеттингов
+    // (реестр stateExtensions, патч 208). Например, Fallout двигает
+    // шкалы еды/воды выживания при употреблении еды/напитков ЛЮБЫМ путём
+    // (инвентарь или модалка выживания). Движок правил не знает.
+    const extensionResults = notifyConsumableApplied(item, {
+      stateExtensions,
+      setStateExtension,
+    });
+
     debugLog('consumable.apply.result', {
       timedResult,
       addictionResult,
       diseaseRiskResult,
+      extensionResults,
       conditionsRemoved: removed,
       conditionRemovalsRequested,
       healAmount: vitalChanges.healAmount,
@@ -1330,6 +1407,7 @@ export const CharacterProvider = ({ children }) => {
       timedResult: { ...timedResult, expired: normalizedCurrent.expired },
       addictionResult,
       diseaseRiskResult,
+      extensionResults,
       conditionsRemoved: removed,
       conditionRemovalsRequested,
       healAmount: vitalChanges.healAmount,
@@ -1453,9 +1531,9 @@ export const CharacterProvider = ({ children }) => {
     });
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
-    // Выживание сбрасывается; при сохранённом ориджине его подхватит эффект
-    // инициализации (максимум органикам, null роботам/киборгам).
-    setSurvival(null);
+    // Поля сеттинговых расширений сбрасываются (reset расширения); при
+    // следующем выборе ориджина фабрики заполнят их заново.
+    useCharacterStore.getState().setStateExtensions(resetStateExtensionFields());
     setEquippedArmor(createEmptyEquippedArmor());
     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
@@ -1586,8 +1664,12 @@ export const CharacterProvider = ({ children }) => {
     getModifiedItem,
     saveModifiedItem,
     removeModifiedItem,
-    survival,
-    setSurvival,
+    // Расширения состояния (src/store/stateExtensions.js): сеттинги
+    // регистрируют поля и читают/меняют их через эти методы.
+    stateExtensions,
+    setStateExtension,
+    advanceEffectsByGameHours,
+    resolveSceneRiskEventById: applyDiseaseExposureEvent,
     resetCharacter,
     resetKitAndRewards,
     resetKitOnly,

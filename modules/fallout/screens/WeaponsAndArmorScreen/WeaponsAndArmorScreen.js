@@ -35,7 +35,10 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
-import { survivalEffectRows } from '../../../../domain/survival';
+import { survivalEffectRows } from '../../survival/survival';
+import { useSurvivalState } from '../../survival/hooks';
+import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
+import SleepModal from './modals/SleepModal';
 import { dedupeWeaponCards } from './dedupeWeaponCards';
 import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
 import { getBodyPlan } from '../../../../domain/bodyplan';
@@ -562,12 +565,15 @@ const WeaponsAndArmorScreen = () => {
     trait,
     origin,
     radiation,
-    survival,
     // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
     // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
     equippedPowerArmor,
     adjustPowerArmorDurability,
   } = useCharacter();
+
+  // Выживание — поле расширения сеттинга (modules/fallout/survival/):
+  // движок хранит его в stateExtensions, модуль читает через свой хук.
+  const survival = useSurvivalState();
 
   const storeItems = useCharacterStore((state) => state.items);
   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
@@ -618,7 +624,10 @@ const WeaponsAndArmorScreen = () => {
   const meleeBonusValue = calculateMeleeBonusValue(attributesEffective, trait);
   const maxHealth = attributesSaved ? calculateMaxHealth(attributesEffective, level) : 0;
   const timedMaxHpBonus = getTimedMaxHpBonus(activeTimedEffects);
-  const effectiveMaxHealth = maxHealth + timedMaxHpBonus;
+  // Выживание (§4 дока): «прекрасно отдохнувший» даёт +2 к макс. ОЗ
+  // до следующего сна — hpBonus в состоянии survival.
+  const survivalHpBonus = survival?.hpBonus || 0;
+  const effectiveMaxHealth = maxHealth + timedMaxHpBonus + survivalHpBonus;
   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
   
   const characterForImmunities = { origin, trait };
@@ -710,6 +719,9 @@ const WeaponsAndArmorScreen = () => {
   );
 
   // Состояние для модального окна модификаций
+  const [eatModalVisible, setEatModalVisible] = useState(false);
+  const [drinkModalVisible, setDrinkModalVisible] = useState(false);
+  const [sleepModalVisible, setSleepModalVisible] = useState(false);
   const [modificationModalVisible, setModificationModalVisible] = useState(false);
   const [selectedWeaponForModification, setSelectedWeaponForModification] = useState(null);
   const [armorModalVisible, setArmorModalVisible] = useState(false);
@@ -1041,6 +1053,41 @@ const WeaponsAndArmorScreen = () => {
                 />
               </View>
             ) : null}
+            {/* Кнопки модалок выживания — под областями (§7 дока). */}
+            {survival ? (
+              <View style={[localStyles.statsRow, { marginTop: 8 }]}>
+                <View style={localStyles.survivalActionCell}>
+                  <TouchableOpacity
+                    style={localStyles.survivalActionButton}
+                    onPress={() => setEatModalVisible(true)}
+                  >
+                    <Text style={localStyles.survivalActionText}>
+                      {tWeaponsAndArmorScreen('survival.actions.eat')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={localStyles.survivalActionCell}>
+                  <TouchableOpacity
+                    style={localStyles.survivalActionButton}
+                    onPress={() => setDrinkModalVisible(true)}
+                  >
+                    <Text style={localStyles.survivalActionText}>
+                      {tWeaponsAndArmorScreen('survival.actions.drink')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={localStyles.survivalActionCell}>
+                  <TouchableOpacity
+                    style={localStyles.survivalActionButton}
+                    onPress={() => setSleepModalVisible(true)}
+                  >
+                    <Text style={localStyles.survivalActionText}>
+                      {tWeaponsAndArmorScreen('survival.actions.sleep')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
             <EffectsPanel
               effects={activeTimedEffects || []}
               immunities={allImmunities}
@@ -1291,6 +1338,22 @@ const WeaponsAndArmorScreen = () => {
         </ScrollView>
       </SafeAreaView>
       
+      {/* Модалки выживания (еда/питьё/сон, док §7) */}
+      <SurvivalConsumeModal
+        visible={eatModalVisible}
+        kind="eat"
+        onClose={() => setEatModalVisible(false)}
+      />
+      <SurvivalConsumeModal
+        visible={drinkModalVisible}
+        kind="drink"
+        onClose={() => setDrinkModalVisible(false)}
+      />
+      <SleepModal
+        visible={sleepModalVisible}
+        onClose={() => setSleepModalVisible(false)}
+      />
+
       {/* Модальное окно модификаций */}
       <WeaponModificationModal
         visible={modificationModalVisible}

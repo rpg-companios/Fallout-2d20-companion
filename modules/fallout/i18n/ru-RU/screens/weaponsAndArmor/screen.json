@@ -214,12 +214,53 @@
       "4": "Отдохнувший",
       "3": "Усталый",
       "2": "Измождённый",
-      "1": "Истощённый"
+      "1": "Истощённый",
+      "title": "Сон",
+      "placeBed": "Кровать",
+      "placeWasteland": "Пустошь",
+      "hours": "Часы: {n}",
+      "wastelandNote": "Сон в пустоши: проверка на болезнь (Выносливость + Выживание)",
+      "forecastTitle": "Прогноз",
+      "forecastState": "Состояние: {state}",
+      "forecastHpLost": "Потеря ОЗ: {n}",
+      "forecastHpEnd": "ОЗ после сна: {n}",
+      "forecastZeroWarning": "ОЗ упадут до 0 за время сна",
+      "forecastFatigueCleared": "Снято усталости (сон): {n}",
+      "forecastFoodDown": "Голод: −{n}",
+      "forecastWaterDown": "Жажда: −{n}",
+      "forecastHpBonus": "+2 к макс. ОЗ до следующего сна",
+      "confirm": "Спать",
+      "cancel": "Отмена",
+      "reportTitle": "Сон: {hours} ч",
+      "reportState": "Состояние: {state}",
+      "reportHp": "ОЗ: {n}",
+      "reportHpLost": "Потеря ОЗ: {n}",
+      "reportHpBonus": "+2 к макс. ОЗ до следующего сна",
+      "reportFatigueCleared": "Снято усталости (сон): {n}"
     },
     "fatigue": "Усталость {n}",
     "apPenalty": "Количество получаемых ОД −{n}",
     "foodTitle": "Голод",
     "waterTitle": "Жажда",
-    "sleepTitle": "Сон"
+    "sleepTitle": "Сон",
+    "actions": {
+      "eat": "Поесть",
+      "drink": "Пить",
+      "sleep": "Спать"
+    },
+    "gain": {
+      "food": "Сытость +{n}",
+      "water": "Вода +{n}"
+    },
+    "consumeNotAllowed": "Нельзя применить на себя",
+    "eat": {
+      "title": "Еда",
+      "blocked": "Вы не можете больше есть",
+      "empty": "В инвентаре нет еды"
+    },
+    "drink": {
+      "title": "Питьё",
+      "empty": "В инвентаре нет напитков"
+    }
   }
 }

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { migrateCharacterState, migrateSurvivalField } from '../../src/store/migrations';
+// Side-effect: сеттинг регистрирует расширение состояния (поле survival +
+// миграцию v22→v23) в реестре движка — как это делает App.js.
+import '../../modules/fallout/survival';
+import { migrateCharacterState } from '../../src/store/migrations';
+import { migrateSurvivalField } from '../../modules/fallout/survival/migration';
 import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
-import { SURVIVAL_RULES } from '../../domain/survival';
+import { SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
 
 const v22 = (origin, extra = {}) => ({ schemaVersion: 22, origin, ...extra });
 

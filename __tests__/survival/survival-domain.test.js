@@ -15,7 +15,7 @@ import {
     removeFatigueTotal,
     rest,
     totalFatigue,
-} from '../../domain/survival';
+} from '../../modules/fallout/survival/survival';
 import food from '../../modules/fallout/data/consumables/food.json';
 import drinks from '../../modules/fallout/data/consumables/drinks.json';
 

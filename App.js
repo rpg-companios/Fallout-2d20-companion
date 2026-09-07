@@ -14,6 +14,9 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { CharacterProvider } from './components/CharacterContext';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
+// Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
+// с AlertHost; движок лишь рендерит, правила внутри модуля.
+import SurvivalClock from './modules/fallout/survival/SurvivalClock';
 import { initDatabase } from './db/Database';
 import { seedDatabase } from './db/seed';
 import { useLocale, useModuleLocale } from './i18n/locale';
@@ -24,6 +27,10 @@ import CharacterScreen from './modules/fallout/screens/CharacterScreen/Character
 import EquipmentScreen from './modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
 import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
 import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
+// Side-effect: сеттинг регистрирует расширение состояния (поле сейва
+// survival + миграцию v22→v23) в реестре движка ДО монтирования
+// CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
+import './modules/fallout/survival';
 import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
 import useAppSettingsStore, {
   selectBootScreenEnabled,
@@ -230,6 +237,7 @@ function App() {
           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
           <FusionCoreChoiceModal />
           <AlertHost />
+          <SurvivalClock />
         </CharacterProvider>
       </SafeAreaProvider>
     </PaperProvider>

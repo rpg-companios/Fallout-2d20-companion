@@ -30,6 +30,21 @@ const diseaseFailureMessage = (diseaseRiskResult) => {
 };
 
 /**
+ * Строки отчёта по проверке заражения (единая механика diseaseExposure:
+ * расходники rawFood/dirtyWater и сон в пустоши sleepOnGround).
+ * Возвращает { positive, negative } — пустые списки, если проверки не было.
+ */
+export const diseaseRiskReportLines = (diseaseRiskResult) => {
+  if (diseaseRiskResult?.status !== 'checked') return { positive: [], negative: [] };
+  if (diseaseRiskResult.check?.passed) {
+    return { positive: [tInventory('screen.alerts.diseaseCheckPassedSummary')], negative: [] };
+  }
+  // По решению владельца провал остаётся отрицательным итогом даже тогда,
+  // когда иммунитет или уже активная болезнь не добавили нового состояния.
+  return { positive: [], negative: [diseaseFailureMessage(diseaseRiskResult)] };
+};
+
+/**
  * Собирает один итог применения расходника. Механические результаты остаются
  * структурированными: UI не распознаёт локализованный текст и не парсит броски.
  */
@@ -71,15 +86,9 @@ export const buildConsumableResultReport = ({
     positive.push(conditionRemovalMessage(conditionId, removedSet.has(conditionId)));
   }
 
-  if (diseaseRiskResult?.status === 'checked') {
-    if (diseaseRiskResult.check?.passed) {
-      positive.push(tInventory('screen.alerts.diseaseCheckPassedSummary'));
-    } else {
-      // По решению владельца провал остаётся отрицательным итогом даже тогда,
-      // когда иммунитет или уже активная болезнь не добавили нового состояния.
-      negative.push(diseaseFailureMessage(diseaseRiskResult));
-    }
-  }
+  const diseaseLines = diseaseRiskReportLines(diseaseRiskResult);
+  positive.push(...diseaseLines.positive);
+  negative.push(...diseaseLines.negative);
 
   if (addictionResult) {
     if (addictionResult.addicted) {
