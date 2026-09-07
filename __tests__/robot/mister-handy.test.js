@@ -124,9 +124,13 @@ describe('Мистер Хэнди — acceptance-критерий новой м�
     );
 
     expect(Object.keys(slots)).toEqual(['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster']);
+    // Патч 191: навесы крепятся К рукам — во всех трёх слотах руки-манипуляторы,
+    // огнемёт и пила — в ладонях.
     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
-    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
-    expect(slots.arm3.limb?.id).toBe('robot_weapon_circular_saw');
+    expect(slots.arm1.heldWeapon?.id).toBe('robot_weapon_flamethrower');
+    expect(slots.arm2.limb?.id).toBe('robot_arm_mister_handy');
+    expect(slots.arm2.heldWeapon?.id).toBe('robot_weapon_circular_saw');
+    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
     // Движитель: thruster, а не leftLeg/rightLeg.
     expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
   });
@@ -206,8 +210,8 @@ describe('Мистер Хэнди — acceptance-критерий новой м�
   });
 
   it('arm3 не теряется: каждая рука-манипулятор даёт собственную атаку', () => {
-    // Комплект «Няня»: arm1 — рука-манипулятор, arm2 — огнемёт,
-    // arm3 — рука-манипулятор (первый вариант выбора).
+    // Комплект «Няня»: arm1 — рука-манипулятор, arm2 — огнемёт (навес в ладони,
+    // патч 191), arm3 — рука-манипулятор (первый вариант выбора).
     const { slots } = initRobotSlots(
       'misterHandy',
       resolveKit('mister_handy_nanny'),
@@ -217,17 +221,18 @@ describe('Мистер Хэнди — acceptance-критерий новой м�
     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
     expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
 
-    // Три источника атак: манипулятор arm1, огнемёт arm2, манипулятор arm3.
-    // Сейчас getItem-дедуп по id оружия съедает второй манипулятор.
-    expect(attacksOfSlot(slots, 'arm1')).toHaveLength(1);
+    // Четыре источника атак: манипулятор arm1 + огнемёт в его ладони (навес
+    // не глушит собственную атаку руки), манипуляторы arm2 и arm3.
+    // Дедуп по id оружия второй манипулятор не съедает.
+    expect(attacksOfSlot(slots, 'arm1')).toHaveLength(2);
     expect(attacksOfSlot(slots, 'arm2')).toHaveLength(1);
     expect(attacksOfSlot(slots, 'arm3')).toHaveLength(1);
-    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(3);
+    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(4);
   });
 
-  it('оружие вместо руки не принимает обшивку (броня — только на конечность)', () => {
-    // Комплект «Помощник»: arm1 — рука-манипулятор, arm2 — огнемёт,
-    // arm3 — циркулярная пила (обе — оружие вместо руки).
+  it('рука с навесом принимает обшивку: броня — на любую конечность (патч 191)', () => {
+    // Комплект «Помощник»: во всех трёх слотах — руки-манипуляторы; огнемёт
+    // и пила — навесы в ладонях, а не «оружие вместо руки».
     const { slots } = initRobotSlots(
       'misterHandy',
       [
@@ -239,12 +244,10 @@ describe('Мистер Хэнди — acceptance-критерий новой м�
       robotCatalog,
     );
 
-    // Обшивка ложится только на настоящую конечность.
+    // Обшивка ложится на каждую руку: навес в ладони ей не мешает.
     expect(slots.arm1.plating?.id).toBeTruthy();
-    // Слот, занятый оружием вместо руки, защиты не принимает: у него нет своей
-    // СУ и нет куда её надевать — только характеристики самого оружия.
-    expect(slots.arm2.plating).toBeFalsy();
-    expect(slots.arm3.plating).toBeFalsy();
+    expect(slots.arm2.plating?.id).toBeTruthy();
+    expect(slots.arm3.plating?.id).toBeTruthy();
   });
 
 });

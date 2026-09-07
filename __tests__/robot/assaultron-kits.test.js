@@ -72,7 +72,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
     expect(laser.isBuiltin).toBe(true);
   });
 
-  it('initRobotSlots: строительные когти — оружие со статами в слотах рук', () => {
+  it('initRobotSlots: строительные когти — навесы в ладонях стандартных рук (патч 191)', () => {
     const clawWeapon = byId(robotWeapons, 'robot_weapon_construction_claw');
     const kitItems = [
       { ...clawWeapon, itemType: 'weapon', weaponId: clawWeapon.id, slot: 'left' },
@@ -80,16 +80,19 @@ describe('комплекты снаряжения Штурмотрона', () =>
     ];
     const { slots } = initRobotSlots('assaultron', kitItems, robotCatalog);
 
-    expect(slots.leftArm.limb?.id).toBe('robot_weapon_construction_claw');
-    expect(slots.rightArm.limb?.id).toBe('robot_weapon_construction_claw');
+    // В слоте — стандартная рука штурмотрона, навес — в её ладони.
+    expect(slots.leftArm.limb?.id).toBe('robot_arm_assaultron');
+    expect(slots.rightArm.limb?.id).toBe('robot_arm_assaultron');
+    expect(slots.leftArm.heldWeapon?.id).toBe('robot_weapon_construction_claw');
+    expect(slots.rightArm.heldWeapon?.id).toBe('robot_weapon_construction_claw');
 
     const weapons = getBuiltinWeaponsFromSlots(slots);
-    const claw = weapons.find((w) => w.id === 'robot_weapon_construction_claw');
-    expect(claw, 'коготь не попал в оружие').toBeTruthy();
+    const claws = weapons.filter((w) => w.id === 'robot_weapon_construction_claw');
+    expect(claws, 'когти не попали в оружие').toHaveLength(2);
+    const claw = claws[0];
     expect(claw.damage).toBe(4);
     expect(claw.damageType).toBe('physical');
     expect(claw.mainSkill).toBe('UNARMED');
-    expect(claw.isBuiltin).toBe(true);
   });
 
   it('initRobotSlots: рамы и обшивка — 1 предмет = 1 слот (включая ноги)', () => {

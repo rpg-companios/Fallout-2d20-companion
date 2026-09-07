@@ -56,7 +56,10 @@
 //       стандартная): ссылки robot_plating_factory_* в слотах робота и в
 //       инвентаре переименованы в robot_plating_standard_* (миграция
 //       migrateRobotPlatingIds в migrations.js).
-export const CURRENT_SCHEMA_VERSION = 21;
+// v22 — навесы (arm attachments) — оружие, крепящееся к руке: слоты, где
+//       навес стоял вместо руки, получают стандартную руку плана тела,
+//       навес пересаживается в ладонь (миграция migrateRobotArmAttachments).
+export const CURRENT_SCHEMA_VERSION = 22;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

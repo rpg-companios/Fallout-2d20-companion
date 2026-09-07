@@ -9,6 +9,9 @@ import { getPerks, getUniqQualityName } from '../../domain/registry';
 import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
 import { debugLog } from '../debug/falloutDebug';
+import { getDefaultLimbs } from '../../domain/bodyplan';
+import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+import robotLimbsFile from '../../modules/fallout/data/equipment/robot/limbs.json';
 
 const PERK_ID_REMAP_V18 = {
   triggerRush: 'scrounger',
@@ -520,6 +523,55 @@ export const migrateRobotPlatingIds = (state) => {
   }
 
   return changed ? next : state;
+};
+
+/**
+ * v21 -> v22: навесы (arm attachments) перестали быть конечностями.
+ *
+ * Новая модель: навес — оружие, которое крепится К руке и живёт в её ладони
+ * (heldWeapon). Слот, где навес стоял ВМЕСТО руки, получает стандартную руку
+ * плана тела (у каждого робота своя: мистер-помощник, секьюритрон, штурмотрон,
+ * протектрон…), а сам навес пересаживается в ладонь. Если у плана нет
+ * стандартной руки для слота, слот освобождается — навес сохраняется в
+ * ладони и ждёт установки руки.
+ *
+ * Понимает и «толстый» вид (объект конечности), и «худой» (id из v20+).
+ * Идемпотентна: после пересадки в limb не остаётся навесов.
+ */
+export const migrateRobotArmAttachments = (state) => {
+  if (!state || typeof state !== 'object') return state;
+  if (!state.equippedRobotSlots || typeof state.equippedRobotSlots !== 'object') return state;
+
+  const attachmentIds = new Set(
+    (Array.isArray(robotWeaponAsLimbFile) ? robotWeaponAsLimbFile : []).map((entry) => entry.id)
+  );
+  const limbsById = new Map(
+    (Array.isArray(robotLimbsFile) ? robotLimbsFile : []).map((entry) => [entry.id, entry])
+  );
+  const planDefaults = getDefaultLimbs(state?.origin?.bodyPlan) || {};
+
+  let changed = false;
+  const slots = {};
+  for (const [key, slot] of Object.entries(state.equippedRobotSlots)) {
+    if (!slot || typeof slot !== 'object') { slots[key] = slot; continue; }
+    const limb = slot.limb;
+    const limbId = typeof limb === 'string' ? limb : limb?.id;
+    if (!limbId) { slots[key] = slot; continue; }
+    const isAttachment = attachmentIds.has(limbId)
+      || (limb?.itemType === 'robotArm' && limb?.canHoldWeapons === false);
+    if (!isAttachment) { slots[key] = slot; continue; }
+
+    const defaultArmId = planDefaults[key];
+    const defaultArm = defaultArmId ? limbsById.get(defaultArmId) : null;
+    slots[key] = {
+      ...slot,
+      limb: defaultArm ? { id: defaultArm.id } : null,
+      heldWeapon: { ...(slot.heldWeapon || {}), id: limbId, weaponId: limbId, itemType: 'weapon' },
+    };
+    changed = true;
+  }
+
+  return changed ? { ...state, equippedRobotSlots: slots } : state;
 };
 
 const MIGRATIONS = [
@@ -1168,6 +1220,11 @@ const MIGRATIONS = [
   // robot_plating_standard_* — иначе слой не разрешится и персонаж потеряет
   // защиту. Идемпотентна.
   migrateRobotPlatingIds,
+
+  // v21 -> v22: навес — оружие, крепящееся К руке, а не конечность. Слоты,
+  // где навес стоял вместо руки, получают стандартную руку плана тела, навес
+  // пересаживается в ладонь (heldWeapon). Идемпотентна.
+  migrateRobotArmAttachments,
 
 ];
 /**

@@ -227,6 +227,50 @@ const resolveMods = (catalog, ids = []) => (ids || [])
   .map((id) => (catalog?.weaponMods || []).find((m) => m.id === id))
   .filter(Boolean);
 
+// ---------------------------------------------------------------------------
+// Навесы (arm attachments): оружие, крепящееся К руке, а не вместо неё.
+// ---------------------------------------------------------------------------
+
+/**
+ * Навес ли предмет: запись каталога weaponAsLimb или предмет с id такого
+ * навеса (в том числе «худой» вид из сейва — { id } / { weaponId }).
+ *
+ * @param {object|null} item
+ * @param {object} catalog — каталог конечностей (по умолчанию реестр).
+ * @returns {boolean}
+ */
+export function isArmAttachment(item, catalog = getRobotLimbCatalog()) {
+  const id = item?.itemCategory === 'weaponAsLimb'
+    ? item.id
+    : (item?.weaponId ?? item?.id);
+  if (!id) return false;
+  return (catalog?.weaponAsLimb || []).some((entry) => entry.id === id);
+}
+
+/**
+ * Можно ли заменить предмет в ладони руки.
+ *
+ * Строгий режим (настройка «прикрепляемые части рук — только на аналогичные»):
+ * навес меняется только на другой навес, обычное оружие — только на оружие.
+ * Свободный режим разрешает любую замену. Первая установка в пустую ладонь
+ * ограничением не является — правило про ЗАМЕНУ.
+ *
+ * @param {object|null} existingItem — предмет в ладони (или его id-запись)
+ * @param {object|null} incomingItem — кандидат
+ * @param {object} options — { strict?: boolean, catalog? }
+ * @returns {{ allowed: boolean, reason: string|null }}
+ */
+export function canReplaceArmWeapon(existingItem, incomingItem, options = {}) {
+  const { strict = true, catalog = getRobotLimbCatalog() } = options;
+  if (!strict) return allow();
+  const existingIsAttachment = isArmAttachment(existingItem, catalog);
+  const incomingIsAttachment = isArmAttachment(incomingItem, catalog);
+  return existingIsAttachment === incomingIsAttachment
+    ? allow()
+    : deny('equip.error.armPartReplaceStrict');
+}
+
+
 /**
  * Карта применённых модов { слот: id } — вид, который ждут экраны и отпечаток
  * карточки. Восстанавливается из списка id: каждый мод знает свой слот.
@@ -616,7 +660,7 @@ export function slotAcceptsArmor(slot, options = {}) {
  * @returns {{ allowed: boolean, reason: string|null }}
  */
 export function canEquip(slot, item, options = {}) {
-  const { bodyPlan, slotId, catalog = getRobotLimbCatalog() } = options;
+  const { bodyPlan, slotId, catalog = getRobotLimbCatalog(), armPartsStrict = true } = options;
   const state = normalizeSlot(slot);
   const def = getSlotDef(bodyPlan, slotId);
   const kind = classifyItem(item);
@@ -627,6 +671,11 @@ export function canEquip(slot, item, options = {}) {
   // --- Конечность или оружие вместо конечности ---
   if (kind === 'limb') {
     const entry = resolveLimb(catalog, item);
+    // Навес — не конечность: он крепится К руке и живёт в её ладони
+    // (ветка «оружие или навес в ладонь» ниже).
+    if (item?.itemCategory === 'weaponAsLimb' || entry?.itemCategory === 'weaponAsLimb') {
+      return deny('equip.error.attachmentNotALimb');
+    }
     const limbType = item.limbType || entry?.limbType;
     if (!limbType) return deny('equip.error.limbTypeMismatch');
     if (!def.accepts.includes(limbType)) return deny('equip.error.limbTypeMismatch');
@@ -640,24 +689,41 @@ export function canEquip(slot, item, options = {}) {
     return slotAcceptsArmor(slot, { ...options, item });
   }
 
-  // --- Оружие в ладонь ---
+  // --- Оружие или навес в ладонь ---
+  // Навес (arm attachment) — оружие, которое крепится К руке: без руки его
+  // получить нельзя (ветка limb выше это гарантирует), занимает ладонь наравне
+  // с обычным оружием и меняется по правилу «аналогичное на аналогичное»
+  // (строгий режим, настройка «прикрепляемые части рук»).
   const limb = resolveLimb(catalog, state.content);
   if (!limb || limb.itemCategory !== 'limb' || limb.canHoldWeapons !== true) {
     return deny('equip.error.limbCannotHoldWeapons');
   }
   const weaponSlots = limb.weaponSlots ?? 1;
   if (weaponSlots <= 0) return deny('equip.error.limbCannotHoldWeapons');
-  if (state.heldWeaponId) return deny('equip.error.slotOccupied');
+
+  const incomingIsAttachment = isArmAttachment(item, catalog);
+
+  if (state.heldWeaponId) {
+    // В ладони уже что-то есть — это замена, а не первая установка.
+    const replaceCheck = canReplaceArmWeapon(slot?.heldWeapon ?? { id: state.heldWeaponId }, item, {
+      strict: armPartsStrict,
+      catalog,
+    });
+    if (!replaceCheck.allowed) return replaceCheck;
+  }
 
   const weapon = resolveWeapon(catalog, item?.weaponId || item?.id);
-  if (weapon && weapon.handheld === false) return deny('equip.error.weaponNotHandheld');
+  if (weapon && weapon.handheld === false && !incomingIsAttachment) {
+    return deny('equip.error.weaponNotHandheld');
+  }
 
-  // Вес и двуручность — как в старой модели, поля те же.
+  // Вес и двуручность — как в старой модели, поля те же. Навес весит как
+  // рука, которой он крепится, — отдельных ограничений по весу у него нет.
   const maxWeight = limb.maxHandelWeaponWeight;
-  if (maxWeight != null && (item?.weight ?? 0) > maxWeight) {
+  if (!incomingIsAttachment && maxWeight != null && (item?.weight ?? 0) > maxWeight) {
     return deny('equip.error.weaponTooHeavyForLimb');
   }
-  if (limb.excludeTwoHanded && item?.twoHanded) {
+  if (!incomingIsAttachment && limb.excludeTwoHanded && item?.twoHanded) {
     return deny('equip.error.limbExcludesTwoHandedWeapons');
   }
   return allow();
@@ -717,7 +783,10 @@ export function attacksFromSlot(slot, options = {}) {
 
   if (state.heldWeaponId && canHold) {
     const held = resolveWeapon(catalog, state.heldWeaponId);
-    if (!held || held.handheld !== false) {
+    // Навес в ладони законен даже при handheld === false: это не ручное
+    // оружие человека, а оружие, крепящееся к руке (arm attachment).
+    const heldIsAttachment = isArmAttachment({ id: state.heldWeaponId }, catalog);
+    if (!held || held.handheld !== false || heldIsAttachment) {
       push(held || { id: state.heldWeaponId }, 'held', state.heldWeaponMods);
     }
   }
@@ -872,7 +941,13 @@ export function limbOptionsForSlot(runtimeCatalog, bodyPlan, slotId) {
     ...(runtimeCatalog?.robotBody || []),
     ...(runtimeCatalog?.robotLegs || []),
   ];
-  return pool.filter((limb) => accepts.includes(resolveLimb(catalog, limb)?.limbType));
+  return pool.filter((limb) => {
+    const entry = resolveLimb(catalog, limb);
+    // Навес — не конечность: в пикер замены руки он не попадает,
+    // крепится к руке и меняется из инвентаря (правило «arm attachment»).
+    if (entry?.itemCategory === 'weaponAsLimb') return false;
+    return accepts.includes(entry?.limbType);
+  });
 }
 
 /**

@@ -236,3 +236,4 @@ export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValu
 export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingValue('weaponDurabilityLossPer10Shots');
 export const selectRandomWeaponQualityEnabled = (state) => state.getSettingValue('randomWeaponQualityEnabled');
 export const selectUnarmedAttackVisible = (state) => state.getSettingValue('unarmedAttackVisible');
+export const selectRobotArmPartsStrictReplace = (state) => state.getSettingValue('robotArmPartsStrictReplace');

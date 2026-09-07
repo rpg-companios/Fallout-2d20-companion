@@ -198,10 +198,12 @@ describe('canEquip: конечности', () => {
     }).allowed).toBe(true);
   });
 
-  it('оружие вместо руки ставится в слот руки', () => {
-    expect(canEquip({}, weaponLimbById('robot_weapon_flamethrower'), {
+  it('навес не ставится в слот руки — только в ладонь (патч 191)', () => {
+    const { allowed, reason } = canEquip({}, weaponLimbById('robot_weapon_flamethrower'), {
       bodyPlan: 'misterHandy', slotId: 'arm2',
-    }).allowed).toBe(true);
+    });
+    expect(allowed).toBe(false);
+    expect(reason).toBe('equip.error.attachmentNotALimb');
   });
 });
 
@@ -213,13 +215,19 @@ describe('canEquip: оружие в ладонь', () => {
     expect(allowed).toBe(true);
   });
 
-  it('занятая ладонь — отказ, а не потеря вложенного оружия', () => {
+  it('занятая ладонь — замена по правилу, а не потеря вложенного оружия', () => {
     const busy = { content: 'robot_arm_mister_handy', heldWeaponId: 'robot_weapon_manipulator' };
-    const { allowed, reason } = canEquip(busy, weaponById('robot_weapon_circular_saw'), {
+    // манипулятор → навес: строгий режим запрещает (не аналогичное)
+    const toAttachment = canEquip(busy, weaponById('robot_weapon_circular_saw'), {
       bodyPlan: 'misterHandy', slotId: 'arm1',
     });
-    expect(allowed).toBe(false);
-    expect(reason).toBe('equip.error.slotOccupied');
+    expect(toAttachment.allowed).toBe(false);
+    expect(toAttachment.reason).toBe('equip.error.armPartReplaceStrict');
+    // манипулятор → манипулятор: замена оружия на оружие разрешена
+    const toWeapon = canEquip(busy, weaponById('robot_weapon_manipulator'), {
+      bodyPlan: 'misterHandy', slotId: 'arm1',
+    });
+    expect(toWeapon.allowed).toBe(true);
   });
 
   it('оружие вместо руки ничего в ладонь не берёт', () => {
@@ -230,13 +238,14 @@ describe('canEquip: оружие в ладонь', () => {
     expect(reason).toBe('equip.error.limbCannotHoldWeapons');
   });
 
-  it('встроенная атака (handheld: false) в ладонь не кладётся', () => {
-    const { allowed, reason } = canEquip(handyArmSlot(), weaponById('robot_weapon_flamethrower'), {
+  it('обычная недержабельная атака (handheld: false) в ладонь не кладётся, навес — кладётся', () => {
+    // Огнемёт — навес: в ладонь руки кладётся (патч 191), handheld:false
+    // его не бракует — это оружие, крепящееся к руке, а не ручное.
+    const flamer = canEquip(handyArmSlot(), weaponById('robot_weapon_flamethrower'), {
       bodyPlan: 'misterHandy', slotId: 'arm1',
     });
     expect(weaponById('robot_weapon_flamethrower').handheld).toBe(false);
-    expect(allowed).toBe(false);
-    expect(reason).toBe('equip.error.weaponNotHandheld');
+    expect(flamer.allowed).toBe(true);
   });
 });
 
@@ -343,14 +352,14 @@ describe('attacksFromSlot', () => {
     ].sort());
   });
 
-  it('недержабельное оружие в ладони не считается атакой', () => {
-    // Пила handheld: false — она сама конечность, а не предмет в ладони.
+  it('навес в ладони считается атакой руки (патч 191)', () => {
+    // Пила handheld: false, но она навес — крепится к руке и атакует из ладони.
     const attacks = attacksFromSlot({
       content: 'robot_arm_mister_handy',
       heldWeaponId: 'robot_weapon_circular_saw',
     }, { slotId: 'arm1' });
-    expect(attacks).toHaveLength(1);
-    expect(attacks[0].id).toBe('robot_weapon_manipulator');
+    const ids = attacks.map((w) => w.id).sort();
+    expect(ids).toEqual(['robot_weapon_circular_saw', 'robot_weapon_manipulator']);
   });
 
   it('оружие вместо руки даёт свою атаку и не держит чужую', () => {

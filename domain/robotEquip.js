@@ -359,8 +359,47 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         if (weaponStats) pendingHeadBuiltinWeapons.push(weaponStats);
         continue; // Не добавлять в инвентарь и не экипировать как heldWeapon
       }
+      // Навес (arm attachment): оружие крепится К руке, а не вместо неё.
+      // Рука уже стоит — занимаем её ладонь. Руки нет — ставим стандартную
+      // руку плана тела (у каждого робота своя), навес — уже в неё. Получить
+      // навес без руки нельзя: если и стандартную руку поставить некуда —
+      // предмет уходит в инвентарь.
+      const attachmentEntry = (robotCatalog.weaponAsLimb || []).find(
+        (entry) => entry.id === (weaponData.id ?? item.weaponId)
+      );
+      if (attachmentEntry) {
+        const armKeys = slotKeys.filter((k) => k.toLowerCase().includes('arm'));
+        let targetKey = armKeys.find(
+          (k) => slots[k]?.limb?.canHoldWeapons === true && !slots[k]?.heldWeapon
+        );
+        if (!targetKey) {
+          const emptyKey = armKeys.find((k) => slots[k]?.limb == null);
+          const planDefaults = getDefaultLimbs(getBodyPlan(bodyPlan)?.id ?? bodyPlan);
+          const defaultArmId = emptyKey ? planDefaults[emptyKey] : null;
+          const defaultEntry = defaultArmId
+            ? (robotCatalog.limbs || []).find((l) => l.id === defaultArmId)
+            : null;
+          if (emptyKey && defaultEntry) {
+            slots[emptyKey] = {
+              ...slots[emptyKey],
+              limb: buildLimbFromArmEntry(defaultEntry),
+            };
+            targetKey = emptyKey;
+          }
+        }
+        if (targetKey && slots[targetKey] !== undefined) {
+          slots[targetKey].heldWeapon = {
+            ...(resolveWeaponStats(attachmentEntry.id) ?? weaponData),
+            itemType: 'weapon',
+          };
+        } else {
+          inventoryItems.push(item);
+        }
+        continue;
+      }
+
       const armEntry = resolveLimbEntry(weaponData.id ?? item.weaponId);
-      if (armEntry) {
+      if (armEntry && armEntry.itemCategory !== 'weaponAsLimb') {
         const targetKey = findFreeSlotForLimb(armEntry);
         if (targetKey && slots[targetKey] !== undefined) {
           const limbFromArm = buildLimbFromArmEntry(armEntry);
@@ -373,26 +412,9 @@ export function initRobotSlots(bodyPlan, resolvedKitItems = [], robotCatalog = {
         }
       }
 
-      // Fallback: robot weapon as limb even without explicit arms catalog entry.
-      if (String(weaponData.id || item.weaponId || '').startsWith('robot_weapon_')) {
-        const preferred = item.limbSlot;
-        const targetKey = (preferred && slotKeys.includes(preferred) && slots[preferred]?.limb == null)
-          ? preferred
-          : slotKeys.find((k) => k.toLowerCase().includes('arm') && slots[k]?.limb == null);
-        if (targetKey && slots[targetKey] !== undefined) {
-          slots[targetKey].limb = {
-            ...weaponData,
-            itemType: 'robotArm',
-            canHoldWeapons: false,
-            weaponSlots: 0,
-            builtinWeapons: buildBuiltinWeapons(weaponData).map((w) => ({ ...w, isBuiltin: true })),
-          };
-          slots[targetKey].heldWeapon = null;
-          continue;
-        }
-      }
-
-      // Иначе как обычное оружие в руке.
+      // Иначе как обычное оружие в руке. Ветку «робо-оружие вместо конечности»
+      // сняли: навесы крепятся к руке выше, прочее робо-оружие (лазер, кувалда
+      // робомозга) встаёт в ладонь как любое другое.
       const targetKey = slotKeys.find((k) =>
         k.toLowerCase().includes('arm') && slots[k].limb?.canHoldWeapons && slots[k].heldWeapon == null
       );

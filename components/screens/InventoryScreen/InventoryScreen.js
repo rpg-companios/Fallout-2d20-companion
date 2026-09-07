@@ -22,7 +22,7 @@ import {
 } from '../../../domain/powerArmor';
 import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
-import { slotsForLimbType } from '../../../domain/robotSlots';
+import { slotsForLimbType, isArmAttachment, canReplaceArmWeapon } from '../../../domain/robotSlots';
 import { rerollConsumableRadiationRoll } from '../../../domain/effects';
 import { buildConsumableResultReport } from './logic/consumableResultReport';
 import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
@@ -38,7 +38,7 @@ import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../..
 import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
 import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
 import styles from '../../../styles/InventoryScreen.styles';
-import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled } from '../../../src/store/appSettingsStore';
+import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled, selectRobotArmPartsStrictReplace } from '../../../src/store/appSettingsStore';
 import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
 
 const PARAM_FIELDS = [
@@ -111,6 +111,7 @@ const InventoryScreen = () => {
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+  const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     if (!stackKey) return undefined;
@@ -695,6 +696,78 @@ const InventoryScreen = () => {
       if (!armDef) return;
       const slots = equippedRobotSlots || {};
       const slotKeys = Object.keys(slots);
+
+      // Навес (arm attachment) — оружие, крепящееся К руке: без руки его
+      // получить нельзя, занимает ладонь и меняется на аналогичный навес
+      // (строгий режим — настройка «прикрепляемые части рук»).
+      if (isArmAttachment(displayWeapon)) {
+        const armEntries = slotKeys
+          .map((key) => [key, slots[key]])
+          .filter(([, slotData]) => slotData?.limb?.canHoldWeapons === true);
+        if (armEntries.length === 0) {
+          showAlert(
+            tInventory('screen.alerts.robotArmRequiredTitle'),
+            tInventory('screen.alerts.robotArmRequiredMessage')
+          );
+          return;
+        }
+        // Свободная ладонь → первая установка; занятая → замена по правилу.
+        let target = armEntries.find(([, slotData]) => slotData?.heldWeapon == null);
+        let replaced = null;
+        if (!target) {
+          for (const entry of armEntries) {
+            const check = canReplaceArmWeapon(entry[1].heldWeapon, displayWeapon, {
+              strict: robotArmPartsStrict,
+            });
+            if (check.allowed) { target = entry; replaced = entry[1].heldWeapon; break; }
+          }
+          if (!target) {
+            showAlert(
+              tInventory('screen.alerts.armPartStrictTitle'),
+              tInventory('screen.alerts.armPartStrictMessage')
+            );
+            return;
+          }
+        }
+        const [targetKey] = target;
+        const sourceStackKey = weaponToEquip.stackKey || getStackKey(displayWeapon);
+        const totalOwned = findUnequippedStoreItemByStackKey(sourceStackKey)?.quantity || 0;
+        if (totalOwned <= 0) {
+          showAlert(tInventory('screen.alerts.noItemsTitle'), tInventory('screen.alerts.noItemsMessage'));
+          return;
+        }
+        const weaponEntry = {
+          ...displayWeapon,
+          itemType: 'weapon',
+          stackKey: sourceStackKey,
+          uniqueId: displayWeapon.uniqueId || createWeaponInstanceId(),
+          sourceSlot: targetKey,
+        };
+        const updatedSlots = {
+          ...slots,
+          [targetKey]: { ...slots[targetKey], heldWeapon: weaponEntry },
+        };
+        setEquippedRobotSlots(updatedSlots);
+        // Снятый предмет возвращается в инвентарь (как при снятии из ладони).
+        if (replaced) {
+          const replacedStackKey = replaced.stackKey || getStackKey(replaced);
+          const stackMate = findUnequippedStoreItemByStackKey(replacedStackKey);
+          if (stackMate) adjustStoreItemQuantity(stackMate.id, 1);
+          else {
+            addNewItem({
+              ...flattenItemParams(replaced),
+              itemType: 'weapon',
+              stackKey: replacedStackKey,
+              equipped: false,
+              quantity: 1,
+            });
+          }
+        }
+        const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
+        if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
+        return;
+      }
+
       // Слоты под конечность даёт план тела по типу конечности — раньше их
       // список лежал внутри самой конечности (compatibleSlots).
       const compatibleSlots = slotsForLimbType(robotBodyPlan, armDef.limbType ?? 'arm');
@@ -752,6 +825,25 @@ const InventoryScreen = () => {
       // Validate weight / two-handed against the arm (Requirement 7.6)
       const [armSlotKey, armSlotData] = armWithHoldCapability;
       const armLimb = armSlotData.limb;
+
+      // Ладонь занята — это замена, а не первая установка: строгий режим
+      // требует «аналогичное на аналогичное» (навес меняется навесом, оружие —
+      // оружием). Снятый предмет возвращается в инвентарь, а не пропадает.
+      let replacedPalmItem = null;
+      if (armSlotData?.heldWeapon) {
+        const replaceCheck = canReplaceArmWeapon(armSlotData.heldWeapon, displayWeapon, {
+          strict: robotArmPartsStrict,
+        });
+        if (!replaceCheck.allowed) {
+          showAlert(
+            tInventory('screen.alerts.armPartStrictTitle'),
+            tInventory('screen.alerts.armPartStrictMessage')
+          );
+          return;
+        }
+        replacedPalmItem = armSlotData.heldWeapon;
+      }
+
       const candidateWeight = toWeight(displayWeapon.weight);
       const excludeTwoHanded = Boolean(armLimb?.excludeTwoHanded);
       if (excludeTwoHanded && isTwoHandedWeapon) {
@@ -799,6 +891,21 @@ const InventoryScreen = () => {
         [armSlotKey]: { ...slots[armSlotKey], heldWeapon: weaponEntry },
       };
       setEquippedRobotSlots(updatedSlots);
+      // Заменённый предмет ладони возвращается в инвентарь (как при снятии).
+      if (replacedPalmItem) {
+        const replacedStackKey = replacedPalmItem.stackKey || getStackKey(replacedPalmItem);
+        const stackMate = findUnequippedStoreItemByStackKey(replacedStackKey);
+        if (stackMate) adjustStoreItemQuantity(stackMate.id, 1);
+        else {
+          addNewItem({
+            ...flattenItemParams(replacedPalmItem),
+            itemType: 'weapon',
+            stackKey: replacedStackKey,
+            equipped: false,
+            quantity: 1,
+          });
+        }
+      }
       const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
       if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
       return;

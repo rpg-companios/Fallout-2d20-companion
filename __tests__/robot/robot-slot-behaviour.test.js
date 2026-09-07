@@ -143,15 +143,16 @@ describe('регрессии', () => {
     expect(laser.isBuiltin).toBe(true);
   });
 
-  it('строительные когти: одинаковые руки дают две карточки', () => {
+  it('строительные когти: одинаковые навесы в ладонях дают две карточки', () => {
     const claw = byId(weaponsCatalog, 'robot_weapon_construction_claw');
     const { slots } = initRobotSlots('assaultron', [
       { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'left' },
       { ...claw, itemType: 'weapon', weaponId: claw.id, slot: 'right' },
     ], robotCatalog);
 
-    expect(slots.leftArm.limb?.id).toBe('robot_weapon_construction_claw');
-    expect(slots.rightArm.limb?.id).toBe('robot_weapon_construction_claw');
+    // Патч 191: навес крепится к руке — в слоте стандартная рука, навес в ладони.
+    expect(slots.leftArm.limb?.id).toBe('robot_arm_assaultron');
+    expect(slots.rightArm.limb?.id).toBe('robot_arm_assaultron');
     const claws = getBuiltinWeaponsFromSlots(slots).filter((w) => w.id === 'robot_weapon_construction_claw');
     expect(claws).toHaveLength(2);
     expect(claws.map((w) => w.sourceSlot).sort()).toEqual(['leftArm', 'rightArm']);
@@ -528,12 +529,14 @@ describe('каталог конечностей для слота', () => {
   };
   const ids = (list) => list.map((l) => l.id).sort();
 
-  it('слот руки предлагает только руки (включая оружие вместо руки)', () => {
+  it('слот руки предлагает только руки (навесы — не конечности, патч 191)', () => {
     const options = limbOptionsForSlot(runtimeCatalog, 'misterHandy', 'arm1');
     expect(options.length).toBeGreaterThan(0);
-    // Все кандидаты — конечности типа arm: и руки, и оружие-руки.
+    // Все кандидаты — конечности типа arm; навесы (weaponAsLimb) в пикер
+    // замены руки не попадают: они крепятся к руке, а не заменяют её.
     for (const limb of options) {
       expect(limb.itemType).toBe('robotArm');
+      expect(weaponAsLimbCatalog.some((w) => w.id === limb.id)).toBe(false);
     }
     // Головы, корпуса и движители в список руки не попадают.
     expect(ids(options)).not.toContain('robot_head_protectron');
@@ -555,9 +558,12 @@ describe('каталог конечностей для слота', () => {
 
   it('для привычных слотов набор совпадает с каталогом нужного типа', () => {
     const options = (slot, plan) => ids(limbOptionsForSlot(runtimeCatalog, plan, slot));
+    // Для рук ожидание — каталог рук БЕЗ навесов: навес не конечность.
     const catalog = (slot) => ids(slot === 'head' ? runtimeCatalog.robotHeads
       : slot === 'body' ? runtimeCatalog.robotBody
-        : slot.toLowerCase().includes('arm') ? runtimeCatalog.robotArms : runtimeCatalog.robotLegs);
+        : slot.toLowerCase().includes('arm')
+          ? runtimeCatalog.robotArms.filter((l) => !weaponAsLimbCatalog.some((w) => w.id === l.id))
+          : runtimeCatalog.robotLegs);
 
     expect(options('leftArm', 'protectron')).toEqual(catalog('leftArm'));
     expect(options('head', 'protectron')).toEqual(catalog('head'));

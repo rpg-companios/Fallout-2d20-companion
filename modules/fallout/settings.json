@@ -51,5 +51,14 @@
       { "value": "cards", "labelKey": "settings.cards.cards" },
       { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
     ]
+  },
+  {
+    "id": "robotArmPartsStrictReplace",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "robots",
+    "labelKey": "settings.robotArmsStrictTitle",
+    "descriptionKey": "settings.robotArmsStrictDescription",
+    "defaultValue": true
   }
 ]

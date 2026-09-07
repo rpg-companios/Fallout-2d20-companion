@@ -54,9 +54,14 @@ describe('комплект снаряжения собирает робота (�
     expect(slots.head.limb?.id).toBe('robot_head_mister_handy_eye_stalk');
     expect(slots.body.limb?.id).toBe('robot_body_mister_handy');
     expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
+    // Патч 191: во всех слотах — руки, навесы (огнемёт, пила) — в ладонях.
     expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
-    expect(slots.arm2.limb?.id).toBe('robot_weapon_flamethrower');
-    expect(slots.arm3.limb?.id).toBe('robot_weapon_circular_saw');
+    expect(slots.arm2.limb?.id).toBe('robot_arm_mister_handy');
+    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
+    expect(
+      [slots.arm1.heldWeapon?.id, slots.arm2.heldWeapon?.id, slots.arm3.heldWeapon?.id]
+        .filter(Boolean).sort()
+    ).toEqual(['robot_weapon_circular_saw', 'robot_weapon_flamethrower']);
   });
 
   it('конечности приходят из каталога, а не заглушками из кита', async () => {
