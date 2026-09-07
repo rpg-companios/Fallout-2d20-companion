@@ -4,6 +4,12 @@ import {
   createDuplicateCharacterId,
 } from '../domain/characterDuplication';
 import {
+  isValidFolderReference,
+  overlayFolderOnSaveData,
+  planFolderReconcile,
+  stampFolderOnSaveData,
+} from '../domain/characterFolders';
+import {
   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
   catalogGetAmmoTypes, catalogGetAmmoById,
@@ -89,7 +95,14 @@ const makeDuplicateCharacterId = (timestamp) => createDuplicateCharacterId(
 
 export async function saveCharacter(id, name, level, originName, data) {
   const now = Date.now();
-  const dataStr = typeof data === 'string' ? data : JSON.stringify(data);
+  // Знание каталога (патч 212): сейв штампуется членством устройства, а
+  // знание из облака/файла переживает импорт и сверяется с каталогами
+  // устройства (недостающий каталог создаётся, персонаж помещается внутрь).
+  const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+  const localFolder = await getLocalFolderReference(id);
+  const overlaid = overlayFolderOnSaveData({ data: parsedData, localFolder });
+  const reconciled = await reconcileCharacterFolder(id, overlaid);
+  const dataStr = JSON.stringify(reconciled);
   const existing = await getFirst('SELECT id FROM characters WHERE id = ?', [id]);
   if (existing) {
     await runQuery(
@@ -111,9 +124,14 @@ export async function loadCharacterById(id) {
     'SELECT character_id FROM character_rename_requests WHERE character_id = ?',
     [id],
   );
+  const parsedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+  // Знание каталога (патч 212): при загрузке сверяем сейв с каталогами
+  // устройства — недостающий создаётся вне зависимости от настроек, и
+  // персонаж помещается внутрь.
+  const reconciled = await reconcileCharacterFolder(id, parsedData);
   return {
     ...row,
-    data: typeof row.data === 'string' ? JSON.parse(row.data) : row.data,
+    data: reconciled,
     renamePending: Boolean(renameRequest),
   };
 }
@@ -229,6 +247,54 @@ export async function createCharacterFolder(name) {
   await runQuery('INSERT INTO character_folders (id, name, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?)', [folder.id, folder.name, now, now, folder.sortOrder]);
   return folder;
 }
+/**
+ * Гарантирует каталог сейва на устройстве (патч 212): создаётся с id ИЗ
+ * сейва; существующий с этим id не переименовывается. Создание не зависит
+ * от настройки «каталоги персонажей» — требование владельца.
+ */
+export async function ensureCharacterFolder(folder) {
+  if (!isValidFolderReference(folder)) return null;
+  const existing = await getFirst('SELECT id, name FROM character_folders WHERE id = ?', [folder.id]);
+  if (existing) return { id: existing.id, name: existing.name };
+  const now = Date.now();
+  const cleanName = cleanFolderName(folder.name) || folder.name;
+  const last = await getFirst('SELECT sort_order FROM character_folders ORDER BY sort_order DESC LIMIT 1');
+  const sortOrder = Number(last?.sort_order ?? -1) + 1;
+  await runQuery('INSERT INTO character_folders (id, name, created_at, updated_at, sort_order) VALUES (?, ?, ?, ?, ?)',
+    [folder.id, cleanName, now, now, sortOrder]);
+  return { id: folder.id, name: cleanName };
+}
+
+/** Каталог персонажа на ЭТОМ устройстве: { id, name } | null. */
+export async function getLocalFolderReference(characterId) {
+  const row = await getFirst(
+    'SELECT f.id AS id, f.name AS name FROM character_folder_memberships m JOIN character_folders f ON f.id = m.folder_id WHERE m.character_id = ?',
+    [characterId],
+  );
+  return row?.id ? { id: row.id, name: row.name } : null;
+}
+
+/** Переписать данные сейва персонажа (поле data) без остальных колонок. */
+export async function updateCharacterSaveData(characterId, data) {
+  await runQuery('UPDATE characters SET data = ?, updated_at = ? WHERE id = ?',
+    [JSON.stringify(data), Date.now(), characterId]);
+}
+
+/**
+ * Сверка знания каталога (патч 212): если сейв несёт каталог, а членство
+ * устройства расходится — каталог гарантируется и персонаж помещается
+ * внутрь. Идемпотентна. Возвращает обновлённые данные сейва.
+ */
+async function reconcileCharacterFolder(characterId, data) {
+  const localFolder = await getLocalFolderReference(characterId);
+  const plan = planFolderReconcile({ saveFolder: data?.folder, localFolderId: localFolder?.id ?? null });
+  if (plan.action !== 'ensure') return data;
+  const ensured = await ensureCharacterFolder(plan.folder);
+  if (!ensured) return data;
+  await moveCharacterToFolder(characterId, ensured.id);
+  return stampFolderOnSaveData(data, { id: ensured.id, name: ensured.name });
+}
+
 export async function renameCharacterFolder(folderId, name) {
   const cleanName = cleanFolderName(name);
   if (!cleanName) throw new Error('Folder name is required');
@@ -238,10 +304,26 @@ export async function getCharacterFolderId(characterId) {
   return (await getFirst('SELECT folder_id FROM character_folder_memberships WHERE character_id = ?', [characterId]))?.folder_id ?? null;
 }
 export async function moveCharacterToFolder(characterId, folderId) {
-  if (folderId == null) return runQuery('DELETE FROM character_folder_memberships WHERE character_id = ?', [characterId]);
-  if (!(await getFirst('SELECT id FROM character_folders WHERE id = ?', [folderId]))) throw new Error('Folder not found');
+  if (folderId == null) {
+    await runQuery('DELETE FROM character_folder_memberships WHERE character_id = ?', [characterId]);
+    // Перемещение в корневой список сразу штампует сейв (патч 212).
+    const row = await getFirst('SELECT data FROM characters WHERE id = ?', [characterId]);
+    if (row && row.data != null) {
+      const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      await updateCharacterSaveData(characterId, stampFolderOnSaveData(parsed, null));
+    }
+    return;
+  }
+  const folder = await getFirst('SELECT id, name FROM character_folders WHERE id = ?', [folderId]);
+  if (!folder) throw new Error('Folder not found');
   if (await getCharacterFolderId(characterId)) await runQuery('UPDATE character_folder_memberships SET folder_id = ? WHERE character_id = ?', [folderId, characterId]);
   else await runQuery('INSERT INTO character_folder_memberships (character_id, folder_id) VALUES (?, ?)', [characterId, folderId]);
+  // Сейв сразу узнаёт свой каталог (патч 212), не дожидаясь автосейва.
+  const row = await getFirst('SELECT data FROM characters WHERE id = ?', [characterId]);
+  if (row && row.data != null) {
+    const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    await updateCharacterSaveData(characterId, stampFolderOnSaveData(parsed, { id: folder.id, name: folder.name }));
+  }
 }
 export async function getRootCharactersList() {
   const [characters, memberships] = await Promise.all([getAll('SELECT id, name, level, origin_name, created_at, updated_at FROM characters ORDER BY created_at DESC'), getAll('SELECT character_id FROM character_folder_memberships')]);
