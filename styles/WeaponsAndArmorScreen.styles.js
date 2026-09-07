@@ -34,6 +34,9 @@ const styles = StyleSheet.create({
   statBoxValueContainer: {
     flex: 1,
     paddingVertical: 8,
+    // Отступы от краёв области: длинные текстовые значения (названия
+    // состояний выживания) не упираются в рамку (владелец, 0.3.7).
+    paddingHorizontal: 6,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
@@ -154,7 +157,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     color: '#fff',
     fontWeight: 'bold',
-    flex: 1,
+    // Фиксированная доля ячейки-лейбла — одинакова во всех карточках
+    // (владелец): 60% лейбл / 40% значение; длинное значение переносится
+    // во второй ячейке, а не распирает строку.
+    width: '60%',
     padding: 8,
     fontSize: 12,
   },
@@ -166,6 +172,10 @@ const styles = StyleSheet.create({
     borderColor: '#5a5a5a',
     backgroundColor: '#fff',
     textAlign: 'center',
+    // Браузерный автоперенос длинных слов (веб): работает при проставленном
+    // lang документа (см. App.js). На нативных платформах свойство
+    // игнорируется — там перенос по словам.
+    hyphens: 'auto',
   },
   armorModificationButton: {
     padding: 8,

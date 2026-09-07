@@ -31,7 +31,8 @@ const migrateSkillsToCanonical = (rawSkills) => {
     return canonical ? { ...s, name: canonical } : s;
   });
 };
-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterType } from '../domain/origins';
+import { createSurvivalState } from '../domain/survival';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
@@ -261,6 +262,17 @@ export const CharacterProvider = ({ children }) => {
   const [equippedWeapons, setEquippedWeapons] = useState([]);
   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+  // Выживание (docs/survival-system-design.md): null = ещё не создан или
+  // робот/киборг (шкал нет). Инициализируется при выборе ориджина.
+  const [survival, setSurvival] = useState(null);
+
+  // Новый персонаж: как только выбран ориджин — стартовые шкалы (максимумы
+  // для органиков, null роботам/киборгам). При загрузке сейва поле уже
+  // задано миграцией v23, эффект — no-op.
+  useEffect(() => {
+    if (!origin || survival !== null) return;
+    setSurvival(createSurvivalState(getCharacterType({ origin })));
+  }, [origin, survival]);
 
   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
   // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
@@ -768,6 +780,7 @@ export const CharacterProvider = ({ children }) => {
     conditions,
     chemDosesLog,
     sceneRiskStates,
+    survival,
   }), [
     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
@@ -775,7 +788,7 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, attributesSaved, skillsSaved, selectedPerks,
-    conditions, chemDosesLog, sceneRiskStates,
+    conditions, chemDosesLog, sceneRiskStates, survival,
   ]);
 
   // Realtime save for already persisted characters.
@@ -892,6 +905,7 @@ export const CharacterProvider = ({ children }) => {
       setSceneCounter(data.sceneCounter ?? 0);
       sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
       setSceneRiskStates(data.sceneRiskStates);
+      setSurvival(data.survival ?? null);
       // Migrate old [null, null] format to dynamic array
       const rawWeapons = data.equippedWeapons || [];
       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
@@ -1439,6 +1453,9 @@ export const CharacterProvider = ({ children }) => {
     });
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
+    // Выживание сбрасывается; при сохранённом ориджине его подхватит эффект
+    // инициализации (максимум органикам, null роботам/киборгам).
+    setSurvival(null);
     setEquippedArmor(createEmptyEquippedArmor());
     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
@@ -1569,6 +1586,8 @@ export const CharacterProvider = ({ children }) => {
     getModifiedItem,
     saveModifiedItem,
     removeModifiedItem,
+    survival,
+    setSurvival,
     resetCharacter,
     resetKitAndRewards,
     resetKitOnly,

@@ -67,8 +67,13 @@ function App() {
 
   // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
   // даже если версия @react-navigation/native не поддерживает documentTitle.
+  // Заодно проставляем lang документа: включает браузерные словари переносов
+  // (CSS hyphens: auto в стилях текста) для активной локали приложения.
   useEffect(() => {
-    if (typeof document !== 'undefined') document.title = APP_BRAND;
+    if (typeof document !== 'undefined') {
+      document.title = APP_BRAND;
+      document.documentElement.lang = locale;
+    }
   }, [locale, moduleTabsActive]);
 
   useEffect(() => {

@@ -226,8 +226,8 @@ describe('патч 191: навес — оружие на руке, а не ко�
     expect(migrated.equippedRobotSlots.leftArm.heldWeapon).toMatchObject({ id: 'robot_weapon_drill' });
   });
 
-  it('версия схемы — 22', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(22);
+  it('версия схемы — 23 (v22 навесы, v23 выживание)', () => {
+    expect(CURRENT_SCHEMA_VERSION).toBe(23);
   });
 
   // ------------------------------------------------------------------ настройка

@@ -35,6 +35,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+import { survivalEffectRows } from '../../../../domain/survival';
 import { dedupeWeaponCards } from './dedupeWeaponCards';
 import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
 import { getBodyPlan } from '../../../../domain/bodyplan';
@@ -179,7 +180,9 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => 
 
 // extraRows: постоянные строки (силовая броня: «Ядерный блок: n/max», эффекты каркаса) —
 // рендерятся как иммунитеты, с «∞» в колонке таймера.
-export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+// survivalRows: строки выживания («Усталость N», «Количество получаемых ОД −N»,
+// док §6) — без колонки таймера, негативной окраской.
+export const EffectsPanel = ({ effects, immunities = [], extraRows = [], survivalRows = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
   const moduleLocale = useModuleLocale();
@@ -190,7 +193,7 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
   const hasImmunities = immunities.length > 0;
   const hasEffects = (effects || []).length > 0;
   const hasExtraRows = extraRows.length > 0;
-  const isEmpty = !hasImmunities && !hasEffects && !hasExtraRows;
+  const isEmpty = !hasImmunities && !hasEffects && !hasExtraRows && survivalRows.length === 0;
 
   const immunityLabel = hasImmunities
     ? `${tWeaponsAndArmorScreen('effectsPanel.immunityPrefix')} ${immunities
@@ -210,6 +213,11 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
             <Text style={localStyles.effectsPanelEmpty}>{tWeaponsAndArmorScreen('effectsPanel.empty')}</Text>
           ) : (
             <>
+              {survivalRows.map((row) => (
+                <View key={row.key} style={localStyles.effectsPanelRow}>
+                  <Text style={[localStyles.effectText, localStyles.negativeEffectText]}>{row.text}</Text>
+                </View>
+              ))}
               {extraRows.map((row) => (
                 <View key={row.key} style={localStyles.effectsPanelRow}>
                   <Text style={[localStyles.effectText, localStyles.positiveEffectText]}>{row.text}</Text>
@@ -554,6 +562,7 @@ const WeaponsAndArmorScreen = () => {
     trait,
     origin,
     radiation,
+    survival,
     // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
     // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
     equippedPowerArmor,
@@ -854,6 +863,16 @@ const WeaponsAndArmorScreen = () => {
     return rows;
   }, [equippedPowerArmor, equipmentCatalog]);
 
+  // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
+  // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
+  const survivalRows = useMemo(
+    () => survivalEffectRows(survival).map((row) => ({
+      key: `survival_${row.key}`,
+      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
+    })),
+    [survival]
+  );
+
   const renderArmorPart = (slotKey) => {
     // Проверяем является ли персонаж роботом
     const isRobot = isRobotCharacter({ origin, trait });
@@ -1003,7 +1022,31 @@ const WeaponsAndArmorScreen = () => {
                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
                 </StatBox>
             </View>
-            <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} extraRows={powerArmorEffectRows} />
+            {/* Выживание (док §7): три области как ряд статистики —
+                Голод / Жажда / Сон, значение = название состояния из книги.
+                Роботы и киборги (survival === null) ряда не получают. */}
+            {survival ? (
+              <View style={[localStyles.statsRow, { marginTop: 8 }]}>
+                <StatBox
+                  title={tWeaponsAndArmorScreen('survival.foodTitle')}
+                  value={tWeaponsAndArmorScreen(`survival.food.${survival.food}`)}
+                />
+                <StatBox
+                  title={tWeaponsAndArmorScreen('survival.waterTitle')}
+                  value={tWeaponsAndArmorScreen(`survival.water.${survival.water}`)}
+                />
+                <StatBox
+                  title={tWeaponsAndArmorScreen('survival.sleepTitle')}
+                  value={tWeaponsAndArmorScreen(`survival.sleep.${survival.sleep}`)}
+                />
+              </View>
+            ) : null}
+            <EffectsPanel
+              effects={activeTimedEffects || []}
+              immunities={allImmunities}
+              extraRows={powerArmorEffectRows}
+              survivalRows={survivalRows}
+            />
             </View>
 
             {/* Броня / Слоты робота */}
