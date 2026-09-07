@@ -1023,21 +1023,13 @@ const WeaponsAndArmorScreen = () => {
                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
                 </StatBox>
             </View>
-            {survival ? (
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1 }}>
-                  <EffectsPanel
-                    effects={activeTimedEffects || []}
-                    immunities={allImmunities}
-                    extraRows={powerArmorEffectRows}
-                    survivalRows={survivalRows}
-                  />
-                </View>
-                <SurvivalScales survival={survival} />
-              </View>
-            ) : (
-              <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} extraRows={powerArmorEffectRows} />
-            )}
+            <EffectsPanel
+              effects={activeTimedEffects || []}
+              immunities={allImmunities}
+              extraRows={powerArmorEffectRows}
+              survivalRows={survivalRows}
+            />
+            {survival ? <SurvivalScales survival={survival} /> : null}
             </View>
 
             {/* Броня / Слоты робота */}

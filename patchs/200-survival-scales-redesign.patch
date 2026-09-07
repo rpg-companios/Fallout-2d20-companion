@@ -1,0 +1,280 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 09:03:45 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20200:=20=D1=80=D0=B5?=
+ =?UTF-8?q?=D0=B4=D0=B8=D0=B7=D0=B0=D0=B9=D0=BD=20=D1=88=D0=BA=D0=B0=D0=BB?=
+ =?UTF-8?q?=20=D0=B2=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D1=8F=20?=
+ =?UTF-8?q?=E2=80=94=20=D1=81=D0=B2=D0=B5=D1=82=D0=BB=D1=8B=D0=B9=20=D1=84?=
+ =?UTF-8?q?=D0=BE=D0=BD,=20=D0=B3=D0=BE=D1=80=D0=B8=D0=B7=D0=BE=D0=BD?=
+ =?UTF-8?q?=D1=82=D0=B0=D0=BB=D1=8C=D0=BD=D1=8B=D0=B5=20=D0=BF=D0=BE=D0=BB?=
+ =?UTF-8?q?=D0=BE=D1=81=D1=8B-=D0=BA=D0=B0=D0=BF=D1=81=D1=83=D0=BB=D1=8B?=
+ =?UTF-8?q?=20=D1=81=20=D0=BE=D0=B1=D0=B2=D0=BE=D0=B4=D0=BA=D0=BE=D0=B9,?=
+ =?UTF-8?q?=20=D0=B8=D0=BA=D0=BE=D0=BD=D0=BA=D0=B8=20=D0=B2=20=D1=87=D1=91?=
+ =?UTF-8?q?=D1=80=D0=BD=D1=8B=D1=85=20=D0=BA=D1=80=D1=83=D0=B6=D0=BA=D0=B0?=
+ =?UTF-8?q?=D1=85,=20=D0=BF=D0=BE=D0=BB=D0=B5=20=D0=BF=D0=BE=D0=B4=20?=
+ =?UTF-8?q?=D0=AD=D1=84=D1=84=D0=B5=D0=BA=D1=82=D0=B0=D0=BC=D0=B8?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ docs/survival-system-design.md                |  19 ++-
+ .../WeaponsAndArmorScreen/SurvivalScales.js   | 126 +++++++++---------
+ .../WeaponsAndArmorScreen.js                  |  22 +--
+ 3 files changed, 82 insertions(+), 85 deletions(-)
+
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 49b650d..45ecb5b 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,7 +1,7 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.4** от 2026-09-07.
+-Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–199);
++Редакция **0.3.5** от 2026-09-07.
++Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–200);
+ модалки еды/питья/сна — следующий патч.
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+@@ -203,9 +203,13 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ ## 7. UI шкал и модалки (кнопки под шкалами)
+ 
+-**Поле шкал** (рядом с «Эффектами»): три вертикальные шкалы — еда 5 секций,
+-вода 4 (выровнены по низу), сон 5. Подписи — **иконками, без текстовых
+-надписей**: еда = мясо, вода = капля, сон = 💤.
++**Поле шкал** (под панелью «Эффекты», на всю ширину): три **горизонтальные**
++шкалы — еда 5 секций, вода 4, сон 5. Дизайн (владелец, 0.3.5): фон светлый,
++как у большинства областей; иконки в **чёрных кружках**, кружки вплотную
++прилегают к полосам; полосы со скруглёнными углами, шкала-заполнение
++находится **внутри** полосы, как будто объёмная; у шкал есть обводка;
++под цветным заполнением — прозрачный слой (виден цвет фона). Заполнение —
++доля текущей секции от максимума.
+ 
+ Цвета (решение владельца; точные оттенки — при макете):
+ 
+@@ -402,6 +406,11 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.3.5 (2026-09-07):** редизайн поля шкал по владельцу: светлый фон,
++  три горизонтальные полосы (вместо вертикальных), иконки в чёрных кружках
++  вплотную к полосам, скруглённая капсула с обводкой, заполнение внутри
++  («объёмное»), под заполнением прозрачный слой; поле перенесено под
++  «Эффекты» на всю ширину.
+ - **0.3.4 (2026-09-07):** первая часть этапа 4 — компонент SurvivalScales
+   (шкалы/иконки/цвета/тап-названия) рядом с «Эффектами», строки
+   «Усталость N»/«−N ОД» в панели эффектов, i18n ru/en названий состояний
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js b/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
+index b3c38d1..9d4829b 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
+@@ -1,10 +1,12 @@
+ // modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
+ //
+-// Поле выживания (docs/survival-system-design.md §7): три вертикальные
+-// шкалы рядом с панелью «Эффекты». Еда 5 секций, вода 4 (короче, выровнены
+-// по низу), сон 5. Подписи — иконки (мясо/капля/💤), без текста; тап по
+-// шкале показывает название текущего состояния. Роботы и киборги поле не
+-// получают (survival === null → не рендерится).
++// Поле выживания (docs/survival-system-design.md §7): три горизонтальные
++// шкалы под панелью «Эффекты». Дизайн (владелец, док 0.3.5): светлый фон;
++// иконки в чёрных кружках, кружки вплотную к полосам; полоса — скруглённая
++// капсула с обводкой, шкала-заполнение находится внутри, как будто объёмная;
++// под цветным заполнением — прозрачный слой (виден цвет фона).
++// Тап по шкале показывает название текущего состояния. Роботы и киборги
++// поле не получают (survival === null → не рендерится).
+ //
+ // Модалки еды/питья/сна — следующий этап; сейчас шкалы только отображаются.
+ 
+@@ -14,8 +16,8 @@ import { SURVIVAL_RULES } from '../../../../domain/survival';
+ import { useLocale } from '../../../../i18n/locale';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+ 
+-// Цвета и иконки — решение владельца (док 0.3.1): еда красно-коричневый,
+-// вода синий, сон зелёный; ориентиры оттенков закреплены в доке.
++// Цвета заполнения — решение владельца (док 0.3.1): еда красно-коричневый,
++// вода синий, сон зелёный.
+ const LADDERS = [
+   { key: 'food', icon: '🍖', color: '#A0522D' },
+   { key: 'water', icon: '💧', color: '#2E6FBF' },
+@@ -31,36 +33,29 @@ export const SurvivalScales = ({ survival }) => {
+ 
+   return (
+     <View style={styles.field}>
+-      <View style={styles.barsRow}>
+-        {LADDERS.map(({ key, icon, color }) => {
+-          const max = SURVIVAL_RULES.max[key];
+-          const current = survival[key];
+-          const sections = [];
+-          for (let section = max; section >= 1; section -= 1) sections.push(section);
+-          return (
+-            <TouchableOpacity
+-              key={key}
+-              style={styles.ladder}
+-              onPress={() => handlePress(key)}
+-              activeOpacity={0.7}
+-            >
+-              <View style={styles.ladderBars}>
+-                {sections.map((section) => (
+-                  <View
+-                    key={section}
+-                    style={[
+-                      styles.section,
+-                      { borderColor: color },
+-                      section <= current ? { backgroundColor: color } : styles.sectionEmpty,
+-                    ]}
+-                  />
+-                ))}
+-              </View>
++      {LADDERS.map(({ key, icon, color }) => {
++        const max = SURVIVAL_RULES.max[key];
++        const current = survival[key];
++        const fillPct = `${(current / max) * 100}%`;
++        return (
++          <TouchableOpacity
++            key={key}
++            style={styles.row}
++            onPress={() => handlePress(key)}
++            activeOpacity={0.7}
++          >
++            {/* Иконка в чёрном кружке — вплотную к полосе. */}
++            <View style={styles.iconCircle}>
+               <Text style={styles.icon}>{icon}</Text>
+-            </TouchableOpacity>
+-          );
+-        })}
+-      </View>
++            </View>
++            {/* Полоса-капсула: обводка, внутри — объёмное заполнение,
++                под ним прозрачный слой (цвет фона поля). */}
++            <View style={styles.track}>
++              <View style={[styles.fill, { width: fillPct, backgroundColor: color }]} />
++            </View>
++          </TouchableOpacity>
++        );
++      })}
+       <Text style={styles.stateName}>
+         {selected ? tWeaponsAndArmorScreen(`survival.${selected}.${survival[selected]}`) : ''}
+       </Text>
+@@ -68,52 +63,53 @@ export const SurvivalScales = ({ survival }) => {
+   );
+ };
+ 
+-const SECTION_H = 13;
+-const BAR_W = 16;
+-
+ const styles = StyleSheet.create({
+   field: {
+     marginTop: 8,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     borderRadius: 5,
+-    backgroundColor: '#1a1a1a',
+-    paddingVertical: 8,
+-    paddingHorizontal: 6,
+-    alignItems: 'center',
++    backgroundColor: '#fff',
++    paddingVertical: 10,
++    paddingHorizontal: 10,
+   },
+-  barsRow: {
++  row: {
+     flexDirection: 'row',
+-    alignItems: 'flex-end',
++    alignItems: 'center',
++    marginTop: 6,
+   },
+-  ladder: {
++  iconCircle: {
++    width: 22,
++    height: 22,
++    borderRadius: 11,
++    backgroundColor: '#000',
+     alignItems: 'center',
+-    marginHorizontal: 4,
++    justifyContent: 'center',
+   },
+-  ladderBars: {
+-    flexDirection: 'column',
++  icon: {
++    fontSize: 12,
++    lineHeight: 14,
+   },
+-  section: {
+-    width: BAR_W,
+-    height: SECTION_H,
++  track: {
++    flex: 1,
++    height: 16,
+     borderWidth: 1,
+-    borderRadius: 2,
+-    marginBottom: 3,
+-  },
+-  sectionEmpty: {
++    borderColor: '#5a5a5a',
++    borderRadius: 8,
++    padding: 2,
+     backgroundColor: 'transparent',
++    flexDirection: 'row',
+   },
+-  icon: {
+-    fontSize: 14,
+-    lineHeight: 18,
+-    marginTop: 1,
++  fill: {
++    height: '100%',
++    borderRadius: 5,
+   },
+   stateName: {
+-    color: '#fff',
+-    fontSize: 10,
+-    lineHeight: 13,
++    color: '#444',
++    fontSize: 11,
++    lineHeight: 14,
+     textAlign: 'center',
+-    minHeight: 26,
+-    marginTop: 4,
++    minHeight: 14,
++    marginTop: 6,
+   },
+ });
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 6aa4d9c..a3bb52c 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -1023,21 +1023,13 @@ const WeaponsAndArmorScreen = () => {
+                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
+                 </StatBox>
+             </View>
+-            {survival ? (
+-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+-                <View style={{ flex: 1 }}>
+-                  <EffectsPanel
+-                    effects={activeTimedEffects || []}
+-                    immunities={allImmunities}
+-                    extraRows={powerArmorEffectRows}
+-                    survivalRows={survivalRows}
+-                  />
+-                </View>
+-                <SurvivalScales survival={survival} />
+-              </View>
+-            ) : (
+-              <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} extraRows={powerArmorEffectRows} />
+-            )}
++            <EffectsPanel
++              effects={activeTimedEffects || []}
++              immunities={allImmunities}
++              extraRows={powerArmorEffectRows}
++              survivalRows={survivalRows}
++            />
++            {survival ? <SurvivalScales survival={survival} /> : null}
+             </View>
+ 
+             {/* Броня / Слоты робота */}
+-- 
+2.39.5
+

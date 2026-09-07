@@ -1,10 +1,12 @@
 // modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
 //
-// Поле выживания (docs/survival-system-design.md §7): три вертикальные
-// шкалы рядом с панелью «Эффекты». Еда 5 секций, вода 4 (короче, выровнены
-// по низу), сон 5. Подписи — иконки (мясо/капля/💤), без текста; тап по
-// шкале показывает название текущего состояния. Роботы и киборги поле не
-// получают (survival === null → не рендерится).
+// Поле выживания (docs/survival-system-design.md §7): три горизонтальные
+// шкалы под панелью «Эффекты». Дизайн (владелец, док 0.3.5): светлый фон;
+// иконки в чёрных кружках, кружки вплотную к полосам; полоса — скруглённая
+// капсула с обводкой, шкала-заполнение находится внутри, как будто объёмная;
+// под цветным заполнением — прозрачный слой (виден цвет фона).
+// Тап по шкале показывает название текущего состояния. Роботы и киборги
+// поле не получают (survival === null → не рендерится).
 //
 // Модалки еды/питья/сна — следующий этап; сейчас шкалы только отображаются.
 
@@ -14,8 +16,8 @@ import { SURVIVAL_RULES } from '../../../../domain/survival';
 import { useLocale } from '../../../../i18n/locale';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 
-// Цвета и иконки — решение владельца (док 0.3.1): еда красно-коричневый,
-// вода синий, сон зелёный; ориентиры оттенков закреплены в доке.
+// Цвета заполнения — решение владельца (док 0.3.1): еда красно-коричневый,
+// вода синий, сон зелёный.
 const LADDERS = [
   { key: 'food', icon: '🍖', color: '#A0522D' },
   { key: 'water', icon: '💧', color: '#2E6FBF' },
@@ -31,36 +33,29 @@ export const SurvivalScales = ({ survival }) => {
 
   return (
     <View style={styles.field}>
-      <View style={styles.barsRow}>
-        {LADDERS.map(({ key, icon, color }) => {
-          const max = SURVIVAL_RULES.max[key];
-          const current = survival[key];
-          const sections = [];
-          for (let section = max; section >= 1; section -= 1) sections.push(section);
-          return (
-            <TouchableOpacity
-              key={key}
-              style={styles.ladder}
-              onPress={() => handlePress(key)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.ladderBars}>
-                {sections.map((section) => (
-                  <View
-                    key={section}
-                    style={[
-                      styles.section,
-                      { borderColor: color },
-                      section <= current ? { backgroundColor: color } : styles.sectionEmpty,
-                    ]}
-                  />
-                ))}
-              </View>
+      {LADDERS.map(({ key, icon, color }) => {
+        const max = SURVIVAL_RULES.max[key];
+        const current = survival[key];
+        const fillPct = `${(current / max) * 100}%`;
+        return (
+          <TouchableOpacity
+            key={key}
+            style={styles.row}
+            onPress={() => handlePress(key)}
+            activeOpacity={0.7}
+          >
+            {/* Иконка в чёрном кружке — вплотную к полосе. */}
+            <View style={styles.iconCircle}>
               <Text style={styles.icon}>{icon}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+            </View>
+            {/* Полоса-капсула: обводка, внутри — объёмное заполнение,
+                под ним прозрачный слой (цвет фона поля). */}
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: fillPct, backgroundColor: color }]} />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
       <Text style={styles.stateName}>
         {selected ? tWeaponsAndArmorScreen(`survival.${selected}.${survival[selected]}`) : ''}
       </Text>
@@ -68,52 +63,53 @@ export const SurvivalScales = ({ survival }) => {
   );
 };
 
-const SECTION_H = 13;
-const BAR_W = 16;
-
 const styles = StyleSheet.create({
   field: {
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     borderRadius: 5,
-    backgroundColor: '#1a1a1a',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
   },
-  barsRow: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  ladder: {
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginTop: 6,
   },
-  ladderBars: {
-    flexDirection: 'column',
-  },
-  section: {
-    width: BAR_W,
-    height: SECTION_H,
-    borderWidth: 1,
-    borderRadius: 2,
-    marginBottom: 3,
-  },
-  sectionEmpty: {
-    backgroundColor: 'transparent',
+  iconCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   icon: {
-    fontSize: 14,
-    lineHeight: 18,
-    marginTop: 1,
+    fontSize: 12,
+    lineHeight: 14,
+  },
+  track: {
+    flex: 1,
+    height: 16,
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 8,
+    padding: 2,
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: 5,
   },
   stateName: {
-    color: '#fff',
-    fontSize: 10,
-    lineHeight: 13,
+    color: '#444',
+    fontSize: 11,
+    lineHeight: 14,
     textAlign: 'center',
-    minHeight: 26,
-    marginTop: 4,
+    minHeight: 14,
+    marginTop: 6,
   },
 });
