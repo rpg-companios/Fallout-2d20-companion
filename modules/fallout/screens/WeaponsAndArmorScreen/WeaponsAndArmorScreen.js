@@ -1041,7 +1041,6 @@ const WeaponsAndArmorScreen = () => {
                 />
               </View>
             ) : null}
-            </View>
             <EffectsPanel
               effects={activeTimedEffects || []}
               immunities={allImmunities}
