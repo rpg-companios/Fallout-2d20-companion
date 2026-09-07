@@ -317,3 +317,16 @@ export function rest(state, { place, hours, currentHp = null }) {
 export function forecastSleep(state, opts) {
     return rest(state, opts);
 }
+
+// Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
+// «Усталость N» и «Количество получаемых ОД −N» (M = N). Возвращает данные;
+// тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty).
+export function survivalEffectRows(survival) {
+    if (!survival) return [];
+    const n = totalFatigue(survival);
+    if (n <= 0) return [];
+    return [
+        { key: 'fatigue', n },
+        { key: 'apPenalty', n },
+    ];
+}

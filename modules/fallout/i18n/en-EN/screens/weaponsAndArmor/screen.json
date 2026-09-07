@@ -194,5 +194,29 @@
     "robot_body_securitron": "Securitron Body",
     "robot_arm_securitron": "Securitron Arm",
     "robot_legs_securitron": "Securitron Wheel"
+  },
+  "survival": {
+    "food": {
+      "5": "Completely Full",
+      "4": "Full",
+      "3": "Peckish",
+      "2": "Hungry",
+      "1": "Starving"
+    },
+    "water": {
+      "4": "Fully Quenched",
+      "3": "Hydrated",
+      "2": "Thirsty",
+      "1": "Dehydrated"
+    },
+    "sleep": {
+      "5": "Perfectly Rested",
+      "4": "Rested",
+      "3": "Tired",
+      "2": "Exhausted",
+      "1": "Wrecked"
+    },
+    "fatigue": "Fatigue {n}",
+    "apPenalty": "Action Points gained −{n}"
   }
 }

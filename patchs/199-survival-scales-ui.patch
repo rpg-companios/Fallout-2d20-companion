@@ -1,0 +1,470 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 08:45:09 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20199:=20=D0=B2=D1=8B?=
+ =?UTF-8?q?=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D0=B5=20=D1=8D=D1=82=D0=B0?=
+ =?UTF-8?q?=D0=BF=204=20(=D1=87=D0=B0=D1=81=D1=82=D1=8C=201)=20=E2=80=94?=
+ =?UTF-8?q?=20=D1=88=D0=BA=D0=B0=D0=BB=D1=8B=20SurvivalScales=20=D1=80?=
+ =?UTF-8?q?=D1=8F=D0=B4=D0=BE=D0=BC=20=D1=81=20=D0=AD=D1=84=D1=84=D0=B5?=
+ =?UTF-8?q?=D0=BA=D1=82=D0=B0=D0=BC=D0=B8,=20=D1=82=D0=B0=D0=BF-=D0=BD?=
+ =?UTF-8?q?=D0=B0=D0=B7=D0=B2=D0=B0=D0=BD=D0=B8=D1=8F=20=D1=81=D0=BE=D1=81?=
+ =?UTF-8?q?=D1=82=D0=BE=D1=8F=D0=BD=D0=B8=D0=B9,=20=D1=81=D1=82=D1=80?=
+ =?UTF-8?q?=D0=BE=D0=BA=D0=B8=20=D0=A3=D1=81=D1=82=D0=B0=D0=BB=D0=BE=D1=81?=
+ =?UTF-8?q?=D1=82=D1=8C=20N=20/=20=E2=88=92N=20=D0=9E=D0=94,=20i18n=20ru/e?=
+ =?UTF-8?q?n?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/survival/survival-ui.test.js        |  78 ++++++++++++
+ docs/survival-system-design.md                |  21 +++-
+ domain/survival.js                            |  13 ++
+ .../en-EN/screens/weaponsAndArmor/screen.json |  24 ++++
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  24 ++++
+ .../WeaponsAndArmorScreen/SurvivalScales.js   | 119 ++++++++++++++++++
+ .../WeaponsAndArmorScreen.js                  |  40 +++++-
+ 7 files changed, 314 insertions(+), 5 deletions(-)
+ create mode 100644 __tests__/survival/survival-ui.test.js
+ create mode 100644 modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
+
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+new file mode 100644
+index 0000000..730ef26
+--- /dev/null
++++ b/__tests__/survival/survival-ui.test.js
+@@ -0,0 +1,78 @@
++import { describe, expect, it } from 'vitest';
++import { SURVIVAL_RULES, addFatigue, createSurvivalState, survivalEffectRows } from '../../domain/survival';
++import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
++import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
++
++describe('survival: строки эффектов (§6)', () => {
++    it('нет состояния (робот/киборг) — строк нет', () => {
++        expect(survivalEffectRows(null)).toEqual([]);
++    });
++
++    it('нулевая усталость — строк нет', () => {
++        expect(survivalEffectRows(createSurvivalState('human'))).toEqual([]);
++    });
++
++    it('N ≥ 1 — «Усталость N» и «Количество получаемых ОД −N», M = N', () => {
++        const s = createSurvivalState('human');
++        addFatigue(s, 'food', 1);
++        expect(survivalEffectRows(s)).toEqual([
++            { key: 'fatigue', n: 1 },
++            { key: 'apPenalty', n: 1 },
++        ]);
++        addFatigue(s, 'water', 2);
++        expect(survivalEffectRows(s)).toEqual([
++            { key: 'fatigue', n: 3 },
++            { key: 'apPenalty', n: 3 },
++        ]);
++    });
++});
++
++// ПРАВИЛО владельца: никаких пропусков i18n — ключи обязаны быть в обеих
++// локалях, промах ключа виден как сам путь.
++describe('survival: i18n шкал (ru/en)', () => {
++    const locales = { 'ru-RU': ruScreen, 'en-EN': enScreen };
++
++    it.each(Object.entries(locales))('%s: названия всех секций всех шкал', (loc, dict) => {
++        const survival = dict.survival;
++        expect(survival).toBeTruthy();
++        for (const [ladder, max] of Object.entries(SURVIVAL_RULES.max)) {
++            for (let section = 1; section <= max; section += 1) {
++                const name = survival?.[ladder]?.[String(section)];
++                expect(name, `${loc} survival.${ladder}.${section}`).toMatch(/^\S.+$/);
++            }
++        }
++    });
++
++    it('ru: канонические названия владельца дословно', () => {
++        expect(ruScreen.survival.food).toEqual({
++            5: 'Полностью сыт',
++            4: 'Сыт',
++            3: 'Проголодался',
++            2: 'Голодный',
++            1: 'Сильно голоден',
++        });
++        expect(ruScreen.survival.water).toEqual({
++            4: 'Полностью утолили жажду',
++            3: 'Гидратированы',
++            2: 'Мучает жажда',
++            1: 'Обезвожены',
++        });
++        expect(ruScreen.survival.sleep).toEqual({
++            5: 'Прекрасно отдохнувший',
++            4: 'Отдохнувший',
++            3: 'Усталый',
++            2: 'Измождённый',
++            1: 'Истощённый',
++        });
++    });
++
++    it.each(Object.entries(locales))('%s: шаблоны строк эффектов с {n}', (loc, dict) => {
++        expect(dict.survival.fatigue).toContain('{n}');
++        expect(dict.survival.apPenalty).toContain('{n}');
++    });
++
++    it('ru: формулировки строк эффектов — слова владельца', () => {
++        expect(ruScreen.survival.fatigue).toBe('Усталость {n}');
++        expect(ruScreen.survival.apPenalty).toBe('Количество получаемых ОД −{n}');
++    });
++});
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 6d36b8f..49b650d 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,7 +1,8 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.3** от 2026-09-07.
+-Статус: правила согласованы; этапы 1–3 плана реализованы (патчи 197–198).
++Редакция **0.3.4** от 2026-09-07.
++Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–199);
++модалки еды/питья/сна — следующий патч.
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -362,6 +363,18 @@ survival: {
+ 4. **UI:** поле с тремя вертикальными шкалами рядом с «Эффектами», иконки,
+    строки «Усталость N» / «Количество получаемых ОД −M» в эффектах,
+    модалки еды/питья/сна с прогнозом и алертом.
++   - **Шкалы и строки — готово (патч 199):** `SurvivalScales.js` на экране
++     экипировки (WeaponsAndArmorScreen): три вертикальные шкалы рядом с
++     панелью «Эффекты» (вода короче, выровнены по низу), иконки 🍖/💧/💤,
++     цвета §7, тап по шкале — название текущего состояния под шкалами
++     (повторный тап скрывает). Строки усталости — в панель «Эффекты»
++     (без колонки таймера, негативная окраска); данные — домен
++     `survivalEffectRows`. Роботы/киборги (survival === null) не получают
++     ни шкал, ни строк. Названия состояний — i18n
++     `screens/weaponsAndArmor/screen.json` → `survival.*` (ru/en, полнота
++     покрыта тестами). Gating настройкой выживания — этап 5 (сейчас поле
++     видно всем органикам).
++   - **Модалки еды/питья/сна — следующий патч.**
+ 5. **Настройки:** раздел `survivalMode`, курс времени, тик реального времени
+    в открытом приложении.
+ 6. **Движок ОД (без UI):** пул, ручные операции, условия получения,
+@@ -389,6 +402,10 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.3.4 (2026-09-07):** первая часть этапа 4 — компонент SurvivalScales
++  (шкалы/иконки/цвета/тап-названия) рядом с «Эффектами», строки
++  «Усталость N»/«−N ОД» в панели эффектов, i18n ru/en названий состояний
++  (9 тестов UI-слоя). Модалки — следующим патчем.
+ - **0.3.3 (2026-09-07):** реализован этап 3 — миграция v22→v23
+   (`migrateSurvivalField`), инициализация при выборе ориджина, проводка в
+   сейв/контекст (13 тестов миграции). Открытый вопрос: выживание при смене
+diff --git a/domain/survival.js b/domain/survival.js
+index f2b3606..71e78a1 100644
+--- a/domain/survival.js
++++ b/domain/survival.js
+@@ -317,3 +317,16 @@ export function rest(state, { place, hours, currentHp = null }) {
+ export function forecastSleep(state, opts) {
+     return rest(state, opts);
+ }
++
++// Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
++// «Усталость N» и «Количество получаемых ОД −N» (M = N). Возвращает данные;
++// тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty).
++export function survivalEffectRows(survival) {
++    if (!survival) return [];
++    const n = totalFatigue(survival);
++    if (n <= 0) return [];
++    return [
++        { key: 'fatigue', n },
++        { key: 'apPenalty', n },
++    ];
++}
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index e7f2f6c..c970c7e 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -194,5 +194,29 @@
+     "robot_body_securitron": "Securitron Body",
+     "robot_arm_securitron": "Securitron Arm",
+     "robot_legs_securitron": "Securitron Wheel"
++  },
++  "survival": {
++    "food": {
++      "5": "Completely Full",
++      "4": "Full",
++      "3": "Peckish",
++      "2": "Hungry",
++      "1": "Starving"
++    },
++    "water": {
++      "4": "Fully Quenched",
++      "3": "Hydrated",
++      "2": "Thirsty",
++      "1": "Dehydrated"
++    },
++    "sleep": {
++      "5": "Perfectly Rested",
++      "4": "Rested",
++      "3": "Tired",
++      "2": "Exhausted",
++      "1": "Wrecked"
++    },
++    "fatigue": "Fatigue {n}",
++    "apPenalty": "Action Points gained −{n}"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index a273127..9db78f1 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -194,5 +194,29 @@
+     "robot_body_securitron": "Корпус Секьюритрона",
+     "robot_arm_securitron": "Рука Секьюритрона",
+     "robot_legs_securitron": "Колесо Секьюритрона"
++  },
++  "survival": {
++    "food": {
++      "5": "Полностью сыт",
++      "4": "Сыт",
++      "3": "Проголодался",
++      "2": "Голодный",
++      "1": "Сильно голоден"
++    },
++    "water": {
++      "4": "Полностью утолили жажду",
++      "3": "Гидратированы",
++      "2": "Мучает жажда",
++      "1": "Обезвожены"
++    },
++    "sleep": {
++      "5": "Прекрасно отдохнувший",
++      "4": "Отдохнувший",
++      "3": "Усталый",
++      "2": "Измождённый",
++      "1": "Истощённый"
++    },
++    "fatigue": "Усталость {n}",
++    "apPenalty": "Количество получаемых ОД −{n}"
+   }
+ }
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js b/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
+new file mode 100644
+index 0000000..b3c38d1
+--- /dev/null
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
+@@ -0,0 +1,119 @@
++// modules/fallout/screens/WeaponsAndArmorScreen/SurvivalScales.js
++//
++// Поле выживания (docs/survival-system-design.md §7): три вертикальные
++// шкалы рядом с панелью «Эффекты». Еда 5 секций, вода 4 (короче, выровнены
++// по низу), сон 5. Подписи — иконки (мясо/капля/💤), без текста; тап по
++// шкале показывает название текущего состояния. Роботы и киборги поле не
++// получают (survival === null → не рендерится).
++//
++// Модалки еды/питья/сна — следующий этап; сейчас шкалы только отображаются.
++
++import React, { useState } from 'react';
++import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
++import { SURVIVAL_RULES } from '../../../../domain/survival';
++import { useLocale } from '../../../../i18n/locale';
++import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
++
++// Цвета и иконки — решение владельца (док 0.3.1): еда красно-коричневый,
++// вода синий, сон зелёный; ориентиры оттенков закреплены в доке.
++const LADDERS = [
++  { key: 'food', icon: '🍖', color: '#A0522D' },
++  { key: 'water', icon: '💧', color: '#2E6FBF' },
++  { key: 'sleep', icon: '💤', color: '#3F9B63' },
++];
++
++export const SurvivalScales = ({ survival }) => {
++  const [selected, setSelected] = useState(null);
++  useLocale();
++  if (!survival) return null;
++
++  const handlePress = (key) => setSelected((prev) => (prev === key ? null : key));
++
++  return (
++    <View style={styles.field}>
++      <View style={styles.barsRow}>
++        {LADDERS.map(({ key, icon, color }) => {
++          const max = SURVIVAL_RULES.max[key];
++          const current = survival[key];
++          const sections = [];
++          for (let section = max; section >= 1; section -= 1) sections.push(section);
++          return (
++            <TouchableOpacity
++              key={key}
++              style={styles.ladder}
++              onPress={() => handlePress(key)}
++              activeOpacity={0.7}
++            >
++              <View style={styles.ladderBars}>
++                {sections.map((section) => (
++                  <View
++                    key={section}
++                    style={[
++                      styles.section,
++                      { borderColor: color },
++                      section <= current ? { backgroundColor: color } : styles.sectionEmpty,
++                    ]}
++                  />
++                ))}
++              </View>
++              <Text style={styles.icon}>{icon}</Text>
++            </TouchableOpacity>
++          );
++        })}
++      </View>
++      <Text style={styles.stateName}>
++        {selected ? tWeaponsAndArmorScreen(`survival.${selected}.${survival[selected]}`) : ''}
++      </Text>
++    </View>
++  );
++};
++
++const SECTION_H = 13;
++const BAR_W = 16;
++
++const styles = StyleSheet.create({
++  field: {
++    marginTop: 8,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    backgroundColor: '#1a1a1a',
++    paddingVertical: 8,
++    paddingHorizontal: 6,
++    alignItems: 'center',
++  },
++  barsRow: {
++    flexDirection: 'row',
++    alignItems: 'flex-end',
++  },
++  ladder: {
++    alignItems: 'center',
++    marginHorizontal: 4,
++  },
++  ladderBars: {
++    flexDirection: 'column',
++  },
++  section: {
++    width: BAR_W,
++    height: SECTION_H,
++    borderWidth: 1,
++    borderRadius: 2,
++    marginBottom: 3,
++  },
++  sectionEmpty: {
++    backgroundColor: 'transparent',
++  },
++  icon: {
++    fontSize: 14,
++    lineHeight: 18,
++    marginTop: 1,
++  },
++  stateName: {
++    color: '#fff',
++    fontSize: 10,
++    lineHeight: 13,
++    textAlign: 'center',
++    minHeight: 26,
++    marginTop: 4,
++  },
++});
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 27d984e..6aa4d9c 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -35,6 +35,8 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects,
+ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
++import { SurvivalScales } from './SurvivalScales';
++import { survivalEffectRows } from '../../../../domain/survival';
+ import { dedupeWeaponCards } from './dedupeWeaponCards';
+ import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
+ import { getBodyPlan } from '../../../../domain/bodyplan';
+@@ -179,7 +181,9 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) =>
+ 
+ // extraRows: постоянные строки (силовая броня: «Ядерный блок: n/max», эффекты каркаса) —
+ // рендерятся как иммунитеты, с «∞» в колонке таймера.
+-export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
++// survivalRows: строки выживания («Усталость N», «Количество получаемых ОД −N»,
++// док §6) — без колонки таймера, негативной окраской.
++export const EffectsPanel = ({ effects, immunities = [], extraRows = [], survivalRows = [] }) => {
+   const [isOpen, setIsOpen] = useState(false);
+   useLocale();
+   const moduleLocale = useModuleLocale();
+@@ -190,7 +194,7 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+   const hasImmunities = immunities.length > 0;
+   const hasEffects = (effects || []).length > 0;
+   const hasExtraRows = extraRows.length > 0;
+-  const isEmpty = !hasImmunities && !hasEffects && !hasExtraRows;
++  const isEmpty = !hasImmunities && !hasEffects && !hasExtraRows && survivalRows.length === 0;
+ 
+   const immunityLabel = hasImmunities
+     ? `${tWeaponsAndArmorScreen('effectsPanel.immunityPrefix')} ${immunities
+@@ -210,6 +214,11 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [] }) => {
+             <Text style={localStyles.effectsPanelEmpty}>{tWeaponsAndArmorScreen('effectsPanel.empty')}</Text>
+           ) : (
+             <>
++              {survivalRows.map((row) => (
++                <View key={row.key} style={localStyles.effectsPanelRow}>
++                  <Text style={[localStyles.effectText, localStyles.negativeEffectText]}>{row.text}</Text>
++                </View>
++              ))}
+               {extraRows.map((row) => (
+                 <View key={row.key} style={localStyles.effectsPanelRow}>
+                   <Text style={[localStyles.effectText, localStyles.positiveEffectText]}>{row.text}</Text>
+@@ -554,6 +563,7 @@ const WeaponsAndArmorScreen = () => {
+     trait,
+     origin,
+     radiation,
++    survival,
+     // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
+     // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
+     equippedPowerArmor,
+@@ -854,6 +864,16 @@ const WeaponsAndArmorScreen = () => {
+     return rows;
+   }, [equippedPowerArmor, equipmentCatalog]);
+ 
++  // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
++  // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
++  const survivalRows = useMemo(
++    () => survivalEffectRows(survival).map((row) => ({
++      key: `survival_${row.key}`,
++      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
++    })),
++    [survival]
++  );
++
+   const renderArmorPart = (slotKey) => {
+     // Проверяем является ли персонаж роботом
+     const isRobot = isRobotCharacter({ origin, trait });
+@@ -1003,7 +1023,21 @@ const WeaponsAndArmorScreen = () => {
+                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
+                 </StatBox>
+             </View>
+-            <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} extraRows={powerArmorEffectRows} />
++            {survival ? (
++              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
++                <View style={{ flex: 1 }}>
++                  <EffectsPanel
++                    effects={activeTimedEffects || []}
++                    immunities={allImmunities}
++                    extraRows={powerArmorEffectRows}
++                    survivalRows={survivalRows}
++                  />
++                </View>
++                <SurvivalScales survival={survival} />
++              </View>
++            ) : (
++              <EffectsPanel effects={activeTimedEffects || []} immunities={allImmunities} extraRows={powerArmorEffectRows} />
++            )}
+             </View>
+ 
+             {/* Броня / Слоты робота */}
+-- 
+2.39.5
+
