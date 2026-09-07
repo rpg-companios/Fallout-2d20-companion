@@ -605,7 +605,8 @@
     "radiationModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false
+    "preserved": false,
+    "soup": true
   },
   {
     "id": "food_instamash",
@@ -1253,7 +1254,8 @@
     "radiationModifier": null,
     "effectKey": "itemEffects.food.radstagStew",
     "state": "cooked",
-    "preserved": false
+    "preserved": false,
+    "soup": true
   },
   {
     "id": "food_razorgrain",
@@ -1460,7 +1462,8 @@
     "radiationModifier": null,
     "effectKey": "",
     "state": "cooked",
-    "preserved": false
+    "preserved": false,
+    "soup": true
   },
   {
     "id": "food_stingwing_fillet",
@@ -1625,7 +1628,8 @@
     "radiationModifier": null,
     "effectKey": "itemEffects.food.vegetableSoup",
     "state": "cooked",
-    "preserved": false
+    "preserved": false,
+    "soup": true
   },
   {
     "id": "food_yao_guai_meat",

@@ -1,0 +1,832 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 07:56:08 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20197:=20=D0=B2=D1=8B?=
+ =?UTF-8?q?=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D0=B5=20=D1=8D=D1=82=D0=B0?=
+ =?UTF-8?q?=D0=BF=D1=8B=201-2=20=E2=80=94=20=D1=84=D0=BB=D0=B0=D0=B3=D0=B8?=
+ =?UTF-8?q?=20soup/purified=20=D0=B2=20=D0=B4=D0=B0=D0=BD=D0=BD=D1=8B?=
+ =?UTF-8?q?=D1=85,=20=D0=B4=D0=BE=D0=BC=D0=B5=D0=BD=20survival.js=20(?=
+ =?UTF-8?q?=D0=BB=D0=B5=D1=81=D1=82=D0=BD=D0=B8=D1=86=D1=8B,=20=D1=87?=
+ =?UTF-8?q?=D0=B0=D1=81=D0=BE=D0=B2=D0=BE=D0=B9=20=D1=82=D0=B8=D0=BA,=20?=
+ =?UTF-8?q?=D1=83=D1=81=D1=82=D0=B0=D0=BB=D0=BE=D1=81=D1=82=D1=8C,=20?=
+ =?UTF-8?q?=D1=81=D0=BE=D0=BD,=20=D0=BF=D1=80=D0=BE=D0=B3=D0=BD=D0=BE?=
+ =?UTF-8?q?=D0=B7)=20+=2029=20=D1=82=D0=B5=D1=81=D1=82=D0=BE=D0=B2?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/survival/survival-domain.test.js   | 335 +++++++++++++++++++
+ docs/survival-system-design.md               |  32 +-
+ domain/survival.js                           | 319 ++++++++++++++++++
+ modules/fallout/data/consumables/drinks.json |   3 +-
+ modules/fallout/data/consumables/food.json   |  12 +-
+ 5 files changed, 685 insertions(+), 16 deletions(-)
+ create mode 100644 __tests__/survival/survival-domain.test.js
+ create mode 100644 domain/survival.js
+
+diff --git a/__tests__/survival/survival-domain.test.js b/__tests__/survival/survival-domain.test.js
+new file mode 100644
+index 0000000..5672ba4
+--- /dev/null
++++ b/__tests__/survival/survival-domain.test.js
+@@ -0,0 +1,335 @@
++import { describe, expect, it } from 'vitest';
++import {
++    SURVIVAL_RULES,
++    addFatigue,
++    advanceHours,
++    advanceRealMinutes,
++    clearFatigueSource,
++    consumeDrink,
++    consumeFood,
++    createSurvivalState,
++    fatigueFromSource,
++    forecastSleep,
++    hpDrainForFatigue,
++    isSurvivalCapable,
++    removeFatigueTotal,
++    rest,
++    totalFatigue,
++} from '../../domain/survival';
++import food from '../../modules/fallout/data/consumables/food.json';
++import drinks from '../../modules/fallout/data/consumables/drinks.json';
++
++const foodItem = (id) => food.find((x) => x.id === id);
++const drinkItem = (id) => drinks.find((x) => x.id === id);
++
++describe('survival: доступность и начальное состояние', () => {
++    it('шкалы у органиков, роботам/киборгам — null', () => {
++        expect(isSurvivalCapable('human')).toBe(true);
++        expect(isSurvivalCapable('ghoul')).toBe(true);
++        expect(isSurvivalCapable('mutant')).toBe(true);
++        expect(isSurvivalCapable('robot')).toBe(false);
++        expect(isSurvivalCapable('cyborg')).toBe(false);
++        expect(createSurvivalState('robot')).toBeNull();
++        expect(createSurvivalState('cyborg')).toBeNull();
++    });
++
++    it('начальное состояние — максимумы, усталости нет', () => {
++        const s = createSurvivalState('human');
++        expect(s).toMatchObject({ food: 5, water: 4, sleep: 5, timeCarried: 0, hpBonus: 0 });
++        expect(s.fatigue).toEqual([]);
++        expect(s.acc).toEqual({ food: 0, water: 0, sleep: 0 });
++    });
++});
++
++describe('survival: лестница еды (1/4/8/16 ч, дно 24 ч)', () => {
++    it('полный спуск за 29 часов с начислением усталости на дне', () => {
++        let s = createSurvivalState('human');
++        s = advanceHours(s, 1).state;
++        expect(s.food).toBe(4);
++        s = advanceHours(s, 4).state; // 5 ч всего
++        expect(s.food).toBe(3);
++        s = advanceHours(s, 8).state; // 13 ч
++        expect(s.food).toBe(2);
++        expect(fatigueFromSource(s, 'food')).toBe(0); // вода к этому часу уже на дне — её усталость не трогаем
++        s = advanceHours(s, 16).state; // 29 ч
++        expect(s.food).toBe(1);
++        expect(fatigueFromSource(s, 'food')).toBe(1); // переход 2→1
++        s = advanceHours(s, 24).state; // 53 ч
++        expect(fatigueFromSource(s, 'food')).toBe(2); // сутки на дне
++        s = advanceHours(s, 24).state;
++        expect(fatigueFromSource(s, 'food')).toBe(3);
++    });
++
++    it('счётчик секции сбрасывается при подъёме едой', () => {
++        let s = createSurvivalState('human');
++        s = advanceHours(s, 3).state; // food 4, acc 2 из 4
++        s = consumeFood(s, foodItem('food_instamash')).state; // консерва +1 → 5
++        expect(s.food).toBe(5);
++        expect(s.acc.food).toBe(0);
++        const after = advanceHours(s, 1).state; // снова 1 ч до спуска
++        expect(after.food).toBe(4);
++    });
++});
++
++describe('survival: лестница воды (1/2/4 ч, дно 8 ч)', () => {
++    it('полный спуск за 7 часов', () => {
++        let s = createSurvivalState('human');
++        s = advanceHours(s, 1).state;
++        expect(s.water).toBe(3);
++        s = advanceHours(s, 2).state;
++        expect(s.water).toBe(2);
++        s = advanceHours(s, 4).state;
++        expect(s.water).toBe(1);
++        expect(fatigueFromSource(s, 'water')).toBe(1);
++        s = advanceHours(s, 8).state;
++        expect(fatigueFromSource(s, 'water')).toBe(2);
++    });
++});
++
++describe('survival: лестница сна (8/8/8/8 ч, дно 4 ч)', () => {
++    it('полный спуск за 32 часа с двумя очками усталости', () => {
++        let s = createSurvivalState('human');
++        s = advanceHours(s, 8).state;
++        expect(s.sleep).toBe(4);
++        s = advanceHours(s, 8).state; // 16 ч
++        expect(s.sleep).toBe(3);
++        s = advanceHours(s, 8).state; // 24 ч
++        expect(s.sleep).toBe(2);
++        expect(fatigueFromSource(s, 'sleep')).toBe(1); // 3→2
++        s = advanceHours(s, 8).state; // 32 ч
++        expect(s.sleep).toBe(1);
++        expect(fatigueFromSource(s, 'sleep')).toBe(2); // 2→1
++        s = advanceHours(s, 4).state;
++        expect(fatigueFromSource(s, 'sleep')).toBe(3); // дно: каждые 4 ч
++    });
++});
++
++describe('survival: часовой тик — порядок трёх шагов', () => {
++    it('дрен ОЗ = ⌊N/2⌋ по итоговому N', () => {
++        expect(hpDrainForFatigue(0)).toBe(0);
++        expect(hpDrainForFatigue(1)).toBe(0);
++        expect(hpDrainForFatigue(2)).toBe(1);
++        expect(hpDrainForFatigue(3)).toBe(1);
++        expect(hpDrainForFatigue(4)).toBe(2);
++        const r = advanceHours({ ...createSurvivalState('human'), food: 1, fatigue: [{ source: 'food', amount: 4 }] }, 1);
++        expect(r.hpLost).toBe(2);
++    });
++
++    it('снятие −1 в час при чистых источниках, не ниже нуля', () => {
++        let s = createSurvivalState('human');
++        addFatigue(s, 'food', 3);
++        const r1 = advanceHours(s, 1);
++        expect(totalFatigue(r1.state)).toBe(2); // чист по всем лестницам → −1
++        expect(r1.hpLost).toBe(1); // дрен по итоговому N=2
++        s = r1.state;
++        const r2 = advanceHours(s, 2);
++        expect(totalFatigue(r2.state)).toBe(0); // −1 и −1, пол нуля не пробивает
++    });
++
++    it('в час падения в «сильно голоден» снятия нет (состояние после шага)', () => {
++        let s = createSurvivalState('human');
++        addFatigue(s, 'food', 1);
++        s = advanceHours(s, 29).state; // еда на дне, усталость food=2 (1+переход)
++        const before = totalFatigue(s);
++        const r = advanceHours(s, 1);
++        expect(totalFatigue(r.state)).toBe(before); // food=1 блокирует снятие
++    });
++
++    it('снятие блокируется изнеможением (сон 2 < 3)', () => {
++        let s = createSurvivalState('human');
++        addFatigue(s, 'food', 1);
++        s.sleep = 2;
++        const r = advanceHours(s, 1);
++        expect(totalFatigue(r.state)).toBe(1);
++    });
++
++    it('списание −1 берёт с наибольшего источника', () => {
++        const s = createSurvivalState('human');
++        addFatigue(s, 'food', 2);
++        addFatigue(s, 'water', 1);
++        removeFatigueTotal(s, 1);
++        expect(fatigueFromSource(s, 'food')).toBe(1);
++        expect(fatigueFromSource(s, 'water')).toBe(1);
++    });
++});
++
++describe('survival: реальный тик по курсу', () => {
++    it('дефолт 30 минут = 1 игровой час', () => {
++        let s = createSurvivalState('human');
++        s = advanceRealMinutes(s, 30).state;
++        expect(s.water).toBe(3); // 1 час: вода 4→3
++        expect(s.timeCarried).toBe(0);
++    });
++
++    it('дробные часы копятся до целого', () => {
++        let s = createSurvivalState('human');
++        s = advanceRealMinutes(s, 10).state; // 1/3 часа
++        expect(s.water).toBe(4);
++        expect(s.timeCarried).toBeCloseTo(1 / 3, 10);
++        s = advanceRealMinutes(s, 10).state;
++        expect(s.water).toBe(4);
++        expect(s.timeCarried).toBeCloseTo(2 / 3, 10);
++        s = advanceRealMinutes(s, 10).state; // суммарно 30 минут = 1 час
++        expect(s.water).toBe(3);
++        expect(s.timeCarried).toBe(0);
++    });
++
++    it('курс из настройки: 10 минут = 1 час', () => {
++        const s = advanceRealMinutes(createSurvivalState('human'), 30, 10).state;
++        expect(s.water).toBe(2); // 3 часа: 4→3, ещё через 2 ч → 2
++    });
++});
++
++describe('survival: еда и питьё', () => {
++    it('сырая +1, приготовленная +2, консервы +1', () => {
++        let s = createSurvivalState('human');
++        s.food = 2;
++        s = consumeFood(s, foodItem('food_brahmin_meat')).state; // rawMeat, сырое
++        expect(s.food).toBe(3);
++        s = consumeFood(s, foodItem('food_grilled_bloatfly')).state; // cooked
++        expect(s.food).toBe(5); // +2 с потолком
++        s.food = 3;
++        s = consumeFood(s, foodItem('food_instamash')).state; // preserved
++        expect(s.food).toBe(4);
++    });
++
++    it('суп: +1 еда и +1 вода одновременно', () => {
++        let s = createSurvivalState('human');
++        s.food = 3;
++        s.water = 2;
++        const r = consumeFood(s, foodItem('food_vegetable_soup'));
++        expect(r.ok).toBe(true);
++        expect(r.gained).toEqual({ food: 1, water: 1 });
++        expect(r.state.food).toBe(4);
++        expect(r.state.water).toBe(3);
++    });
++
++    it('на секции 5 есть нельзя, включая суп', () => {
++        const s = createSurvivalState('human'); // food=5
++        expect(consumeFood(s, foodItem('food_grilled_bloatfly')).ok).toBe(false);
++        expect(consumeFood(s, foodItem('food_vegetable_soup')).ok).toBe(false);
++    });
++
++    it('напитки: любой +1, очищенная вода +2, на потолке пить можно', () => {
++        let s = createSurvivalState('human');
++        s.water = 1;
++        s = consumeDrink(s, drinkItem('drink_dirty_water')).state; // грязная: +1, побочки — вне шкал
++        expect(s.water).toBe(2);
++        s = consumeDrink(s, drinkItem('drink_purified_water')).state; // очищенная: +2
++        expect(s.water).toBe(4);
++        const r = consumeDrink(s, drinkItem('drink_nuka_cola')); // на потолке — ок, шкала стоит
++        expect(r.ok).toBe(true);
++        expect(r.gained.water).toBe(0);
++        expect(r.state.water).toBe(4);
++    });
++
++    it('не-еда и не-напиток отклоняются', () => {
++        const s = createSurvivalState('human');
++        expect(consumeFood(s, drinkItem('drink_nuka_cola')).ok).toBe(false);
++        expect(consumeDrink(s, foodItem('food_instamash')).ok).toBe(false);
++    });
++});
++
++describe('survival: сон', () => {
++    it('короткий сон 1–5 ч: +1 ступень с потолком «усталый»', () => {
++        let s = createSurvivalState('human');
++        s.sleep = 1;
++        s = rest(s, { place: 'wasteland', hours: 3 }).state;
++        expect(s.sleep).toBe(2);
++        s = rest(s, { place: 'wasteland', hours: 1 }).state;
++        expect(s.sleep).toBe(3); // потолок короткого сна
++        const fresh = createSurvivalState('human'); // sleep=5
++        const r = rest(fresh, { place: 'wasteland', hours: 2 });
++        expect(r.state.sleep).toBe(5); // короткий сон не понижает
++    });
++
++    it('≥6 ч — «отдохнувший»; ≥8 ч в кровати — «прекрасно» + бонус ОЗ', () => {
++        let s = createSurvivalState('human');
++        s.sleep = 1;
++        s = rest(s, { place: 'wasteland', hours: 6 }).state;
++        expect(s.sleep).toBe(4); // пустошь: потолок «отдохнувший»
++        expect(s.hpBonus).toBe(0);
++        s.sleep = 1;
++        const r = rest(s, { place: 'bed', hours: 8 });
++        expect(r.state.sleep).toBe(5);
++        expect(r.state.hpBonus).toBe(2);
++    });
++
++    it('любой сон снимает бонус +2 ОЗ («до следующего сна»)', () => {
++        let s = createSurvivalState('human');
++        s.hpBonus = 2;
++        s = rest(s, { place: 'wasteland', hours: 1 }).state;
++        expect(s.hpBonus).toBe(0);
++    });
++
++    it('сон двигает еду и воду по их таймингам', () => {
++        let s = createSurvivalState('human');
++        s = rest(s, { place: 'bed', hours: 8 }).state;
++        expect(s.food).toBe(3); // 1 ч → 4, 5 ч → 3
++        expect(s.water).toBe(1); // 1 ч → 3, 3 ч → 2, 7 ч → 1
++        expect(fatigueFromSource(s, 'water')).toBe(1); // переход 2→1 на 7-м часу
++    });
++
++    it('на 6-м часе сна списывается только усталость недосыпа', () => {
++        // вода на дне блокирует почасовое снятие — изолируем списание сна
++        let s = createSurvivalState('human');
++        s.food = 3;
++        s.water = 1;
++        addFatigue(s, 'sleep', 2);
++        addFatigue(s, 'food', 3);
++        const r = rest(s, { place: 'wasteland', hours: 7 });
++        expect(fatigueFromSource(r.state, 'sleep')).toBe(0);
++        expect(fatigueFromSource(r.state, 'food')).toBe(3);
++        const cleared = r.events.find((e) => e.type === 'fatigueSleepCleared');
++        expect(cleared).toMatchObject({ hour: 6, removed: 2 });
++    });
++
++    it('дрен ОЗ во сне тикает, прогноз ловит ноль с указанием часа', () => {
++        // еда на дне: снятие заблокировано, усталость food спят не лечится
++        const s = createSurvivalState('human');
++        s.food = 1;
++        addFatigue(s, 'food', 4); // дрен 2 ОЗ/час
++        const f = forecastSleep(s, { place: 'bed', hours: 8, currentHp: 5 });
++        expect(f.hitsZero).toBe(true);
++        expect(f.zeroAtHour).toBe(3); // 5 − 2 − 2 → 1, на 3-м часе ≤ 0
++        expect(f.hpLost).toBe(16); // 8 часов по 2
++        // сам прогноз состояние не меняет:
++        expect(fatigueFromSource(s, 'food')).toBe(4);
++    });
++
++    it('валидация аргументов', () => {
++        const s = createSurvivalState('human');
++        expect(() => rest(s, { place: 'tent', hours: 4 })).toThrow();
++        expect(() => rest(s, { place: 'bed', hours: 0 })).toThrow();
++        expect(() => rest(s, { place: 'bed', hours: 25 })).toThrow();
++        expect(() => advanceHours(s, -1)).toThrow();
++    });
++});
++
++describe('survival: данные', () => {
++    it('флаг soup ровно на четырёх утверждённых блюдах', () => {
++        const soups = food.filter((x) => x.soup === true).map((x) => x.id).sort();
++        expect(soups).toEqual([
++            'food_iguana_stew',
++            'food_radstag_stew',
++            'food_squirrel_stew',
++            'food_vegetable_soup',
++        ]);
++        expect(food.find((x) => x.id === 'food_yao_guai_roast').soup).toBeUndefined();
++    });
++
++    it('флаг purified только у очищенной воды', () => {
++        const purified = drinks.filter((x) => x.purified === true).map((x) => x.id);
++        expect(purified).toEqual(['drink_purified_water']);
++    });
++
++    it('константы правил соответствуют дока 0.3', () => {
++        expect(SURVIVAL_RULES.stepHours).toEqual({
++            food: { 5: 1, 4: 4, 3: 8, 2: 16 },
++            water: { 4: 1, 3: 2, 2: 4 },
++            sleep: { 5: 8, 4: 8, 3: 8, 2: 8 },
++        });
++        expect(SURVIVAL_RULES.bottomPeriodHours).toEqual({ food: 24, water: 8, sleep: 4 });
++        expect(SURVIVAL_RULES.defaultCourseMinutesPerHour).toBe(30);
++    });
++});
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 9835373..4379f7d 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,7 +1,7 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.1** от 2026-09-07.
+-Статус: правила согласованы с владельцем, документ готов к реализации.
++Редакция **0.3.2** от 2026-09-07.
++Статус: правила согласованы; этапы 1–2 плана реализованы (патч 197).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -215,6 +215,8 @@ human/mutant — шкалы им положены по правилу типа.
+ | Сон (усталость) | зелёный | #3F9B63 |
+ 
+ Заголовка-текста у поля нет — только шкалы с иконками.
++**Тап по шкале показывает название текущего состояния** («Полностью сыт»
++и т.п.) — постоянных текстовых надписей нет (решение владельца).
+ 
+ **Еда:** предметы инвентаря категории еда (`itemType: "food"`, 75 записей
+ `food.json`). Применение — штатная механика употребления, предмет уходит
+@@ -299,8 +301,9 @@ human/mutant — шкалы им положены по правилу типа.
+ супом **не** является.
+ 
+ Уже существующие признаки используются как есть: `state` (`raw`/`cooked`),
+-`rawMeat`, `preserved`, `irradiated`; в `drinks.json` —
+-`drink_purified_water` (+2) против `drink_dirty_water` (+1, облучение).
++`rawMeat`, `preserved`, `irradiated`. Созданные по железному правилу поля:
++`soup: true` (4 записи выше) и `purified: true` у `drink_purified_water`
++(+2 секции воды; прочие напитки +1, грязная вода +1 с облучением).
+ 
+ Категория «дикоросы» из раннего ТЗ в данных отсутствует (все 75 записей
+ `itemType: "food"`); для правил выживания дикоросы ничем не отличаются от
+@@ -336,11 +339,14 @@ survival: {
+ 
+ ## 13. План реализации (предложение, этапы)
+ 
+-1. **Данные:** флаг `soup` у 4 записей `food.json` (+ i18n не требует —
+-   флаг безымянный).
+-2. **Домен:** `domain/survival.js` — лестницы, тайминги, часовой тик
+-   (порядок §5), усталость, сон (обе лестницы и списание), дрен ОЗ,
+-   прогноз для модалки. Чистые функции, без React.
++1. **Данные (готово, патч 197):** флаг `soup` у 4 записей `food.json`,
++   `purified` у очищенной воды.
++2. **Домен (готово, патч 197):** `domain/survival.js` — лестницы, тайминги,
++   часовой тик (порядок §5), усталость, сон (обе лестницы и списание),
++   дрен ОЗ, прогноз для модалки. Чистые функции, без React.
++   Детали реализации: счётчик времени в секции сбрасывается при любой смене
++   секции (включая подъём едой/питьём); почасовое снятие −1 списывается
++   с наибольшего источника.
+ 3. **Сейв/миграции:** поле `survival`, начальные максимумы, роботы/киборги.
+ 4. **UI:** поле с тремя вертикальными шкалами рядом с «Эффектами», иконки,
+    строки «Усталость N» / «Количество получаемых ОД −M» в эффектах,
+@@ -357,8 +363,8 @@ survival: {
+ 
+ ## 14. Открытые вопросы
+ 
+-1. Поведение на узких экранах; показывать ли название текущего состояния
+-   шкалы (например, тапом) при том, что постоянных текстовых надписей нет.
++1. Поведение на узких экранах (название состояния по тапу — решено, цвета —
++   решено 0.3.1).
+ 2. Нужен ли признак «дикоросы» для фильтра в модалке еды (для правил
+    не нужен, §11).
+ 3. Движок ОД: период пополнения пула, интеграция с дайс-движком, чья
+@@ -369,6 +375,10 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.3.2 (2026-09-07):** решено: название состояния — тапом по шкале.
++  Реализованы этапы 1–2 плана: флаги `soup` (4 блюда) и `purified`
++  (очищенная вода) в данных, домен `domain/survival.js` с полным набором
++  правил (29 тестов).
+ - **0.3.1 (2026-09-07):** цвета шкал — еда красно-коричневый, вода синий,
+   сон зелёный (оттенки при макете); подписи только иконками, без текстовых
+   надписей и заголовка поля.
+diff --git a/domain/survival.js b/domain/survival.js
+new file mode 100644
+index 0000000..f2b3606
+--- /dev/null
++++ b/domain/survival.js
+@@ -0,0 +1,319 @@
++// Система выживания — домен (редакция правил 0.3 дизайн-дока).
++//
++// Чистые функции без React и без обращения к часам: время передаётся
++// явно (игровые часы / реальные минуты). Состояние хранится в сейве
++// персонажа (см. docs/survival-system-design.md §12).
++//
++// Порядок часового тика (утверждён владельцем, §5):
++//   1) шаг лестниц (еда/вода/сон) + начисление Усталости за переходы;
++//   2) снятие Усталости: −1, если еда ≥ 2, вода ≥ 2, сон ≥ 3;
++//   3) дрен ОЗ ⌊N/2⌋ по итоговому N, без сопротивлений.
++
++export const SURVIVAL_RULES = {
++    // Шкалы есть только у органиков (origins.json → characterType).
++    capableTypes: ['human', 'ghoul', 'mutant'],
++    // Максимум секций: еда 5, вода 4, сон 5.
++    max: { food: 5, water: 4, sleep: 5 },
++    // Игровые часы до спуска на секцию ниже, по текущей секции.
++    stepHours: {
++        food: { 5: 1, 4: 4, 3: 8, 2: 16 },
++        water: { 4: 1, 3: 2, 2: 4 },
++        sleep: { 5: 8, 4: 8, 3: 8, 2: 8 },
++    },
++    // На дне (секция 1): +1 Усталость за каждые N часов в состоянии.
++    bottomPeriodHours: { food: 24, water: 8, sleep: 4 },
++    // Очки Усталости при переходе вниз ИЗ указанной секции (2→1 у еды/воды;
++    // 3→2 и 2→1 у сна).
++    fatigueOnStep: {
++        food: { 2: 1 },
++        water: { 2: 1 },
++        sleep: { 3: 1, 2: 1 },
++    },
++    // Снятие по часу разрешено при: еда ≥ 2, вода ≥ 2, сон ≥ 3.
++    removalMin: { food: 2, water: 2, sleep: 3 },
++    // Сон: 1–5 ч — +1 ступень с потолком «усталый»(3); ≥6 ч — «отдохнувший»(4);
++    // ≥8 ч в кровати — «прекрасно отдохнувший»(5) + бонус к макс. ОЗ.
++    sleep: {
++        capShort: 3,
++        longHours: 6,
++        perfectHours: 8,
++        perfectPlace: 'bed',
++        hpBonus: 2,
++        fatigueClearHours: 6, // на 6-м часе сна списывается вся усталость источника «сон»
++    },
++    // Дефолтный курс времени: 30 реальных минут = 1 игровой час.
++    defaultCourseMinutesPerHour: 30,
++    maxSleepHours: 24,
++};
++
++const LADDERS = ['food', 'water', 'sleep'];
++
++export function isSurvivalCapable(characterType) {
++    return SURVIVAL_RULES.capableTypes.includes(characterType);
++}
++
++// Начальное состояние — все шкалы на максимуме (решение владельца).
++// Роботам/киборгам шкалы не положены — null.
++export function createSurvivalState(characterType) {
++    if (!isSurvivalCapable(characterType)) return null;
++    return {
++        food: SURVIVAL_RULES.max.food,
++        water: SURVIVAL_RULES.max.water,
++        sleep: SURVIVAL_RULES.max.sleep,
++        fatigue: [], // [{ source: 'food'|'water'|'sleep', amount }]
++        acc: { food: 0, water: 0, sleep: 0 }, // часы в текущей секции
++        timeCarried: 0, // дробная часть игрового часа от реального тика
++        hpBonus: 0, // +2 к макс. ОЗ до следующего сна (кровать, ≥8 ч)
++    };
++}
++
++function cloneState(state) {
++    return {
++        ...state,
++        fatigue: state.fatigue.map((f) => ({ ...f })),
++        acc: { ...state.acc },
++    };
++}
++
++export function totalFatigue(state) {
++    return state.fatigue.reduce((sum, f) => sum + f.amount, 0);
++}
++
++export function fatigueFromSource(state, source) {
++    const entry = state.fatigue.find((f) => f.source === source);
++    return entry ? entry.amount : 0;
++}
++
++export function addFatigue(state, source, amount) {
++    const entry = state.fatigue.find((f) => f.source === source);
++    if (entry) entry.amount += amount;
++    else state.fatigue.push({ source, amount });
++}
++
++// Списание из общей кучи: сначала с наибольшего источника
++// (детерминированная деталь реализации, §6 дока).
++export function removeFatigueTotal(state, amount) {
++    let left = amount;
++    while (left > 0) {
++        let biggest = null;
++        for (const f of state.fatigue) {
++            if (f.amount > 0 && (!biggest || f.amount > biggest.amount)) biggest = f;
++        }
++        if (!biggest) return;
++        const take = Math.min(left, biggest.amount);
++        biggest.amount -= take;
++        left -= take;
++    }
++}
++
++export function clearFatigueSource(state, source) {
++    const entry = state.fatigue.find((f) => f.source === source);
++    if (entry) entry.amount = 0;
++}
++
++// 1 ОЗ за каждые 2 очка Усталости, без сопротивлений.
++export function hpDrainForFatigue(fatigueTotal) {
++    return Math.floor(fatigueTotal / 2);
++}
++
++// Смена секции (в любую сторону) — счётчик времени в состоянии с нуля.
++function bumpLadder(state, key, delta) {
++    const max = SURVIVAL_RULES.max[key];
++    const before = state[key];
++    if (before >= max && delta > 0) return 0; // на потолке подъём не меняет шкалу
++    const after = Math.max(1, Math.min(max, before + delta));
++    if (after !== before) {
++        state[key] = after;
++        state.acc[key] = 0;
++        return after - before;
++    }
++    return 0;
++}
++
++// Шаг одной лестницы по накопленным часам. Возвращает события.
++function stepLadder(state, key, events) {
++    const cur = state[key];
++    if (cur <= 1) {
++        const period = SURVIVAL_RULES.bottomPeriodHours[key];
++        while (state.acc[key] >= period) {
++            state.acc[key] -= period;
++            addFatigue(state, key, 1);
++            events.push({ type: 'fatigueAdded', source: key, cause: 'bottom' });
++        }
++        return;
++    }
++    const threshold = SURVIVAL_RULES.stepHours[key][cur];
++    if (threshold == null) return;
++    if (state.acc[key] >= threshold) {
++        state.acc[key] = 0; // время в новом состоянии с нуля
++        state[key] = cur - 1;
++        events.push({ type: 'step', ladder: key, from: cur, to: cur - 1 });
++        const fatigue = (SURVIVAL_RULES.fatigueOnStep[key] || {})[cur] || 0;
++        if (fatigue > 0) {
++            addFatigue(state, key, fatigue);
++            events.push({ type: 'fatigueAdded', source: key, cause: 'step' });
++        }
++    }
++}
++
++// Один часовой тик (три шага, §5). Мутирует рабочую копию.
++// options.sleepMode — часы сна: лестница сна заморожена (сон лечит).
++function tickHour(state, options = {}) {
++    const events = [];
++    // 1. Лестницы + начисление Усталости.
++    for (const key of LADDERS) {
++        if (options.sleepMode && key === 'sleep') continue;
++        state.acc[key] += 1;
++        stepLadder(state, key, events);
++    }
++    // 2. Снятие: −1 очко, если все лестницы вне зон начисления
++    //    (проверка по состояниям ПОСЛЕ шага — «на уровнях до начисления»
++    //    означает вне штрафных зон на момент снятия).
++    const { removalMin } = SURVIVAL_RULES;
++    if (
++        state.food >= removalMin.food
++        && state.water >= removalMin.water
++        && state.sleep >= removalMin.sleep
++        && totalFatigue(state) > 0
++    ) {
++        removeFatigueTotal(state, 1);
++        events.push({ type: 'fatigueRemoved', amount: 1 });
++    }
++    // 3. Дрен ОЗ по итоговому N.
++    const drain = hpDrainForFatigue(totalFatigue(state));
++    if (drain > 0) events.push({ type: 'hpDrain', amount: drain });
++    return { drain, events };
++}
++
++// Продвижение игровых часов контура выживания (реальный тик, сон —
++// для еды/воды). Дробные часы копятся в timeCarried, тик — по целым.
++export function advanceHours(state, hours, options = {}) {
++    if (!Number.isFinite(hours) || hours < 0) {
++        throw new Error(`advanceHours: некорректные часы: ${hours}`);
++    }
++    const wk = cloneState(state);
++    const carried = wk.timeCarried + hours;
++    const whole = Math.floor(carried);
++    wk.timeCarried = carried - whole;
++    let hpLost = 0;
++    const events = [];
++    for (let i = 0; i < whole; i += 1) {
++        const r = tickHour(wk, options);
++        hpLost += r.drain;
++        for (const e of r.events) events.push({ hour: i + 1, ...e });
++    }
++    return { state: wk, hpLost, events };
++}
++
++// Реальный тик: X реальных минут = 1 игровой час (курс из настроек).
++export function advanceRealMinutes(state, realMinutes, courseMinutesPerHour = SURVIVAL_RULES.defaultCourseMinutesPerHour) {
++    if (!(courseMinutesPerHour > 0)) {
++        throw new Error(`advanceRealMinutes: некорректный курс: ${courseMinutesPerHour}`);
++    }
++    return advanceHours(state, realMinutes / courseMinutesPerHour);
++}
++
++// Еда. Возвращает { ok, reason?, state, gained: { food, water } }.
++// На секции 5 есть нельзя («не можете больше есть») — суп тоже.
++export function consumeFood(state, item) {
++    if (!item || item.itemType !== 'food') {
++        return { ok: false, reason: 'notFood', state, gained: { food: 0, water: 0 } };
++    }
++    if (state.food >= SURVIVAL_RULES.max.food) {
++        return { ok: false, reason: 'full', state, gained: { food: 0, water: 0 } };
++    }
++    const wk = cloneState(state);
++    let foodSteps = 0;
++    let waterSteps = 0;
++    if (item.soup) {
++        // Суп — всегда +1 еда и +1 вода, замещает категорию приготовленного.
++        foodSteps = bumpLadder(wk, 'food', 1);
++        waterSteps = bumpLadder(wk, 'water', 1);
++    } else if (item.state === 'cooked' && !item.preserved) {
++        foodSteps = bumpLadder(wk, 'food', 2); // приготовленная еда
++    } else {
++        foodSteps = bumpLadder(wk, 'food', 1); // сырая или консервированная
++    }
++    return { ok: true, state: wk, gained: { food: foodSteps, water: waterSteps } };
++}
++
++// Питьё. На потолке пить МОЖНО — шкала не двигается, эффекты работают.
++export function consumeDrink(state, item) {
++    if (!item || item.itemType !== 'drinks') {
++        return { ok: false, reason: 'notDrink', state, gained: { water: 0 } };
++    }
++    const wk = cloneState(state);
++    const steps = item.purified ? 2 : 1; // очищенная вода +2, остальное +1
++    const waterSteps = bumpLadder(wk, 'water', steps);
++    return { ok: true, state: wk, gained: { water: waterSteps } };
++}
++
++// Сон. place: 'bed' | 'wasteland', часы 1–24.
++// currentHp (число) — включает прогноз: hpEnd / hitsZero / zeroAtHour
++// (алерт в модали до подтверждения, §6).
++export function rest(state, { place, hours, currentHp = null }) {
++    const rules = SURVIVAL_RULES.sleep;
++    if (!['bed', 'wasteland'].includes(place)) {
++        throw new Error(`rest: некорректное место сна: ${place}`);
++    }
++    if (!Number.isInteger(hours) || hours < 1 || hours > SURVIVAL_RULES.maxSleepHours) {
++        throw new Error(`rest: некорректные часы сна: ${hours}`);
++    }
++    const wk = cloneState(state);
++    wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
++    const events = [];
++    let hpLost = 0;
++    let hp = currentHp;
++    let hitsZero = false;
++    let zeroAtHour = null;
++    for (let h = 1; h <= hours; h += 1) {
++        const r = tickHour(wk, { sleepMode: true });
++        hpLost += r.drain;
++        if (hp != null && !hitsZero) {
++            hp -= r.drain;
++            if (hp <= 0) {
++                hitsZero = true;
++                zeroAtHour = h;
++            }
++        }
++        for (const e of r.events) events.push({ hour: h, ...e });
++        if (h === rules.fatigueClearHours) {
++            const removed = fatigueFromSource(wk, 'sleep');
++            if (removed > 0) {
++                clearFatigueSource(wk, 'sleep');
++                events.push({ hour: h, type: 'fatigueSleepCleared', removed });
++            }
++        }
++    }
++    // Итог лестницы сна (§4). Короткий сон не понижает высоких состояний.
++    const before = wk.sleep;
++    if (hours >= rules.perfectHours && place === rules.perfectPlace) {
++        wk.sleep = 5;
++        wk.hpBonus = rules.hpBonus;
++    } else if (hours >= rules.longHours) {
++        wk.sleep = 4;
++    } else if (wk.sleep < rules.capShort) {
++        wk.sleep = Math.min(rules.capShort, wk.sleep + 1);
++    }
++    wk.acc.sleep = 0;
++    events.push({
++        hour: hours,
++        type: 'sleepResult',
++        from: before,
++        to: wk.sleep,
++        place,
++        hpBonus: wk.hpBonus,
++    });
++    const result = { state: wk, hpLost, events };
++    if (hp != null) {
++        result.hpEnd = hitsZero ? 0 : hp;
++        result.hitsZero = hitsZero;
++        result.zeroAtHour = zeroAtHour;
++    }
++    return result;
++}
++
++// Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
++export function forecastSleep(state, opts) {
++    return rest(state, opts);
++}
+diff --git a/modules/fallout/data/consumables/drinks.json b/modules/fallout/data/consumables/drinks.json
+index 8436c97..2e3f8da 100644
+--- a/modules/fallout/data/consumables/drinks.json
++++ b/modules/fallout/data/consumables/drinks.json
+@@ -69,7 +69,8 @@
+     "hpHealed": 3,
+     "irradiated": false,
+     "effectKey": "",
+-    "isAlcohol": false
++    "isAlcohol": false,
++    "purified": true
+   },
+   {
+     "id": "drink_dirty_water",
+diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/consumables/food.json
+index 8b198dd..193c27f 100644
+--- a/modules/fallout/data/consumables/food.json
++++ b/modules/fallout/data/consumables/food.json
+@@ -605,7 +605,8 @@
+     "radiationModifier": null,
+     "effectKey": "",
+     "state": "cooked",
+-    "preserved": false
++    "preserved": false,
++    "soup": true
+   },
+   {
+     "id": "food_instamash",
+@@ -1253,7 +1254,8 @@
+     "radiationModifier": null,
+     "effectKey": "itemEffects.food.radstagStew",
+     "state": "cooked",
+-    "preserved": false
++    "preserved": false,
++    "soup": true
+   },
+   {
+     "id": "food_razorgrain",
+@@ -1460,7 +1462,8 @@
+     "radiationModifier": null,
+     "effectKey": "",
+     "state": "cooked",
+-    "preserved": false
++    "preserved": false,
++    "soup": true
+   },
+   {
+     "id": "food_stingwing_fillet",
+@@ -1625,7 +1628,8 @@
+     "radiationModifier": null,
+     "effectKey": "itemEffects.food.vegetableSoup",
+     "state": "cooked",
+-    "preserved": false
++    "preserved": false,
++    "soup": true
+   },
+   {
+     "id": "food_yao_guai_meat",
+-- 
+2.39.5
+
