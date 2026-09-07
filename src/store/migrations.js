@@ -8,6 +8,8 @@ import { generateItemId } from '../../domain/itemIdentity';
 import { getPerks, getUniqQualityName } from '../../domain/registry';
 import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
 import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+import { createSurvivalState } from '../../domain/survival';
+import originsFile from '../../modules/fallout/data/origins/origins.json';
 import { debugLog } from '../debug/falloutDebug';
 import { getDefaultLimbs } from '../../domain/bodyplan';
 import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
@@ -572,6 +574,34 @@ export const migrateRobotArmAttachments = (state) => {
   }
 
   return changed ? { ...state, equippedRobotSlots: slots } : state;
+};
+
+// Тип персонажа для инициализации выживания: ориджин в сейве может быть
+// «худым» ({id}) или «толстым» (объект с characterType); остальное — каталог.
+const _ORIGINS_BY_ID = new Map(
+  (Array.isArray(originsFile) ? originsFile : []).map((entry) => [entry.id, entry])
+);
+const _survivalCharacterType = (origin) => {
+  if (origin && typeof origin === 'object' && origin.characterType) {
+    return origin.characterType;
+  }
+  const id = typeof origin === 'string' ? origin : origin?.id;
+  return (id && _ORIGINS_BY_ID.get(id)?.characterType) || 'human';
+};
+
+/**
+ * v22 -> v23: выживание. Всем сейвам добавляется поле survival:
+ * органики получают начальное состояние (все шкалы на максимуме,
+ * усталости нет), роботы и киборги — null. Существующее поле не
+ * перезаписывается (идемпотентна). Правила — docs/survival-system-design.md.
+ */
+export const migrateSurvivalField = (state) => {
+  if (!state || typeof state !== 'object') return state;
+  if (state.survival !== undefined) return state;
+  return {
+    ...state,
+    survival: createSurvivalState(_survivalCharacterType(state.origin)),
+  };
 };
 
 const MIGRATIONS = [
@@ -1225,6 +1255,10 @@ const MIGRATIONS = [
   // где навес стоял вместо руки, получают стандартную руку плана тела, навес
   // пересаживается в ладонь (heldWeapon). Идемпотентна.
   migrateRobotArmAttachments,
+
+  // v22 -> v23: выживание — поле survival (шкалы еды/воды/сна, Усталость).
+  // Органики — начальные максимумы, роботы/киборги — null. Идемпотентна.
+  migrateSurvivalField,
 
 ];
 /**

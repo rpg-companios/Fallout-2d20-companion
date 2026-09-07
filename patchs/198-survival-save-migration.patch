@@ -1,0 +1,360 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 08:26:27 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20198:=20=D0=B2=D1=8B?=
+ =?UTF-8?q?=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D0=B5=20=D1=8D=D1=82=D0=B0?=
+ =?UTF-8?q?=D0=BF=203=20=E2=80=94=20=D1=81=D1=85=D0=B5=D0=BC=D0=B0=20v23,?=
+ =?UTF-8?q?=20=D0=BC=D0=B8=D0=B3=D1=80=D0=B0=D1=86=D0=B8=D1=8F=20survival?=
+ =?UTF-8?q?=20(=D0=BC=D0=B0=D0=BA=D1=81=D0=B8=D0=BC=D1=83=D0=BC=D1=8B=20?=
+ =?UTF-8?q?=D0=BE=D1=80=D0=B3=D0=B0=D0=BD=D0=B8=D0=BA=D0=B0=D0=BC,=20null?=
+ =?UTF-8?q?=20=D1=80=D0=BE=D0=B1=D0=BE=D1=82=D0=B0=D0=BC/=D0=BA=D0=B8?=
+ =?UTF-8?q?=D0=B1=D0=BE=D1=80=D0=B3=D0=B0=D0=BC),=20=D0=B8=D0=BD=D0=B8?=
+ =?UTF-8?q?=D1=86=D0=B8=D0=B0=D0=BB=D0=B8=D0=B7=D0=B0=D1=86=D0=B8=D1=8F=20?=
+ =?UTF-8?q?=D0=BF=D1=80=D0=B8=20=D0=B2=D1=8B=D0=B1=D0=BE=D1=80=D0=B5=20?=
+ =?UTF-8?q?=D0=BE=D1=80=D0=B8=D0=B4=D0=B6=D0=B8=D0=BD=D0=B0,=20=D0=BF?=
+ =?UTF-8?q?=D1=80=D0=BE=D0=B2=D0=BE=D0=B4=D0=BA=D0=B0=20=D0=B2=20=D1=81?=
+ =?UTF-8?q?=D0=B5=D0=B9=D0=B2?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../robot/robot-arm-attachment-mode.test.js   |  4 +-
+ __tests__/survival/survival-migration.test.js | 81 +++++++++++++++++++
+ components/CharacterContext.js                | 23 +++++-
+ docs/survival-system-design.md                | 33 ++++++--
+ src/store/migrations.js                       | 34 ++++++++
+ src/store/saveSchema.js                       |  6 +-
+ 6 files changed, 169 insertions(+), 12 deletions(-)
+ create mode 100644 __tests__/survival/survival-migration.test.js
+
+diff --git a/__tests__/robot/robot-arm-attachment-mode.test.js b/__tests__/robot/robot-arm-attachment-mode.test.js
+index b5e68c8..c6b692b 100644
+--- a/__tests__/robot/robot-arm-attachment-mode.test.js
++++ b/__tests__/robot/robot-arm-attachment-mode.test.js
+@@ -226,8 +226,8 @@ describe('патч 191: навес — оружие на руке, а не ко
+     expect(migrated.equippedRobotSlots.leftArm.heldWeapon).toMatchObject({ id: 'robot_weapon_drill' });
+   });
+ 
+-  it('версия схемы — 22', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(22);
++  it('версия схемы — 23 (v22 навесы, v23 выживание)', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(23);
+   });
+ 
+   // ------------------------------------------------------------------ настройка
+diff --git a/__tests__/survival/survival-migration.test.js b/__tests__/survival/survival-migration.test.js
+new file mode 100644
+index 0000000..73b5903
+--- /dev/null
++++ b/__tests__/survival/survival-migration.test.js
+@@ -0,0 +1,81 @@
++import { describe, expect, it } from 'vitest';
++import { migrateCharacterState, migrateSurvivalField } from '../../src/store/migrations';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++import { SURVIVAL_RULES } from '../../domain/survival';
++
++const v22 = (origin, extra = {}) => ({ schemaVersion: 22, origin, ...extra });
++
++const maxState = () => ({
++    food: SURVIVAL_RULES.max.food,
++    water: SURVIVAL_RULES.max.water,
++    sleep: SURVIVAL_RULES.max.sleep,
++    fatigue: [],
++    acc: { food: 0, water: 0, sleep: 0 },
++    timeCarried: 0,
++    hpBonus: 0,
++});
++
++describe('survival: миграция v22 → v23', () => {
++    it('версия схемы — 23', () => {
++        expect(CURRENT_SCHEMA_VERSION).toBe(23);
++    });
++
++    it.each([
++        ['brotherhood', 'human'],
++        ['ghoul', 'ghoul'],
++        ['superMutant', 'mutant'],
++        ['shadow', 'mutant'],
++    ])('органику %s (%s) — начальные максимумы', (originId) => {
++        const out = migrateCharacterState(v22({ id: originId }));
++        expect(out.schemaVersion).toBe(23);
++        expect(out.survival).toEqual(maxState());
++    });
++
++    it.each([
++        ['protectron', 'robot'],
++        ['misterHandy', 'robot'],
++        ['synth', 'cyborg'],
++    ])('роботу/киборгу %s (%s) — null, шкал нет', (originId) => {
++        const out = migrateCharacterState(v22({ id: originId }));
++        expect(out.schemaVersion).toBe(23);
++        expect(out.survival).toBeNull();
++    });
++
++    it('«толстый» ориджин с characterType читается без каталога', () => {
++        const out = migrateCharacterState(v22({ id: 'ghoul', characterType: 'ghoul' }));
++        expect(out.survival).toEqual(maxState());
++    });
++
++    it('ориджин-строкой тоже определяется', () => {
++        const out = migrateCharacterState(v22('protectron'));
++        expect(out.survival).toBeNull();
++    });
++
++    it('без ориджина — фолбэк human (как в domain/origins)', () => {
++        const out = migrateCharacterState(v22(null));
++        expect(out.survival).toEqual(maxState());
++    });
++
++    it('существующее поле survival не перезаписывается', () => {
++        const existing = {
++            food: 2,
++            water: 1,
++            sleep: 3,
++            fatigue: [{ source: 'food', amount: 2 }],
++            acc: { food: 3, water: 1, sleep: 7 },
++            timeCarried: 0.5,
++            hpBonus: 2,
++        };
++        const out = migrateCharacterState(v22({ id: 'brotherhood' }, { survival: existing }));
++        expect(out.survival).toEqual(existing);
++    });
++
++    it('идемпотентна: повторный прогон не меняет результат', () => {
++        const once = migrateCharacterState(v22({ id: 'ghoul' }));
++        const twice = migrateCharacterState(once);
++        expect(twice).toEqual(once);
++        expect(migrateSurvivalField(migrateSurvivalField(v22({ id: 'ghoul' })))).toEqual(
++            migrateSurvivalField(v22({ id: 'ghoul' }))
++        );
++    });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index a3daa55..7768d21 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -31,7 +31,8 @@ const migrateSkillsToCanonical = (rawSkills) => {
+     return canonical ? { ...s, name: canonical } : s;
+   });
+ };
+-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
++import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterArchetype } from '../domain/origins';
++import { createSurvivalState } from '../domain/survival';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+@@ -261,6 +262,17 @@ export const CharacterProvider = ({ children }) => {
+   const [equippedWeapons, setEquippedWeapons] = useState([]);
+   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
+   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
++  // Выживание (docs/survival-system-design.md): null = ещё не создан или
++  // робот/киборг (шкал нет). Инициализируется при выборе ориджина.
++  const [survival, setSurvival] = useState(null);
++
++  // Новый персонаж: как только выбран ориджин — стартовые шкалы (максимумы
++  // для органиков, null роботам/киборгам). При загрузке сейва поле уже
++  // задано миграцией v23, эффект — no-op.
++  useEffect(() => {
++    if (!origin || survival !== null) return;
++    setSurvival(createSurvivalState(getCharacterArchetype({ origin })));
++  }, [origin, survival]);
+ 
+   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+   // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
+@@ -768,6 +780,7 @@ export const CharacterProvider = ({ children }) => {
+     conditions,
+     chemDosesLog,
+     sceneRiskStates,
++    survival,
+   }), [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+@@ -775,7 +788,7 @@ export const CharacterProvider = ({ children }) => {
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+-    conditions, chemDosesLog, sceneRiskStates,
++    conditions, chemDosesLog, sceneRiskStates, survival,
+   ]);
+ 
+   // Realtime save for already persisted characters.
+@@ -892,6 +905,7 @@ export const CharacterProvider = ({ children }) => {
+       setSceneCounter(data.sceneCounter ?? 0);
+       sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
+       setSceneRiskStates(data.sceneRiskStates);
++      setSurvival(data.survival ?? null);
+       // Migrate old [null, null] format to dynamic array
+       const rawWeapons = data.equippedWeapons || [];
+       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
+@@ -1439,6 +1453,9 @@ export const CharacterProvider = ({ children }) => {
+     });
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
++    // Выживание сбрасывается; при сохранённом ориджине его подхватит эффект
++    // инициализации (максимум органикам, null роботам/киборгам).
++    setSurvival(null);
+     setEquippedArmor(createEmptyEquippedArmor());
+     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
+@@ -1569,6 +1586,8 @@ export const CharacterProvider = ({ children }) => {
+     getModifiedItem,
+     saveModifiedItem,
+     removeModifiedItem,
++    survival,
++    setSurvival,
+     resetCharacter,
+     resetKitAndRewards,
+     resetKitOnly,
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 4379f7d..6d36b8f 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,7 +1,7 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.2** от 2026-09-07.
+-Статус: правила согласованы; этапы 1–2 плана реализованы (патч 197).
++Редакция **0.3.3** от 2026-09-07.
++Статус: правила согласованы; этапы 1–3 плана реализованы (патчи 197–198).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -322,13 +322,21 @@ survival: {
+   water: 1..4,        // секция шкалы воды
+   sleep: 1..5,        // секция шкалы сна
+   fatigue: [{ source, amount }],  // очки Усталости по источникам
+-  accumulators: { food, water, sleep },  // игровые часы в текущем состоянии
+-  timeCarried: число,  // накопленные игровые часы реального тика
+-  lastTickAt: метка,   // последний реальный тик (только открытое приложение)
+-  hpBonusUntilNextSleep: 0|2,
++  acc: { food, water, sleep },    // игровые часы, накопленные в текущей секции
++  timeCarried: число,  // дробная часть игрового часа от реального тика
++  hpBonus: 0|2,        // +2 к макс. ОЗ до следующего сна (кровать, ≥8 ч)
+ }
+ ```
+ 
++Реализовано (патч 198): миграция **v22 → v23** (`migrateSurvivalField` в
++`src/store/migrations.js`) — всем существующим сейвам поле добавляется
++при первом открытии; роботы/киборги получают `null` (тип берётся из
++ориджина: «худой» id → каталог `origins.json`, «толстый» объект → его
++`characterType`, фолбэк human как в `domain/origins`). Новые персонажи —
++эффект в `CharacterContext`: при выборе ориджина `survival === null` →
++стартовые максимумы. Поле ездит через `buildSnapshot`/`serializeState`/
++`deserializeState` и выставляется из контекста как `survival`/`setSurvival`.
++
+ Секция — единственный источник истины для отображения; пороги спуска —
+ константы домена. Роботы/киборги поле не содержат вовсе (или `null`).
+ 
+@@ -347,7 +355,10 @@ survival: {
+    Детали реализации: счётчик времени в секции сбрасывается при любой смене
+    секции (включая подъём едой/питьём); почасовое снятие −1 списывается
+    с наибольшего источника.
+-3. **Сейв/миграции:** поле `survival`, начальные максимумы, роботы/киборги.
++3. **Сейв/миграции (готово, патч 198):** версия схемы v23, миграция
++   `migrateSurvivalField` (максимумы всем, null роботам/киборгам,
++   идемпотентна), инициализация новых персонажей в `CharacterContext`,
++   проводка в снапшот/сериализацию, `survival`/`setSurvival` в контексте.
+ 4. **UI:** поле с тремя вертикальными шкалами рядом с «Эффектами», иконки,
+    строки «Усталость N» / «Количество получаемых ОД −M» в эффектах,
+    модалки еды/питья/сна с прогнозом и алертом.
+@@ -370,11 +381,19 @@ survival: {
+ 3. Движок ОД: период пополнения пула, интеграция с дайс-движком, чья
+    Усталость учитывается в группе.
+ 4. Температура — отложено (§9), вернуться по решению владельца.
++5. Смена ориджина у существующего персонажа (`resetKitAndRewards`) выживание
++   не трогает — шкалы остаются как есть. Если смена типа (например, на
++   робота) должна обнулять/пересоздавать поле — определить правилом.
+ 
+ ---
+ 
+ ## 15. История редакций
+ 
++- **0.3.3 (2026-09-07):** реализован этап 3 — миграция v22→v23
++  (`migrateSurvivalField`), инициализация при выборе ориджина, проводка в
++  сейв/контекст (13 тестов миграции). Открытый вопрос: выживание при смене
++  ориджина живого персонажа.
++
+ - **0.3.2 (2026-09-07):** решено: название состояния — тапом по шкале.
+   Реализованы этапы 1–2 плана: флаги `soup` (4 блюда) и `purified`
+   (очищенная вода) в данных, домен `domain/survival.js` с полным набором
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 3b1eaae..a8a1f59 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -8,6 +8,8 @@ import { generateItemId } from '../../domain/itemIdentity';
+ import { getPerks, getUniqQualityName } from '../../domain/registry';
+ import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
+ import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
++import { createSurvivalState } from '../../domain/survival';
++import originsFile from '../../modules/fallout/data/origins/origins.json';
+ import { debugLog } from '../debug/falloutDebug';
+ import { getDefaultLimbs } from '../../domain/bodyplan';
+ import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+@@ -574,6 +576,34 @@ export const migrateRobotArmAttachments = (state) => {
+   return changed ? { ...state, equippedRobotSlots: slots } : state;
+ };
+ 
++// Тип персонажа для инициализации выживания: ориджин в сейве может быть
++// «худым» ({id}) или «толстым» (объект с characterType); остальное — каталог.
++const _ORIGINS_BY_ID = new Map(
++  (Array.isArray(originsFile) ? originsFile : []).map((entry) => [entry.id, entry])
++);
++const _survivalCharacterType = (origin) => {
++  if (origin && typeof origin === 'object' && origin.characterType) {
++    return origin.characterType;
++  }
++  const id = typeof origin === 'string' ? origin : origin?.id;
++  return (id && _ORIGINS_BY_ID.get(id)?.characterType) || 'human';
++};
++
++/**
++ * v22 -> v23: выживание. Всем сейвам добавляется поле survival:
++ * органики получают начальное состояние (все шкалы на максимуме,
++ * усталости нет), роботы и киборги — null. Существующее поле не
++ * перезаписывается (идемпотентна). Правила — docs/survival-system-design.md.
++ */
++export const migrateSurvivalField = (state) => {
++  if (!state || typeof state !== 'object') return state;
++  if (state.survival !== undefined) return state;
++  return {
++    ...state,
++    survival: createSurvivalState(_survivalCharacterType(state.origin)),
++  };
++};
++
+ const MIGRATIONS = [
+   // v0 -> v1: разделить эффекты/качества в экипированном оружии.
+   (state) => {
+@@ -1226,6 +1256,10 @@ const MIGRATIONS = [
+   // пересаживается в ладонь (heldWeapon). Идемпотентна.
+   migrateRobotArmAttachments,
+ 
++  // v22 -> v23: выживание — поле survival (шкалы еды/воды/сна, Усталость).
++  // Органики — начальные максимумы, роботы/киборги — null. Идемпотентна.
++  migrateSurvivalField,
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 2821973..16e59d4 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -59,7 +59,11 @@
+ // v22 — навесы (arm attachments) — оружие, крепящееся к руке: слоты, где
+ //       навес стоял вместо руки, получают стандартную руку плана тела,
+ //       навес пересаживается в ладонь (миграция migrateRobotArmAttachments).
+-export const CURRENT_SCHEMA_VERSION = 22;
++// v23 — выживание: поле survival (шкалы еды/воды/сна, очки Усталости с
++//       источниками, аккумуляторы времени) — миграция migrateSurvivalField.
++//       Органикам (human/ghoul/mutant) — начальные максимумы, роботам и
++//       киборгам — null (шкал нет).
++export const CURRENT_SCHEMA_VERSION = 23;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+-- 
+2.39.5
+
