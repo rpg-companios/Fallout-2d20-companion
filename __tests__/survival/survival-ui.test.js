@@ -71,6 +71,18 @@ describe('survival: i18n шкал (ru/en)', () => {
         expect(dict.survival.apPenalty).toContain('{n}');
     });
 
+    it.each(Object.entries(locales))('%s: заголовки областей Голод/Жажда/Сон', (loc, dict) => {
+        expect(dict.survival.foodTitle).toMatch(/^\S.+$/);
+        expect(dict.survival.waterTitle).toMatch(/^\S.+$/);
+        expect(dict.survival.sleepTitle).toMatch(/^\S.+$/);
+    });
+
+    it('ru: заголовки — слова владельца', () => {
+        expect(ruScreen.survival.foodTitle).toBe('Голод');
+        expect(ruScreen.survival.waterTitle).toBe('Жажда');
+        expect(ruScreen.survival.sleepTitle).toBe('Сон');
+    });
+
     it('ru: формулировки строк эффектов — слова владельца', () => {
         expect(ruScreen.survival.fatigue).toBe('Усталость {n}');
         expect(ruScreen.survival.apPenalty).toBe('Количество получаемых ОД −{n}');

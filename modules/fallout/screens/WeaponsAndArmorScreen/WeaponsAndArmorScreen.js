@@ -35,7 +35,6 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
-import { SurvivalScales } from './SurvivalScales';
 import { survivalEffectRows } from '../../../../domain/survival';
 import { dedupeWeaponCards } from './dedupeWeaponCards';
 import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
@@ -1023,13 +1022,32 @@ const WeaponsAndArmorScreen = () => {
                   <HealthCounter max={effectiveMaxHealth} isEnabled={attributesSaved} radiation={radiation} />
                 </StatBox>
             </View>
+            {/* Выживание (док §7): три области как ряд статистики —
+                Голод / Жажда / Сон, значение = название состояния из книги.
+                Роботы и киборги (survival === null) ряда не получают. */}
+            {survival ? (
+              <View style={[localStyles.statsRow, { marginTop: 8 }]}>
+                <StatBox
+                  title={tWeaponsAndArmorScreen('survival.foodTitle')}
+                  value={tWeaponsAndArmorScreen(`survival.food.${survival.food}`)}
+                />
+                <StatBox
+                  title={tWeaponsAndArmorScreen('survival.waterTitle')}
+                  value={tWeaponsAndArmorScreen(`survival.water.${survival.water}`)}
+                />
+                <StatBox
+                  title={tWeaponsAndArmorScreen('survival.sleepTitle')}
+                  value={tWeaponsAndArmorScreen(`survival.sleep.${survival.sleep}`)}
+                />
+              </View>
+            ) : null}
+            </View>
             <EffectsPanel
               effects={activeTimedEffects || []}
               immunities={allImmunities}
               extraRows={powerArmorEffectRows}
               survivalRows={survivalRows}
             />
-            {survival ? <SurvivalScales survival={survival} /> : null}
             </View>
 
             {/* Броня / Слоты робота */}
