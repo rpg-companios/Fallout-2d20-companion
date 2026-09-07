@@ -1,0 +1,101 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 10:12:38 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20205:=20=D0=BA=D0=B0?=
+ =?UTF-8?q?=D1=80=D1=82=D0=BE=D1=87=D0=BA=D0=B8=20=D0=BE=D1=80=D1=83=D0=B6?=
+ =?UTF-8?q?=D0=B8=D1=8F=2060/40=20(=D0=BB=D0=B5=D0=B9=D0=B1=D0=BB=20=D1=88?=
+ =?UTF-8?q?=D0=B8=D1=80=D0=B5,=20=D0=B7=D0=BD=D0=B0=D1=87=D0=B5=D0=BD?=
+ =?UTF-8?q?=D0=B8=D0=B5=20=D0=BF=D0=B5=D1=80=D0=B5=D0=BD=D0=BE=D1=81=D0=B8?=
+ =?UTF-8?q?=D1=82=D1=81=D1=8F),=20=D0=B1=D1=80=D0=B0=D1=83=D0=B7=D0=B5?=
+ =?UTF-8?q?=D1=80=D0=BD=D1=8B=D0=B5=20=D0=BF=D0=B5=D1=80=D0=B5=D0=BD=D0=BE?=
+ =?UTF-8?q?=D1=81=D1=8B=20=D1=81=D0=BB=D0=BE=D0=B2=20=E2=80=94=20hyphens:a?=
+ =?UTF-8?q?uto=20+=20document.lang=20=D0=BF=D0=BE=20=D0=BB=D0=BE=D0=BA?=
+ =?UTF-8?q?=D0=B0=D0=BB=D0=B8?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                 |  7 ++++++-
+ docs/survival-system-design.md         |  8 ++++++--
+ styles/WeaponsAndArmorScreen.styles.js | 12 ++++++++----
+ 3 files changed, 20 insertions(+), 7 deletions(-)
+
+diff --git a/App.js b/App.js
+index 723e270..449b4af 100644
+--- a/App.js
++++ b/App.js
+@@ -67,8 +67,13 @@ function App() {
+ 
+   // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
+   // даже если версия @react-navigation/native не поддерживает documentTitle.
++  // Заодно проставляем lang документа: включает браузерные словари переносов
++  // (CSS hyphens: auto в стилях текста) для активной локали приложения.
+   useEffect(() => {
+-    if (typeof document !== 'undefined') document.title = APP_BRAND;
++    if (typeof document !== 'undefined') {
++      document.title = APP_BRAND;
++      document.documentElement.lang = locale;
++    }
+   }, [locale, moduleTabsActive]);
+ 
+   useEffect(() => {
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index cd5d77d..d450d8c 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,7 +1,7 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.8** от 2026-09-07.
+-Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–204);
++Редакция **0.3.9** от 2026-09-07.
++Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–205);
+ модалки еды/питья/сна — следующий патч.
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+@@ -394,6 +394,10 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.3.9 (2026-09-07):** карточки оружия — пропорция ячеек 60/40 (лейбл
++  шире, значение переносится); включён браузерный автоперенос длинных слов
++  (`hyphens: auto` + `document.lang` по локали в App.js; на нативных
++  платформах — перенос по словам, словарей переносов в RN нет).
+ - **0.3.8 (2026-09-07):** фикс бага патча 198: импортировалась
+   несуществующая функция `getCharacterArchetype` (реальная —
+   `getCharacterType`) — эффект инициализации выживания падал TypeError при
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index 8952f0b..8532736 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -157,10 +157,10 @@ const styles = StyleSheet.create({
+     backgroundColor: '#333',
+     color: '#fff',
+     fontWeight: 'bold',
+-    // Фиксированная доля ячейки-лейбла — одинакова во всех карточках:
+-    // длинное значение («Энергетический») больше не сжимает первую ячейку
+-    // (владелец, 0.3.7). Ячейка значения забирает остальное (flex: 1).
+-    width: '42%',
++    // Фиксированная доля ячейки-лейбла — одинакова во всех карточках
++    // (владелец): 60% лейбл / 40% значение; длинное значение переносится
++    // во второй ячейке, а не распирает строку.
++    width: '60%',
+     padding: 8,
+     fontSize: 12,
+   },
+@@ -172,6 +172,10 @@ const styles = StyleSheet.create({
+     borderColor: '#5a5a5a',
+     backgroundColor: '#fff',
+     textAlign: 'center',
++    // Браузерный автоперенос длинных слов (веб): работает при проставленном
++    // lang документа (см. App.js). На нативных платформах свойство
++    // игнорируется — там перенос по словам.
++    hyphens: 'auto',
+   },
+   armorModificationButton: {
+     padding: 8,
+-- 
+2.39.5
+
