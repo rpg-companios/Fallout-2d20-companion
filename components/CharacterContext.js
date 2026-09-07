@@ -31,7 +31,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
     return canonical ? { ...s, name: canonical } : s;
   });
 };
-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterArchetype } from '../domain/origins';
+import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterType } from '../domain/origins';
 import { createSurvivalState } from '../domain/survival';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
@@ -271,7 +271,7 @@ export const CharacterProvider = ({ children }) => {
   // задано миграцией v23, эффект — no-op.
   useEffect(() => {
     if (!origin || survival !== null) return;
-    setSurvival(createSurvivalState(getCharacterArchetype({ origin })));
+    setSurvival(createSurvivalState(getCharacterType({ origin })));
   }, [origin, survival]);
 
   // ── Robot equipment: single source of truth = Zustand robot slice ──────────

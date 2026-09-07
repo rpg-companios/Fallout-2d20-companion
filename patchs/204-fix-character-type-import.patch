@@ -1,0 +1,155 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 09:59:42 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20204:=20=D1=84=D0=B8?=
+ =?UTF-8?q?=D0=BA=D1=81=20=D0=B7=D0=B0=D0=B3=D1=80=D1=83=D0=B7=D0=BA=D0=B8?=
+ =?UTF-8?q?=20=E2=80=94=20=D0=BD=D0=B5=D1=81=D1=83=D1=89=D0=B5=D1=81=D1=82?=
+ =?UTF-8?q?=D0=B2=D1=83=D1=8E=D1=89=D0=B8=D0=B9=20=D0=B8=D0=BC=D0=BF=D0=BE?=
+ =?UTF-8?q?=D1=80=D1=82=20getCharacterArchetype=20(=D1=80=D0=B5=D0=B0?=
+ =?UTF-8?q?=D0=BB=D1=8C=D0=BD=D0=B0=D1=8F=20getCharacterType)=20=D1=80?=
+ =?UTF-8?q?=D0=BE=D0=BD=D1=8F=D0=BB=20=D1=8D=D1=84=D1=84=D0=B5=D0=BA=D1=82?=
+ =?UTF-8?q?=20=D0=B2=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D1=8F=20?=
+ =?UTF-8?q?=D0=B8=20=D0=BB=D0=BE=D0=BC=D0=B0=D0=BB=20=D0=B2=D1=8B=D0=B4?=
+ =?UTF-8?q?=D0=B0=D1=87=D1=83=20=D0=BA=D0=BE=D0=BC=D0=BF=D0=BB=D0=B5=D0=BA?=
+ =?UTF-8?q?=D1=82=D0=B0;=20=D1=82=D0=B5=D1=81=D1=82=20=D1=86=D0=B5=D0=BB?=
+ =?UTF-8?q?=D0=BE=D1=81=D1=82=D0=BD=D0=BE=D1=81=D1=82=D0=B8=20=D0=B8=D0=BC?=
+ =?UTF-8?q?=D0=BF=D0=BE=D1=80=D1=82=D0=BE=D0=B2=20CharacterContext?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-imports.test.js         | 68 +++++++++++++++++++
+ components/CharacterContext.js                |  4 +-
+ docs/survival-system-design.md                | 11 ++-
+ 3 files changed, 79 insertions(+), 4 deletions(-)
+ create mode 100644 __tests__/survival/character-context-imports.test.js
+
+diff --git a/__tests__/survival/character-context-imports.test.js b/__tests__/survival/character-context-imports.test.js
+new file mode 100644
+index 0000000..5414636
+--- /dev/null
++++ b/__tests__/survival/character-context-imports.test.js
+@@ -0,0 +1,68 @@
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { parseSync } from '@babel/core';
++import jsxPlugin from '@babel/plugin-transform-react-jsx';
++
++// Регрессия патча 198: в CharacterContext был импортирован несуществующий
++// getCharacterArchetype (функция зовётся getCharacterType) — эффект
++// инициализации выживания падал TypeError при загрузке сейва и ломал
++// загрузку дальше по цепочке. Импортировать сам модуль в vitest нельзя
++// (react-native — Flow), поэтому проверяем целостность именованных
++// импортов статически: каждое имя из локального '../…' должно быть
++// экспортировано целевым файлом.
++
++const ROOT = path.resolve(__dirname, '../..');
++const FILE = path.join(ROOT, 'components/CharacterContext.js');
++
++const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
++    filename: file,
++    babelrc: false,
++    configFile: false,
++    sourceType: 'module',
++    plugins: [jsxPlugin],
++    parserOpts: { allowReturnOutsideFunction: true },
++});
++
++const exportedNames = (ast) => {
++    const names = new Set();
++    for (const node of ast.program.body) {
++        if (node.type === 'ExportNamedDeclaration') {
++            if (node.specifiers.length) {
++                node.specifiers.forEach((s) => names.add(s.exported.name));
++            }
++            const decl = node.declaration;
++            if (decl) {
++                if (decl.id) names.add(decl.id.name); // function/class
++                if (decl.declarations) {
++                    decl.declarations.forEach((d) => {
++                        if (d.id.type === 'Identifier') names.add(d.id.name);
++                    });
++                }
++            }
++        }
++        if (node.type === 'ExportDefaultDeclaration') names.add('default');
++    }
++    return names;
++};
++
++describe('CharacterContext: целостность именованных импортов', () => {
++    it('каждое импортируемое имя существует в целевом локальном модуле', () => {
++        const ast = parse(FILE);
++        const problems = [];
++        for (const node of ast.program.body) {
++            if (node.type !== 'ImportDeclaration') continue;
++            if (!node.source.value.startsWith('.')) continue; // только локальные
++            const target = path.resolve(path.dirname(FILE), node.source.value) + '.js';
++            if (!fs.existsSync(target)) continue; // индексы/пакеты — не наш случай
++            const available = exportedNames(parse(target));
++            for (const spec of node.specifiers) {
++                if (spec.type !== 'ImportSpecifier') continue;
++                if (!available.has(spec.imported.name)) {
++                    problems.push(`${node.source.value}: ${spec.imported.name}`);
++                }
++            }
++        }
++        expect(problems).toEqual([]);
++    });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 7768d21..b2a6fb8 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -31,7 +31,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
+     return canonical ? { ...s, name: canonical } : s;
+   });
+ };
+-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterArchetype } from '../domain/origins';
++import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterType } from '../domain/origins';
+ import { createSurvivalState } from '../domain/survival';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+@@ -271,7 +271,7 @@ export const CharacterProvider = ({ children }) => {
+   // задано миграцией v23, эффект — no-op.
+   useEffect(() => {
+     if (!origin || survival !== null) return;
+-    setSurvival(createSurvivalState(getCharacterArchetype({ origin })));
++    setSurvival(createSurvivalState(getCharacterType({ origin })));
+   }, [origin, survival]);
+ 
+   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 09854e5..cd5d77d 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,7 +1,7 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.7** от 2026-09-07.
+-Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–203);
++Редакция **0.3.8** от 2026-09-07.
++Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–204);
+ модалки еды/питья/сна — следующий патч.
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+@@ -394,6 +394,13 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.3.8 (2026-09-07):** фикс бага патча 198: импортировалась
++  несуществующая функция `getCharacterArchetype` (реальная —
++  `getCharacterType`) — эффект инициализации выживания падал TypeError при
++  загрузке сейва и ломал загрузку дальше по цепочке (слетал комплект
++  снаряжения). Добавлен тест целостности именованных импортов
++  CharacterContext (сам модуль в vitest не импортируется — react-native
++  на Flow); негативная проверка подтвердила, что тест ловит регрессию.
+ - **0.3.7 (2026-09-07):** полировка UI: значения областей выживания —
+   отступы от краёв (paddingHorizontal); карточки оружия — ячейка-лейбл
+   фиксированной доли (42%) во всех карточках, длинные значения
+-- 
+2.39.5
+
