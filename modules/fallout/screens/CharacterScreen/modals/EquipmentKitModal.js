@@ -335,6 +335,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
       const allInventoryItems = [...dedupedFinalItems, ...robotInventory];
 
       onSelectKit({
+        id: kit.id,
         name: kit.name,
         items: allInventoryItems,
         weight,
@@ -349,6 +350,7 @@ const EquipmentKitModal = ({ visible, onClose, equipmentKits, onSelectKit, chara
       // Non-robots always have their built-in unarmed weapon (fists).
       const builtin = getBuiltinBaseWeapon(character);
       onSelectKit({
+        id: kit.id,
         name: kit.name,
         items: finalItems,
         weight,
