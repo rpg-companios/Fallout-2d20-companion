@@ -21,6 +21,8 @@ import { initDatabase } from './db/Database';
 import { seedDatabase } from './db/seed';
 import { useLocale, useModuleLocale } from './i18n/locale';
 import { tApp } from './i18n/appI18n';
+import useCharacterStore from './src/store/characterStore';
+import { debugLog } from './src/debug/falloutDebug';
 
 import HomeScreen from './components/screens/HomeScreen/HomeScreen';
 import CharacterScreen from './modules/fallout/screens/CharacterScreen/CharacterScreen';
@@ -54,6 +56,7 @@ const TAB_ROUTES = {
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
+  const [characterStoreReady, setCharacterStoreReady] = useState(false);
   const [bootDone, setBootDone] = useState(false);
   const [bootProgress, setBootProgress] = useState(0);
   // Решение фиксируется один раз после гидратации: переключение настройки
@@ -91,6 +94,38 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
+    const hydrateCharacterStore = async () => {
+      try {
+        await useCharacterStore.persist.rehydrate();
+        if (!cancelled) setCharacterStoreReady(true);
+      } catch (error) {
+        // character-store is a rebuildable cache; SQLite/WebAdapter remains
+        // the canonical source for saved characters.
+        debugLog('characterStore.rehydrate.failed', {
+          message: error?.message || String(error),
+        });
+        try {
+          await useCharacterStore.persist.clearStorage();
+          useCharacterStore.getState().resetCharacterStore();
+          debugLog('characterStore.rehydrate.recovered', {});
+        } catch (recoveryError) {
+          debugLog('characterStore.rehydrate.recoveryFailed', {
+            message: recoveryError?.message || String(recoveryError),
+          });
+        } finally {
+          if (!cancelled) setCharacterStoreReady(true);
+        }
+      }
+    };
+
+    hydrateCharacterStore();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     async function initDb() {
       try {
         if (!cancelled) setBootProgress(0.2);
@@ -120,7 +155,7 @@ function App() {
     );
   }
 
-  if (bootEnabledForLaunch === null || !dbReady) {
+  if (bootEnabledForLaunch === null || !dbReady || !characterStoreReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }}>
         <ActivityIndicator size="large" color="#f0e68c" />

@@ -1085,9 +1085,23 @@ const useCharacterStore = create(devtools(
       // On rehydrate, ensure all totals are recalculated
       onRehydrateStorage: () => (state) => {
         if (state) {
-          state.recalculateAll();
+          // The Zustand cache is a rebuildable web/native working cache. A
+          // stale equipped item must not make the whole PWA fail before the
+          // canonical character row can be loaded from SQLite.
+          try {
+            state.recalculateAll();
+          } catch (error) {
+            debugLog('characterStore.rehydrate.recalculateFailed', {
+              message: error?.message || String(error),
+            });
+            throw error;
+          }
         }
       },
+      // App.js explicitly awaits hydration before mounting CharacterProvider.
+      // This prevents a persisted cache from racing with a character loaded
+      // from the canonical SQLite/WebAdapter row.
+      skipHydration: true,
     }
   ),
   {

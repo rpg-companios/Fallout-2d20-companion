@@ -3,3 +3,4 @@
 - [Kit inventory item ID resolution](kit-item-id-resolution.md) — addNewItem and normalizeItems must accept itemId/armorId/clothingId fallbacks; kit JSON armor IDs must match catalog exactly.
 - [React Native drag drop measurements](react-native-drag-drop-measurements.md) — conditionally rendered drop zones must be measured after mount and awaited again on release; refs can be null at drag start.
 - [Expo static publishing](expo-static-publishing.md) — publish Expo web builds as static assets; SPA fallback can return HTML for missing hashed JavaScript and cause `Unexpected token '<'`.
+- [Character store hydration](character-store-hydration.md) — treat persisted character state as a rebuildable cache; hydrate before mounting UI and recover without deleting database characters.
