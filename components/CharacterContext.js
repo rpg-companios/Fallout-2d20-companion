@@ -369,8 +369,12 @@ export const CharacterProvider = ({ children }) => {
   });
   const healCharacter = (amount, maxOverride) =>
     setCurrentHealth(restore(healthCounter(maxOverride), amount).current);
+  // Урон списывается без потолка базовой формулы: текущее ОЗ может быть
+  // законно ВЫШЕ базового максимума (бонус «прекрасно отдохнувший», патч 213
+  // снижает максимум от усталости) — зажим createCounter к базовому max
+  // молча отрезал бы разницу. Ограничение — только нижняя граница 0.
   const damageCharacter = (amount) =>
-    setCurrentHealth(consume(healthCounter(), amount).current);
+    setCurrentHealth(consume(createCounter({ id: 'health', current: currentHealth, max: null }), amount).current);
 
   // Радиация: ресурс с обратным знаком — «хорошо» быть у нуля. Потолка нет,
   // ограничение только снизу.

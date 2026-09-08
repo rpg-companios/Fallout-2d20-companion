@@ -10,29 +10,23 @@
 //     случаются в норме).
 //
 // Монтируется в App.js рядом с AlertHost (внутри CharacterProvider).
-// Рендерит null: только таймер и запись результата в стор + дрен ОЗ.
+// Рендерит null: только таймер и запись результата в стор. Текущие ОЗ
+// не трогаются: усталость снижает МАКСИМУМ ОЗ (производная от N, патч 213),
+// и это пересчитывается в сторе самим тиком.
 //
 // Движок не знает правил: компонент читает настройки через общий стор,
-// состояние — из слайса stateExtensions, дрен ОЗ — через контекст
-// (setCurrentHealth — родовой счётчик персонажа).
+// состояние — из слайса stateExtensions.
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { AppState } from 'react-native';
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
-import { useCharacter } from '../../../components/CharacterContext';
 import { advanceRealMinutes } from './survival';
 
 const TICK_INTERVAL_MS = 30_000;
 const MAX_REAL_MINUTES_PER_TICK = 5;
 
 const SurvivalClock = () => {
-  const { currentHealth, setCurrentHealth } = useCharacter();
-  const healthRef = useRef(currentHealth);
-  healthRef.current = currentHealth;
-  const setHealthRef = useRef(setCurrentHealth);
-  setHealthRef.current = setCurrentHealth;
-
   useEffect(() => {
     let lastTickAt = null;
     let timer = null;
@@ -56,13 +50,6 @@ const SurvivalClock = () => {
       if (!(course > 0)) return; // страховка: домен бросает на неположительном курсе
       const result = advanceRealMinutes(survival, elapsedRealMinutes, course);
       store.setStateExtension('survival', result.state);
-
-      if (result.hpLost > 0) {
-        const hp = healthRef.current;
-        if (hp != null) {
-          setHealthRef.current(Math.max(0, hp - result.hpLost));
-        }
-      }
     };
 
     const stop = () => {

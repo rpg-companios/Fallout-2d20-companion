@@ -1,19 +1,21 @@
 // Модалка сна выживания (docs/survival-system-design.md §4, §5, §7).
 //
 // Место (кровать/пустошь) и часы 1–24. Перед подтверждением — прогноз
-// чистым доменом forecastSleep (шаг шкал, усталость, дрен ОЗ, потолок
-// состояния, бонус ОЗ); при достижении 0 ОЗ — красное предупреждение
-// (§6: игрок сам решает — спать меньше или сначала поесть/попить).
-// Подтверждение — операция контекста sleepSurvival: применяет rest(),
-// двигает таймеры эффектов на N × 12 сцен (мост контуров, §5) и в пустоши
-// проверяет болезнь по имеющейся механике (событие sleepOnGround).
+// чистым доменом forecastSleep (шаг шкал, усталость, итоговый максимум ОЗ:
+// усталость снижает МАКСИМУМ ОЗ, а не текущие — патч 213, §6). Подтверждение
+// — операция контекста sleepSurvival: применяет rest(), двигает таймеры
+// эффектов на N × 12 сцен (мост контуров, §5) и в пустоши проверяет болезнь
+// по имеющейся механике (событие sleepOnGround).
 
 import React, { useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
 import { useCharacter } from '../../../../../components/CharacterContext';
+import { calculateMaxHealth } from '../../../../../domain/characterCreation';
 import {
     forecastSleep,
+    hpMaxPenaltyForFatigue,
     SURVIVAL_RULES,
+    totalFatigue,
     type SleepPlace,
     type SurvivalState,
     type RestResult,
@@ -40,31 +42,24 @@ interface ForecastLine {
     tone: 'neutral' | 'positive' | 'negative';
 }
 
-const buildForecastLines = (forecast: RestResult): ForecastLine[] => {
+// Максимум ОЗ после сна: базовый + бонус «прекрасно отдохнувший» −
+// снижение от усталости (⌊N/2⌋, патч 213). Не ниже нуля.
+const maxHpAfterSleep = (state: SurvivalState, baseMaxHealth: number): number =>
+    Math.max(0, baseMaxHealth + state.hpBonus - hpMaxPenaltyForFatigue(totalFatigue(state)));
+
+const buildForecastLines = (forecast: RestResult, baseMaxHealth: number): ForecastLine[] => {
     const lines: ForecastLine[] = [
         {
             key: 'state',
             text: t('survival.sleep.forecastState').replace('{state}', stateName(forecast.state.sleep)),
             tone: 'neutral',
         },
-    ];
-    if (forecast.hpLost > 0) {
-        lines.push({
-            key: 'hpLost',
-            text: t('survival.sleep.forecastHpLost').replace('{n}', String(forecast.hpLost)),
-            tone: 'negative',
-        });
-    }
-    if (forecast.hpEnd != null) {
-        lines.push({
-            key: 'hpEnd',
-            text: t('survival.sleep.forecastHpEnd').replace('{n}', String(forecast.hpEnd)),
+        {
+            key: 'maxHp',
+            text: t('survival.sleep.forecastMaxHp').replace('{n}', String(maxHpAfterSleep(forecast.state, baseMaxHealth))),
             tone: 'neutral',
-        });
-    }
-    if (forecast.hitsZero) {
-        lines.push({ key: 'zero', text: t('survival.sleep.forecastZeroWarning'), tone: 'negative' });
-    }
+        },
+    ];
     const cleared = forecast.events.find((e) => e.type === 'fatigueSleepCleared');
     if (typeof cleared?.removed === 'number' && cleared.removed > 0) {
         lines.push({
@@ -102,17 +97,21 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
     useModuleLocale();
     const survival = useSurvivalState();
     const { sleepSurvival } = useSurvivalActions();
-    const { currentHealth } = useCharacter();
+    const { attributes, level, attributesSaved } = useCharacter();
     const [place, setPlace] = useState<SleepPlace>('bed');
     const [hours, setHours] = useState(8);
+
+    // Базовый максимум ОЗ — формула сеттинга от атрибутов и уровня; строка
+    // максимума показывается, когда персонаж собран (как счётчик ОЗ).
+    const baseMaxHealth = attributesSaved ? calculateMaxHealth(attributes, level) : 0;
 
     const forecast = useMemo<RestResult | null>(() => {
         const state = survival as SurvivalState | null;
         if (!state) return null;
-        return forecastSleep(state, { place, hours, currentHp: currentHealth });
-    }, [survival, place, hours, currentHealth]);
+        return forecastSleep(state, { place, hours });
+    }, [survival, place, hours]);
 
-    const lines = forecast ? buildForecastLines(forecast) : [];
+    const lines = forecast ? buildForecastLines(forecast, baseMaxHealth) : [];
 
     const handleConfirm = () => {
         const apply = sleepSurvival({ place, hours }) as {
@@ -129,11 +128,10 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
         const reportLines: string[] = [
             t('survival.sleep.reportState').replace('{state}', stateName(result.state.sleep)),
         ];
-        if (result.hpLost > 0) {
-            reportLines.push(t('survival.sleep.reportHpLost').replace('{n}', String(result.hpLost)));
-        }
-        if (result.hpEnd != null) {
-            reportLines.push(t('survival.sleep.reportHp').replace('{n}', String(result.hpEnd)));
+        if (attributesSaved) {
+            reportLines.push(
+                t('survival.sleep.reportMaxHp').replace('{n}', String(maxHpAfterSleep(result.state, baseMaxHealth))),
+            );
         }
         if (result.state.hpBonus > 0) {
             reportLines.push(t('survival.sleep.reportHpBonus'));

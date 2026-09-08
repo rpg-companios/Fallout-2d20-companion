@@ -177,8 +177,12 @@ export function clearFatigueSource(state: SurvivalState, source: FatigueSource):
     if (entry) entry.amount = 0;
 }
 
-// 1 ОЗ за каждые 2 очка Усталости, без сопротивлений.
-export function hpDrainForFatigue(fatigueTotal: number): number {
+// Снижение максимума ОЗ от Усталости (патч 213): −1 к макс. ОЗ за каждые
+// 2 очка Усталости (⌊N/2⌋), без сопротивлений. По книге усталость дренирует
+// МАКСИМУМ ОЗ, а не текущие — величина производная от текущего N:
+// пересчитывается каждый игровой час (шаг 3 тика), отдельного аккумулятора
+// в состоянии нет; при снятии Усталости максимум возвращается сам.
+export function hpMaxPenaltyForFatigue(fatigueTotal: number): number {
     return Math.floor(fatigueTotal / 2);
 }
 
@@ -234,7 +238,7 @@ export interface TickOptions {
 
 // Один часовой тик (три шага, §5). Мутирует рабочую копию.
 // options.sleepMode — часы сна: лестница сна заморожена (сон лечит).
-function tickHour(state: SurvivalState, options: TickOptions = {}): { drain: number; events: SurvivalEvent[] } {
+function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEvent[] {
     const events: SurvivalEvent[] = [];
     // 1. Лестницы + начисление Усталости.
     for (const key of LADDERS) {
@@ -255,15 +259,15 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): { drain: num
         removeFatigueTotal(state, 1);
         events.push({ type: 'fatigueRemoved', amount: 1 });
     }
-    // 3. Дрен ОЗ по итоговому N.
-    const drain = hpDrainForFatigue(totalFatigue(state));
-    if (drain > 0) events.push({ type: 'hpDrain', amount: drain });
-    return { drain, events };
+    // 3. Снижение максимума ОЗ по итоговому N (патч 213): производная
+    //    ⌊N/2⌋ — событие для наблюдателей/тестов, состояние не пишется.
+    const maxPenalty = hpMaxPenaltyForFatigue(totalFatigue(state));
+    if (maxPenalty > 0) events.push({ type: 'hpMaxPenalty', amount: maxPenalty });
+    return events;
 }
 
 export interface AdvanceResult {
     state: SurvivalState;
-    hpLost: number;
     events: SurvivalEvent[];
 }
 
@@ -277,14 +281,12 @@ export function advanceHours(state: SurvivalState, hours: number, options: TickO
     const carried = wk.timeCarried + hours;
     const whole = Math.floor(carried);
     wk.timeCarried = carried - whole;
-    let hpLost = 0;
     const events: SurvivalEvent[] = [];
     for (let i = 0; i < whole; i += 1) {
-        const r = tickHour(wk, options);
-        hpLost += r.drain;
-        for (const e of r.events) events.push({ hour: i + 1, ...e });
+        const hourEvents = tickHour(wk, options);
+        for (const e of hourEvents) events.push({ hour: i + 1, ...e });
     }
-    return { state: wk, hpLost, events };
+    return { state: wk, events };
 }
 
 // Реальный тик: X реальных минут = 1 игровой час (курс из настроек).
@@ -346,22 +348,17 @@ export function consumeDrink(state: SurvivalState, item: SurvivalConsumable | nu
 export interface RestOptions {
     place: SleepPlace;
     hours: number;
-    currentHp?: number | null;
 }
 
 export interface RestResult {
     state: SurvivalState;
-    hpLost: number;
     events: SurvivalEvent[];
-    hpEnd?: number;
-    hitsZero?: boolean;
-    zeroAtHour?: number | null;
 }
 
 // Сон. place: 'bed' | 'wasteland', часы 1–24.
-// currentHp (число) — включает прогноз: hpEnd / hitsZero / zeroAtHour
-// (алерт в модали до подтверждения, §6).
-export function rest(state: SurvivalState, { place, hours, currentHp = null }: RestOptions): RestResult {
+// Текущие ОЗ сон не трогает: усталость снижает максимум (производная, §6,
+// патч 213) — прогноз в модали показывает итоговый максимум ОЗ после сна.
+export function rest(state: SurvivalState, { place, hours }: RestOptions): RestResult {
     const rules = SURVIVAL_RULES.sleep;
     if (!['bed', 'wasteland'].includes(place)) {
         throw new Error(`rest: некорректное место сна: ${place}`);
@@ -372,21 +369,9 @@ export function rest(state: SurvivalState, { place, hours, currentHp = null }: R
     const wk = cloneState(state);
     wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
     const events: SurvivalEvent[] = [];
-    let hpLost = 0;
-    let hp: number | null = currentHp != null ? Number(currentHp) : null;
-    let hitsZero = false;
-    let zeroAtHour: number | null = null;
     for (let h = 1; h <= hours; h += 1) {
-        const r = tickHour(wk, { sleepMode: true });
-        hpLost += r.drain;
-        if (hp != null && !hitsZero) {
-            hp -= r.drain;
-            if (hp <= 0) {
-                hitsZero = true;
-                zeroAtHour = h;
-            }
-        }
-        for (const e of r.events) events.push({ hour: h, ...e });
+        const hourEvents = tickHour(wk, { sleepMode: true });
+        for (const e of hourEvents) events.push({ hour: h, ...e });
         if (h === rules.fatigueClearHours) {
             const removed = fatigueFromSource(wk, 'sleep');
             if (removed > 0) {
@@ -414,13 +399,7 @@ export function rest(state: SurvivalState, { place, hours, currentHp = null }: R
         place,
         hpBonus: wk.hpBonus,
     });
-    const result: RestResult = { state: wk, hpLost, events };
-    if (hp != null) {
-        result.hpEnd = hitsZero ? 0 : hp;
-        result.hitsZero = hitsZero;
-        result.zeroAtHour = zeroAtHour;
-    }
-    return result;
+    return { state: wk, events };
 }
 
 // Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
@@ -429,16 +408,21 @@ export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResu
 }
 
 // Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
-// «Усталость N» и «Количество получаемых ОД −N» (M = N). Возвращает данные;
-// тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty).
+// «Усталость N», «Количество получаемых ОД −N» (M = N) и
+// «Максимум ОЗ: −P» (P = ⌊N/2⌋, при P ≥ 1 — патч 213). Возвращает данные;
+// тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty /
+// survival.maxHpPenalty).
 export function survivalEffectRows(
     survival: SurvivalState | null | undefined,
 ): Array<{ key: string; n: number }> {
     if (!survival) return [];
     const n = totalFatigue(survival);
     if (n <= 0) return [];
-    return [
+    const rows: Array<{ key: string; n: number }> = [
         { key: 'fatigue', n },
         { key: 'apPenalty', n },
     ];
+    const maxPenalty = hpMaxPenaltyForFatigue(n);
+    if (maxPenalty > 0) rows.push({ key: 'maxHpPenalty', n: maxPenalty });
+    return rows;
 }

@@ -1,10 +1,11 @@
 // Операции выживания — модуль сеттинга Fallout.
 //
 // sleepSurvival применяет сон (docs/survival-system-design.md §4–§7):
-// лестницы + усталость + дрен ОЗ (чистый домен rest), мост контуров —
-// временные эффекты продвигаются на N × 12 сцен (родовая операция
-// контекста advanceEffectsByGameHours), и при сне в пустоши — проверка
-// болезни по имеющейся механике (событие sleepOnGround, родовая операция
+// лестницы + усталость (чистый домен rest; текущие ОЗ сон не трогает —
+// усталость снижает максимум, патч 213), мост контуров — временные
+// эффекты продвигаются на N × 12 сцен (родовая операция контекста
+// advanceEffectsByGameHours), и при сне в пустоши — проверка болезни по
+// имеющейся механике (событие sleepOnGround, родовая операция
 // resolveSceneRiskEventById). Прогноз для модали делает чистый домен
 // forecastSleep (состояние не фиксируется) — эта функция фиксирует.
 //
@@ -62,8 +63,6 @@ export const sleepSurvival = (ctx, { place, hours }) => {
 
   const {
     setStateExtension,
-    currentHealth,
-    setCurrentHealth,
     advanceEffectsByGameHours,
     resolveSceneRiskEventById,
   } = ctx;
@@ -71,11 +70,8 @@ export const sleepSurvival = (ctx, { place, hours }) => {
   const survival = currentSurvival();
   if (!survival) return { ok: false, reason: 'notCapable' };
 
-  const result = rest(survival, { place, hours, currentHp: currentHealth });
+  const result = rest(survival, { place, hours });
   setStateExtension('survival', result.state);
-  if (currentHealth != null && result.hpEnd != null) {
-    setCurrentHealth(result.hpEnd);
-  }
 
   // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
   const { expired } = advanceEffectsByGameHours(hours);
@@ -89,9 +85,7 @@ export const sleepSurvival = (ctx, { place, hours }) => {
     place,
     hours,
     sleepTo: result.state.sleep,
-    hpEnd: result.hpEnd,
-    hpLost: result.hpLost,
-    hitsZero: result.hitsZero,
+    fatigueAfter: result.state.fatigue.reduce((sum, f) => sum + f.amount, 0),
     diseaseRiskResult,
     effectsExpired: expired.length,
   });

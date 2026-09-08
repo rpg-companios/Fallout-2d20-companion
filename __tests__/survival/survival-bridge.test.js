@@ -169,7 +169,7 @@ describe('survival: гейт настройкой survivalModeEnabled (этап 
 });
 
 describe('sleepSurvival: сон применяется к слайсу стора', () => {
-  it('8 часов в кровати: sleep 5, бонус +2, ОЗ обновляется', () => {
+  it('8 часов в кровати: sleep 5, бонус +2, текущие ОЗ не трогаются (патч 213)', () => {
     const start = createSurvivalState('human');
     start.sleep = 2;
     setStoreSurvival(start);
@@ -177,7 +177,6 @@ describe('sleepSurvival: сон применяется к слайсу стор�
     const result = sleepSurvival(
       {
         setStateExtension: useCharacterStore.getState().setStateExtension,
-        currentHealth: 20,
         setCurrentHealth: (hp) => hpApplied.push(hp),
         advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
         resolveSceneRiskEventById: () => null,
@@ -188,7 +187,8 @@ describe('sleepSurvival: сон применяется к слайсу стор�
     expect(storeSurvival().sleep).toBe(5);
     expect(storeSurvival().hpBonus).toBe(SURVIVAL_RULES.sleep.hpBonus);
     expect(result.diseaseRiskResult).toBeNull(); // кровать — без проверки болезни
-    expect(hpApplied).toEqual([20]);
+    // Усталость снижает максимум ОЗ (производная), сон текущие ОЗ не пишет.
+    expect(hpApplied).toEqual([]);
   });
 
   it('сон в пустоши — проверка болезни', () => {
@@ -198,8 +198,6 @@ describe('sleepSurvival: сон применяется к слайсу стор�
     const result = sleepSurvival(
       {
         setStateExtension: useCharacterStore.getState().setStateExtension,
-        currentHealth: 10,
-        setCurrentHealth: () => {},
         advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
         resolveSceneRiskEventById: () => disease,
       },

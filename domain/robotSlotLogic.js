@@ -12,7 +12,7 @@ import { getSlotHitRange } from './robotSlots';
  *   1. Физ.СУ  — physicalDR from limb
  *   2. Энрг.СУ — energyDR from limb
  *   3. Рад.СУ  — radDR from limb
- *   4. Кнопка "Конечность"
+ *   4. Кнопка "Часть тела"
  *   5. Кнопка "Броня" (opens picker for plating/armor/frame)
  *
  * @param {string} slotKey

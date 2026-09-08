@@ -125,7 +125,7 @@
       "damage": "DMG"
     },
     "buttons": {
-      "upgradeLimb": "Limb",
+      "upgradeLimb": "Body part",
       "upgradeArmor": "Armor",
       "upgradePlating": "Plating",
       "upgradeFrame": "Frame"
@@ -222,9 +222,7 @@
       "wastelandNote": "Sleeping in the wasteland: disease check (Endurance + Survival)",
       "forecastTitle": "Forecast",
       "forecastState": "Result: {state}",
-      "forecastHpLost": "HP lost: {n}",
-      "forecastHpEnd": "HP after sleep: {n}",
-      "forecastZeroWarning": "HP will reach 0 during this sleep",
+      "forecastMaxHp": "Max HP after sleep: {n}",
       "forecastFatigueCleared": "Fatigue (sleep) removed: {n}",
       "forecastFoodDown": "Hunger: −{n}",
       "forecastWaterDown": "Thirst: −{n}",
@@ -233,13 +231,13 @@
       "cancel": "Cancel",
       "reportTitle": "Sleep: {hours} h",
       "reportState": "Result: {state}",
-      "reportHp": "HP: {n}",
-      "reportHpLost": "HP lost: {n}",
+      "reportMaxHp": "Max HP: {n}",
       "reportHpBonus": "+2 max HP until your next sleep",
       "reportFatigueCleared": "Fatigue (sleep) removed: {n}"
     },
     "fatigue": "Fatigue {n}",
     "apPenalty": "Action Points gained −{n}",
+    "maxHpPenalty": "Max HP: −{n}",
     "foodTitle": "Hunger",
     "waterTitle": "Thirst",
     "sleepTitle": "Sleep",

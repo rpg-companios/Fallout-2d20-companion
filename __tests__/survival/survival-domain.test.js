@@ -10,7 +10,7 @@ import {
     createSurvivalState,
     fatigueFromSource,
     forecastSleep,
-    hpDrainForFatigue,
+    hpMaxPenaltyForFatigue,
     isSurvivalCapable,
     removeFatigueTotal,
     rest,
@@ -106,13 +106,13 @@ describe('survival: лестница сна (8/8/8/8 ч, дно 4 ч)', () => {
 
 describe('survival: часовой тик — порядок трёх шагов', () => {
     it('дрен ОЗ = ⌊N/2⌋ по итоговому N', () => {
-        expect(hpDrainForFatigue(0)).toBe(0);
-        expect(hpDrainForFatigue(1)).toBe(0);
-        expect(hpDrainForFatigue(2)).toBe(1);
-        expect(hpDrainForFatigue(3)).toBe(1);
-        expect(hpDrainForFatigue(4)).toBe(2);
+        expect(hpMaxPenaltyForFatigue(0)).toBe(0);
+        expect(hpMaxPenaltyForFatigue(1)).toBe(0);
+        expect(hpMaxPenaltyForFatigue(2)).toBe(1);
+        expect(hpMaxPenaltyForFatigue(3)).toBe(1);
+        expect(hpMaxPenaltyForFatigue(4)).toBe(2);
         const r = advanceHours({ ...createSurvivalState('human'), food: 1, fatigue: [{ source: 'food', amount: 4 }] }, 1);
-        expect(r.hpLost).toBe(2);
+        expect(r.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 2 }));
     });
 
     it('снятие −1 в час при чистых источниках, не ниже нуля', () => {
@@ -120,7 +120,7 @@ describe('survival: часовой тик — порядок трёх шагов
         addFatigue(s, 'food', 3);
         const r1 = advanceHours(s, 1);
         expect(totalFatigue(r1.state)).toBe(2); // чист по всем лестницам → −1
-        expect(r1.hpLost).toBe(1); // дрен по итоговому N=2
+        expect(r1.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 1 })); // ⌊2/2⌋ = 1
         s = r1.state;
         const r2 = advanceHours(s, 2);
         expect(totalFatigue(r2.state)).toBe(0); // −1 и −1, пол нуля не пробивает
@@ -284,15 +284,14 @@ describe('survival: сон', () => {
         expect(cleared).toMatchObject({ hour: 6, removed: 2 });
     });
 
-    it('дрен ОЗ во сне тикает, прогноз ловит ноль с указанием часа', () => {
-        // еда на дне: снятие заблокировано, усталость food спят не лечится
+    it('сон не трогает текущие ОЗ: снижение максимума — от итоговой усталости', () => {
+        // еда на дне: снятие заблокировано, усталость food сном не лечится.
         const s = createSurvivalState('human');
         s.food = 1;
-        addFatigue(s, 'food', 4); // дрен 2 ОЗ/час
-        const f = forecastSleep(s, { place: 'bed', hours: 8, currentHp: 5 });
-        expect(f.hitsZero).toBe(true);
-        expect(f.zeroAtHour).toBe(3); // 5 − 2 − 2 → 1, на 3-м часе ≤ 0
-        expect(f.hpLost).toBe(16); // 8 часов по 2
+        addFatigue(s, 'food', 4); // ⌊4/2⌋ = 2 к макс. ОЗ
+        const f = forecastSleep(s, { place: 'bed', hours: 8 });
+        expect(hpMaxPenaltyForFatigue(totalFatigue(f.state))).toBe(2);
+        expect(f.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 2 }));
         // сам прогноз состояние не меняет:
         expect(fatigueFromSource(s, 'food')).toBe(4);
     });

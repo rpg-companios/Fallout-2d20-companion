@@ -88,7 +88,7 @@ describe('survival settings: курс времени в домене', () => {
     // Один часовой тик: еда шагает 5 → 4 (шаг накапливается с нуля).
     expect(result.state.food).toBe(4);
     expect(result.state.acc.food).toBe(0);
-    expect(result.hpLost).toBe(0); // усталости нет — дрена нет
+    expect(result.events).not.toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty' })); // усталости нет — снижения максимума нет
   });
 
   it('курс по умолчанию — 30 (параметр не передан)', () => {
@@ -96,10 +96,10 @@ describe('survival settings: курс времени в домене', () => {
     expect(s.food).toBe(4);
   });
 
-  it('курс 30 и усталость: часовой тик дренит ОЗ (⌊N/2⌋)', () => {
+  it('курс 30 и усталость: часовой тик снижает максимум ОЗ (⌊N/2⌋)', () => {
     let s = createSurvivalState('human');
     s.fatigue = [{ source: 'sleep', amount: 3 }];
     const result = advanceRealMinutes(s, 30, 30);
-    expect(result.hpLost).toBe(1);
+    expect(result.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 1 }));
   });
 });

@@ -142,7 +142,11 @@ const styles = StyleSheet.create({
   armorStatLabel: {
     color: '#000',
     fontSize: 13,
-    flex: 1,
+    // Фиксированная доля ячейки-лейбла (владелец, патч 214): 70% лейбл /
+    // 30% значение — в значениях в основном числа; длинный лейбл вроде
+    // «Часть тела» переносится на две строки внутри ячейки, а не распирает
+    // строку и не сокращается.
+    width: '70%',
     padding: 5,
     backgroundColor: '#fce5cd',
   },
@@ -150,8 +154,8 @@ const styles = StyleSheet.create({
     color: '#000',
     fontWeight: 'bold',
     fontSize: 13,
+    flex: 1,
     padding: 5,
-    minWidth: 40,
     textAlign: 'center',
     borderLeftWidth: 1,
     borderLeftColor: '#5a5a5a',
@@ -180,11 +184,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     // Фиксированная доля ячейки-лейбла — одинакова во всех карточках
-    // (владелец): 60% лейбл / 40% значение; длинное значение переносится
-    // во второй ячейке, а не распирает строку.
-    width: '60%',
+    // (владелец, патч 214): 61% лейбл / 39% значение; «Дистанция» и
+    // «Модификация» помещаются одной строкой (кегль 11), длинное значение
+    // переносится во второй ячейке, а не распирает строку. Без сокращений.
+    width: '61%',
     padding: 8,
-    fontSize: 12,
+    fontSize: 11,
   },
   weaponStatValue: {
     flex: 1,
@@ -200,8 +205,10 @@ const styles = StyleSheet.create({
     hyphens: 'auto',
   },
   armorModificationButton: {
+    // Кнопка занимает ту же долю, что и значение (30%, патч 214) — правый
+    // край кнопки совпадает с правым краем числовых значений строки.
+    flex: 1,
     padding: 8,
-    minWidth: 40,
     borderLeftWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#fff',
