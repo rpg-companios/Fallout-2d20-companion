@@ -14,11 +14,12 @@
 // на Flow-парсинге react-native).
 
 import {
+  registerConditionEventListener,
   registerConsumableAppliedListener,
   registerStateExtension,
   registerStateMigration,
 } from '../../../src/store/stateExtensions';
-import { createSurvivalState } from './survival';
+import { createSurvivalState, withDiseaseFatigue, withoutDiseaseFatigue } from './survival';
 import { migrateSurvivalField } from './migration';
 import { survivalConsumableListener } from './operations';
 
@@ -41,8 +42,16 @@ registerStateExtension({
   },
   // Загрузка сейва: поле уже создано миграцией v23 (или фабрикой).
   // hydrate идемпотентна: null/undefined остаются null (роботы/киборги
-  // и «ещё не создано»), объект проходит как есть.
-  hydrate: (raw) => (raw && typeof raw === 'object' ? raw : null),
+  // и «ещё не создано»), объекту достраивается аккумулятор отдыха в
+  // постели (патч 215) — дозаполнение внутри существующего поля,
+  // версию схемы не поднимает.
+  hydrate: (raw) => {
+    if (!raw || typeof raw !== 'object') return null;
+    const bedRestHours = Number(raw.bedRestHours);
+    return Number.isFinite(bedRestHours) && bedRestHours >= 0
+      ? { ...raw, bedRestHours }
+      : { ...raw, bedRestHours: 0 };
+  },
   reset: () => null,
 });
 
@@ -52,6 +61,36 @@ registerStateMigration(migrateSurvivalField, 22);
 // Расходники: употребление еды/напитков ЛЮБЫМ путём (инвентарь, модалки
 // выживания) двигает шкалы — слушатель патча 208.
 registerConsumableAppliedListener({ id: 'survival', listener: survivalConsumableListener });
+
+// Болезни (патч 215): усталость источника «болезнь» — +1 при заражении,
+// −1 при излечении. Слушатели событий состояний (stateExtensions.js):
+// движок уведомляет при заражении/излечении, модуль двигает усталость.
+const diseaseFatigueListener = (payload, ctx) => {
+  const survival = ctx?.stateExtensions?.survival ?? null;
+  if (!survival || payload?.kind !== 'disease') return null;
+  if (payload.event === 'infected') {
+    ctx.setStateExtension('survival', withDiseaseFatigue(survival, 1));
+    return { survivalFatigueApplied: true };
+  }
+  if (payload.event === 'cured') {
+    ctx.setStateExtension('survival', withoutDiseaseFatigue(survival, 1));
+    return { survivalFatigueRemoved: true };
+  }
+  return null;
+};
+
+registerConditionEventListener({
+  id: 'survivalDiseaseFatigue',
+  kind: 'disease',
+  event: 'infected',
+  listener: diseaseFatigueListener,
+});
+registerConditionEventListener({
+  id: 'survivalDiseaseFatigue',
+  kind: 'disease',
+  event: 'cured',
+  listener: diseaseFatigueListener,
+});
 
 export { createSurvivalState } from './survival';
 export { migrateSurvivalField } from './migration';

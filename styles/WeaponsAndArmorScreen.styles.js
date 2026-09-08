@@ -118,6 +118,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 3,
   },
+  // Болезнь (патч 215): название с рангом занимает всю свободную ширину
+  // строки и центрируется внутри неё (flex: 1 + textAlign center — цвет
+  // задан прямо в стиле, не зависит от effectKind эффекта); кнопка
+  // «Сопротивляться» — обычный блок справа в потоке. Описание — по центру
+  // ниже.
+  diseaseBlock: {
+    paddingVertical: 3,
+  },
+  diseaseNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  diseaseNameText: {
+    flex: 1,
+    textAlign: 'left',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#00A651',
+  },
+  resistButton: {
+    flexShrink: 0,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#fce5cd',
+  },
+  resistButtonDisabled: {
+    opacity: 0.4,
+  },
+  resistButtonText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#000',
+  },
   armorItemNameTitle: {
     color: '#fff',
     fontSize: 11,

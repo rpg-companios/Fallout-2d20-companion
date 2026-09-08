@@ -118,6 +118,8 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
             ok: boolean;
             reason?: string;
             result?: RestResult;
+            bedRestCompleted?: number;
+            bedRestHealed?: string[];
             diseaseRiskResult?: unknown;
         };
         if (!apply.ok || !apply.result) {
@@ -135,6 +137,13 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
         }
         if (result.state.hpBonus > 0) {
             reportLines.push(t('survival.sleep.reportHpBonus'));
+        }
+        // Отдых в постели (патч 215): накопленные порции сна в кровати
+        // снимают единицы болезней — показываем число излеченных.
+        if ((apply.bedRestHealed as string[] | undefined)?.length) {
+            reportLines.push(
+                t('survival.sleep.reportBedRestHealed').replace('{n}', String((apply.bedRestHealed as string[]).length)),
+            );
         }
         const cleared = (result.events as Array<{ type?: string; removed?: number }>)
             .find((e) => e.type === 'fatigueSleepCleared');

@@ -32,13 +32,22 @@ const migrateSkillsToCanonical = (rawSkills) => {
   });
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
-import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConsumableApplied } from '../src/store/stateExtensions';
+import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConditionEvent, notifyConsumableApplied } from '../src/store/stateExtensions';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
 import { isSkillTagged } from '../domain/d20Checks';
-import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
+import {
+  addPersistentDiseaseEffect,
+  DISEASE_RESIST_COOLDOWN_MS,
+  effectDiseaseRank,
+  increaseDiseaseRank,
+  reduceDiseaseRanks,
+  removePersistentDiseaseEffects,
+  resistDiseaseRoll,
+  rollDiseaseFromCatalog,
+} from '../domain/diseaseConditions';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 import { showAlert as showCatalogAlert, showRawAlert } from './alerts/alertService';
 
@@ -90,6 +99,11 @@ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/
 
 const INITIAL_LEVEL = 1;
 const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
+// Патч 215: антибиотик — не более одной дозы в 24 часа. Кулдаун
+// сопротивления — DISEASE_RESIST_COOLDOWN_MS из domain/diseaseConditions.
+const ANTIBIOTIC_CHEM_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DISEASE_ATTRIBUTE = 'END';
+const DISEASE_SKILL = 'SURVIVAL';
 
 const CharacterContext = createContext();
 
@@ -304,11 +318,19 @@ export const CharacterProvider = ({ children }) => {
   const setEquippedRobotSlots = useCallback((updater) => {
     setEquippedRobotSlotsRaw((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      // mirror into the store slice
-      useCharacterStore.getState().loadRobotState({
-        bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
-        slots: next || {},
-        modules: useCharacterStore.getState().robot?.modules ?? [],
+      // Mirror into the store slice. ВАЖНО (патч 218): апдейтер useState
+      // исполняется React'ом ВО ВРЕМЯ рендера — стор-действие внутри него
+      // обновляло стор прямо из рендера и давало
+      // «Cannot update a component (CharacterProvider) while rendering a
+      // different component (CharacterProvider)». Микротаск выполняется после
+      // commit-фазы, до передачи управления event loop (тот же приём, что и
+      // для синхронизации derivedStats ниже).
+      queueMicrotask(() => {
+        useCharacterStore.getState().loadRobotState({
+          bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
+          slots: next || {},
+          modules: useCharacterStore.getState().robot?.modules ?? [],
+        });
       });
       return next;
     });
@@ -317,10 +339,14 @@ export const CharacterProvider = ({ children }) => {
   const setEquippedRobotModules = useCallback((updater) => {
     setEquippedRobotModulesRaw((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      useCharacterStore.getState().loadRobotState({
-        bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
-        slots: useCharacterStore.getState().robot?.slots ?? {},
-        modules: next || [],
+      // Зеркало в стор — в микрозадаче: стор-действие в апдейтере исполняется
+      // во время рендера (патч 218, см. setEquippedRobotSlots выше).
+      queueMicrotask(() => {
+        useCharacterStore.getState().loadRobotState({
+          bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
+          slots: useCharacterStore.getState().robot?.slots ?? {},
+          modules: next || [],
+        });
       });
       return next;
     });
@@ -395,7 +421,11 @@ export const CharacterProvider = ({ children }) => {
   const setSelectedPerks = useCallback((updater) => {
     setSelectedPerksRaw((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      useCharacterStore.getState().setSelectedPerks(next || []);
+      // Зеркало в стор — в микрозадаче: стор-действие в апдейтере исполняется
+      // во время рендера (патч 218, см. setEquippedRobotSlots выше).
+      queueMicrotask(() => {
+        useCharacterStore.getState().setSelectedPerks(next || []);
+      });
       return next || [];
     });
   }, []);
@@ -407,6 +437,9 @@ export const CharacterProvider = ({ children }) => {
   const [defense, setDefense] = useState(1);
   const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
   const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
+  // Момент последней попытки «Сопротивляться» болезни (патч 215): одна
+  // попытка в сутки; null = сопротивляться можно. Поле сейва (v25).
+  const [lastDiseaseResistAt, setLastDiseaseResistAt] = useState(null);
   const [sceneRiskStates, setSceneRiskStates] = useState({});
   const sceneRiskTrackerRef = useRef(null);
   if (sceneRiskTrackerRef.current === null) {
@@ -806,6 +839,7 @@ export const CharacterProvider = ({ children }) => {
     conditions,
     chemDosesLog,
     sceneRiskStates,
+    lastDiseaseResistAt,
     ...stateExtensions,
   }), [
     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
@@ -814,7 +848,7 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, attributesSaved, skillsSaved, selectedPerks,
-    conditions, chemDosesLog, sceneRiskStates, stateExtensions,
+    conditions, chemDosesLog, sceneRiskStates, lastDiseaseResistAt, stateExtensions,
   ]);
 
   // Realtime save for already persisted characters.
@@ -970,6 +1004,7 @@ export const CharacterProvider = ({ children }) => {
       setCaps(data.caps ?? 0);
       setCurrentHealth(data.currentHealth ?? 0);
       setRadiationRaw(Math.max(0, data.radiation ?? 0));
+      setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
       setLuckPoints(data.luckPoints ?? 0);
@@ -1174,11 +1209,113 @@ export const CharacterProvider = ({ children }) => {
       previous.includes('diseased') ? previous : [...previous, 'diseased']
     ));
 
+    if (applied.added) {
+      // Усталость от болезни (патч 215): +1 источник «болезнь». Движок
+      // уведомляет сеттинг — модуль Fallout двигает усталость
+      // (modules/fallout/survival/index.js, слушатель событий состояний).
+      notifyConditionEvent(
+        { kind: 'disease', event: 'infected', conditionId: disease.id },
+        { stateExtensions, setStateExtension },
+      );
+    }
+
     return {
       ...riskResult,
       diseaseRoll,
       disease,
       infectionStatus: applied.added ? 'infected' : 'duplicate',
+    };
+  };
+
+  /**
+   * Лечение болезней (патч 215): снимает `amount` единиц с КАЖДОЙ активной
+   * болезни (антибиотик — 1 за раз, отдых в постели — по порциям сна).
+   * Излеченные болезни удаляются из эффектов; сеттинг уведомляется о каждой
+   * (модуль Fallout снимает усталость источника «болезнь»). Условие
+   * 'diseased' остаётся, пока есть хотя бы одна болезнь.
+   * @returns {{ healed: string[], diseasesLeft: number }}
+   */
+  const reducePersistentDiseaseRanks = (amount) => {
+    const storeNow = useCharacterStore.getState();
+    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(storeNow.effects)).effects;
+    const treated = reduceDiseaseRanks(currentEffects, amount);
+    syncTimedEffectsToStore(treated.effects, storeNow);
+    setActiveTimedEffects(treated.effects);
+    for (const conditionId of treated.healed) {
+      notifyConditionEvent(
+        { kind: 'disease', event: 'cured', conditionId },
+        { stateExtensions, setStateExtension },
+      );
+    }
+    const diseasesLeft = treated.effects.filter((e) => e.effectType === 'disease').length;
+    if (diseasesLeft === 0 && conditions.includes('diseased')) {
+      setConditions((previous) => previous.filter((c) => c !== 'diseased'));
+    }
+    return { healed: treated.healed, diseasesLeft };
+  };
+
+  /**
+   * Проверка «Сопротивляться» болезни (патч 215): 2d20, успех грани —
+   * <= ВЫН + Выживание (1 на грани — 2 успеха; отмеченный навык «Выживание»
+   * и грань <= его ранга — 2 успеха). Сумма успехов >= ранга болезни
+   * излечивает её; каждая грань 20 повышает ранг болезни на 1. Одна
+   * попытка в сутки.
+   */
+  const resistDisease = (conditionId) => {
+    const now = Date.now();
+    if (lastDiseaseResistAt != null && now - lastDiseaseResistAt < DISEASE_RESIST_COOLDOWN_MS) {
+      return { ok: false, reason: 'cooldown', retryInMs: DISEASE_RESIST_COOLDOWN_MS - (now - lastDiseaseResistAt) };
+    }
+    const storeNow = useCharacterStore.getState();
+    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(storeNow.effects)).effects;
+    const effect = currentEffects.find((e) => e.effectType === 'disease' && e.conditionId === conditionId);
+    if (!effect) return { ok: false, reason: 'notFound' };
+
+    const attribute = attributes.find((entry) => entry?.name === DISEASE_ATTRIBUTE);
+    const skill = skills.find((entry) => entry?.name === DISEASE_SKILL);
+    if (!attribute || !skill) {
+      throw new Error(`[CharacterContext] Для сопротивления болезни отсутствует ${DISEASE_ATTRIBUTE} или ${DISEASE_SKILL}`);
+    }
+    const isTagged = isSkillTagged({
+      skillId: DISEASE_SKILL,
+      primaryTaggedSkillIds: selectedSkills,
+      extraTaggedSkillIds: extraTaggedSkills,
+    });
+
+    const rankBefore = effectDiseaseRank(effect);
+    const roll = resistDiseaseRoll({
+      targetNumber: getAttributeValue(attributes, DISEASE_ATTRIBUTE) + skill.value,
+      taggedSurvivalRank: isTagged ? skill.value : null,
+      diseaseRank: rankBefore,
+    });
+
+    setLastDiseaseResistAt(now);
+
+    let rankAfter = rankBefore;
+    if (roll.cured) {
+      const withoutDisease = currentEffects.filter((e) => e !== effect);
+      syncTimedEffectsToStore(withoutDisease, storeNow);
+      setActiveTimedEffects(withoutDisease);
+      notifyConditionEvent(
+        { kind: 'disease', event: 'cured', conditionId },
+        { stateExtensions, setStateExtension },
+      );
+      if (!withoutDisease.some((e) => e.effectType === 'disease') && conditions.includes('diseased')) {
+        setConditions((previous) => previous.filter((c) => c !== 'diseased'));
+      }
+    } else if (roll.rankIncrease > 0) {
+      rankAfter = rankBefore + roll.rankIncrease;
+      const withRank = increaseDiseaseRank(currentEffects, conditionId, roll.rankIncrease);
+      syncTimedEffectsToStore(withRank, storeNow);
+      setActiveTimedEffects(withRank);
+    }
+
+    return {
+      ok: true,
+      diseaseName: effect.effectName,
+      ...roll,
+      rankBefore,
+      rankAfter,
     };
   };
 
@@ -1305,14 +1442,37 @@ export const CharacterProvider = ({ children }) => {
     // 3. removeCondition (аддиктол, антибиотики)
     const {
       conditions: nextConditions,
-      removed,
+      removed: removedRaw,
       requested: conditionRemovalsRequested,
     } = applyRemoveConditions(item, conditions);
-    if (removed.length > 0) {
+    let removed = removedRaw;
+    // Лечение болезней (патч 215): антибиотик снимает 1 единицу с КАЖДОЙ
+    // болезни (ранги), а не лечит всё разом; не более 1 дозы в 24 часа.
+    let diseaseTreatment = null;
+    const antibioticRequested = conditionRemovalsRequested.includes('diseased') && item?.antibiotic === true;
+    if (antibioticRequested && removedRaw.includes('diseased')) {
+      const lastAntibioticDose = chemDosesLog
+        .filter((d) => d.chemId === item.id)
+        .map((d) => d.takenAt)
+        .sort((a, b) => b - a)[0];
+      const onCooldown = lastAntibioticDose != null && Date.now() - lastAntibioticDose < ANTIBIOTIC_CHEM_WINDOW_MS;
+      if (onCooldown) {
+        diseaseTreatment = { blocked: true };
+        removed = removedRaw.filter((c) => c !== 'diseased');
+      } else {
+        const treatment = reducePersistentDiseaseRanks(1);
+        diseaseTreatment = { blocked: false, ...treatment };
+        removed = treatment.diseasesLeft === 0 ? removedRaw : removedRaw.filter((c) => c !== 'diseased');
+      }
+      // Условие 'diseased' пересчитывается в reducePersistentDiseaseRanks
+      // (снимается только при полном излечении); nextConditions без него
+      // при частичном лечении не применяем.
+      setConditions(nextConditions);
+    } else if (removedRaw.length > 0) {
       setConditions(nextConditions);
       // Снятие зависимости (аддиктол): удаляем перманентный эффект
       // «Зависимость: Стелс-бой» из активных эффектов.
-      if (removed.includes('addicted')) {
+      if (removedRaw.includes('addicted')) {
         const storeNow = useCharacterStore.getState();
         const currentEffects = effectsDictToLegacyArray(storeNow.effects);
         const withoutAddiction = currentEffects.filter(
@@ -1321,12 +1481,21 @@ export const CharacterProvider = ({ children }) => {
         syncTimedEffectsToStore(withoutAddiction, storeNow);
         setActiveTimedEffects(withoutAddiction);
       }
-      if (removed.includes('diseased')) {
+      if (removedRaw.includes('diseased')) {
+        // Не-антибиотик, снимающий болезни целиком (историческое поведение):
+        // удаляем все болезненные эффекты и уведомляем сеттинг о каждой
+        // излеченной болезни (усталость источника «болезнь» снимается).
         const storeNow = useCharacterStore.getState();
         const currentEffects = effectsDictToLegacyArray(storeNow.effects);
-        const withoutDiseases = removePersistentDiseaseEffects(currentEffects).effects;
-        syncTimedEffectsToStore(withoutDiseases, storeNow);
-        setActiveTimedEffects(withoutDiseases);
+        const withoutDiseases = removePersistentDiseaseEffects(currentEffects);
+        syncTimedEffectsToStore(withoutDiseases.effects, storeNow);
+        setActiveTimedEffects(withoutDiseases.effects);
+        for (const cured of withoutDiseases.removed) {
+          notifyConditionEvent(
+            { kind: 'disease', event: 'cured', conditionId: cured.conditionId },
+            { stateExtensions, setStateExtension },
+          );
+        }
       }
     }
 
@@ -1414,6 +1583,7 @@ export const CharacterProvider = ({ children }) => {
       extensionResults,
       conditionsRemoved: removed,
       conditionRemovalsRequested,
+      diseaseTreatment,
       healAmount: vitalChanges.healAmount,
       radiationAmount: vitalChanges.radiationAmount,
     };
@@ -1546,6 +1716,7 @@ export const CharacterProvider = ({ children }) => {
     setSelectedPerks([]);
     setConditions([]);
     setChemDosesLog([]);
+    setLastDiseaseResistAt(null);
     setMeleeBonus(0);
     setInitiative(calculateInitiative(initialAttributes));
     setDefense(calculateDefense(initialAttributes));
@@ -1674,6 +1845,12 @@ export const CharacterProvider = ({ children }) => {
     setStateExtension,
     advanceEffectsByGameHours,
     resolveSceneRiskEventById: applyDiseaseExposureEvent,
+    // Болезни (патч 215): лечение по единицам (антибиотики, отдых в
+    // постели) и проверка «Сопротивляться». Правила усталости от болезни
+    // остаются в модуле Fallout (уведомления о событиях состояний).
+    reducePersistentDiseaseRanks,
+    resistDisease,
+    lastDiseaseResistAt,
     resetCharacter,
     resetKitAndRewards,
     resetKitOnly,

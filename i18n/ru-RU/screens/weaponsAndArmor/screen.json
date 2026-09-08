@@ -7,7 +7,14 @@
   "effectsPanel": {
     "title": "Эффекты",
     "empty": "Нет активных эффектов",
-    "immunityPrefix": "Иммунитет к:"
+    "immunityPrefix": "Иммунитет к:",
+    "resist": "Сопротивляться",
+    "resistTitle": "Сопротивление болезни",
+    "resistRolls": "Броски: {r1}, {r2} (цель ≤ {t}).",
+    "resistCured": "Успехов {s}/{r} — болезнь «{name}» побеждена.",
+    "resistFailed": "Успехов {s}/{r} — болезнь «{name}» остаётся.",
+    "resistRankIncreased": "Выпало 20 — сложность болезни выросла до {r}.",
+    "resistCooldown": "Сопротивляться можно раз в сутки."
   },
   "armor": {
     "fields": {

@@ -203,6 +203,7 @@ export const normalizeEffects = (activeTimedEffects = []) => {
     result[effect.id] = {
       id: effect.id,
       name: effect.effectLabel || effect.effectName || 'Unnamed Effect',
+      rank: effect.rank,
       effectName: effect.effectName,
       effectLabel: effect.effectLabel,
       effectKind: effect.effectKind,
@@ -314,6 +315,7 @@ export const denormalizeEffects = (effectsDict = {}) => {
     .map(effect => ({
       id: effect.id,
       effectName: effect.effectName ?? effect.name,
+      rank: effect.rank,
       effectLabel: effect.effectLabel ?? effect.name,
       effectKind: effect.effectKind ?? effect.type,
       maxHpModifier: effect.maxHpModifier,
@@ -1260,6 +1262,12 @@ const MIGRATIONS = [
   // folder { id, name } | null (патч 212). Миграция идентична: поле пишется
   // и сверяется слоем БД (domain/characterFolders.js), преобразований нет;
   // отсутствие поля = корневой список.
+  (state) => state,
+
+  // v24 -> v25: болезни с рангами (патч 215). Движковая часть идентична:
+  // lastDiseaseResistAt опционально (отсутствие = можно сопротивляться),
+  // ранг на эффекте болезни проставляет сетевая миграция (вставка на тот
+  // же индекс, modules/fallout/diseases/migration.js).
   (state) => state,
 
 ];

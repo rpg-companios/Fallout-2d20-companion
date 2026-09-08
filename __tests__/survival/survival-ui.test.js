@@ -16,12 +16,20 @@ describe('survival: строки эффектов (§6)', () => {
         const s = createSurvivalState('human');
         addFatigue(s, 'food', 1);
         expect(survivalEffectRows(s)).toEqual([
-            { key: 'fatigue', n: 1 },
+            // Патч 217: строка «Усталость» несёт разбивку по источникам.
+            { key: 'fatigue', n: 1, sources: [{ source: 'food', amount: 1 }] },
             { key: 'apPenalty', n: 1 },
         ]);
         addFatigue(s, 'water', 2);
         expect(survivalEffectRows(s)).toEqual([
-            { key: 'fatigue', n: 3 },
+            {
+                key: 'fatigue',
+                n: 3,
+                sources: [
+                    { source: 'food', amount: 1 },
+                    { source: 'water', amount: 2 },
+                ],
+            },
             { key: 'apPenalty', n: 3 },
             { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
         ]);
@@ -90,5 +98,28 @@ describe('survival: i18n шкал (ru/en)', () => {
     it('ru: формулировки строк эффектов — слова владельца', () => {
         expect(ruScreen.survival.fatigue).toBe('Усталость {n}');
         expect(ruScreen.survival.apPenalty).toBe('Количество получаемых ОД −{n}');
+    });
+
+    // Патч 217: разбивка усталости по активным источникам.
+    it.each(Object.entries(locales))('%s: ключи разбивки источников', (loc, dict) => {
+        expect(dict.survival.fatigueSources).toContain('{n}');
+        expect(dict.survival.fatigueSources).toContain('{sources}');
+        expect(dict.survival.fatigueSourceJoin).toMatch(/^.+$/);
+        for (const source of ['food', 'water', 'sleep', 'disease']) {
+            expect(
+                dict.survival.fatigueSource?.[source],
+                `${loc} survival.fatigueSource.${source}`,
+            ).toMatch(/^\S.+$/);
+        }
+    });
+
+    it('ru: разбивка — слова владельца', () => {
+        expect(ruScreen.survival.fatigueSources).toBe('Усталость {n} ({sources})');
+        expect(ruScreen.survival.fatigueSource).toEqual({
+            food: 'голод',
+            water: 'жажда',
+            sleep: 'сон',
+            disease: 'болезнь',
+        });
     });
 });

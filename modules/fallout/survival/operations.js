@@ -63,6 +63,7 @@ export const sleepSurvival = (ctx, { place, hours }) => {
 
   const {
     setStateExtension,
+    reducePersistentDiseaseRanks,
     advanceEffectsByGameHours,
     resolveSceneRiskEventById,
   } = ctx;
@@ -72,6 +73,13 @@ export const sleepSurvival = (ctx, { place, hours }) => {
 
   const result = rest(survival, { place, hours });
   setStateExtension('survival', result.state);
+
+  // Отдых в постели (патч 215): каждая накопленная порция 12 часов сна
+  // в кровати снимает 1 единицу с каждой болезни.
+  let bedRestHealed = [];
+  if (result.bedRestCompleted > 0 && typeof reducePersistentDiseaseRanks === 'function') {
+    bedRestHealed = reducePersistentDiseaseRanks(result.bedRestCompleted).healed;
+  }
 
   // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
   const { expired } = advanceEffectsByGameHours(hours);
@@ -86,6 +94,8 @@ export const sleepSurvival = (ctx, { place, hours }) => {
     hours,
     sleepTo: result.state.sleep,
     fatigueAfter: result.state.fatigue.reduce((sum, f) => sum + f.amount, 0),
+    bedRestCompleted: result.bedRestCompleted,
+    bedRestHealed,
     diseaseRiskResult,
     effectsExpired: expired.length,
   });
@@ -93,6 +103,8 @@ export const sleepSurvival = (ctx, { place, hours }) => {
   return {
     ok: true,
     result,
+    bedRestCompleted: result.bedRestCompleted,
+    bedRestHealed,
     diseaseRiskResult,
     effectsExpired: expired,
   };

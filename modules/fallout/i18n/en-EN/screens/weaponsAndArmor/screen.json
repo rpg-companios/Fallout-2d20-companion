@@ -233,9 +233,18 @@
       "reportState": "Result: {state}",
       "reportMaxHp": "Max HP: {n}",
       "reportHpBonus": "+2 max HP until your next sleep",
-      "reportFatigueCleared": "Fatigue (sleep) removed: {n}"
+      "reportFatigueCleared": "Fatigue (sleep) removed: {n}",
+      "reportBedRestHealed": "Bed rest cured diseases: {n}"
     },
     "fatigue": "Fatigue {n}",
+    "fatigueSources": "Fatigue {n} ({sources})",
+    "fatigueSourceJoin": " / ",
+    "fatigueSource": {
+      "food": "hunger",
+      "water": "thirst",
+      "sleep": "sleep",
+      "disease": "disease"
+    },
     "apPenalty": "Action Points gained −{n}",
     "maxHpPenalty": "Max HP: −{n}",
     "foodTitle": "Hunger",

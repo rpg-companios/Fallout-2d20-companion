@@ -48,6 +48,8 @@
         "notPresent": "No active diseases."
       }
     },
+    "antibioticDailyLimit": "Antibiotics already taken: no more than 1 dose per 24 hours.",
+    "antibioticReduced": "Diseases weakened: −{units} unit from each.",
     "foundItemBonus": "{perkName}: you received + {amount} {itemType}."
   },
   "foundItemTypes": {

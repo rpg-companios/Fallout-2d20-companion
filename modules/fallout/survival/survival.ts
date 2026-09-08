@@ -32,6 +32,10 @@ export interface SurvivalState {
     acc: { food: number; water: number; sleep: number };
     timeCarried: number;
     hpBonus: number;
+    // Аккумулятор отдыха в постели (патч 215): часы сна В КРОВАТИ; каждые
+    // bedRestHealHours накопленных часов снимают 1 единицу с каждой болезни
+    // (применяет вызывающий — операции, через контекст персонажа).
+    bedRestHours: number;
 }
 
 // Признаки расходника, которые читает домен выживания (данные сеттинга:
@@ -59,6 +63,9 @@ export interface SurvivalRules {
         hpBonus: number;
         fatigueClearHours: number;
     };
+    // Отдых в постели: каждые N накопленных часов сна в кровати снимают
+    // 1 единицу с каждой болезни (патч 215).
+    bedRestHealHours: number;
     defaultCourseMinutesPerHour: number;
     maxSleepHours: number;
 }
@@ -95,6 +102,9 @@ export const SURVIVAL_RULES: SurvivalRules = {
         hpBonus: 2,
         fatigueClearHours: 6, // на 6-м часе сна списывается вся усталость источника «сон»
     },
+    // Отдых в постели: 12 накопленных часов сна в кровати снимают
+    // 1 единицу с каждой болезни (решение владельца, патч 215).
+    bedRestHealHours: 12,
     // Дефолтный курс времени: 30 реальных минут = 1 игровой час.
     defaultCourseMinutesPerHour: 30,
     maxSleepHours: 24,
@@ -130,6 +140,7 @@ export function createSurvivalState(characterType: string | undefined | null): S
         acc: { food: 0, water: 0, sleep: 0 }, // часы в текущей секции
         timeCarried: 0, // дробная часть игрового часа от реального тика
         hpBonus: 0, // +2 к макс. ОЗ до следующего сна (кровать, ≥8 ч)
+        bedRestHours: 0, // аккумулятор отдыха в постели (патч 215)
     };
 }
 
@@ -158,18 +169,53 @@ export function addFatigue(state: SurvivalState, source: FatigueSource, amount: 
 
 // Списание из общей кучи: сначала с наибольшего источника
 // (детерминированная деталь реализации, §6 дока).
-export function removeFatigueTotal(state: SurvivalState, amount: number): void {
+// excludeSources — источники, которые списание не трогает (усталость от
+// болезни снимается только излечением, патч 215).
+export function removeFatigueTotal(state: SurvivalState, amount: number, excludeSources: FatigueSource[] = []): void {
     let left = amount;
     while (left > 0) {
         let biggest: FatigueEntry | null = null;
         for (const f of state.fatigue) {
-            if (f.amount > 0 && (!biggest || f.amount > biggest.amount)) biggest = f;
+            if (f.amount > 0 && !excludeSources.includes(f.source) && (!biggest || f.amount > biggest.amount)) biggest = f;
         }
         if (!biggest) return;
         const take = Math.min(left, biggest.amount);
         biggest.amount -= take;
         left -= take;
     }
+}
+
+// Усталость от болезни (патч 215): +1 при заражении (на каждую болезнь),
+// −1 при полном излечении болезни. Снимается ТОЛЬКО излечением: часовое
+// снятие и сон её не трогают (excludeSources выше).
+export function addDiseaseFatigue(state: SurvivalState, amount: number): void {
+    addFatigue(state, 'disease', amount);
+}
+
+export function removeDiseaseFatigue(state: SurvivalState, amount: number): void {
+    const entry = state.fatigue.find((f) => f.source === 'disease');
+    if (entry && entry.amount > 0) {
+        entry.amount = Math.max(0, entry.amount - amount);
+    }
+}
+
+// Чистые переходы для контекста персонажа (патч 215): домен мутирует
+// рабочие копии, а болезни меняют усталость точечно — возвращаем новое
+// состояние без мутации исходного.
+export function cloneSurvivalState(state: SurvivalState): SurvivalState {
+    return cloneState(state);
+}
+
+export function withDiseaseFatigue(state: SurvivalState, amount: number): SurvivalState {
+    const next = cloneState(state);
+    addFatigue(next, 'disease', amount);
+    return next;
+}
+
+export function withoutDiseaseFatigue(state: SurvivalState, amount: number): SurvivalState {
+    const next = cloneState(state);
+    removeDiseaseFatigue(next, amount);
+    return next;
 }
 
 export function clearFatigueSource(state: SurvivalState, source: FatigueSource): void {
@@ -256,7 +302,7 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEven
         && state.sleep >= removalMin.sleep
         && totalFatigue(state) > 0
     ) {
-        removeFatigueTotal(state, 1);
+        removeFatigueTotal(state, 1, ['disease']);
         events.push({ type: 'fatigueRemoved', amount: 1 });
     }
     // 3. Снижение максимума ОЗ по итоговому N (патч 213): производная
@@ -353,6 +399,9 @@ export interface RestOptions {
 export interface RestResult {
     state: SurvivalState;
     events: SurvivalEvent[];
+    // Сколько полных порций bedRestHealHours накоплено этим сном в кровати
+    // (патч 215): вызывающий снимает по 1 единице с каждой болезни за порцию.
+    bedRestCompleted: number;
 }
 
 // Сон. place: 'bed' | 'wasteland', часы 1–24.
@@ -369,6 +418,16 @@ export function rest(state: SurvivalState, { place, hours }: RestOptions): RestR
     const wk = cloneState(state);
     wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
     const events: SurvivalEvent[] = [];
+    // Отдых в постели (патч 215): часы сна В КРОВАТИ копятся в аккумулятор;
+    // каждые bedRestHealHours часов — порция лечения болезней (применяет
+    // вызывающий, чтобы получить имена излеченных). Сон в пустоши
+    // аккумулятор не двигает.
+    let bedRestCompleted = 0;
+    if (place === 'bed') {
+        wk.bedRestHours += hours;
+        bedRestCompleted = Math.floor(wk.bedRestHours / SURVIVAL_RULES.bedRestHealHours);
+        wk.bedRestHours -= bedRestCompleted * SURVIVAL_RULES.bedRestHealHours;
+    }
     for (let h = 1; h <= hours; h += 1) {
         const hourEvents = tickHour(wk, { sleepMode: true });
         for (const e of hourEvents) events.push({ hour: h, ...e });
@@ -399,7 +458,7 @@ export function rest(state: SurvivalState, { place, hours }: RestOptions): RestR
         place,
         hpBonus: wk.hpBonus,
     });
-    return { state: wk, events };
+    return { state: wk, events, bedRestCompleted };
 }
 
 // Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
@@ -407,19 +466,36 @@ export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResu
     return rest(state, opts);
 }
 
+// Канонический порядок источников Усталости в разбивке панели «Эффекты»
+// (патч 217): лестницы (еда, вода, сон), затем болезнь.
+export const FATIGUE_SOURCE_ORDER: FatigueSource[] = ['food', 'water', 'sleep', 'disease'];
+
+// Активные источники Усталости (только amount > 0) в каноническом порядке.
+// Неизвестные источники (вне FATIGUE_SOURCE_ORDER) — в конце, в порядке
+// сейва: сумма разбивки всегда совпадает с totalFatigue.
+export function fatigueSourceBreakdown(state: SurvivalState): Array<{ source: FatigueSource; amount: number }> {
+    const known = FATIGUE_SOURCE_ORDER.map((source) => ({ source, amount: fatigueFromSource(state, source) }))
+        .filter((entry) => entry.amount > 0);
+    const unknown = state.fatigue
+        .filter((entry) => entry.amount > 0 && !FATIGUE_SOURCE_ORDER.includes(entry.source))
+        .map((entry) => ({ source: entry.source, amount: entry.amount }));
+    return [...known, ...unknown];
+}
+
 // Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
 // «Усталость N», «Количество получаемых ОД −N» (M = N) и
 // «Максимум ОЗ: −P» (P = ⌊N/2⌋, при P ≥ 1 — патч 213). Возвращает данные;
 // тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty /
-// survival.maxHpPenalty).
+// survival.maxHpPenalty). Патч 217: строка «Усталость» несёт разбивку по
+// активным источникам (sources), UI добавляет её в скобках.
 export function survivalEffectRows(
     survival: SurvivalState | null | undefined,
-): Array<{ key: string; n: number }> {
+): Array<{ key: string; n: number; sources?: Array<{ source: string; amount: number }> }> {
     if (!survival) return [];
     const n = totalFatigue(survival);
     if (n <= 0) return [];
-    const rows: Array<{ key: string; n: number }> = [
-        { key: 'fatigue', n },
+    const rows: Array<{ key: string; n: number; sources?: Array<{ source: string; amount: number }> }> = [
+        { key: 'fatigue', n, sources: fatigueSourceBreakdown(survival) },
         { key: 'apPenalty', n },
     ];
     const maxPenalty = hpMaxPenaltyForFatigue(n);

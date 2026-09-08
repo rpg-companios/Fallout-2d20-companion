@@ -233,9 +233,18 @@
       "reportState": "Состояние: {state}",
       "reportMaxHp": "Максимум ОЗ: {n}",
       "reportHpBonus": "+2 к макс. ОЗ до следующего сна",
-      "reportFatigueCleared": "Снято усталости (сон): {n}"
+      "reportFatigueCleared": "Снято усталости (сон): {n}",
+      "reportBedRestHealed": "Отдых в постели излечил болезней: {n}"
     },
     "fatigue": "Усталость {n}",
+    "fatigueSources": "Усталость {n} ({sources})",
+    "fatigueSourceJoin": " / ",
+    "fatigueSource": {
+      "food": "голод",
+      "water": "жажда",
+      "sleep": "сон",
+      "disease": "болезнь"
+    },
     "apPenalty": "Количество получаемых ОД −{n}",
     "maxHpPenalty": "Максимум ОЗ: −{n}",
     "foodTitle": "Голод",

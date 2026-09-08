@@ -7,7 +7,14 @@
   "effectsPanel": {
     "title": "Effects",
     "empty": "No active effects",
-    "immunityPrefix": "Immunity to:"
+    "immunityPrefix": "Immunity to:",
+    "resist": "Resist",
+    "resistTitle": "Resist disease",
+    "resistRolls": "Rolls: {r1}, {r2} (target \u2264 {t}).",
+    "resistCured": "{s}/{r} successes \u2014 the disease \"{name}\" is cured.",
+    "resistFailed": "{s}/{r} successes \u2014 the disease \"{name}\" remains.",
+    "resistRankIncreased": "A 20 was rolled \u2014 the disease difficulty increased to {r}.",
+    "resistCooldown": "You can resist once per day."
   },
   "armor": {
     "fields": {

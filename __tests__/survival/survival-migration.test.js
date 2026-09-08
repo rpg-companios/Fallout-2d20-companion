@@ -17,11 +17,12 @@ const maxState = () => ({
     acc: { food: 0, water: 0, sleep: 0 },
     timeCarried: 0,
     hpBonus: 0,
+    bedRestHours: 0, // патч 215
 });
 
 describe('survival: миграция v22 → v23', () => {
-    it('версия схемы — 24 (поле выживания добавляется переходом v22→v23)', () => {
-        expect(CURRENT_SCHEMA_VERSION).toBe(24);
+    it('версия схемы — 25 (поле выживания добавляется переходом v22→v23)', () => {
+        expect(CURRENT_SCHEMA_VERSION).toBe(25);
     });
 
     it.each([
@@ -31,7 +32,7 @@ describe('survival: миграция v22 → v23', () => {
         ['shadow', 'mutant'],
     ])('органику %s (%s) — начальные максимумы', (originId) => {
         const out = migrateCharacterState(v22({ id: originId }));
-        expect(out.schemaVersion).toBe(24);
+        expect(out.schemaVersion).toBe(25);
         expect(out.survival).toEqual(maxState());
     });
 
@@ -41,7 +42,7 @@ describe('survival: миграция v22 → v23', () => {
         ['synth', 'cyborg'],
     ])('роботу/киборгу %s (%s) — null, шкал нет', (originId) => {
         const out = migrateCharacterState(v22({ id: originId }));
-        expect(out.schemaVersion).toBe(24);
+        expect(out.schemaVersion).toBe(25);
         expect(out.survival).toBeNull();
     });
 

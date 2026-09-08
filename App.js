@@ -33,6 +33,9 @@ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen
 // survival + миграцию v22→v23) в реестре движка ДО монтирования
 // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
 import './modules/fallout/survival';
+// Болезни: миграция v24→v25 (ранги на эффектах болезней из каталога,
+// патч 215) — та же точка регистрации, см. modules/fallout/diseases/migration.js.
+import './modules/fallout/diseases/migration';
 import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
 import useAppSettingsStore, {
   selectBootScreenEnabled,

@@ -2,6 +2,8 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCharacter } from '../../../../components/CharacterContext';
+import { showRawAlert } from '../../../../components/alerts/alertService';
+import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../../../domain/diseaseConditions';
 import useCharacterStore from '../../../../src/store/characterStore';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -189,6 +191,7 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
   const moduleLocale = useModuleLocale();
+  const { resistDisease, lastDiseaseResistAt } = useCharacter();
   const diseasesById = useMemo(() => new Map(
     getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
   ), [moduleLocale]);
@@ -245,6 +248,59 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
                   : effect.effectName || effect.effectLabel || '—');
                 const effectDescription = localizedDisease?.effectLabel;
                 const isNegative = effect.effectKind === 'negative';
+                // Болезнь (патч 215): название с рангом зелёным, по левому
+                // краю (патч 216), справа — кнопка «Сопротивляться» (одна
+                // попытка в сутки). Описание — отдельной строкой по центру.
+                if (effect.effectType === 'disease') {
+                  const resistOnCooldown = lastDiseaseResistAt != null
+                    && Date.now() - lastDiseaseResistAt < DISEASE_RESIST_COOLDOWN_MS;
+                  const handleResist = () => {
+                    if (resistOnCooldown) return;
+                    const result = resistDisease(effect.conditionId);
+                    if (!result.ok) return;
+                    const lines = [
+                      tWeaponsAndArmorScreen('effectsPanel.resistRolls')
+                        .replace('{r1}', String(result.rolls[0]))
+                        .replace('{r2}', String(result.rolls[1]))
+                        .replace('{t}', String(result.targetNumber)),
+                    ];
+                    if (result.rankIncrease > 0) {
+                      lines.push(tWeaponsAndArmorScreen('effectsPanel.resistRankIncreased')
+                        .replace('{r}', String(result.rankAfter)));
+                    }
+                    lines.push((result.cured
+                      ? tWeaponsAndArmorScreen('effectsPanel.resistCured')
+                      : tWeaponsAndArmorScreen('effectsPanel.resistFailed'))
+                      .replace('{s}', String(result.successes))
+                      .replace('{r}', String(result.rankBefore))
+                      .replace('{name}', String(result.diseaseName)));
+                    showRawAlert({
+                      title: tWeaponsAndArmorScreen('effectsPanel.resistTitle'),
+                      message: lines.join('\n'),
+                    });
+                  };
+                  return (
+                    <View key={effect.id} style={localStyles.diseaseBlock}>
+                      <View style={localStyles.diseaseNameRow}>
+                        <Text style={localStyles.diseaseNameText}>
+                          {effectText} ({effectDiseaseRank(effect)})
+                        </Text>
+                        <TouchableOpacity
+                          style={[localStyles.resistButton, resistOnCooldown && localStyles.resistButtonDisabled]}
+                          onPress={handleResist}
+                          disabled={resistOnCooldown}
+                        >
+                          <Text style={localStyles.resistButtonText}>
+                            {tWeaponsAndArmorScreen('effectsPanel.resist')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      {effectDescription ? (
+                        <Text style={localStyles.diseaseEffectDescription}>{effectDescription}</Text>
+                      ) : null}
+                    </View>
+                  );
+                }
                 return (
                   <View key={effect.id} style={localStyles.effectsPanelRow}>
                     <View style={localStyles.effectDetails}>
@@ -884,11 +940,26 @@ const WeaponsAndArmorScreen = () => {
 
   // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
   // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
+  // Патч 217: у строки «Усталость» в скобках активные источники —
+  // «Усталость 5 (голод: 1 / жажда: 2 / сон: 1 / болезнь: 1)»; показываются
+  // только источники с ненулевым вкладом.
   const survivalRows = useMemo(
-    () => survivalEffectRows(survival).map((row) => ({
-      key: `survival_${row.key}`,
-      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
-    })),
+    () => survivalEffectRows(survival).map((row) => {
+      const text = tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n));
+      if (row.key !== 'fatigue' || !row.sources || row.sources.length === 0) {
+        return { key: `survival_${row.key}`, text };
+      }
+      const join = tWeaponsAndArmorScreen('survival.fatigueSourceJoin');
+      const sources = row.sources
+        .map((entry) => `${tWeaponsAndArmorScreen(`survival.fatigueSource.${entry.source}`)}: ${entry.amount}`)
+        .join(join);
+      return {
+        key: `survival_${row.key}`,
+        text: tWeaponsAndArmorScreen('survival.fatigueSources')
+          .replace('{n}', String(row.n))
+          .replace('{sources}', sources),
+      };
+    }),
     [survival]
   );
 
