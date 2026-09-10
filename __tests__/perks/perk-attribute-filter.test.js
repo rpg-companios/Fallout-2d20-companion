@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { perkMatchesAttributeFilters } from '../../domain/perks';
+import { getPerkUnmetReasons, perkMatchesAttributeFilters } from '../../domain/perks';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 
 const byId = (id) => perksData.find((perk) => perk.id === id);
@@ -21,5 +21,20 @@ describe('perkMatchesAttributeFilters', () => {
     expect(perkMatchesAttributeFilters(byId('contractor'), ['CHA'])).toBe(true);
     expect(perkMatchesAttributeFilters(byId('contractor'), ['CHA', 'INT'])).toBe(true);
     expect(perkMatchesAttributeFilters(byId('contractor'), ['CHA', 'STR'])).toBe(false);
+  });
+
+  it('uses the committed AGI value for Gun Fu requirements', () => {
+    const gunFu = byId('gunFu');
+
+    expect(getPerkUnmetReasons(gunFu, [{ name: 'AGI', value: 8 }], 5, [])).toEqual(
+      expect.objectContaining({
+        attributes: {
+          AGI: { required: 10, current: 8 },
+        },
+      }),
+    );
+    expect(getPerkUnmetReasons(gunFu, [{ name: 'AGI', value: 10 }], 5, [])).toEqual(
+      expect.objectContaining({ attributes: {} }),
+    );
   });
 });

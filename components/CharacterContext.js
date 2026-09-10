@@ -1660,6 +1660,13 @@ export const CharacterProvider = ({ children }) => {
       }
     });
 
+    // Keep the legacy context mirror in sync with the canonical Zustand store.
+    // The character sheet reads attributes from the store, while the perks
+    // screen evaluates requirements through CharacterContext. Updating only
+    // Zustand here made the sheet show the new value (for example AGI 10)
+    // while perk requirements still saw the previous value (AGI 8).
+    setAttributes(newAttributes);
+
     // Update other state fields
     setAvailablePerkAttributePoints(prev => prev - pointsSpent);
     const newLuck = getLuckPoints(newAttributes, trait);
