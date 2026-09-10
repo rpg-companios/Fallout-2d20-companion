@@ -1,0 +1,1888 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 11:12:15 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20206:=20=D0=BC=D0=BE?=
+ =?UTF-8?q?=D0=B4=D0=B0=D0=BB=D0=BA=D0=B8=20=D0=B2=D1=8B=D0=B6=D0=B8=D0=B2?=
+ =?UTF-8?q?=D0=B0=D0=BD=D0=B8=D1=8F=20=E2=80=94=20=D0=B5=D0=B4=D0=B0/?=
+ =?UTF-8?q?=D0=BF=D0=B8=D1=82=D1=8C=D1=91/=D1=81=D0=BE=D0=BD=20=D1=81=20?=
+ =?UTF-8?q?=D0=BF=D1=80=D0=BE=D0=B3=D0=BD=D0=BE=D0=B7=D0=BE=D0=BC=20=D0=B8?=
+ =?UTF-8?q?=20=D0=BC=D0=BE=D1=81=D1=82=D0=BE=D0=BC=20=D0=BA=D0=BE=D0=BD?=
+ =?UTF-8?q?=D1=82=D1=83=D1=80=D0=BE=D0=B2;=20=D0=B4=D0=BE=D0=BC=D0=B5?=
+ =?UTF-8?q?=D0=BD=20=D0=B2=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D1=8F?=
+ =?UTF-8?q?=20=D0=BD=D0=B0=20TypeScript?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-imports.test.js         |  56 ++++-
+ __tests__/survival/survival-modals.test.js    | 137 +++++++++++
+ __tests__/survival/survival-ui.test.js        |   4 +-
+ components/CharacterContext.js                |  90 +++++++-
+ .../logic/consumableResultReport.js           |  27 ++-
+ docs/survival-system-design.md                |  37 ++-
+ domain/effects.js                             |  30 +++
+ domain/{survival.js => survival.ts}           | 199 ++++++++++++----
+ .../en-EN/screens/weaponsAndArmor/screen.json |  45 +++-
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  45 +++-
+ .../WeaponsAndArmorScreen.js                  |  61 ++++-
+ .../modals/SleepModal.tsx                     | 218 ++++++++++++++++++
+ .../modals/SurvivalConsumeModal.tsx           | 212 +++++++++++++++++
+ .../modals/survivalModalStyles.ts             | 188 +++++++++++++++
+ package.json                                  |   3 +-
+ styles/WeaponsAndArmorScreen.styles.js        |  22 ++
+ tsconfig.json                                 |  25 ++
+ 17 files changed, 1317 insertions(+), 82 deletions(-)
+ create mode 100644 __tests__/survival/survival-modals.test.js
+ rename domain/{survival.js => survival.ts} (66%)
+ create mode 100644 modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+ create mode 100644 modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+ create mode 100644 modules/fallout/screens/WeaponsAndArmorScreen/modals/survivalModalStyles.ts
+ create mode 100644 tsconfig.json
+
+diff --git a/__tests__/survival/character-context-imports.test.js b/__tests__/survival/character-context-imports.test.js
+index 5414636..66debfe 100644
+--- a/__tests__/survival/character-context-imports.test.js
++++ b/__tests__/survival/character-context-imports.test.js
+@@ -3,6 +3,7 @@ import fs from 'node:fs';
+ import path from 'node:path';
+ import { parseSync } from '@babel/core';
+ import jsxPlugin from '@babel/plugin-transform-react-jsx';
++import ts from 'typescript';
+ 
+ // Регрессия патча 198: в CharacterContext был импортирован несуществующий
+ // getCharacterArchetype (функция зовётся getCharacterType) — эффект
+@@ -10,7 +11,8 @@ import jsxPlugin from '@babel/plugin-transform-react-jsx';
+ // загрузку дальше по цепочке. Импортировать сам модуль в vitest нельзя
+ // (react-native — Flow), поэтому проверяем целостность именованных
+ // импортов статически: каждое имя из локального '../…' должно быть
+-// экспортировано целевым файлом.
++// экспортировано целевым файлом. С патча 206 целевой модуль может быть
++// .ts (домен выживания) — такие файлы разбираем TypeScript-парсером.
+ 
+ const ROOT = path.resolve(__dirname, '../..');
+ const FILE = path.join(ROOT, 'components/CharacterContext.js');
+@@ -46,6 +48,50 @@ const exportedNames = (ast) => {
+     return names;
+ };
+ 
++const exportedNamesFromTs = (file) => {
++    const source = ts.createSourceFile(
++        file,
++        fs.readFileSync(file, 'utf8'),
++        ts.ScriptTarget.Latest,
++        true,
++        ts.ScriptKind.TS,
++    );
++    const names = new Set();
++    const collect = (node) => {
++        if (ts.isExportDeclaration(node)) {
++            if (node.exportClause && ts.isNamedExports(node.exportClause)) {
++                node.exportClause.elements.forEach((el) => names.add(el.name.text));
++            }
++        } else if (ts.isExportAssignment(node)) {
++            names.add('default');
++        } else if (node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
++            if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
++                if (node.name) names.add(node.name.text);
++            } else if (ts.isVariableStatement(node)) {
++                node.declarationList.declarations.forEach((d) => {
++                    if (ts.isIdentifier(d.name)) names.add(d.name.text);
++                });
++            } else if (
++                ts.isInterfaceDeclaration(node)
++                || ts.isTypeAliasDeclaration(node)
++                || ts.isEnumDeclaration(node)
++            ) {
++                names.add(node.name.text);
++            }
++        }
++        ts.forEachChild(node, collect);
++    };
++    collect(source);
++    return names;
++};
++
++// Целевой модуль импорта: .js или (с патча 206) .ts.
++const resolveTarget = (base) => {
++    if (fs.existsSync(`${base}.js`)) return { file: `${base}.js`, isTs: false };
++    if (fs.existsSync(`${base}.ts`)) return { file: `${base}.ts`, isTs: true };
++    return null;
++};
++
+ describe('CharacterContext: целостность именованных импортов', () => {
+     it('каждое импортируемое имя существует в целевом локальном модуле', () => {
+         const ast = parse(FILE);
+@@ -53,9 +99,11 @@ describe('CharacterContext: целостность именованных имп
+         for (const node of ast.program.body) {
+             if (node.type !== 'ImportDeclaration') continue;
+             if (!node.source.value.startsWith('.')) continue; // только локальные
+-            const target = path.resolve(path.dirname(FILE), node.source.value) + '.js';
+-            if (!fs.existsSync(target)) continue; // индексы/пакеты — не наш случай
+-            const available = exportedNames(parse(target));
++            const target = resolveTarget(path.resolve(path.dirname(FILE), node.source.value));
++            if (!target) continue; // индексы/пакеты — не наш случай
++            const available = target.isTs
++                ? exportedNamesFromTs(target.file)
++                : exportedNames(parse(target.file));
+             for (const spec of node.specifiers) {
+                 if (spec.type !== 'ImportSpecifier') continue;
+                 if (!available.has(spec.imported.name)) {
+diff --git a/__tests__/survival/survival-modals.test.js b/__tests__/survival/survival-modals.test.js
+new file mode 100644
+index 0000000..5e78cf5
+--- /dev/null
++++ b/__tests__/survival/survival-modals.test.js
+@@ -0,0 +1,137 @@
++// Патч 206 — модалки еды/питья/сна: превью подъёма шкал, мост контуров
++// (продвижение эффектов сценами), полнота i18n ключей модалок.
++
++import { describe, expect, it } from 'vitest';
++import { drinkGain, foodGain } from '../../domain/survival';
++import { advanceEffectsByScenes } from '../../domain/effects';
++import food from '../../modules/fallout/data/consumables/food.json';
++import drinks from '../../modules/fallout/data/consumables/drinks.json';
++import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
++import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
++
++const SCENE_MS = 5 * 60 * 1000;
++
++const timedEffect = (scenesLeft, extra = {}) => ({
++    id: `effect-${Math.random().toString(36).slice(2, 8)}`,
++    effectName: 'Тестовый эффект',
++    effectKind: 'positive',
++    sourceName: 'Тест',
++    createdAt: Date.now(),
++    durationMs: scenesLeft * SCENE_MS,
++    expiresAt: Date.now() + scenesLeft * SCENE_MS,
++    scenesLeft,
++    ...extra,
++});
++
++describe('survival: превью подъёма шкал (foodGain / drinkGain)', () => {
++    it('суп — +1 еда и +1 вода (замещает категорию приготовленного)', () => {
++        const soup = food.find((x) => x.id === 'food_vegetable_soup');
++        expect(foodGain(soup)).toEqual({ food: 1, water: 1 });
++    });
++
++    it('приготовленное не консервированное — +2 еды', () => {
++        const cooked = food.find((x) => x.state === 'cooked' && !x.preserved && !x.soup);
++        expect(foodGain(cooked)).toEqual({ food: 2, water: 0 });
++    });
++
++    it('сырое и консервированное — +1 еда', () => {
++        const raw = food.find((x) => x.state === 'raw');
++        const preserved = food.find((x) => x.preserved);
++        expect(foodGain(raw)).toEqual({ food: 1, water: 0 });
++        expect(foodGain(preserved)).toEqual({ food: 1, water: 0 });
++    });
++
++    it('напитки: очищенная вода +2, остальное +1', () => {
++        const purified = drinks.find((x) => x.id === 'drink_purified_water');
++        const other = drinks.find((x) => !x.purified);
++        expect(drinkGain(purified)).toEqual({ food: 0, water: 2 });
++        expect(drinkGain(other)).toEqual({ food: 0, water: 1 });
++    });
++});
++
++describe('survival: мост контуров — advanceEffectsByScenes (§5)', () => {
++    it('12 сцен (= 1 час сна) укорачивают эффект на 12 сцен', () => {
++        const effect = timedEffect(24);
++        const { effects, expired } = advanceEffectsByScenes([effect], 12);
++        expect(expired).toEqual([]);
++        expect(effects[0].scenesLeft).toBe(12);
++    });
++
++    it('эффект короче срока сна истекает', () => {
++        const effect = timedEffect(6);
++        const { effects, expired } = advanceEffectsByScenes([effect], 12);
++        expect(effects).toEqual([]);
++        expect(expired.map((e) => e.id)).toEqual([effect.id]);
++    });
++
++    it('перманентные эффекты сценами не двигаются', () => {
++        const permanent = timedEffect(9999, { isPermanent: true });
++        const { effects, expired } = advanceEffectsByScenes([permanent], 288);
++        expect(expired).toEqual([]);
++        expect(effects[0].scenesLeft).toBe(9999);
++    });
++
++    it('некорректное число сцен — ошибка', () => {
++        expect(() => advanceEffectsByScenes([], -1)).toThrow();
++        expect(() => advanceEffectsByScenes([], 1.5)).toThrow();
++    });
++});
++
++describe('survival: i18n модалок (ru/en)', () => {
++    const keyPaths = [
++        'survival.actions.eat',
++        'survival.actions.drink',
++        'survival.actions.sleep',
++        'survival.gain.food',
++        'survival.gain.water',
++        'survival.consumeNotAllowed',
++        'survival.eat.title',
++        'survival.eat.blocked',
++        'survival.eat.empty',
++        'survival.drink.title',
++        'survival.drink.empty',
++        'survival.sleep.title',
++        'survival.sleep.placeBed',
++        'survival.sleep.placeWasteland',
++        'survival.sleep.hours',
++        'survival.sleep.wastelandNote',
++        'survival.sleep.forecastTitle',
++        'survival.sleep.forecastState',
++        'survival.sleep.forecastHpLost',
++        'survival.sleep.forecastHpEnd',
++        'survival.sleep.forecastZeroWarning',
++        'survival.sleep.forecastFatigueCleared',
++        'survival.sleep.forecastFoodDown',
++        'survival.sleep.forecastWaterDown',
++        'survival.sleep.forecastHpBonus',
++        'survival.sleep.confirm',
++        'survival.sleep.cancel',
++        'survival.sleep.reportTitle',
++        'survival.sleep.reportState',
++        'survival.sleep.reportHp',
++        'survival.sleep.reportHpLost',
++        'survival.sleep.reportHpBonus',
++        'survival.sleep.reportFatigueCleared',
++    ];
++
++    const at = (dict, path) => path.split('.').reduce((acc, part) => acc?.[part], dict);
++
++    it.each(['ru-RU', 'en-EN'])('%s: каждый ключ модалок есть и непустой', (locale) => {
++        const dict = locale === 'ru-RU' ? ruScreen : enScreen;
++        for (const path of keyPaths) {
++            const value = at(dict, path);
++            expect(typeof value, `${locale}: ${path}`).toBe('string');
++            expect(value, `${locale}: ${path}`).toMatch(/\S/);
++        }
++    });
++
++    it('структура секций модалок идентична в обеих локалях', () => {
++        const ruKeys = Object.keys(ruScreen.survival.sleep).sort();
++        const enKeys = Object.keys(enScreen.survival.sleep).sort();
++        expect(enKeys).toEqual(ruKeys);
++        expect(Object.keys(ruScreen.survival.eat).sort())
++            .toEqual(Object.keys(enScreen.survival.eat).sort());
++        expect(Object.keys(ruScreen.survival.drink).sort())
++            .toEqual(Object.keys(enScreen.survival.drink).sort());
++    });
++});
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+index 941f15c..34505c8 100644
+--- a/__tests__/survival/survival-ui.test.js
++++ b/__tests__/survival/survival-ui.test.js
+@@ -57,7 +57,9 @@ describe('survival: i18n шкал (ru/en)', () => {
+             2: 'Мучает жажда',
+             1: 'Обезвожен',
+         });
+-        expect(ruScreen.survival.sleep).toEqual({
++        // С патча 206 survival.sleep кроме названий секций несёт ключи
++        // модалки сна — проверяем секции частичным совпадением.
++        expect(ruScreen.survival.sleep).toMatchObject({
+             5: 'Прекрасно отдохнувший',
+             4: 'Отдохнувший',
+             3: 'Усталый',
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index b2a6fb8..6144639 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -32,9 +32,9 @@ const migrateSkillsToCanonical = (rawSkills) => {
+   });
+ };
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterType } from '../domain/origins';
+-import { createSurvivalState } from '../domain/survival';
++import { createSurvivalState, rest } from '../domain/survival';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+-import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
++import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
+ import { isSkillTagged } from '../domain/d20Checks';
+@@ -1076,19 +1076,18 @@ export const CharacterProvider = ({ children }) => {
+     return result.doseCount;
+   };
+ 
+-  const applyDiseaseExposureForConsumable = (item) => {
+-    if (
+-      item?.id === 'drink_dirty_water'
+-      && Boolean(useCharacterStore.getState().perkBonuses?.dirtyWaterDiseaseImmune)
+-    ) {
+-      return null;
+-    }
++  const applyDiseaseExposureEvent = (eventId) => {
+     const ruleMatches = getSceneRiskRules()
+-      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
++      .map((rule) => ({
++        rule,
++        event: Array.isArray(rule.eventTypes) && rule.eventTypes.includes(eventId)
++          ? { eventId }
++          : null,
++      }))
+       .filter(({ event }) => event !== null);
+     if (ruleMatches.length === 0) return null;
+     if (ruleMatches.length > 1) {
+-      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
++      throw new Error(`[CharacterContext] Событие риска "${eventId}" объявлено несколькими правилами`);
+     }
+ 
+     const { rule, event } = ruleMatches[0];
+@@ -1151,6 +1150,74 @@ export const CharacterProvider = ({ children }) => {
+     };
+   };
+ 
++  const applyDiseaseExposureForConsumable = (item) => {
++    if (
++      item?.id === 'drink_dirty_water'
++      && Boolean(useCharacterStore.getState().perkBonuses?.dirtyWaterDiseaseImmune)
++    ) {
++      return null;
++    }
++    const ruleMatches = getSceneRiskRules()
++      .map((rule) => ({ rule, event: getSceneRiskEventForRule(item, rule.id) }))
++      .filter(({ event }) => event !== null);
++    if (ruleMatches.length === 0) return null;
++    if (ruleMatches.length > 1) {
++      throw new Error('[CharacterContext] Расходник объявляет несколько проверок риска одной сцены');
++    }
++
++    // Единая механика проверки болезни (§7 дока): событие расходника
++    // (rawFood / dirtyWater) разрешается тем же кодом, что и sleepOnGround.
++    return applyDiseaseExposureEvent(ruleMatches[0].event.eventId);
++  };
++
++  /**
++   * Сон — операция выживания (docs/survival-system-design.md §4–§7):
++   * лестницы + усталость + дрен ОЗ (домен rest), мост контуров — временные
++   * эффекты продвигаются на N × 12 сцен, и при сне в пустоши — проверка
++   * болезни по имеющейся механике (событие sleepOnGround).
++   * Прогноз для модали делает чистый домен forecastSleep (состояние не
++   * фиксируется); эта функция — применяет и фиксирует.
++   */
++  const sleepSurvival = ({ place, hours }) => {
++    if (!survival) return { ok: false, reason: 'notCapable' };
++    const result = rest(survival, { place, hours, currentHp: currentHealth });
++    setSurvival(result.state);
++    if (currentHealth != null && result.hpEnd != null) {
++      setCurrentHealth(result.hpEnd);
++    }
++    // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
++    const store = useCharacterStore.getState();
++    const currentLegacy = effectsDictToLegacyArray(store.effects);
++    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
++    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
++    const { effects: nextEffects, expired } = advanceEffectsByScenes(
++      normalizedCurrent.effects,
++      hours * SCENE_RULES.SCENES_PER_GAME_HOUR,
++    );
++    syncTimedEffectsToStore(nextEffects, store);
++    setActiveTimedEffects(nextEffects);
++    // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
++    const diseaseRiskResult = place === 'wasteland'
++      ? applyDiseaseExposureEvent('sleepOnGround')
++      : null;
++    debugLog('survival.sleep.apply', {
++      place,
++      hours,
++      sleepTo: result.state.sleep,
++      hpEnd: result.hpEnd,
++      hpLost: result.hpLost,
++      hitsZero: result.hitsZero,
++      diseaseRiskResult,
++      effectsExpired: expired.length,
++    });
++    return {
++      ok: true,
++      result,
++      diseaseRiskResult,
++      effectsExpired: [...normalizedCurrent.expired, ...expired],
++    };
++  };
++
+   /**
+    * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
+    * removeCondition, проверку зависимости и явно объявленный риск заражения.
+@@ -1588,6 +1655,7 @@ export const CharacterProvider = ({ children }) => {
+     removeModifiedItem,
+     survival,
+     setSurvival,
++    sleepSurvival,
+     resetCharacter,
+     resetKitAndRewards,
+     resetKitOnly,
+diff --git a/components/screens/InventoryScreen/logic/consumableResultReport.js b/components/screens/InventoryScreen/logic/consumableResultReport.js
+index 7ee1bd2..60118fd 100644
+--- a/components/screens/InventoryScreen/logic/consumableResultReport.js
++++ b/components/screens/InventoryScreen/logic/consumableResultReport.js
+@@ -29,6 +29,21 @@ const diseaseFailureMessage = (diseaseRiskResult) => {
+   return formatInventoryText(tInventory(`screen.alerts.${key}`), { diseaseName: disease.name });
+ };
+ 
++/**
++ * Строки отчёта по проверке заражения (единая механика diseaseExposure:
++ * расходники rawFood/dirtyWater и сон в пустоши sleepOnGround).
++ * Возвращает { positive, negative } — пустые списки, если проверки не было.
++ */
++export const diseaseRiskReportLines = (diseaseRiskResult) => {
++  if (diseaseRiskResult?.status !== 'checked') return { positive: [], negative: [] };
++  if (diseaseRiskResult.check?.passed) {
++    return { positive: [tInventory('screen.alerts.diseaseCheckPassedSummary')], negative: [] };
++  }
++  // По решению владельца провал остаётся отрицательным итогом даже тогда,
++  // когда иммунитет или уже активная болезнь не добавили нового состояния.
++  return { positive: [], negative: [diseaseFailureMessage(diseaseRiskResult)] };
++};
++
+ /**
+  * Собирает один итог применения расходника. Механические результаты остаются
+  * структурированными: UI не распознаёт локализованный текст и не парсит броски.
+@@ -71,15 +86,9 @@ export const buildConsumableResultReport = ({
+     positive.push(conditionRemovalMessage(conditionId, removedSet.has(conditionId)));
+   }
+ 
+-  if (diseaseRiskResult?.status === 'checked') {
+-    if (diseaseRiskResult.check?.passed) {
+-      positive.push(tInventory('screen.alerts.diseaseCheckPassedSummary'));
+-    } else {
+-      // По решению владельца провал остаётся отрицательным итогом даже тогда,
+-      // когда иммунитет или уже активная болезнь не добавили нового состояния.
+-      negative.push(diseaseFailureMessage(diseaseRiskResult));
+-    }
+-  }
++  const diseaseLines = diseaseRiskReportLines(diseaseRiskResult);
++  positive.push(...diseaseLines.positive);
++  negative.push(...diseaseLines.negative);
+ 
+   if (addictionResult) {
+     if (addictionResult.addicted) {
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index d450d8c..3289cf2 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,8 +1,8 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.3.9** от 2026-09-07.
+-Статус: этапы 1–3 и первая часть этапа 4 реализованы (патчи 197–205);
+-модалки еды/питья/сна — следующий патч.
++Редакция **0.4.0** от 2026-09-07.
++Статус: этапы 1–4 реализованы (патчи 197–206); следующий шаг — этап 5
++(настройки `survivalMode`: включение системы и курс времени).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -366,7 +366,20 @@ survival: {
+      `screens/weaponsAndArmor/screen.json` → `survival.*` (ru/en, полнота
+      покрыта тестами). Gating настройкой выживания — этап 5 (сейчас поле
+      видно всем органикам).
+-   - **Модалки еды/питья/сна — следующий патч.**
++   - **Модалки еды/питья/сна — готово (патч 206):** под областями
++     Голод/Жажда/Сон кнопки «Поесть»/«Пить»/«Спать». Еда/питьё — списки
++     предметов инвентаря с превью подъёма из данных (foodGain/drinkGain);
++     применение — штатная механика употребления + домен
++     consumeFood/consumeDrink; на секции 5 еда заблокирована (баннер
++     «не можете больше есть»), питьё на потолке разрешено. Сон — место
++     (кровать/пустошь), часы 1–24, прогноз `forecastSleep` (итоговое
++     состояние, потеря/итог ОЗ, красный алерт при 0 ОЗ, снятие усталости
++     недосыпа, шаги голода/жажды, бонус ОЗ) и подтверждение — операция
++     контекста `sleepSurvival`: rest + мост контуров (эффекты на
++     N × 12 сцен) + в пустоши проверка болезни `sleepOnGround` по
++     имеющейся механике. Бонус hpBonus вошёл в максимум ОЗ экрана.
++     Домен выживания переведён на TypeScript (файл `domain/survival.ts`),
++     новые модалки — `.tsx`, добавлен `npm run typecheck`.
+ 5. **Настройки:** раздел `survivalMode`, курс времени, тик реального времени
+    в открытом приложении.
+ 6. **Движок ОД (без UI):** пул, ручные операции, условия получения,
+@@ -381,8 +394,9 @@ survival: {
+ 
+ 1. Поведение на узких экранах (название состояния по тапу — решено, цвета —
+    решено 0.3.1).
+-2. Нужен ли признак «дикоросы» для фильтра в модалке еды (для правил
+-   не нужен, §11).
++2. Признак «дикоросы» для фильтра в модалке еды не заводим — модалка
++   (патч 206) показывает всю еду инвентаря, для правил фильтр не нужен
++   (§11). Вопрос закрыт.
+ 3. Движок ОД: период пополнения пула, интеграция с дайс-движком, чья
+    Усталость учитывается в группе.
+ 4. Температура — отложено (§9), вернуться по решению владельца.
+@@ -394,6 +408,17 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.0 (2026-09-07):** модалки еды/питья/сна (этап 4.2, §7):
++  кнопки под областями Голод/Жажда/Сон; списки предметов с превью
++  подъёма из данных (foodGain/drinkGain); блокировка еды на секции 5;
++  сон с местом/часами, прогнозом (состояние, ОЗ, алерт нуля, усталость,
++  шаги голода/жажды, бонус ОЗ) и подтверждением; мост контуров —
++  эффекты продвигаются на N × 12 сцен (`advanceEffectsByScenes`); болезнь
++  в пустоши — событие `sleepOnGround` через единую механику
++  `applyDiseaseExposureEvent` (расходники и сон больше не дублируют
++  код); бонус hpBonus учитывается в максимуме ОЗ. Домен выживания
++  переведён на TypeScript (`domain/survival.ts`), модалки — `.tsx`,
++  `npm run typecheck`; сейв-формат не менялся.
+ - **0.3.9 (2026-09-07):** карточки оружия — пропорция ячеек 60/40 (лейбл
+   шире, значение переносится); включён браузерный автоперенос длинных слов
+   (`hyphens: auto` + `document.lang` по локали в App.js; на нативных
+diff --git a/domain/effects.js b/domain/effects.js
+index 8136292..05032ef 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -488,6 +488,32 @@ export const advanceEffectsByScene = (currentEffects = []) => {
+     };
+ };
+ 
++// Массовое продвижение таймеров эффектов на N сцен одним проходом.
++// Сон — мост контуров (док выживания §5): N часов сна = N × 12 сцен
++// (1 игровой час = 60 минут = 12 сцен по 5 минут). Применяется модалкой
++// сна; счётчик сцен персонажа при этом не меняется.
++export const advanceEffectsByScenes = (currentEffects = [], scenes = 0) => {
++    if (!Number.isInteger(scenes) || scenes < 0) {
++        throw new Error(`[effects] advanceEffectsByScenes: некорректное число сцен: ${scenes}`);
++    }
++    const nowMs = Date.now() + scenes * SCENE_DURATION_MS;
++    const expired = [];
++    const nextEffects = currentEffects.reduce((acc, effect) => {
++        const normalized = normalizeTimedEffectWithClock(effect, nowMs);
++        if (normalized.expired) {
++            expired.push(normalized.normalized);
++            return acc;
++        }
++        acc.push(normalized.normalized);
++        return acc;
++    }, []);
++
++    return {
++        effects: nextEffects,
++        expired,
++    };
++};
++
+ export const pruneExpiredTimedEffects = (currentEffects = [], nowMs = Date.now()) => {
+     let changed = false;
+     const expired = [];
+@@ -744,6 +770,9 @@ export const getTimedApBonus = (activeEffects = []) =>
+ 
+ export const SCENE_RULES = {
+     SCENE_DURATION_MINUTES,
++    // Сцен в одном игровом часу (60 минут / 5 минут на сцену) — мост
++    // между контуром эффектов и сном (док выживания §5).
++    SCENES_PER_GAME_HOUR: Math.round(60 / SCENE_DURATION_MINUTES),
+ };
+ 
+ export default {
+@@ -754,6 +783,7 @@ export default {
+     checkAddiction,
+     applyRemoveConditions,
+     advanceEffectsByScene,
++    advanceEffectsByScenes,
+     pruneExpiredTimedEffects,
+     getTimedAttributeModifiers,
+     getTimedMaxHpBonus,
+diff --git a/domain/survival.js b/domain/survival.ts
+similarity index 66%
+rename from domain/survival.js
+rename to domain/survival.ts
+index 71e78a1..b3a966c 100644
+--- a/domain/survival.js
++++ b/domain/survival.ts
+@@ -8,8 +8,59 @@
+ //   1) шаг лестниц (еда/вода/сон) + начисление Усталости за переходы;
+ //   2) снятие Усталости: −1, если еда ≥ 2, вода ≥ 2, сон ≥ 3;
+ //   3) дрен ОЗ ⌊N/2⌋ по итоговому N, без сопротивлений.
++//
++// Файл переведён на TypeScript патчем 206 (модалки еды/питья/сна):
++// тронутая логика переходит в .ts, сейв-формат не меняется.
++
++export type SurvivalLadder = 'food' | 'water' | 'sleep';
++export type FatigueSource = 'food' | 'water' | 'sleep' | string;
++export type SleepPlace = 'bed' | 'wasteland';
+ 
+-export const SURVIVAL_RULES = {
++export interface FatigueEntry {
++    source: FatigueSource;
++    amount: number;
++}
++
++export interface SurvivalState {
++    food: number;
++    water: number;
++    sleep: number;
++    fatigue: FatigueEntry[];
++    acc: { food: number; water: number; sleep: number };
++    timeCarried: number;
++    hpBonus: number;
++}
++
++// Признаки расходника, которые читает домен выживания (данные сеттинга:
++// food.json / drinks.json). Прочие поля предмета домену не важны.
++export interface SurvivalConsumable {
++    itemType?: string;
++    soup?: boolean;
++    state?: string;
++    preserved?: boolean;
++    purified?: boolean;
++}
++
++export interface SurvivalRules {
++    capableTypes: string[];
++    max: Record<SurvivalLadder, number>;
++    stepHours: Record<SurvivalLadder, Record<number, number>>;
++    bottomPeriodHours: Record<SurvivalLadder, number>;
++    fatigueOnStep: Record<SurvivalLadder, Record<number, number>>;
++    removalMin: Record<SurvivalLadder, number>;
++    sleep: {
++        capShort: number;
++        longHours: number;
++        perfectHours: number;
++        perfectPlace: SleepPlace;
++        hpBonus: number;
++        fatigueClearHours: number;
++    };
++    defaultCourseMinutesPerHour: number;
++    maxSleepHours: number;
++}
++
++export const SURVIVAL_RULES: SurvivalRules = {
+     // Шкалы есть только у органиков (origins.json → characterType).
+     capableTypes: ['human', 'ghoul', 'mutant'],
+     // Максимум секций: еда 5, вода 4, сон 5.
+@@ -46,15 +97,27 @@ export const SURVIVAL_RULES = {
+     maxSleepHours: 24,
+ };
+ 
+-const LADDERS = ['food', 'water', 'sleep'];
++const LADDERS: SurvivalLadder[] = ['food', 'water', 'sleep'];
++
++export interface ConsumeGain {
++    food: number;
++    water: number;
++}
++
++export interface ConsumeResult {
++    ok: boolean;
++    reason?: 'notFood' | 'full' | 'notDrink';
++    state: SurvivalState;
++    gained: ConsumeGain;
++}
+ 
+-export function isSurvivalCapable(characterType) {
+-    return SURVIVAL_RULES.capableTypes.includes(characterType);
++export function isSurvivalCapable(characterType: string | undefined | null): boolean {
++    return SURVIVAL_RULES.capableTypes.includes(characterType ?? '');
+ }
+ 
+ // Начальное состояние — все шкалы на максимуме (решение владельца).
+ // Роботам/киборгам шкалы не положены — null.
+-export function createSurvivalState(characterType) {
++export function createSurvivalState(characterType: string | undefined | null): SurvivalState | null {
+     if (!isSurvivalCapable(characterType)) return null;
+     return {
+         food: SURVIVAL_RULES.max.food,
+@@ -67,7 +130,7 @@ export function createSurvivalState(characterType) {
+     };
+ }
+ 
+-function cloneState(state) {
++function cloneState(state: SurvivalState): SurvivalState {
+     return {
+         ...state,
+         fatigue: state.fatigue.map((f) => ({ ...f })),
+@@ -75,16 +138,16 @@ function cloneState(state) {
+     };
+ }
+ 
+-export function totalFatigue(state) {
++export function totalFatigue(state: SurvivalState): number {
+     return state.fatigue.reduce((sum, f) => sum + f.amount, 0);
+ }
+ 
+-export function fatigueFromSource(state, source) {
++export function fatigueFromSource(state: SurvivalState, source: FatigueSource): number {
+     const entry = state.fatigue.find((f) => f.source === source);
+     return entry ? entry.amount : 0;
+ }
+ 
+-export function addFatigue(state, source, amount) {
++export function addFatigue(state: SurvivalState, source: FatigueSource, amount: number): void {
+     const entry = state.fatigue.find((f) => f.source === source);
+     if (entry) entry.amount += amount;
+     else state.fatigue.push({ source, amount });
+@@ -92,10 +155,10 @@ export function addFatigue(state, source, amount) {
+ 
+ // Списание из общей кучи: сначала с наибольшего источника
+ // (детерминированная деталь реализации, §6 дока).
+-export function removeFatigueTotal(state, amount) {
++export function removeFatigueTotal(state: SurvivalState, amount: number): void {
+     let left = amount;
+     while (left > 0) {
+-        let biggest = null;
++        let biggest: FatigueEntry | null = null;
+         for (const f of state.fatigue) {
+             if (f.amount > 0 && (!biggest || f.amount > biggest.amount)) biggest = f;
+         }
+@@ -106,18 +169,18 @@ export function removeFatigueTotal(state, amount) {
+     }
+ }
+ 
+-export function clearFatigueSource(state, source) {
++export function clearFatigueSource(state: SurvivalState, source: FatigueSource): void {
+     const entry = state.fatigue.find((f) => f.source === source);
+     if (entry) entry.amount = 0;
+ }
+ 
+ // 1 ОЗ за каждые 2 очка Усталости, без сопротивлений.
+-export function hpDrainForFatigue(fatigueTotal) {
++export function hpDrainForFatigue(fatigueTotal: number): number {
+     return Math.floor(fatigueTotal / 2);
+ }
+ 
+ // Смена секции (в любую сторону) — счётчик времени в состоянии с нуля.
+-function bumpLadder(state, key, delta) {
++function bumpLadder(state: SurvivalState, key: SurvivalLadder, delta: number): number {
+     const max = SURVIVAL_RULES.max[key];
+     const before = state[key];
+     if (before >= max && delta > 0) return 0; // на потолке подъём не меняет шкалу
+@@ -130,8 +193,14 @@ function bumpLadder(state, key, delta) {
+     return 0;
+ }
+ 
++export interface SurvivalEvent {
++    hour?: number;
++    type: string;
++    [key: string]: unknown;
++}
++
+ // Шаг одной лестницы по накопленным часам. Возвращает события.
+-function stepLadder(state, key, events) {
++function stepLadder(state: SurvivalState, key: SurvivalLadder, events: SurvivalEvent[]): void {
+     const cur = state[key];
+     if (cur <= 1) {
+         const period = SURVIVAL_RULES.bottomPeriodHours[key];
+@@ -156,10 +225,14 @@ function stepLadder(state, key, events) {
+     }
+ }
+ 
++export interface TickOptions {
++    sleepMode?: boolean;
++}
++
+ // Один часовой тик (три шага, §5). Мутирует рабочую копию.
+ // options.sleepMode — часы сна: лестница сна заморожена (сон лечит).
+-function tickHour(state, options = {}) {
+-    const events = [];
++function tickHour(state: SurvivalState, options: TickOptions = {}): { drain: number; events: SurvivalEvent[] } {
++    const events: SurvivalEvent[] = [];
+     // 1. Лестницы + начисление Усталости.
+     for (const key of LADDERS) {
+         if (options.sleepMode && key === 'sleep') continue;
+@@ -185,9 +258,15 @@ function tickHour(state, options = {}) {
+     return { drain, events };
+ }
+ 
++export interface AdvanceResult {
++    state: SurvivalState;
++    hpLost: number;
++    events: SurvivalEvent[];
++}
++
+ // Продвижение игровых часов контура выживания (реальный тик, сон —
+ // для еды/воды). Дробные часы копятся в timeCarried, тик — по целым.
+-export function advanceHours(state, hours, options = {}) {
++export function advanceHours(state: SurvivalState, hours: number, options: TickOptions = {}): AdvanceResult {
+     if (!Number.isFinite(hours) || hours < 0) {
+         throw new Error(`advanceHours: некорректные часы: ${hours}`);
+     }
+@@ -196,7 +275,7 @@ export function advanceHours(state, hours, options = {}) {
+     const whole = Math.floor(carried);
+     wk.timeCarried = carried - whole;
+     let hpLost = 0;
+-    const events = [];
++    const events: SurvivalEvent[] = [];
+     for (let i = 0; i < whole; i += 1) {
+         const r = tickHour(wk, options);
+         hpLost += r.drain;
+@@ -206,16 +285,38 @@ export function advanceHours(state, hours, options = {}) {
+ }
+ 
+ // Реальный тик: X реальных минут = 1 игровой час (курс из настроек).
+-export function advanceRealMinutes(state, realMinutes, courseMinutesPerHour = SURVIVAL_RULES.defaultCourseMinutesPerHour) {
++export function advanceRealMinutes(
++    state: SurvivalState,
++    realMinutes: number,
++    courseMinutesPerHour: number = SURVIVAL_RULES.defaultCourseMinutesPerHour,
++): AdvanceResult {
+     if (!(courseMinutesPerHour > 0)) {
+         throw new Error(`advanceRealMinutes: некорректный курс: ${courseMinutesPerHour}`);
+     }
+     return advanceHours(state, realMinutes / courseMinutesPerHour);
+ }
+ 
+-// Еда. Возвращает { ok, reason?, state, gained: { food, water } }.
++// Подъём шкал от еды — чисто по данным предмета (§2, §11): суп всегда
++// +1 еда и +1 вода (замещает категорию приготовленного); приготовленное
++// не консервированное — +2 еды; сырое/консервированное — +1 еда.
++export function foodGain(item: SurvivalConsumable | null | undefined): ConsumeGain {
++    if (item?.soup) {
++        return { food: 1, water: 1 };
++    }
++    if (item?.state === 'cooked' && !item?.preserved) {
++        return { food: 2, water: 0 };
++    }
++    return { food: 1, water: 0 };
++}
++
++// Подъём шкалы воды от напитка (§3, §11): очищенная вода +2, остальное +1.
++export function drinkGain(item: SurvivalConsumable | null | undefined): ConsumeGain {
++    return { food: 0, water: item?.purified ? 2 : 1 };
++}
++
++// Еда. Возвращает { ok, reason?, state, gained }.
+ // На секции 5 есть нельзя («не можете больше есть») — суп тоже.
+-export function consumeFood(state, item) {
++export function consumeFood(state: SurvivalState, item: SurvivalConsumable | null | undefined): ConsumeResult {
+     if (!item || item.itemType !== 'food') {
+         return { ok: false, reason: 'notFood', state, gained: { food: 0, water: 0 } };
+     }
+@@ -223,35 +324,41 @@ export function consumeFood(state, item) {
+         return { ok: false, reason: 'full', state, gained: { food: 0, water: 0 } };
+     }
+     const wk = cloneState(state);
+-    let foodSteps = 0;
+-    let waterSteps = 0;
+-    if (item.soup) {
+-        // Суп — всегда +1 еда и +1 вода, замещает категорию приготовленного.
+-        foodSteps = bumpLadder(wk, 'food', 1);
+-        waterSteps = bumpLadder(wk, 'water', 1);
+-    } else if (item.state === 'cooked' && !item.preserved) {
+-        foodSteps = bumpLadder(wk, 'food', 2); // приготовленная еда
+-    } else {
+-        foodSteps = bumpLadder(wk, 'food', 1); // сырая или консервированная
+-    }
++    const gain = foodGain(item);
++    const foodSteps = bumpLadder(wk, 'food', gain.food);
++    const waterSteps = gain.water > 0 ? bumpLadder(wk, 'water', gain.water) : 0;
+     return { ok: true, state: wk, gained: { food: foodSteps, water: waterSteps } };
+ }
+ 
+ // Питьё. На потолке пить МОЖНО — шкала не двигается, эффекты работают.
+-export function consumeDrink(state, item) {
++export function consumeDrink(state: SurvivalState, item: SurvivalConsumable | null | undefined): ConsumeResult {
+     if (!item || item.itemType !== 'drinks') {
+-        return { ok: false, reason: 'notDrink', state, gained: { water: 0 } };
++        return { ok: false, reason: 'notDrink', state, gained: { food: 0, water: 0 } };
+     }
+     const wk = cloneState(state);
+-    const steps = item.purified ? 2 : 1; // очищенная вода +2, остальное +1
+-    const waterSteps = bumpLadder(wk, 'water', steps);
+-    return { ok: true, state: wk, gained: { water: waterSteps } };
++    const waterSteps = bumpLadder(wk, 'water', drinkGain(item).water);
++    return { ok: true, state: wk, gained: { food: 0, water: waterSteps } };
++}
++
++export interface RestOptions {
++    place: SleepPlace;
++    hours: number;
++    currentHp?: number | null;
++}
++
++export interface RestResult {
++    state: SurvivalState;
++    hpLost: number;
++    events: SurvivalEvent[];
++    hpEnd?: number;
++    hitsZero?: boolean;
++    zeroAtHour?: number | null;
+ }
+ 
+ // Сон. place: 'bed' | 'wasteland', часы 1–24.
+ // currentHp (число) — включает прогноз: hpEnd / hitsZero / zeroAtHour
+ // (алерт в модали до подтверждения, §6).
+-export function rest(state, { place, hours, currentHp = null }) {
++export function rest(state: SurvivalState, { place, hours, currentHp = null }: RestOptions): RestResult {
+     const rules = SURVIVAL_RULES.sleep;
+     if (!['bed', 'wasteland'].includes(place)) {
+         throw new Error(`rest: некорректное место сна: ${place}`);
+@@ -261,11 +368,11 @@ export function rest(state, { place, hours, currentHp = null }) {
+     }
+     const wk = cloneState(state);
+     wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
+-    const events = [];
++    const events: SurvivalEvent[] = [];
+     let hpLost = 0;
+-    let hp = currentHp;
++    let hp: number | null = currentHp != null ? Number(currentHp) : null;
+     let hitsZero = false;
+-    let zeroAtHour = null;
++    let zeroAtHour: number | null = null;
+     for (let h = 1; h <= hours; h += 1) {
+         const r = tickHour(wk, { sleepMode: true });
+         hpLost += r.drain;
+@@ -304,7 +411,7 @@ export function rest(state, { place, hours, currentHp = null }) {
+         place,
+         hpBonus: wk.hpBonus,
+     });
+-    const result = { state: wk, hpLost, events };
++    const result: RestResult = { state: wk, hpLost, events };
+     if (hp != null) {
+         result.hpEnd = hitsZero ? 0 : hp;
+         result.hitsZero = hitsZero;
+@@ -314,14 +421,16 @@ export function rest(state, { place, hours, currentHp = null }) {
+ }
+ 
+ // Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
+-export function forecastSleep(state, opts) {
++export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResult {
+     return rest(state, opts);
+ }
+ 
+ // Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
+ // «Усталость N» и «Количество получаемых ОД −N» (M = N). Возвращает данные;
+ // тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty).
+-export function survivalEffectRows(survival) {
++export function survivalEffectRows(
++    survival: SurvivalState | null | undefined,
++): Array<{ key: string; n: number }> {
+     if (!survival) return [];
+     const n = totalFatigue(survival);
+     if (n <= 0) return [];
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 6253372..c4681eb 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -214,12 +214,53 @@
+       "4": "Rested",
+       "3": "Tired",
+       "2": "Exhausted",
+-      "1": "Wrecked"
++      "1": "Wrecked",
++      "title": "Sleep",
++      "placeBed": "Bed",
++      "placeWasteland": "Wasteland",
++      "hours": "Hours: {n}",
++      "wastelandNote": "Sleeping in the wasteland: disease check (Endurance + Survival)",
++      "forecastTitle": "Forecast",
++      "forecastState": "Result: {state}",
++      "forecastHpLost": "HP lost: {n}",
++      "forecastHpEnd": "HP after sleep: {n}",
++      "forecastZeroWarning": "HP will reach 0 during this sleep",
++      "forecastFatigueCleared": "Fatigue (sleep) removed: {n}",
++      "forecastFoodDown": "Hunger: −{n}",
++      "forecastWaterDown": "Thirst: −{n}",
++      "forecastHpBonus": "+2 max HP until your next sleep",
++      "confirm": "Sleep",
++      "cancel": "Cancel",
++      "reportTitle": "Sleep: {hours} h",
++      "reportState": "Result: {state}",
++      "reportHp": "HP: {n}",
++      "reportHpLost": "HP lost: {n}",
++      "reportHpBonus": "+2 max HP until your next sleep",
++      "reportFatigueCleared": "Fatigue (sleep) removed: {n}"
+     },
+     "fatigue": "Fatigue {n}",
+     "apPenalty": "Action Points gained −{n}",
+     "foodTitle": "Hunger",
+     "waterTitle": "Thirst",
+-    "sleepTitle": "Sleep"
++    "sleepTitle": "Sleep",
++    "actions": {
++      "eat": "Eat",
++      "drink": "Drink",
++      "sleep": "Sleep"
++    },
++    "gain": {
++      "food": "Food +{n}",
++      "water": "Water +{n}"
++    },
++    "consumeNotAllowed": "Cannot be used on yourself",
++    "eat": {
++      "title": "Food",
++      "blocked": "You cannot eat any more",
++      "empty": "No food in inventory"
++    },
++    "drink": {
++      "title": "Drinks",
++      "empty": "No drinks in inventory"
++    }
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index e0a595b..df2f1ed 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -214,12 +214,53 @@
+       "4": "Отдохнувший",
+       "3": "Усталый",
+       "2": "Измождённый",
+-      "1": "Истощённый"
++      "1": "Истощённый",
++      "title": "Сон",
++      "placeBed": "Кровать",
++      "placeWasteland": "Пустошь",
++      "hours": "Часы: {n}",
++      "wastelandNote": "Сон в пустоши: проверка на болезнь (Выносливость + Выживание)",
++      "forecastTitle": "Прогноз",
++      "forecastState": "Состояние: {state}",
++      "forecastHpLost": "Потеря ОЗ: {n}",
++      "forecastHpEnd": "ОЗ после сна: {n}",
++      "forecastZeroWarning": "ОЗ упадут до 0 за время сна",
++      "forecastFatigueCleared": "Снято усталости (сон): {n}",
++      "forecastFoodDown": "Голод: −{n}",
++      "forecastWaterDown": "Жажда: −{n}",
++      "forecastHpBonus": "+2 к макс. ОЗ до следующего сна",
++      "confirm": "Спать",
++      "cancel": "Отмена",
++      "reportTitle": "Сон: {hours} ч",
++      "reportState": "Состояние: {state}",
++      "reportHp": "ОЗ: {n}",
++      "reportHpLost": "Потеря ОЗ: {n}",
++      "reportHpBonus": "+2 к макс. ОЗ до следующего сна",
++      "reportFatigueCleared": "Снято усталости (сон): {n}"
+     },
+     "fatigue": "Усталость {n}",
+     "apPenalty": "Количество получаемых ОД −{n}",
+     "foodTitle": "Голод",
+     "waterTitle": "Жажда",
+-    "sleepTitle": "Сон"
++    "sleepTitle": "Сон",
++    "actions": {
++      "eat": "Поесть",
++      "drink": "Пить",
++      "sleep": "Спать"
++    },
++    "gain": {
++      "food": "Сытость +{n}",
++      "water": "Вода +{n}"
++    },
++    "consumeNotAllowed": "Нельзя применить на себя",
++    "eat": {
++      "title": "Еда",
++      "blocked": "Вы не можете больше есть",
++      "empty": "В инвентаре нет еды"
++    },
++    "drink": {
++      "title": "Питьё",
++      "empty": "В инвентаре нет напитков"
++    }
+   }
+ }
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index f2d1b83..a3645e9 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -36,6 +36,8 @@ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+ import { survivalEffectRows } from '../../../../domain/survival';
++import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
++import SleepModal from './modals/SleepModal';
+ import { dedupeWeaponCards } from './dedupeWeaponCards';
+ import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
+ import { getBodyPlan } from '../../../../domain/bodyplan';
+@@ -618,7 +620,10 @@ const WeaponsAndArmorScreen = () => {
+   const meleeBonusValue = calculateMeleeBonusValue(attributesEffective, trait);
+   const maxHealth = attributesSaved ? calculateMaxHealth(attributesEffective, level) : 0;
+   const timedMaxHpBonus = getTimedMaxHpBonus(activeTimedEffects);
+-  const effectiveMaxHealth = maxHealth + timedMaxHpBonus;
++  // Выживание (§4 дока): «прекрасно отдохнувший» даёт +2 к макс. ОЗ
++  // до следующего сна — hpBonus в состоянии survival.
++  const survivalHpBonus = survival?.hpBonus || 0;
++  const effectiveMaxHealth = maxHealth + timedMaxHpBonus + survivalHpBonus;
+   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
+   
+   const characterForImmunities = { origin, trait };
+@@ -710,6 +715,9 @@ const WeaponsAndArmorScreen = () => {
+   );
+ 
+   // Состояние для модального окна модификаций
++  const [eatModalVisible, setEatModalVisible] = useState(false);
++  const [drinkModalVisible, setDrinkModalVisible] = useState(false);
++  const [sleepModalVisible, setSleepModalVisible] = useState(false);
+   const [modificationModalVisible, setModificationModalVisible] = useState(false);
+   const [selectedWeaponForModification, setSelectedWeaponForModification] = useState(null);
+   const [armorModalVisible, setArmorModalVisible] = useState(false);
+@@ -1041,6 +1049,41 @@ const WeaponsAndArmorScreen = () => {
+                 />
+               </View>
+             ) : null}
++            {/* Кнопки модалок выживания — под областями (§7 дока). */}
++            {survival ? (
++              <View style={[localStyles.statsRow, { marginTop: 8 }]}>
++                <View style={localStyles.survivalActionCell}>
++                  <TouchableOpacity
++                    style={localStyles.survivalActionButton}
++                    onPress={() => setEatModalVisible(true)}
++                  >
++                    <Text style={localStyles.survivalActionText}>
++                      {tWeaponsAndArmorScreen('survival.actions.eat')}
++                    </Text>
++                  </TouchableOpacity>
++                </View>
++                <View style={localStyles.survivalActionCell}>
++                  <TouchableOpacity
++                    style={localStyles.survivalActionButton}
++                    onPress={() => setDrinkModalVisible(true)}
++                  >
++                    <Text style={localStyles.survivalActionText}>
++                      {tWeaponsAndArmorScreen('survival.actions.drink')}
++                    </Text>
++                  </TouchableOpacity>
++                </View>
++                <View style={localStyles.survivalActionCell}>
++                  <TouchableOpacity
++                    style={localStyles.survivalActionButton}
++                    onPress={() => setSleepModalVisible(true)}
++                  >
++                    <Text style={localStyles.survivalActionText}>
++                      {tWeaponsAndArmorScreen('survival.actions.sleep')}
++                    </Text>
++                  </TouchableOpacity>
++                </View>
++              </View>
++            ) : null}
+             <EffectsPanel
+               effects={activeTimedEffects || []}
+               immunities={allImmunities}
+@@ -1291,6 +1334,22 @@ const WeaponsAndArmorScreen = () => {
+         </ScrollView>
+       </SafeAreaView>
+       
++      {/* Модалки выживания (еда/питьё/сон, док §7) */}
++      <SurvivalConsumeModal
++        visible={eatModalVisible}
++        kind="eat"
++        onClose={() => setEatModalVisible(false)}
++      />
++      <SurvivalConsumeModal
++        visible={drinkModalVisible}
++        kind="drink"
++        onClose={() => setDrinkModalVisible(false)}
++      />
++      <SleepModal
++        visible={sleepModalVisible}
++        onClose={() => setSleepModalVisible(false)}
++      />
++
+       {/* Модальное окно модификаций */}
+       <WeaponModificationModal
+         visible={modificationModalVisible}
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+new file mode 100644
+index 0000000..8e841ff
+--- /dev/null
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -0,0 +1,218 @@
++// Модалка сна выживания (docs/survival-system-design.md §4, §5, §7).
++//
++// Место (кровать/пустошь) и часы 1–24. Перед подтверждением — прогноз
++// чистым доменом forecastSleep (шаг шкал, усталость, дрен ОЗ, потолок
++// состояния, бонус ОЗ); при достижении 0 ОЗ — красное предупреждение
++// (§6: игрок сам решает — спать меньше или сначала поесть/попить).
++// Подтверждение — операция контекста sleepSurvival: применяет rest(),
++// двигает таймеры эффектов на N × 12 сцен (мост контуров, §5) и в пустоши
++// проверяет болезнь по имеющейся механике (событие sleepOnGround).
++
++import React, { useMemo, useState } from 'react';
++import { Modal, Text, TouchableOpacity, View } from 'react-native';
++import { useCharacter } from '../../../../../components/CharacterContext';
++import {
++    forecastSleep,
++    SURVIVAL_RULES,
++    type SleepPlace,
++    type SurvivalState,
++    type RestResult,
++} from '../../../../../domain/survival';
++import { diseaseRiskReportLines } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
++import { showRawAlert } from '../../../../../components/alerts/alertService';
++import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
++import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
++import { survivalModalStyles as styles } from './survivalModalStyles';
++
++interface SleepModalProps {
++    visible: boolean;
++    onClose: () => void;
++}
++
++const t = (path: string): string => tWeaponsAndArmorScreen(path);
++
++const stateName = (section: number): string => t(`survival.sleep.${section}`);
++
++interface ForecastLine {
++    key: string;
++    text: string;
++    tone: 'neutral' | 'positive' | 'negative';
++}
++
++const buildForecastLines = (forecast: RestResult): ForecastLine[] => {
++    const lines: ForecastLine[] = [
++        {
++            key: 'state',
++            text: t('survival.sleep.forecastState').replace('{state}', stateName(forecast.state.sleep)),
++            tone: 'neutral',
++        },
++    ];
++    if (forecast.hpLost > 0) {
++        lines.push({
++            key: 'hpLost',
++            text: t('survival.sleep.forecastHpLost').replace('{n}', String(forecast.hpLost)),
++            tone: 'negative',
++        });
++    }
++    if (forecast.hpEnd != null) {
++        lines.push({
++            key: 'hpEnd',
++            text: t('survival.sleep.forecastHpEnd').replace('{n}', String(forecast.hpEnd)),
++            tone: 'neutral',
++        });
++    }
++    if (forecast.hitsZero) {
++        lines.push({ key: 'zero', text: t('survival.sleep.forecastZeroWarning'), tone: 'negative' });
++    }
++    const cleared = forecast.events.find((e) => e.type === 'fatigueSleepCleared');
++    if (typeof cleared?.removed === 'number' && cleared.removed > 0) {
++        lines.push({
++            key: 'fatigueCleared',
++            text: t('survival.sleep.forecastFatigueCleared').replace('{n}', String(cleared.removed)),
++            tone: 'positive',
++        });
++    }
++    const stepDowns = (ladder: string): number => forecast.events
++        .filter((e) => e.type === 'step' && e.ladder === ladder).length;
++    const foodDown = stepDowns('food');
++    if (foodDown > 0) {
++        lines.push({
++            key: 'foodDown',
++            text: t('survival.sleep.forecastFoodDown').replace('{n}', String(foodDown)),
++            tone: 'negative',
++        });
++    }
++    const waterDown = stepDowns('water');
++    if (waterDown > 0) {
++        lines.push({
++            key: 'waterDown',
++            text: t('survival.sleep.forecastWaterDown').replace('{n}', String(waterDown)),
++            tone: 'negative',
++        });
++    }
++    if (forecast.state.hpBonus > 0) {
++        lines.push({ key: 'hpBonus', text: t('survival.sleep.forecastHpBonus'), tone: 'positive' });
++    }
++    return lines;
++};
++
++const SleepModal = ({ visible, onClose }: SleepModalProps) => {
++    useLocale();
++    useModuleLocale();
++    const { survival, sleepSurvival, currentHealth } = useCharacter();
++    const [place, setPlace] = useState<SleepPlace>('bed');
++    const [hours, setHours] = useState(8);
++
++    const forecast = useMemo<RestResult | null>(() => {
++        const state = survival as SurvivalState | null;
++        if (!state) return null;
++        return forecastSleep(state, { place, hours, currentHp: currentHealth });
++    }, [survival, place, hours, currentHealth]);
++
++    const lines = forecast ? buildForecastLines(forecast) : [];
++
++    const handleConfirm = () => {
++        const apply = sleepSurvival({ place, hours });
++        if (!apply.ok) {
++            onClose();
++            return;
++        }
++        const { result, diseaseRiskResult } = apply;
++        const reportLines: string[] = [
++            t('survival.sleep.reportState').replace('{state}', stateName(result.state.sleep)),
++        ];
++        if (result.hpLost > 0) {
++            reportLines.push(t('survival.sleep.reportHpLost').replace('{n}', String(result.hpLost)));
++        }
++        if (result.hpEnd != null) {
++            reportLines.push(t('survival.sleep.reportHp').replace('{n}', String(result.hpEnd)));
++        }
++        if (result.state.hpBonus > 0) {
++            reportLines.push(t('survival.sleep.reportHpBonus'));
++        }
++        const cleared = (result.events as Array<{ type?: string; removed?: number }>)
++            .find((e) => e.type === 'fatigueSleepCleared');
++        if (typeof cleared?.removed === 'number' && cleared.removed > 0) {
++            reportLines.push(t('survival.sleep.reportFatigueCleared').replace('{n}', String(cleared.removed)));
++        }
++        const diseaseLines = diseaseRiskReportLines(diseaseRiskResult);
++        reportLines.push(...diseaseLines.positive, ...diseaseLines.negative);
++        showRawAlert({
++            title: t('survival.sleep.reportTitle').replace('{hours}', String(hours)),
++            message: reportLines.join('\n'),
++            buttons: undefined,
++        });
++        onClose();
++    };
++
++    return (
++        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++            <View style={styles.overlay}>
++                <View style={styles.content}>
++                    <Text style={styles.title}>{t('survival.sleep.title')}</Text>
++                    <View style={styles.placeRow}>
++                        <TouchableOpacity
++                            style={[styles.placeButton, place === 'bed' && styles.placeButtonActive]}
++                            onPress={() => setPlace('bed')}
++                        >
++                            <Text style={styles.placeButtonText}>{t('survival.sleep.placeBed')}</Text>
++                        </TouchableOpacity>
++                        <TouchableOpacity
++                            style={[styles.placeButton, place === 'wasteland' && styles.placeButtonActive]}
++                            onPress={() => setPlace('wasteland')}
++                        >
++                            <Text style={styles.placeButtonText}>{t('survival.sleep.placeWasteland')}</Text>
++                        </TouchableOpacity>
++                    </View>
++                    <View style={styles.hoursRow}>
++                        <TouchableOpacity
++                            style={styles.hoursButton}
++                            onPress={() => setHours((h) => Math.max(1, h - 1))}
++                        >
++                            <Text style={styles.hoursButtonText}>−</Text>
++                        </TouchableOpacity>
++                        <Text style={styles.hoursValue}>{t('survival.sleep.hours').replace('{n}', String(hours))}</Text>
++                        <TouchableOpacity
++                            style={styles.hoursButton}
++                            onPress={() => setHours((h) => Math.min(SURVIVAL_RULES.maxSleepHours, h + 1))}
++                        >
++                            <Text style={styles.hoursButtonText}>+</Text>
++                        </TouchableOpacity>
++                    </View>
++                    {place === 'wasteland' ? (
++                        <Text style={styles.hint}>{t('survival.sleep.wastelandNote')}</Text>
++                    ) : null}
++                    {forecast ? (
++                        <View style={styles.forecastBox}>
++                            <Text style={styles.forecastTitle}>{t('survival.sleep.forecastTitle')}</Text>
++                            {lines.map((line) => (
++                                <Text
++                                    key={line.key}
++                                    style={
++                                        line.tone === 'negative'
++                                            ? styles.forecastLineNegative
++                                            : line.tone === 'positive'
++                                                ? styles.forecastLinePositive
++                                                : styles.forecastLine
++                                    }
++                                >
++                                    {line.text}
++                                </Text>
++                            ))}
++                        </View>
++                    ) : null}
++                    <View style={styles.buttonRow}>
++                        <TouchableOpacity style={[styles.button, styles.confirmButton]} onPress={handleConfirm}>
++                            <Text style={styles.buttonText}>{t('survival.sleep.confirm')}</Text>
++                        </TouchableOpacity>
++                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
++                            <Text style={styles.buttonText}>{t('survival.sleep.cancel')}</Text>
++                        </TouchableOpacity>
++                    </View>
++                </View>
++            </View>
++        </Modal>
++    );
++};
++
++export default SleepModal;
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+new file mode 100644
+index 0000000..b52ce22
+--- /dev/null
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+@@ -0,0 +1,212 @@
++// Модалка еды/питья выживания (docs/survival-system-design.md §2, §3, §7).
++//
++// kind='eat'  — предметы инвентаря itemType 'food';  подъём шкалы по §2.
++//               На секции 5 еды модалка заблокирована («не можете больше
++//               есть», суп тоже — его +1 воды не спасает).
++// kind='drink'— предметы itemType 'drinks'; подъём по §3. На потолке воды
++//               пить можно — шкала не двигается, эффекты напитка работают.
++//
++// Применение — штатная механика употребления (applyConsumableFull +
++// отчёт buildConsumableResultReport): предмет уходит из инвентаря по общим
++// правилам, а шкала выживания поднимается доменом consumeFood/consumeDrink.
++// Превью подъёма в списке — чистые функции foodGain/drinkGain по данным.
++
++import React, { useMemo } from 'react';
++import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
++import { useCharacter } from '../../../../../components/CharacterContext';
++import useCharacterStore from '../../../../../src/store/characterStore';
++import { selectItemsByEquipped } from '../../../../../src/store/selectors';
++import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
++import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
++import { resolveItem } from '../../../../../domain/resolveItem';
++import {
++  consumeDrink,
++  consumeFood,
++  drinkGain,
++  foodGain,
++  SURVIVAL_RULES,
++  type SurvivalState,
++} from '../../../../../domain/survival';
++import { canConsumeOnSelf } from '../../../../../domain/itemfitRules';
++import { rerollConsumableRadiationRoll } from '../../../../../domain/effects';
++import { buildConsumableResultReport } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
++import { showAlert as showCatalogAlert, showRawAlert } from '../../../../../components/alerts/alertService';
++import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
++import { survivalModalStyles as styles } from './survivalModalStyles';
++
++type ConsumeKind = 'eat' | 'drink';
++
++// Строка списка: сырой предмет стора (его потребляет applyConsumableFull)
++// и локализованная запись каталога (имя + признаки для превью подъёма).
++interface ConsumeEntry {
++    storeItem: Record<string, unknown>;
++    display: Record<string, unknown>;
++}
++
++interface SurvivalConsumeModalProps {
++    visible: boolean;
++    kind: ConsumeKind;
++    onClose: () => void;
++}
++
++const t = (path: string): string => tWeaponsAndArmorScreen(path);
++
++const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalProps) => {
++    useLocale();
++    const moduleLocale = useModuleLocale();
++    const {
++        survival,
++        setSurvival,
++        applyConsumableFull,
++        previewConsumableRadiation,
++        origin,
++        trait,
++    } = useCharacter();
++    const storeItems = useCharacterStore((state) => state.items);
++    const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
++
++    const targetType = kind === 'eat' ? 'food' : 'drinks';
++    const isEat = kind === 'eat';
++
++    const items = useMemo<ConsumeEntry[]>(
++        () => selectItemsByEquipped({ items: storeItems }, false)
++            .filter((item: { itemType?: string }) => item?.itemType === targetType)
++            .map((item: Record<string, unknown>) => ({
++                storeItem: item,
++                display: resolveItem(item, catalog) as Record<string, unknown>,
++            })),
++        [storeItems, catalog, targetType],
++    );
++
++    const blocked = isEat && ((survival as SurvivalState | null)?.food ?? 0) >= SURVIVAL_RULES.max.food;
++
++    const gainText = (item: Record<string, unknown>): string => {
++        const gain = isEat ? foodGain(item) : drinkGain(item);
++        const parts: string[] = [];
++        if (gain.food > 0) parts.push(t('survival.gain.food').replace('{n}', String(gain.food)));
++        if (gain.water > 0) parts.push(t('survival.gain.water').replace('{n}', String(gain.water)));
++        return parts.join(', ');
++    };
++
++    const adjustStoreItemQuantity = (itemId: string, delta: number): void => {
++        const { items: current } = useCharacterStore.getState();
++        const item = current[itemId];
++        if (!item) return;
++        const newQty = (item.quantity || 1) + delta;
++        if (newQty <= 0) {
++            const updated = { ...current };
++            delete updated[itemId];
++            useCharacterStore.setState({ items: updated });
++            return;
++        }
++        useCharacterStore.getState().updateItem(itemId, { quantity: newQty });
++    };
++
++    const handleConsume = async (entry: ConsumeEntry) => {
++        const state = survival as SurvivalState | null;
++        if (!state) return;
++        // Канонический контракт (domain/resolveItem): в сторе предмет — ссылка,
++        // данные (эффекты, признаки soup/state/purified, имя) — из каталога.
++        // Применяем и превьюим каталожную запись, как инвентарь; из ссылки
++        // берём только id для списания штуки.
++        const catalogItem = entry.display;
++        const itemName = String(catalogItem?.name || '');
++        const storeItemId = String(entry.storeItem?.id || '');
++
++        const finish = (radiationRequestedAmount: number | null | undefined) => {
++            const applyResult = applyConsumableFull(catalogItem, { radiationRequestedAmount });
++            const consume = isEat ? consumeFood(state, catalogItem) : consumeDrink(state, catalogItem);
++            if (!consume.ok) {
++                // Потолок шкалы: модалка блокирует строки, страховка от гонки состояний.
++                showRawAlert({ title: t('survival.eat.blocked'), buttons: undefined });
++                return;
++            }
++            setSurvival(consume.state);
++            adjustStoreItemQuantity(storeItemId, -1);
++            const report = buildConsumableResultReport({ itemName, ...applyResult });
++            const gainLines: string[] = [];
++            if (consume.gained.food > 0) {
++                gainLines.push(t('survival.gain.food').replace('{n}', String(consume.gained.food)));
++            }
++            if (consume.gained.water > 0) {
++                gainLines.push(t('survival.gain.water').replace('{n}', String(consume.gained.water)));
++            }
++            const message = [
++                report.message,
++                gainLines.length > 0 ? gainLines.join('\n') : null,
++            ].filter(Boolean).join('\n\n');
++            showRawAlert({ title: report.title, message, buttons: undefined });
++        };
++
++        if (!canConsumeOnSelf(catalogItem, { origin, trait })) {
++            showRawAlert({ title: t('survival.consumeNotAllowed'), buttons: undefined });
++            return;
++        }
++
++        const preview = previewConsumableRadiation(catalogItem);
++        if (!preview.canOfferReroll) {
++            finish(preview.requestedAmount);
++            return;
++        }
++        // Штатный выбор из каталога (как в инвентаре): 'reroll' — перебросить,
++        // 'keep'/закрытие — оставить.
++        const choice = await showCatalogAlert('leadBellyReroll', {
++            radiationAmount: preview.receivedRadiationDamage,
++        });
++        if (choice === 'reroll') {
++            finish(rerollConsumableRadiationRoll(catalogItem, preview.rolls).requestedAmount);
++        } else {
++            finish(preview.requestedAmount);
++        }
++    };
++
++    const renderRow = ({ item }: { item: ConsumeEntry }) => {
++        const name = String(item.display?.name || '');
++        const qty = Number(item.storeItem?.quantity) || 1;
++        return (
++            <TouchableOpacity
++                style={[styles.row, blocked && styles.rowDisabled]}
++                onPress={() => handleConsume(item)}
++                disabled={blocked}
++            >
++                <Text style={styles.rowName}>{name}</Text>
++                <View style={styles.rowMeta}>
++                    <Text style={styles.rowGain}>{gainText(item.display)}</Text>
++                    {qty > 1 ? <Text style={styles.rowQty}>×{qty}</Text> : null}
++                </View>
++            </TouchableOpacity>
++        );
++    };
++
++    return (
++        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++            <View style={styles.overlay}>
++                <View style={styles.content}>
++                    <Text style={styles.title}>{t(isEat ? 'survival.eat.title' : 'survival.drink.title')}</Text>
++                    {isEat && blocked ? (
++                        <View style={styles.blockBanner}>
++                            <Text style={styles.blockBannerText}>{t('survival.eat.blocked')}</Text>
++                        </View>
++                    ) : null}
++                    {items.length === 0 ? (
++                        <Text style={styles.emptyText}>{t(isEat ? 'survival.eat.empty' : 'survival.drink.empty')}</Text>
++                    ) : (
++                        <FlatList
++                            data={items}
++                            keyExtractor={(entry) => String(entry.storeItem?.id || '')}
++                            renderItem={renderRow}
++                            style={styles.list}
++                        />
++                    )}
++                    <View style={styles.buttonRow}>
++                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
++                            <Text style={styles.buttonText}>{t('common.close')}</Text>
++                        </TouchableOpacity>
++                    </View>
++                </View>
++            </View>
++        </Modal>
++    );
++};
++
++export default SurvivalConsumeModal;
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/survivalModalStyles.ts b/modules/fallout/screens/WeaponsAndArmorScreen/modals/survivalModalStyles.ts
+new file mode 100644
+index 0000000..3faddbb
+--- /dev/null
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/survivalModalStyles.ts
+@@ -0,0 +1,188 @@
++// Общие стили модалок выживания (еда/питьё/сон) на экране «Снаряжение».
++// Отдельный модуль, чтобы три модалки не копировали overlay/кнопки друг у друга.
++
++import { StyleSheet } from 'react-native';
++
++export const survivalModalStyles = StyleSheet.create({
++  overlay: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++    backgroundColor: 'rgba(0, 0, 0, 0.6)',
++    paddingHorizontal: 16,
++  },
++  content: {
++    width: '100%',
++    maxWidth: 520,
++    maxHeight: '85%',
++    backgroundColor: '#fff',
++    borderRadius: 10,
++    padding: 16,
++  },
++  title: {
++    fontSize: 20,
++    fontWeight: 'bold',
++    textAlign: 'center',
++    marginBottom: 12,
++    color: '#222',
++  },
++  blockBanner: {
++    backgroundColor: '#fdecea',
++    borderWidth: 1,
++    borderColor: '#e8a33d',
++    borderRadius: 6,
++    padding: 10,
++    marginBottom: 10,
++  },
++  blockBannerText: {
++    color: '#7a1f1f',
++    textAlign: 'center',
++    fontWeight: '600',
++    fontSize: 13,
++  },
++  emptyText: {
++    textAlign: 'center',
++    color: '#666',
++    paddingVertical: 16,
++  },
++  list: {
++    flexGrow: 0,
++  },
++  row: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    borderBottomWidth: 1,
++    borderBottomColor: '#ddd',
++    paddingVertical: 10,
++    paddingHorizontal: 4,
++  },
++  rowDisabled: {
++    opacity: 0.4,
++  },
++  rowName: {
++    flex: 1,
++    fontSize: 14,
++    color: '#111',
++    flexWrap: 'wrap',
++  },
++  rowMeta: {
++    marginLeft: 8,
++    alignItems: 'flex-end',
++  },
++  rowGain: {
++    fontSize: 12,
++    color: '#2e7d32',
++    fontWeight: '600',
++  },
++  rowQty: {
++    fontSize: 12,
++    color: '#666',
++    marginTop: 2,
++  },
++  buttonRow: {
++    flexDirection: 'row',
++    marginTop: 16,
++  },
++  button: {
++    flex: 1,
++    padding: 12,
++    borderRadius: 8,
++    alignItems: 'center',
++    marginHorizontal: 4,
++  },
++  confirmButton: {
++    backgroundColor: '#4CAF50',
++  },
++  cancelButton: {
++    backgroundColor: '#f44336',
++  },
++  buttonText: {
++    color: '#fff',
++    fontWeight: 'bold',
++    fontSize: 15,
++  },
++  placeRow: {
++    flexDirection: 'row',
++    justifyContent: 'center',
++    marginBottom: 12,
++  },
++  placeButton: {
++    paddingHorizontal: 18,
++    paddingVertical: 8,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: '#999',
++    marginHorizontal: 4,
++    backgroundColor: '#eee',
++  },
++  placeButtonActive: {
++    backgroundColor: '#e8a33d',
++    borderColor: '#b07b1f',
++  },
++  placeButtonText: {
++    fontWeight: '600',
++    color: '#333',
++  },
++  hoursRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    marginBottom: 12,
++  },
++  hoursButton: {
++    width: 40,
++    height: 40,
++    borderRadius: 20,
++    backgroundColor: '#ddd',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  hoursButtonText: {
++    fontSize: 22,
++    fontWeight: 'bold',
++    color: '#333',
++  },
++  hoursValue: {
++    minWidth: 64,
++    textAlign: 'center',
++    fontSize: 18,
++    fontWeight: 'bold',
++    color: '#222',
++  },
++  forecastBox: {
++    borderWidth: 1,
++    borderColor: '#ccc',
++    borderRadius: 6,
++    padding: 10,
++    marginBottom: 12,
++    backgroundColor: '#fafafa',
++  },
++  forecastTitle: {
++    fontWeight: 'bold',
++    fontSize: 14,
++    marginBottom: 6,
++    color: '#222',
++  },
++  forecastLine: {
++    fontSize: 13,
++    color: '#333',
++    marginVertical: 1,
++  },
++  forecastLinePositive: {
++    fontSize: 13,
++    color: '#2e7d32',
++    marginVertical: 1,
++  },
++  forecastLineNegative: {
++    fontSize: 13,
++    color: '#b71c1c',
++    marginVertical: 1,
++    fontWeight: '600',
++  },
++  hint: {
++    fontSize: 12,
++    color: '#777',
++    textAlign: 'center',
++    marginBottom: 10,
++  },
++});
+diff --git a/package.json b/package.json
+index bdf98ed..b0139fe 100644
+--- a/package.json
++++ b/package.json
+@@ -8,7 +8,8 @@
+     "web": "expo start --web",
+     "build": "expo export --platform web",
+     "serve": "npx serve -s dist -l 5000",
+-    "test": "vitest run"
++    "test": "vitest run",
++    "typecheck": "tsc --noEmit"
+   },
+   "dependencies": {
+     "@expo/metro-runtime": "~57.0.13",
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index 8532736..31d74d3 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -15,6 +15,28 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     alignItems: 'stretch',
+   },
++  // Кнопки модалок выживания — под областями Голод/Жажда/Сон (§7 дока).
++  survivalActionCell: {
++    flex: 1,
++    marginHorizontal: 4,
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  survivalActionButton: {
++    paddingVertical: 6,
++    paddingHorizontal: 14,
++    backgroundColor: '#2c2c2c',
++    borderWidth: 1,
++    borderColor: '#e8a33d',
++    borderRadius: 5,
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  survivalActionText: {
++    color: '#e8a33d',
++    fontSize: 12,
++    fontWeight: '600',
++  },
+   statBoxContainer: {
+     flex: 1,
+     marginHorizontal: 4,
+diff --git a/tsconfig.json b/tsconfig.json
+new file mode 100644
+index 0000000..4e933b7
+--- /dev/null
++++ b/tsconfig.json
+@@ -0,0 +1,25 @@
++{
++  // Постепенная миграция на TypeScript (патч 206): конфиг покрывает только
++  // переведённые файлы. Остальная кодовая база — JS, typecheck её не
++  // трогает. Запуск: npm run typecheck (tsc --noEmit).
++  "compilerOptions": {
++    "target": "ES2020",
++    "module": "ESNext",
++    "moduleResolution": "bundler",
++    "lib": ["ES2020", "DOM"],
++    "jsx": "react",
++    "strict": true,
++    "noEmit": true,
++    "esModuleInterop": true,
++    "allowSyntheticDefaultImports": true,
++    "skipLibCheck": true,
++    "allowJs": true,
++    "checkJs": false,
++    "resolveJsonModule": true,
++    "types": []
++  },
++  "include": [
++    "domain/survival.ts",
++    "modules/fallout/screens/WeaponsAndArmorScreen/modals"
++  ]
++}
+-- 
+2.39.5
+

@@ -1,0 +1,681 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 15:45:14 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20208:=20=D1=80=D0=B0?=
+ =?UTF-8?q?=D1=81=D1=85=D0=BE=D0=B4=D0=BD=D0=B8=D0=BA=20=D0=BB=D1=8E=D0=B1?=
+ =?UTF-8?q?=D1=8B=D0=BC=20=D0=BF=D1=83=D1=82=D1=91=D0=BC=20=D0=B4=D0=B2?=
+ =?UTF-8?q?=D0=B8=D0=B3=D0=B0=D0=B5=D1=82=20=D1=88=D0=BA=D0=B0=D0=BB=D1=8B?=
+ =?UTF-8?q?=20=D0=B2=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D1=8F=20(?=
+ =?UTF-8?q?=D1=81=D0=BB=D1=83=D1=88=D0=B0=D1=82=D0=B5=D0=BB=D0=B8=20=D1=80?=
+ =?UTF-8?q?=D0=B0=D1=81=D1=85=D0=BE=D0=B4=D0=BD=D0=B8=D0=BA=D0=BE=D0=B2=20?=
+ =?UTF-8?q?=D0=B2=20=D1=80=D0=B5=D0=B5=D1=81=D1=82=D1=80=D0=B5=20=D1=80?=
+ =?UTF-8?q?=D0=B0=D1=81=D1=88=D0=B8=D1=80=D0=B5=D0=BD=D0=B8=D0=B9);=20?=
+ =?UTF-8?q?=D0=BF=D0=BE=D0=B4=D0=BF=D0=B8=D1=81=D0=B8=20=D0=BA=D0=BD=D0=BE?=
+ =?UTF-8?q?=D0=BF=D0=BE=D0=BA=20=D1=81=D1=8B=D1=80=D1=8B=D1=85=20=D0=B0?=
+ =?UTF-8?q?=D0=BB=D0=B5=D1=80=D1=82=D0=BE=D0=B2=20=E2=80=94=20=D0=B8=D0=B7?=
+ =?UTF-8?q?=20=D0=BE=D0=B1=D1=89=D0=B5=D0=B3=D0=BE=20=D1=81=D0=BB=D0=BE?=
+ =?UTF-8?q?=D0=B2=D0=B0=D1=80=D1=8F?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/alerts/raw-alert-scope.test.js      |  40 +++++++
+ __tests__/saves/consumable-listeners.test.js  |  78 +++++++++++++
+ __tests__/survival/survival-bridge.test.js    | 106 ++++++++++++++++++
+ components/CharacterContext.js                |  23 +++-
+ components/alerts/alertService.js             |   6 +-
+ docs/architecture/engine-setting-audit.md     |   6 +
+ docs/survival-system-design.md                |  23 +++-
+ i18n/en-EN/App.json                           |   6 +
+ i18n/ru-RU/App.json                           |   6 +
+ .../modals/SurvivalConsumeModal.tsx           |  32 +++---
+ modules/fallout/survival/index.js             |  13 ++-
+ modules/fallout/survival/operations.js        |  28 ++++-
+ src/store/stateExtensions.js                  |  48 +++++++-
+ 13 files changed, 389 insertions(+), 26 deletions(-)
+ create mode 100644 __tests__/alerts/raw-alert-scope.test.js
+ create mode 100644 __tests__/saves/consumable-listeners.test.js
+ create mode 100644 __tests__/survival/survival-bridge.test.js
+
+diff --git a/__tests__/alerts/raw-alert-scope.test.js b/__tests__/alerts/raw-alert-scope.test.js
+new file mode 100644
+index 0000000..3fd2bd0
+--- /dev/null
++++ b/__tests__/alerts/raw-alert-scope.test.js
+@@ -0,0 +1,40 @@
++// Патч 208 — сырые алерты: кнопка «Ок» должна переводиться, а не
++// показывать путь «buttons.ok». Дефект был в отсутствии scope у raw-записи:
++// AlertHost не находил словарь и возвращал сам путь. Теперь scope:'app' +
++// ключи buttons.* в общем словаре приложения (i18n/*/App.json).
++
++import { describe, expect, it } from 'vitest';
++import { registerAlertHost, showRawAlert } from '../../components/alerts/alertService';
++import ruApp from '../../i18n/ru-RU/App.json';
++import enApp from '../../i18n/en-EN/App.json';
++
++describe('showRawAlert: scope кнопок', () => {
++  it('запрос сырого алерта получает scope "app"', async () => {
++    let captured = null;
++    registerAlertHost((request) => {
++      captured = request;
++      return Promise.resolve(undefined);
++    });
++
++    await showRawAlert({ title: 'Заголовок', message: 'Текст' });
++
++    expect(captured).not.toBeNull();
++    expect(captured.entry.scope).toBe('app');
++    expect(captured.entry.kind).toBe('info');
++    expect(captured.raw.title).toBe('Заголовок');
++  });
++
++  it('ключ buttons.ok есть в словарях приложения (ru/en)', () => {
++    expect(ruApp.buttons.ok).toBe('Ок');
++    expect(enApp.buttons.ok).toBe('Ok');
++  });
++
++  it('подписи confirm-кнопок тоже закрыты общим словарём', () => {
++    // DEFAULT_CONFIRM_BUTTONS ссылается на buttons.yes / buttons.cancel —
++    // при scope:'app' они обязаны существовать в обоих словарях.
++    expect(ruApp.buttons.yes).toBe('Да');
++    expect(ruApp.buttons.cancel).toBe('Отмена');
++    expect(enApp.buttons.yes).toBe('Yes');
++    expect(enApp.buttons.cancel).toBe('Cancel');
++  });
++});
+diff --git a/__tests__/saves/consumable-listeners.test.js b/__tests__/saves/consumable-listeners.test.js
+new file mode 100644
+index 0000000..1a1d616
+--- /dev/null
++++ b/__tests__/saves/consumable-listeners.test.js
+@@ -0,0 +1,78 @@
++// Патч 208 — слушатели применённых расходников (stateExtensions.js):
++// родовое уведомление «расходник применён на себя» для расширений
++// сеттингов. Тесты реестра без сеттинговых правил; поведение слушателя
++// выживания — в __tests__/survival/survival-bridge.test.js.
++
++import { describe, expect, it } from 'vitest';
++import {
++  getRegisteredConsumableAppliedListeners,
++  notifyConsumableApplied,
++  registerConsumableAppliedListener,
++} from '../../src/store/stateExtensions';
++
++describe('stateExtensions: слушатели расходников', () => {
++  it('регистрация требует { id, listener }', () => {
++    expect(() => registerConsumableAppliedListener(null)).toThrow();
++    expect(() => registerConsumableAppliedListener({})).toThrow(/id/);
++    expect(() => registerConsumableAppliedListener({ id: 'x' })).toThrow(/listener/);
++  });
++
++  it('повторная регистрация того же id — ошибка', () => {
++    registerConsumableAppliedListener({ id: 'dupListenerA', listener: () => null });
++    expect(() =>
++      registerConsumableAppliedListener({ id: 'dupListenerA', listener: () => null }),
++    ).toThrow(/уже зарегистрирован/);
++  });
++
++  it('notify: результаты собираются с id, null пропускается', () => {
++    registerConsumableAppliedListener({
++      id: 'listenerB',
++      listener: (item) => (item?.flagB ? { gained: 2 } : null),
++    });
++    registerConsumableAppliedListener({
++      id: 'listenerC',
++      listener: (item) => (item?.flagC ? { gained: 1 } : null),
++    });
++
++    const none = notifyConsumableApplied({}, {});
++    expect(none).toEqual([]);
++
++    const one = notifyConsumableApplied({ flagB: true }, {});
++    expect(one).toEqual([{ id: 'listenerB', gained: 2 }]);
++
++    const both = notifyConsumableApplied({ flagB: true, flagC: true }, {});
++    expect(both).toEqual([
++      { id: 'listenerB', gained: 2 },
++      { id: 'listenerC', gained: 1 },
++    ]);
++  });
++
++  it('listener получает ctx { stateExtensions, setStateExtension }', () => {
++    let receivedCtx = null;
++    registerConsumableAppliedListener({
++      id: 'listenerD',
++      listener: (_item, ctx) => {
++        receivedCtx = ctx;
++        return { ok: true };
++      },
++    });
++    const ctx = { stateExtensions: { field: 1 }, setStateExtension: () => {} };
++    notifyConsumableApplied({}, ctx);
++    expect(receivedCtx).toBe(ctx);
++  });
++
++  it('исключение слушателя всплывает (не молчим о дефекте)', () => {
++    registerConsumableAppliedListener({
++      id: 'listenerE',
++      listener: () => {
++        throw new Error('дефект слушателя');
++      },
++    });
++    expect(() => notifyConsumableApplied({}, {})).toThrow(/дефект слушателя/);
++  });
++
++  it('слушатели видны в реестре', () => {
++    const registered = getRegisteredConsumableAppliedListeners();
++    expect(registered.some(([id]) => id === 'listenerB')).toBe(true);
++  });
++});
+diff --git a/__tests__/survival/survival-bridge.test.js b/__tests__/survival/survival-bridge.test.js
+new file mode 100644
+index 0000000..864e3f3
+--- /dev/null
++++ b/__tests__/survival/survival-bridge.test.js
+@@ -0,0 +1,106 @@
++// Патч 208 — слушатель расходников выживания (survivalConsumableListener):
++// употребление еды/напитков ЛЮБЫМ путём (инвентарь или модалки) двигает
++// шкалы выживания одинаково, одним кодом.
++
++import { describe, expect, it } from 'vitest';
++import { survivalConsumableListener } from '../../modules/fallout/survival/operations';
++import { createSurvivalState, SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
++import food from '../../modules/fallout/data/consumables/food.json';
++import drinks from '../../modules/fallout/data/consumables/drinks.json';
++
++const steak = food.find((entry) => entry.id === 'food_bloodbug_steak') || food[0];
++const rawMeat = food.find((entry) => entry.id === 'food_bloatfly_meat') || food[1];
++const soupEntry = food.find((entry) => entry.id === 'food_vegetable_soup') || food[2];
++const purified = drinks.find((entry) => entry.id === 'drink_purified_water') || drinks[0];
++const dirty = drinks.find((entry) => entry.id === 'drink_dirty_water') || drinks[1];
++
++const makeCtx = (initial) => {
++  const holder = { survival: initial };
++  const calls = [];
++  return {
++    ctx: {
++      stateExtensions: holder,
++      setStateExtension: (fieldKey, value) => {
++        calls.push({ fieldKey, value });
++        holder[fieldKey] = value;
++      },
++    },
++    holder,
++    calls,
++  };
++};
++
++describe('survivalConsumableListener: еда и напитки двигают шкалы', () => {
++  it('готовый стейк: +2 еды, вода не трогается', () => {
++    const start = createSurvivalState('human');
++    start.food = 1;
++    start.water = 1;
++    const { ctx, holder } = makeCtx(start);
++    const result = survivalConsumableListener(steak, ctx);
++    expect(result).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
++    expect(holder.survival.food).toBe(3);
++    expect(holder.survival.water).toBe(1);
++  });
++
++  it('суп: +1 еды и +1 воды (данные soup)', () => {
++    const start = createSurvivalState('human');
++    start.food = 1;
++    start.water = 1;
++    const { ctx, holder } = makeCtx(start);
++    const result = survivalConsumableListener(soupEntry, ctx);
++    expect(result).toMatchObject({ ok: true, gained: { food: 1, water: 1 } });
++    expect(holder.survival.food).toBe(2);
++    expect(holder.survival.water).toBe(2);
++  });
++
++  it('очищенная вода: +2 воды; грязная: +1', () => {
++    const start = createSurvivalState('human');
++    start.water = 1;
++    const { ctx: ctxA, holder: holderA } = makeCtx(start);
++    const purifiedResult = survivalConsumableListener(purified, ctxA);
++    expect(purifiedResult).toMatchObject({ ok: true, gained: { food: 0, water: 2 } });
++    expect(holderA.survival.water).toBe(3);
++
++    const { ctx: ctxB, holder: holderB } = makeCtx(createSurvivalState('human'));
++    holderB.survival.water = 2;
++    const dirtyResult = survivalConsumableListener(dirty, ctxB);
++    expect(dirtyResult).toMatchObject({ ok: true, gained: { food: 0, water: 1 } });
++    expect(holderB.survival.water).toBe(3);
++  });
++
++  it('еда на максимуме: ok:false, состояние не меняется', () => {
++    const start = createSurvivalState('human');
++    start.food = SURVIVAL_RULES.max.food;
++    const { ctx, holder } = makeCtx(start);
++    const result = survivalConsumableListener(steak, ctx);
++    expect(result).toEqual({ ok: false, reason: 'full' });
++    expect(holder.survival.food).toBe(SURVIVAL_RULES.max.food);
++  });
++
++  it('вода на максимуме: ок, шкала не двигается, подъём 0', () => {
++    const start = createSurvivalState('human');
++    start.water = SURVIVAL_RULES.max.water;
++    const { ctx, holder } = makeCtx(start);
++    const result = survivalConsumableListener(purified, ctx);
++    expect(result).toMatchObject({ ok: true, gained: { food: 0, water: 0 } });
++    expect(holder.survival.water).toBe(SURVIVAL_RULES.max.water);
++  });
++
++  it('сырое мясо — тоже еда: +1 (признак state)', () => {
++    const start = createSurvivalState('human');
++    start.food = 1;
++    const { ctx, holder } = makeCtx(start);
++    const result = survivalConsumableListener(rawMeat, ctx);
++    expect(result).toMatchObject({ ok: true, gained: { food: 1, water: 0 } });
++    expect(holder.survival.food).toBe(2);
++  });
++
++  it('не еда/не напиток — null; нет выживания (робот) — null', () => {
++    const { ctx } = makeCtx(createSurvivalState('human'));
++    expect(survivalConsumableListener({ itemType: 'chem', id: 'chem_mentats' }, ctx)).toBeNull();
++
++    const { ctx: robotCtx } = makeCtx(null);
++    expect(survivalConsumableListener(steak, robotCtx)).toBeNull();
++    expect(survivalConsumableListener(purified, robotCtx)).toBeNull();
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index d1a66ba..f198fa8 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -32,7 +32,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
+   });
+ };
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+-import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields } from '../src/store/stateExtensions';
++import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConsumableApplied } from '../src/store/stateExtensions';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+@@ -286,6 +286,12 @@ export const CharacterProvider = ({ children }) => {
+     if (changed) setStateExtensions(merged);
+   }, [origin, trait, stateExtensions]);
+ 
++  // Запись поля расширения — стабильная функция: используется и в значении
++  // контекста, и в уведомлениях расширений (расходники, патч 208).
++  const setStateExtension = useCallback((fieldKey, value) => {
++    setStateExtensions((prev) => ({ ...prev, [fieldKey]: value }));
++  }, []);
++
+   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+   // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
+   // sync while ALSO writing through to the store. Screens keep calling the same
+@@ -1372,10 +1378,20 @@ export const CharacterProvider = ({ children }) => {
+ 
+     const diseaseRiskResult = applyDiseaseExposureForConsumable(item);
+ 
++    // Расходник применён на себя — уведомляем расширения сеттингов
++    // (реестр stateExtensions, патч 208). Например, Fallout двигает
++    // шкалы еды/воды выживания при употреблении еды/напитков ЛЮБЫМ путём
++    // (инвентарь или модалка выживания). Движок правил не знает.
++    const extensionResults = notifyConsumableApplied(item, {
++      stateExtensions,
++      setStateExtension,
++    });
++
+     debugLog('consumable.apply.result', {
+       timedResult,
+       addictionResult,
+       diseaseRiskResult,
++      extensionResults,
+       conditionsRemoved: removed,
+       conditionRemovalsRequested,
+       healAmount: vitalChanges.healAmount,
+@@ -1386,6 +1402,7 @@ export const CharacterProvider = ({ children }) => {
+       timedResult: { ...timedResult, expired: normalizedCurrent.expired },
+       addictionResult,
+       diseaseRiskResult,
++      extensionResults,
+       conditionsRemoved: removed,
+       conditionRemovalsRequested,
+       healAmount: vitalChanges.healAmount,
+@@ -1645,9 +1662,7 @@ export const CharacterProvider = ({ children }) => {
+     // Расширения состояния (src/store/stateExtensions.js): сеттинги
+     // регистрируют поля и читают/меняют их через эти методы.
+     stateExtensions,
+-    setStateExtension: (fieldKey, value) => {
+-      setStateExtensions((prev) => ({ ...prev, [fieldKey]: value }));
+-    },
++    setStateExtension,
+     advanceEffectsByGameHours,
+     resolveSceneRiskEventById: applyDiseaseExposureEvent,
+     resetCharacter,
+diff --git a/components/alerts/alertService.js b/components/alerts/alertService.js
+index 0e7a513..7ac8620 100644
+--- a/components/alerts/alertService.js
++++ b/components/alerts/alertService.js
+@@ -88,9 +88,13 @@ export const confirmAlert = (alertId, params = {}) =>
+  * Для всего остального пользуйтесь showAlert с ключом.
+  */
+ export const showRawAlert = ({ title, message = '', kind = 'info', buttons }) => {
++  // scope: 'app' — подписи кнопок сырых алертов (например, «Ок») берутся из
++  // общего словаря приложения (i18n/*/App.json, buttons.*), а не из словаря
++  // конкретного экрана (патч 208). Раньше scope отсутствовал, и AlertHost
++  // показывал сам путь «buttons.ok» вместо перевода.
+   const request = {
+     id: '__raw__',
+-    entry: { kind, buttons },
++    entry: { kind, buttons, scope: 'app' },
+     params: {},
+     raw: { title, message },
+   };
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index acecdf0..9f423ee 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -180,6 +180,12 @@ modules/fallout/
+ - родовые операции, нужные сеттингам: `advanceEffectsByGameHours` (мост
+   времени и эффектов) и `resolveSceneRiskEventById` (проверка риска сцены
+   по событию) — Fallout строит на них сон в пустоши, не трогая движок.
++- патч 208: **слушатели применённых расходников** — `registerConsumableAppliedListener`
++  в том же реестре; движок зовёт их в конце `applyConsumableFull` и
++  возвращает результаты в `extensionResults`. Fallout регистрирует
++  `survivalConsumableListener` (шкалы еды/воды двигаются при употреблении
++  любым путём — инвентарь или модалки выживания), и модалка читает свой
++  результат оттуда же. Движок о категориях `food`/`drinks` не знает.
+ 
+ Этим механизмом следует пользоваться для любых будущих сеттинговых полей
+ сейва и сеттинговых миграций (например, при переносе остальных
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 6f0648e..a8815e4 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,10 +1,11 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.1** от 2026-09-07.
++Редакция **0.4.2** от 2026-09-07.
+ Статус: этапы 1–4 реализованы (патчи 197–206); выживание целиком вынесено
+ в модуль сеттинга (патч 207, `modules/fallout/survival/`) через родовой
+-механизм расширений состояния движка. Следующий шаг — этап 5 (настройки
+-`survivalMode`: включение системы и курс времени).
++механизм расширений состояния движка; употребление еды/напитков любым
++путём двигает шкалы (патч 208 — слушатель расходников). Следующий шаг —
++этап 5 (настройки `survivalMode`: включение системы и курс времени).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -215,7 +216,11 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ **Еда:** предметы инвентаря категории еда (`itemType: "food"`, 75 записей
+ `food.json`). Применение — штатная механика употребления, предмет уходит
+-из инвентаря по общим правилам. Подъём шкалы — по §2. На секции 5
++из инвентаря по общим правилам. Подъём шкалы — по §2. С патча 208 подъём
++делает слушатель расходников (`survivalConsumableListener`, родовой реестр
++`stateExtensions`): употребление еды/напитков **любым путём** — из модалки
++выживания или обычным «применить на себя» в инвентаре — двигает шкалы
++одним кодом. На секции 5
+ заблокирована.
+ 
+ **Питьё:** предметы категории напитки (`drinks.json`, 22 записи).
+@@ -410,6 +415,16 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.2 (2026-09-07):** единый путь употребления (патч 208). Слушатель
++  расходников в реестре расширений движка (`registerConsumableAppliedListener`
++  → `notifyConsumableApplied` в конце `applyConsumableFull`): модуль
++  выживания регистрирует `survivalConsumableListener`, и еда/напитки,
++  употреблённые из инвентаря или из модалок, двигают шкалы одним кодом;
++  модалка больше не применяет домен сама, а читает свой результат из
++  `applyResult.extensionResults`. Заодно починен дефект подписи кнопки
++  сырых алертов: показывался путь `buttons.ok` вместо перевода — у
++  raw-алертов теперь `scope: 'app'`, подписи кнопок — из общего словаря
++  приложения (`i18n/*/App.json`, `buttons.*`).
+ - **0.4.1 (2026-09-07):** выживание — модуль сеттинга (патч 207):
+   `domain/survival.ts` → `modules/fallout/survival/survival.ts`, миграция
+   v22→v23 — `modules/fallout/survival/migration.js`, операция сна —
+diff --git a/i18n/en-EN/App.json b/i18n/en-EN/App.json
+index 9df45b4..298842e 100644
+--- a/i18n/en-EN/App.json
++++ b/i18n/en-EN/App.json
+@@ -2,5 +2,11 @@
+   "loading": "Loading data...",
+   "tabs": {
+     "home": "Manager"
++  },
++  "buttons": {
++    "ok": "Ok",
++    "cancel": "Cancel",
++    "yes": "Yes",
++    "no": "No"
+   }
+ }
+diff --git a/i18n/ru-RU/App.json b/i18n/ru-RU/App.json
+index 59ae1d4..729b7de 100644
+--- a/i18n/ru-RU/App.json
++++ b/i18n/ru-RU/App.json
+@@ -2,5 +2,11 @@
+   "loading": "Загрузка данных...",
+   "tabs": {
+     "home": "Менеджер"
++  },
++  "buttons": {
++    "ok": "Ок",
++    "cancel": "Отмена",
++    "yes": "Да",
++    "no": "Нет"
+   }
+ }
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+index b606f34..1e4ebd7 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+@@ -8,8 +8,10 @@
+ //
+ // Применение — штатная механика употребления (applyConsumableFull +
+ // отчёт buildConsumableResultReport): предмет уходит из инвентаря по общим
+-// правилам, а шкала выживания поднимается доменом consumeFood/consumeDrink.
+-// Превью подъёма в списке — чистые функции foodGain/drinkGain по данным.
++// правилам, а шкала выживания поднимается слушателем расходников модуля
++// (survivalConsumableListener, патч 208) — тем же кодом, что и употребление
++// через инвентарь. Превью подъёма в списке — чистые функции
++// foodGain/drinkGain по данным.
+ 
+ import React, { useMemo } from 'react';
+ import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
+@@ -20,14 +22,12 @@ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import { resolveItem } from '../../../../../domain/resolveItem';
+ import {
+-  consumeDrink,
+-  consumeFood,
+   drinkGain,
+   foodGain,
+   SURVIVAL_RULES,
+   type SurvivalState,
+ } from '../../../survival/survival';
+-import { useSurvivalState, useSurvivalActions } from '../../../survival/hooks';
++import { useSurvivalState } from '../../../survival/hooks';
+ import { canConsumeOnSelf } from '../../../../../domain/itemfitRules';
+ import { rerollConsumableRadiationRoll } from '../../../../../domain/effects';
+ import { buildConsumableResultReport } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
+@@ -62,7 +62,6 @@ const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalPr
+         trait,
+     } = useCharacter();
+     const survival = useSurvivalState();
+-    const { setSurvival } = useSurvivalActions();
+     const storeItems = useCharacterStore((state) => state.items);
+     const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
+ 
+@@ -116,21 +115,28 @@ const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalPr
+ 
+         const finish = (radiationRequestedAmount: number | null | undefined) => {
+             const applyResult = applyConsumableFull(catalogItem, { radiationRequestedAmount });
+-            const consume = isEat ? consumeFood(state, catalogItem) : consumeDrink(state, catalogItem);
+-            if (!consume.ok) {
++            // Результат слушателя выживания (патч 208): шкала уже обновлена
++            // внутри applyConsumableFull тем же кодом, что и для инвентаря.
++            const extensionResults = (
++                applyResult as {
++                    extensionResults?: Array<{ id?: string; ok?: boolean; reason?: string; gained?: { food: number; water: number } }>;
++                }
++            ).extensionResults ?? [];
++            const survivalResult = extensionResults.find((result) => result.id === 'survival');
++            if (survivalResult && survivalResult.ok === false) {
+                 // Потолок шкалы: модалка блокирует строки, страховка от гонки состояний.
+                 showRawAlert({ title: t('survival.eat.blocked'), buttons: undefined });
+                 return;
+             }
+-            setSurvival(consume.state);
+             adjustStoreItemQuantity(storeItemId, -1);
++            const gained = survivalResult?.gained ?? { food: 0, water: 0 };
+             const report = buildConsumableResultReport({ itemName, ...applyResult });
+             const gainLines: string[] = [];
+-            if (consume.gained.food > 0) {
+-                gainLines.push(t('survival.gain.food').replace('{n}', String(consume.gained.food)));
++            if (gained.food > 0) {
++                gainLines.push(t('survival.gain.food').replace('{n}', String(gained.food)));
+             }
+-            if (consume.gained.water > 0) {
+-                gainLines.push(t('survival.gain.water').replace('{n}', String(consume.gained.water)));
++            if (gained.water > 0) {
++                gainLines.push(t('survival.gain.water').replace('{n}', String(gained.water)));
+             }
+             const message = [
+                 report.message,
+diff --git a/modules/fallout/survival/index.js b/modules/fallout/survival/index.js
+index 4bcb1cb..2ac939c 100644
+--- a/modules/fallout/survival/index.js
++++ b/modules/fallout/survival/index.js
+@@ -13,9 +13,14 @@
+ // экранов лежат в hooks.js отдельно (иначе тесты регистрации падали бы
+ // на Flow-парсинге react-native).
+ 
+-import { registerStateExtension, registerStateMigration } from '../../../src/store/stateExtensions';
++import {
++  registerConsumableAppliedListener,
++  registerStateExtension,
++  registerStateMigration,
++} from '../../../src/store/stateExtensions';
+ import { createSurvivalState } from './survival';
+ import { migrateSurvivalField } from './migration';
++import { survivalConsumableListener } from './operations';
+ 
+ // Тип персонажа для фабрики: ориджин в сейве — объект с characterType,
+ // при создании нового персонажа — выбранный ориджин из каталога.
+@@ -44,7 +49,11 @@ registerStateExtension({
+ // Переход v22 -> v23: место в цепочке — как в патче 198 (MIGRATIONS[22]).
+ registerStateMigration(migrateSurvivalField, 22);
+ 
++// Расходники: употребление еды/напитков ЛЮБЫМ путём (инвентарь, модалки
++// выживания) двигает шкалы — слушатель патча 208.
++registerConsumableAppliedListener({ id: 'survival', listener: survivalConsumableListener });
++
+ export { createSurvivalState } from './survival';
+ export { migrateSurvivalField } from './migration';
+-export { sleepSurvival } from './operations';
++export { sleepSurvival, survivalConsumableListener } from './operations';
+ export * from './survival';
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+index e81e4ed..1c40a9f 100644
+--- a/modules/fallout/survival/operations.js
++++ b/modules/fallout/survival/operations.js
+@@ -12,7 +12,33 @@
+ // импортирует React и не знает, где живёт состояние.
+ 
+ import { debugLog } from '../../../src/debug/falloutDebug';
+-import { rest } from './survival';
++import { consumeDrink, consumeFood, rest } from './survival';
++
++/**
++ * Слушатель применённых расходников (реестр stateExtensions, патч 208).
++ * Движок зовёт его в конце applyConsumableFull — то есть при употреблении
++ * еды/напитков ЛЮБЫМ путём (инвентарь или модалка выживания) шкалы
++ * выживания двигаются одинаково. Возвращает null, если предмет —
++ * не еда/напиток или у персонажа нет выживания (робот/киборг).
++ */
++export const survivalConsumableListener = (item, ctx) => {
++  const survival = ctx?.stateExtensions?.survival ?? null;
++  if (!survival) return null;
++
++  const apply = (result) => {
++    if (!result.ok) return { ok: false, reason: result.reason };
++    ctx.setStateExtension('survival', result.state);
++    return { ok: true, gained: result.gained };
++  };
++
++  if (item?.itemType === 'food') {
++    return apply(consumeFood(survival, item));
++  }
++  if (item?.itemType === 'drinks') {
++    return apply(consumeDrink(survival, item));
++  }
++  return null;
++};
+ 
+ export const sleepSurvival = (ctx, { place, hours }) => {
+   const {
+diff --git a/src/store/stateExtensions.js b/src/store/stateExtensions.js
+index 6f4f255..f87a7ea 100644
+--- a/src/store/stateExtensions.js
++++ b/src/store/stateExtensions.js
+@@ -20,7 +20,9 @@
+ //   - reset    — состояние поля при сбросе персонажа. По умолчанию null.
+ //   Миграции версий регистрируются отдельно (registerStateMigration): они
+ //   встраиваются в цепочку migrateCharacterState на место, указанное
+-//   владельцем фичи (индекс в массиве MIGRATIONS).
++//   владельцем фичи (индекс в массиве MIGRATIONS). Отдельно регистрируются
++//   слушатели применённых расходников (registerConsumableAppliedListener):
++//   движок уведомляет их из applyConsumableFull.
+ //
+ // ПРАВИЛА (владелец):
+ //   - никаких сеттинговых имён/правил в этом файле — только движковый
+@@ -125,3 +127,47 @@ export const registerStateMigration = (migration, index) => {
+ };
+ 
+ export const getRegisteredStateMigrations = () => Array.from(MIGRATION_INSERTIONS);
++
++// --- Слушатели применённых расходников -------------------------------------
++
++// Родовое уведомление «расходник применён на себя» (патч 208). Движок
++// вызывает слушателей в конце applyConsumableFull и собирает их результаты
++// в extensionResults; сеттинг сам решает, что делать (например, Fallout
++// двигает шкалы еды/воды выживания). Движок правил не знает.
++//
++// Контракт слушателя: (item, ctx) => result | null, где ctx —
++// { stateExtensions, setStateExtension } (чтение/запись полей расширений),
++// result — произвольный объект с id слушателя (или null, если предмет
++// слушателя не касается). Исключение слушателя — дефект, роняем
++// применение, чтобы не молча терять состояние.
++const CONSUMABLE_LISTENERS = new Map();
++
++export const registerConsumableAppliedListener = (entry) => {
++  if (!entry || typeof entry !== 'object') {
++    throw new Error('[stateExtensions] Слушатель расходников должен быть объектом');
++  }
++  if (typeof entry.id !== 'string' || !entry.id) {
++    throw new Error('[stateExtensions] Слушатель расходников обязан иметь id');
++  }
++  if (typeof entry.listener !== 'function') {
++    throw new Error(`[stateExtensions] Слушатель расходников "${entry.id}" обязан иметь listener`);
++  }
++  if (CONSUMABLE_LISTENERS.has(entry.id)) {
++    throw new Error(`[stateExtensions] Слушатель расходников "${entry.id}" уже зарегистрирован`);
++  }
++  CONSUMABLE_LISTENERS.set(entry.id, entry.listener);
++};
++
++export const getRegisteredConsumableAppliedListeners = () =>
++  Array.from(CONSUMABLE_LISTENERS.entries());
++
++export const notifyConsumableApplied = (item, ctx) => {
++  const results = [];
++  for (const [id, listener] of CONSUMABLE_LISTENERS) {
++    const result = listener(item, ctx);
++    if (result != null) {
++      results.push(result && typeof result === 'object' ? { ...result, id } : { id });
++    }
++  }
++  return results;
++};
+-- 
+2.39.5
+

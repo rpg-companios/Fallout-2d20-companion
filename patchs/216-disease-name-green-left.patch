@@ -1,0 +1,75 @@
+From 1b984b86c3487d946307a434405dcc334fd7d71a Mon Sep 17 00:00:00 2001
+From: test <test@example.com>
+Date: Tue, 8 Sep 2026 08:24:25 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20216:=20=D0=BA=D0=B0=D1=80?=
+ =?UTF-8?q?=D1=82=D0=BE=D1=87=D0=BA=D0=B0=20=D1=8D=D1=84=D1=84=D0=B5=D0=BA?=
+ =?UTF-8?q?=D1=82=D0=BE=D0=B2=20=E2=80=94=20=D0=BD=D0=B0=D0=B7=D0=B2=D0=B0?=
+ =?UTF-8?q?=D0=BD=D0=B8=D0=B5=20=D0=B1=D0=BE=D0=BB=D0=B5=D0=B7=D0=BD=D0=B8?=
+ =?UTF-8?q?=20=D0=B7=D0=B5=D0=BB=D1=91=D0=BD=D1=8B=D0=BC,=20=D0=BF=D0=BE?=
+ =?UTF-8?q?=20=D0=BB=D0=B5=D0=B2=D0=BE=D0=BC=D1=83=20=D0=BA=D1=80=D0=B0?=
+ =?UTF-8?q?=D1=8E=20(=D0=BF=D1=80=D0=B0=D0=B2=D0=BA=D0=B0=20215)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../WeaponsAndArmorScreen.js                  |  2 +-
+ styles/WeaponsAndArmorScreen.styles.js        | 20 +++++++++++++------
+ 2 files changed, 15 insertions(+), 7 deletions(-)
+
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 260c87d..0cbc893 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -282,7 +282,7 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
+                   return (
+                     <View key={effect.id} style={localStyles.diseaseBlock}>
+                       <View style={localStyles.diseaseNameRow}>
+-                        <Text style={[localStyles.effectText, localStyles.negativeEffectText]}>
++                        <Text style={localStyles.diseaseNameText}>
+                           {effectText} ({effectDiseaseRank(effect)})
+                         </Text>
+                         <TouchableOpacity
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index c81bddc..9971db4 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -118,20 +118,28 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     paddingVertical: 3,
+   },
+-  // Болезнь (патч 215): название с рангом по центру, кнопка
+-  // «Сопротивляться» — справа в той же строке; описание — по центру ниже.
++  // Болезнь (патч 215): название с рангом занимает всю свободную ширину
++  // строки и центрируется внутри неё (flex: 1 + textAlign center — цвет
++  // задан прямо в стиле, не зависит от effectKind эффекта); кнопка
++  // «Сопротивляться» — обычный блок справа в потоке. Описание — по центру
++  // ниже.
+   diseaseBlock: {
+     paddingVertical: 3,
+   },
+   diseaseNameRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+-    justifyContent: 'center',
+-    position: 'relative',
++  },
++  diseaseNameText: {
++    flex: 1,
++    textAlign: 'left',
++    fontSize: 12,
++    fontWeight: '700',
++    color: '#00A651',
+   },
+   resistButton: {
+-    position: 'absolute',
+-    right: 0,
++    flexShrink: 0,
++    marginLeft: 8,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     borderRadius: 3,
+-- 
+2.39.5
+

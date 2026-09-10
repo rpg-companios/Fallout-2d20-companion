@@ -1,0 +1,599 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 16:18:08 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20209:=20=D0=B2=D1=8B?=
+ =?UTF-8?q?=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D0=B5=20=D0=B2=20=D0=B7?=
+ =?UTF-8?q?=D1=83=D1=81=D1=82=D0=B0=D0=BD=D0=B4-=D1=81=D0=BB=D0=B0=D0=B9?=
+ =?UTF-8?q?=D1=81=D0=B5=20stateExtensions=20=E2=80=94=20=D0=B5=D0=B4=D0=B8?=
+ =?UTF-8?q?=D0=BD=D1=81=D1=82=D0=B2=D0=B5=D0=BD=D0=BD=D1=8B=D0=B9=20=D0=B8?=
+ =?UTF-8?q?=D1=81=D1=82=D0=BE=D1=87=D0=BD=D0=B8=D0=BA=20=D0=B8=D1=81=D1=82?=
+ =?UTF-8?q?=D0=B8=D0=BD=D1=8B=20=D0=B2=20=D1=81=D1=82=D0=BE=D1=80=D0=B5;?=
+ =?UTF-8?q?=20=D0=BE=D0=BF=D0=B5=D1=80=D0=B0=D1=86=D0=B8=D0=B8=20=D1=87?=
+ =?UTF-8?q?=D0=B8=D1=82=D0=B0=D1=8E=D1=82=20=D1=81=D0=B2=D0=B5=D0=B6=D0=B5?=
+ =?UTF-8?q?=D0=B5=20=D1=81=D0=BE=D1=81=D1=82=D0=BE=D1=8F=D0=BD=D0=B8=D0=B5?=
+ =?UTF-8?q?,=20=D0=BC=D1=83=D1=82=D0=B0=D1=86=D0=B8=D0=B8=20=D1=82=D0=BE?=
+ =?UTF-8?q?=D0=BB=D1=8C=D0=BA=D0=BE=20=D0=B4=D0=B5=D0=B9=D1=81=D1=82=D0=B2?=
+ =?UTF-8?q?=D0=B8=D1=8F=D0=BC=D0=B8=20=D1=81=D1=82=D0=BE=D1=80=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/saves/survival-store-slice.test.js |  56 ++++++++++
+ __tests__/survival/survival-bridge.test.js   | 107 ++++++++++---------
+ components/CharacterContext.js               |  21 ++--
+ docs/architecture/engine-setting-audit.md    |   8 +-
+ docs/architecture/zustand-diagnosis.md       |  25 +++++
+ docs/survival-system-design.md               |  53 ++++++---
+ modules/fallout/survival/hooks.js            |  15 +--
+ modules/fallout/survival/operations.js       |  14 ++-
+ src/store/characterStore.js                  |  22 ++++
+ 9 files changed, 241 insertions(+), 80 deletions(-)
+ create mode 100644 __tests__/saves/survival-store-slice.test.js
+
+diff --git a/__tests__/saves/survival-store-slice.test.js b/__tests__/saves/survival-store-slice.test.js
+new file mode 100644
+index 0000000..f888883
+--- /dev/null
++++ b/__tests__/saves/survival-store-slice.test.js
+@@ -0,0 +1,56 @@
++// Патч 209 — слайс stateExtensions в characterStore: хранилище полей
++// расширений сеттингов переехало из useState контекста в зустанд-стор
++// (как items/effects). Мутации — только действия стора, экраны подписаны
++// селекторами; контекст раскладывает словарь в сейв под теми же ключами.
++
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++
++afterEach(() => {
++  useCharacterStore.getState().setStateExtensions({});
++});
++
++describe('characterStore: слайс stateExtensions', () => {
++  it('начальное состояние — пустой словарь', () => {
++    expect(useCharacterStore.getState().stateExtensions).toEqual({});
++  });
++
++  it('setStateExtension добавляет/меняет одно поле, не трогая остальные', () => {
++    const store = useCharacterStore.getState();
++    store.setStateExtensions({ other: { keep: true } });
++    store.setStateExtension('survival', { food: 5 });
++    expect(useCharacterStore.getState().stateExtensions).toEqual({
++      other: { keep: true },
++      survival: { food: 5 },
++    });
++    store.setStateExtension('survival', { food: 3 });
++    expect(useCharacterStore.getState().stateExtensions.survival).toEqual({ food: 3 });
++    expect(useCharacterStore.getState().stateExtensions.other).toEqual({ keep: true });
++  });
++
++  it('setStateExtensions заменяет весь словарь', () => {
++    useCharacterStore.getState().setStateExtensions({ survival: { food: 1 } });
++    useCharacterStore.getState().setStateExtensions({ survival: { food: 2 }, next: null });
++    expect(useCharacterStore.getState().stateExtensions).toEqual({
++      survival: { food: 2 },
++      next: null,
++    });
++  });
++
++  it('подписка на слайс срабатывает при изменении (store = источник)', () => {
++    const seen = [];
++    const unsubscribe = useCharacterStore.subscribe((state) => {
++      seen.push(state.stateExtensions?.survival?.food ?? null);
++    });
++    useCharacterStore.getState().setStateExtension('survival', { food: 5 });
++    useCharacterStore.getState().setStateExtension('survival', { food: 4 });
++    unsubscribe();
++    expect(seen).toEqual([5, 4]);
++  });
++
++  it('resetCharacterStore очищает слайс', () => {
++    useCharacterStore.getState().setStateExtensions({ survival: { food: 5 } });
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().stateExtensions).toEqual({});
++  });
++});
+diff --git a/__tests__/survival/survival-bridge.test.js b/__tests__/survival/survival-bridge.test.js
+index 864e3f3..9b0d50d 100644
+--- a/__tests__/survival/survival-bridge.test.js
++++ b/__tests__/survival/survival-bridge.test.js
+@@ -1,8 +1,10 @@
+-// Патч 208 — слушатель расходников выживания (survivalConsumableListener):
+-// употребление еды/напитков ЛЮБЫМ путём (инвентарь или модалки) двигает
+-// шкалы выживания одинаково, одним кодом.
++// Патчи 208–209 — слушатель расходников выживания (survivalConsumableListener)
++// и хранилище в зустанд-слайсе stateExtensions: употребление еды/напитков
++// ЛЮБЫМ путём (инвентарь или модалки) двигает шкалы выживания одинаково,
++// одним кодом. Операции читают свежее состояние прямо из стора.
+ 
+-import { describe, expect, it } from 'vitest';
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
+ import { survivalConsumableListener } from '../../modules/fallout/survival/operations';
+ import { createSurvivalState, SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
+ import food from '../../modules/fallout/data/consumables/food.json';
+@@ -14,93 +16,102 @@ const soupEntry = food.find((entry) => entry.id === 'food_vegetable_soup') || fo
+ const purified = drinks.find((entry) => entry.id === 'drink_purified_water') || drinks[0];
+ const dirty = drinks.find((entry) => entry.id === 'drink_dirty_water') || drinks[1];
+ 
+-const makeCtx = (initial) => {
+-  const holder = { survival: initial };
+-  const calls = [];
+-  return {
+-    ctx: {
+-      stateExtensions: holder,
+-      setStateExtension: (fieldKey, value) => {
+-        calls.push({ fieldKey, value });
+-        holder[fieldKey] = value;
+-      },
+-    },
+-    holder,
+-    calls,
+-  };
++// Контекст для слушателя: пишет через действие стора (как контекст движка).
++const ctx = () => ({
++  setStateExtension: useCharacterStore.getState().setStateExtension,
++});
++
++const storeSurvival = () => useCharacterStore.getState().stateExtensions?.survival ?? null;
++const setStoreSurvival = (survival) => {
++  useCharacterStore.getState().setStateExtensions({ survival });
+ };
+ 
+-describe('survivalConsumableListener: еда и напитки двигают шкалы', () => {
++afterEach(() => {
++  useCharacterStore.getState().setStateExtensions({});
++});
++
++describe('survivalConsumableListener: еда и напитки двигают шкалы (через стор)', () => {
+   it('готовый стейк: +2 еды, вода не трогается', () => {
+     const start = createSurvivalState('human');
+     start.food = 1;
+     start.water = 1;
+-    const { ctx, holder } = makeCtx(start);
+-    const result = survivalConsumableListener(steak, ctx);
++    setStoreSurvival(start);
++    const result = survivalConsumableListener(steak, ctx());
+     expect(result).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
+-    expect(holder.survival.food).toBe(3);
+-    expect(holder.survival.water).toBe(1);
++    expect(storeSurvival().food).toBe(3);
++    expect(storeSurvival().water).toBe(1);
+   });
+ 
+   it('суп: +1 еды и +1 воды (данные soup)', () => {
+     const start = createSurvivalState('human');
+     start.food = 1;
+     start.water = 1;
+-    const { ctx, holder } = makeCtx(start);
+-    const result = survivalConsumableListener(soupEntry, ctx);
++    setStoreSurvival(start);
++    const result = survivalConsumableListener(soupEntry, ctx());
+     expect(result).toMatchObject({ ok: true, gained: { food: 1, water: 1 } });
+-    expect(holder.survival.food).toBe(2);
+-    expect(holder.survival.water).toBe(2);
++    expect(storeSurvival().food).toBe(2);
++    expect(storeSurvival().water).toBe(2);
+   });
+ 
+   it('очищенная вода: +2 воды; грязная: +1', () => {
+     const start = createSurvivalState('human');
+     start.water = 1;
+-    const { ctx: ctxA, holder: holderA } = makeCtx(start);
+-    const purifiedResult = survivalConsumableListener(purified, ctxA);
++    setStoreSurvival(start);
++    const purifiedResult = survivalConsumableListener(purified, ctx());
+     expect(purifiedResult).toMatchObject({ ok: true, gained: { food: 0, water: 2 } });
+-    expect(holderA.survival.water).toBe(3);
++    expect(storeSurvival().water).toBe(3);
+ 
+-    const { ctx: ctxB, holder: holderB } = makeCtx(createSurvivalState('human'));
+-    holderB.survival.water = 2;
+-    const dirtyResult = survivalConsumableListener(dirty, ctxB);
++    const second = createSurvivalState('human');
++    second.water = 2;
++    setStoreSurvival(second);
++    const dirtyResult = survivalConsumableListener(dirty, ctx());
+     expect(dirtyResult).toMatchObject({ ok: true, gained: { food: 0, water: 1 } });
+-    expect(holderB.survival.water).toBe(3);
++    expect(storeSurvival().water).toBe(3);
+   });
+ 
+   it('еда на максимуме: ok:false, состояние не меняется', () => {
+     const start = createSurvivalState('human');
+     start.food = SURVIVAL_RULES.max.food;
+-    const { ctx, holder } = makeCtx(start);
+-    const result = survivalConsumableListener(steak, ctx);
++    setStoreSurvival(start);
++    const result = survivalConsumableListener(steak, ctx());
+     expect(result).toEqual({ ok: false, reason: 'full' });
+-    expect(holder.survival.food).toBe(SURVIVAL_RULES.max.food);
++    expect(storeSurvival().food).toBe(SURVIVAL_RULES.max.food);
+   });
+ 
+   it('вода на максимуме: ок, шкала не двигается, подъём 0', () => {
+     const start = createSurvivalState('human');
+     start.water = SURVIVAL_RULES.max.water;
+-    const { ctx, holder } = makeCtx(start);
+-    const result = survivalConsumableListener(purified, ctx);
++    setStoreSurvival(start);
++    const result = survivalConsumableListener(purified, ctx());
+     expect(result).toMatchObject({ ok: true, gained: { food: 0, water: 0 } });
+-    expect(holder.survival.water).toBe(SURVIVAL_RULES.max.water);
++    expect(storeSurvival().water).toBe(SURVIVAL_RULES.max.water);
+   });
+ 
+   it('сырое мясо — тоже еда: +1 (признак state)', () => {
+     const start = createSurvivalState('human');
+     start.food = 1;
+-    const { ctx, holder } = makeCtx(start);
+-    const result = survivalConsumableListener(rawMeat, ctx);
++    setStoreSurvival(start);
++    const result = survivalConsumableListener(rawMeat, ctx());
+     expect(result).toMatchObject({ ok: true, gained: { food: 1, water: 0 } });
+-    expect(holder.survival.food).toBe(2);
++    expect(storeSurvival().food).toBe(2);
+   });
+ 
+   it('не еда/не напиток — null; нет выживания (робот) — null', () => {
+-    const { ctx } = makeCtx(createSurvivalState('human'));
+-    expect(survivalConsumableListener({ itemType: 'chem', id: 'chem_mentats' }, ctx)).toBeNull();
++    setStoreSurvival(createSurvivalState('human'));
++    expect(survivalConsumableListener({ itemType: 'chem', id: 'chem_mentats' }, ctx())).toBeNull();
+ 
+-    const { ctx: robotCtx } = makeCtx(null);
+-    expect(survivalConsumableListener(steak, robotCtx)).toBeNull();
+-    expect(survivalConsumableListener(purified, robotCtx)).toBeNull();
++    setStoreSurvival(null);
++    expect(survivalConsumableListener(steak, ctx())).toBeNull();
++    expect(survivalConsumableListener(purified, ctx())).toBeNull();
++  });
++
++  it('два употребления подряд читают свежее состояние стора', () => {
++    const start = createSurvivalState('human');
++    start.food = 1;
++    setStoreSurvival(start);
++    survivalConsumableListener(steak, ctx()); // 1 → 3
++    const second = survivalConsumableListener(steak, ctx()); // 3 → 5
++    expect(second).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
++    expect(storeSurvival().food).toBe(5);
+   });
+ });
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index f198fa8..64dba71 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -265,8 +265,11 @@ export const CharacterProvider = ({ children }) => {
+   // Расширения состояния персонажа (src/store/stateExtensions.js): поля сейва,
+   // которыми владеют сеттинги (например, survival у Fallout). Движок правил
+   // не знает — применяет фабрики/hydrate/reset из реестра.
+-  // { [fieldKey]: value } — пусто, пока персонаж не создан и не загружен.
+-  const [stateExtensions, setStateExtensions] = useState({});
++  // С патча 209 хранилище — слайс `stateExtensions` зустанд-стора (как
++  // items/effects): единственный источник истины, все экраны подписаны,
++  // мутации — только действия стора. Контекст читает слайс селектором и
++  // раскладывает его в снапшот сейва под теми же ключами.
++  const stateExtensions = useCharacterStore((s) => s.stateExtensions);
+ 
+   // Новый персонаж: как только выбран ориджин — сеттинговые фабрики
+   // заполняют ещё не созданные поля (null = «не создано»). При загрузке
+@@ -283,13 +286,14 @@ export const CharacterProvider = ({ children }) => {
+         changed = true;
+       }
+     }
+-    if (changed) setStateExtensions(merged);
++    if (changed) useCharacterStore.getState().setStateExtensions(merged);
+   }, [origin, trait, stateExtensions]);
+ 
+-  // Запись поля расширения — стабильная функция: используется и в значении
+-  // контекста, и в уведомлениях расширений (расходники, патч 208).
++  // Запись поля расширения — стабильная функция, делегирует действию стора:
++  // используется и в значении контекста, и в уведомлениях расширений
++  // (расходники, патч 208).
+   const setStateExtension = useCallback((fieldKey, value) => {
+-    setStateExtensions((prev) => ({ ...prev, [fieldKey]: value }));
++    useCharacterStore.getState().setStateExtension(fieldKey, value);
+   }, []);
+ 
+   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+@@ -925,7 +929,8 @@ export const CharacterProvider = ({ children }) => {
+       setSceneRiskStates(data.sceneRiskStates);
+       // Поля сеттинговых расширений: hydrate расширения сам решает, как
+       // нормализовать своё поле (идемпотентно, без подъёма версии схемы).
+-      setStateExtensions(hydrateStateExtensionFields(data, {
++      // Хранилище — слайс stateExtensions стора (патч 209).
++      useCharacterStore.getState().setStateExtensions(hydrateStateExtensionFields(data, {
+         origin: resolveOrigin(data.origin),
+         trait: data.trait || null,
+       }));
+@@ -1528,7 +1533,7 @@ export const CharacterProvider = ({ children }) => {
+     setEquippedRobotModules([]);
+     // Поля сеттинговых расширений сбрасываются (reset расширения); при
+     // следующем выборе ориджина фабрики заполнят их заново.
+-    setStateExtensions(resetStateExtensionFields());
++    useCharacterStore.getState().setStateExtensions(resetStateExtensionFields());
+     setEquippedArmor(createEmptyEquippedArmor());
+     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 9f423ee..80d872c 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -174,9 +174,11 @@ modules/fallout/
+   index)` встраивает переход в цепочку `migrateCharacterState` на то же
+   место (индекс = версия «до») **без подъёма CURRENT_SCHEMA_VERSION** —
+   старые сейвы совместимы, номер схемы остаётся движковым;
+-- `CharacterContext` хранит поля расширений в `stateExtensions` и
+-  раскладывает их в снапшот сейва под теми же ключами (`...stateExtensions`
+-  вместо отдельных полей) — JSON сейва не изменился;
++- поля расширений хранятся в **слайсе `stateExtensions` зустанд-стора**
++  (патч 209, как items/effects): мутации — только действия стора, экраны
++  подписаны селекторами; `CharacterContext` раскладывает словарь в
++  снапшот сейва под теми же ключами (`...stateExtensions` вместо
++  отдельных полей) — JSON сейва не изменился;
+ - родовые операции, нужные сеттингам: `advanceEffectsByGameHours` (мост
+   времени и эффектов) и `resolveSceneRiskEventById` (проверка риска сцены
+   по событию) — Fallout строит на них сон в пустоши, не трогая движок.
+diff --git a/docs/architecture/zustand-diagnosis.md b/docs/architecture/zustand-diagnosis.md
+index 83e2136..219a56c 100644
+--- a/docs/architecture/zustand-diagnosis.md
++++ b/docs/architecture/zustand-diagnosis.md
+@@ -133,3 +133,28 @@ Store: `attributes` = dict `{ STR: {base, modifiers, total} }`.
+ 5. **Баг 5** (атрибуты → один источник) — финал миграции.
+ 
+ Каждый шаг отдельным коммитом + прогон `npx vitest run`.
++
++---
++
++## Дополнение патча 209 — поля расширений в сторе (прецедент для остальных)
++
++Свежий случай «второго источника» закрыт по образцу этой диагностики:
++выживание Fallout (поле сейва `survival`) жило в `useState` контекста, а
++действия употребления шли двумя путями (модалка знала про шкалы, инвентарь —
++нет). Патчи 207–209:
++
++- **патч 207** — поле оформлено как расширение состояния сеттинга
++  (`src/store/stateExtensions.js`: фабрика/hydrate/reset + миграция в цепочке);
++- **патч 208** — действие одно: `applyConsumableFull` уведомляет слушателей
++  расширений, модалка не держит своей копии логики;
++- **патч 209** — хранилище переехало в стор: слайс `stateExtensions`
++  (словарь полей расширений) с действиями `setStateExtensions` /
++  `setStateExtension`; экраны подписаны селекторами (`useSurvivalState`),
++  операции модуля читают свежее состояние `useCharacterStore.getState()`;
++  контекст раскладывает словарь в снапшот сейва (`...stateExtensions`) —
++  JSON сейва не изменился. `resetCharacterStore` очищает слайс,
++  `partialize` персиста его включает.
++
++Итог: мутация в одном месте → обновились все подписанные экраны, без
++«работает в одном экране, не работает в другом». Тот же приём — образец
++для перевода остальных полей документа персонажа из контекста в стор.
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index a8815e4..b03d137 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,11 +1,13 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.2** от 2026-09-07.
++Редакция **0.4.3** от 2026-09-07.
+ Статус: этапы 1–4 реализованы (патчи 197–206); выживание целиком вынесено
+ в модуль сеттинга (патч 207, `modules/fallout/survival/`) через родовой
+ механизм расширений состояния движка; употребление еды/напитков любым
+-путём двигает шкалы (патч 208 — слушатель расходников). Следующий шаг —
+-этап 5 (настройки `survivalMode`: включение системы и курс времени).
++путём двигает шкалы (патч 208 — слушатель расходников); состояние
++выживания живёт в зустанд-слайсе `stateExtensions` стора (патч 209).
++Следующий шаг — этап 5 (настройки `survivalMode`: включение системы и
++курс времени).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -314,7 +316,12 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ ## 12. Модель сейва
+ 
+-В сейве персонажа (не в `activeTimedEffects`):
++В сейве персонажа (не в `activeTimedEffects`) — поле верхнего уровня
++`survival`, как и раньше; **рантайм-хранилище с патча 209 — слайс
++`stateExtensions` зустанд-стора** (см. §12.1): поле хранится в сторе как
++`stateExtensions.survival`, мутации — только действия стора, все экраны
++подписаны; `buildSnapshot` контекста раскладывает словарь обратно в сейв
++под теми же ключами, поэтому JSON сейва не изменился.
+ 
+ ```
+ survival: {
+@@ -328,18 +335,31 @@ survival: {
+ }
+ ```
+ 
+-Реализовано (патч 198): миграция **v22 → v23** (`migrateSurvivalField` в
+-`src/store/migrations.js`) — всем существующим сейвам поле добавляется
+-при первом открытии; роботы/киборги получают `null` (тип берётся из
+-ориджина: «худой» id → каталог `origins.json`, «толстый» объект → его
+-`characterType`, фолбэк human как в `domain/origins`). Новые персонажи —
+-эффект в `CharacterContext`: при выборе ориджина `survival === null` →
+-стартовые максимумы. Поле ездит через `buildSnapshot`/`serializeState`/
+-`deserializeState` и выставляется из контекста как `survival`/`setSurvival`.
++Реализовано (патч 198): миграция **v22 → v23** — всем существующим сейвам
++поле добавляется при первом открытии; роботы/киборги получают `null`
++(тип берётся из ориджина: «худой» id → каталог `origins.json`, «толстый»
++объект → его `characterType`). Патчем 207 миграция переехала в модуль
++(`modules/fallout/survival/migration.js`) и встраивается в цепочку
++реестром расширений; патчем 209 рантайм-хранилище переехало в слайс
++`stateExtensions` зустанд-стора (см. §12.1). Поле ездит через
++`buildSnapshot`/`serializeState`/`deserializeState` без изменений.
+ 
+ Секция — единственный источник истины для отображения; пороги спуска —
+ константы домена. Роботы/киборги поле не содержат вовсе (или `null`).
+ 
++### 12.1 Хранилище: слайс зустанд-стора (патч 209)
++
++Как `items`/`effects`/`robot`: состояние выживания живёт в зустанд-сторе
++в слайсе `stateExtensions` (непрозрачный словарь полей расширений, движок
++правил не знает): `stateExtensions.survival`. Мутации — только действия
++стора (`setStateExtensions` / `setStateExtension`), операции модуля читают
++свежее состояние `useCharacterStore.getState()` и пишут действием стора;
++экраны подписаны селектором (`useSurvivalState`). Контекст раскладывает
++словарь в снапшот сейва (`...stateExtensions` в `buildSnapshot`) — JSON
++сейва не изменился, сейвы совместимы. Сценарий «в одном месте еда
++двигает шкалы, в другом нет» стал структурно невозможен: путь действия
++один.
++
+ **Начальные состояния (новые персонажи и миграция существующих сейвов):**
+ все шкалы на максимуме — еда 5, вода 4, сон 5; усталость 0; аккумуляторы 0.
+ 
+@@ -415,6 +435,15 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.3 (2026-09-07):** выживание в зустанд-сторе (патч 209). Слайс
++  `stateExtensions` в `characterStore` (как items/effects): рантайм-истина —
++  стор, мутации только действиями стора, экраны подписаны селектором
++  (`useSurvivalState`); операции модуля читают свежее состояние прямо из
++  стора и пишут действием стора; контекст раскладывает словарь в сейв —
++  формат сейва не изменился. Фабрика/hydrate/reset расширений теперь
++  пишут в стор; `resetCharacterStore` очищает слайс; `partialize` персиста
++  включает `stateExtensions`. Детали — §12.1 и
++  docs/architecture/zustand-diagnosis.md (дополнение патча 209).
+ - **0.4.2 (2026-09-07):** единый путь употребления (патч 208). Слушатель
+   расходников в реестре расширений движка (`registerConsumableAppliedListener`
+   → `notifyConsumableApplied` в конце `applyConsumableFull`): модуль
+diff --git a/modules/fallout/survival/hooks.js b/modules/fallout/survival/hooks.js
+index c2cec06..22d74bb 100644
+--- a/modules/fallout/survival/hooks.js
++++ b/modules/fallout/survival/hooks.js
+@@ -1,18 +1,21 @@
+-// Хуки выживания для экранов Fallout. Модуль читает своё поле сейва через
+-// родовое API контекста (stateExtensions / setStateExtension) — движок
+-// хранит поле, но правил не знает.
++// Хуки выживания для экранов Fallout. С патча 209 хранилище — слайс
++// stateExtensions зустанд-стора: хук подписан селектором напрямую на стор
++// (как экраны на items/effects), мутации — только действия стора. Движок
++// хранит поле как непрозрачный словарь и правил не знает.
+ 
++import useCharacterStore from '../../../src/store/characterStore';
+ import { useCharacter } from '../../../components/CharacterContext';
+ import { sleepSurvival } from './operations';
+ 
+ /** Текущее состояние выживания (null у роботов/киборгов и до создания). */
+-export const useSurvivalState = () => useCharacter().stateExtensions?.survival ?? null;
++export const useSurvivalState = () =>
++  useCharacterStore((s) => s.stateExtensions?.survival ?? null);
+ 
+-/** Операции выживания: смена состояния поля и сон. */
++/** Операции выживания: смена состояния поля (действие стора) и сон. */
+ export const useSurvivalActions = () => {
+   const ctx = useCharacter();
+   return {
+-    setSurvival: (state) => ctx.setStateExtension('survival', state),
++    setSurvival: (state) => useCharacterStore.getState().setStateExtension('survival', state),
+     sleepSurvival: (options) => sleepSurvival(ctx, options),
+   };
+ };
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+index 1c40a9f..5d4b160 100644
+--- a/modules/fallout/survival/operations.js
++++ b/modules/fallout/survival/operations.js
+@@ -11,9 +11,18 @@
+ // Зависимости приходят объектом контекста (useCharacter()): модуль не
+ // импортирует React и не знает, где живёт состояние.
+ 
++import useCharacterStore from '../../../src/store/characterStore';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { consumeDrink, consumeFood, rest } from './survival';
+ 
++// Хранилище выживания — слайс stateExtensions стора (патч 209). Операции
++// читают СВЕЖЕЕ состояние прямо из стора (не из замыканий рендеров), а
++// пишут — действием стора через ctx.setStateExtension (контекст делегирует
++// туда же). Так «поесть/попить/поспать» из любого места работают на одних
++// данных — в точности как items/effects.
++const currentSurvival = () =>
++  useCharacterStore.getState().stateExtensions?.survival ?? null;
++
+ /**
+  * Слушатель применённых расходников (реестр stateExtensions, патч 208).
+  * Движок зовёт его в конце applyConsumableFull — то есть при употреблении
+@@ -22,7 +31,7 @@ import { consumeDrink, consumeFood, rest } from './survival';
+  * не еда/напиток или у персонажа нет выживания (робот/киборг).
+  */
+ export const survivalConsumableListener = (item, ctx) => {
+-  const survival = ctx?.stateExtensions?.survival ?? null;
++  const survival = currentSurvival();
+   if (!survival) return null;
+ 
+   const apply = (result) => {
+@@ -42,7 +51,6 @@ export const survivalConsumableListener = (item, ctx) => {
+ 
+ export const sleepSurvival = (ctx, { place, hours }) => {
+   const {
+-    stateExtensions,
+     setStateExtension,
+     currentHealth,
+     setCurrentHealth,
+@@ -50,7 +58,7 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+     resolveSceneRiskEventById,
+   } = ctx;
+ 
+-  const survival = stateExtensions?.survival ?? null;
++  const survival = currentSurvival();
+   if (!survival) return { ok: false, reason: 'notCapable' };
+ 
+   const result = rest(survival, { place, hours, currentHp: currentHealth });
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 8d88dee..3ecd356 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -202,6 +202,14 @@ const useCharacterStore = create(devtools(
+       skills: {},
+       items: {},
+       effects: {},
++      // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
++      // патчи 207–209): движок хранит их как непрозрачный словарь
++      // { [fieldKey]: value } — например, { survival } у Fallout. Единый
++      // источник истины: мутации только через действия стора
++      // (setStateExtensions / setStateExtension), экраны подписаны
++      // селекторами. В сейв поля идут под своими ключами верхнего уровня
++      // (buildSnapshot контекста раскладывает словарь).
++      stateExtensions: {},
+       selectedPerks: [],
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
+@@ -989,6 +997,18 @@ const useCharacterStore = create(devtools(
+         get().recalculateAll();
+       },
+ 
++      /**
++       * Поля расширений состояния (stateExtensions.js, патч 209): движок
++       * хранит непрозрачный словарь, сеттинг сам кладёт/читает своё поле.
++       */
++      setStateExtensions: (dict = {}) => {
++        set({ stateExtensions: dict });
++      },
++
++      setStateExtension: (fieldKey, value) => set((state) => ({
++        stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
++      })),
++
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+        *
+@@ -1005,6 +1025,7 @@ const useCharacterStore = create(devtools(
+           skills: normalizedDefaults.skills || {},
+           items: {},
+           effects: {},
++          stateExtensions: {},
+           selectedPerks: legacyDefaults?.selectedPerks || [],
+           rewardedSkills: legacyDefaults?.rewardedSkills || [],
+           perkBonuses: {},
+@@ -1058,6 +1079,7 @@ const useCharacterStore = create(devtools(
+         selectedPerks: state.selectedPerks,
+         rewardedSkills: state.rewardedSkills,
+         robot: state.robot,
++        stateExtensions: state.stateExtensions,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
+-- 
+2.39.5
+

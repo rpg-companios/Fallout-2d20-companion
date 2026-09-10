@@ -1,0 +1,792 @@
+From fde872a3d588b791c16ff5358b23e96dec8cb742 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 02:46:26 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20213:=20=D1=83=D1=81=D1=82?=
+ =?UTF-8?q?=D0=B0=D0=BB=D0=BE=D1=81=D1=82=D1=8C=20=D1=81=D0=BD=D0=B8=D0=B6?=
+ =?UTF-8?q?=D0=B0=D0=B5=D1=82=20=D0=BC=D0=B0=D0=BA=D1=81=D0=B8=D0=BC=D1=83?=
+ =?UTF-8?q?=D0=BC=20=D0=9E=D0=97,=20=D0=B0=20=D0=BD=D0=B5=20=D1=82=D0=B5?=
+ =?UTF-8?q?=D0=BA=D1=83=D1=89=D0=B8=D0=B5=20(=D0=BF=D0=BE=20=D0=BA=D0=BD?=
+ =?UTF-8?q?=D0=B8=D0=B3=D0=B5)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- survival.ts: hpDrainForFatigue -> hpMaxPenaltyForFatigue (⌊N/2⌋,
+  производная от N — отдельного аккумулятора нет, при снятии усталости
+  максимум возвращается сам); тик/сон больше не считают потерю текущих ОЗ
+  (hpLost/hpEnd/hitsZero/zeroAtHour удалены), событие hpMaxPenalty
+- SurvivalClock/operations: дрен текущих ОЗ убран, сон их не трогает
+- W&A: effectiveMaxHealth -= ⌊N/2⌋ (не ниже нуля); строка эффектов
+  «Максимум ОЗ: −P»; CharacterContext: урон не зажимается к базовому
+  максимуму (законное «выше максимума» не отрезается)
+- SleepModal: прогноз/отчёт переформулированы под максимум (forecastMaxHp/
+  reportMaxHp), предупреждение о 0 ОЗ убрано; i18n ru/en обновлены
+- тесты переведены на новую семантику; дока 0.4.5 (§5 шаг 3, §6, §7)
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/survival/survival-bridge.test.js    |  8 +-
+ __tests__/survival/survival-domain.test.js    | 29 ++++----
+ __tests__/survival/survival-modals.test.js    |  7 +-
+ __tests__/survival/survival-settings.test.js  |  6 +-
+ __tests__/survival/survival-ui.test.js        |  2 +
+ components/CharacterContext.js                |  6 +-
+ docs/survival-system-design.md                | 34 +++++----
+ .../en-EN/screens/weaponsAndArmor/screen.json |  8 +-
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  8 +-
+ .../WeaponsAndArmorScreen.js                  | 11 ++-
+ .../modals/SleepModal.tsx                     | 64 ++++++++--------
+ modules/fallout/survival/SurvivalClock.js     | 23 ++----
+ modules/fallout/survival/operations.js        | 20 ++---
+ modules/fallout/survival/survival.ts          | 74 ++++++++-----------
+ 14 files changed, 137 insertions(+), 163 deletions(-)
+
+diff --git a/__tests__/survival/survival-bridge.test.js b/__tests__/survival/survival-bridge.test.js
+index 5817530..d04fd7a 100644
+--- a/__tests__/survival/survival-bridge.test.js
++++ b/__tests__/survival/survival-bridge.test.js
+@@ -169,7 +169,7 @@ describe('survival: гейт настройкой survivalModeEnabled (этап
+ });
+ 
+ describe('sleepSurvival: сон применяется к слайсу стора', () => {
+-  it('8 часов в кровати: sleep 5, бонус +2, ОЗ обновляется', () => {
++  it('8 часов в кровати: sleep 5, бонус +2, текущие ОЗ не трогаются (патч 213)', () => {
+     const start = createSurvivalState('human');
+     start.sleep = 2;
+     setStoreSurvival(start);
+@@ -177,7 +177,6 @@ describe('sleepSurvival: сон применяется к слайсу стор
+     const result = sleepSurvival(
+       {
+         setStateExtension: useCharacterStore.getState().setStateExtension,
+-        currentHealth: 20,
+         setCurrentHealth: (hp) => hpApplied.push(hp),
+         advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
+         resolveSceneRiskEventById: () => null,
+@@ -188,7 +187,8 @@ describe('sleepSurvival: сон применяется к слайсу стор
+     expect(storeSurvival().sleep).toBe(5);
+     expect(storeSurvival().hpBonus).toBe(SURVIVAL_RULES.sleep.hpBonus);
+     expect(result.diseaseRiskResult).toBeNull(); // кровать — без проверки болезни
+-    expect(hpApplied).toEqual([20]);
++    // Усталость снижает максимум ОЗ (производная), сон текущие ОЗ не пишет.
++    expect(hpApplied).toEqual([]);
+   });
+ 
+   it('сон в пустоши — проверка болезни', () => {
+@@ -198,8 +198,6 @@ describe('sleepSurvival: сон применяется к слайсу стор
+     const result = sleepSurvival(
+       {
+         setStateExtension: useCharacterStore.getState().setStateExtension,
+-        currentHealth: 10,
+-        setCurrentHealth: () => {},
+         advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
+         resolveSceneRiskEventById: () => disease,
+       },
+diff --git a/__tests__/survival/survival-domain.test.js b/__tests__/survival/survival-domain.test.js
+index 1638c9a..69aed8d 100644
+--- a/__tests__/survival/survival-domain.test.js
++++ b/__tests__/survival/survival-domain.test.js
+@@ -10,7 +10,7 @@ import {
+     createSurvivalState,
+     fatigueFromSource,
+     forecastSleep,
+-    hpDrainForFatigue,
++    hpMaxPenaltyForFatigue,
+     isSurvivalCapable,
+     removeFatigueTotal,
+     rest,
+@@ -106,13 +106,13 @@ describe('survival: лестница сна (8/8/8/8 ч, дно 4 ч)', () => {
+ 
+ describe('survival: часовой тик — порядок трёх шагов', () => {
+     it('дрен ОЗ = ⌊N/2⌋ по итоговому N', () => {
+-        expect(hpDrainForFatigue(0)).toBe(0);
+-        expect(hpDrainForFatigue(1)).toBe(0);
+-        expect(hpDrainForFatigue(2)).toBe(1);
+-        expect(hpDrainForFatigue(3)).toBe(1);
+-        expect(hpDrainForFatigue(4)).toBe(2);
++        expect(hpMaxPenaltyForFatigue(0)).toBe(0);
++        expect(hpMaxPenaltyForFatigue(1)).toBe(0);
++        expect(hpMaxPenaltyForFatigue(2)).toBe(1);
++        expect(hpMaxPenaltyForFatigue(3)).toBe(1);
++        expect(hpMaxPenaltyForFatigue(4)).toBe(2);
+         const r = advanceHours({ ...createSurvivalState('human'), food: 1, fatigue: [{ source: 'food', amount: 4 }] }, 1);
+-        expect(r.hpLost).toBe(2);
++        expect(r.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 2 }));
+     });
+ 
+     it('снятие −1 в час при чистых источниках, не ниже нуля', () => {
+@@ -120,7 +120,7 @@ describe('survival: часовой тик — порядок трёх шагов
+         addFatigue(s, 'food', 3);
+         const r1 = advanceHours(s, 1);
+         expect(totalFatigue(r1.state)).toBe(2); // чист по всем лестницам → −1
+-        expect(r1.hpLost).toBe(1); // дрен по итоговому N=2
++        expect(r1.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 1 })); // ⌊2/2⌋ = 1
+         s = r1.state;
+         const r2 = advanceHours(s, 2);
+         expect(totalFatigue(r2.state)).toBe(0); // −1 и −1, пол нуля не пробивает
+@@ -284,15 +284,14 @@ describe('survival: сон', () => {
+         expect(cleared).toMatchObject({ hour: 6, removed: 2 });
+     });
+ 
+-    it('дрен ОЗ во сне тикает, прогноз ловит ноль с указанием часа', () => {
+-        // еда на дне: снятие заблокировано, усталость food спят не лечится
++    it('сон не трогает текущие ОЗ: снижение максимума — от итоговой усталости', () => {
++        // еда на дне: снятие заблокировано, усталость food сном не лечится.
+         const s = createSurvivalState('human');
+         s.food = 1;
+-        addFatigue(s, 'food', 4); // дрен 2 ОЗ/час
+-        const f = forecastSleep(s, { place: 'bed', hours: 8, currentHp: 5 });
+-        expect(f.hitsZero).toBe(true);
+-        expect(f.zeroAtHour).toBe(3); // 5 − 2 − 2 → 1, на 3-м часе ≤ 0
+-        expect(f.hpLost).toBe(16); // 8 часов по 2
++        addFatigue(s, 'food', 4); // ⌊4/2⌋ = 2 к макс. ОЗ
++        const f = forecastSleep(s, { place: 'bed', hours: 8 });
++        expect(hpMaxPenaltyForFatigue(totalFatigue(f.state))).toBe(2);
++        expect(f.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 2 }));
+         // сам прогноз состояние не меняет:
+         expect(fatigueFromSource(s, 'food')).toBe(4);
+     });
+diff --git a/__tests__/survival/survival-modals.test.js b/__tests__/survival/survival-modals.test.js
+index 6cb2d8b..8ad11d0 100644
+--- a/__tests__/survival/survival-modals.test.js
++++ b/__tests__/survival/survival-modals.test.js
+@@ -97,9 +97,7 @@ describe('survival: i18n модалок (ru/en)', () => {
+         'survival.sleep.wastelandNote',
+         'survival.sleep.forecastTitle',
+         'survival.sleep.forecastState',
+-        'survival.sleep.forecastHpLost',
+-        'survival.sleep.forecastHpEnd',
+-        'survival.sleep.forecastZeroWarning',
++        'survival.sleep.forecastMaxHp',
+         'survival.sleep.forecastFatigueCleared',
+         'survival.sleep.forecastFoodDown',
+         'survival.sleep.forecastWaterDown',
+@@ -108,8 +106,7 @@ describe('survival: i18n модалок (ru/en)', () => {
+         'survival.sleep.cancel',
+         'survival.sleep.reportTitle',
+         'survival.sleep.reportState',
+-        'survival.sleep.reportHp',
+-        'survival.sleep.reportHpLost',
++        'survival.sleep.reportMaxHp',
+         'survival.sleep.reportHpBonus',
+         'survival.sleep.reportFatigueCleared',
+     ];
+diff --git a/__tests__/survival/survival-settings.test.js b/__tests__/survival/survival-settings.test.js
+index 69f72a5..3bcee17 100644
+--- a/__tests__/survival/survival-settings.test.js
++++ b/__tests__/survival/survival-settings.test.js
+@@ -88,7 +88,7 @@ describe('survival settings: курс времени в домене', () => {
+     // Один часовой тик: еда шагает 5 → 4 (шаг накапливается с нуля).
+     expect(result.state.food).toBe(4);
+     expect(result.state.acc.food).toBe(0);
+-    expect(result.hpLost).toBe(0); // усталости нет — дрена нет
++    expect(result.events).not.toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty' })); // усталости нет — снижения максимума нет
+   });
+ 
+   it('курс по умолчанию — 30 (параметр не передан)', () => {
+@@ -96,10 +96,10 @@ describe('survival settings: курс времени в домене', () => {
+     expect(s.food).toBe(4);
+   });
+ 
+-  it('курс 30 и усталость: часовой тик дренит ОЗ (⌊N/2⌋)', () => {
++  it('курс 30 и усталость: часовой тик снижает максимум ОЗ (⌊N/2⌋)', () => {
+     let s = createSurvivalState('human');
+     s.fatigue = [{ source: 'sleep', amount: 3 }];
+     const result = advanceRealMinutes(s, 30, 30);
+-    expect(result.hpLost).toBe(1);
++    expect(result.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 1 }));
+   });
+ });
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+index 91a8413..79d3f5c 100644
+--- a/__tests__/survival/survival-ui.test.js
++++ b/__tests__/survival/survival-ui.test.js
+@@ -23,6 +23,7 @@ describe('survival: строки эффектов (§6)', () => {
+         expect(survivalEffectRows(s)).toEqual([
+             { key: 'fatigue', n: 3 },
+             { key: 'apPenalty', n: 3 },
++            { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
+         ]);
+     });
+ });
+@@ -71,6 +72,7 @@ describe('survival: i18n шкал (ru/en)', () => {
+     it.each(Object.entries(locales))('%s: шаблоны строк эффектов с {n}', (loc, dict) => {
+         expect(dict.survival.fatigue).toContain('{n}');
+         expect(dict.survival.apPenalty).toContain('{n}');
++        expect(dict.survival.maxHpPenalty).toContain('{n}'); // патч 213
+     });
+ 
+     it.each(Object.entries(locales))('%s: заголовки областей Голод/Жажда/Сон', (loc, dict) => {
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 64dba71..c16268c 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -369,8 +369,12 @@ export const CharacterProvider = ({ children }) => {
+   });
+   const healCharacter = (amount, maxOverride) =>
+     setCurrentHealth(restore(healthCounter(maxOverride), amount).current);
++  // Урон списывается без потолка базовой формулы: текущее ОЗ может быть
++  // законно ВЫШЕ базового максимума (бонус «прекрасно отдохнувший», патч 213
++  // снижает максимум от усталости) — зажим createCounter к базовому max
++  // молча отрезал бы разницу. Ограничение — только нижняя граница 0.
+   const damageCharacter = (amount) =>
+-    setCurrentHealth(consume(healthCounter(), amount).current);
++    setCurrentHealth(consume(createCounter({ id: 'health', current: currentHealth, max: null }), amount).current);
+ 
+   // Радиация: ресурс с обратным знаком — «хорошо» быть у нуля. Потолка нет,
+   // ограничение только снизу.
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index d4de42d..487e2e9 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,11 +1,12 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.4** от 2026-09-07.
++Редакция **0.4.5** от 2026-09-08.
+ Статус: этапы 1–5 реализованы (патчи 197–206, 210); выживание целиком
+ вынесено в модуль сеттинга (патч 207, `modules/fallout/survival/`) через
+ родовой механизм расширений состояния движка; употребление еды/напитков
+ любым путём двигает шкалы (патч 208 — слушатель расходников); состояние
+-выживания живёт в зустанд-слайсе `stateExtensions` стора (патч 209).
++выживания живёт в зустанд-слайсе `stateExtensions` стора (патч 209);
++усталость снижает МАКСИМУМ ОЗ, а не текущие — по книге (патч 213).
+ Настройки системы и реальный тик времени — патч 210 (этап 5).
+ Следующий шаг — этап 6 (движок ОД без UI, §8).
+ 
+@@ -152,7 +153,8 @@ human/mutant — шкалы им положены по правилу типа.
+    переходы в штрафные зоны и периодические очки на дне;
+ 2. Снятие Усталости: −1 очко, если по итоговым состояниям еда ≥ 2,
+    вода ≥ 2, сон ≥ 3 (не ниже 0);
+-3. Дрен ОЗ: ⌊N/2⌋ по итоговому N, без сопротивлений (см. §6).
++3. Снижение максимума ОЗ: −⌊N/2⌋ по итоговому N, без сопротивлений
++   (см. §6); текущие ОЗ не трогаются.
+ 
+ ---
+ 
+@@ -172,9 +174,14 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ - каждый набор ОД — на 1 меньше за каждое очко Усталости, до минимума 0
+   (правило движка ОД, §8; в UI отображается строкой, считает игрок/движок);
+-- **потеря ОЗ в начале каждого игрового часа**: 1 ОЗ за каждые 2 очка
+-  (⌊N/2⌋), без сопротивлений — решение владельца, отличается от книги
+-  («начало сцены») ради работы вне различения сцен.
++- **снижение максимума ОЗ на ⌊N/2⌋** (1 за каждые 2 очка), без
++  сопротивлений — по книге усталость дренирует максимум ОЗ, а не текущие
++  (патч 213); ранее решением владельца вместо книги («начало сцены»)
++  величина пересчитывалась почасово, но вычиталась из ТЕКУЩИХ ОЗ —
++  исправлено. Величина производная от текущего N: отдельного аккумулятора
++  нет, при снятии Усталости максимум возвращается сам;
++- **текущие ОЗ не трогаются**: если они выше сниженного максимума — законное
++  состояние (как радиация); лечение упирается в сниженный максимум.
+ 
+ **Снятие:**
+ 
+@@ -191,17 +198,18 @@ human/mutant — шкалы им положены по правилу типа.
+ (решение владельца) — различение боевых/небоевых сцен для выживания
+ не требуется.
+ 
+-**Усталость во сне:** часовой дрен ОЗ работает и во время сна (часы сна —
+-те же игровые часы). Если по прогнозу ОЗ достигнут 0 в какой-то час
+-планового сна — **алерт в модали до подтверждения** (прогноз детерминирован,
+-«шанс» = точный расчёт): игрок сам решает — спать меньше, сначала поесть
+-и попить и т.п.
++**Усталость во сне:** часы сна — те же игровые часы: усталость во сне
++начисляется и снимается как обычно (на 6-м часе — вся усталость источника
++«сон»), снижение максимума ОЗ пересчитывается вместе с N. Текущие ОЗ сон
++не трогает — предупреждение о достижении 0 ОЗ из модали убрано (патч 213);
++прогноз показывает итоговый максимум ОЗ.
+ 
+ **UI:** в секции «Эффекты» карточки персонажа:
+ 
+ ```
+ Усталость N            (при N ≥ 1)
+ Количество получаемых ОД −M   (M = N, при N ≥ 1)
++Максимум ОЗ: −P        (P = ⌊N/2⌋, при P ≥ 1)
+ ```
+ 
+ Отдельного бейджа нет; при N = 0 строки исчезают.
+@@ -238,8 +246,8 @@ human/mutant — шкалы им положены по правилу типа.
+   механике** — событие `sleepOnGround` правила `diseaseExposure`
+   (`modules/fallout/data/rules/diseaseExposure.json`: END + SURVIVAL,
+   rollD20, таблица болезней, иммунитет «disease»). Новых правил не вводим.
+-- Перед подтверждением — прогноз: шаг всех шкал, усталость, дрен ОЗ;
+-  алерт при достижении ОЗ 0 (§6).
++- Перед подтверждением — прогноз: шаг всех шкал, усталость, итоговый
++  максимум ОЗ (§6); текущие ОЗ сон не трогает (патч 213).
+ 
+ ---
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index c4681eb..9aa804b 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -222,9 +222,7 @@
+       "wastelandNote": "Sleeping in the wasteland: disease check (Endurance + Survival)",
+       "forecastTitle": "Forecast",
+       "forecastState": "Result: {state}",
+-      "forecastHpLost": "HP lost: {n}",
+-      "forecastHpEnd": "HP after sleep: {n}",
+-      "forecastZeroWarning": "HP will reach 0 during this sleep",
++      "forecastMaxHp": "Max HP after sleep: {n}",
+       "forecastFatigueCleared": "Fatigue (sleep) removed: {n}",
+       "forecastFoodDown": "Hunger: −{n}",
+       "forecastWaterDown": "Thirst: −{n}",
+@@ -233,13 +231,13 @@
+       "cancel": "Cancel",
+       "reportTitle": "Sleep: {hours} h",
+       "reportState": "Result: {state}",
+-      "reportHp": "HP: {n}",
+-      "reportHpLost": "HP lost: {n}",
++      "reportMaxHp": "Max HP: {n}",
+       "reportHpBonus": "+2 max HP until your next sleep",
+       "reportFatigueCleared": "Fatigue (sleep) removed: {n}"
+     },
+     "fatigue": "Fatigue {n}",
+     "apPenalty": "Action Points gained −{n}",
++    "maxHpPenalty": "Max HP: −{n}",
+     "foodTitle": "Hunger",
+     "waterTitle": "Thirst",
+     "sleepTitle": "Sleep",
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index df2f1ed..2404f32 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -222,9 +222,7 @@
+       "wastelandNote": "Сон в пустоши: проверка на болезнь (Выносливость + Выживание)",
+       "forecastTitle": "Прогноз",
+       "forecastState": "Состояние: {state}",
+-      "forecastHpLost": "Потеря ОЗ: {n}",
+-      "forecastHpEnd": "ОЗ после сна: {n}",
+-      "forecastZeroWarning": "ОЗ упадут до 0 за время сна",
++      "forecastMaxHp": "Максимум ОЗ после сна: {n}",
+       "forecastFatigueCleared": "Снято усталости (сон): {n}",
+       "forecastFoodDown": "Голод: −{n}",
+       "forecastWaterDown": "Жажда: −{n}",
+@@ -233,13 +231,13 @@
+       "cancel": "Отмена",
+       "reportTitle": "Сон: {hours} ч",
+       "reportState": "Состояние: {state}",
+-      "reportHp": "ОЗ: {n}",
+-      "reportHpLost": "Потеря ОЗ: {n}",
++      "reportMaxHp": "Максимум ОЗ: {n}",
+       "reportHpBonus": "+2 к макс. ОЗ до следующего сна",
+       "reportFatigueCleared": "Снято усталости (сон): {n}"
+     },
+     "fatigue": "Усталость {n}",
+     "apPenalty": "Количество получаемых ОД −{n}",
++    "maxHpPenalty": "Максимум ОЗ: −{n}",
+     "foodTitle": "Голод",
+     "waterTitle": "Жажда",
+     "sleepTitle": "Сон",
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 840a3f6..78a6524 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -35,7 +35,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects,
+ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+-import { survivalEffectRows } from '../../survival/survival';
++import { hpMaxPenaltyForFatigue, survivalEffectRows, totalFatigue } from '../../survival/survival';
+ import { useSurvivalState } from '../../survival/hooks';
+ import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
+ import SleepModal from './modals/SleepModal';
+@@ -627,7 +627,14 @@ const WeaponsAndArmorScreen = () => {
+   // Выживание (§4 дока): «прекрасно отдохнувший» даёт +2 к макс. ОЗ
+   // до следующего сна — hpBonus в состоянии survival.
+   const survivalHpBonus = survival?.hpBonus || 0;
+-  const effectiveMaxHealth = maxHealth + timedMaxHpBonus + survivalHpBonus;
++  // Усталость снижает МАКСИМУМ ОЗ, а не текущие (§6, патч 213): −⌊N/2⌋,
++  // производная от текущей усталости; текущие ОЗ не трогаются (как радиация,
++  // законно быть выше максимума). Не ниже нуля.
++  const survivalMaxHpPenalty = survival ? hpMaxPenaltyForFatigue(totalFatigue(survival)) : 0;
++  const effectiveMaxHealth = Math.max(
++    0,
++    maxHealth + timedMaxHpBonus + survivalHpBonus - survivalMaxHpPenalty,
++  );
+   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
+   
+   const characterForImmunities = { origin, trait };
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+index de6720d..8066644 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -1,19 +1,21 @@
+ // Модалка сна выживания (docs/survival-system-design.md §4, §5, §7).
+ //
+ // Место (кровать/пустошь) и часы 1–24. Перед подтверждением — прогноз
+-// чистым доменом forecastSleep (шаг шкал, усталость, дрен ОЗ, потолок
+-// состояния, бонус ОЗ); при достижении 0 ОЗ — красное предупреждение
+-// (§6: игрок сам решает — спать меньше или сначала поесть/попить).
+-// Подтверждение — операция контекста sleepSurvival: применяет rest(),
+-// двигает таймеры эффектов на N × 12 сцен (мост контуров, §5) и в пустоши
+-// проверяет болезнь по имеющейся механике (событие sleepOnGround).
++// чистым доменом forecastSleep (шаг шкал, усталость, итоговый максимум ОЗ:
++// усталость снижает МАКСИМУМ ОЗ, а не текущие — патч 213, §6). Подтверждение
++// — операция контекста sleepSurvival: применяет rest(), двигает таймеры
++// эффектов на N × 12 сцен (мост контуров, §5) и в пустоши проверяет болезнь
++// по имеющейся механике (событие sleepOnGround).
+ 
+ import React, { useMemo, useState } from 'react';
+ import { Modal, Text, TouchableOpacity, View } from 'react-native';
+ import { useCharacter } from '../../../../../components/CharacterContext';
++import { calculateMaxHealth } from '../../../../../domain/characterCreation';
+ import {
+     forecastSleep,
++    hpMaxPenaltyForFatigue,
+     SURVIVAL_RULES,
++    totalFatigue,
+     type SleepPlace,
+     type SurvivalState,
+     type RestResult,
+@@ -40,31 +42,24 @@ interface ForecastLine {
+     tone: 'neutral' | 'positive' | 'negative';
+ }
+ 
+-const buildForecastLines = (forecast: RestResult): ForecastLine[] => {
++// Максимум ОЗ после сна: базовый + бонус «прекрасно отдохнувший» −
++// снижение от усталости (⌊N/2⌋, патч 213). Не ниже нуля.
++const maxHpAfterSleep = (state: SurvivalState, baseMaxHealth: number): number =>
++    Math.max(0, baseMaxHealth + state.hpBonus - hpMaxPenaltyForFatigue(totalFatigue(state)));
++
++const buildForecastLines = (forecast: RestResult, baseMaxHealth: number): ForecastLine[] => {
+     const lines: ForecastLine[] = [
+         {
+             key: 'state',
+             text: t('survival.sleep.forecastState').replace('{state}', stateName(forecast.state.sleep)),
+             tone: 'neutral',
+         },
+-    ];
+-    if (forecast.hpLost > 0) {
+-        lines.push({
+-            key: 'hpLost',
+-            text: t('survival.sleep.forecastHpLost').replace('{n}', String(forecast.hpLost)),
+-            tone: 'negative',
+-        });
+-    }
+-    if (forecast.hpEnd != null) {
+-        lines.push({
+-            key: 'hpEnd',
+-            text: t('survival.sleep.forecastHpEnd').replace('{n}', String(forecast.hpEnd)),
++        {
++            key: 'maxHp',
++            text: t('survival.sleep.forecastMaxHp').replace('{n}', String(maxHpAfterSleep(forecast.state, baseMaxHealth))),
+             tone: 'neutral',
+-        });
+-    }
+-    if (forecast.hitsZero) {
+-        lines.push({ key: 'zero', text: t('survival.sleep.forecastZeroWarning'), tone: 'negative' });
+-    }
++        },
++    ];
+     const cleared = forecast.events.find((e) => e.type === 'fatigueSleepCleared');
+     if (typeof cleared?.removed === 'number' && cleared.removed > 0) {
+         lines.push({
+@@ -102,17 +97,21 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+     useModuleLocale();
+     const survival = useSurvivalState();
+     const { sleepSurvival } = useSurvivalActions();
+-    const { currentHealth } = useCharacter();
++    const { attributes, level, attributesSaved } = useCharacter();
+     const [place, setPlace] = useState<SleepPlace>('bed');
+     const [hours, setHours] = useState(8);
+ 
++    // Базовый максимум ОЗ — формула сеттинга от атрибутов и уровня; строка
++    // максимума показывается, когда персонаж собран (как счётчик ОЗ).
++    const baseMaxHealth = attributesSaved ? calculateMaxHealth(attributes, level) : 0;
++
+     const forecast = useMemo<RestResult | null>(() => {
+         const state = survival as SurvivalState | null;
+         if (!state) return null;
+-        return forecastSleep(state, { place, hours, currentHp: currentHealth });
+-    }, [survival, place, hours, currentHealth]);
++        return forecastSleep(state, { place, hours });
++    }, [survival, place, hours]);
+ 
+-    const lines = forecast ? buildForecastLines(forecast) : [];
++    const lines = forecast ? buildForecastLines(forecast, baseMaxHealth) : [];
+ 
+     const handleConfirm = () => {
+         const apply = sleepSurvival({ place, hours }) as {
+@@ -129,11 +128,10 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+         const reportLines: string[] = [
+             t('survival.sleep.reportState').replace('{state}', stateName(result.state.sleep)),
+         ];
+-        if (result.hpLost > 0) {
+-            reportLines.push(t('survival.sleep.reportHpLost').replace('{n}', String(result.hpLost)));
+-        }
+-        if (result.hpEnd != null) {
+-            reportLines.push(t('survival.sleep.reportHp').replace('{n}', String(result.hpEnd)));
++        if (attributesSaved) {
++            reportLines.push(
++                t('survival.sleep.reportMaxHp').replace('{n}', String(maxHpAfterSleep(result.state, baseMaxHealth))),
++            );
+         }
+         if (result.state.hpBonus > 0) {
+             reportLines.push(t('survival.sleep.reportHpBonus'));
+diff --git a/modules/fallout/survival/SurvivalClock.js b/modules/fallout/survival/SurvivalClock.js
+index 1d3157a..7e1769d 100644
+--- a/modules/fallout/survival/SurvivalClock.js
++++ b/modules/fallout/survival/SurvivalClock.js
+@@ -10,29 +10,23 @@
+ //     случаются в норме).
+ //
+ // Монтируется в App.js рядом с AlertHost (внутри CharacterProvider).
+-// Рендерит null: только таймер и запись результата в стор + дрен ОЗ.
++// Рендерит null: только таймер и запись результата в стор. Текущие ОЗ
++// не трогаются: усталость снижает МАКСИМУМ ОЗ (производная от N, патч 213),
++// и это пересчитывается в сторе самим тиком.
+ //
+ // Движок не знает правил: компонент читает настройки через общий стор,
+-// состояние — из слайса stateExtensions, дрен ОЗ — через контекст
+-// (setCurrentHealth — родовой счётчик персонажа).
++// состояние — из слайса stateExtensions.
+ 
+-import { useEffect, useRef } from 'react';
++import { useEffect } from 'react';
+ import { AppState } from 'react-native';
+ import useCharacterStore from '../../../src/store/characterStore';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+-import { useCharacter } from '../../../components/CharacterContext';
+ import { advanceRealMinutes } from './survival';
+ 
+ const TICK_INTERVAL_MS = 30_000;
+ const MAX_REAL_MINUTES_PER_TICK = 5;
+ 
+ const SurvivalClock = () => {
+-  const { currentHealth, setCurrentHealth } = useCharacter();
+-  const healthRef = useRef(currentHealth);
+-  healthRef.current = currentHealth;
+-  const setHealthRef = useRef(setCurrentHealth);
+-  setHealthRef.current = setCurrentHealth;
+-
+   useEffect(() => {
+     let lastTickAt = null;
+     let timer = null;
+@@ -56,13 +50,6 @@ const SurvivalClock = () => {
+       if (!(course > 0)) return; // страховка: домен бросает на неположительном курсе
+       const result = advanceRealMinutes(survival, elapsedRealMinutes, course);
+       store.setStateExtension('survival', result.state);
+-
+-      if (result.hpLost > 0) {
+-        const hp = healthRef.current;
+-        if (hp != null) {
+-          setHealthRef.current(Math.max(0, hp - result.hpLost));
+-        }
+-      }
+     };
+ 
+     const stop = () => {
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+index f0692cc..51cfe3f 100644
+--- a/modules/fallout/survival/operations.js
++++ b/modules/fallout/survival/operations.js
+@@ -1,10 +1,11 @@
+ // Операции выживания — модуль сеттинга Fallout.
+ //
+ // sleepSurvival применяет сон (docs/survival-system-design.md §4–§7):
+-// лестницы + усталость + дрен ОЗ (чистый домен rest), мост контуров —
+-// временные эффекты продвигаются на N × 12 сцен (родовая операция
+-// контекста advanceEffectsByGameHours), и при сне в пустоши — проверка
+-// болезни по имеющейся механике (событие sleepOnGround, родовая операция
++// лестницы + усталость (чистый домен rest; текущие ОЗ сон не трогает —
++// усталость снижает максимум, патч 213), мост контуров — временные
++// эффекты продвигаются на N × 12 сцен (родовая операция контекста
++// advanceEffectsByGameHours), и при сне в пустоши — проверка болезни по
++// имеющейся механике (событие sleepOnGround, родовая операция
+ // resolveSceneRiskEventById). Прогноз для модали делает чистый домен
+ // forecastSleep (состояние не фиксируется) — эта функция фиксирует.
+ //
+@@ -62,8 +63,6 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+ 
+   const {
+     setStateExtension,
+-    currentHealth,
+-    setCurrentHealth,
+     advanceEffectsByGameHours,
+     resolveSceneRiskEventById,
+   } = ctx;
+@@ -71,11 +70,8 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+   const survival = currentSurvival();
+   if (!survival) return { ok: false, reason: 'notCapable' };
+ 
+-  const result = rest(survival, { place, hours, currentHp: currentHealth });
++  const result = rest(survival, { place, hours });
+   setStateExtension('survival', result.state);
+-  if (currentHealth != null && result.hpEnd != null) {
+-    setCurrentHealth(result.hpEnd);
+-  }
+ 
+   // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
+   const { expired } = advanceEffectsByGameHours(hours);
+@@ -89,9 +85,7 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+     place,
+     hours,
+     sleepTo: result.state.sleep,
+-    hpEnd: result.hpEnd,
+-    hpLost: result.hpLost,
+-    hitsZero: result.hitsZero,
++    fatigueAfter: result.state.fatigue.reduce((sum, f) => sum + f.amount, 0),
+     diseaseRiskResult,
+     effectsExpired: expired.length,
+   });
+diff --git a/modules/fallout/survival/survival.ts b/modules/fallout/survival/survival.ts
+index a92ee1a..2c52b28 100644
+--- a/modules/fallout/survival/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -177,8 +177,12 @@ export function clearFatigueSource(state: SurvivalState, source: FatigueSource):
+     if (entry) entry.amount = 0;
+ }
+ 
+-// 1 ОЗ за каждые 2 очка Усталости, без сопротивлений.
+-export function hpDrainForFatigue(fatigueTotal: number): number {
++// Снижение максимума ОЗ от Усталости (патч 213): −1 к макс. ОЗ за каждые
++// 2 очка Усталости (⌊N/2⌋), без сопротивлений. По книге усталость дренирует
++// МАКСИМУМ ОЗ, а не текущие — величина производная от текущего N:
++// пересчитывается каждый игровой час (шаг 3 тика), отдельного аккумулятора
++// в состоянии нет; при снятии Усталости максимум возвращается сам.
++export function hpMaxPenaltyForFatigue(fatigueTotal: number): number {
+     return Math.floor(fatigueTotal / 2);
+ }
+ 
+@@ -234,7 +238,7 @@ export interface TickOptions {
+ 
+ // Один часовой тик (три шага, §5). Мутирует рабочую копию.
+ // options.sleepMode — часы сна: лестница сна заморожена (сон лечит).
+-function tickHour(state: SurvivalState, options: TickOptions = {}): { drain: number; events: SurvivalEvent[] } {
++function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEvent[] {
+     const events: SurvivalEvent[] = [];
+     // 1. Лестницы + начисление Усталости.
+     for (const key of LADDERS) {
+@@ -255,15 +259,15 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): { drain: num
+         removeFatigueTotal(state, 1);
+         events.push({ type: 'fatigueRemoved', amount: 1 });
+     }
+-    // 3. Дрен ОЗ по итоговому N.
+-    const drain = hpDrainForFatigue(totalFatigue(state));
+-    if (drain > 0) events.push({ type: 'hpDrain', amount: drain });
+-    return { drain, events };
++    // 3. Снижение максимума ОЗ по итоговому N (патч 213): производная
++    //    ⌊N/2⌋ — событие для наблюдателей/тестов, состояние не пишется.
++    const maxPenalty = hpMaxPenaltyForFatigue(totalFatigue(state));
++    if (maxPenalty > 0) events.push({ type: 'hpMaxPenalty', amount: maxPenalty });
++    return events;
+ }
+ 
+ export interface AdvanceResult {
+     state: SurvivalState;
+-    hpLost: number;
+     events: SurvivalEvent[];
+ }
+ 
+@@ -277,14 +281,12 @@ export function advanceHours(state: SurvivalState, hours: number, options: TickO
+     const carried = wk.timeCarried + hours;
+     const whole = Math.floor(carried);
+     wk.timeCarried = carried - whole;
+-    let hpLost = 0;
+     const events: SurvivalEvent[] = [];
+     for (let i = 0; i < whole; i += 1) {
+-        const r = tickHour(wk, options);
+-        hpLost += r.drain;
+-        for (const e of r.events) events.push({ hour: i + 1, ...e });
++        const hourEvents = tickHour(wk, options);
++        for (const e of hourEvents) events.push({ hour: i + 1, ...e });
+     }
+-    return { state: wk, hpLost, events };
++    return { state: wk, events };
+ }
+ 
+ // Реальный тик: X реальных минут = 1 игровой час (курс из настроек).
+@@ -346,22 +348,17 @@ export function consumeDrink(state: SurvivalState, item: SurvivalConsumable | nu
+ export interface RestOptions {
+     place: SleepPlace;
+     hours: number;
+-    currentHp?: number | null;
+ }
+ 
+ export interface RestResult {
+     state: SurvivalState;
+-    hpLost: number;
+     events: SurvivalEvent[];
+-    hpEnd?: number;
+-    hitsZero?: boolean;
+-    zeroAtHour?: number | null;
+ }
+ 
+ // Сон. place: 'bed' | 'wasteland', часы 1–24.
+-// currentHp (число) — включает прогноз: hpEnd / hitsZero / zeroAtHour
+-// (алерт в модали до подтверждения, §6).
+-export function rest(state: SurvivalState, { place, hours, currentHp = null }: RestOptions): RestResult {
++// Текущие ОЗ сон не трогает: усталость снижает максимум (производная, §6,
++// патч 213) — прогноз в модали показывает итоговый максимум ОЗ после сна.
++export function rest(state: SurvivalState, { place, hours }: RestOptions): RestResult {
+     const rules = SURVIVAL_RULES.sleep;
+     if (!['bed', 'wasteland'].includes(place)) {
+         throw new Error(`rest: некорректное место сна: ${place}`);
+@@ -372,21 +369,9 @@ export function rest(state: SurvivalState, { place, hours, currentHp = null }: R
+     const wk = cloneState(state);
+     wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
+     const events: SurvivalEvent[] = [];
+-    let hpLost = 0;
+-    let hp: number | null = currentHp != null ? Number(currentHp) : null;
+-    let hitsZero = false;
+-    let zeroAtHour: number | null = null;
+     for (let h = 1; h <= hours; h += 1) {
+-        const r = tickHour(wk, { sleepMode: true });
+-        hpLost += r.drain;
+-        if (hp != null && !hitsZero) {
+-            hp -= r.drain;
+-            if (hp <= 0) {
+-                hitsZero = true;
+-                zeroAtHour = h;
+-            }
+-        }
+-        for (const e of r.events) events.push({ hour: h, ...e });
++        const hourEvents = tickHour(wk, { sleepMode: true });
++        for (const e of hourEvents) events.push({ hour: h, ...e });
+         if (h === rules.fatigueClearHours) {
+             const removed = fatigueFromSource(wk, 'sleep');
+             if (removed > 0) {
+@@ -414,13 +399,7 @@ export function rest(state: SurvivalState, { place, hours, currentHp = null }: R
+         place,
+         hpBonus: wk.hpBonus,
+     });
+-    const result: RestResult = { state: wk, hpLost, events };
+-    if (hp != null) {
+-        result.hpEnd = hitsZero ? 0 : hp;
+-        result.hitsZero = hitsZero;
+-        result.zeroAtHour = zeroAtHour;
+-    }
+-    return result;
++    return { state: wk, events };
+ }
+ 
+ // Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
+@@ -429,16 +408,21 @@ export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResu
+ }
+ 
+ // Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
+-// «Усталость N» и «Количество получаемых ОД −N» (M = N). Возвращает данные;
+-// тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty).
++// «Усталость N», «Количество получаемых ОД −N» (M = N) и
++// «Максимум ОЗ: −P» (P = ⌊N/2⌋, при P ≥ 1 — патч 213). Возвращает данные;
++// тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty /
++// survival.maxHpPenalty).
+ export function survivalEffectRows(
+     survival: SurvivalState | null | undefined,
+ ): Array<{ key: string; n: number }> {
+     if (!survival) return [];
+     const n = totalFatigue(survival);
+     if (n <= 0) return [];
+-    return [
++    const rows: Array<{ key: string; n: number }> = [
+         { key: 'fatigue', n },
+         { key: 'apPenalty', n },
+     ];
++    const maxPenalty = hpMaxPenaltyForFatigue(n);
++    if (maxPenalty > 0) rows.push({ key: 'maxHpPenalty', n: maxPenalty });
++    return rows;
+ }
+-- 
+2.39.5
+

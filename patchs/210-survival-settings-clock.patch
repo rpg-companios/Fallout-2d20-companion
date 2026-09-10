@@ -1,0 +1,817 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 16:46:37 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20210:=20=D1=8D=D1=82?=
+ =?UTF-8?q?=D0=B0=D0=BF=205=20=E2=80=94=20=D0=BD=D0=B0=D1=81=D1=82=D1=80?=
+ =?UTF-8?q?=D0=BE=D0=B9=D0=BA=D0=B8=20=D0=B2=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0?=
+ =?UTF-8?q?=D0=BD=D0=B8=D1=8F=20(=D1=80=D0=B0=D0=B7=D0=B4=D0=B5=D0=BB=20?=
+ =?UTF-8?q?=C2=AB=D0=92=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D0=B5?=
+ =?UTF-8?q?=C2=BB,=20=D0=B2=D0=BA=D0=BB/=D0=B2=D1=8B=D0=BA=D0=BB=20=D1=81?=
+ =?UTF-8?q?=D0=B8=D1=81=D1=82=D0=B5=D0=BC=D1=8B,=20=D0=BA=D1=83=D1=80?=
+ =?UTF-8?q?=D1=81=20=D0=B2=D1=80=D0=B5=D0=BC=D0=B5=D0=BD=D0=B8)=20=D0=B8?=
+ =?UTF-8?q?=20=D1=80=D0=B5=D0=B0=D0=BB=D1=8C=D0=BD=D1=8B=D0=B9=20=D1=82?=
+ =?UTF-8?q?=D0=B8=D0=BA=20SurvivalClock=20=D0=B2=20=D0=BC=D0=BE=D0=B4?=
+ =?UTF-8?q?=D1=83=D0=BB=D0=B5;=20=D1=81=D0=B2=D0=BE=D0=B1=D0=BE=D0=B4?=
+ =?UTF-8?q?=D0=BD=D1=8B=D0=B9=20=D0=B2=D0=B2=D0=BE=D0=B4=20=D1=87=D0=B8?=
+ =?UTF-8?q?=D1=81=D0=BB=D0=B0=20=D0=B2=20=D0=BD=D0=B0=D1=81=D1=82=D1=80?=
+ =?UTF-8?q?=D0=BE=D0=B9=D0=BA=D0=B0=D1=85?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                        |   4 +
+ __tests__/survival/survival-bridge.test.js    | 108 +++++++++++++++++-
+ __tests__/survival/survival-settings.test.js  | 105 +++++++++++++++++
+ components/settings/SettingsModal.js          |  69 ++++++++++-
+ docs/architecture/engine-setting-audit.md     |   4 +
+ docs/survival-system-design.md                |  63 +++++++---
+ .../i18n/en-EN/data/system/settings.json      |   6 +-
+ .../i18n/ru-RU/data/system/settings.json      |   6 +-
+ modules/fallout/settings.json                 |  28 ++++-
+ modules/fallout/survival/SurvivalClock.js     | 101 ++++++++++++++++
+ modules/fallout/survival/hooks.js             |  14 ++-
+ modules/fallout/survival/operations.js        |  12 +-
+ src/store/appSettingsStore.js                 |   2 +
+ 13 files changed, 487 insertions(+), 35 deletions(-)
+ create mode 100644 __tests__/survival/survival-settings.test.js
+ create mode 100644 modules/fallout/survival/SurvivalClock.js
+
+diff --git a/App.js b/App.js
+index 33569fd..7768134 100644
+--- a/App.js
++++ b/App.js
+@@ -14,6 +14,9 @@ import { Provider as PaperProvider } from 'react-native-paper';
+ import { CharacterProvider } from './components/CharacterContext';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import AlertHost from './components/alerts/AlertHost';
++// Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
++// с AlertHost; движок лишь рендерит, правила внутри модуля.
++import SurvivalClock from './modules/fallout/survival/SurvivalClock';
+ import { initDatabase } from './db/Database';
+ import { seedDatabase } from './db/seed';
+ import { useLocale, useModuleLocale } from './i18n/locale';
+@@ -234,6 +237,7 @@ function App() {
+           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
+           <FusionCoreChoiceModal />
+           <AlertHost />
++          <SurvivalClock />
+         </CharacterProvider>
+       </SafeAreaProvider>
+     </PaperProvider>
+diff --git a/__tests__/survival/survival-bridge.test.js b/__tests__/survival/survival-bridge.test.js
+index 9b0d50d..5817530 100644
+--- a/__tests__/survival/survival-bridge.test.js
++++ b/__tests__/survival/survival-bridge.test.js
+@@ -1,11 +1,13 @@
+-// Патчи 208–209 — слушатель расходников выживания (survivalConsumableListener)
+-// и хранилище в зустанд-слайсе stateExtensions: употребление еды/напитков
+-// ЛЮБЫМ путём (инвентарь или модалки) двигает шкалы выживания одинаково,
+-// одним кодом. Операции читают свежее состояние прямо из стора.
++// Патчи 208–210 — слушатель расходников выживания (survivalConsumableListener),
++// хранилище в зустанд-слайсе stateExtensions и гейт настройкой (этап 5):
++// употребление еды/напитков ЛЮБЫМ путём (инвентарь или модалки) двигает
++// шкалы одинаково, одним кодом; при выключенном выживании — заморожено.
++// Операции читают свежее состояние прямо из стора.
+ 
+-import { afterEach, describe, expect, it } from 'vitest';
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+ import useCharacterStore from '../../src/store/characterStore';
+-import { survivalConsumableListener } from '../../modules/fallout/survival/operations';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { sleepSurvival, survivalConsumableListener } from '../../modules/fallout/survival/operations';
+ import { createSurvivalState, SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
+ import food from '../../modules/fallout/data/consumables/food.json';
+ import drinks from '../../modules/fallout/data/consumables/drinks.json';
+@@ -26,8 +28,17 @@ const setStoreSurvival = (survival) => {
+   useCharacterStore.getState().setStateExtensions({ survival });
+ };
+ 
++const setSurvivalEnabled = (value) => {
++  useAppSettingsStore.getState().setValue('survivalModeEnabled', value);
++};
++
++beforeEach(() => {
++  setSurvivalEnabled(true); // операторы выживания тестируем на включённой системе
++});
++
+ afterEach(() => {
+   useCharacterStore.getState().setStateExtensions({});
++  setSurvivalEnabled(false); // дефолт настройки
+ });
+ 
+ describe('survivalConsumableListener: еда и напитки двигают шкалы (через стор)', () => {
+@@ -115,3 +126,88 @@ describe('survivalConsumableListener: еда и напитки двигают ш
+     expect(storeSurvival().food).toBe(5);
+   });
+ });
++
++describe('survival: гейт настройкой survivalModeEnabled (этап 5)', () => {
++  it('выключено — слушатель заморожен: null, шкала не двигается', () => {
++    const start = createSurvivalState('human');
++    start.food = 1;
++    setStoreSurvival(start);
++    setSurvivalEnabled(false);
++    expect(survivalConsumableListener(steak, ctx())).toBeNull();
++    expect(storeSurvival().food).toBe(1);
++  });
++
++  it('включено — слушатель снова работает', () => {
++    const start = createSurvivalState('human');
++    start.food = 1;
++    setStoreSurvival(start);
++    setSurvivalEnabled(false);
++    setSurvivalEnabled(true);
++    const result = survivalConsumableListener(steak, ctx());
++    expect(result).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
++    expect(storeSurvival().food).toBe(3);
++  });
++
++  it('выключено — сон не применяется (reason disabled), состояние не трогается', () => {
++    const start = createSurvivalState('human');
++    start.sleep = 2;
++    setStoreSurvival(start);
++    setSurvivalEnabled(false);
++    const result = sleepSurvival(
++      {
++        setStateExtension: useCharacterStore.getState().setStateExtension,
++        currentHealth: 20,
++        setCurrentHealth: () => {},
++        advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
++        resolveSceneRiskEventById: () => null,
++      },
++      { place: 'bed', hours: 8 },
++    );
++    expect(result).toEqual({ ok: false, reason: 'disabled' });
++    expect(storeSurvival().sleep).toBe(2);
++  });
++});
++
++describe('sleepSurvival: сон применяется к слайсу стора', () => {
++  it('8 часов в кровати: sleep 5, бонус +2, ОЗ обновляется', () => {
++    const start = createSurvivalState('human');
++    start.sleep = 2;
++    setStoreSurvival(start);
++    const hpApplied = [];
++    const result = sleepSurvival(
++      {
++        setStateExtension: useCharacterStore.getState().setStateExtension,
++        currentHealth: 20,
++        setCurrentHealth: (hp) => hpApplied.push(hp),
++        advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
++        resolveSceneRiskEventById: () => null,
++      },
++      { place: 'bed', hours: 8 },
++    );
++    expect(result.ok).toBe(true);
++    expect(storeSurvival().sleep).toBe(5);
++    expect(storeSurvival().hpBonus).toBe(SURVIVAL_RULES.sleep.hpBonus);
++    expect(result.diseaseRiskResult).toBeNull(); // кровать — без проверки болезни
++    expect(hpApplied).toEqual([20]);
++  });
++
++  it('сон в пустоши — проверка болезни', () => {
++    const start = createSurvivalState('human');
++    setStoreSurvival(start);
++    const disease = { status: 'passed' };
++    const result = sleepSurvival(
++      {
++        setStateExtension: useCharacterStore.getState().setStateExtension,
++        currentHealth: 10,
++        setCurrentHealth: () => {},
++        advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
++        resolveSceneRiskEventById: () => disease,
++      },
++      { place: 'wasteland', hours: 4 },
++    );
++    expect(result.ok).toBe(true);
++    expect(result.diseaseRiskResult).toBe(disease);
++    // пустошь: потолок «отдохнувший», бонуса нет
++    expect(storeSurvival().hpBonus).toBe(0);
++  });
++});
+diff --git a/__tests__/survival/survival-settings.test.js b/__tests__/survival/survival-settings.test.js
+new file mode 100644
+index 0000000..69f72a5
+--- /dev/null
++++ b/__tests__/survival/survival-settings.test.js
+@@ -0,0 +1,105 @@
++// Этап 5, патч 210 — настройки выживания (док §10):
++//   - раздел «Выживание» в настройках объединяет прочность оружия (патроны)
++//     и шкалы голода/жажды/сна (решение владельца 2026-09-07);
++//   - survivalModeEnabled — выкл по умолчанию: шкалы скрыты, трекинг
++//     заморожен, состояние в сейве сохраняется;
++//   - survivalTimeCourseMinutes — курс времени, свободный ввод, дефолт 30,
++//     согласован с SURVIVAL_RULES.defaultCourseMinutesPerHour.
++
++import { describe, expect, it } from 'vitest';
++import settingsFile from '../../modules/fallout/settings.json';
++import ruSettings from '../../modules/fallout/i18n/ru-RU/data/system/settings.json';
++import enSettings from '../../modules/fallout/i18n/en-EN/data/system/settings.json';
++import {
++  advanceRealMinutes,
++  createSurvivalState,
++  SURVIVAL_RULES,
++} from '../../modules/fallout/survival/survival';
++
++const byId = (id) => settingsFile.find((setting) => setting.id === id);
++
++describe('survival settings: данные раздела «Выживание»', () => {
++  it('survivalModeEnabled: boolean, выкл по умолчанию, раздел survival', () => {
++    const setting = byId('survivalModeEnabled');
++    expect(setting).toBeTruthy();
++    expect(setting.type).toBe('boolean');
++    expect(setting.defaultValue).toBe(false);
++    expect(setting.sectionKey).toBe('survival');
++    expect(setting.controlSurface).toBe('settings');
++  });
++
++  it('survivalTimeCourseMinutes: number, дефолт 30, свободный ввод, зависит от включения', () => {
++    const setting = byId('survivalTimeCourseMinutes');
++    expect(setting).toBeTruthy();
++    expect(setting.type).toBe('number');
++    expect(setting.defaultValue).toBe(30);
++    expect(setting.min).toBe(1);
++    expect(setting.freeInput).toBe(true);
++    expect(setting.dependsOn).toBe('survivalModeEnabled');
++  });
++
++  it('прочность оружия переехала в раздел «Выживание» без смены id и дефолтов', () => {
++    for (const id of [
++      'weaponDurabilityLossEnabled',
++      'weaponDurabilityLossPer10Shots',
++      'randomWeaponQualityEnabled',
++    ]) {
++      const setting = byId(id);
++      expect(setting).toBeTruthy();
++      expect(setting.sectionKey).toBe('survival');
++    }
++    expect(byId('weaponDurabilityLossEnabled').defaultValue).toBe(false);
++    expect(byId('weaponDurabilityLossPer10Shots').defaultValue).toBe(1);
++    expect(byId('randomWeaponQualityEnabled').defaultValue).toBe(false);
++  });
++
++  it('старый раздел survivalMode больше никем не используется', () => {
++    expect(settingsFile.some((setting) => setting.sectionKey === 'survivalMode')).toBe(false);
++  });
++
++  it('дефолт курса совпадает с константой домена', () => {
++    expect(byId('survivalTimeCourseMinutes').defaultValue)
++      .toBe(SURVIVAL_RULES.defaultCourseMinutesPerHour);
++  });
++
++  it('i18n раздела и подписей полный в обеих локалях', () => {
++    for (const dict of [ruSettings, enSettings]) {
++      expect(typeof dict.survival).toBe('string');
++      expect(typeof dict.survivalSystemTitle).toBe('string');
++      expect(typeof dict.survivalSystemDescription).toBe('string');
++      expect(typeof dict.survivalTimeCourseTitle).toBe('string');
++      expect(typeof dict.survivalTimeCourseDescription).toBe('string');
++    }
++  });
++});
++
++describe('survival settings: курс времени в домене', () => {
++  it('курс 60: 30 реальных минут = половина игрового часа (дробь копится)', () => {
++    const s = advanceRealMinutes(createSurvivalState('human'), 30, 60).state;
++    expect(s.timeCarried).toBeCloseTo(0.5, 5);
++    expect(s.acc.food).toBe(0); // полный час не накопился — тика не было
++  });
++
++  it('курс 60: две порции по 30 минут = ровно один игровой час', () => {
++    let s = createSurvivalState('human');
++    s = advanceRealMinutes(s, 30, 60).state;
++    const result = advanceRealMinutes(s, 30, 60);
++    expect(result.state.timeCarried).toBeCloseTo(0, 5);
++    // Один часовой тик: еда шагает 5 → 4 (шаг накапливается с нуля).
++    expect(result.state.food).toBe(4);
++    expect(result.state.acc.food).toBe(0);
++    expect(result.hpLost).toBe(0); // усталости нет — дрена нет
++  });
++
++  it('курс по умолчанию — 30 (параметр не передан)', () => {
++    const s = advanceRealMinutes(createSurvivalState('human'), 30).state;
++    expect(s.food).toBe(4);
++  });
++
++  it('курс 30 и усталость: часовой тик дренит ОЗ (⌊N/2⌋)', () => {
++    let s = createSurvivalState('human');
++    s.fatigue = [{ source: 'sleep', amount: 3 }];
++    const result = advanceRealMinutes(s, 30, 30);
++    expect(result.hpLost).toBe(1);
++  });
++});
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+index ff7968b..f0e50a8 100644
+--- a/components/settings/SettingsModal.js
++++ b/components/settings/SettingsModal.js
+@@ -1,5 +1,5 @@
+-import React from 'react';
+-import { Modal, View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
++import React, { useEffect, useState } from 'react';
++import { Modal, View, Text, TextInput, Switch, TouchableOpacity, StyleSheet } from 'react-native';
+ import useAppSettingsStore from '../../src/store/appSettingsStore';
+ import {
+   ENGINE_SETTINGS,
+@@ -51,6 +51,60 @@ const tSection = (section) => (
+ 
+ const SETTINGS_SCREEN_SETTINGS = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS);
+ 
++// Число со свободным вводом (флаг freeInput в данных настройки, например
++// курс времени выживания): ввод с клавиатуры + −/+, фиксация при потере
++// фокуса/Enter с клампом в min/max.
++const FreeNumberRow = ({ setting, min, max }) => {
++  const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
++  const setValue = useAppSettingsStore((state) => state.setValue);
++  const [draft, setDraft] = useState(String(value));
++
++  useEffect(() => {
++    setDraft(String(value));
++  }, [value]);
++
++  const commit = () => {
++    const parsed = Number.parseInt(draft, 10);
++    if (!Number.isFinite(parsed)) {
++      setDraft(String(value));
++      return;
++    }
++    const clamped = Math.min(max, Math.max(min, parsed));
++    setDraft(String(clamped));
++    setValue(setting.id, clamped);
++  };
++
++  return (
++    <View style={styles.loss}>
++      <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
++      <View style={styles.counter}>
++        <TouchableOpacity
++          disabled={Number(value) <= min}
++          onPress={() => setValue(setting.id, Number(value) - 1)}
++        >
++          <Text style={styles.button}>−</Text>
++        </TouchableOpacity>
++        <TextInput
++          style={styles.input}
++          value={draft}
++          onChangeText={(text) => setDraft(text.replace(/[^0-9]/g, ''))}
++          onBlur={commit}
++          onSubmitEditing={commit}
++          keyboardType="numeric"
++          maxLength={4}
++        />
++        <TouchableOpacity
++          disabled={Number(value) >= max}
++          onPress={() => setValue(setting.id, Number(value) + 1)}
++        >
++          <Text style={styles.button}>+</Text>
++        </TouchableOpacity>
++      </View>
++      <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
++    </View>
++  );
++};
++
+ const SettingRow = ({ setting }) => {
+   const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
+   const setValue = useAppSettingsStore((state) => state.setValue);
+@@ -58,6 +112,9 @@ const SettingRow = ({ setting }) => {
+   if (setting.type === 'number') {
+     const min = setting.min ?? 0;
+     const max = setting.max ?? 100;
++    if (setting.freeInput) {
++      return <FreeNumberRow setting={setting} min={min} max={max} />;
++    }
+     return (
+       <View style={styles.loss}>
+         <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
+@@ -175,6 +232,14 @@ const styles = StyleSheet.create({
+   counter: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 20 },
+   button: { fontSize: 28, fontWeight: '700', paddingHorizontal: 12 },
+   value: { fontSize: 22, minWidth: 45, textAlign: 'center' },
++  input: {
++    fontSize: 22,
++    minWidth: 64,
++    textAlign: 'center',
++    borderBottomWidth: 1,
++    borderColor: '#999',
++    paddingVertical: 4,
++  },
+   close: { alignSelf: 'flex-end', marginTop: 18, padding: 10 },
+   selectButtons: { flexDirection: 'row', gap: 6 },
+   selectButtonsColumn: { flex: 2, flexDirection: 'column' },
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index 80d872c..cd82e44 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -188,6 +188,10 @@ modules/fallout/
+   `survivalConsumableListener` (шкалы еды/воды двигаются при употреблении
+   любым путём — инвентарь или модалки выживания), и модалка читает свой
+   результат оттуда же. Движок о категориях `food`/`drinks` не знает.
++- патч 210: **модульный фоновый компонент** — `SurvivalClock` (часы
++  выживания) живёт в модуле, а движковая оболочка (App.js) лишь монтирует
++  его рядом с AlertHost; часы читают настройки через общий стор и пишут в
++  слайс расширений. Образец «модуль приносит свой долгоживущий компонент».
+ 
+ Этим механизмом следует пользоваться для любых будущих сеттинговых полей
+ сейва и сеттинговых миграций (например, при переносе остальных
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index b03d137..d4de42d 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,13 +1,13 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.3** от 2026-09-07.
+-Статус: этапы 1–4 реализованы (патчи 197–206); выживание целиком вынесено
+-в модуль сеттинга (патч 207, `modules/fallout/survival/`) через родовой
+-механизм расширений состояния движка; употребление еды/напитков любым
+-путём двигает шкалы (патч 208 — слушатель расходников); состояние
++Редакция **0.4.4** от 2026-09-07.
++Статус: этапы 1–5 реализованы (патчи 197–206, 210); выживание целиком
++вынесено в модуль сеттинга (патч 207, `modules/fallout/survival/`) через
++родовой механизм расширений состояния движка; употребление еды/напитков
++любым путём двигает шкалы (патч 208 — слушатель расходников); состояние
+ выживания живёт в зустанд-слайсе `stateExtensions` стора (патч 209).
+-Следующий шаг — этап 5 (настройки `survivalMode`: включение системы и
+-курс времени).
++Настройки системы и реальный тик времени — патч 210 (этап 5).
++Следующий шаг — этап 6 (движок ОД без UI, §8).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -124,13 +124,15 @@ human/mutant — шкалы им положены по правилу типа.
+ **Контур A — выживание (еда/вода/сон и Усталость):**
+ 
+ - источник — **реальный тик по настроенному курсу**: X реальных минут =
+-  1 игровой час;
++  1 игровой час (реализовано патчем 210: `SurvivalClock`, тик каждые 30 с);
+ - **дефолт 30 минут**, значение меняется свободно числом (60, 10, …);
+ - настройка общая на приложение (исходное значение для всех персонажей),
+   аккумулятор игрового времени — **у каждого персонажа свой**;
+ - копится **только пока приложение открыто** (с данным загруженным
+-  персонажем); между запусками ничего не копится;
+-- при выключенном выживании трекинг заморожен.
++  персонажем); между запусками и в фоне ничего не копится;
++- при выключенном выживании трекинг заморожен;
++- за один тик учитывается не более 5 реальных минут — страховка от
++  патологических скачков таймера при активном приложении.
+ 
+ **Контур B — сцены и временные эффекты (препараты и др.):**
+ 
+@@ -273,15 +275,18 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ ## 10. Настройки
+ 
+-Раздел `survivalMode` (id полей предварительные, структура — как у
+-существующих разделов `modules/fallout/settings.json`):
++Реализовано патчем 210 (этап 5). Раздел **«Выживание»** в настройках —
++совместный с прочностью оружия (решение владельца 2026-09-07: «в нём
++настройки и патронов, и жажды/голода/сна; при отключении не учитываются,
++но в сейвы пишется»): прочность перенесена из прежнего раздела
++`survivalMode` в `survival` без смены id (сохранённые значения целы).
+ 
+ | Поле | Смысл | Значение |
+ |---|---|---|
+-| `survivalModeEnabled` | включение системы | выкл по умолчанию; выкл = нет шкал, поля, трекинга времени; состояние в сейве не удаляется |
+-| `survivalTimeCourseMinutes` | курс времени | сколько реальных минут = 1 игровой час; число, свободный ввод; дефолт **30** |
++| `survivalModeEnabled` | включение системы | выкл по умолчанию; выкл = нет шкал, нет трекинга времени; состояние в сейве не удаляется |
++| `survivalTimeCourseMinutes` | курс времени | сколько реальных минут = 1 игровой час; число, свободный ввод (клавиатура + −/+), диапазон 1–1440; дефолт **30**; показывается при включённой системе |
+ 
+-Настройка едина на приложение; аккумуляторы и шкалы — в сейме персонажа.
++Настройка едина на приложение; аккумуляторы и шкалы — в сейве персонажа.
+ 
+ ---
+ 
+@@ -391,8 +396,8 @@ survival: {
+      `survivalEffectRows`. Роботы/киборги (survival === null) не получают
+      ни шкал, ни строк. Названия состояний — i18n
+      `screens/weaponsAndArmor/screen.json` → `survival.*` (ru/en, полнота
+-     покрыта тестами). Gating настройкой выживания — этап 5 (сейчас поле
+-     видно всем органикам).
++     покрыта тестами). Gating настройкой выживания — готово (патч 210,
++     этап 5): при выключенной системе шкалы/кнопки/строки скрыты.
+    - **Модалки еды/питья/сна — готово (патч 206):** под областями
+      Голод/Жажда/Сон кнопки «Поесть»/«Пить»/«Спать». Еда/питьё — списки
+      предметов инвентаря с превью подъёма из данных (foodGain/drinkGain);
+@@ -408,7 +413,16 @@ survival: {
+      Домен выживания переведён на TypeScript (файл `domain/survival.ts`),
+      новые модалки — `.tsx`, добавлен `npm run typecheck`.
+ 5. **Настройки:** раздел `survivalMode`, курс времени, тик реального времени
+-   в открытом приложении.
++   в открытом приложении. — **Готово (патч 210):** раздел «Выживание» в
++   настройках (совместно с прочностью оружия — решение владельца
++   2026-09-07), `survivalModeEnabled` (выкл по умолчанию, выкл = шкалы
++   скрыты и трекинг заморожен, состояние в сейве сохраняется),
++   `survivalTimeCourseMinutes` (свободный ввод, дефолт 30), компонент
++   `SurvivalClock` в модуле: тик каждые 30 с реального времени, копится
++   только при активном приложении с загруженным персонажем (AppState
++   active; между запусками и в фоне — ничего), за один тик — не более
++   5 реальных минут (страховка от скачков таймера). Курс передаётся
++   домену параметром `advanceRealMinutes(state, minutes, course)`.
+ 6. **Движок ОД (без UI):** пул, ручные операции, условия получения,
+    правило Усталости.
+ 
+@@ -435,6 +449,19 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.4 (2026-09-07):** этап 5 — настройки и реальный тик (патч 210).
++  Раздел «Выживание» в настройках: `survivalModeEnabled` (выкл по
++  умолчанию; выкл = шкалы скрыты, трекинг заморожен, состояние в сейве
++  сохраняется — гейт в хуках `useSurvivalState`, слушателе расходников и
++  `sleepSurvival`) и `survivalTimeCourseMinutes` (свободный ввод, дефолт
++  30, согласован с `SURVIVAL_RULES.defaultCourseMinutesPerHour`; курс —
++  параметр `advanceRealMinutes`). Прочность оружия перенесена в раздел
++  «Выживание» из `survivalMode` без смены id (решение владельца). Тик —
++  `SurvivalClock` (модуль, монтируется в App.js рядом с AlertHost): каждые
++  30 с реального времени, только при активном приложении (AppState) с
++  загруженным персонажем, не более 5 реальных минут за тик; дрен ОЗ — через
++  `setCurrentHealth` контекста. Модалка настроек: числа со `freeInput` —
++  ввод с клавиатуры (+ −/+), кламп в min/max.
+ - **0.4.3 (2026-09-07):** выживание в зустанд-сторе (патч 209). Слайс
+   `stateExtensions` в `characterStore` (как items/effects): рантайм-истина —
+   стор, мутации только действиями стора, экраны подписаны селектором
+diff --git a/modules/fallout/i18n/en-EN/data/system/settings.json b/modules/fallout/i18n/en-EN/data/system/settings.json
+index 3620867..c61f285 100644
+--- a/modules/fallout/i18n/en-EN/data/system/settings.json
++++ b/modules/fallout/i18n/en-EN/data/system/settings.json
+@@ -1,7 +1,11 @@
+ {
+-  "survivalMode": "Survival mode settings",
++  "survival": "Survival",
+   "combat": "Combat",
+   "interface": "Interface",
++  "survivalSystemTitle": "Hunger, thirst, sleep",
++  "survivalSystemDescription": "Hunger/thirst/sleep scales, fatigue and hourly HP loss. When off — the scales are hidden and time tracking is frozen; the character's state is kept in the save.",
++  "survivalTimeCourseTitle": "Time course",
++  "survivalTimeCourseDescription": "How many real minutes make one survival in-game hour (default 30). Time only accumulates while the app is open with a loaded character.",
+   "durabilityTitle": "Weapon wear on shots",
+   "durabilityDescription": "Enable weapon wear mechanics on shots.",
+   "lossTitle": "Durability loss per 10 shots",
+diff --git a/modules/fallout/i18n/ru-RU/data/system/settings.json b/modules/fallout/i18n/ru-RU/data/system/settings.json
+index e3a70b2..3d3d564 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/settings.json
++++ b/modules/fallout/i18n/ru-RU/data/system/settings.json
+@@ -1,7 +1,11 @@
+ {
+-  "survivalMode": "Настройки режима «Выживание»",
++  "survival": "Выживание",
+   "combat": "Бой",
+   "interface": "Интерфейс",
++  "survivalSystemTitle": "Голод, жажда, сон",
++  "survivalSystemDescription": "Шкалы голода/жажды/сна, усталость и потеря ОЗ по часам. Выключено — шкалы скрыты и трекинг времени заморожен; состояние персонажа в сейве сохраняется.",
++  "survivalTimeCourseTitle": "Курс времени",
++  "survivalTimeCourseDescription": "Сколько реальных минут длится один игровой час выживания (по умолчанию 30). Время копится только пока приложение открыто с загруженным персонажем.",
+   "durabilityTitle": "Износ оружия при выстреле",
+   "durabilityDescription": "Включить механику износа оружия при выстрелах.",
+   "lossTitle": "Расход прочности за 10 выстрелов",
+diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
+index d4d227a..c99fb24 100644
+--- a/modules/fallout/settings.json
++++ b/modules/fallout/settings.json
+@@ -1,9 +1,31 @@
+ [
++  {
++    "id": "survivalModeEnabled",
++    "type": "boolean",
++    "controlSurface": "settings",
++    "sectionKey": "survival",
++    "labelKey": "settings.survivalSystemTitle",
++    "descriptionKey": "settings.survivalSystemDescription",
++    "defaultValue": false
++  },
++  {
++    "id": "survivalTimeCourseMinutes",
++    "type": "number",
++    "controlSurface": "settings",
++    "sectionKey": "survival",
++    "labelKey": "settings.survivalTimeCourseTitle",
++    "descriptionKey": "settings.survivalTimeCourseDescription",
++    "defaultValue": 30,
++    "min": 1,
++    "max": 1440,
++    "freeInput": true,
++    "dependsOn": "survivalModeEnabled"
++  },
+   {
+     "id": "weaponDurabilityLossEnabled",
+     "type": "boolean",
+     "controlSurface": "settings",
+-    "sectionKey": "survivalMode",
++    "sectionKey": "survival",
+     "labelKey": "settings.durabilityTitle",
+     "descriptionKey": "settings.durabilityDescription",
+     "defaultValue": false
+@@ -12,7 +34,7 @@
+     "id": "weaponDurabilityLossPer10Shots",
+     "type": "number",
+     "controlSurface": "settings",
+-    "sectionKey": "survivalMode",
++    "sectionKey": "survival",
+     "labelKey": "settings.lossTitle",
+     "descriptionKey": "settings.lossDescription",
+     "defaultValue": 1,
+@@ -24,7 +46,7 @@
+     "id": "randomWeaponQualityEnabled",
+     "type": "boolean",
+     "controlSurface": "settings",
+-    "sectionKey": "survivalMode",
++    "sectionKey": "survival",
+     "labelKey": "settings.qualityTitle",
+     "descriptionKey": "settings.qualityDescription",
+     "defaultValue": false,
+diff --git a/modules/fallout/survival/SurvivalClock.js b/modules/fallout/survival/SurvivalClock.js
+new file mode 100644
+index 0000000..1d3157a
+--- /dev/null
++++ b/modules/fallout/survival/SurvivalClock.js
+@@ -0,0 +1,101 @@
++// Часы выживания — компонент модуля Fallout (этап 5, патч 210).
++//
++// Реальный тик контура A (док §5): X реальных минут = 1 игровой час,
++// курс — настройка survivalTimeCourseMinutes (дефолт 30). Правила:
++//   - копится только пока приложение открыто (AppState active) и персонаж
++//     загружен (есть поле survival); между запусками и в фоне — ничего;
++//   - при выключенной настройке survivalModeEnabled трекинг заморожен;
++//   - за один тик учитывается не более 5 реальных минут — страховка от
++//     патологических скачков таймера (при активном приложении они не
++//     случаются в норме).
++//
++// Монтируется в App.js рядом с AlertHost (внутри CharacterProvider).
++// Рендерит null: только таймер и запись результата в стор + дрен ОЗ.
++//
++// Движок не знает правил: компонент читает настройки через общий стор,
++// состояние — из слайса stateExtensions, дрен ОЗ — через контекст
++// (setCurrentHealth — родовой счётчик персонажа).
++
++import { useEffect, useRef } from 'react';
++import { AppState } from 'react-native';
++import useCharacterStore from '../../../src/store/characterStore';
++import useAppSettingsStore from '../../../src/store/appSettingsStore';
++import { useCharacter } from '../../../components/CharacterContext';
++import { advanceRealMinutes } from './survival';
++
++const TICK_INTERVAL_MS = 30_000;
++const MAX_REAL_MINUTES_PER_TICK = 5;
++
++const SurvivalClock = () => {
++  const { currentHealth, setCurrentHealth } = useCharacter();
++  const healthRef = useRef(currentHealth);
++  healthRef.current = currentHealth;
++  const setHealthRef = useRef(setCurrentHealth);
++  setHealthRef.current = setCurrentHealth;
++
++  useEffect(() => {
++    let lastTickAt = null;
++    let timer = null;
++
++    const tick = () => {
++      const now = Date.now();
++      const elapsedRealMinutes = Math.min(
++        (now - (lastTickAt ?? now)) / 60_000,
++        MAX_REAL_MINUTES_PER_TICK,
++      );
++      lastTickAt = now;
++
++      const settings = useAppSettingsStore.getState();
++      if (!settings.getSettingValue('survivalModeEnabled')) return;
++
++      const store = useCharacterStore.getState();
++      const survival = store.stateExtensions?.survival ?? null;
++      if (!survival) return;
++
++      const course = settings.getSettingValue('survivalTimeCourseMinutes');
++      if (!(course > 0)) return; // страховка: домен бросает на неположительном курсе
++      const result = advanceRealMinutes(survival, elapsedRealMinutes, course);
++      store.setStateExtension('survival', result.state);
++
++      if (result.hpLost > 0) {
++        const hp = healthRef.current;
++        if (hp != null) {
++          setHealthRef.current(Math.max(0, hp - result.hpLost));
++        }
++      }
++    };
++
++    const stop = () => {
++      if (timer) {
++        clearInterval(timer);
++        timer = null;
++      }
++      lastTickAt = null; // в фоне время не копится
++    };
++
++    const start = () => {
++      if (timer) return;
++      lastTickAt = Date.now();
++      timer = setInterval(tick, TICK_INTERVAL_MS);
++    };
++
++    const handleAppStateChange = (nextState) => {
++      if (nextState === 'active') start();
++      else stop();
++    };
++
++    const subscription = AppState.addEventListener('change', handleAppStateChange);
++    // AppState.currentState бывает null при первом рендере (native) — считаем
++    // приложение активным и запускаемся; фоновое состояние поймает 'change'.
++    if (AppState.currentState !== 'background') start();
++
++    return () => {
++      stop();
++      subscription.remove();
++    };
++  }, []);
++
++  return null;
++};
++
++export default SurvivalClock;
+diff --git a/modules/fallout/survival/hooks.js b/modules/fallout/survival/hooks.js
+index 22d74bb..bd8a217 100644
+--- a/modules/fallout/survival/hooks.js
++++ b/modules/fallout/survival/hooks.js
+@@ -2,14 +2,22 @@
+ // stateExtensions зустанд-стора: хук подписан селектором напрямую на стор
+ // (как экраны на items/effects), мутации — только действия стора. Движок
+ // хранит поле как непрозрачный словарь и правил не знает.
++//
++// С этапа 5 (патч 210) состояние видимо только при включённой настройке
++// survivalModeEnabled (док §10): выключено — хук возвращает null, шкалы,
++// кнопки и строки эффектов скрываются сами, состояние в сейве остаётся.
+ 
+ import useCharacterStore from '../../../src/store/characterStore';
++import useAppSettingsStore, { selectSurvivalModeEnabled } from '../../../src/store/appSettingsStore';
+ import { useCharacter } from '../../../components/CharacterContext';
+ import { sleepSurvival } from './operations';
+ 
+-/** Текущее состояние выживания (null у роботов/киборгов и до создания). */
+-export const useSurvivalState = () =>
+-  useCharacterStore((s) => s.stateExtensions?.survival ?? null);
++/** Текущее состояние выживания (null: выключено настройкой, робот/киборг, не создано). */
++export const useSurvivalState = () => {
++  const enabled = useAppSettingsStore(selectSurvivalModeEnabled);
++  const survival = useCharacterStore((s) => s.stateExtensions?.survival ?? null);
++  return enabled ? survival : null;
++};
+ 
+ /** Операции выживания: смена состояния поля (действие стора) и сон. */
+ export const useSurvivalActions = () => {
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+index 5d4b160..f0692cc 100644
+--- a/modules/fallout/survival/operations.js
++++ b/modules/fallout/survival/operations.js
+@@ -12,6 +12,7 @@
+ // импортирует React и не знает, где живёт состояние.
+ 
+ import useCharacterStore from '../../../src/store/characterStore';
++import useAppSettingsStore from '../../../src/store/appSettingsStore';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { consumeDrink, consumeFood, rest } from './survival';
+ 
+@@ -23,14 +24,21 @@ import { consumeDrink, consumeFood, rest } from './survival';
+ const currentSurvival = () =>
+   useCharacterStore.getState().stateExtensions?.survival ?? null;
+ 
++// Гейт настройкой (этап 5, патч 210): выключенное выживание заморожено —
++// шкалы не двигаются, трекинг не идёт; состояние в сейве сохраняется.
++const survivalEnabled = () =>
++  useAppSettingsStore.getState().getSettingValue('survivalModeEnabled') === true;
++
+ /**
+  * Слушатель применённых расходников (реестр stateExtensions, патч 208).
+  * Движок зовёт его в конце applyConsumableFull — то есть при употреблении
+  * еды/напитков ЛЮБЫМ путём (инвентарь или модалка выживания) шкалы
+  * выживания двигаются одинаково. Возвращает null, если предмет —
+- * не еда/напиток или у персонажа нет выживания (робот/киборг).
++ * не еда/напиток, у персонажа нет выживания (робот/киборг) или система
++ * выключена настройкой (заморожено).
+  */
+ export const survivalConsumableListener = (item, ctx) => {
++  if (!survivalEnabled()) return null;
+   const survival = currentSurvival();
+   if (!survival) return null;
+ 
+@@ -50,6 +58,8 @@ export const survivalConsumableListener = (item, ctx) => {
+ };
+ 
+ export const sleepSurvival = (ctx, { place, hours }) => {
++  if (!survivalEnabled()) return { ok: false, reason: 'disabled' };
++
+   const {
+     setStateExtension,
+     currentHealth,
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index f17a442..26e4dda 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -237,3 +237,5 @@ export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingV
+ export const selectRandomWeaponQualityEnabled = (state) => state.getSettingValue('randomWeaponQualityEnabled');
+ export const selectUnarmedAttackVisible = (state) => state.getSettingValue('unarmedAttackVisible');
+ export const selectRobotArmPartsStrictReplace = (state) => state.getSettingValue('robotArmPartsStrictReplace');
++export const selectSurvivalModeEnabled = (state) => state.getSettingValue('survivalModeEnabled');
++export const selectSurvivalTimeCourseMinutes = (state) => state.getSettingValue('survivalTimeCourseMinutes');
+-- 
+2.39.5
+

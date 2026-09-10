@@ -1,0 +1,217 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 07:05:00 +0000
+Subject: [PATCH] патч 219: слайс equipment в zustand-сторе — комплект
+ снаряжения хранится в сторе (единый источник истины), CharacterContext —
+ тонкий фасад
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Шаг миграции комплекта снаряжения (equipment) из CharacterContext в
+зустанд-стор — по аналогии со слайсом stateExtensions (патч 209):
+
+- characterStore: начальный стейт equipment: null, экшен setEquipment
+  (поддерживает функциональный апдейтер prev => next — паттерн
+  LimbUpgradeModal), equipment в partialize персиста и в сбросе
+  resetCharacterStore;
+- CharacterContext: useState заменён на селектор + экшен стора, контекст —
+  тонкий фасад useCharacter().equipment / setEquipment для существующих
+  экранов; mergeEquipmentWithStore больше не вызывается (мержить нечего —
+  источник один), функция оставлена в migrations.js;
+- фикс по пути: resetCharacterStore теперь обнуляет комплект — раньше
+  стейт equipment не сбрасывался при полном ресете персонажа;
+- тест __tests__/saves/equipment-store-slice.test.js: прямой сет,
+  функциональный апдейтер, persist-раундтрип, сброс.
+
+Экраны (CharacterScreen, InventoryScreen, LimbUpgradeModal) не тронуты —
+интерфейс useCharacter() не изменился.
+---
+ __tests__/saves/equipment-store-slice.test.js | 84 +++++++++++++++++++++++++++
+ components/CharacterContext.js                | 10 +++-
+ src/store/characterStore.js                   | 19 ++++++
+ 3 files changed, 110 insertions(+), 3 deletions(-)
+
+diff --git a/__tests__/saves/equipment-store-slice.test.js b/__tests__/saves/equipment-store-slice.test.js
+new file mode 100644
+index 0000000..2820039
+--- /dev/null
++++ b/__tests__/saves/equipment-store-slice.test.js
+@@ -0,0 +1,84 @@
++// Шаг миграции equipment из CharacterContext в characterStore: комплект
++// снаряжения ({ id, name, weight, price, items, purchaseMaxRarity } | null)
++// хранится в зустанд-сторе, Context — тонкий фасад (селектор + экшен) для
++// существующих экранов (useCharacter().equipment / setEquipment).
++//
++// Покрывает:
++//  - прямой сет объекта (CharacterScreen.handleSelectKit, loadCharacter);
++//  - функциональный апдейтер prev => next (LimbUpgradeModal переносит
++//    снимаемую конечность в equipment.items);
++//  - персист: equipment входит в partialize и переживает rehydrate;
++//  - resetCharacterStore сбрасывает комплект в null (resetCharacter /
++//    resetKitAndRewards больше не оставляют «хвост» от прошлого персонажа).
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import useCharacterStore from '../../src/store/characterStore';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++const kit = {
++  id: 'starting_kit',
++  name: 'Стартовый комплект',
++  weight: 12.5,
++  price: 300,
++  items: [{ id: 'chem_stimpak', name: 'Стимпак', quantity: 2 }],
++  purchaseMaxRarity: null,
++};
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: слайс equipment', () => {
++  it('начальное состояние — null', () => {
++    expect(useCharacterStore.getState().equipment).toBeNull();
++  });
++
++  it('setEquipment сохраняет объект комплекта целиком', () => {
++    useCharacterStore.getState().setEquipment(kit);
++    expect(useCharacterStore.getState().equipment).toEqual(kit);
++  });
++
++  it('setEquipment поддерживает функциональный апдейтер (prev => next)', () => {
++    const store = useCharacterStore.getState();
++    store.setEquipment(kit);
++    // Паттерн LimbUpgradeModal: дописать предмет в items комплекта.
++    store.setEquipment((prev) => ({
++      ...prev,
++      items: [...(prev?.items || []), { id: 'robotArm_x', name: 'Манипулятор' }],
++    }));
++    const equipment = useCharacterStore.getState().equipment;
++    expect(equipment.items).toHaveLength(2);
++    expect(equipment.id).toBe(kit.id);
++  });
++
++  it('equipment входит в partialize и переживает persist → rehydrate', async () => {
++    useCharacterStore.getState().setEquipment(kit);
++
++    // Ждём асинхронную запись персиста и проверяем, что partialize
++    // включил equipment в сохраняемое состояние.
++    const raw = await vi.waitFor(async () => {
++      const data = await AsyncStorage.getItem('character-store');
++      expect(data).not.toBeNull();
++      expect(JSON.parse(data).state.equipment).toEqual(kit);
++      return data;
++    });
++    expect(JSON.parse(raw).version).toBe(CURRENT_SCHEMA_VERSION);
++
++    // Раундтрип в духе character-store-rehydration.test.js: пишем запись
++    // руками (сброс стора сам перезаписал бы storage), ре-гидрация
++    // возвращает комплект в стейт.
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().equipment).toBeNull();
++    await AsyncStorage.setItem('character-store', raw);
++    await useCharacterStore.persist.rehydrate();
++    expect(useCharacterStore.getState().equipment).toEqual(kit);
++  });
++
++  it('resetCharacterStore сбрасывает комплект в null', () => {
++    useCharacterStore.getState().setEquipment(kit);
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().equipment).toBeNull();
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 604b53d..26d5030 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -114,7 +114,7 @@ import { Platform } from 'react-native';
+ 
+ // Zustand Store integration (Task 4.1)
+ import useCharacterStore from '../src/store/characterStore';
+-import { denormalizeCharacterState, migrateCharacterState, mergeEquipmentWithStore, mergeEquippedWeapons } from '../src/store/migrations.js';
++import { denormalizeCharacterState, migrateCharacterState, mergeEquippedWeapons } from '../src/store/migrations.js';
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/saveSchema.js';
+ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
+ 
+@@ -270,7 +270,6 @@ const mergeSnapshotWithStoreData = (snapshot) => {
+     ...snapshot,
+     attributes: preferFilled(legacyData.attributes, snapshot.attributes),
+     skills: preferFilled(legacyData.skills, snapshot.skills),
+-    equipment: mergeEquipmentWithStore(snapshot.equipment, legacyData.equipment),
+     equippedWeapons: mergeEquippedWeapons(snapshot.equippedWeapons, legacyData.equippedWeapons),
+     activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
+     rewardedSkills: legacyData.rewardedSkills,
+@@ -290,7 +289,6 @@ export const CharacterProvider = ({ children }) => {
+   const [forcedSelectedSkills, setForcedSelectedSkills] = useState([]);
+   const [origin, setOrigin] = useState(null);
+   const [trait, setTrait] = useState(null);
+-  const [equipment, setEquipment] = useState(null);
+   const [effects, setEffects] = useState([]);
+   const [activeTimedEffects, setActiveTimedEffects] = useState([]);
+   const [sceneCounter, setSceneCounter] = useState(0);
+@@ -306,6 +304,12 @@ export const CharacterProvider = ({ children }) => {
+   // раскладывает его в снапшот сейва под теми же ключами.
+   const stateExtensions = useCharacterStore((s) => s.stateExtensions);
+ 
++  // Комплект снаряжения: единственный источник — Zustand стор (Шаг 1 миграции
++  // из CharacterContext). Context — тонкий фасад для обратной совместимости
++  // существующих экранов (useCharacter().equipment / setEquipment).
++  const equipment = useCharacterStore((s) => s.equipment);
++  const setEquipment = useCharacterStore((s) => s.setEquipment);
++
+   // Новый персонаж: как только выбран ориджин — сеттинговые фабрики
+   // заполняют ещё не созданные поля (null = «не создано»). При загрузке
+   // сейва поля заданы миграцией/гидратацией — эффект их не трогает.
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 6d153dd..0b0b47f 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -210,6 +210,11 @@ const useCharacterStore = create(devtools(
+       // селекторами. В сейв поля идут под своими ключами верхнего уровня
+       // (buildSnapshot контекста раскладывает словарь).
+       stateExtensions: {},
++      // Комплект снаряжения { id, name, weight, price, items,
++      // purchaseMaxRarity } | null — единственный источник истины, мигрирован
++      // из useState в CharacterContext. Мутации — только через setEquipment
++      // (поддерживает и функциональный апдейтер prev => next).
++      equipment: null,
+       selectedPerks: [],
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
+@@ -1009,6 +1014,18 @@ const useCharacterStore = create(devtools(
+         stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
+       })),
+ 
++      /**
++       * Комплект снаряжения персонажа: { id, name, weight, price, items,
++       * purchaseMaxRarity } | null. Единственный источник — стор (мигрировано
++       * из CharacterContext). Поддерживает функциональный апдейтер (prev => next)
++       * для обратной совместимости с существующими вызовами.
++       */
++      setEquipment: (updater) => {
++        set((state) => ({
++          equipment: typeof updater === 'function' ? updater(state.equipment) : updater,
++        }));
++      },
++
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+        *
+@@ -1030,6 +1047,7 @@ const useCharacterStore = create(devtools(
+           rewardedSkills: legacyDefaults?.rewardedSkills || [],
+           perkBonuses: {},
+           derivedStats: {},
++          equipment: null,
+           _characterContext: undefined,
+           ...createInitialRobotState(),
+         });
+@@ -1080,6 +1098,7 @@ const useCharacterStore = create(devtools(
+         rewardedSkills: state.rewardedSkills,
+         robot: state.robot,
+         stateExtensions: state.stateExtensions,
++        equipment: state.equipment,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
