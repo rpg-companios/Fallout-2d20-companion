@@ -1,0 +1,593 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 11:05:00 +0000
+Subject: [PATCH] патч 225: слим экспорта (тело сейва без дублей каталога),
+ мост навыков в домен с фиксом тихого no-op, фикстура грязного сейва v18
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+1. Экспорт худым телом: createCharacterExportPayload(row, { getEntry })
+   прогоняет тело через slimSaveData — в файл идут только состояние
+   экземпляров предметов; импорт восстанавливает каталогом
+   (restoreSaveData), как БД-путь с v19. Формат не меняется. HomeScreen
+   передаёт каталог активной локали.
+
+2. Мост канонизации навыков → domain/skillCanonical.js. ФИКС: мост читал
+   skillsCatalog из движкового screen.json, а каталог навыков — в слое
+   сеттинга; карта была пуста, legacy-сейвы с русскими именами навыков
+   тихо не канонизировались. Теперь склоненный словарь (deepMerge),
+   как tCharacterScreen.
+
+3. Фикстура грязного сейва v18 (обезличенный реальный экспорт) + тесты:
+   миграции v18→v25 без потерь, каталог-рестор (стаб не ломается),
+   слайм→рестор круговой рейс, мост RU→ключи/no-op/мусор.
+---
+ __tests__/fixtures/dirty-save-v18.json      | 268 ++++++++++++++++++++++++++++
+ __tests__/saves/dirty-save-v18.test.js      | 123 +++++++++++++
+ components/CharacterContext.js              |  20 +--
+ components/screens/HomeScreen/HomeScreen.js |  15 +-
+ domain/characterTransfer.js                 |  11 +-
+ domain/skillCanonical.js                    |  43 +++++
+ 6 files changed, 460 insertions(+), 20 deletions(-)
+
+diff --git a/__tests__/fixtures/dirty-save-v18.json b/__tests__/fixtures/dirty-save-v18.json
+new file mode 100644
+index 0000000..76764d1
+--- /dev/null
++++ b/__tests__/fixtures/dirty-save-v18.json
+@@ -0,0 +1,268 @@
++{
++  "characterName": "dirty-fixture",
++  "level": 1,
++  "attributes": [
++    { "name": "STR", "value": 5 },
++    { "name": "END", "value": 6 },
++    { "name": "PER", "value": 6 },
++    { "name": "AGI", "value": 6 },
++    { "name": "INT", "value": 6 },
++    { "name": "CHA", "value": 5 },
++    { "name": "LCK", "value": 6 }
++  ],
++  "skills": [
++    { "name": "ATHLETICS", "value": 3 },
++    { "name": "BARTER", "value": 3 },
++    { "name": "BIG_GUNS", "value": 3 },
++    { "name": "ENERGY_WEAPONS", "value": 3 },
++    { "name": "EXPLOSIVES", "value": 3 },
++    { "name": "LOCKPICK", "value": 3 },
++    { "name": "MEDICINE", "value": 1 },
++    { "name": "MELEE_WEAPONS", "value": 0 },
++    { "name": "PILOT", "value": 0 },
++    { "name": "REPAIR", "value": 0 },
++    { "name": "SCIENCE", "value": 0 },
++    { "name": "SMALL_GUNS", "value": 0 },
++    { "name": "SNEAK", "value": 0 },
++    { "name": "SPEECH", "value": 2 },
++    { "name": "SURVIVAL", "value": 0 },
++    { "name": "THROWING", "value": 0 },
++    { "name": "UNARMED", "value": 0 }
++  ],
++  "selectedSkills": [],
++  "extraTaggedSkills": [],
++  "forcedSelectedSkills": [],
++  "origin": { "id": "minuteman" },
++  "trait": {
++    "ids": ["minuteman-peoples-militia"],
++    "id": "minuteman-peoples-militia",
++    "name": "Народное ополчение",
++    "modifiers": {
++      "extraSkills": 1,
++      "forcedSkills": ["SPEECH"],
++      "skillPickChoice": {
++        "count": 1,
++        "from": ["SMALL_GUNS", "SURVIVAL", "SPEECH"]
++      },
++      "effects": [
++        "improved_caravans",
++        "base_defense_4",
++        "cover_dr_bonus",
++        "outnumbered_damage_bonus"
++      ],
++      "skillPickSelected": ["SPEECH"]
++    }
++  },
++  "equipment": {
++    "name": "Застрельщик Минитмен",
++    "weight": 18.5,
++    "price": 224,
++    "items": [
++      {
++        "id": "clothing_casual_clothes",
++        "instanceId": "clothing_casual_clothes",
++        "weaponId": "clothing_casual_clothes",
++        "name": "Повседневная одежда",
++        "itemType": "clothing",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 1,
++        "stackKey": "clothing_casual_clothes",
++        "appliedMods": {},
++        "physicalDamageRating": 0,
++        "energyDamageRating": 0,
++        "radiationDamageRating": 0,
++        "cost": 20,
++        "rarity": 1,
++        "weight": 1,
++        "durabilityTracked": false,
++        "protectedAreas": ["Body", "Hand", "Leg"]
++      },
++      {
++        "id": "headwear_military_helmet",
++        "instanceId": "headwear_military_helmet",
++        "weaponId": "headwear_military_helmet",
++        "name": "Армейский шлем",
++        "itemType": "clothing",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 1,
++        "stackKey": "headwear_military_helmet",
++        "appliedMods": {},
++        "physicalDamageRating": 2,
++        "energyDamageRating": 0,
++        "radiationDamageRating": 0,
++        "cost": 20,
++        "rarity": 1,
++        "weight": 1.5,
++        "durabilityTracked": false,
++        "protectedAreas": ["Head"]
++      },
++      {
++        "id": "armor_metal_chest_001",
++        "instanceId": "armor_metal_chest_001",
++        "weaponId": "armor_metal_chest_001",
++        "name": "Металлический Нагрудник",
++        "itemType": "armor",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 1,
++        "stackKey": "armor_metal_chest_001",
++        "appliedMods": {},
++        "physicalDamageRating": 2,
++        "energyDamageRating": 1,
++        "radiationDamageRating": 0,
++        "cost": 40,
++        "rarity": 1,
++        "weight": 6,
++        "imageName": "metal_armor_chest",
++        "durabilityTracked": false,
++        "protectedAreas": ["Body"]
++      },
++      {
++        "id": "weapon_double_barrel_shotgun",
++        "instanceId": "weapon_double_barrel_shotgun",
++        "weaponId": "weapon_double_barrel_shotgun",
++        "name": "Двуствольный дробовик",
++        "itemType": "weapon",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 1,
++        "stackKey": "weapon_double_barrel_shotgun",
++        "appliedMods": {},
++        "damage": 5,
++        "fireRate": 0,
++        "range": "C",
++        "damageType": "physical",
++        "cost": "39",
++        "rarity": "1",
++        "weight": "9",
++        "ammoId": "ammo_shotgun_shell",
++        "qualities": "[{\"qualityId\":\"quality_two-handed\"},{\"qualityId\":\"quality_inaccurate\"}]",
++        "imageName": "Double-Barrel Shotgun",
++        "durabilityTracked": false
++      },
++      {
++        "id": "ammo_shotgun_shell",
++        "instanceId": "ammo_shotgun_shell",
++        "weaponId": "ammo_shotgun_shell",
++        "name": "Патроны для дробовика",
++        "itemType": "ammo",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 5,
++        "stackKey": "ammo_shotgun_shell",
++        "appliedMods": {},
++        "cost": "3",
++        "rarity": "1",
++        "durabilityTracked": false
++      },
++      {
++        "id": "chem_super_stimpak",
++        "instanceId": "chem_super_stimpak",
++        "weaponId": "chem_super_stimpak",
++        "name": "Суперстимулятор",
++        "itemType": "chem",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 1,
++        "stackKey": "chem_super_stimpak",
++        "appliedMods": {},
++        "cost": 90,
++        "rarity": 4,
++        "weight": 0.5,
++        "durabilityTracked": false,
++        "positiveEffect": {
++          "hpModifier": { "op": "+", "value": 8 }
++        },
++        "positiveEffectDuration": "instant",
++        "positiveEffectLabel": "Восстанавливает 8 HP",
++        "negativeEffect": "",
++        "negativeEffectDuration": "",
++        "negativeEffectLabel": "",
++        "addictionLevel": 0
++      },
++      {
++        "id": "trinkets_stub_2",
++        "instanceId": "trinkets_stub_2",
++        "weaponId": "trinkets_stub_2",
++        "name": "Заглючивший голодиск",
++        "itemType": "misc",
++        "equipped": false,
++        "locked": false,
++        "requiresMkII": false,
++        "quantity": 1,
++        "stackKey": "trinkets_stub_2",
++        "appliedMods": {},
++        "cost": 0,
++        "rarity": 0,
++        "weight": 0.5,
++        "durabilityTracked": false
++      },
++      {
++        "id": "unarmed_human",
++        "isBuiltin": true,
++        "equipped": true
++      }
++    ]
++  },
++  "effects": [
++    "improved_caravans",
++    "base_defense_4",
++    "cover_dr_bonus",
++    "outnumbered_damage_bonus"
++  ],
++  "activeTimedEffects": [],
++  "sceneCounter": 0,
++  "equippedWeapons": [
++    { "id": "unarmed_human", "isBuiltin": true }
++  ],
++  "equippedRobotSlots": null,
++  "equippedRobotModules": [],
++  "mk2Installed": false,
++  "equippedArmor": {
++    "head": { "armor": null, "clothing": null },
++    "body": { "armor": null, "clothing": null },
++    "leftArm": { "armor": null, "clothing": null },
++    "rightArm": { "armor": null, "clothing": null },
++    "leftLeg": { "armor": null, "clothing": null },
++    "rightLeg": { "armor": null, "clothing": null }
++  },
++  "equippedPowerArmor": {
++    "frame": null,
++    "pieces": {
++      "head": null,
++      "body": null,
++      "leftArm": null,
++      "rightArm": null,
++      "leftLeg": null,
++      "rightLeg": null
++    }
++  },
++  "powerArmorRuntime": { "coreAccumulatorMs": 0 },
++  "caps": 5,
++  "currentHealth": 12,
++  "radiation": 0,
++  "modifiedItems": [],
++  "availablePerkAttributePoints": 0,
++  "luckPoints": 6,
++  "maxLuckPoints": 6,
++  "attributesSaved": true,
++  "skillsSaved": false,
++  "selectedPerks": [],
++  "carryWeight": 200,
++  "meleeBonus": 0,
++  "initiative": 12,
++  "defense": 1,
++  "conditions": [],
++  "chemDosesLog": [],
++  "sceneRiskStates": {},
++  "rewardedSkills": [],
++  "schemaVersion": 18
++}
+diff --git a/__tests__/saves/dirty-save-v18.test.js b/__tests__/saves/dirty-save-v18.test.js
+new file mode 100644
+index 0000000..94b7437
+--- /dev/null
++++ b/__tests__/saves/dirty-save-v18.test.js
+@@ -0,0 +1,123 @@
++// Регресс-фикстура «грязного» сейва (реальный экспорт персонажа Minuteman,
++// schemaVersion 18, обезличен). Такой сейв ДОЛЖЕН загружаться как положено:
++//
++//  - навыки уже канонические ключи (мост migrateSkillsToCanonical — no-op),
++//    а legacy-сейвы с русскими именами («Ремонт») канонизируются на загрузке;
++//  - в equipment.items болтается «призрак» встроенного кулака
++//    (unarmed_human, isBuiltin, без instanceId) — артефакт старого флоу
++//    выдачи комплекта; конвейер должен его ТЕРПЕТЬ, не падая;
++//  - caps — персистентный контракт (рантайм-имя currency, поле сейва caps);
++//  - мёртвые производные (carryWeight/initiative/…) игнорируются конвейером
++//    и осыпаются при следующем сохранении;
++//  - жирные предметы (имена/статы/imageName в файле) — норма для v18
++//    (слайм начался с v19): каталог на загрузке восстанавливает их заново.
++//
++// Дополнительно фиксируется НОВЫЙ слим экспорта (патч 225): slimSaveData →
++// restoreSaveData на этом же сейве — круговой рейс без потерь имени.
++
++import { describe, expect, it } from 'vitest';
++import fixture from '../fixtures/dirty-save-v18.json';
++import { migrateCharacterState } from '../../src/store/migrations';
++import { restoreSaveData, slimSaveData } from '../../domain/saveSlimming';
++import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { setCurrentModuleLocale } from '../../i18n/locale';
++import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++const withCatalog = (fn) => {
++  setCurrentModuleLocale('ru-RU');
++  const catalog = getEquipmentCatalog('ru-RU');
++  expect(catalog).toBeTruthy();
++  return fn(catalog);
++};
++
++describe('фикстура грязного сейва v18: конвейер загрузки', () => {
++  it('миграции v18 → текущая: без потерь, навыки/крышки/призрак на месте', () => {
++    const migrated = migrateCharacterState(fixture);
++    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
++
++    // Навыки канонические, значения не тронуты.
++    expect(migrated.skills).toHaveLength(17);
++    expect(migrated.skills.find((s) => s.name === 'REPAIR')?.value).toBe(0);
++    expect(migrated.skills.find((s) => s.name === 'SPEECH')?.value).toBe(2);
++
++    // Персистентный контракт: caps остаётся caps.
++    expect(migrated.caps).toBe(5);
++
++    // «Призрак» кулака в комплекте терпится (не роняет конвейер).
++    const ghost = migrated.equipment?.items?.find((item) => item.id === 'unarmed_human');
++    expect(ghost?.isBuiltin).toBe(true);
++
++    // Комплект без id — поле name сохраняется (деградация дисплея — отдельный слой).
++    expect(migrated.equipment?.name).toBe('Застрельщик Минитмен');
++  });
++
++  it('восстановление из каталога: имена возвращаются по id, стаб без записи не ломается', () => {
++    withCatalog((catalog) => {
++      const migrated = migrateCharacterState(fixture);
++      const restored = restoreSaveData(migrated, {
++        resolve: (item) => {
++          try { return resolveItem(item, catalog); } catch (e) { return item; }
++        },
++      });
++
++      const clothes = restored.equipment.items.find((i) => i.id === 'clothing_casual_clothes');
++      const entry = findCatalogEntry(catalog, 'clothing_casual_clothes', 'clothing');
++      expect(entry).toBeTruthy();
++      // Имя пришло из каталога (совпадает с записью), не из сейва.
++      expect(clothes.name).toBe(entry.name);
++
++      // Стаб (trinkets_stub_2) без каталожной записи остаётся как есть.
++      const stub = restored.equipment.items.find((i) => i.id === 'trinkets_stub_2');
++      expect(stub.name).toBe('Заглючивший голодиск');
++    });
++  });
++
++  it('новый слим экспорта: slim → restore на этом сейве — круговой рейс без потерь', () => {
++    withCatalog((catalog) => {
++      const migrated = migrateCharacterState(fixture);
++      const slimmed = slimSaveData(migrated, {
++        getEntry: (id, itemType) => {
++          try { return findCatalogEntry(catalog, id, itemType); } catch (e) { return null; }
++        },
++      });
++      // Слайм выкинул каталог-владельческое имя у обычной одежды...
++      const slimClothes = slimmed.equipment.items.find((i) => i.id === 'clothing_casual_clothes');
++      expect(slimClothes.name).toBeUndefined();
++      // ...но НЕ тронул стаб (каталог им не владеет).
++      const slimStub = slimmed.equipment.items.find((i) => i.id === 'trinkets_stub_2');
++      expect(slimStub.name).toBe('Заглючивший голодиск');
++      // Состояние экземпляра переживает слайм.
++      const slimAmmo = slimmed.equipment.items.find((i) => i.id === 'ammo_shotgun_shell');
++      expect(slimAmmo.quantity).toBe(5);
++
++      // И полный круг: restore возвращает имя из каталога.
++      const restored = restoreSaveData(slimmed, {
++        resolve: (item) => {
++          try { return resolveItem(item, catalog); } catch (e) { return item; }
++        },
++      });
++      expect(restored.equipment.items.find((i) => i.id === 'clothing_casual_clothes').name)
++        .toBe(findCatalogEntry(catalog, 'clothing_casual_clothes', 'clothing').name);
++    });
++  });
++});
++
++describe('мост канонизации навыков (domain/skillCanonical)', () => {
++  it('legacy русские имена → канонические ключи', () => {
++    const result = migrateSkillsToCanonical([
++      { name: 'Ремонт', value: 2 },
++      { name: 'Красноречие', value: 0 },
++    ]);
++    expect(result.map((s) => s.name)).toEqual(['REPAIR', 'SPEECH']);
++    expect(result[0].value).toBe(2);
++  });
++
++  it('канонический сейв проходит насквозь (no-op), не-массив → null', () => {
++    const canonical = [{ name: 'REPAIR', value: 3 }];
++    expect(migrateSkillsToCanonical(canonical)).toEqual(canonical);
++    expect(migrateSkillsToCanonical('мусор')).toBeNull();
++    expect(migrateSkillsToCanonical(null)).toBeNull();
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 9407c61..57d0e17 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1,7 +1,6 @@
+ import { debugLog } from '../src/debug/falloutDebug';
+ import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
+ import * as db from '../db';
+-import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
+ import {
+   createInitialAttributes,
+   ALL_SKILLS,
+@@ -16,22 +15,8 @@ import {
+   getAttributeLimits,
+ } from '../domain/characterCreation';
+ 
+-// One-time migration: legacy saves stored skills with Russian display names as
+-// `skill.name` (e.g. "Ремонт"). After the canonical-id refactor, identity is
+-// the UPPER_SNAKE_CASE key (e.g. "REPAIR"). This bridge runs only at load.
+-const RU_SKILL_NAME_TO_KEY = Object.entries(ruCharacterScreen?.skillsCatalog || {}).reduce(
+-  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
+-  {},
+-);
+-const migrateSkillsToCanonical = (rawSkills) => {
+-  if (!Array.isArray(rawSkills)) return null;
+-  return rawSkills.map((s) => {
+-    if (!s || typeof s.name !== 'string') return s;
+-    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
+-    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
+-    return canonical ? { ...s, name: canonical } : s;
+-  });
+-};
++// Мост канонизации навыков (legacy RU-имена → ключи) переехал в
++// domain/skillCanonical.js — тестируемый домен-модуль без React.
+ 
+ const clampAttributesToRules = (rawAttributes, trait) => {
+   const attributes = Array.isArray(rawAttributes) ? rawAttributes : createInitialAttributes();
+@@ -73,6 +58,7 @@ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ 
+ import { resolveBodyPlan } from '../domain/bodyplan';
+ import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
++import { migrateSkillsToCanonical } from '../domain/skillCanonical';
+ import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
+ import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
+ import { resolveKitItems } from '../domain/kitResolver';
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 7abe4fb..e60aca0 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -1,3 +1,5 @@
++import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
++import { findCatalogEntry } from '../../../domain/resolveItem';
+ import React, { useState, useCallback, useEffect, useRef } from 'react';
+ import {
+   View,
+@@ -524,7 +526,18 @@ export default function HomeScreen({ navigation }) {
+         return;
+       }
+ 
+-      const payload = createCharacterExportPayload(row);
++      // Экспорт худым телом (слайм): имя/цена/вес/статы восстанавливаются
++      // из каталога на импорте — файл не тащит дубли каталога.
++      let exportCatalog = null;
++      try { exportCatalog = getEquipmentCatalog(moduleLocale); } catch (e) { exportCatalog = null; }
++      const payload = createCharacterExportPayload(row, {
++        getEntry: exportCatalog
++          ? (id, itemType) => {
++              try { return findCatalogEntry(exportCatalog, id, itemType); }
++              catch (e) { return null; }
++            }
++          : undefined,
++      });
+       const result = await downloadCharacterPayload(payload, row.name);
+       
+       if (!result.success && !result.aborted) {
+diff --git a/domain/characterTransfer.js b/domain/characterTransfer.js
+index 20ce152..42ce915 100644
+--- a/domain/characterTransfer.js
++++ b/domain/characterTransfer.js
+@@ -1,3 +1,4 @@
++import { slimSaveData } from './saveSlimming';
+ /**
+  * domain/characterTransfer.js
+  * Чистая доменная логика импорта/экспорта персонажей.
+@@ -59,7 +60,7 @@ export const sanitizeFileName = (name) => {
+  * Создает payload для экспорта.
+  * @param {Object} characterRow - строка из БД: {id, name, level, origin_name, data}
+  */
+-export const createCharacterExportPayload = (characterRow) => ({
++export const createCharacterExportPayload = (characterRow, { getEntry } = {}) => ({
+   format: 'rpg-companion-character',
+   version: EXPORT_FORMAT_VERSION,
+   exportedAt: new Date().toISOString(),
+@@ -68,7 +69,13 @@ export const createCharacterExportPayload = (characterRow) => ({
+     name: characterRow.name,
+     level: characterRow.level ?? 1,
+     originName: characterRow.origin_name ?? null,
+-    data: characterRow.data,
++    // «Оземпик» тела сейва (слайм): в файл идёт только состояние экземпляров
++    // предметов (id, quantity, equipped, моды, прочность/заряды) — имя/цену/вес/
++    // статы импорт восстанавливает из каталога (restoreSaveData на загрузке).
++    // Формат не меняется: жирные (v18-) и худые экспорты грузятся одним кодом.
++    data: typeof getEntry === 'function'
++      ? slimSaveData(characterRow.data, { getEntry })
++      : characterRow.data,
+   },
+ });
+ 
+diff --git a/domain/skillCanonical.js b/domain/skillCanonical.js
+new file mode 100644
+index 0000000..469a672
+--- /dev/null
++++ b/domain/skillCanonical.js
+@@ -0,0 +1,43 @@
++// domain/skillCanonical.js
++// Мост канонизации навыков при загрузке сейвов (переехал из CharacterContext,
++// Шаг 5 подготовка: loadCharacter будет переписываться — мосту нужен
++// тестируемый домен-дом).
++//
++// Зачем: legacy-сейвы хранят skills с РУССКИМИ отображаемыми именами в поле
++// `name` (например «Ремонт»). После канонического рефакторинга идентичность
++// навыка — ключ UPPER_SNAKE_CASE (REPAIR). Это НЕ про i18n: интерфейс и раньше
++// рисовал названия из каталога переводов, но в сейве имя было
++// персистентным идентификатором. Мост запускается только на загрузке;
++// новые сейвы уже пишут ключи, для них операция — no-op.
++
++import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
++import ruSettingCharacterScreen from '../modules/fallout/i18n/ru-RU/screens/character/screen.json';
++import { ALL_SKILL_KEYS } from './characterCreation';
++import { deepMerge } from '../i18n/mergeDicts';
++
++// ВАЖНО: каталог навыков живёт в СЛОЕ СЕТТИНГА (modules/fallout/i18n), а не в
++// движковом screen.json. Мост обязан читать СКЛЕННЫЙ словарь (движок + сеттинг,
++// как tCharacterScreen): раньше тут читался только движковый, где skillsCatalog
++// отсутствует — карта была пуста, мост тихо не работал (поймано фикстурой
++// грязного сейва, __tests__/saves/dirty-save-v18.test.js).
++const RU_SKILL_NAME_TO_KEY = Object.entries(
++  deepMerge(ruCharacterScreen, ruSettingCharacterScreen)?.skillsCatalog || {},
++).reduce(
++  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
++  {},
++);
++
++/**
++ * Канонизировать имена навыков в загружаемом сейве.
++ * @param {*} rawSkills — массив [{name, value}] из сейва или не-массив.
++ * @returns {Array|null} — канонизированный массив; null для не-массива.
++ */
++export const migrateSkillsToCanonical = (rawSkills) => {
++  if (!Array.isArray(rawSkills)) return null;
++  return rawSkills.map((s) => {
++    if (!s || typeof s.name !== 'string') return s;
++    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
++    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
++    return canonical ? { ...s, name: canonical } : s;
++  });
++};
