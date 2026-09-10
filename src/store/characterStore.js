@@ -60,9 +60,10 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
-// Каунтеры ресурсов (domain/counters.js): крышки — число с нижней границей 0
-// без потолка. Тот же паттерн, что раньше жил в CharacterContext.
-import { createCounter, consume, restore, canConsume } from '../../domain/counters';
+// Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
+// число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
+// в CharacterContext.
+import { createCounter, restore } from '../../domain/counters';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -218,10 +219,14 @@ const useCharacterStore = create(devtools(
       // из useState в CharacterContext. Мутации — только через setEquipment
       // (поддерживает и функциональный апдейтер prev => next).
       equipment: null,
-      // Крышки персонажа: ресурс без верхней границы, не ниже нуля
-      // (мигрировано из CharacterContext, Шаг 2). Мутации — только через
-      // earnCaps / spendCaps / setCaps.
-      caps: 0,
+      /**
+       * Персонажный счётный ресурс без верхней границы (в Fallout — крышки).
+       * Единственный источник правды. Название нейтральное: движок не знает
+       * про крышки — конкретное имя/иконка/локализация остаются в UI-слое
+       * сеттинга (см. tInventory('screen.caps.title')).
+       * @type {number}
+       */
+      currency: 0,
       selectedPerks: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
@@ -1034,39 +1039,42 @@ const useCharacterStore = create(devtools(
       },
 
       /**
-       * Крышки персонажа: ресурс без верхней границы, не ниже нуля
-       * (domain/counters.js — тот же паттерн, что и раньше в CharacterContext).
+       * Начислить ресурс. Без верхней границы; отрицательная/некорректная
+       * сумма — no-op.
+       * @param {number} amount
        */
-      earnCaps: (amount) => {
+      earnCurrency: (amount) => {
         const state = get();
-        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
-        set({ caps: restore(counter, amount).current });
+        const counter = createCounter({ id: 'currency', current: state.currency, max: null });
+        set({ currency: restore(counter, amount).current });
       },
 
       /**
-       * Списать крышки. Транзакционно: если amount больше остатка, списание
-       * ОТКЛОНЯЕТСЯ ({ ok: false, reason: 'not-enough-caps' }), баланс не
-       * меняется — покупка «в долг» невозможна ни по одному пути вызова
-       * (тот же контракт, что у spendAmmoForWeapon). Нулевой/отрицательный
-       * amount — no-op с { ok: true } (бесплатная покупка / «списать минус
-       * пять» — ошибка вызывающего, а не скрытое восполнение).
+       * Потратить ресурс. Транзакционная операция: при недостатке средств
+       * баланс не меняется, возвращается явный отказ.
+       * @param {number} amount
+       * @returns {import('../../domain/types').SpendOutcome}
        */
-      spendCaps: (amount) => {
+      spendCurrency: (amount) => {
         const state = get();
-        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
-        if (!canConsume(counter, amount)) {
-          debugLog('store.caps.insufficient', { current: state.caps, amount });
-          return { ok: false, reason: 'not-enough-caps' };
+        const delta = Number(amount);
+        // Мусор (NaN и т.п.) — ошибка вызывающего: no-op вместо порчи ресурса
+        // (раньше эту защиту давал toFiniteOrNull внутри consume).
+        if (!Number.isFinite(delta)) return { ok: true };
+        if (delta < 0) return { ok: true };
+        if (delta > state.currency) {
+          debugLog('store.currency.insufficient', { current: state.currency, amount });
+          return { ok: false, reason: 'not-enough-currency' };
         }
-        set({ caps: consume(counter, amount).current });
+        set({ currency: state.currency - delta });
         return { ok: true };
       },
 
       /**
-       * Абсолютная установка крышек (восстановление из сейва). Инкрементальные
-       * earnCaps/spendCaps для этого не годятся.
+       * Установить абсолютное значение — только при загрузке сейва.
+       * @param {number} amount
        */
-      setCaps: (amount) => set({ caps: Math.max(0, Number(amount) || 0) }),
+      setCurrency: (amount) => set({ currency: Math.max(0, Number(amount) || 0) }),
 
       /**
        * Reset all per-character Zustand data before starting a new character.
@@ -1090,7 +1098,7 @@ const useCharacterStore = create(devtools(
           perkBonuses: {},
           derivedStats: {},
           equipment: null,
-          caps: 0,
+          currency: 0,
           _characterContext: undefined,
           ...createInitialRobotState(),
         });
@@ -1142,7 +1150,7 @@ const useCharacterStore = create(devtools(
         robot: state.robot,
         stateExtensions: state.stateExtensions,
         equipment: state.equipment,
-        caps: state.caps,
+        currency: state.currency,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

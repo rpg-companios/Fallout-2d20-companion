@@ -394,21 +394,27 @@ export const CharacterProvider = ({ children }) => {
   const [currentHealth, setCurrentHealth] = useState(0);
   const [radiation, setRadiationRaw] = useState(0);
 
-  // Крышки: единственный источник — Zustand стор (Шаг 2 миграции из
-  // CharacterContext). earnCaps/spendCaps — стор-экшены, не локальный setState.
-  // Контекст — тонкий фасад для существующих экранов
-  // (useCharacter().caps / earnCaps / spendCaps).
-  const caps = useCharacterStore((s) => s.caps);
-  const earnCaps = useCharacterStore((s) => s.earnCaps);
-  const spendCaps = useCharacterStore((s) => s.spendCaps);
+  /**
+   * Ресурс (в Fallout — крышки): единственный источник — Zustand стор
+   * (Шаг 2 миграции из CharacterContext). earnCurrency/spendCurrency —
+   * стор-экшены, не локальный setState. Контекст — тонкий фасад для
+   * существующих экранов (useCharacter().currency / earnCurrency /
+   * spendCurrency).
+   * @type {number}
+   */
+  const currency = useCharacterStore((s) => s.currency);
+  /** @type {(amount: number) => void} */
+  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
+  /** @type {(amount: number) => import('../domain/types').SpendOutcome} */
+  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
 
   // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
   // и в сейве лежит только текущее значение числом; потолок и нижняя граница
   // — вычисляемые, они собираются здесь в момент операции.
   // См. docs/architecture/counters-storage.md.
   //
-  // (Крышки мигрировали в стор — экшены earnCaps/spendCaps выше; правило
-  // «не ниже нуля» теперь живёт в стор-слайсе.)
+  // (Ресурс мигрировал в стор — экшены earnCurrency/spendCurrency выше;
+  // правило «не ниже нуля» теперь живёт в стор-слайсе.)
 
   // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
   // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
@@ -851,7 +857,10 @@ export const CharacterProvider = ({ children }) => {
     equippedArmor,
     equippedPowerArmor,
     powerArmorRuntime,
-    caps,
+    // Рантайм-имя ресурса — currency (стор), поле сейва остаётся caps:
+    // персистентный формат не меняем (совместимость со старыми сохранениями
+    // и migrations.js).
+    caps: currency,
     currentHealth,
     radiation,
     modifiedItems,
@@ -874,7 +883,7 @@ export const CharacterProvider = ({ children }) => {
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
-    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+    currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, attributesSaved, skillsSaved, selectedPerks,
     conditions, chemDosesLog, sceneRiskStates, lastDiseaseResistAt, stateExtensions,
   ]);
@@ -913,7 +922,7 @@ export const CharacterProvider = ({ children }) => {
     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
     equippedArmor, equippedPowerArmor, powerArmorRuntime,
-    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+    currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
     luckPoints, attributesSaved, skillsSaved, selectedPerks,
     // Производные убраны и отсюда: они не попадают в снимок, а их пересчёт
     // зря будил автосохранение (запись в БД + синхронизация с облаком).
@@ -1031,9 +1040,10 @@ export const CharacterProvider = ({ children }) => {
       setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
       setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
       setPendingCoreChoice(null);
-      // Абсолютная установка из сейва: инкрементальные earnCaps/spendCaps
-      // для этого не годятся (Шаг 2 миграции крышек в стор).
-      useCharacterStore.getState().setCaps(data.caps ?? 0);
+      // Абсолютная установка из сейва: инкрементальные earnCurrency/spendCurrency
+      // для этого не годятся (Шаг 2 миграции ресурса в стор). Поле сейва —
+      // data.caps: персистентный формат не переименовываем.
+      useCharacterStore.getState().setCurrency(data.caps ?? 0);
       setCurrentHealth(data.currentHealth ?? 0);
       setRadiationRaw(Math.max(0, data.radiation ?? 0));
       setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
@@ -1767,7 +1777,7 @@ export const CharacterProvider = ({ children }) => {
     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
     setPendingCoreChoice(null);
-    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
+    // Ресурс обнуляет resetCharacterStore (слайс currency, Шаг 2 миграции).
     setSelectedPerks([]);
     setConditions([]);
     setChemDosesLog([]);
@@ -1799,7 +1809,7 @@ export const CharacterProvider = ({ children }) => {
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
     setEquippedArmor(createEmptyEquippedArmor());
-    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
+    // Ресурс обнуляет resetCharacterStore (слайс currency, Шаг 2 миграции).
     // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
     const { attributes: legacyAttributes, skills: legacySkills } =
       denormalizeCharacterState(useCharacterStore.getState());
@@ -1869,7 +1879,7 @@ export const CharacterProvider = ({ children }) => {
     // Ресурсы наружу — числом, как и раньше. Менять их можно только
     // именованными операциями: правило границ живёт в domain/counters.js,
     // а не переписывается заново на каждом экране.
-    caps, earnCaps, spendCaps,
+    currency, earnCurrency, spendCurrency,
     currentHealth, healCharacter, damageCharacter, setCurrentHealth,
     radiation, setRadiation, addRadiation, healRadiation,
     luckPoints, setLuckPoints,

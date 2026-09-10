@@ -284,9 +284,9 @@ export default function CharacterScreen() {
     setEquipment,
     effects,
     setEffects,
-    caps,
-    earnCaps,
-    spendCaps,
+    currency,
+    earnCurrency,
+    spendCurrency,
     setCurrentHealth,
     luckPoints,
     setLuckPoints,
@@ -552,8 +552,8 @@ export default function CharacterScreen() {
     if (kit.items && Array.isArray(kit.items)) {
       kit.items.forEach(item => {
         // Currency (caps) is not an inventory item — it is tracked separately via
-        // setCaps below. Skip it so it never hits addNewItem (which would warn about
-        // a missing id field).
+        // earnCurrency below. Skip it so it never hits addNewItem (which would warn
+        // about a missing id field).
         debugLog('kits.select.candidate', {
           name: item?.name,
           itemType: item?.itemType,
@@ -582,8 +582,8 @@ export default function CharacterScreen() {
       purchaseMaxRarity: kit.purchaseMaxRarity ?? null,
     });
     
-    // 3. Update caps
-    earnCaps(kit.caps || 0);
+    // 3. Update currency (kit.caps — поле данных комплекта, остаётся как есть)
+    earnCurrency(kit.caps || 0);
 
     // 4. Robot: apply slot/weapon/module state from initRobotSlots
     if (kit.robotSlots) {
@@ -623,7 +623,7 @@ export default function CharacterScreen() {
       // Корзина структурно не даёт перерасхода (canAfford в startingPurchase),
       // так что отказ возможен только при рассинхроне — логируем. Предметы
       // всё равно выдаются: это выдача комплекта создания, а не сделка.
-      const result = spendCaps(spent);
+      const result = spendCurrency(spent);
       if (!result.ok) {
         debugLog('kits.purchase.spendRejected', { spent, reason: result.reason });
       }
@@ -1133,7 +1133,7 @@ export default function CharacterScreen() {
           const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
           rewardItems.forEach(item => addNewItem(item));
           // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
-          if (rewardCaps) earnCaps(rewardCaps);
+          if (rewardCaps) earnCurrency(rewardCaps);
           markSkillsAsRewarded(unrewardedSkills);
         }
       }

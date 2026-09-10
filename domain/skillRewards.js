@@ -43,7 +43,7 @@ const resolveEntry = async (entry, catalog, kitContext) => {
   }
 
   // Currency (крышки) — идёт в счётчик крышек, а не в инвентарь (как у комплектов:
-  // handleSelectKit делает setCaps(prev => prev + kit.caps)). В инвентаре крышек
+  // handleSelectKit делает earnCurrency(kit.caps)). В инвентаре крышек
   // быть не должно — у них нет каталоговой записи, и «две стопки по 9 и 17»
   // возникали именно отсюда.
   if (entry.itemType === 'currency') {
@@ -108,7 +108,8 @@ const resolveEntry = async (entry, catalog, kitContext) => {
  * @param {object} [options] — { ammoFromKit?: string } (id патрона из комплекта)
  * @returns {Promise<{ items: object[], caps: number }>}
  *   items  — предметы для addNewItem;
- *   caps   — крышки (BARTER), их надо провести через setCaps, а не addNewItem.
+ *   caps   — крышки (BARTER): экран проводит их через earnCurrency, а не addNewItem
+ *          (имя поля caps — формат данных награды, не рантайм-имя ресурса).
  */
 export const resolveSkillRewards = async (skillKeys, options = {}) => {
   const catalog = getEquipmentCatalog();

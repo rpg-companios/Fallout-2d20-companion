@@ -79,7 +79,7 @@ const InventoryScreen = () => {
     equippedWeapons, setEquippedWeapons, 
     equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
-    caps, earnCaps, spendCaps,
+    currency, earnCurrency, spendCurrency,
     equipment,
     applyConsumableFull,
     previewConsumableRadiation,
@@ -376,11 +376,11 @@ const InventoryScreen = () => {
   const handleSaveCaps = (amount) => {
     if (capsOperationType === 'add') {
       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
-      earnCaps(amount + sumFoundItemBonus(bonusEvents));
+      earnCurrency(amount + sumFoundItemBonus(bonusEvents));
       showFoundItemBonusAlerts(bonusEvents);
       return;
     }
-    spendCaps(amount);
+    spendCurrency(amount);
   };
 
   const handleApplyConsumable = (item) => {
@@ -485,7 +485,7 @@ const InventoryScreen = () => {
   };
 
   const handleConfirmSale = (quantity, finalPrice) => {
-    earnCaps(finalPrice);
+    earnCurrency(finalPrice);
 
     const stackKey = selectedItemForSale?.stackKey || getStackKey(selectedItemForSale);
     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
@@ -609,11 +609,11 @@ const InventoryScreen = () => {
     // Списание атомарно (инвариант стора «нельзя купить на больше, чем
     // есть»): при отказе предмет НЕ выдаётся. Модалка уже проверяет баланс —
     // это вторая линия на случай иного пути вызова.
-    const result = spendCaps(finalCost);
+    const result = spendCurrency(finalCost);
     if (!result.ok) {
       showAlert(
         tInventory('modals.buyItemModal.notEnoughCapsTitle'),
-        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps }),
+        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps: currency }),
       );
       return;
     }
@@ -1753,7 +1753,7 @@ const InventoryScreen = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <CapsSection 
-            caps={caps}
+            caps={currency}
             onAdd={() => handleOpenCapsModal('add')}
             onSubtract={() => handleOpenCapsModal('subtract')}
           />
@@ -1779,7 +1779,7 @@ const InventoryScreen = () => {
           onClose={() => setIsCapsModalVisible(false)}
           onSave={handleSaveCaps}
           operationType={capsOperationType}
-          caps={caps}
+          caps={currency}
         />
         <SellItemModal
             visible={isSellModalVisible}
@@ -1802,7 +1802,7 @@ const InventoryScreen = () => {
             setSelectedItemForBuy(null);
           }}
           item={selectedItemForBuy}
-          caps={caps}
+          caps={currency}
           onConfirmBuy={handleConfirmBuy}
         />
 
