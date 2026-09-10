@@ -1,0 +1,1703 @@
+From 40b13e21d29e6eae2003067622f242a1a529bd4a Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 07:34:23 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20215:=20=D0=B1=D0=BE=D0=BB?=
+ =?UTF-8?q?=D0=B5=D0=B7=D0=BD=D0=B8=20=D1=81=20=D1=80=D0=B0=D0=BD=D0=B3?=
+ =?UTF-8?q?=D0=B0=D0=BC=D0=B8=20=E2=80=94=20=D0=BB=D0=B5=D1=87=D0=B5=D0=BD?=
+ =?UTF-8?q?=D0=B8=D0=B5,=20=D1=83=D1=81=D1=82=D0=B0=D0=BB=D0=BE=D1=81?=
+ =?UTF-8?q?=D1=82=D1=8C=20=D0=BE=D1=82=20=D0=B1=D0=BE=D0=BB=D0=B5=D0=B7?=
+ =?UTF-8?q?=D0=BD=D0=B8=20=D0=B8=20=D1=81=D0=BE=D0=BF=D1=80=D0=BE=D1=82?=
+ =?UTF-8?q?=D0=B8=D0=B2=D0=BB=D0=B5=D0=BD=D0=B8=D0=B5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- domain/diseaseConditions.js: ранг из duration каталога на эффекте (rank),
+  reduceDiseaseRanks (по единицам с каждой болезни), increaseDiseaseRank,
+  resistDiseaseRoll (2d20: грань <= ВЫН+Выживание — успех; грань 1 и
+  отмеченный навык <= ранга — 2 успеха; успехи >= ранга излечивают;
+  каждая 20 — ранг +1), кулдаун сутки
+- лечение: антибиотик (признак antibiotic в данных) снимает 1 единицу
+  с каждой болезни, не более 1 дозы в 24 ч; отдых в постели — каждые
+  12 накопленных часов сна в кровати (bedRestHours в survival) снимают
+  1 единицу с каждой; излеченная болезнь удаляется, 'diseased' снимается
+  при нуле болезней
+- усталость: источник 'disease' (+1 при заражении, -1 при излечении;
+  часовое снятие и сон её не трогают); слушатели событий состояний в
+  stateExtensions (registerConditionEventListener)
+- UI: строка болезни по центру с рангом и кнопкой «Сопротивляться»
+  справа (неактивна сутки), отчёт алертом; строка отдыха в отчёте сна
+- сейв v25: lastDiseaseResistAt, rank на эффектах (миграция v24->v25
+  modules/fallout/diseases/migration.js), normalize/denormalize rank
+- i18n ru/en (инвентарь и экран); дока 0.4.6; тесты domain/миграций/
+  i18n/данных (__tests__/saves/disease-ranks.test.js)
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                        |   3 +
+ .../robot/robot-arm-attachment-mode.test.js   |   4 +-
+ .../saves/character-folder-knowledge.test.js  |  12 +-
+ __tests__/saves/disease-ranks.test.js         | 314 ++++++++++++++++++
+ __tests__/survival/survival-migration.test.js |   9 +-
+ components/CharacterContext.js                | 181 +++++++++-
+ docs/survival-system-design.md                |  46 ++-
+ domain/diseaseConditions.js                   | 155 +++++++++
+ i18n/en-EN/screens/inventory/screen.json      |   2 +
+ .../en-EN/screens/weaponsAndArmor/screen.json |   9 +-
+ i18n/ru-RU/screens/inventory/screen.json      |   2 +
+ .../ru-RU/screens/weaponsAndArmor/screen.json |   9 +-
+ modules/fallout/data/consumables/chems.json   |   1 +
+ modules/fallout/diseases/migration.js         |  38 +++
+ .../en-EN/screens/weaponsAndArmor/screen.json |   3 +-
+ .../ru-RU/screens/weaponsAndArmor/screen.json |   3 +-
+ .../WeaponsAndArmorScreen.js                  |  56 ++++
+ .../modals/SleepModal.tsx                     |   9 +
+ modules/fallout/survival/index.js             |  45 ++-
+ modules/fallout/survival/operations.js        |  12 +
+ modules/fallout/survival/survival.ts          |  67 +++-
+ src/store/migrations.js                       |   8 +
+ src/store/saveSchema.js                       |   7 +-
+ src/store/stateExtensions.js                  |  53 +++
+ styles/WeaponsAndArmorScreen.styles.js        |  29 ++
+ 25 files changed, 1041 insertions(+), 36 deletions(-)
+ create mode 100644 __tests__/saves/disease-ranks.test.js
+ create mode 100644 modules/fallout/diseases/migration.js
+
+diff --git a/App.js b/App.js
+index 732ebc3..c7c72a3 100644
+--- a/App.js
++++ b/App.js
+@@ -33,6 +33,9 @@ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen
+ // survival + миграцию v22→v23) в реестре движка ДО монтирования
+ // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
+ import './modules/fallout/survival';
++// Болезни: миграция v24→v25 (ранги на эффектах болезней из каталога,
++// патч 215) — та же точка регистрации, см. modules/fallout/diseases/migration.js.
++import './modules/fallout/diseases/migration';
+ import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
+ import useAppSettingsStore, {
+   selectBootScreenEnabled,
+diff --git a/__tests__/robot/robot-arm-attachment-mode.test.js b/__tests__/robot/robot-arm-attachment-mode.test.js
+index 7cbe551..ca5892e 100644
+--- a/__tests__/robot/robot-arm-attachment-mode.test.js
++++ b/__tests__/robot/robot-arm-attachment-mode.test.js
+@@ -226,8 +226,8 @@ describe('патч 191: навес — оружие на руке, а не ко
+     expect(migrated.equippedRobotSlots.leftArm.heldWeapon).toMatchObject({ id: 'robot_weapon_drill' });
+   });
+ 
+-  it('версия схемы — 24 (v22 навесы, v23 выживание, v24 каталог в сейве)', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(24);
++  it('версия схемы — 25 (v22 навесы, v23 выживание, v24 каталог, v25 болезни)', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(25);
+   });
+ 
+   // ------------------------------------------------------------------ настройка
+diff --git a/__tests__/saves/character-folder-knowledge.test.js b/__tests__/saves/character-folder-knowledge.test.js
+index 9e4696c..ffeeeb4 100644
+--- a/__tests__/saves/character-folder-knowledge.test.js
++++ b/__tests__/saves/character-folder-knowledge.test.js
+@@ -103,9 +103,9 @@ describe('characterFolders: наложение при записи (overlayFolde
+   });
+ });
+ 
+-describe('characterFolders: схема v24 и миграция', () => {
+-  it('текущая версия схемы — 24', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(24);
++describe('characterFolders: схема v25 и миграция', () => {
++  it('текущая версия схемы — 25', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(25);
+   });
+ 
+   it('миграция v23→v24 идентична: поле folder проходит без изменений', () => {
+@@ -115,7 +115,7 @@ describe('characterFolders: схема v24 и миграция', () => {
+       folder: { id: 'folder_a', name: 'Рейдеры' },
+     };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(24);
++    expect(out.schemaVersion).toBe(25);
+     expect(out.folder).toEqual({ id: 'folder_a', name: 'Рейдеры' });
+     expect(out.characterName).toBe('Курьер');
+   });
+@@ -123,14 +123,14 @@ describe('characterFolders: схема v24 и миграция', () => {
+   it('старый сейв без folder мигрирует без поля (корневой список)', () => {
+     const v23 = { schemaVersion: 23, characterName: 'Курьер' };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(24);
++    expect(out.schemaVersion).toBe(25);
+     expect(Object.hasOwn(out, 'folder')).toBe(false);
+   });
+ 
+   it('сейв с folder: null остаётся null (явный корневой список)', () => {
+     const v23 = { schemaVersion: 23, characterName: 'Курьер', folder: null };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(24);
++    expect(out.schemaVersion).toBe(25);
+     expect(out.folder).toBeNull();
+   });
+ });
+diff --git a/__tests__/saves/disease-ranks.test.js b/__tests__/saves/disease-ranks.test.js
+new file mode 100644
+index 0000000..2a1bfd7
+--- /dev/null
++++ b/__tests__/saves/disease-ranks.test.js
+@@ -0,0 +1,314 @@
++// Патч 215 — болезни с рангами.
++//
++// Правила владельца:
++//   - болезнь имеет ранг (в данных — duration: 1/3/4); ранг живёт на эффекте
++//     болезни (поле rank) и растёт на каждой 20-ке в сопротивлении;
++//   - антибиотик снимает 1 единицу с КАЖДОЙ болезни, не более 1 дозы в 24 ч;
++//   - отдых в постели: каждые 12 накопленных часов сна в кровати снимают
++//     1 единицу с каждой болезни;
++//   - заражение даёт +1 усталость источника «болезнь»; излечение болезни
++//     снимает её (часовое снятие и сон эту усталость не трогают);
++//   - «Сопротивляться»: 2d20, успех грани <= ВЫН + Выживание; грань 1 —
++//     2 успеха; отмеченный навык «Выживание» и грань <= его ранга —
++//     2 успеха; сумма успехов >= ранга излечивает болезнь; каждая грань
++//     20 повышает ранг болезни на 1.
++
++import { describe, expect, it } from 'vitest';
++import {
++  addPersistentDiseaseEffect,
++  createPersistentDiseaseEffect,
++  DISEASE_RESIST_COOLDOWN_MS,
++  effectDiseaseRank,
++  increaseDiseaseRank,
++  reduceDiseaseRanks,
++  resistDiseaseRoll,
++} from '../../domain/diseaseConditions';
++import {
++  addDiseaseFatigue,
++  addFatigue,
++  advanceHours,
++  cloneSurvivalState,
++  createSurvivalState,
++  fatigueFromSource,
++  forecastSleep,
++  rest,
++  SURVIVAL_RULES,
++  totalFatigue,
++  withDiseaseFatigue,
++  withoutDiseaseFatigue,
++} from '../../modules/fallout/survival/survival';
++import { migrateDiseaseRanks } from '../../modules/fallout/diseases/migration';
++import { migrateCharacterState } from '../../src/store/migrations';
++
++const buzzBrain = {
++  id: 'disease_buzz_brain',
++  name: 'Гул в голове',
++  effectLabel: 'Сложность проверок ИНТ увеличивается на 1.',
++  d20Roll: 3,
++  duration: 4,
++};
++
++const shellShock = {
++  id: 'disease_shell_shock',
++  name: 'Контузия',
++  effectLabel: 'Тест.',
++  d20Roll: 14,
++  duration: 3,
++};
++
++describe('болезни: ранг на эффекте', () => {
++  it('создание эффекта берёт ранг из duration', () => {
++    const effect = createPersistentDiseaseEffect(buzzBrain, 1000);
++    expect(effect.rank).toBe(4);
++    expect(effect.effectType).toBe('disease');
++    expect(effect.isPermanent).toBe(true);
++  });
++
++  it('каталог без валидного duration — ошибка данных', () => {
++    expect(() => createPersistentDiseaseEffect({ ...buzzBrain, duration: 0 })).toThrow(/ранга/);
++  });
++
++  it('effectDiseaseRank: поле rank; эффект без поля — ранг 1 (миграция v25)', () => {
++    expect(effectDiseaseRank({ rank: 3 })).toBe(3);
++    expect(effectDiseaseRank({})).toBe(1);
++    expect(effectDiseaseRank({ rank: 0 })).toBe(1);
++    expect(effectDiseaseRank(null)).toBe(1);
++  });
++});
++
++describe('болезни: лечение по единицам (антибиотик, отдых)', () => {
++  it('reduceDiseaseRanks снимает по 1 с каждой болезни, излеченные удаляются', () => {
++    let effects = [
++      createPersistentDiseaseEffect(buzzBrain, 1000), // ранг 4
++      createPersistentDiseaseEffect(shellShock, 1000), // ранг 3
++      { id: 'timed', effectType: 'positive', scenesLeft: 3 }, // не болезнь
++    ];
++    const first = reduceDiseaseRanks(effects, 1);
++    expect(first.healed).toEqual([]);
++    expect(effectDiseaseRank(first.effects[0])).toBe(3);
++    expect(effectDiseaseRank(first.effects[1])).toBe(2);
++
++    const second = reduceDiseaseRanks(first.effects, 2);
++    expect(effectDiseaseRank(second.effects[0])).toBe(1);
++    expect(second.healed).toEqual(['disease_shell_shock']); // 2-2 = 0
++
++    const third = reduceDiseaseRanks(second.effects, 1);
++    expect(third.healed).toEqual(['disease_buzz_brain']);
++    expect(third.effects).toEqual([{ id: 'timed', effectType: 'positive', scenesLeft: 3 }]);
++  });
++
++  it('increaseDiseaseRank поднимает ранг только указанной болезни', () => {
++    const effects = [
++      createPersistentDiseaseEffect(buzzBrain, 1000),
++      createPersistentDiseaseEffect(shellShock, 1000),
++    ];
++    const next = increaseDiseaseRank(effects, 'disease_shell_shock', 1);
++    expect(effectDiseaseRank(next[0])).toBe(4);
++    expect(effectDiseaseRank(next[1])).toBe(4);
++  });
++
++  it('повторное заражение той же болезнью эффект не дублирует', () => {
++    const effects = [createPersistentDiseaseEffect(buzzBrain, 1000)];
++    const applied = addPersistentDiseaseEffect(effects, buzzBrain, 2000);
++    expect(applied.added).toBe(false);
++    expect(applied.effects).toHaveLength(1);
++  });
++});
++
++describe('болезни: проверка «Сопротивляться» (2d20)', () => {
++  it('грань <= цели — успех; грань 1 — два успеха', () => {
++    const r = resistDiseaseRoll({ targetNumber: 10, diseaseRank: 2, rollD20: () => 5 });
++    expect(r.successes).toBe(2);
++    expect(r.cured).toBe(true);
++    expect(r.rankIncrease).toBe(0);
++  });
++
++  it('отмеченный навык: грань <= ранга навыка — два успеха', () => {
++    const r = resistDiseaseRoll({ targetNumber: 12, taggedSurvivalRank: 4, diseaseRank: 3, rollD20: () => 4 });
++    expect(r.successes).toBe(4);
++    expect(r.cured).toBe(true);
++  });
++
++  it('без отмеченного навыка та же грань — один успех', () => {
++    const r = resistDiseaseRoll({ targetNumber: 12, taggedSurvivalRank: null, diseaseRank: 3, rollD20: () => 4 });
++    expect(r.successes).toBe(2);
++    expect(r.cured).toBe(false);
++  });
++
++  it('грань 20 — успеха нет, сложность +1 (за каждую 20-ку)', () => {
++    const r = resistDiseaseRoll({ targetNumber: 10, diseaseRank: 3, rollD20: () => 20 });
++    expect(r.successes).toBe(0);
++    expect(r.cured).toBe(false);
++    expect(r.rankIncrease).toBe(2);
++  });
++
++  it('успехов меньше ранга — болезнь остаётся', () => {
++    const faces = [7, 7];
++    const r = resistDiseaseRoll({
++      targetNumber: 10,
++      diseaseRank: 3,
++      rollD20: () => faces.shift(),
++    });
++    expect(r.successes).toBe(2);
++    expect(r.cured).toBe(false);
++  });
++
++  it('кулдаун — сутки', () => {
++    expect(DISEASE_RESIST_COOLDOWN_MS).toBe(24 * 60 * 60 * 1000);
++  });
++
++  it('некорректные аргументы — ошибка', () => {
++    expect(() => resistDiseaseRoll({ targetNumber: 0, diseaseRank: 1, rollD20: () => 1 })).toThrow();
++    expect(() => resistDiseaseRoll({ targetNumber: 10, diseaseRank: 0, rollD20: () => 1 })).toThrow();
++    expect(() => resistDiseaseRoll({ targetNumber: 10, diseaseRank: 1, rollD20: () => 42 })).toThrow();
++  });
++});
++
++describe('болезни: усталость источника «болезнь»', () => {
++  it('заражение +1, излечение −1 — чистыми переходами без мутации', () => {
++    const base = createSurvivalState('human');
++    const infected = withDiseaseFatigue(base, 1);
++    expect(fatigueFromSource(infected, 'disease')).toBe(1);
++    expect(totalFatigue(base)).toBe(0); // исходное не тронуто
++    const cured = withoutDiseaseFatigue(infected, 1);
++    expect(fatigueFromSource(cured, 'disease')).toBe(0);
++  });
++
++  it('часовое снятие не трогает усталость болезни', () => {
++    const s = createSurvivalState('human');
++    addDiseaseFatigue(s, 1);
++    addFatigue(s, 'food', 2);
++    const after = advanceHours(s, 2).state;
++    expect(fatigueFromSource(after, 'disease')).toBe(1); // не снялась
++    expect(fatigueFromSource(after, 'food')).toBe(0); // пищевая снялась
++  });
++
++  it('сон не снимает усталость болезни (только источник «сон» на 6-м часе)', () => {
++    const s = createSurvivalState('human');
++    addDiseaseFatigue(s, 1);
++    addFatigue(s, 'sleep', 2);
++    const after = rest(s, { place: 'bed', hours: 8 }).state;
++    expect(fatigueFromSource(after, 'disease')).toBe(1);
++    expect(fatigueFromSource(after, 'sleep')).toBe(0);
++  });
++
++  it('cloneSurvivalState — глубокая копия (fatigue не разделяется)', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'food', 2);
++    const copy = cloneSurvivalState(s);
++    addFatigue(copy, 'water', 1);
++    expect(totalFatigue(s)).toBe(2);
++    expect(totalFatigue(copy)).toBe(3);
++  });
++});
++
++describe('болезни: отдых в постели (аккумулятор 12 часов)', () => {
++  it('сон в кровати копит часы; порции по 12 снимаются из аккумулятора', () => {
++    let s = createSurvivalState('human');
++    const first = rest(s, { place: 'bed', hours: 8 });
++    expect(first.bedRestCompleted).toBe(0);
++    expect(first.state.bedRestHours).toBe(8);
++
++    const second = rest(first.state, { place: 'bed', hours: 4 });
++    expect(second.bedRestCompleted).toBe(1);
++    expect(second.state.bedRestHours).toBe(0);
++
++    const third = rest(second.state, { place: 'bed', hours: 24 });
++    expect(third.bedRestCompleted).toBe(2);
++    expect(third.state.bedRestHours).toBe(0);
++  });
++
++  it('сон в пустоши аккумулятор не двигает', () => {
++    let s = createSurvivalState('human');
++    s = rest(s, { place: 'bed', hours: 8 }).state;
++    const wasteland = rest(s, { place: 'wasteland', hours: 8 });
++    expect(wasteland.bedRestCompleted).toBe(0);
++    expect(wasteland.state.bedRestHours).toBe(8);
++  });
++
++  it('прогноз сна не меняет исходное состояние', () => {
++    const s = createSurvivalState('human');
++    forecastSleep(s, { place: 'bed', hours: 12 });
++    expect(s.bedRestHours).toBe(0);
++    expect(SURVIVAL_RULES.bedRestHealHours).toBe(12);
++  });
++});
++
++describe('болезни: миграция v24 → v25 (ранги из каталога)', () => {
++  it('эффектам болезней без rank проставляется duration каталога', () => {
++    const state = {
++      schemaVersion: 24,
++      activeTimedEffects: [
++        { id: 'c-buzz', effectType: 'disease', conditionId: 'disease_buzz_brain', isPermanent: true },
++        { id: 'c-shell', effectType: 'disease', conditionId: 'disease_shell_shock', isPermanent: true, rank: 2 },
++        { id: 'timed', effectType: 'positive', scenesLeft: 4 },
++      ],
++    };
++    const out = migrateDiseaseRanks(state);
++    expect(out.activeTimedEffects[0].rank).toBe(4);
++    expect(out.activeTimedEffects[1].rank).toBe(2); // существующий ранг не переписан
++    expect(out.activeTimedEffects[2].rank).toBeUndefined();
++  });
++
++  it('идемпотентна', () => {
++    const state = {
++      schemaVersion: 24,
++      activeTimedEffects: [
++        { id: 'c-buzz', effectType: 'disease', conditionId: 'disease_buzz_brain', isPermanent: true },
++      ],
++    };
++    const once = migrateDiseaseRanks(state);
++    expect(migrateDiseaseRanks(once)).toEqual(once);
++  });
++
++  it('полная цепочка migrateCharacterState доводит сейв до v25', () => {
++    const v23 = {
++      schemaVersion: 23,
++      characterName: 'Курьер',
++      activeTimedEffects: [
++        { id: 'c-buzz', effectType: 'disease', conditionId: 'disease_buzz_brain', isPermanent: true },
++      ],
++    };
++    const out = migrateCharacterState(v23);
++    expect(out.schemaVersion).toBe(25);
++    expect(out.activeTimedEffects[0].rank).toBe(4);
++  });
++});
++
++describe('болезни: i18n новых строк (ru/en)', () => {
++  it('ключи сопротивления есть в обоих словарях экрана', async () => {
++    const ruWaA = (await import('../../i18n/ru-RU/screens/weaponsAndArmor/screen.json')).default;
++    const enWaA = (await import('../../i18n/en-EN/screens/weaponsAndArmor/screen.json')).default;
++    for (const dict of [ruWaA, enWaA]) {
++      expect(dict.effectsPanel.resist).toBeTruthy();
++      expect(dict.effectsPanel.resistTitle).toBeTruthy();
++      expect(dict.effectsPanel.resistRolls).toContain('{r1}');
++      expect(dict.effectsPanel.resistCured).toContain('{name}');
++      expect(dict.effectsPanel.resistFailed).toContain('{name}');
++      expect(dict.effectsPanel.resistRankIncreased).toContain('{r}');
++      expect(dict.effectsPanel.resistCooldown).toBeTruthy();
++    }
++  });
++
++  it('ключи лечения антибиотиками есть в обоих словарях инвентаря', async () => {
++    const ruInv = (await import('../../i18n/ru-RU/screens/inventory/screen.json')).default;
++    const enInv = (await import('../../i18n/en-EN/screens/inventory/screen.json')).default;
++    for (const dict of [ruInv, enInv]) {
++      expect(dict.alerts.antibioticDailyLimit).toBeTruthy();
++      expect(dict.alerts.antibioticReduced).toContain('{units}');
++    }
++  });
++
++  it('данные: антибиотик помечен antibiotic, у всех болезней валидный ранг', async () => {
++    const chems = (await import('../../modules/fallout/data/consumables/chems.json')).default;
++    const antibiotics = chems.find((c) => c.id === 'chem_antibiotics');
++    expect(antibiotics?.antibiotic).toBe(true);
++    expect(antibiotics?.positiveEffect?.removeCondition).toContain('diseased');
++
++    const diseases = (await import('../../modules/fallout/data/conditions/diseases.json')).default;
++    expect(diseases).toHaveLength(20);
++    for (const disease of diseases) {
++      expect(Number.isInteger(disease.duration) && disease.duration >= 1, disease.id).toBe(true);
++    }
++  });
++});
+diff --git a/__tests__/survival/survival-migration.test.js b/__tests__/survival/survival-migration.test.js
+index 36026c4..13f98fa 100644
+--- a/__tests__/survival/survival-migration.test.js
++++ b/__tests__/survival/survival-migration.test.js
+@@ -17,11 +17,12 @@ const maxState = () => ({
+     acc: { food: 0, water: 0, sleep: 0 },
+     timeCarried: 0,
+     hpBonus: 0,
++    bedRestHours: 0, // патч 215
+ });
+ 
+ describe('survival: миграция v22 → v23', () => {
+-    it('версия схемы — 24 (поле выживания добавляется переходом v22→v23)', () => {
+-        expect(CURRENT_SCHEMA_VERSION).toBe(24);
++    it('версия схемы — 25 (поле выживания добавляется переходом v22→v23)', () => {
++        expect(CURRENT_SCHEMA_VERSION).toBe(25);
+     });
+ 
+     it.each([
+@@ -31,7 +32,7 @@ describe('survival: миграция v22 → v23', () => {
+         ['shadow', 'mutant'],
+     ])('органику %s (%s) — начальные максимумы', (originId) => {
+         const out = migrateCharacterState(v22({ id: originId }));
+-        expect(out.schemaVersion).toBe(24);
++        expect(out.schemaVersion).toBe(25);
+         expect(out.survival).toEqual(maxState());
+     });
+ 
+@@ -41,7 +42,7 @@ describe('survival: миграция v22 → v23', () => {
+         ['synth', 'cyborg'],
+     ])('роботу/киборгу %s (%s) — null, шкал нет', (originId) => {
+         const out = migrateCharacterState(v22({ id: originId }));
+-        expect(out.schemaVersion).toBe(24);
++        expect(out.schemaVersion).toBe(25);
+         expect(out.survival).toBeNull();
+     });
+ 
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index c16268c..7863b90 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -32,13 +32,22 @@ const migrateSkillsToCanonical = (rawSkills) => {
+   });
+ };
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+-import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConsumableApplied } from '../src/store/stateExtensions';
++import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConditionEvent, notifyConsumableApplied } from '../src/store/stateExtensions';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
+ import { isSkillTagged } from '../domain/d20Checks';
+-import { addPersistentDiseaseEffect, removePersistentDiseaseEffects, rollDiseaseFromCatalog } from '../domain/diseaseConditions';
++import {
++  addPersistentDiseaseEffect,
++  DISEASE_RESIST_COOLDOWN_MS,
++  effectDiseaseRank,
++  increaseDiseaseRank,
++  reduceDiseaseRanks,
++  removePersistentDiseaseEffects,
++  resistDiseaseRoll,
++  rollDiseaseFromCatalog,
++} from '../domain/diseaseConditions';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ import { showAlert as showCatalogAlert, showRawAlert } from './alerts/alertService';
+ 
+@@ -90,6 +99,11 @@ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/
+ 
+ const INITIAL_LEVEL = 1;
+ const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
++// Патч 215: антибиотик — не более одной дозы в 24 часа. Кулдаун
++// сопротивления — DISEASE_RESIST_COOLDOWN_MS из domain/diseaseConditions.
++const ANTIBIOTIC_CHEM_WINDOW_MS = 24 * 60 * 60 * 1000;
++const DISEASE_ATTRIBUTE = 'END';
++const DISEASE_SKILL = 'SURVIVAL';
+ 
+ const CharacterContext = createContext();
+ 
+@@ -407,6 +421,9 @@ export const CharacterProvider = ({ children }) => {
+   const [defense, setDefense] = useState(1);
+   const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
+   const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
++  // Момент последней попытки «Сопротивляться» болезни (патч 215): одна
++  // попытка в сутки; null = сопротивляться можно. Поле сейва (v25).
++  const [lastDiseaseResistAt, setLastDiseaseResistAt] = useState(null);
+   const [sceneRiskStates, setSceneRiskStates] = useState({});
+   const sceneRiskTrackerRef = useRef(null);
+   if (sceneRiskTrackerRef.current === null) {
+@@ -806,6 +823,7 @@ export const CharacterProvider = ({ children }) => {
+     conditions,
+     chemDosesLog,
+     sceneRiskStates,
++    lastDiseaseResistAt,
+     ...stateExtensions,
+   }), [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+@@ -814,7 +832,7 @@ export const CharacterProvider = ({ children }) => {
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+-    conditions, chemDosesLog, sceneRiskStates, stateExtensions,
++    conditions, chemDosesLog, sceneRiskStates, lastDiseaseResistAt, stateExtensions,
+   ]);
+ 
+   // Realtime save for already persisted characters.
+@@ -970,6 +988,7 @@ export const CharacterProvider = ({ children }) => {
+       setCaps(data.caps ?? 0);
+       setCurrentHealth(data.currentHealth ?? 0);
+       setRadiationRaw(Math.max(0, data.radiation ?? 0));
++      setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
+       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
+       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
+       setLuckPoints(data.luckPoints ?? 0);
+@@ -1174,6 +1193,16 @@ export const CharacterProvider = ({ children }) => {
+       previous.includes('diseased') ? previous : [...previous, 'diseased']
+     ));
+ 
++    if (applied.added) {
++      // Усталость от болезни (патч 215): +1 источник «болезнь». Движок
++      // уведомляет сеттинг — модуль Fallout двигает усталость
++      // (modules/fallout/survival/index.js, слушатель событий состояний).
++      notifyConditionEvent(
++        { kind: 'disease', event: 'infected', conditionId: disease.id },
++        { stateExtensions, setStateExtension },
++      );
++    }
++
+     return {
+       ...riskResult,
+       diseaseRoll,
+@@ -1182,6 +1211,98 @@ export const CharacterProvider = ({ children }) => {
+     };
+   };
+ 
++  /**
++   * Лечение болезней (патч 215): снимает `amount` единиц с КАЖДОЙ активной
++   * болезни (антибиотик — 1 за раз, отдых в постели — по порциям сна).
++   * Излеченные болезни удаляются из эффектов; сеттинг уведомляется о каждой
++   * (модуль Fallout снимает усталость источника «болезнь»). Условие
++   * 'diseased' остаётся, пока есть хотя бы одна болезнь.
++   * @returns {{ healed: string[], diseasesLeft: number }}
++   */
++  const reducePersistentDiseaseRanks = (amount) => {
++    const storeNow = useCharacterStore.getState();
++    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(storeNow.effects)).effects;
++    const treated = reduceDiseaseRanks(currentEffects, amount);
++    syncTimedEffectsToStore(treated.effects, storeNow);
++    setActiveTimedEffects(treated.effects);
++    for (const conditionId of treated.healed) {
++      notifyConditionEvent(
++        { kind: 'disease', event: 'cured', conditionId },
++        { stateExtensions, setStateExtension },
++      );
++    }
++    const diseasesLeft = treated.effects.filter((e) => e.effectType === 'disease').length;
++    if (diseasesLeft === 0 && conditions.includes('diseased')) {
++      setConditions((previous) => previous.filter((c) => c !== 'diseased'));
++    }
++    return { healed: treated.healed, diseasesLeft };
++  };
++
++  /**
++   * Проверка «Сопротивляться» болезни (патч 215): 2d20, успех грани —
++   * <= ВЫН + Выживание (1 на грани — 2 успеха; отмеченный навык «Выживание»
++   * и грань <= его ранга — 2 успеха). Сумма успехов >= ранга болезни
++   * излечивает её; каждая грань 20 повышает ранг болезни на 1. Одна
++   * попытка в сутки.
++   */
++  const resistDisease = (conditionId) => {
++    const now = Date.now();
++    if (lastDiseaseResistAt != null && now - lastDiseaseResistAt < DISEASE_RESIST_COOLDOWN_MS) {
++      return { ok: false, reason: 'cooldown', retryInMs: DISEASE_RESIST_COOLDOWN_MS - (now - lastDiseaseResistAt) };
++    }
++    const storeNow = useCharacterStore.getState();
++    const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(storeNow.effects)).effects;
++    const effect = currentEffects.find((e) => e.effectType === 'disease' && e.conditionId === conditionId);
++    if (!effect) return { ok: false, reason: 'notFound' };
++
++    const attribute = attributes.find((entry) => entry?.name === DISEASE_ATTRIBUTE);
++    const skill = skills.find((entry) => entry?.name === DISEASE_SKILL);
++    if (!attribute || !skill) {
++      throw new Error(`[CharacterContext] Для сопротивления болезни отсутствует ${DISEASE_ATTRIBUTE} или ${DISEASE_SKILL}`);
++    }
++    const isTagged = isSkillTagged({
++      skillId: DISEASE_SKILL,
++      primaryTaggedSkillIds: selectedSkills,
++      extraTaggedSkillIds: extraTaggedSkills,
++    });
++
++    const rankBefore = effectDiseaseRank(effect);
++    const roll = resistDiseaseRoll({
++      targetNumber: getAttributeValue(attributes, DISEASE_ATTRIBUTE) + skill.value,
++      taggedSurvivalRank: isTagged ? skill.value : null,
++      diseaseRank: rankBefore,
++    });
++
++    setLastDiseaseResistAt(now);
++
++    let rankAfter = rankBefore;
++    if (roll.cured) {
++      const withoutDisease = currentEffects.filter((e) => e !== effect);
++      syncTimedEffectsToStore(withoutDisease, storeNow);
++      setActiveTimedEffects(withoutDisease);
++      notifyConditionEvent(
++        { kind: 'disease', event: 'cured', conditionId },
++        { stateExtensions, setStateExtension },
++      );
++      if (!withoutDisease.some((e) => e.effectType === 'disease') && conditions.includes('diseased')) {
++        setConditions((previous) => previous.filter((c) => c !== 'diseased'));
++      }
++    } else if (roll.rankIncrease > 0) {
++      rankAfter = rankBefore + roll.rankIncrease;
++      const withRank = increaseDiseaseRank(currentEffects, conditionId, roll.rankIncrease);
++      syncTimedEffectsToStore(withRank, storeNow);
++      setActiveTimedEffects(withRank);
++    }
++
++    return {
++      ok: true,
++      diseaseName: effect.effectName,
++      ...roll,
++      rankBefore,
++      rankAfter,
++    };
++  };
++
+   const applyDiseaseExposureForConsumable = (item) => {
+     if (
+       item?.id === 'drink_dirty_water'
+@@ -1305,14 +1426,37 @@ export const CharacterProvider = ({ children }) => {
+     // 3. removeCondition (аддиктол, антибиотики)
+     const {
+       conditions: nextConditions,
+-      removed,
++      removed: removedRaw,
+       requested: conditionRemovalsRequested,
+     } = applyRemoveConditions(item, conditions);
+-    if (removed.length > 0) {
++    let removed = removedRaw;
++    // Лечение болезней (патч 215): антибиотик снимает 1 единицу с КАЖДОЙ
++    // болезни (ранги), а не лечит всё разом; не более 1 дозы в 24 часа.
++    let diseaseTreatment = null;
++    const antibioticRequested = conditionRemovalsRequested.includes('diseased') && item?.antibiotic === true;
++    if (antibioticRequested && removedRaw.includes('diseased')) {
++      const lastAntibioticDose = chemDosesLog
++        .filter((d) => d.chemId === item.id)
++        .map((d) => d.takenAt)
++        .sort((a, b) => b - a)[0];
++      const onCooldown = lastAntibioticDose != null && Date.now() - lastAntibioticDose < ANTIBIOTIC_CHEM_WINDOW_MS;
++      if (onCooldown) {
++        diseaseTreatment = { blocked: true };
++        removed = removedRaw.filter((c) => c !== 'diseased');
++      } else {
++        const treatment = reducePersistentDiseaseRanks(1);
++        diseaseTreatment = { blocked: false, ...treatment };
++        removed = treatment.diseasesLeft === 0 ? removedRaw : removedRaw.filter((c) => c !== 'diseased');
++      }
++      // Условие 'diseased' пересчитывается в reducePersistentDiseaseRanks
++      // (снимается только при полном излечении); nextConditions без него
++      // при частичном лечении не применяем.
++      setConditions(nextConditions);
++    } else if (removedRaw.length > 0) {
+       setConditions(nextConditions);
+       // Снятие зависимости (аддиктол): удаляем перманентный эффект
+       // «Зависимость: Стелс-бой» из активных эффектов.
+-      if (removed.includes('addicted')) {
++      if (removedRaw.includes('addicted')) {
+         const storeNow = useCharacterStore.getState();
+         const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+         const withoutAddiction = currentEffects.filter(
+@@ -1321,12 +1465,21 @@ export const CharacterProvider = ({ children }) => {
+         syncTimedEffectsToStore(withoutAddiction, storeNow);
+         setActiveTimedEffects(withoutAddiction);
+       }
+-      if (removed.includes('diseased')) {
++      if (removedRaw.includes('diseased')) {
++        // Не-антибиотик, снимающий болезни целиком (историческое поведение):
++        // удаляем все болезненные эффекты и уведомляем сеттинг о каждой
++        // излеченной болезни (усталость источника «болезнь» снимается).
+         const storeNow = useCharacterStore.getState();
+         const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+-        const withoutDiseases = removePersistentDiseaseEffects(currentEffects).effects;
+-        syncTimedEffectsToStore(withoutDiseases, storeNow);
+-        setActiveTimedEffects(withoutDiseases);
++        const withoutDiseases = removePersistentDiseaseEffects(currentEffects);
++        syncTimedEffectsToStore(withoutDiseases.effects, storeNow);
++        setActiveTimedEffects(withoutDiseases.effects);
++        for (const cured of withoutDiseases.removed) {
++          notifyConditionEvent(
++            { kind: 'disease', event: 'cured', conditionId: cured.conditionId },
++            { stateExtensions, setStateExtension },
++          );
++        }
+       }
+     }
+ 
+@@ -1414,6 +1567,7 @@ export const CharacterProvider = ({ children }) => {
+       extensionResults,
+       conditionsRemoved: removed,
+       conditionRemovalsRequested,
++      diseaseTreatment,
+       healAmount: vitalChanges.healAmount,
+       radiationAmount: vitalChanges.radiationAmount,
+     };
+@@ -1546,6 +1700,7 @@ export const CharacterProvider = ({ children }) => {
+     setSelectedPerks([]);
+     setConditions([]);
+     setChemDosesLog([]);
++    setLastDiseaseResistAt(null);
+     setMeleeBonus(0);
+     setInitiative(calculateInitiative(initialAttributes));
+     setDefense(calculateDefense(initialAttributes));
+@@ -1674,6 +1829,12 @@ export const CharacterProvider = ({ children }) => {
+     setStateExtension,
+     advanceEffectsByGameHours,
+     resolveSceneRiskEventById: applyDiseaseExposureEvent,
++    // Болезни (патч 215): лечение по единицам (антибиотики, отдых в
++    // постели) и проверка «Сопротивляться». Правила усталости от болезни
++    // остаются в модуле Fallout (уведомления о событиях состояний).
++    reducePersistentDiseaseRanks,
++    resistDisease,
++    lastDiseaseResistAt,
+     resetCharacter,
+     resetKitAndRewards,
+     resetKitOnly,
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 487e2e9..ed5303e 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,12 +1,14 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.5** от 2026-09-08.
++Редакция **0.4.6** от 2026-09-08.
+ Статус: этапы 1–5 реализованы (патчи 197–206, 210); выживание целиком
+ вынесено в модуль сеттинга (патч 207, `modules/fallout/survival/`) через
+ родовой механизм расширений состояния движка; употребление еды/напитков
+ любым путём двигает шкалы (патч 208 — слушатель расходников); состояние
+ выживания живёт в зустанд-слайсе `stateExtensions` стора (патч 209);
+-усталость снижает МАКСИМУМ ОЗ, а не текущие — по книге (патч 213).
++усталость снижает МАКСИМУМ ОЗ, а не текущие — по книге (патч 213);
++болезни с рангами — лечение, усталость от болезни и сопротивление
++(патч 215).
+ Настройки системы и реальный тик времени — патч 210 (этап 5).
+ Следующий шаг — этап 6 (движок ОД без UI, §8).
+ 
+@@ -249,6 +251,36 @@ human/mutant — шкалы им положены по правилу типа.
+ - Перед подтверждением — прогноз: шаг всех шкал, усталость, итоговый
+   максимум ОЗ (§6); текущие ОЗ сон не трогает (патч 213).
+ 
++### Болезни — ранги, лечение, сопротивление (патч 215)
++
++**Ранги.** Каждая болезнь имеет ранг (в данных `conditions/diseases.json` —
++поле `duration`: 1/3/4). Ранг живёт на эффекте болезни (поле `rank`, сейв
++v25) и означает:
++
++- число «единиц» болезни — сколько лечения нужно снять;
++- сложность проверки «Сопротивляться».
++
++**Лечение.** Антибиотики (`chem_antibiotics`, признак `antibiotic` в данных)
++снимают **1 единицу с каждой активной болезни**, не более **1 дозы за
++24 часа** (повторная доза в окне не лечит — отчёт предупреждает). Отдых в
++постели: часы сна **в кровати** копятся в аккумулятор `bedRestHours`
++(состояние survival); каждые **12 накопленных часов** снимают 1 единицу с
++каждой болезни (сон в пустоши аккумулятор не двигает). Излеченная болезнь
++удаляется из эффектов; условие «diseased» снимается, когда болезней не
++осталось.
++
++**Усталость.** Заражение добавляет **+1 усталость источника `disease`**
++(за каждую болезнь); полное излечение болезни снимает 1 очко. Часовое
++снятие и сон эту усталость не трогают (только излечение).
++
++**Сопротивление.** В блоке эффектов у каждой болезни справа — кнопка
++«Сопротивляться» (одна попытка в сутки; поле сейва `lastDiseaseResistAt`).
++Бросок **2d20**: грань **≤ ВЫН + Выживание** — 1 успех; если навык
++«Выживание» отмечен и грань ≤ его ранга — 2 успеха; грань **1** — 2 успеха.
++Сумма успехов **≥ ранга** излечивает болезнь (и её усталость). Каждая
++грань **20** повышает ранг болезни на **+1** (сложность растёт). Отчёт
++показан алертом: броски, цель, успехи, итог.
++
+ ---
+ 
+ ## 8. Движок очков действия (ОД) — без UI
+@@ -457,6 +489,16 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.6 (2026-09-08):** болезни с рангами (патч 215): ранг = duration
++  каталога, эффект несёт rank (сейв v25, миграция проставляет старым);
++  антибиотик снимает 1 единицу с каждой болезни (1 доза/24 ч); отдых в
++  постели — 12 накопленных часов сна в кровати снимают 1 единицу с каждой;
++  усталость источника «болезнь» (+1 при заражении, −1 при излечении,
++  часовое снятие её не трогает); кнопка «Сопротивляться» — 2d20 против
++  ВЫН + Выживание, грань 1 и отмеченный навык дают 2 успеха, успехи ≥ ранга
++  излечивают, 20 повышает ранг; раз в сутки.
++- **0.4.5 (2026-09-08):** усталость снижает максимум ОЗ, а не текущие —
++  по книге (патч 213); прогноз сна показывает максимум ОЗ.
+ - **0.4.4 (2026-09-07):** этап 5 — настройки и реальный тик (патч 210).
+   Раздел «Выживание» в настройках: `survivalModeEnabled` (выкл по
+   умолчанию; выкл = шкалы скрыты, трекинг заморожен, состояние в сейве
+diff --git a/domain/diseaseConditions.js b/domain/diseaseConditions.js
+index 79b24e6..a8f4d98 100644
+--- a/domain/diseaseConditions.js
++++ b/domain/diseaseConditions.js
+@@ -58,6 +58,7 @@ export const createPersistentDiseaseEffect = (disease, now = Date.now()) => {
+     effectType: 'disease',
+     conditionId: disease.id,
+     sourceName: disease.name,
++    rank: diseaseRankFromCatalog(disease),
+     createdAt: now,
+     isPermanent: true,
+     scenesLeft: 0,
+@@ -88,3 +89,157 @@ export const removePersistentDiseaseEffects = (currentEffects) => {
+     removed: currentEffects.filter((effect) => effect?.effectType === 'disease'),
+   };
+ };
++
++// ---------------------------------------------------------------------------
++// Ранги болезней (патч 215)
++// ---------------------------------------------------------------------------
++//
++// Каждая болезнь имеет ранг (в данных — duration, 1/3/4). Ранг — текущая
++// сложность сопротивления и число «единиц» болезни, которые нужно снять
++// лечением (антибиотик −1 с каждой болезни, отдых в постели) или одной
++// успешной проверкой «Сопротивляться». Ранг живёт на эффекте болезни
++// (поле rank) и растёт на каждой 20-ке в броске сопротивления.
++//
++// Усталость от болезни — отдельный источник ('disease') состояния
++// выживания: +1 при заражении, −1 при полном излечении болезни
++// (modules/fallout/survival/survival.ts, патч 215).
++
++export const DEFAULT_DISEASE_RANK = 1;
++
++// Одна попытка «Сопротивляться» в сутки (решение владельца, патч 215).
++export const DISEASE_RESIST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
++
++/** Ранг болезни из данных (duration); невалидный — ошибка данных. */
++export const diseaseRankFromCatalog = (disease) => {
++  const rank = Number(disease?.duration);
++  if (!Number.isInteger(rank) || rank < 1) {
++    throw new Error(`[diseaseConditions] Для болезни "${disease?.id}" нет валидного ранга (duration)`);
++  }
++  return rank;
++};
++
++/** Ранг на эффекте болезни: поле rank; эффект без поля — ранг 1 (миграция v25). */
++export const effectDiseaseRank = (effect) => {
++  const rank = Number(effect?.rank);
++  return Number.isInteger(rank) && rank >= 1 ? rank : DEFAULT_DISEASE_RANK;
++};
++
++/**
++ * Снимает `amount` единиц с КАЖДОЙ болезни. Болезнь, чей ранг стал 0,
++ * вылечена: эффект удаляется, её id попадает в healed. Не мутирует эффекты.
++ * @returns {{ effects: object[], healed: string[] }}
++ */
++export const reduceDiseaseRanks = (currentEffects, amount = 1) => {
++  if (!Array.isArray(currentEffects)) {
++    throw new Error('[diseaseConditions] Active effects must be an array');
++  }
++  if (!Number.isInteger(amount) || amount < 0) {
++    throw new Error('[diseaseConditions] reduceDiseaseRanks: amount должен быть целым >= 0');
++  }
++  const healed = [];
++  const effects = [];
++  for (const effect of currentEffects) {
++    if (effect?.effectType !== 'disease') {
++      effects.push(effect);
++      continue;
++    }
++    const rank = effectDiseaseRank(effect) - amount;
++    if (rank <= 0) {
++      healed.push(effect.conditionId);
++      continue;
++    }
++    effects.push({ ...effect, rank });
++  }
++  return { effects, healed };
++};
++
++/**
++ * Увеличивает ранг конкретной болезни (20-ка в броске сопротивления,
++ * патч 215). Не мутирует эффекты.
++ * @returns {object[]} новый массив эффектов
++ */
++export const increaseDiseaseRank = (currentEffects, conditionId, amount = 1) => {
++  if (!Array.isArray(currentEffects)) {
++    throw new Error('[diseaseConditions] Active effects must be an array');
++  }
++  if (!Number.isInteger(amount) || amount < 0) {
++    throw new Error('[diseaseConditions] increaseDiseaseRank: amount должен быть целым >= 0');
++  }
++  return currentEffects.map((effect) => (
++    effect?.effectType === 'disease' && effect.conditionId === conditionId
++      ? { ...effect, rank: effectDiseaseRank(effect) + amount }
++      : effect
++  ));
++};
++
++/**
++ * Одна проверка «Сопротивляться» болезни (чистая, патч 215).
++ *
++ * Бросок 2d20. Для каждой грани:
++ *   - грань 1 — 2 успеха;
++ *   - грань <= targetNumber (ВЫН + Выживание) — 1 успех; если навык
++ *     «Выживание» отмечен (tagged) и грань <= его ранга — 2 успеха;
++ *   - иначе 0 успехов.
++ * Сумма успехов >= ранга болезни — болезнь отменена (cured: true).
++ * Каждая грань 20 — сложность болезни +1 (rankIncrease).
++ *
++ * @param {object} options
++ * @param {number} options.targetNumber сумма ВЫН + Выживание
++ * @param {number|null} [options.taggedSurvivalRank] ранг отмеченного навыка
++ *        «Выживание» (null — навык не отмечен)
++ * @param {number} [options.diseaseRank] текущий ранг болезни
++ * @param {function} [options.rollD20] инъекция броска (по умолчанию rollDie(20))
++ * @returns {{ rolls: number[], successes: number, targetNumber: number,
++ *            cured: boolean, rankIncrease: number }}
++ */
++export const resistDiseaseRoll = ({
++  targetNumber,
++  taggedSurvivalRank = null,
++  diseaseRank = DEFAULT_DISEASE_RANK,
++  rollD20 = () => rollDie(20),
++}) => {
++  if (!Number.isInteger(targetNumber) || targetNumber < 1) {
++    throw new Error('[diseaseConditions] resistDiseaseRoll: targetNumber должен быть целым >= 1');
++  }
++  if (!Number.isInteger(diseaseRank) || diseaseRank < 1) {
++    throw new Error('[diseaseConditions] resistDiseaseRoll: diseaseRank должен быть целым >= 1');
++  }
++  if (typeof rollD20 !== 'function') {
++    throw new Error('[diseaseConditions] resistDiseaseRoll: rollD20 должен быть функцией');
++  }
++  const taggedRank = taggedSurvivalRank == null ? null : Number(taggedSurvivalRank);
++  if (taggedRank !== null && (!Number.isInteger(taggedRank) || taggedRank < 1)) {
++    throw new Error('[diseaseConditions] resistDiseaseRoll: taggedSurvivalRank должен быть целым >= 1 или null');
++  }
++
++  const rolls = [rollD20(), rollD20()];
++  for (const face of rolls) {
++    if (!Number.isInteger(face) || face < 1 || face > 20) {
++      throw new Error('[diseaseConditions] d20 roller returned a value outside 1..20');
++    }
++  }
++
++  let successes = 0;
++  let rankIncrease = 0;
++  for (const face of rolls) {
++    if (face === 20) {
++      rankIncrease += 1;
++      continue; // 20 > любой суммы ВЫН+Выживание — успеха нет
++    }
++    if (face === 1) {
++      successes += 2;
++      continue;
++    }
++    if (face <= targetNumber) {
++      successes += (taggedRank !== null && face <= taggedRank) ? 2 : 1;
++    }
++  }
++
++  return {
++    rolls,
++    successes,
++    targetNumber,
++    cured: successes >= diseaseRank,
++    rankIncrease,
++  };
++};
+diff --git a/i18n/en-EN/screens/inventory/screen.json b/i18n/en-EN/screens/inventory/screen.json
+index f0c5c44..694071a 100644
+--- a/i18n/en-EN/screens/inventory/screen.json
++++ b/i18n/en-EN/screens/inventory/screen.json
+@@ -48,6 +48,8 @@
+         "notPresent": "No active diseases."
+       }
+     },
++    "antibioticDailyLimit": "Antibiotics already taken: no more than 1 dose per 24 hours.",
++    "antibioticReduced": "Diseases weakened: −{units} unit from each.",
+     "foundItemBonus": "{perkName}: you received + {amount} {itemType}."
+   },
+   "foundItemTypes": {
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 413d861..dc5b460 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -7,7 +7,14 @@
+   "effectsPanel": {
+     "title": "Effects",
+     "empty": "No active effects",
+-    "immunityPrefix": "Immunity to:"
++    "immunityPrefix": "Immunity to:",
++    "resist": "Resist",
++    "resistTitle": "Resist disease",
++    "resistRolls": "Rolls: {r1}, {r2} (target \u2264 {t}).",
++    "resistCured": "{s}/{r} successes \u2014 the disease \"{name}\" is cured.",
++    "resistFailed": "{s}/{r} successes \u2014 the disease \"{name}\" remains.",
++    "resistRankIncreased": "A 20 was rolled \u2014 the disease difficulty increased to {r}.",
++    "resistCooldown": "You can resist once per day."
+   },
+   "armor": {
+     "fields": {
+diff --git a/i18n/ru-RU/screens/inventory/screen.json b/i18n/ru-RU/screens/inventory/screen.json
+index 3836fda..85caf0b 100644
+--- a/i18n/ru-RU/screens/inventory/screen.json
++++ b/i18n/ru-RU/screens/inventory/screen.json
+@@ -48,6 +48,8 @@
+         "notPresent": "Активных болезней нет."
+       }
+     },
++    "antibioticDailyLimit": "Антибиотик уже принят: не более 1 дозы за 24 часа.",
++    "antibioticReduced": "Болезни ослаблены: −{units} единица с каждой.",
+     "foundItemBonus": "{perkName}: вы получили + {amount} {itemType}."
+   },
+   "foundItemTypes": {
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index cfed9fa..b3301ae 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -7,7 +7,14 @@
+   "effectsPanel": {
+     "title": "Эффекты",
+     "empty": "Нет активных эффектов",
+-    "immunityPrefix": "Иммунитет к:"
++    "immunityPrefix": "Иммунитет к:",
++    "resist": "Сопротивляться",
++    "resistTitle": "Сопротивление болезни",
++    "resistRolls": "Броски: {r1}, {r2} (цель ≤ {t}).",
++    "resistCured": "Успехов {s}/{r} — болезнь «{name}» побеждена.",
++    "resistFailed": "Успехов {s}/{r} — болезнь «{name}» остаётся.",
++    "resistRankIncreased": "Выпало 20 — сложность болезни выросла до {r}.",
++    "resistCooldown": "Сопротивляться можно раз в сутки."
+   },
+   "armor": {
+     "fields": {
+diff --git a/modules/fallout/data/consumables/chems.json b/modules/fallout/data/consumables/chems.json
+index 5a78492..beb4d3f 100644
+--- a/modules/fallout/data/consumables/chems.json
++++ b/modules/fallout/data/consumables/chems.json
+@@ -18,6 +18,7 @@
+   {
+     "id": "chem_antibiotics",
+     "itemType": "chem",
++    "antibiotic": true,
+     "weight": 0.5,
+     "cost": 75,
+     "rarity": 3,
+diff --git a/modules/fallout/diseases/migration.js b/modules/fallout/diseases/migration.js
+new file mode 100644
+index 0000000..8f22d66
+--- /dev/null
++++ b/modules/fallout/diseases/migration.js
+@@ -0,0 +1,38 @@
++// Болезни — модуль сеттинга Fallout (патч 215).
++//
++// Регистрирует сеттинговую миграцию v24 -> v25: старые сейвы не несут ранг
++// на эффекте болезни (поле rank) — миграция проставляет его из каталога
++// (duration в conditions/diseases.json). Вставка на индекс 24 (переход
++// v24 -> v25) идёт рядом с движковой identity-миграцией той же версии;
++// старые сейвы совместимы: болезнь без ранга лечилась как ранг 1.
++//
++// Импорт этого модуля — side-effect регистрации (App.js импортирует его
++// до монтирования CharacterProvider, рядом с modules/fallout/survival).
++
++import diseasesFile from '../data/conditions/diseases.json';
++import { registerStateMigration } from '../../../src/store/stateExtensions';
++
++const DISEASE_RANK_BY_ID = new Map(
++  (Array.isArray(diseasesFile) ? diseasesFile : []).map((entry) => [entry.id, entry.duration]),
++);
++
++/**
++ * v24 -> v25: эффектам болезней в activeTimedEffects без поля rank
++ * проставляется ранг из каталога. Идемпотентна: эффекты с rank не
++ * переписываются, не-болезни и не-массивы проходят без изменений.
++ */
++export const migrateDiseaseRanks = (state) => {
++  if (!state || typeof state !== 'object') return state;
++  if (!Array.isArray(state.activeTimedEffects)) return state;
++  const effects = state.activeTimedEffects.map((effect) => {
++    if (!effect || effect.effectType !== 'disease') return effect;
++    if (Number.isInteger(effect.rank) && effect.rank >= 1) return effect;
++    const duration = DISEASE_RANK_BY_ID.get(effect.conditionId);
++    if (!Number.isInteger(duration) || duration < 1) return effect; // неизвестная болезнь — не додумываем
++    return { ...effect, rank: duration };
++  });
++  return { ...state, activeTimedEffects: effects };
++};
++
++// Переход v24 -> v25: место в цепочке — как в патче 212 (MIGRATIONS[24]).
++registerStateMigration(migrateDiseaseRanks, 24);
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 97d14e8..41f36bd 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -233,7 +233,8 @@
+       "reportState": "Result: {state}",
+       "reportMaxHp": "Max HP: {n}",
+       "reportHpBonus": "+2 max HP until your next sleep",
+-      "reportFatigueCleared": "Fatigue (sleep) removed: {n}"
++      "reportFatigueCleared": "Fatigue (sleep) removed: {n}",
++      "reportBedRestHealed": "Bed rest cured diseases: {n}"
+     },
+     "fatigue": "Fatigue {n}",
+     "apPenalty": "Action Points gained −{n}",
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index d6d5e7f..2d565c2 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -233,7 +233,8 @@
+       "reportState": "Состояние: {state}",
+       "reportMaxHp": "Максимум ОЗ: {n}",
+       "reportHpBonus": "+2 к макс. ОЗ до следующего сна",
+-      "reportFatigueCleared": "Снято усталости (сон): {n}"
++      "reportFatigueCleared": "Снято усталости (сон): {n}",
++      "reportBedRestHealed": "Отдых в постели излечил болезней: {n}"
+     },
+     "fatigue": "Усталость {n}",
+     "apPenalty": "Количество получаемых ОД −{n}",
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 78a6524..260c87d 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -2,6 +2,8 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
+ import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useCharacter } from '../../../../components/CharacterContext';
++import { showRawAlert } from '../../../../components/alerts/alertService';
++import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../../../domain/diseaseConditions';
+ import useCharacterStore from '../../../../src/store/characterStore';
+ import { useShallow } from 'zustand/react/shallow';
+ import {
+@@ -189,6 +191,7 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
+   const [isOpen, setIsOpen] = useState(false);
+   useLocale();
+   const moduleLocale = useModuleLocale();
++  const { resistDisease, lastDiseaseResistAt } = useCharacter();
+   const diseasesById = useMemo(() => new Map(
+     getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
+   ), [moduleLocale]);
+@@ -245,6 +248,59 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
+                   : effect.effectName || effect.effectLabel || '—');
+                 const effectDescription = localizedDisease?.effectLabel;
+                 const isNegative = effect.effectKind === 'negative';
++                // Болезнь (патч 215): название с рангом по центру, справа —
++                // кнопка «Сопротивляться» (одна попытка в сутки). Описание
++                // — отдельной строкой по центру.
++                if (effect.effectType === 'disease') {
++                  const resistOnCooldown = lastDiseaseResistAt != null
++                    && Date.now() - lastDiseaseResistAt < DISEASE_RESIST_COOLDOWN_MS;
++                  const handleResist = () => {
++                    if (resistOnCooldown) return;
++                    const result = resistDisease(effect.conditionId);
++                    if (!result.ok) return;
++                    const lines = [
++                      tWeaponsAndArmorScreen('effectsPanel.resistRolls')
++                        .replace('{r1}', String(result.rolls[0]))
++                        .replace('{r2}', String(result.rolls[1]))
++                        .replace('{t}', String(result.targetNumber)),
++                    ];
++                    if (result.rankIncrease > 0) {
++                      lines.push(tWeaponsAndArmorScreen('effectsPanel.resistRankIncreased')
++                        .replace('{r}', String(result.rankAfter)));
++                    }
++                    lines.push((result.cured
++                      ? tWeaponsAndArmorScreen('effectsPanel.resistCured')
++                      : tWeaponsAndArmorScreen('effectsPanel.resistFailed'))
++                      .replace('{s}', String(result.successes))
++                      .replace('{r}', String(result.rankBefore))
++                      .replace('{name}', String(result.diseaseName)));
++                    showRawAlert({
++                      title: tWeaponsAndArmorScreen('effectsPanel.resistTitle'),
++                      message: lines.join('\n'),
++                    });
++                  };
++                  return (
++                    <View key={effect.id} style={localStyles.diseaseBlock}>
++                      <View style={localStyles.diseaseNameRow}>
++                        <Text style={[localStyles.effectText, localStyles.negativeEffectText]}>
++                          {effectText} ({effectDiseaseRank(effect)})
++                        </Text>
++                        <TouchableOpacity
++                          style={[localStyles.resistButton, resistOnCooldown && localStyles.resistButtonDisabled]}
++                          onPress={handleResist}
++                          disabled={resistOnCooldown}
++                        >
++                          <Text style={localStyles.resistButtonText}>
++                            {tWeaponsAndArmorScreen('effectsPanel.resist')}
++                          </Text>
++                        </TouchableOpacity>
++                      </View>
++                      {effectDescription ? (
++                        <Text style={localStyles.diseaseEffectDescription}>{effectDescription}</Text>
++                      ) : null}
++                    </View>
++                  );
++                }
+                 return (
+                   <View key={effect.id} style={localStyles.effectsPanelRow}>
+                     <View style={localStyles.effectDetails}>
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+index 8066644..d03c46a 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -118,6 +118,8 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+             ok: boolean;
+             reason?: string;
+             result?: RestResult;
++            bedRestCompleted?: number;
++            bedRestHealed?: string[];
+             diseaseRiskResult?: unknown;
+         };
+         if (!apply.ok || !apply.result) {
+@@ -136,6 +138,13 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+         if (result.state.hpBonus > 0) {
+             reportLines.push(t('survival.sleep.reportHpBonus'));
+         }
++        // Отдых в постели (патч 215): накопленные порции сна в кровати
++        // снимают единицы болезней — показываем число излеченных.
++        if ((apply.bedRestHealed as string[] | undefined)?.length) {
++            reportLines.push(
++                t('survival.sleep.reportBedRestHealed').replace('{n}', String((apply.bedRestHealed as string[]).length)),
++            );
++        }
+         const cleared = (result.events as Array<{ type?: string; removed?: number }>)
+             .find((e) => e.type === 'fatigueSleepCleared');
+         if (typeof cleared?.removed === 'number' && cleared.removed > 0) {
+diff --git a/modules/fallout/survival/index.js b/modules/fallout/survival/index.js
+index 2ac939c..a0c5922 100644
+--- a/modules/fallout/survival/index.js
++++ b/modules/fallout/survival/index.js
+@@ -14,11 +14,12 @@
+ // на Flow-парсинге react-native).
+ 
+ import {
++  registerConditionEventListener,
+   registerConsumableAppliedListener,
+   registerStateExtension,
+   registerStateMigration,
+ } from '../../../src/store/stateExtensions';
+-import { createSurvivalState } from './survival';
++import { createSurvivalState, withDiseaseFatigue, withoutDiseaseFatigue } from './survival';
+ import { migrateSurvivalField } from './migration';
+ import { survivalConsumableListener } from './operations';
+ 
+@@ -41,8 +42,16 @@ registerStateExtension({
+   },
+   // Загрузка сейва: поле уже создано миграцией v23 (или фабрикой).
+   // hydrate идемпотентна: null/undefined остаются null (роботы/киборги
+-  // и «ещё не создано»), объект проходит как есть.
+-  hydrate: (raw) => (raw && typeof raw === 'object' ? raw : null),
++  // и «ещё не создано»), объекту достраивается аккумулятор отдыха в
++  // постели (патч 215) — дозаполнение внутри существующего поля,
++  // версию схемы не поднимает.
++  hydrate: (raw) => {
++    if (!raw || typeof raw !== 'object') return null;
++    const bedRestHours = Number(raw.bedRestHours);
++    return Number.isFinite(bedRestHours) && bedRestHours >= 0
++      ? { ...raw, bedRestHours }
++      : { ...raw, bedRestHours: 0 };
++  },
+   reset: () => null,
+ });
+ 
+@@ -53,6 +62,36 @@ registerStateMigration(migrateSurvivalField, 22);
+ // выживания) двигает шкалы — слушатель патча 208.
+ registerConsumableAppliedListener({ id: 'survival', listener: survivalConsumableListener });
+ 
++// Болезни (патч 215): усталость источника «болезнь» — +1 при заражении,
++// −1 при излечении. Слушатели событий состояний (stateExtensions.js):
++// движок уведомляет при заражении/излечении, модуль двигает усталость.
++const diseaseFatigueListener = (payload, ctx) => {
++  const survival = ctx?.stateExtensions?.survival ?? null;
++  if (!survival || payload?.kind !== 'disease') return null;
++  if (payload.event === 'infected') {
++    ctx.setStateExtension('survival', withDiseaseFatigue(survival, 1));
++    return { survivalFatigueApplied: true };
++  }
++  if (payload.event === 'cured') {
++    ctx.setStateExtension('survival', withoutDiseaseFatigue(survival, 1));
++    return { survivalFatigueRemoved: true };
++  }
++  return null;
++};
++
++registerConditionEventListener({
++  id: 'survivalDiseaseFatigue',
++  kind: 'disease',
++  event: 'infected',
++  listener: diseaseFatigueListener,
++});
++registerConditionEventListener({
++  id: 'survivalDiseaseFatigue',
++  kind: 'disease',
++  event: 'cured',
++  listener: diseaseFatigueListener,
++});
++
+ export { createSurvivalState } from './survival';
+ export { migrateSurvivalField } from './migration';
+ export { sleepSurvival, survivalConsumableListener } from './operations';
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+index 51cfe3f..4891207 100644
+--- a/modules/fallout/survival/operations.js
++++ b/modules/fallout/survival/operations.js
+@@ -63,6 +63,7 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+ 
+   const {
+     setStateExtension,
++    reducePersistentDiseaseRanks,
+     advanceEffectsByGameHours,
+     resolveSceneRiskEventById,
+   } = ctx;
+@@ -73,6 +74,13 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+   const result = rest(survival, { place, hours });
+   setStateExtension('survival', result.state);
+ 
++  // Отдых в постели (патч 215): каждая накопленная порция 12 часов сна
++  // в кровати снимает 1 единицу с каждой болезни.
++  let bedRestHealed = [];
++  if (result.bedRestCompleted > 0 && typeof reducePersistentDiseaseRanks === 'function') {
++    bedRestHealed = reducePersistentDiseaseRanks(result.bedRestCompleted).healed;
++  }
++
+   // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
+   const { expired } = advanceEffectsByGameHours(hours);
+ 
+@@ -86,6 +94,8 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+     hours,
+     sleepTo: result.state.sleep,
+     fatigueAfter: result.state.fatigue.reduce((sum, f) => sum + f.amount, 0),
++    bedRestCompleted: result.bedRestCompleted,
++    bedRestHealed,
+     diseaseRiskResult,
+     effectsExpired: expired.length,
+   });
+@@ -93,6 +103,8 @@ export const sleepSurvival = (ctx, { place, hours }) => {
+   return {
+     ok: true,
+     result,
++    bedRestCompleted: result.bedRestCompleted,
++    bedRestHealed,
+     diseaseRiskResult,
+     effectsExpired: expired,
+   };
+diff --git a/modules/fallout/survival/survival.ts b/modules/fallout/survival/survival.ts
+index 2c52b28..3931280 100644
+--- a/modules/fallout/survival/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -32,6 +32,10 @@ export interface SurvivalState {
+     acc: { food: number; water: number; sleep: number };
+     timeCarried: number;
+     hpBonus: number;
++    // Аккумулятор отдыха в постели (патч 215): часы сна В КРОВАТИ; каждые
++    // bedRestHealHours накопленных часов снимают 1 единицу с каждой болезни
++    // (применяет вызывающий — операции, через контекст персонажа).
++    bedRestHours: number;
+ }
+ 
+ // Признаки расходника, которые читает домен выживания (данные сеттинга:
+@@ -59,6 +63,9 @@ export interface SurvivalRules {
+         hpBonus: number;
+         fatigueClearHours: number;
+     };
++    // Отдых в постели: каждые N накопленных часов сна в кровати снимают
++    // 1 единицу с каждой болезни (патч 215).
++    bedRestHealHours: number;
+     defaultCourseMinutesPerHour: number;
+     maxSleepHours: number;
+ }
+@@ -95,6 +102,9 @@ export const SURVIVAL_RULES: SurvivalRules = {
+         hpBonus: 2,
+         fatigueClearHours: 6, // на 6-м часе сна списывается вся усталость источника «сон»
+     },
++    // Отдых в постели: 12 накопленных часов сна в кровати снимают
++    // 1 единицу с каждой болезни (решение владельца, патч 215).
++    bedRestHealHours: 12,
+     // Дефолтный курс времени: 30 реальных минут = 1 игровой час.
+     defaultCourseMinutesPerHour: 30,
+     maxSleepHours: 24,
+@@ -130,6 +140,7 @@ export function createSurvivalState(characterType: string | undefined | null): S
+         acc: { food: 0, water: 0, sleep: 0 }, // часы в текущей секции
+         timeCarried: 0, // дробная часть игрового часа от реального тика
+         hpBonus: 0, // +2 к макс. ОЗ до следующего сна (кровать, ≥8 ч)
++        bedRestHours: 0, // аккумулятор отдыха в постели (патч 215)
+     };
+ }
+ 
+@@ -158,12 +169,14 @@ export function addFatigue(state: SurvivalState, source: FatigueSource, amount:
+ 
+ // Списание из общей кучи: сначала с наибольшего источника
+ // (детерминированная деталь реализации, §6 дока).
+-export function removeFatigueTotal(state: SurvivalState, amount: number): void {
++// excludeSources — источники, которые списание не трогает (усталость от
++// болезни снимается только излечением, патч 215).
++export function removeFatigueTotal(state: SurvivalState, amount: number, excludeSources: FatigueSource[] = []): void {
+     let left = amount;
+     while (left > 0) {
+         let biggest: FatigueEntry | null = null;
+         for (const f of state.fatigue) {
+-            if (f.amount > 0 && (!biggest || f.amount > biggest.amount)) biggest = f;
++            if (f.amount > 0 && !excludeSources.includes(f.source) && (!biggest || f.amount > biggest.amount)) biggest = f;
+         }
+         if (!biggest) return;
+         const take = Math.min(left, biggest.amount);
+@@ -172,6 +185,39 @@ export function removeFatigueTotal(state: SurvivalState, amount: number): void {
+     }
+ }
+ 
++// Усталость от болезни (патч 215): +1 при заражении (на каждую болезнь),
++// −1 при полном излечении болезни. Снимается ТОЛЬКО излечением: часовое
++// снятие и сон её не трогают (excludeSources выше).
++export function addDiseaseFatigue(state: SurvivalState, amount: number): void {
++    addFatigue(state, 'disease', amount);
++}
++
++export function removeDiseaseFatigue(state: SurvivalState, amount: number): void {
++    const entry = state.fatigue.find((f) => f.source === 'disease');
++    if (entry && entry.amount > 0) {
++        entry.amount = Math.max(0, entry.amount - amount);
++    }
++}
++
++// Чистые переходы для контекста персонажа (патч 215): домен мутирует
++// рабочие копии, а болезни меняют усталость точечно — возвращаем новое
++// состояние без мутации исходного.
++export function cloneSurvivalState(state: SurvivalState): SurvivalState {
++    return cloneState(state);
++}
++
++export function withDiseaseFatigue(state: SurvivalState, amount: number): SurvivalState {
++    const next = cloneState(state);
++    addFatigue(next, 'disease', amount);
++    return next;
++}
++
++export function withoutDiseaseFatigue(state: SurvivalState, amount: number): SurvivalState {
++    const next = cloneState(state);
++    removeDiseaseFatigue(next, amount);
++    return next;
++}
++
+ export function clearFatigueSource(state: SurvivalState, source: FatigueSource): void {
+     const entry = state.fatigue.find((f) => f.source === source);
+     if (entry) entry.amount = 0;
+@@ -256,7 +302,7 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEven
+         && state.sleep >= removalMin.sleep
+         && totalFatigue(state) > 0
+     ) {
+-        removeFatigueTotal(state, 1);
++        removeFatigueTotal(state, 1, ['disease']);
+         events.push({ type: 'fatigueRemoved', amount: 1 });
+     }
+     // 3. Снижение максимума ОЗ по итоговому N (патч 213): производная
+@@ -353,6 +399,9 @@ export interface RestOptions {
+ export interface RestResult {
+     state: SurvivalState;
+     events: SurvivalEvent[];
++    // Сколько полных порций bedRestHealHours накоплено этим сном в кровати
++    // (патч 215): вызывающий снимает по 1 единице с каждой болезни за порцию.
++    bedRestCompleted: number;
+ }
+ 
+ // Сон. place: 'bed' | 'wasteland', часы 1–24.
+@@ -369,6 +418,16 @@ export function rest(state: SurvivalState, { place, hours }: RestOptions): RestR
+     const wk = cloneState(state);
+     wk.hpBonus = 0; // «до следующего сна» — любой сон снимает бонус
+     const events: SurvivalEvent[] = [];
++    // Отдых в постели (патч 215): часы сна В КРОВАТИ копятся в аккумулятор;
++    // каждые bedRestHealHours часов — порция лечения болезней (применяет
++    // вызывающий, чтобы получить имена излеченных). Сон в пустоши
++    // аккумулятор не двигает.
++    let bedRestCompleted = 0;
++    if (place === 'bed') {
++        wk.bedRestHours += hours;
++        bedRestCompleted = Math.floor(wk.bedRestHours / SURVIVAL_RULES.bedRestHealHours);
++        wk.bedRestHours -= bedRestCompleted * SURVIVAL_RULES.bedRestHealHours;
++    }
+     for (let h = 1; h <= hours; h += 1) {
+         const hourEvents = tickHour(wk, { sleepMode: true });
+         for (const e of hourEvents) events.push({ hour: h, ...e });
+@@ -399,7 +458,7 @@ export function rest(state: SurvivalState, { place, hours }: RestOptions): RestR
+         place,
+         hpBonus: wk.hpBonus,
+     });
+-    return { state: wk, events };
++    return { state: wk, events, bedRestCompleted };
+ }
+ 
+ // Прогноз сна для модали (чистый прогон rest, состояние не фиксируется).
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index f156016..31d8eb9 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -203,6 +203,7 @@ export const normalizeEffects = (activeTimedEffects = []) => {
+     result[effect.id] = {
+       id: effect.id,
+       name: effect.effectLabel || effect.effectName || 'Unnamed Effect',
++      rank: effect.rank,
+       effectName: effect.effectName,
+       effectLabel: effect.effectLabel,
+       effectKind: effect.effectKind,
+@@ -314,6 +315,7 @@ export const denormalizeEffects = (effectsDict = {}) => {
+     .map(effect => ({
+       id: effect.id,
+       effectName: effect.effectName ?? effect.name,
++      rank: effect.rank,
+       effectLabel: effect.effectLabel ?? effect.name,
+       effectKind: effect.effectKind ?? effect.type,
+       maxHpModifier: effect.maxHpModifier,
+@@ -1262,6 +1264,12 @@ const MIGRATIONS = [
+   // отсутствие поля = корневой список.
+   (state) => state,
+ 
++  // v24 -> v25: болезни с рангами (патч 215). Движковая часть идентична:
++  // lastDiseaseResistAt опционально (отсутствие = можно сопротивляться),
++  // ранг на эффекте болезни проставляет сетевая миграция (вставка на тот
++  // же индекс, modules/fallout/diseases/migration.js).
++  (state) => state,
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index a171ed8..724d4dd 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -71,7 +71,12 @@
+ //       Миграция идентична: поле пишется и сверяется слоем БД
+ //       (db/Database.js, domain/characterFolders.js), преобразований нет.
+ //       Старые сейвы без поля остаются в корневом списке.
+-export const CURRENT_SCHEMA_VERSION = 24;
++// v25 — болезни с рангами (патч 215): опциональное поле lastDiseaseResistAt
++//       (момент последней попытки «Сопротивляться»; отсутствие = можно
++//       сопротивляться) и ранг на эффекте болезни (поле rank). Ранг старым
++//       сейвам проставляет сетевая миграция modules/fallout/diseases/
++//       migration.js (по каталогу); движковая миграция версии идентична.
++export const CURRENT_SCHEMA_VERSION = 25;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+diff --git a/src/store/stateExtensions.js b/src/store/stateExtensions.js
+index f87a7ea..0033969 100644
+--- a/src/store/stateExtensions.js
++++ b/src/store/stateExtensions.js
+@@ -171,3 +171,56 @@ export const notifyConsumableApplied = (item, ctx) => {
+   }
+   return results;
+ };
++
++// --- Слушатели событий состояний (болезни, патч 215) -----------------------
++
++// Родовое уведомление «состояние персонажа изменилось» — для сеттинговых
++// правил, завязанных на условия (сейчас — болезнь: заражение и излечение).
++// Движок вызывает слушателей при заражении и излечении болезни и передаёт
++// { kind: 'disease', event: 'infected' | 'cured', conditionId }; сеттинг
++// сам решает, что делать (например, Fallout двигает усталость источника
++// «болезнь»: +1 при заражении, −1 при излечении). Движок правил не знает.
++//
++// Контракт слушателя: (payload, ctx) => result | null, где ctx —
++// { stateExtensions, setStateExtension }; result — произвольный объект
++// с id слушателя (или null, если событие слушателя не касается).
++// Исключение слушателя — дефект, роняем уведомление.
++const CONDITION_EVENT_LISTENERS = new Map();
++
++export const registerConditionEventListener = (entry) => {
++  if (!entry || typeof entry !== 'object') {
++    throw new Error('[stateExtensions] Слушатель событий состояний должен быть объектом');
++  }
++  if (typeof entry.id !== 'string' || !entry.id) {
++    throw new Error('[stateExtensions] Слушатель событий состояний обязан иметь id');
++  }
++  if (typeof entry.kind !== 'string' || !entry.kind) {
++    throw new Error(`[stateExtensions] Слушатель \"${entry.id}\" обязан указать kind`);
++  }
++  if (typeof entry.event !== 'string' || !entry.event) {
++    throw new Error(`[stateExtensions] Слушатель \"${entry.id}\" обязан указать event`);
++  }
++  if (typeof entry.listener !== 'function') {
++    throw new Error(`[stateExtensions] Слушатель \"${entry.id}\" обязан иметь listener`);
++  }
++  const key = `${entry.kind}:${entry.event}:${entry.id}`;
++  if (CONDITION_EVENT_LISTENERS.has(key)) {
++    throw new Error(`[stateExtensions] Слушатель \"${entry.id}\" (${entry.kind}:${entry.event}) уже зарегистрирован`);
++  }
++  CONDITION_EVENT_LISTENERS.set(key, entry);
++};
++
++export const getRegisteredConditionEventListeners = () =>
++  Array.from(CONDITION_EVENT_LISTENERS.values());
++
++export const notifyConditionEvent = (payload, ctx) => {
++  const results = [];
++  for (const entry of CONDITION_EVENT_LISTENERS.values()) {
++    if (entry.kind !== payload?.kind || entry.event !== payload?.event) continue;
++    const result = entry.listener(payload, ctx);
++    if (result != null) {
++      results.push(result && typeof result === 'object' ? { ...result, id: entry.id } : { id: entry.id });
++    }
++  }
++  return results;
++};
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index b6f73b8..c81bddc 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -118,6 +118,35 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     paddingVertical: 3,
+   },
++  // Болезнь (патч 215): название с рангом по центру, кнопка
++  // «Сопротивляться» — справа в той же строке; описание — по центру ниже.
++  diseaseBlock: {
++    paddingVertical: 3,
++  },
++  diseaseNameRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    position: 'relative',
++  },
++  resistButton: {
++    position: 'absolute',
++    right: 0,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 3,
++    paddingHorizontal: 6,
++    paddingVertical: 2,
++    backgroundColor: '#fce5cd',
++  },
++  resistButtonDisabled: {
++    opacity: 0.4,
++  },
++  resistButtonText: {
++    fontSize: 10,
++    fontWeight: '700',
++    color: '#000',
++  },
+   armorItemNameTitle: {
+     color: '#fff',
+     fontSize: 11,
+-- 
+2.39.5
+

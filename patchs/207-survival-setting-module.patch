@@ -1,0 +1,1049 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Mon, 7 Sep 2026 11:42:38 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20207:=20=D0=B2=D1=8B?=
+ =?UTF-8?q?=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD=D0=B8=D0=B5=20=E2=80=94=20=D0=BC?=
+ =?UTF-8?q?=D0=BE=D0=B4=D1=83=D0=BB=D1=8C=20=D1=81=D0=B5=D1=82=D1=82=D0=B8?=
+ =?UTF-8?q?=D0=BD=D0=B3=D0=B0=20fallout;=20=D0=B4=D0=B2=D0=B8=D0=B6=D0=BE?=
+ =?UTF-8?q?=D0=BA=20=D0=BF=D0=BE=D0=BB=D1=83=D1=87=D0=B8=D0=BB=20=D1=80?=
+ =?UTF-8?q?=D0=B5=D0=B5=D1=81=D1=82=D1=80=20=D1=80=D0=B0=D1=81=D1=88=D0=B8?=
+ =?UTF-8?q?=D1=80=D0=B5=D0=BD=D0=B8=D0=B9=20=D1=81=D0=BE=D1=81=D1=82=D0=BE?=
+ =?UTF-8?q?=D1=8F=D0=BD=D0=B8=D1=8F=20(stateExtensions)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                        |   4 +
+ __tests__/saves/state-extensions.test.js      |  95 +++++++++++++
+ __tests__/survival/survival-domain.test.js    |   2 +-
+ __tests__/survival/survival-migration.test.js |   8 +-
+ __tests__/survival/survival-modals.test.js    |   2 +-
+ __tests__/survival/survival-ui.test.js        |   2 +-
+ components/CharacterContext.js                | 104 +++++++-------
+ docs/architecture/engine-setting-audit.md     |  29 ++++
+ docs/survival-system-design.md                |  19 ++-
+ .../WeaponsAndArmorScreen.js                  |   8 +-
+ .../modals/SleepModal.tsx                     |  16 ++-
+ .../modals/SurvivalConsumeModal.tsx           |   7 +-
+ modules/fallout/survival/hooks.js             |  18 +++
+ modules/fallout/survival/index.js             |  50 +++++++
+ modules/fallout/survival/migration.js         |  39 ++++++
+ modules/fallout/survival/operations.js        |  61 +++++++++
+ .../fallout/survival}/survival.ts             |   5 +-
+ src/store/migrations.js                       |  62 ++++-----
+ src/store/saveSchema.js                       |   5 +-
+ src/store/stateExtensions.js                  | 127 ++++++++++++++++++
+ tsconfig.json                                 |   2 +-
+ 21 files changed, 557 insertions(+), 108 deletions(-)
+ create mode 100644 __tests__/saves/state-extensions.test.js
+ create mode 100644 modules/fallout/survival/hooks.js
+ create mode 100644 modules/fallout/survival/index.js
+ create mode 100644 modules/fallout/survival/migration.js
+ create mode 100644 modules/fallout/survival/operations.js
+ rename {domain => modules/fallout/survival}/survival.ts (97%)
+ create mode 100644 src/store/stateExtensions.js
+
+diff --git a/App.js b/App.js
+index 449b4af..33569fd 100644
+--- a/App.js
++++ b/App.js
+@@ -24,6 +24,10 @@ import CharacterScreen from './modules/fallout/screens/CharacterScreen/Character
+ import EquipmentScreen from './modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
+ import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
+ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
++// Side-effect: сеттинг регистрирует расширение состояния (поле сейва
++// survival + миграцию v22→v23) в реестре движка ДО монтирования
++// CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
++import './modules/fallout/survival';
+ import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
+ import useAppSettingsStore, {
+   selectBootScreenEnabled,
+diff --git a/__tests__/saves/state-extensions.test.js b/__tests__/saves/state-extensions.test.js
+new file mode 100644
+index 0000000..4b36d7c
+--- /dev/null
++++ b/__tests__/saves/state-extensions.test.js
+@@ -0,0 +1,95 @@
++// Патч 207 — реестр расширений состояния (src/store/stateExtensions.js):
++// родовой механизм движка для сеттинговых полей сейва. Тесты реестра без
++// сеттинговых правил; встраивание миграции в цепочку покрыто тестом
++// выживания (survival-migration.test.js).
++//
++// Реестр — модульная синглтон-карта и в проде только растёт, поэтому тесты
++// регистрируют УНИКАЛЬНЫЕ id/fieldKey (дубликаты падают — это и проверяем).
++
++import { describe, expect, it } from 'vitest';
++import {
++  createStateExtensionFields,
++  getRegisteredStateMigrations,
++  hydrateStateExtensionFields,
++  registerStateExtension,
++  registerStateMigration,
++  resetStateExtensionFields,
++} from '../../src/store/stateExtensions';
++describe('stateExtensions: валидация регистрации', () => {
++  it('обязательные поля: id, fieldKey, factory', () => {
++    expect(() => registerStateExtension(null)).toThrow();
++    expect(() => registerStateExtension({})).toThrow(/id/);
++    expect(() => registerStateExtension({ id: 'x' })).toThrow(/fieldKey/);
++    expect(() => registerStateExtension({ id: 'x', fieldKey: 'y' })).toThrow(/factory/);
++  });
++
++  it('повторная регистрация того же id — ошибка', () => {
++    registerStateExtension({ id: 'dupIdA', fieldKey: 'dupFieldA', factory: () => 1 });
++    expect(() => registerStateExtension({ id: 'dupIdA', fieldKey: 'other', factory: () => 2 }))
++      .toThrow(/уже зарегистрировано/);
++  });
++
++  it('два расширения не могут владеть одним полем сейва', () => {
++    registerStateExtension({ id: 'ownerB', fieldKey: 'sharedFieldB', factory: () => 1 });
++    expect(() => registerStateExtension({ id: 'intruderB', fieldKey: 'sharedFieldB', factory: () => 2 }))
++      .toThrow(/уже принадлежит/);
++  });
++});
++
++describe('stateExtensions: фабрики / hydrate / reset', () => {
++  it('createStateExtensionFields: фабрика получает персонажа, поле кладётся по fieldKey', () => {
++    registerStateExtension({
++      id: 'factoryC',
++      fieldKey: 'factoryFieldC',
++      factory: (character) => `type=${character?.origin?.characterType}`,
++    });
++    const fields = createStateExtensionFields({ origin: { characterType: 'human' } });
++    expect(fields.factoryFieldC).toBe('type=human');
++  });
++
++  it('hydrate: без hydrate поле берётся как есть, с hydrate — нормализуется', () => {
++    registerStateExtension({ id: 'hydrateD', fieldKey: 'hydrateFieldD', factory: () => null });
++    const saved = { hydrateFieldD: null };
++    expect(hydrateStateExtensionFields(saved, {}).hydrateFieldD).toBeNull();
++
++    registerStateExtension({
++      id: 'hydrateE',
++      fieldKey: 'hydrateFieldE',
++      factory: () => null,
++      hydrate: (raw, character) => (raw == null ? `default-for-${character.origin?.id}` : raw),
++    });
++    const fields = hydrateStateExtensionFields(
++      { hydrateFieldD: 1, hydrateFieldE: undefined },
++      { origin: { id: 'brotherhood' } },
++    );
++    expect(fields.hydrateFieldD).toBe(1); // без hydrate — не трогаем
++    expect(fields.hydrateFieldE).toBe('default-for-brotherhood');
++  });
++
++  it('reset: по умолчанию null, свой reset возвращает своё', () => {
++    registerStateExtension({ id: 'resetF', fieldKey: 'resetFieldF', factory: () => 5 });
++    registerStateExtension({
++      id: 'resetG',
++      fieldKey: 'resetFieldG',
++      factory: () => 5,
++      reset: () => ({ fresh: true }),
++    });
++    const fields = resetStateExtensionFields();
++    expect(fields.resetFieldF).toBeNull();
++    expect(fields.resetFieldG).toEqual({ fresh: true });
++  });
++});
++
++describe('stateExtensions: миграции расширений', () => {
++  it('миграция регистрируется с индексом и попадает в реестр', () => {
++    const migration = (state) => state;
++    registerStateMigration(migration, 22);
++    const registered = getRegisteredStateMigrations();
++    expect(registered.some((entry) => entry.migration === migration && entry.index === 22)).toBe(true);
++  });
++
++  it('некорректный индекс миграции — ошибка', () => {
++    expect(() => registerStateMigration((s) => s, -1)).toThrow();
++    expect(() => registerStateMigration((s) => s, 1.5)).toThrow();
++  });
++});
+diff --git a/__tests__/survival/survival-domain.test.js b/__tests__/survival/survival-domain.test.js
+index 5672ba4..1638c9a 100644
+--- a/__tests__/survival/survival-domain.test.js
++++ b/__tests__/survival/survival-domain.test.js
+@@ -15,7 +15,7 @@ import {
+     removeFatigueTotal,
+     rest,
+     totalFatigue,
+-} from '../../domain/survival';
++} from '../../modules/fallout/survival/survival';
+ import food from '../../modules/fallout/data/consumables/food.json';
+ import drinks from '../../modules/fallout/data/consumables/drinks.json';
+ 
+diff --git a/__tests__/survival/survival-migration.test.js b/__tests__/survival/survival-migration.test.js
+index 73b5903..a080218 100644
+--- a/__tests__/survival/survival-migration.test.js
++++ b/__tests__/survival/survival-migration.test.js
+@@ -1,7 +1,11 @@
+ import { describe, expect, it } from 'vitest';
+-import { migrateCharacterState, migrateSurvivalField } from '../../src/store/migrations';
++// Side-effect: сеттинг регистрирует расширение состояния (поле survival +
++// миграцию v22→v23) в реестре движка — как это делает App.js.
++import '../../modules/fallout/survival';
++import { migrateCharacterState } from '../../src/store/migrations';
++import { migrateSurvivalField } from '../../modules/fallout/survival/migration';
+ import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
+-import { SURVIVAL_RULES } from '../../domain/survival';
++import { SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
+ 
+ const v22 = (origin, extra = {}) => ({ schemaVersion: 22, origin, ...extra });
+ 
+diff --git a/__tests__/survival/survival-modals.test.js b/__tests__/survival/survival-modals.test.js
+index 5e78cf5..6cb2d8b 100644
+--- a/__tests__/survival/survival-modals.test.js
++++ b/__tests__/survival/survival-modals.test.js
+@@ -2,7 +2,7 @@
+ // (продвижение эффектов сценами), полнота i18n ключей модалок.
+ 
+ import { describe, expect, it } from 'vitest';
+-import { drinkGain, foodGain } from '../../domain/survival';
++import { drinkGain, foodGain } from '../../modules/fallout/survival/survival';
+ import { advanceEffectsByScenes } from '../../domain/effects';
+ import food from '../../modules/fallout/data/consumables/food.json';
+ import drinks from '../../modules/fallout/data/consumables/drinks.json';
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+index 34505c8..91a8413 100644
+--- a/__tests__/survival/survival-ui.test.js
++++ b/__tests__/survival/survival-ui.test.js
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from 'vitest';
+-import { SURVIVAL_RULES, addFatigue, createSurvivalState, survivalEffectRows } from '../../domain/survival';
++import { SURVIVAL_RULES, addFatigue, createSurvivalState, survivalEffectRows } from '../../modules/fallout/survival/survival';
+ import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
+ import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
+ 
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 6144639..d1a66ba 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -31,8 +31,8 @@ const migrateSkillsToCanonical = (rawSkills) => {
+     return canonical ? { ...s, name: canonical } : s;
+   });
+ };
+-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon, getCharacterType } from '../domain/origins';
+-import { createSurvivalState, rest } from '../domain/survival';
++import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
++import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields } from '../src/store/stateExtensions';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+@@ -262,17 +262,29 @@ export const CharacterProvider = ({ children }) => {
+   const [equippedWeapons, setEquippedWeapons] = useState([]);
+   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
+   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+-  // Выживание (docs/survival-system-design.md): null = ещё не создан или
+-  // робот/киборг (шкал нет). Инициализируется при выборе ориджина.
+-  const [survival, setSurvival] = useState(null);
+-
+-  // Новый персонаж: как только выбран ориджин — стартовые шкалы (максимумы
+-  // для органиков, null роботам/киборгам). При загрузке сейва поле уже
+-  // задано миграцией v23, эффект — no-op.
++  // Расширения состояния персонажа (src/store/stateExtensions.js): поля сейва,
++  // которыми владеют сеттинги (например, survival у Fallout). Движок правил
++  // не знает — применяет фабрики/hydrate/reset из реестра.
++  // { [fieldKey]: value } — пусто, пока персонаж не создан и не загружен.
++  const [stateExtensions, setStateExtensions] = useState({});
++
++  // Новый персонаж: как только выбран ориджин — сеттинговые фабрики
++  // заполняют ещё не созданные поля (null = «не создано»). При загрузке
++  // сейва поля заданы миграцией/гидратацией — эффект их не трогает.
+   useEffect(() => {
+-    if (!origin || survival !== null) return;
+-    setSurvival(createSurvivalState(getCharacterType({ origin })));
+-  }, [origin, survival]);
++    if (!origin) return;
++    const created = createStateExtensionFields({ origin, trait });
++    let changed = false;
++    const merged = { ...stateExtensions };
++    for (const [fieldKey, value] of Object.entries(created)) {
++      if (merged[fieldKey] === undefined || merged[fieldKey] === null) {
++        if (merged[fieldKey] === value) continue; // null → null: менять нечего
++        merged[fieldKey] = value;
++        changed = true;
++      }
++    }
++    if (changed) setStateExtensions(merged);
++  }, [origin, trait, stateExtensions]);
+ 
+   // ── Robot equipment: single source of truth = Zustand robot slice ──────────
+   // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
+@@ -780,7 +792,7 @@ export const CharacterProvider = ({ children }) => {
+     conditions,
+     chemDosesLog,
+     sceneRiskStates,
+-    survival,
++    ...stateExtensions,
+   }), [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+@@ -788,7 +800,7 @@ export const CharacterProvider = ({ children }) => {
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+-    conditions, chemDosesLog, sceneRiskStates, survival,
++    conditions, chemDosesLog, sceneRiskStates, stateExtensions,
+   ]);
+ 
+   // Realtime save for already persisted characters.
+@@ -905,7 +917,12 @@ export const CharacterProvider = ({ children }) => {
+       setSceneCounter(data.sceneCounter ?? 0);
+       sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
+       setSceneRiskStates(data.sceneRiskStates);
+-      setSurvival(data.survival ?? null);
++      // Поля сеттинговых расширений: hydrate расширения сам решает, как
++      // нормализовать своё поле (идемпотентно, без подъёма версии схемы).
++      setStateExtensions(hydrateStateExtensionFields(data, {
++        origin: resolveOrigin(data.origin),
++        trait: data.trait || null,
++      }));
+       // Migrate old [null, null] format to dynamic array
+       const rawWeapons = data.equippedWeapons || [];
+       let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter(w => w !== null) : [];
+@@ -1171,21 +1188,12 @@ export const CharacterProvider = ({ children }) => {
+   };
+ 
+   /**
+-   * Сон — операция выживания (docs/survival-system-design.md §4–§7):
+-   * лестницы + усталость + дрен ОЗ (домен rest), мост контуров — временные
+-   * эффекты продвигаются на N × 12 сцен, и при сне в пустоши — проверка
+-   * болезни по имеющейся механике (событие sleepOnGround).
+-   * Прогноз для модали делает чистый домен forecastSleep (состояние не
+-   * фиксируется); эта функция — применяет и фиксирует.
++   * Родовой мост времени и эффектов: продвигает таймеры временных эффектов
++   * на N игровых часов (N × 12 сцен). Используется расширениями сеттингов
++   * (например, сон выживания Fallout: docs/survival-system-design.md §5).
++   * Возвращает { effects, expired }.
+    */
+-  const sleepSurvival = ({ place, hours }) => {
+-    if (!survival) return { ok: false, reason: 'notCapable' };
+-    const result = rest(survival, { place, hours, currentHp: currentHealth });
+-    setSurvival(result.state);
+-    if (currentHealth != null && result.hpEnd != null) {
+-      setCurrentHealth(result.hpEnd);
+-    }
+-    // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
++  const advanceEffectsByGameHours = (hours) => {
+     const store = useCharacterStore.getState();
+     const currentLegacy = effectsDictToLegacyArray(store.effects);
+     const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+@@ -1196,26 +1204,7 @@ export const CharacterProvider = ({ children }) => {
+     );
+     syncTimedEffectsToStore(nextEffects, store);
+     setActiveTimedEffects(nextEffects);
+-    // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
+-    const diseaseRiskResult = place === 'wasteland'
+-      ? applyDiseaseExposureEvent('sleepOnGround')
+-      : null;
+-    debugLog('survival.sleep.apply', {
+-      place,
+-      hours,
+-      sleepTo: result.state.sleep,
+-      hpEnd: result.hpEnd,
+-      hpLost: result.hpLost,
+-      hitsZero: result.hitsZero,
+-      diseaseRiskResult,
+-      effectsExpired: expired.length,
+-    });
+-    return {
+-      ok: true,
+-      result,
+-      diseaseRiskResult,
+-      effectsExpired: [...normalizedCurrent.expired, ...expired],
+-    };
++    return { effects: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+   };
+ 
+   /**
+@@ -1520,9 +1509,9 @@ export const CharacterProvider = ({ children }) => {
+     });
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+-    // Выживание сбрасывается; при сохранённом ориджине его подхватит эффект
+-    // инициализации (максимум органикам, null роботам/киборгам).
+-    setSurvival(null);
++    // Поля сеттинговых расширений сбрасываются (reset расширения); при
++    // следующем выборе ориджина фабрики заполнят их заново.
++    setStateExtensions(resetStateExtensionFields());
+     setEquippedArmor(createEmptyEquippedArmor());
+     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
+@@ -1653,9 +1642,14 @@ export const CharacterProvider = ({ children }) => {
+     getModifiedItem,
+     saveModifiedItem,
+     removeModifiedItem,
+-    survival,
+-    setSurvival,
+-    sleepSurvival,
++    // Расширения состояния (src/store/stateExtensions.js): сеттинги
++    // регистрируют поля и читают/меняют их через эти методы.
++    stateExtensions,
++    setStateExtension: (fieldKey, value) => {
++      setStateExtensions((prev) => ({ ...prev, [fieldKey]: value }));
++    },
++    advanceEffectsByGameHours,
++    resolveSceneRiskEventById: applyDiseaseExposureEvent,
+     resetCharacter,
+     resetKitAndRewards,
+     resetKitOnly,
+diff --git a/docs/architecture/engine-setting-audit.md b/docs/architecture/engine-setting-audit.md
+index d6a5238..acecdf0 100644
+--- a/docs/architecture/engine-setting-audit.md
++++ b/docs/architecture/engine-setting-audit.md
+@@ -156,6 +156,35 @@ modules/fallout/
+ 
+ Схема переноса (прецедент патчей 98–101): полные записи в `modules/fallout/data/<зеркальный путь>`, имена в `modules/fallout/i18n/<locale>/data/<зеркальный путь>`, легаси-файлы опустошаются до `[]`, потребители переключаются на модуль, контракт-тест добавляется. Канонизация данных (например `itemType`) — вместе с переносом категории.
+ 
++## 4.1 Расширения состояния персонажа (патч 207)
++
++До патча 207 выживание Fallout протекало в движок: `domain/survival.ts`
++(правила), поле/операции в `components/CharacterContext.js`, миграция
++`migrateSurvivalField` в `src/store/migrations.js`, подъём версии схемы
++`v23` в `src/store/saveSchema.js`.
++
++Патч 207 вынес выживание в `modules/fallout/survival/` (домен, миграция,
++операции, хуки для экранов) и добавил **родовой механизм расширений
++состояния** `src/store/stateExtensions.js`:
++
++- сеттинг регистрирует **расширение поля сейва**: `{ id, fieldKey, factory,
++  hydrate?, reset? }` — движок применяет фабрику при создании персонажа,
++  hydrate при загрузке и reset при сбросе, не зная правил;
++- сеттинг регистрирует **миграцию версии**: `registerStateMigration(fn,
++  index)` встраивает переход в цепочку `migrateCharacterState` на то же
++  место (индекс = версия «до») **без подъёма CURRENT_SCHEMA_VERSION** —
++  старые сейвы совместимы, номер схемы остаётся движковым;
++- `CharacterContext` хранит поля расширений в `stateExtensions` и
++  раскладывает их в снапшот сейва под теми же ключами (`...stateExtensions`
++  вместо отдельных полей) — JSON сейва не изменился;
++- родовые операции, нужные сеттингам: `advanceEffectsByGameHours` (мост
++  времени и эффектов) и `resolveSceneRiskEventById` (проверка риска сцены
++  по событию) — Fallout строит на них сон в пустоши, не трогая движок.
++
++Этим механизмом следует пользоваться для любых будущих сеттинговых полей
++сейва и сеттинговых миграций (например, при переносе остальных
++фоллаутовских правил из `domain/`).
++
+ ## 5. Открытые вопросы (на решение владельца)
+ 
+ Решены (2026-08-15): модель — модуль единственный источник; i18n и данные модуля — зеркало легаси; базы категорий переносятся целиком; UI — в модуль (после данных); порядок — мелкие категории сначала (выполнено).
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 3289cf2..6f0648e 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,8 +1,10 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.0** от 2026-09-07.
+-Статус: этапы 1–4 реализованы (патчи 197–206); следующий шаг — этап 5
+-(настройки `survivalMode`: включение системы и курс времени).
++Редакция **0.4.1** от 2026-09-07.
++Статус: этапы 1–4 реализованы (патчи 197–206); выживание целиком вынесено
++в модуль сеттинга (патч 207, `modules/fallout/survival/`) через родовой
++механизм расширений состояния движка. Следующий шаг — этап 5 (настройки
++`survivalMode`: включение системы и курс времени).
+ 
+ Железное правило (владелец): **опираемся на данные; нужного признака нет —
+ создаём поле в данных, а не матчи́м строки.**
+@@ -408,6 +410,17 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.1 (2026-09-07):** выживание — модуль сеттинга (патч 207):
++  `domain/survival.ts` → `modules/fallout/survival/survival.ts`, миграция
++  v22→v23 — `modules/fallout/survival/migration.js`, операция сна —
++  `operations.js`, хуки для экранов — `hooks.js`. Движок получил родовой
++  реестр расширений состояния (`src/store/stateExtensions.js`): поле сейва,
++  фабрика/hydrate/reset и вставка миграции в цепочку без подъёма версии
++  схемы. `CharacterContext` больше не знает выживания: хранит поля
++  расширений в `stateExtensions` и раскладывает их в снапшот под теми же
++  ключами (JSON сейва не изменился, сейвы совместимы); родовые операции
++  `advanceEffectsByGameHours` и `resolveSceneRiskEventById` публичны в
++  контексте. Детали — docs/architecture/engine-setting-audit.md §4.1.
+ - **0.4.0 (2026-09-07):** модалки еды/питья/сна (этап 4.2, §7):
+   кнопки под областями Голод/Жажда/Сон; списки предметов с превью
+   подъёма из данных (foodGain/drinkGain); блокировка еды на секции 5;
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index a3645e9..840a3f6 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -35,7 +35,8 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects,
+ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+-import { survivalEffectRows } from '../../../../domain/survival';
++import { survivalEffectRows } from '../../survival/survival';
++import { useSurvivalState } from '../../survival/hooks';
+ import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
+ import SleepModal from './modals/SleepModal';
+ import { dedupeWeaponCards } from './dedupeWeaponCards';
+@@ -564,13 +565,16 @@ const WeaponsAndArmorScreen = () => {
+     trait,
+     origin,
+     radiation,
+-    survival,
+     // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
+     // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
+     equippedPowerArmor,
+     adjustPowerArmorDurability,
+   } = useCharacter();
+ 
++  // Выживание — поле расширения сеттинга (modules/fallout/survival/):
++  // движок хранит его в stateExtensions, модуль читает через свой хук.
++  const survival = useSurvivalState();
++
+   const storeItems = useCharacterStore((state) => state.items);
+   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
+   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+index 8e841ff..de6720d 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -17,7 +17,8 @@ import {
+     type SleepPlace,
+     type SurvivalState,
+     type RestResult,
+-} from '../../../../../domain/survival';
++} from '../../../survival/survival';
++import { useSurvivalState, useSurvivalActions } from '../../../survival/hooks';
+ import { diseaseRiskReportLines } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
+ import { showRawAlert } from '../../../../../components/alerts/alertService';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+@@ -99,7 +100,9 @@ const buildForecastLines = (forecast: RestResult): ForecastLine[] => {
+ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+     useLocale();
+     useModuleLocale();
+-    const { survival, sleepSurvival, currentHealth } = useCharacter();
++    const survival = useSurvivalState();
++    const { sleepSurvival } = useSurvivalActions();
++    const { currentHealth } = useCharacter();
+     const [place, setPlace] = useState<SleepPlace>('bed');
+     const [hours, setHours] = useState(8);
+ 
+@@ -112,8 +115,13 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+     const lines = forecast ? buildForecastLines(forecast) : [];
+ 
+     const handleConfirm = () => {
+-        const apply = sleepSurvival({ place, hours });
+-        if (!apply.ok) {
++        const apply = sleepSurvival({ place, hours }) as {
++            ok: boolean;
++            reason?: string;
++            result?: RestResult;
++            diseaseRiskResult?: unknown;
++        };
++        if (!apply.ok || !apply.result) {
+             onClose();
+             return;
+         }
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+index b52ce22..b606f34 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+@@ -26,7 +26,8 @@ import {
+   foodGain,
+   SURVIVAL_RULES,
+   type SurvivalState,
+-} from '../../../../../domain/survival';
++} from '../../../survival/survival';
++import { useSurvivalState, useSurvivalActions } from '../../../survival/hooks';
+ import { canConsumeOnSelf } from '../../../../../domain/itemfitRules';
+ import { rerollConsumableRadiationRoll } from '../../../../../domain/effects';
+ import { buildConsumableResultReport } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
+@@ -55,13 +56,13 @@ const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalPr
+     useLocale();
+     const moduleLocale = useModuleLocale();
+     const {
+-        survival,
+-        setSurvival,
+         applyConsumableFull,
+         previewConsumableRadiation,
+         origin,
+         trait,
+     } = useCharacter();
++    const survival = useSurvivalState();
++    const { setSurvival } = useSurvivalActions();
+     const storeItems = useCharacterStore((state) => state.items);
+     const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
+ 
+diff --git a/modules/fallout/survival/hooks.js b/modules/fallout/survival/hooks.js
+new file mode 100644
+index 0000000..c2cec06
+--- /dev/null
++++ b/modules/fallout/survival/hooks.js
+@@ -0,0 +1,18 @@
++// Хуки выживания для экранов Fallout. Модуль читает своё поле сейва через
++// родовое API контекста (stateExtensions / setStateExtension) — движок
++// хранит поле, но правил не знает.
++
++import { useCharacter } from '../../../components/CharacterContext';
++import { sleepSurvival } from './operations';
++
++/** Текущее состояние выживания (null у роботов/киборгов и до создания). */
++export const useSurvivalState = () => useCharacter().stateExtensions?.survival ?? null;
++
++/** Операции выживания: смена состояния поля и сон. */
++export const useSurvivalActions = () => {
++  const ctx = useCharacter();
++  return {
++    setSurvival: (state) => ctx.setStateExtension('survival', state),
++    sleepSurvival: (options) => sleepSurvival(ctx, options),
++  };
++};
+diff --git a/modules/fallout/survival/index.js b/modules/fallout/survival/index.js
+new file mode 100644
+index 0000000..4bcb1cb
+--- /dev/null
++++ b/modules/fallout/survival/index.js
+@@ -0,0 +1,50 @@
++// Выживание — модуль сеттинга Fallout (docs/survival-system-design.md).
++//
++// Регистрация расширения состояния в движке (src/store/stateExtensions.js):
++//   - поле сейва 'survival' — фабрика при создании персонажа (максимумы
++//     органикам, null роботам/киборгам), hydrate при загрузке, reset при
++//     сбросе персонажа;
++//   - миграция v22 -> v23 (migrateSurvivalField) встраивается в цепочку
++//     движка на то же место, что и раньше (патч 198): номер схемы не
++//     меняется, старые сейвы совместимы.
++//
++// Импорт этого модуля — side-effect регистрации (App.js импортирует его
++// до монтирования CharacterProvider). Модуль не тянет React/RN: хуки для
++// экранов лежат в hooks.js отдельно (иначе тесты регистрации падали бы
++// на Flow-парсинге react-native).
++
++import { registerStateExtension, registerStateMigration } from '../../../src/store/stateExtensions';
++import { createSurvivalState } from './survival';
++import { migrateSurvivalField } from './migration';
++
++// Тип персонажа для фабрики: ориджин в сейве — объект с characterType,
++// при создании нового персонажа — выбранный ориджин из каталога.
++const survivalCharacterType = (character) => {
++  const origin = character?.origin;
++  if (origin && typeof origin === 'object' && origin.characterType) {
++    return origin.characterType;
++  }
++  return null; // нет characterType — фабрика вернёт null (шкал нет)
++};
++
++registerStateExtension({
++  id: 'survival',
++  fieldKey: 'survival',
++  factory: (character) => {
++    const type = survivalCharacterType(character);
++    return type ? createSurvivalState(type) : null;
++  },
++  // Загрузка сейва: поле уже создано миграцией v23 (или фабрикой).
++  // hydrate идемпотентна: null/undefined остаются null (роботы/киборги
++  // и «ещё не создано»), объект проходит как есть.
++  hydrate: (raw) => (raw && typeof raw === 'object' ? raw : null),
++  reset: () => null,
++});
++
++// Переход v22 -> v23: место в цепочке — как в патче 198 (MIGRATIONS[22]).
++registerStateMigration(migrateSurvivalField, 22);
++
++export { createSurvivalState } from './survival';
++export { migrateSurvivalField } from './migration';
++export { sleepSurvival } from './operations';
++export * from './survival';
+diff --git a/modules/fallout/survival/migration.js b/modules/fallout/survival/migration.js
+new file mode 100644
+index 0000000..706d8e3
+--- /dev/null
++++ b/modules/fallout/survival/migration.js
+@@ -0,0 +1,39 @@
++// Миграция поля survival (v22 -> v23) — модуль сеттинга Fallout.
++//
++// Раньше жила в движке (src/store/migrations.js, патч 198); патчем 207
++// переехала в модуль вместе с правилами. В цепочку движка встраивается
++// регистрацией: registerStateMigration(migrateSurvivalField, 22) — переход
++// v22 -> v23, на то же место, что и раньше. Номер схемы и поведение
++// старых сейвов не меняются.
++
++import originsFile from '../data/origins/origins.json';
++import { createSurvivalState } from './survival';
++
++// Тип персонажа для инициализации выживания: ориджин в сейве может быть
++// «худым» ({id}) или «толстым» (объект с characterType); остальное — каталог.
++const ORIGINS_BY_ID = new Map(
++  (Array.isArray(originsFile) ? originsFile : []).map((entry) => [entry.id, entry]),
++);
++
++const survivalCharacterType = (origin) => {
++  if (origin && typeof origin === 'object' && origin.characterType) {
++    return origin.characterType;
++  }
++  const id = typeof origin === 'string' ? origin : origin?.id;
++  return (id && ORIGINS_BY_ID.get(id)?.characterType) || 'human';
++};
++
++/**
++ * v22 -> v23: выживание. Всем сейвам добавляется поле survival:
++ * органики получают начальное состояние (все шкалы на максимуме,
++ * усталости нет), роботы и киборги — null. Существующее поле не
++ * перезаписывается (идемпотентна). Правила — docs/survival-system-design.md.
++ */
++export const migrateSurvivalField = (state) => {
++  if (!state || typeof state !== 'object') return state;
++  if (state.survival !== undefined) return state;
++  return {
++    ...state,
++    survival: createSurvivalState(survivalCharacterType(state.origin)),
++  };
++};
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+new file mode 100644
+index 0000000..e81e4ed
+--- /dev/null
++++ b/modules/fallout/survival/operations.js
+@@ -0,0 +1,61 @@
++// Операции выживания — модуль сеттинга Fallout.
++//
++// sleepSurvival применяет сон (docs/survival-system-design.md §4–§7):
++// лестницы + усталость + дрен ОЗ (чистый домен rest), мост контуров —
++// временные эффекты продвигаются на N × 12 сцен (родовая операция
++// контекста advanceEffectsByGameHours), и при сне в пустоши — проверка
++// болезни по имеющейся механике (событие sleepOnGround, родовая операция
++// resolveSceneRiskEventById). Прогноз для модали делает чистый домен
++// forecastSleep (состояние не фиксируется) — эта функция фиксирует.
++//
++// Зависимости приходят объектом контекста (useCharacter()): модуль не
++// импортирует React и не знает, где живёт состояние.
++
++import { debugLog } from '../../../src/debug/falloutDebug';
++import { rest } from './survival';
++
++export const sleepSurvival = (ctx, { place, hours }) => {
++  const {
++    stateExtensions,
++    setStateExtension,
++    currentHealth,
++    setCurrentHealth,
++    advanceEffectsByGameHours,
++    resolveSceneRiskEventById,
++  } = ctx;
++
++  const survival = stateExtensions?.survival ?? null;
++  if (!survival) return { ok: false, reason: 'notCapable' };
++
++  const result = rest(survival, { place, hours, currentHp: currentHealth });
++  setStateExtension('survival', result.state);
++  if (currentHealth != null && result.hpEnd != null) {
++    setCurrentHealth(result.hpEnd);
++  }
++
++  // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
++  const { expired } = advanceEffectsByGameHours(hours);
++
++  // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
++  const diseaseRiskResult = place === 'wasteland'
++    ? resolveSceneRiskEventById('sleepOnGround')
++    : null;
++
++  debugLog('survival.sleep.apply', {
++    place,
++    hours,
++    sleepTo: result.state.sleep,
++    hpEnd: result.hpEnd,
++    hpLost: result.hpLost,
++    hitsZero: result.hitsZero,
++    diseaseRiskResult,
++    effectsExpired: expired.length,
++  });
++
++  return {
++    ok: true,
++    result,
++    diseaseRiskResult,
++    effectsExpired: expired,
++  };
++};
+diff --git a/domain/survival.ts b/modules/fallout/survival/survival.ts
+similarity index 97%
+rename from domain/survival.ts
+rename to modules/fallout/survival/survival.ts
+index b3a966c..a92ee1a 100644
+--- a/domain/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -1,4 +1,7 @@
+-// Система выживания — домен (редакция правил 0.3 дизайн-дока).
++// Система выживания — домен сеттинга Fallout (редакция правил 0.4 дизайн-дока).
++// Модуль сеттинга: modules/fallout/survival/ (патч 207 — выживание вынесено
++// из движка; движок применяет его через реестр расширений
++// src/store/stateExtensions.js и правил не знает).
+ //
+ // Чистые функции без React и без обращения к часам: время передаётся
+ // явно (игровые часы / реальные минуты). Состояние хранится в сейве
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index a8a1f59..df5d70d 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -8,8 +8,7 @@ import { generateItemId } from '../../domain/itemIdentity';
+ import { getPerks, getUniqQualityName } from '../../domain/registry';
+ import { trimSelectedPerksToMaxRanks } from '../../domain/perks';
+ import { composeNameWithUniqQualities } from '../../domain/uniqQuality';
+-import { createSurvivalState } from '../../domain/survival';
+-import originsFile from '../../modules/fallout/data/origins/origins.json';
++import { getRegisteredStateMigrations } from './stateExtensions';
+ import { debugLog } from '../debug/falloutDebug';
+ import { getDefaultLimbs } from '../../domain/bodyplan';
+ import robotWeaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+@@ -371,6 +370,11 @@ export const denormalizeCharacterState = (storeState = {}) => {
+  * Последовательно применяет миграции, пока состояние не достигнет
+  * CURRENT_SCHEMA_VERSION. Сохранения с неизвестной/будущей версией
+  * не трогаются (вернём как есть), чтобы не повредить данные.
++ *
++ * Сеттинги могут встраивать свои миграции в цепочку через
++ * registerStateMigration (реестр stateExtensions): их переход встаёт на
++ * указанный индекс — то есть между теми же версиями, что и раньше —
++ * без поднятия CURRENT_SCHEMA_VERSION. Сейвы остаются совместимыми.
+  */
+ export function migrateCharacterState(data) {
+   if (!data || typeof data !== 'object') return data;
+@@ -384,9 +388,10 @@ export function migrateCharacterState(data) {
+     return state;
+   }
+ 
++  const chain = migrationsWithExtensions();
+   let version = fromVersion;
+   while (version < CURRENT_SCHEMA_VERSION) {
+-    const migrate = MIGRATIONS[version];
++    const migrate = chain[version];
+     if (typeof migrate !== 'function') {
+       // Нет миграции для этой версии — не знаем, как преобразовать. Не ломаем данные.
+       break;
+@@ -399,6 +404,18 @@ export function migrateCharacterState(data) {
+   return state;
+ }
+ 
++// Цепочка движковых миграций + вставки сеттингов (по индексу перехода,
++// из которого они переводят: index = версия «до»). Вставки на один индекс
++// идут в порядке регистрации после движковой миграции того же перехода,
++// если она есть — на практике они не пересекаются.
++const migrationsWithExtensions = () => {
++  const chain = [...MIGRATIONS];
++  for (const { migration, index } of getRegisteredStateMigrations()) {
++    chain.splice(Math.min(index, chain.length), 0, migration);
++  }
++  return chain;
++};
++
+ /**
+  * Реестр миграций по версиям.
+  * MIGRATIONS[0] — переход v0 -> v1, MIGRATIONS[1] — v1 -> v2, и т.д.
+@@ -576,33 +593,10 @@ export const migrateRobotArmAttachments = (state) => {
+   return changed ? { ...state, equippedRobotSlots: slots } : state;
+ };
+ 
+-// Тип персонажа для инициализации выживания: ориджин в сейве может быть
+-// «худым» ({id}) или «толстым» (объект с characterType); остальное — каталог.
+-const _ORIGINS_BY_ID = new Map(
+-  (Array.isArray(originsFile) ? originsFile : []).map((entry) => [entry.id, entry])
+-);
+-const _survivalCharacterType = (origin) => {
+-  if (origin && typeof origin === 'object' && origin.characterType) {
+-    return origin.characterType;
+-  }
+-  const id = typeof origin === 'string' ? origin : origin?.id;
+-  return (id && _ORIGINS_BY_ID.get(id)?.characterType) || 'human';
+-};
+-
+-/**
+- * v22 -> v23: выживание. Всем сейвам добавляется поле survival:
+- * органики получают начальное состояние (все шкалы на максимуме,
+- * усталости нет), роботы и киборги — null. Существующее поле не
+- * перезаписывается (идемпотентна). Правила — docs/survival-system-design.md.
+- */
+-export const migrateSurvivalField = (state) => {
+-  if (!state || typeof state !== 'object') return state;
+-  if (state.survival !== undefined) return state;
+-  return {
+-    ...state,
+-    survival: createSurvivalState(_survivalCharacterType(state.origin)),
+-  };
+-};
++// Миграции сеттинговых полей состояния (например, v22 -> v23: выживание
++// Fallout) регистрируются сетеингом через registerStateMigration
++// (src/store/stateExtensions.js) и встраиваются в цепочку без поднятия
++// CURRENT_SCHEMA_VERSION. Движок правил сеттинга не знает.
+ 
+ const MIGRATIONS = [
+   // v0 -> v1: разделить эффекты/качества в экипированном оружии.
+@@ -1256,9 +1250,11 @@ const MIGRATIONS = [
+   // пересаживается в ладонь (heldWeapon). Идемпотентна.
+   migrateRobotArmAttachments,
+ 
+-  // v22 -> v23: выживание — поле survival (шкалы еды/воды/сна, Усталость).
+-  // Органики — начальные максимумы, роботы/киборги — null. Идемпотентна.
+-  migrateSurvivalField,
++  // v22 -> v23: слот зарезервирован за сеттинговым расширением состояния —
++  // переход регистрируется модулем (registerStateMigration в stateExtensions).
++  // Движковых изменений в этой версии нет. Если ни одно расширение переход
++  // не зарегистрировало, состояние останется v22 без потери данных.
++  (state) => state,
+ 
+ ];
+ /**
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 16e59d4..7e719a4 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -60,7 +60,10 @@
+ //       навес стоял вместо руки, получают стандартную руку плана тела,
+ //       навес пересаживается в ладонь (миграция migrateRobotArmAttachments).
+ // v23 — выживание: поле survival (шкалы еды/воды/сна, очки Усталости с
+-//       источниками, аккумуляторы времени) — миграция migrateSurvivalField.
++//       источниками, аккумуляторы времени). Поле и миграция принадлежат
++//       модулю сеттинга (modules/fallout/survival/, патч 207): переход
++//       регистрируется через реестр расширений состояния
++//       (stateExtensions.js), номер схемы остаётся движковым.
+ //       Органикам (human/ghoul/mutant) — начальные максимумы, роботам и
+ //       киборгам — null (шкал нет).
+ export const CURRENT_SCHEMA_VERSION = 23;
+diff --git a/src/store/stateExtensions.js b/src/store/stateExtensions.js
+new file mode 100644
+index 0000000..6f4f255
+--- /dev/null
++++ b/src/store/stateExtensions.js
+@@ -0,0 +1,127 @@
++// Реестр расширений состояния персонажа — родовой механизм движка (патч 207).
++//
++// ЗАЧЕМ.
++//   Универсальный движок не должен знать правила сеттинга, но сеттинг вправе
++//   добавлять персонажу состояние (поле сейва, инициализацию при создании,
++//   миграцию старых сейвов, операции). До сих пор выживание Fallout было
++//   зашито в CharacterContext и в цепочку миграций напрямую — сеттинговая
++//   фича протекала в движок. Реестр — то место, где сеттинг регистрирует
++//   своё расширение, а движок применяет его без знания правил.
++//
++// КОНТРАКТ РАСШИРЕНИЯ.
++//   { id, fieldKey, factory(character), hydrate(saved, character)?, reset() }
++//   - id       — уникальный ключ расширения (например, 'survival').
++//   - fieldKey — имя поля в сейве, которым владеет расширение.
++//   - factory  — начальное состояние при создании персонажа (origin уже
++//                выбран). Может вернуть null — поле создаётся, но пустое
++//                (как survival у роботов/киборгов).
++//   - hydrate  — НЕОБЯЗАТЕЛЬНО: нормализация поля при загрузке сейва. Должна
++//                быть идемпотентна. По умолчанию поле берётся как есть.
++//   - reset    — состояние поля при сбросе персонажа. По умолчанию null.
++//   Миграции версий регистрируются отдельно (registerStateMigration): они
++//   встраиваются в цепочку migrateCharacterState на место, указанное
++//   владельцем фичи (индекс в массиве MIGRATIONS).
++//
++// ПРАВИЛА (владелец):
++//   - никаких сеттинговых имён/правил в этом файле — только движковый
++//     реестр; сеттинг регистрирует себя сам (см. modules/fallout/survival/).
++//   - поле сейва появляется миграцией версии (а не `|| fallback` при
++//     загрузке), как и раньше: hydrate не заменяет миграции.
++//   - регистрация идемпотентна: повторный вызов с тем же id — ошибка
++//     (двойное владение полем — дефект данных).
++
++const EXTENSIONS = new Map();
++
++export const registerStateExtension = (extension) => {
++  if (!extension || typeof extension !== 'object') {
++    throw new Error('[stateExtensions] Расширение состояния должно быть объектом');
++  }
++  if (typeof extension.id !== 'string' || !extension.id) {
++    throw new Error('[stateExtensions] Расширение состояния обязано иметь id');
++  }
++  if (typeof extension.fieldKey !== 'string' || !extension.fieldKey) {
++    throw new Error(`[stateExtensions] Расширение "${extension.id}" обязано указать fieldKey`);
++  }
++  if (typeof extension.factory !== 'function') {
++    throw new Error(`[stateExtensions] Расширение "${extension.id}" обязано иметь factory`);
++  }
++  if (extension.hydrate !== undefined && typeof extension.hydrate !== 'function') {
++    throw new Error(`[stateExtensions] hydrate расширения "${extension.id}" должен быть функцией`);
++  }
++  if (extension.reset !== undefined && typeof extension.reset !== 'function') {
++    throw new Error(`[stateExtensions] reset расширения "${extension.id}" должен быть функцией`);
++  }
++  if (EXTENSIONS.has(extension.id)) {
++    throw new Error(`[stateExtensions] Расширение "${extension.id}" уже зарегистрировано`);
++  }
++  for (const registered of EXTENSIONS.values()) {
++    if (registered.fieldKey === extension.fieldKey) {
++      throw new Error(
++        `[stateExtensions] Поле "${extension.fieldKey}" уже принадлежит расширению "${registered.id}"`,
++      );
++    }
++  }
++  EXTENSIONS.set(extension.id, extension);
++};
++
++export const getRegisteredStateExtensions = () => Array.from(EXTENSIONS.values());
++
++/**
++ * Расширения к состоянию только что созданного персонажа: объект полей
++ * { [fieldKey]: value } по всем зарегистрированным расширениям. Вызывается
++ * при выборе ориджина/типа персонажа (поле ещё не существует в сейве).
++ * factory получает { origin, trait } — на момент создания трейта может ещё
++ * не быть, сеттинг сам решает, что ему нужно.
++ */
++export const createStateExtensionFields = (character) => {
++  const fields = {};
++  for (const extension of EXTENSIONS.values()) {
++    fields[extension.fieldKey] = extension.factory(character);
++  }
++  return fields;
++};
++
++/**
++ * Нормализация поля расширения при загрузке сейва. Идемпотентные hydrate
++ * позволяют сеттингу чинить/достраивать своё поле, не поднимая версию
++ * схемы (сейв остаётся совместимым со старыми версиями приложения).
++ * Возвращает { [fieldKey]: normalized }.
++ */
++export const hydrateStateExtensionFields = (savedState, character) => {
++  const fields = {};
++  for (const extension of EXTENSIONS.values()) {
++    const raw = savedState[extension.fieldKey];
++    fields[extension.fieldKey] = extension.hydrate
++      ? extension.hydrate(raw, character)
++      : raw;
++  }
++  return fields;
++};
++
++/** Поля расширений при полном сбросе персонажа (создание нового). */
++export const resetStateExtensionFields = () => {
++  const fields = {};
++  for (const extension of EXTENSIONS.values()) {
++    fields[extension.fieldKey] = extension.reset ? extension.reset() : null;
++  }
++  return fields;
++};
++
++// --- Миграции расширений ---------------------------------------------------
++
++// Зарегистрированные миграции: [{ migration, index }]. index — место в
++// массиве MIGRATIONS движка (переход vN -> vN+1). Вставки происходят до
++// прогона цепочки, без поднятия CURRENT_SCHEMA_VERSION.
++const MIGRATION_INSERTIONS = [];
++
++export const registerStateMigration = (migration, index) => {
++  if (typeof migration !== 'function') {
++    throw new Error('[stateExtensions] Миграция расширения должна быть функцией');
++  }
++  if (!Number.isInteger(index) || index < 0) {
++    throw new Error(`[stateExtensions] Некорректный индекс миграции расширения: ${index}`);
++  }
++  MIGRATION_INSERTIONS.push({ migration, index });
++};
++
++export const getRegisteredStateMigrations = () => Array.from(MIGRATION_INSERTIONS);
+diff --git a/tsconfig.json b/tsconfig.json
+index 4e933b7..372a9fd 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -21,3 +21,3 @@
+   "include": [
+-    "domain/survival.ts",
++    "modules/fallout/survival",
+     "modules/fallout/screens/WeaponsAndArmorScreen/modals"
+-- 
+2.39.5
+

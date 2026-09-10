@@ -1,0 +1,187 @@
+From fb010e43d2d8a0ebd2a1c3336e652e801e0dc460 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 04:23:23 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20214:=20=D1=8F=D1=87=D0=B5?=
+ =?UTF-8?q?=D0=B9=D0=BA=D0=B8=20=D0=BA=D0=B0=D1=80=D1=82=D0=BE=D1=87=D0=B5?=
+ =?UTF-8?q?=D0=BA=20=E2=80=94=20=D0=BE=D1=80=D1=83=D0=B6=D0=B8=D0=B5=2061/?=
+ =?UTF-8?q?39=20(=D0=BA=D0=B5=D0=B3=D0=BB=D1=8C=2011),=20=D0=BA=D0=BE?=
+ =?UTF-8?q?=D0=BD=D0=B5=D1=87=D0=BD=D0=BE=D1=81=D1=82=D0=B8=2070/30,=20?=
+ =?UTF-8?q?=D0=BB=D0=B5=D0=B9=D0=B1=D0=BB=20=C2=AB=D0=A7=D0=B0=D1=81=D1=82?=
+ =?UTF-8?q?=D1=8C=20=D1=82=D0=B5=D0=BB=D0=B0=C2=BB?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- карточка оружия: лейбл 61% / значение 39%, кегль лейбла 11 —
+  «Дистанция» и «Модификация» помещаются одной строкой, без сокращений
+- карточки конечностей/брони: лейбл 70% / значение 30% (в значениях
+  числа), кнопка модернизации занимает долю значения; «Конечность»
+  заменена на «Часть тела» (переносится на две строки)
+- i18n ru/en; комментарии стилей и домена; тест словарей и кнопки
+  конечности (__tests__/robot/card-cell-labels.test.js)
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/robot/card-cell-labels.test.js      | 51 +++++++++++++++++++
+ domain/robotSlotLogic.js                      |  2 +-
+ .../en-EN/screens/weaponsAndArmor/screen.json |  2 +-
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  2 +-
+ styles/WeaponsAndArmorScreen.styles.js        | 21 +++++---
+ 5 files changed, 68 insertions(+), 10 deletions(-)
+ create mode 100644 __tests__/robot/card-cell-labels.test.js
+
+diff --git a/__tests__/robot/card-cell-labels.test.js b/__tests__/robot/card-cell-labels.test.js
+new file mode 100644
+index 0000000..4b3c232
+--- /dev/null
++++ b/__tests__/robot/card-cell-labels.test.js
+@@ -0,0 +1,51 @@
++// Патч 214 — ячейки карточек оружия/конечностей.
++//
++// Владелец: слова «Дистанция» и «Модификация» не помещаются в карточке
++// оружия (лейбл 61% / значение 39%, кегль лейбла 11 — БЕЗ сокращений);
++// в карточках конечностей «Конечность» заменена на «Часть тела»
++// (переносится на две строки), ячейки — 70/30 (в значениях в основном
++// числа). Лейблы приходят из словарей — здесь закреплены обе локали и
++// кнопка конечности из buildRobotSlotStats.
++
++import { describe, expect, it } from 'vitest';
++import { buildRobotSlotStats } from '../../domain/robotSlotLogic';
++import { WEAPONS_DICTIONARIES } from '../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
++
++const at = (dict, path) => path.split('.').reduce((acc, part) => acc?.[part], dict);
++
++describe('карточки конечностей: лейбл «Часть тела» (патч 214)', () => {
++  it('обе локали: кнопка конечности — «Часть тела» / «Body part», без сокращений', () => {
++    expect(at(WEAPONS_DICTIONARIES['ru-RU'], 'robotSlot.buttons.upgradeLimb')).toBe('Часть тела');
++    expect(at(WEAPONS_DICTIONARIES['en-EN'], 'robotSlot.buttons.upgradeLimb')).toBe('Body part');
++  });
++
++  it('buildRobotSlotStats выдаёт кнопку с лейблом из словаря', () => {
++    const t = (path) => at(WEAPONS_DICTIONARIES['ru-RU'], path);
++    const { stats } = buildRobotSlotStats('leftArm', { limb: null }, {
++      t,
++      onUpgradeLimb: () => null,
++      onOpenArmorPicker: () => null,
++    });
++    const limbButton = stats.find((s) => s.type === 'button' && s.onPress);
++    expect(limbButton).toMatchObject({ label: 'Часть тела', value: '⋯' });
++  });
++});
++
++describe('карточки оружия: лейблы без сокращений (патч 214)', () => {
++  it('«Дистанция» и «Модификация» — полными словами в обеих локалях', () => {
++    expect(at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.range')).toBe('ДИСТАНЦИЯ');
++    expect(at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.modification')).toBe('Модификация');
++    expect(at(WEAPONS_DICTIONARIES['en-EN'], 'weapon.fields.range')).toBe('RANGE');
++    expect(at(WEAPONS_DICTIONARIES['en-EN'], 'weapon.fields.modification')).toBe('Modification');
++  });
++
++  it('лейблы не обрезаны многоточием и не содержат сокращающей точки', () => {
++    const ruRange = at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.range');
++    const ruMod = at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.modification');
++    expect(ruRange).not.toContain('…');
++    expect(ruMod).not.toContain('…');
++    // «Дист.»/«Модиф.» — не наш случай: точка сокращения в конце слова.
++    expect(ruRange.endsWith('.')).toBe(false);
++    expect(ruMod.endsWith('.')).toBe(false);
++  });
++});
+diff --git a/domain/robotSlotLogic.js b/domain/robotSlotLogic.js
+index 430314c..19761be 100644
+--- a/domain/robotSlotLogic.js
++++ b/domain/robotSlotLogic.js
+@@ -12,7 +12,7 @@ import { getSlotHitRange } from './robotSlots';
+  *   1. Физ.СУ  — physicalDR from limb
+  *   2. Энрг.СУ — energyDR from limb
+  *   3. Рад.СУ  — radDR from limb
+- *   4. Кнопка "Конечность"
++ *   4. Кнопка "Часть тела"
+  *   5. Кнопка "Броня" (opens picker for plating/armor/frame)
+  *
+  * @param {string} slotKey
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 9aa804b..97d14e8 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -125,7 +125,7 @@
+       "damage": "DMG"
+     },
+     "buttons": {
+-      "upgradeLimb": "Limb",
++      "upgradeLimb": "Body part",
+       "upgradeArmor": "Armor",
+       "upgradePlating": "Plating",
+       "upgradeFrame": "Frame"
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 2404f32..d6d5e7f 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -125,7 +125,7 @@
+       "damage": "Урон"
+     },
+     "buttons": {
+-      "upgradeLimb": "Конечность",
++      "upgradeLimb": "Часть тела",
+       "upgradeArmor": "Броня",
+       "upgradePlating": "Обшивка",
+       "upgradeFrame": "Рама"
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index 31d74d3..b6f73b8 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -142,7 +142,11 @@ const styles = StyleSheet.create({
+   armorStatLabel: {
+     color: '#000',
+     fontSize: 13,
+-    flex: 1,
++    // Фиксированная доля ячейки-лейбла (владелец, патч 214): 70% лейбл /
++    // 30% значение — в значениях в основном числа; длинный лейбл вроде
++    // «Часть тела» переносится на две строки внутри ячейки, а не распирает
++    // строку и не сокращается.
++    width: '70%',
+     padding: 5,
+     backgroundColor: '#fce5cd',
+   },
+@@ -150,8 +154,8 @@ const styles = StyleSheet.create({
+     color: '#000',
+     fontWeight: 'bold',
+     fontSize: 13,
++    flex: 1,
+     padding: 5,
+-    minWidth: 40,
+     textAlign: 'center',
+     borderLeftWidth: 1,
+     borderLeftColor: '#5a5a5a',
+@@ -180,11 +184,12 @@ const styles = StyleSheet.create({
+     color: '#fff',
+     fontWeight: 'bold',
+     // Фиксированная доля ячейки-лейбла — одинакова во всех карточках
+-    // (владелец): 60% лейбл / 40% значение; длинное значение переносится
+-    // во второй ячейке, а не распирает строку.
+-    width: '60%',
++    // (владелец, патч 214): 61% лейбл / 39% значение; «Дистанция» и
++    // «Модификация» помещаются одной строкой (кегль 11), длинное значение
++    // переносится во второй ячейке, а не распирает строку. Без сокращений.
++    width: '61%',
+     padding: 8,
+-    fontSize: 12,
++    fontSize: 11,
+   },
+   weaponStatValue: {
+     flex: 1,
+@@ -200,8 +205,10 @@ const styles = StyleSheet.create({
+     hyphens: 'auto',
+   },
+   armorModificationButton: {
++    // Кнопка занимает ту же долю, что и значение (30%, патч 214) — правый
++    // край кнопки совпадает с правым краем числовых значений строки.
++    flex: 1,
+     padding: 8,
+-    minWidth: 40,
+     borderLeftWidth: 1,
+     borderColor: '#5a5a5a',
+     backgroundColor: '#fff',
+-- 
+2.39.5
+

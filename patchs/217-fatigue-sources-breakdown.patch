@@ -1,0 +1,334 @@
+From c2889d516750b57d4d664cad5054026ee86f8514 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Tue, 8 Sep 2026 09:11:33 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20217:=20=D1=83=D1=81=D1=82?=
+ =?UTF-8?q?=D0=B0=D0=BB=D0=BE=D1=81=D1=82=D1=8C=20=D0=B2=20=D1=8D=D1=84?=
+ =?UTF-8?q?=D1=84=D0=B5=D0=BA=D1=82=D0=B0=D1=85=20=E2=80=94=20=D0=B0=D0=BA?=
+ =?UTF-8?q?=D1=82=D0=B8=D0=B2=D0=BD=D1=8B=D0=B5=20=D0=B8=D1=81=D1=82=D0=BE?=
+ =?UTF-8?q?=D1=87=D0=BD=D0=B8=D0=BA=D0=B8=20=D0=B2=20=D1=81=D0=BA=D0=BE?=
+ =?UTF-8?q?=D0=B1=D0=BA=D0=B0=D1=85=20(=D0=B3=D0=BE=D0=BB=D0=BE=D0=B4/?=
+ =?UTF-8?q?=D0=B6=D0=B0=D0=B6=D0=B4=D0=B0/=D1=81=D0=BE=D0=BD/=D0=B1=D0=BE?=
+ =?UTF-8?q?=D0=BB=D0=B5=D0=B7=D0=BD=D1=8C)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/survival/fatigue-breakdown.test.js  | 78 +++++++++++++++++++
+ __tests__/survival/survival-ui.test.js        | 35 ++++++++-
+ docs/survival-system-design.md                | 10 ++-
+ .../en-EN/screens/weaponsAndArmor/screen.json |  8 ++
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  8 ++
+ .../WeaponsAndArmorScreen.js                  | 29 +++++--
+ modules/fallout/survival/survival.ts          | 25 +++++-
+ 7 files changed, 178 insertions(+), 15 deletions(-)
+ create mode 100644 __tests__/survival/fatigue-breakdown.test.js
+
+diff --git a/__tests__/survival/fatigue-breakdown.test.js b/__tests__/survival/fatigue-breakdown.test.js
+new file mode 100644
+index 0000000..d58001c
+--- /dev/null
++++ b/__tests__/survival/fatigue-breakdown.test.js
+@@ -0,0 +1,78 @@
++import { describe, expect, it } from 'vitest';
++import {
++  addDiseaseFatigue,
++  addFatigue,
++  createSurvivalState,
++  fatigueSourceBreakdown,
++  survivalEffectRows,
++} from '../../modules/fallout/survival/survival';
++
++describe('survival: разбивка усталости по источникам (патч 217)', () => {
++  it('пустое состояние — пустой список', () => {
++    expect(fatigueSourceBreakdown(createSurvivalState('human'))).toEqual([]);
++  });
++
++  it('показываются только активные источники (amount > 0)', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'food', 2);
++    addFatigue(s, 'sleep', 1);
++    addDiseaseFatigue(s, 3);
++    expect(fatigueSourceBreakdown(s)).toEqual([
++      { source: 'food', amount: 2 },
++      { source: 'sleep', amount: 1 },
++      { source: 'disease', amount: 3 },
++    ]);
++  });
++
++  it('канонический порядок: еда, вода, сон, болезнь — независимо от порядка добавления', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'disease', 1);
++    addFatigue(s, 'water', 2);
++    addFatigue(s, 'food', 1);
++    addFatigue(s, 'sleep', 1);
++    expect(fatigueSourceBreakdown(s).map((e) => e.source)).toEqual([
++      'food',
++      'water',
++      'sleep',
++      'disease',
++    ]);
++  });
++
++  it('нулевой источник не показывается', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'water', 0);
++    addFatigue(s, 'food', 1);
++    expect(fatigueSourceBreakdown(s)).toEqual([{ source: 'food', amount: 1 }]);
++  });
++
++  it('неизвестный источник идёт в конце списка', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'disease', 1);
++    addFatigue(s, 'custom', 4);
++    expect(fatigueSourceBreakdown(s).map((e) => e.source)).toEqual([
++      'disease',
++      'custom',
++    ]);
++  });
++
++  it('строка «Усталость» несёт источники, остальные строки — нет', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'food', 1);
++    addDiseaseFatigue(s, 2);
++    const rows = survivalEffectRows(s);
++    expect(rows).toEqual([
++      {
++        key: 'fatigue',
++        n: 3,
++        sources: [
++          { source: 'food', amount: 1 },
++          { source: 'disease', amount: 2 },
++        ],
++      },
++      { key: 'apPenalty', n: 3 },
++      { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
++    ]);
++    expect(rows[1].sources).toBeUndefined();
++    expect(rows[2].sources).toBeUndefined();
++  });
++});
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+index 79d3f5c..bc15869 100644
+--- a/__tests__/survival/survival-ui.test.js
++++ b/__tests__/survival/survival-ui.test.js
+@@ -16,12 +16,20 @@ describe('survival: строки эффектов (§6)', () => {
+         const s = createSurvivalState('human');
+         addFatigue(s, 'food', 1);
+         expect(survivalEffectRows(s)).toEqual([
+-            { key: 'fatigue', n: 1 },
++            // Патч 217: строка «Усталость» несёт разбивку по источникам.
++            { key: 'fatigue', n: 1, sources: [{ source: 'food', amount: 1 }] },
+             { key: 'apPenalty', n: 1 },
+         ]);
+         addFatigue(s, 'water', 2);
+         expect(survivalEffectRows(s)).toEqual([
+-            { key: 'fatigue', n: 3 },
++            {
++                key: 'fatigue',
++                n: 3,
++                sources: [
++                    { source: 'food', amount: 1 },
++                    { source: 'water', amount: 2 },
++                ],
++            },
+             { key: 'apPenalty', n: 3 },
+             { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
+         ]);
+@@ -91,4 +99,27 @@ describe('survival: i18n шкал (ru/en)', () => {
+         expect(ruScreen.survival.fatigue).toBe('Усталость {n}');
+         expect(ruScreen.survival.apPenalty).toBe('Количество получаемых ОД −{n}');
+     });
++
++    // Патч 217: разбивка усталости по активным источникам.
++    it.each(Object.entries(locales))('%s: ключи разбивки источников', (loc, dict) => {
++        expect(dict.survival.fatigueSources).toContain('{n}');
++        expect(dict.survival.fatigueSources).toContain('{sources}');
++        expect(dict.survival.fatigueSourceJoin).toMatch(/^.+$/);
++        for (const source of ['food', 'water', 'sleep', 'disease']) {
++            expect(
++                dict.survival.fatigueSource?.[source],
++                `${loc} survival.fatigueSource.${source}`,
++            ).toMatch(/^\S.+$/);
++        }
++    });
++
++    it('ru: разбивка — слова владельца', () => {
++        expect(ruScreen.survival.fatigueSources).toBe('Усталость {n} ({sources})');
++        expect(ruScreen.survival.fatigueSource).toEqual({
++            food: 'голод',
++            water: 'жажда',
++            sleep: 'сон',
++            disease: 'болезнь',
++        });
++    });
+ });
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index ed5303e..4aee7bb 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -1,6 +1,6 @@
+ # Система выживания — дизайн-документ
+ 
+-Редакция **0.4.6** от 2026-09-08.
++Редакция **0.4.7** от 2026-09-08.
+ Статус: этапы 1–5 реализованы (патчи 197–206, 210); выживание целиком
+ вынесено в модуль сеттинга (патч 207, `modules/fallout/survival/`) через
+ родовой механизм расширений состояния движка; употребление еды/напитков
+@@ -214,7 +214,11 @@ human/mutant — шкалы им положены по правилу типа.
+ Максимум ОЗ: −P        (P = ⌊N/2⌋, при P ≥ 1)
+ ```
+ 
+-Отдельного бейджа нет; при N = 0 строки исчезают.
++У строки «Усталость» в скобках — активные источники (патч 217):
++«Усталость 5 (голод: 1 / жажда: 2 / сон: 1 / болезнь: 1)». Показываются
++только источники с ненулевым вкладом, в каноническом порядке
++(еда, вода, сон, болезнь); усталость источника «болезнь» — отдельный
++источник §7. Отдельного бейджа нет; при N = 0 строки исчезают.
+ 
+ ---
+ 
+@@ -489,6 +493,8 @@ survival: {
+ 
+ ## 15. История редакций
+ 
++- **0.4.7 (2026-09-08):** панель эффектов — у строки «Усталость» в скобках
++  активные источники (голод/жажда/сон/болезнь), только ненулевые (патч 217).
+ - **0.4.6 (2026-09-08):** болезни с рангами (патч 215): ранг = duration
+   каталога, эффект несёт rank (сейв v25, миграция проставляет старым);
+   антибиотик снимает 1 единицу с каждой болезни (1 доза/24 ч); отдых в
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 41f36bd..6d0a24d 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -237,6 +237,14 @@
+       "reportBedRestHealed": "Bed rest cured diseases: {n}"
+     },
+     "fatigue": "Fatigue {n}",
++    "fatigueSources": "Fatigue {n} ({sources})",
++    "fatigueSourceJoin": " / ",
++    "fatigueSource": {
++      "food": "hunger",
++      "water": "thirst",
++      "sleep": "sleep",
++      "disease": "disease"
++    },
+     "apPenalty": "Action Points gained −{n}",
+     "maxHpPenalty": "Max HP: −{n}",
+     "foodTitle": "Hunger",
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 2d565c2..097249f 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -237,6 +237,14 @@
+       "reportBedRestHealed": "Отдых в постели излечил болезней: {n}"
+     },
+     "fatigue": "Усталость {n}",
++    "fatigueSources": "Усталость {n} ({sources})",
++    "fatigueSourceJoin": " / ",
++    "fatigueSource": {
++      "food": "голод",
++      "water": "жажда",
++      "sleep": "сон",
++      "disease": "болезнь"
++    },
+     "apPenalty": "Количество получаемых ОД −{n}",
+     "maxHpPenalty": "Максимум ОЗ: −{n}",
+     "foodTitle": "Голод",
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 0cbc893..790dc47 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -248,9 +248,9 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
+                   : effect.effectName || effect.effectLabel || '—');
+                 const effectDescription = localizedDisease?.effectLabel;
+                 const isNegative = effect.effectKind === 'negative';
+-                // Болезнь (патч 215): название с рангом по центру, справа —
+-                // кнопка «Сопротивляться» (одна попытка в сутки). Описание
+-                // — отдельной строкой по центру.
++                // Болезнь (патч 215): название с рангом зелёным, по левому
++                // краю (патч 216), справа — кнопка «Сопротивляться» (одна
++                // попытка в сутки). Описание — отдельной строкой по центру.
+                 if (effect.effectType === 'disease') {
+                   const resistOnCooldown = lastDiseaseResistAt != null
+                     && Date.now() - lastDiseaseResistAt < DISEASE_RESIST_COOLDOWN_MS;
+@@ -940,11 +940,26 @@ const WeaponsAndArmorScreen = () => {
+ 
+   // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
+   // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
++  // Патч 217: у строки «Усталость» в скобках активные источники —
++  // «Усталость 5 (голод: 1 / жажда: 2 / сон: 1 / болезнь: 1)»; показываются
++  // только источники с ненулевым вкладом.
+   const survivalRows = useMemo(
+-    () => survivalEffectRows(survival).map((row) => ({
+-      key: `survival_${row.key}`,
+-      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
+-    })),
++    () => survivalEffectRows(survival).map((row) => {
++      const text = tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n));
++      if (row.key !== 'fatigue' || !row.sources || row.sources.length === 0) {
++        return { key: `survival_${row.key}`, text };
++      }
++      const join = tWeaponsAndArmorScreen('survival.fatigueSourceJoin');
++      const sources = row.sources
++        .map((entry) => `${tWeaponsAndArmorScreen(`survival.fatigueSource.${entry.source}`)}: ${entry.amount}`)
++        .join(join);
++      return {
++        key: `survival_${row.key}`,
++        text: tWeaponsAndArmorScreen('survival.fatigueSources')
++          .replace('{n}', String(row.n))
++          .replace('{sources}', sources),
++      };
++    }),
+     [survival]
+   );
+ 
+diff --git a/modules/fallout/survival/survival.ts b/modules/fallout/survival/survival.ts
+index 3931280..82386ca 100644
+--- a/modules/fallout/survival/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -466,19 +466,36 @@ export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResu
+     return rest(state, opts);
+ }
+ 
++// Канонический порядок источников Усталости в разбивке панели «Эффекты»
++// (патч 217): лестницы (еда, вода, сон), затем болезнь.
++export const FATIGUE_SOURCE_ORDER: FatigueSource[] = ['food', 'water', 'sleep', 'disease'];
++
++// Активные источники Усталости (только amount > 0) в каноническом порядке.
++// Неизвестные источники (вне FATIGUE_SOURCE_ORDER) — в конце, в порядке
++// сейва: сумма разбивки всегда совпадает с totalFatigue.
++export function fatigueSourceBreakdown(state: SurvivalState): Array<{ source: FatigueSource; amount: number }> {
++    const known = FATIGUE_SOURCE_ORDER.map((source) => ({ source, amount: fatigueFromSource(state, source) }))
++        .filter((entry) => entry.amount > 0);
++    const unknown = state.fatigue
++        .filter((entry) => entry.amount > 0 && !FATIGUE_SOURCE_ORDER.includes(entry.source))
++        .map((entry) => ({ source: entry.source, amount: entry.amount }));
++    return [...known, ...unknown];
++}
++
+ // Строки выживания для панели «Эффекты» (док §6): при Усталости N ≥ 1 —
+ // «Усталость N», «Количество получаемых ОД −N» (M = N) и
+ // «Максимум ОЗ: −P» (P = ⌊N/2⌋, при P ≥ 1 — патч 213). Возвращает данные;
+ // тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty /
+-// survival.maxHpPenalty).
++// survival.maxHpPenalty). Патч 217: строка «Усталость» несёт разбивку по
++// активным источникам (sources), UI добавляет её в скобках.
+ export function survivalEffectRows(
+     survival: SurvivalState | null | undefined,
+-): Array<{ key: string; n: number }> {
++): Array<{ key: string; n: number; sources?: Array<{ source: string; amount: number }> }> {
+     if (!survival) return [];
+     const n = totalFatigue(survival);
+     if (n <= 0) return [];
+-    const rows: Array<{ key: string; n: number }> = [
+-        { key: 'fatigue', n },
++    const rows: Array<{ key: string; n: number; sources?: Array<{ source: string; amount: number }> }> = [
++        { key: 'fatigue', n, sources: fatigueSourceBreakdown(survival) },
+         { key: 'apPenalty', n },
+     ];
+     const maxPenalty = hpMaxPenaltyForFatigue(n);
+-- 
+2.39.5
+
