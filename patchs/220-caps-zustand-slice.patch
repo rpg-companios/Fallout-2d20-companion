@@ -1,0 +1,266 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 07:20:00 +0000
+Subject: [PATCH] патч 220: слайс caps в zustand-сторе — крышки хранятся в
+ сторе через доменные каунтеры, CharacterContext — тонкий фасад
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Шаг 2 миграции крышек — по аналогии со слайсами stateExtensions (патч 209)
+и equipment (патч 219):
+
+- characterStore: начальный стейт caps: 0; экшены earnCaps/spendCaps через
+  доменные каунтеры (domain/counters.js: restore/consume, нижняя граница 0,
+  потолка нет) и setCaps для абсолютной установки из сейва; caps в
+  partialize персиста и в сбросе resetCharacterStore;
+- CharacterContext: useState и локальные хелперы capsCounter/earnCaps/
+  spendCaps убраны, вместо них селекторы + стор-экшены; loadCharacter
+  ставит значение через useCharacterStore.getState().setCaps; дублирующие
+  setCaps(0) в resetCharacter/resetKitAndRewards удалены — обнуляет
+  resetCharacterStore (единая точка сброса);
+- импорт counters остаётся: health/radiation пока живут в контексте;
+- тест __tests__/saves/caps-store-slice.test.js: старт с нуля, earn
+  (минус игнорируется), spend без ухода в минус (999 при 10 → 0),
+  абсолютный set, мусор → 0, persist-раундтрип, сброс.
+
+Экраны не тронуты: useCharacter() отдаёт caps/earnCaps/spendCaps
+с тем же интерфейсом.
+---
+ __tests__/saves/caps-store-slice.test.js | 91 ++++++++++++++++++++++++++++++++
+ components/CharacterContext.js           | 25 +++++----
+ src/store/characterStore.js              | 31 +++++++++++
+ 3 files changed, 137 insertions(+), 10 deletions(-)
+
+diff --git a/__tests__/saves/caps-store-slice.test.js b/__tests__/saves/caps-store-slice.test.js
+new file mode 100644
+index 0000000..080d345
+--- /dev/null
++++ b/__tests__/saves/caps-store-slice.test.js
+@@ -0,0 +1,91 @@
++// Шаг миграции caps (крышки) из CharacterContext в characterStore: ресурс без
++// верхней границы, не ниже нуля — форма «каунтера» из domain/counters.js
++// (createCounter + restore/consume, тот же паттерн, что раньше жил в
++// CharacterContext). Контекст — тонкий фасад (селектор + экшены) для
++// существующих экранов (useCharacter().caps / earnCaps / spendCaps).
++//
++// Покрывает:
++//  - начальное значение 0;
++//  - earnCaps прибавляет (restore: отрицательные/мусорные суммы игнорируются);
++//  - spendCaps зажимается на нуле — consume не даёт ресурсу уйти в минус;
++//  - setCaps — абсолютная установка при загрузке сейва (в т.ч. мусор → 0);
++//  - персист: caps входит в partialize и переживает rehydrate;
++//  - сброс через resetCharacterStore → 0.
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import useCharacterStore from '../../src/store/characterStore';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: слайс caps', () => {
++  it('начальное значение — 0', () => {
++    expect(useCharacterStore.getState().caps).toBe(0);
++  });
++
++  it('earnCaps прибавляет, отрицательная сумма игнорируется', () => {
++    const store = useCharacterStore.getState();
++    store.earnCaps(50);
++    expect(useCharacterStore.getState().caps).toBe(50);
++    // «Вернуть минус пять» — ошибка вызывающего, а не скрытое списание
++    // (restore игнорирует amount <= 0).
++    store.earnCaps(-5);
++    expect(useCharacterStore.getState().caps).toBe(50);
++  });
++
++  it('spendCaps списывает и не уходит в минус при недостатке крышек', () => {
++    const store = useCharacterStore.getState();
++    store.setCaps(10);
++    store.spendCaps(4);
++    expect(useCharacterStore.getState().caps).toBe(6);
++    // Ключевой кейс: списание больше остатка зажимается на нижней границе
++    // (consume → clampToBounds → min 0), а не даёт отрицательное число.
++    store.spendCaps(999);
++    expect(useCharacterStore.getState().caps).toBe(0);
++  });
++
++  it('setCaps ставит абсолютное значение (загрузка сейва), мусор → 0', () => {
++    const store = useCharacterStore.getState();
++    store.earnCaps(15);
++    store.setCaps(777);
++    expect(useCharacterStore.getState().caps).toBe(777);
++    store.setCaps(-3);
++    expect(useCharacterStore.getState().caps).toBe(0);
++    store.setCaps('не число');
++    expect(useCharacterStore.getState().caps).toBe(0);
++  });
++
++  it('caps входит в partialize и переживает persist → rehydrate', async () => {
++    useCharacterStore.getState().setCaps(123);
++
++    // Ждём асинхронную запись персиста и проверяем, что partialize
++    // включил caps в сохраняемое состояние.
++    const raw = await vi.waitFor(async () => {
++      const data = await AsyncStorage.getItem('character-store');
++      expect(data).not.toBeNull();
++      expect(JSON.parse(data).state.caps).toBe(123);
++      return data;
++    });
++    expect(JSON.parse(raw).version).toBe(CURRENT_SCHEMA_VERSION);
++
++    // Раундтрип в духе character-store-rehydration.test.js: пишем запись
++    // руками (сброс стора сам перезаписал бы storage), ре-гидрация
++    // возвращает крышки в стейт.
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().caps).toBe(0);
++    await AsyncStorage.setItem('character-store', raw);
++    await useCharacterStore.persist.rehydrate();
++    expect(useCharacterStore.getState().caps).toBe(123);
++  });
++
++  it('resetCharacterStore сбрасывает крышки в 0', () => {
++    useCharacterStore.getState().earnCaps(200);
++    expect(useCharacterStore.getState().caps).toBe(200);
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().caps).toBe(0);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 26d5030..49a177e 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -391,21 +391,24 @@ export const CharacterProvider = ({ children }) => {
+   useEffect(() => { powerArmorRuntimeRef.current = powerArmorRuntime; }, [powerArmorRuntime]);
+   useEffect(() => { pendingCoreChoiceRef.current = pendingCoreChoice; }, [pendingCoreChoice]);
+ 
+-  const [caps, setCaps] = useState(0);
+   const [currentHealth, setCurrentHealth] = useState(0);
+   const [radiation, setRadiationRaw] = useState(0);
+ 
++  // Крышки: единственный источник — Zustand стор (Шаг 2 миграции из
++  // CharacterContext). earnCaps/spendCaps — стор-экшены, не локальный setState.
++  // Контекст — тонкий фасад для существующих экранов
++  // (useCharacter().caps / earnCaps / spendCaps).
++  const caps = useCharacterStore((s) => s.caps);
++  const earnCaps = useCharacterStore((s) => s.earnCaps);
++  const spendCaps = useCharacterStore((s) => s.spendCaps);
++
+   // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
+   // и в сейве лежит только текущее значение числом; потолок и нижняя граница
+   // — вычисляемые, они собираются здесь в момент операции.
+   // См. docs/architecture/counters-storage.md.
+   //
+-  // Крышки: потолка нет. Правило «не ниже нуля» теперь одно на все места
+-  // вызова — раньше каждый экран писал свой Math.max, и при покупке
+-  // (InventoryScreen) зажим забыли, из-за чего крышки уходили в минус.
+-  const capsCounter = () => createCounter({ id: 'caps', current: caps, max: null });
+-  const earnCaps = (amount) => setCaps(restore(capsCounter(), amount).current);
+-  const spendCaps = (amount) => setCaps(consume(capsCounter(), amount).current);
++  // (Крышки мигрировали в стор — экшены earnCaps/spendCaps выше; правило
++  // «не ниже нуля» теперь живёт в стор-слайсе.)
+ 
+   // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
+   // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
+@@ -1028,7 +1031,9 @@ export const CharacterProvider = ({ children }) => {
+       setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
+       setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
+       setPendingCoreChoice(null);
+-      setCaps(data.caps ?? 0);
++      // Абсолютная установка из сейва: инкрементальные earnCaps/spendCaps
++      // для этого не годятся (Шаг 2 миграции крышек в стор).
++      useCharacterStore.getState().setCaps(data.caps ?? 0);
+       setCurrentHealth(data.currentHealth ?? 0);
+       setRadiationRaw(Math.max(0, data.radiation ?? 0));
+       setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
+@@ -1762,7 +1767,7 @@ export const CharacterProvider = ({ children }) => {
+     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
+     setPendingCoreChoice(null);
+-    setCaps(0);
++    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
+     setSelectedPerks([]);
+     setConditions([]);
+     setChemDosesLog([]);
+@@ -1794,7 +1799,7 @@ export const CharacterProvider = ({ children }) => {
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+     setEquippedArmor(createEmptyEquippedArmor());
+-    setCaps(0);
++    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
+     // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
+     const { attributes: legacyAttributes, skills: legacySkills } =
+       denormalizeCharacterState(useCharacterStore.getState());
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 0b0b47f..8aa6985 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -60,6 +60,9 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
++// Каунтеры ресурсов (domain/counters.js): крышки — число с нижней границей 0
++// без потолка. Тот же паттерн, что раньше жил в CharacterContext.
++import { createCounter, consume, restore } from '../../domain/counters';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
+@@ -215,6 +218,10 @@ const useCharacterStore = create(devtools(
+       // из useState в CharacterContext. Мутации — только через setEquipment
+       // (поддерживает и функциональный апдейтер prev => next).
+       equipment: null,
++      // Крышки персонажа: ресурс без верхней границы, не ниже нуля
++      // (мигрировано из CharacterContext, Шаг 2). Мутации — только через
++      // earnCaps / spendCaps / setCaps.
++      caps: 0,
+       selectedPerks: [],
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
+@@ -1026,6 +1033,28 @@ const useCharacterStore = create(devtools(
+         }));
+       },
+ 
++      /**
++       * Крышки персонажа: ресурс без верхней границы, не ниже нуля
++       * (domain/counters.js — тот же паттерн, что и раньше в CharacterContext).
++       */
++      earnCaps: (amount) => {
++        const state = get();
++        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
++        set({ caps: restore(counter, amount).current });
++      },
++
++      spendCaps: (amount) => {
++        const state = get();
++        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
++        set({ caps: consume(counter, amount).current });
++      },
++
++      /**
++       * Абсолютная установка крышек (восстановление из сейва). Инкрементальные
++       * earnCaps/spendCaps для этого не годятся.
++       */
++      setCaps: (amount) => set({ caps: Math.max(0, Number(amount) || 0) }),
++
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+        *
+@@ -1048,6 +1077,7 @@ const useCharacterStore = create(devtools(
+           perkBonuses: {},
+           derivedStats: {},
+           equipment: null,
++          caps: 0,
+           _characterContext: undefined,
+           ...createInitialRobotState(),
+         });
+@@ -1099,6 +1129,7 @@ const useCharacterStore = create(devtools(
+         robot: state.robot,
+         stateExtensions: state.stateExtensions,
+         equipment: state.equipment,
++        caps: state.caps,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
