@@ -13,6 +13,7 @@ import {
   calculateMeleeBonus,
   calculateCarryWeight,
   getAttributeValue,
+  getAttributeLimits,
 } from '../domain/characterCreation';
 
 // One-time migration: legacy saves stored skills with Russian display names as
@@ -29,6 +30,26 @@ const migrateSkillsToCanonical = (rawSkills) => {
     if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
     const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
     return canonical ? { ...s, name: canonical } : s;
+  });
+};
+
+const clampAttributesToRules = (rawAttributes, trait) => {
+  const attributes = Array.isArray(rawAttributes) ? rawAttributes : createInitialAttributes();
+  return attributes.map((attribute) => {
+    if (!attribute?.name) return attribute;
+
+    const value = Number(attribute.value);
+    if (!Number.isFinite(value)) return attribute;
+
+    const { max } = getAttributeLimits(trait, attribute.name);
+    if (value <= max) return attribute;
+
+    debugLog('character.attribute.clampedOnLoad', {
+      attribute: attribute.name,
+      value,
+      max,
+    });
+    return { ...attribute, value: max };
   });
 };
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
@@ -949,16 +970,19 @@ export const CharacterProvider = ({ children }) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       isSavedRef.current = false;
 
-      setCharacterId(id);
+       const loadedTrait = data.trait || null;
+       const loadedAttributes = clampAttributesToRules(data.attributes, loadedTrait);
+
+       setCharacterId(id);
       setCharacterName(row.name);
       setLevel(data.level ?? INITIAL_LEVEL);
-      setAttributes(data.attributes || createInitialAttributes());
+       setAttributes(loadedAttributes);
       setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
       setSelectedSkills(data.selectedSkills || []);
       setExtraTaggedSkills(data.extraTaggedSkills || []);
       setForcedSelectedSkills(data.forcedSelectedSkills || []);
-      setOrigin(data.origin || null);
-      setTrait(data.trait || null);
+       setOrigin(data.origin || null);
+       setTrait(loadedTrait);
       setEquipment(data.equipment || null);
       setEffects(data.effects || []);
       setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
@@ -978,7 +1002,6 @@ export const CharacterProvider = ({ children }) => {
       // Ensure the archetype's built-in unarmed weapon is present on load
       // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
       const loadedOrigin = resolveOrigin(data.origin);
-      const loadedTrait = data.trait || null;
       const builtin = getBuiltinBaseWeapon({ origin: loadedOrigin, trait: loadedTrait });
       if (builtin && !migratedWeapons.some(w => w?.id === builtin.id)) {
         migratedWeapons = [builtin, ...migratedWeapons];
@@ -1043,7 +1066,10 @@ export const CharacterProvider = ({ children }) => {
       
       // Task 4.4: Migrate old format data to Zustand Store
       // This normalizes attributes, skills, items, and effects into the store
-      useCharacterStore.getState().loadFromLegacyData(data);
+       useCharacterStore.getState().loadFromLegacyData({
+         ...data,
+         attributes: loadedAttributes,
+       });
       
       // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
       // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
@@ -1643,20 +1669,33 @@ export const CharacterProvider = ({ children }) => {
   const commitAttributeChanges = (newAttributes, pointsSpent) => {
     debugLog('ctx.deprecatedCommitAttributeChanges');
 
-    // Calculate deltas from current attributes to new attributes
+    // Calculate deltas from the canonical store, not from the legacy Context
+    // mirror. The mirror can lag by one render and otherwise makes a second
+    // +1 allocation become +2 in the store.
     const currentAttributesArray = attributes;
     const currentAttributesMap = {};
     currentAttributesArray.forEach(attr => {
       currentAttributesMap[attr.name] = attr.value;
     });
 
-    newAttributes.forEach(newAttr => {
-      const currentAttr = currentAttributesMap[newAttr.name];
-      const delta = newAttr.value - (currentAttr || 0);
+    const store = useCharacterStore.getState();
+    const committedAttributes = (newAttributes || []).map((newAttr) => {
+      if (!newAttr?.name) return newAttr;
+      const { max } = getAttributeLimits(trait, newAttr.name);
+      const value = Math.min(Number(newAttr.value) || 0, max);
+      return value === newAttr.value ? newAttr : { ...newAttr, value };
+    });
+
+    committedAttributes.forEach(newAttr => {
+      if (!newAttr?.name) return;
+      const currentAttr = store.attributes?.[newAttr.name]?.base
+        ?? currentAttributesMap[newAttr.name]
+        ?? 0;
+      const delta = newAttr.value - currentAttr;
 
       if (delta !== 0) {
         // Use Zustand Store action
-        useCharacterStore.getState().updateAttribute(newAttr.name, delta);
+        store.updateAttribute(newAttr.name, delta);
       }
     });
 
@@ -1665,17 +1704,17 @@ export const CharacterProvider = ({ children }) => {
     // screen evaluates requirements through CharacterContext. Updating only
     // Zustand here made the sheet show the new value (for example AGI 10)
     // while perk requirements still saw the previous value (AGI 8).
-    setAttributes(newAttributes);
+    setAttributes(committedAttributes);
 
     // Update other state fields
     setAvailablePerkAttributePoints(prev => prev - pointsSpent);
-    const newLuck = getLuckPoints(newAttributes, trait);
+    const newLuck = getLuckPoints(committedAttributes, trait);
     setMaxLuckPoints(newLuck);
     setLuckPoints(prevLuck => Math.min(prevLuck, newLuck));
-    setCarryWeight(calculateCarryWeight(newAttributes, trait, { equippedArmor, equippedRobotSlots }));
-    setMeleeBonus(calculateMeleeBonus(newAttributes, trait));
-    setInitiative(calculateInitiative(newAttributes));
-    setDefense(calculateDefense(newAttributes));
+    setCarryWeight(calculateCarryWeight(committedAttributes, trait, { equippedArmor, equippedRobotSlots }));
+    setMeleeBonus(calculateMeleeBonus(committedAttributes, trait));
+    setInitiative(calculateInitiative(committedAttributes));
+    setDefense(calculateDefense(committedAttributes));
     const newMaxHealth = calculateMaxHealth(newAttributes, level);
     setCurrentHealth(prevHealth => Math.min(prevHealth, newMaxHealth));
   };
