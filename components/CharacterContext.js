@@ -34,6 +34,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
 import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
 import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConditionEvent, notifyConsumableApplied } from '../src/store/stateExtensions';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+import { planPerkAttributeDeltas } from '../domain/perkAttributeChanges';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
@@ -1641,24 +1642,29 @@ export const CharacterProvider = ({ children }) => {
   };
 
   const commitAttributeChanges = (newAttributes, pointsSpent) => {
-    debugLog('ctx.deprecatedCommitAttributeChanges');
+    debugLog('ctx.commitAttributeChanges');
 
-    // Calculate deltas from current attributes to new attributes
-    const currentAttributesArray = attributes;
-    const currentAttributesMap = {};
-    currentAttributesArray.forEach(attr => {
-      currentAttributesMap[attr.name] = attr.value;
-    });
+    // Дельта — от актуальной базы СТОРА (единственный источник истины), а не
+    // от массива контекста. Контекст отстаёт от стора после прошлых коммитов
+    // очков перков, и отсчёт от устаревшей базы задваивал прибавку: 8 + два
+    // ранга «Интенсивных тренировок» давали +1 и +2 (итог 11) вместо +1 и +1
+    // (итог 10). План считает domain/perkAttributeChanges (проверен тестами).
+    const store = useCharacterStore.getState();
+    const storeAttributes = store.attributes || {};
+    const contextValues = {};
+    attributes.forEach((attr) => { contextValues[attr.name] = attr.value; });
 
-    newAttributes.forEach(newAttr => {
-      const currentAttr = currentAttributesMap[newAttr.name];
-      const delta = newAttr.value - (currentAttr || 0);
+    planPerkAttributeDeltas({ newAttributes, storeAttributes, contextValues })
+      .forEach(({ name, delta }) => {
+        if (delta !== 0) {
+          store.updateAttribute(name, delta);
+        }
+      });
 
-      if (delta !== 0) {
-        // Use Zustand Store action
-        useCharacterStore.getState().updateAttribute(newAttr.name, delta);
-      }
-    });
+    // Контекст синхронизируем со стором: meetsPerkRequirements/annotatePerks
+    // читают массив контекста, и без этого перки видели устаревшую базу
+    // («перк показывает ловкость 8» при фактических 10).
+    setAttributes(newAttributes.map((attr) => ({ ...attr })));
 
     // Update other state fields
     setAvailablePerkAttributePoints(prev => prev - pointsSpent);

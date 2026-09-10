@@ -1,0 +1,242 @@
+From 237d53a59785511fbb53ba59294b7cdfa4efe585 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 06:23:52 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20219:=20=D0=BE=D1=87=D0=BA?=
+ =?UTF-8?q?=D0=B8=20=D0=BF=D0=B5=D1=80=D0=BA=D0=BE=D0=B2=20=D0=BA=20=D0=B0?=
+ =?UTF-8?q?=D1=82=D1=80=D0=B8=D0=B1=D1=83=D1=82=D0=B0=D0=BC=20=E2=80=94=20?=
+ =?UTF-8?q?=D0=B4=D0=B5=D0=BB=D1=8C=D1=82=D0=B0=20=D0=BE=D1=82=20=D0=B1?=
+ =?UTF-8?q?=D0=B0=D0=B7=D1=8B=20=D1=81=D1=82=D0=BE=D1=80=D0=B0,=20=D0=BA?=
+ =?UTF-8?q?=D0=BE=D0=BD=D1=82=D0=B5=D0=BA=D1=81=D1=82=20=D1=81=D0=B8=D0=BD?=
+ =?UTF-8?q?=D1=85=D1=80=D0=BE=D0=BD=D0=B8=D0=B7=D0=B8=D1=80=D1=83=D0=B5?=
+ =?UTF-8?q?=D1=82=D1=81=D1=8F=20(=D0=BD=D0=B5=D1=82=20=D0=B7=D0=B0=D0=B4?=
+ =?UTF-8?q?=D0=B2=D0=BE=D0=B5=D0=BD=D0=B8=D1=8F=20=D0=B8=20=D1=80=D0=B0?=
+ =?UTF-8?q?=D1=81=D1=81=D0=B8=D0=BD=D1=85=D1=80=D0=BE=D0=BD=D0=B0)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/perks/perk-attribute-deltas.test.js | 85 +++++++++++++++++++
+ components/CharacterContext.js                | 38 +++++----
+ docs/architecture/zustand-diagnosis.md        |  7 ++
+ domain/perkAttributeChanges.js                | 39 +++++++++
+ 4 files changed, 153 insertions(+), 16 deletions(-)
+ create mode 100644 __tests__/perks/perk-attribute-deltas.test.js
+ create mode 100644 domain/perkAttributeChanges.js
+
+diff --git a/__tests__/perks/perk-attribute-deltas.test.js b/__tests__/perks/perk-attribute-deltas.test.js
+new file mode 100644
+index 0000000..32b793c
+--- /dev/null
++++ b/__tests__/perks/perk-attribute-deltas.test.js
+@@ -0,0 +1,85 @@
++// __tests__/perks/perk-attribute-deltas.test.js
++//
++// Патч 219: очки перков («Интенсивные тренировки») применялись к атрибутам
++// от устаревшего массива контекста — дельта повторно начисляла уже
++// распределённые очки. Дефект владельца: ловкость 8 + два ранга
++// «Интенсивных тренировок» давали 11 вместо 10, а перк «Ган-фу»
++// (требование ЛОВ 10) показывал текущую ловкость 8.
++//
++// Дельта теперь считается от базы стора (planPerkAttributeDeltas).
++
++import { describe, expect, it } from 'vitest';
++import { planPerkAttributeDeltas } from '../../domain/perkAttributeChanges';
++
++describe('planPerkAttributeDeltas (патч 219)', () => {
++  it('дельта — от базы стора, а не от устаревшего контекста', () => {
++    const plan = planPerkAttributeDeltas({
++      newAttributes: [{ name: 'AGI', value: 10 }],
++      storeAttributes: { AGI: { base: 9, modifiers: [], total: 9 } },
++      contextValues: { AGI: 8 },
++    });
++    expect(plan).toEqual([{ name: 'AGI', delta: 1, baseSource: 'store' }]);
++  });
++
++  it('сценарий владельца: два последовательных коммита дают 10, а не 11', () => {
++    const store = { AGI: { base: 8 } };
++    const context = { AGI: 8 }; // контекст в дефекте не обновлялся
++
++    // Ранг 1: ловкость 8 → 9.
++    const first = planPerkAttributeDeltas({
++      newAttributes: [{ name: 'AGI', value: 9 }],
++      storeAttributes: store,
++      contextValues: context,
++    });
++    expect(first[0].delta).toBe(1);
++    store.AGI.base += first[0].delta;
++
++    // Ранг 2: ловкость 9 → 10. При отсчёте от контекста дельта была бы +2,
++    // и итог уезжал в 11.
++    const second = planPerkAttributeDeltas({
++      newAttributes: [{ name: 'AGI', value: 10 }],
++      storeAttributes: store,
++      contextValues: context,
++    });
++    expect(second[0].delta).toBe(1);
++    expect(store.AGI.base + second[0].delta).toBe(10);
++  });
++
++  it('стор не знает атрибут — отсчёт от контекста (поведение как раньше)', () => {
++    const plan = planPerkAttributeDeltas({
++      newAttributes: [{ name: 'STR', value: 6 }],
++      storeAttributes: {},
++      contextValues: { STR: 4 },
++    });
++    expect(plan).toEqual([{ name: 'STR', delta: 2, baseSource: 'context' }]);
++  });
++
++  it('нулевая и отрицательная дельты планируются корректно', () => {
++    const plan = planPerkAttributeDeltas({
++      newAttributes: [
++        { name: 'STR', value: 5 },
++        { name: 'AGI', value: 7 },
++      ],
++      storeAttributes: { STR: { base: 5 }, AGI: { base: 8 } },
++      contextValues: { STR: 4, AGI: 8 },
++    });
++    expect(plan).toEqual([
++      { name: 'STR', delta: 0, baseSource: 'store' },
++      { name: 'AGI', delta: -1, baseSource: 'store' },
++    ]);
++  });
++
++  it('мусорный вход не роняет план и даёт нулевые дельты', () => {
++    expect(planPerkAttributeDeltas({})).toEqual([]);
++    const plan = planPerkAttributeDeltas({
++      newAttributes: [null, { name: 'AGI', value: 'не число' }, { value: 10 }],
++      storeAttributes: { AGI: { base: 5 } },
++      contextValues: {},
++    });
++    expect(plan).toEqual([
++      { name: '', delta: 0, baseSource: 'context' },
++      { name: 'AGI', delta: 0, baseSource: 'store' },
++      { name: '', delta: 0, baseSource: 'context' },
++    ]);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 54bf2db..39f08e6 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -34,6 +34,7 @@ const migrateSkillsToCanonical = (rawSkills) => {
+ import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+ import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConditionEvent, notifyConsumableApplied } from '../src/store/stateExtensions';
+ import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
++import { planPerkAttributeDeltas } from '../domain/perkAttributeChanges';
+ import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
+ import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
+ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
+@@ -1641,24 +1642,29 @@ export const CharacterProvider = ({ children }) => {
+   };
+ 
+   const commitAttributeChanges = (newAttributes, pointsSpent) => {
+-    debugLog('ctx.deprecatedCommitAttributeChanges');
++    debugLog('ctx.commitAttributeChanges');
+ 
+-    // Calculate deltas from current attributes to new attributes
+-    const currentAttributesArray = attributes;
+-    const currentAttributesMap = {};
+-    currentAttributesArray.forEach(attr => {
+-      currentAttributesMap[attr.name] = attr.value;
+-    });
+-
+-    newAttributes.forEach(newAttr => {
+-      const currentAttr = currentAttributesMap[newAttr.name];
+-      const delta = newAttr.value - (currentAttr || 0);
++    // Дельта — от актуальной базы СТОРА (единственный источник истины), а не
++    // от массива контекста. Контекст отстаёт от стора после прошлых коммитов
++    // очков перков, и отсчёт от устаревшей базы задваивал прибавку: 8 + два
++    // ранга «Интенсивных тренировок» давали +1 и +2 (итог 11) вместо +1 и +1
++    // (итог 10). План считает domain/perkAttributeChanges (проверен тестами).
++    const store = useCharacterStore.getState();
++    const storeAttributes = store.attributes || {};
++    const contextValues = {};
++    attributes.forEach((attr) => { contextValues[attr.name] = attr.value; });
++
++    planPerkAttributeDeltas({ newAttributes, storeAttributes, contextValues })
++      .forEach(({ name, delta }) => {
++        if (delta !== 0) {
++          store.updateAttribute(name, delta);
++        }
++      });
+ 
+-      if (delta !== 0) {
+-        // Use Zustand Store action
+-        useCharacterStore.getState().updateAttribute(newAttr.name, delta);
+-      }
+-    });
++    // Контекст синхронизируем со стором: meetsPerkRequirements/annotatePerks
++    // читают массив контекста, и без этого перки видели устаревшую базу
++    // («перк показывает ловкость 8» при фактических 10).
++    setAttributes(newAttributes.map((attr) => ({ ...attr })));
+ 
+     // Update other state fields
+     setAvailablePerkAttributePoints(prev => prev - pointsSpent);
+diff --git a/docs/architecture/zustand-diagnosis.md b/docs/architecture/zustand-diagnosis.md
+index 219a56c..d34c192 100644
+--- a/docs/architecture/zustand-diagnosis.md
++++ b/docs/architecture/zustand-diagnosis.md
+@@ -122,6 +122,13 @@ Store: `attributes` = dict `{ STR: {base, modifiers, total} }`.
+ **Решение:** атрибуты — во владении стора. Context отдаёт их через селектор
+ (`useCharacterAttributes()` уже есть!). `setAttributes(useState)` депрекейтить.
+ 
++**Статус (патч 219):** зафиксирован первый пострадавший — `commitAttributeChanges`
++считал дельту от устаревшего массива контекста: два ранга «Интенсивных
++тренировок» при ловкости 8 давали +1 и +2 (итог 11 вместо 10), а перки
++(`meetsPerkRequirements`) видели базу 8. Дельта теперь считается от базы стора
++(`domain/perkAttributeChanges`), а контекст синхронизируется в том же коммите.
++Полный перевод атрибутов во владение стора остаётся отдельной работой.
++
+ ---
+ 
+ ## Рекомендованный порядок работ
+diff --git a/domain/perkAttributeChanges.js b/domain/perkAttributeChanges.js
+new file mode 100644
+index 0000000..ec086cd
+--- /dev/null
++++ b/domain/perkAttributeChanges.js
+@@ -0,0 +1,39 @@
++// domain/perkAttributeChanges.js
++//
++// План применения распределённых очков перков к атрибутам (патч 219).
++//
++// Дельта каждого атрибута считается от актуальной базы СТОРА — единственного
++// источника истины, а не от массива контекста. Контекст отстаёт от стора
++// после предыдущих коммитов очков перков, и отсчёт от устаревшей базы
++// повторно начислял уже распределённые очки: 8 + два ранга «Интенсивных
++// тренировок» давали +1 и +2 (итог 11) вместо +1 и +1 (итог 10).
++// Если стор атрибут ещё не знает (создание персонажа до первого
++// распределения) — отсчёт от значения контекста, как было раньше.
++
++/**
++ * @param {Array<{name: string, value: number}>} newAttributes — целевые значения
++ *   после распределения очков перков (tempAttributes экрана персонажа).
++ * @param {Object<string, {base?: number}>} storeAttributes — dict атрибутов
++ *   зустанд-стора (актуальная база).
++ * @param {Object<string, number>} contextValues — значения массива контекста
++ *   (фолбэк для атрибутов, которых стор ещё не знает).
++ * @returns {Array<{name: string, delta: number, baseSource: 'store'|'context'}>}
++ */
++export const planPerkAttributeDeltas = ({
++  newAttributes = [],
++  storeAttributes = {},
++  contextValues = {},
++} = {}) => {
++  const attrs = Array.isArray(newAttributes) ? newAttributes : [];
++  return attrs.map((newAttr) => {
++    const name = typeof newAttr?.name === 'string' ? newAttr.name : '';
++    const value = Number(newAttr?.value);
++    if (!name) return { name: '', delta: 0, baseSource: 'context' };
++    const storeAttr = storeAttributes?.[name];
++    const storeBase = storeAttr && Number.isFinite(storeAttr.base) ? storeAttr.base : null;
++    const contextValue = Number.isFinite(contextValues?.[name]) ? contextValues[name] : 0;
++    const base = storeBase == null ? contextValue : storeBase;
++    const delta = Number.isFinite(value) ? value - base : 0;
++    return { name, delta, baseSource: storeBase == null ? 'context' : 'store' };
++  });
++};
+-- 
+2.39.5
+
