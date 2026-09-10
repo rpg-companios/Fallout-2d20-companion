@@ -1,0 +1,703 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 08:00:00 +0000
+Subject: [PATCH] патч 222: персонажный ресурс caps переименован в currency
+ (только рантайм стора/контекста; kit.caps и формат сейва data.caps не тронуты)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Сужение периметра: переименован только персонажный счётный ресурс в
+сторе/контексте (caps/earnCaps/spendCaps/setCaps → currency/
+earnCurrency/spendCurrency/setCurrency). Граница — «движок хранит
+нейтральный currency, Fallout-данные называют его caps, и это нормально»:
+
+- characterStore: поле currency, экшены earnCurrency (каунтер из
+  domain/counters) и spendCurrency (транзакционный, reason
+  'not-enough-currency'; NaN-защита теперь явная — Number.isFinite),
+  setCurrency; currency в partialize и resetCharacterStore;
+- domain/types.js (новый): typedefs SpendResult/SpendRejected/SpendOutcome;
+- CharacterContext: селекторы currency/earnCurrency/spendCurrency;
+  loadCharacter ставит setCurrency(data.caps ?? 0) — поле сейва остаётся
+  caps (персистентный контракт); buildSnapshot маппит обратно
+  caps: currency; value отдаёт currency, earnCurrency, spendCurrency;
+- потребители интерфейса useCharacter() обновлены (ломающее изменение):
+  CharacterScreen (earnCurrency(kit.caps) — поле комплекта не
+  переименовано; награды за навыки; стартовая покупка), InventoryScreen
+  (покупка, продажа, ручная правка; UI-пропы CapsSection/CapsModal/
+  BuyItemModal сохранили имя caps, им передаётся значение currency);
+- skillRewards.js: только комментарии;
+- НЕ тронуто: kit.caps, EquipmentKitModal, kitResolver, migrations,
+  JSON-каталоги, i18n-ключи, формат data.caps;
+- тест caps-store-slice → currency-store-slice (перерасход отклоняется,
+  ноль/отрицательная/NaN — ok no-op, persist, сброс).
+---
+ __tests__/saves/caps-store-slice.test.js           | 110 -------------------
+ __tests__/saves/currency-store-slice.test.js       | 120 +++++++++++++++++++++
+ components/CharacterContext.js                     |  46 ++++----
+ .../screens/InventoryScreen/InventoryScreen.js     |  18 ++--
+ domain/skillRewards.js                             |   5 +-
+ domain/types.js                                    |  24 +++++
+ .../screens/CharacterScreen/CharacterScreen.js     |  18 ++--
+ src/store/characterStore.js                        |  66 +++++++-----
+ 8 files changed, 230 insertions(+), 177 deletions(-)
+
+diff --git a/__tests__/saves/caps-store-slice.test.js b/__tests__/saves/caps-store-slice.test.js
+deleted file mode 100644
+index 7c693c8..0000000
+--- a/__tests__/saves/caps-store-slice.test.js
++++ /dev/null
+@@ -1,110 +0,0 @@
+-// Шаг миграции caps (крышки) из CharacterContext в characterStore: ресурс без
+-// верхней границы, не ниже нуля — форма «каунтера» из domain/counters.js
+-// (createCounter + restore/consume, тот же паттерн, что раньше жил в
+-// CharacterContext). Контекст — тонкий фасад (селектор + экшены) для
+-// существующих экранов (useCharacter().caps / earnCaps / spendCaps).
+-//
+-// Покрывает:
+-//  - начальное значение 0;
+-//  - earnCaps прибавляет (restore: отрицательные/мусорные суммы игнорируются);
+-//  - spendCaps транзакционный: перерасход ОТКЛОНЯЕТСЯ ({ok:false}), баланс
+-//    не меняется — «купить на больше, чем есть» невозможно ни по одному
+-//    пути вызова (контракт spendAmmoForWeapon);
+-//  - setCaps — абсолютная установка при загрузке сейва (в т.ч. мусор → 0);
+-//  - персист: caps входит в partialize и переживает rehydrate;
+-//  - сброс через resetCharacterStore → 0.
+-
+-import { afterEach, describe, expect, it, vi } from 'vitest';
+-import AsyncStorage from '@react-native-async-storage/async-storage';
+-import useCharacterStore from '../../src/store/characterStore';
+-import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
+-
+-afterEach(async () => {
+-  useCharacterStore.getState().resetCharacterStore();
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-describe('characterStore: слайс caps', () => {
+-  it('начальное значение — 0', () => {
+-    expect(useCharacterStore.getState().caps).toBe(0);
+-  });
+-
+-  it('earnCaps прибавляет, отрицательная сумма игнорируется', () => {
+-    const store = useCharacterStore.getState();
+-    store.earnCaps(50);
+-    expect(useCharacterStore.getState().caps).toBe(50);
+-    // «Вернуть минус пять» — ошибка вызывающего, а не скрытое списание
+-    // (restore игнорирует amount <= 0).
+-    store.earnCaps(-5);
+-    expect(useCharacterStore.getState().caps).toBe(50);
+-  });
+-
+-  it('spendCaps отклоняет перерасход: баланс не меняется, ok: false', () => {
+-    const store = useCharacterStore.getState();
+-    store.setCaps(10);
+-    store.spendCaps(4);
+-    expect(useCharacterStore.getState().caps).toBe(6);
+-    // Ключевой кейс инварианта «нельзя списать больше, чем есть»: списание
+-    // больше остатка отклоняется (как spendAmmoForWeapon), баланс НЕ тронут —
+-    // ни зажима на 0, ни ухода в минус.
+-    const rejected = store.spendCaps(999);
+-    expect(rejected).toEqual({ ok: false, reason: 'not-enough-caps' });
+-    expect(useCharacterStore.getState().caps).toBe(6);
+-    // Точная сумма проходит.
+-    expect(store.spendCaps(6)).toEqual({ ok: true });
+-    expect(useCharacterStore.getState().caps).toBe(0);
+-  });
+-
+-  it('spendCaps: нулевая сумма — ok (бесплатная покупка), отрицательная — no-op без изменений', () => {
+-    const store = useCharacterStore.getState();
+-    store.setCaps(10);
+-    // Бесплатная покупка (цена 0): валидна, баланс не меняется.
+-    expect(store.spendCaps(0)).toEqual({ ok: true });
+-    expect(useCharacterStore.getState().caps).toBe(10);
+-    // «Списать минус пять» — ошибка вызывающего, а не скрытое восполнение:
+-    // no-op, баланс прежний.
+-    expect(store.spendCaps(-5)).toEqual({ ok: true });
+-    expect(useCharacterStore.getState().caps).toBe(10);
+-  });
+-
+-  it('setCaps ставит абсолютное значение (загрузка сейва), мусор → 0', () => {
+-    const store = useCharacterStore.getState();
+-    store.earnCaps(15);
+-    store.setCaps(777);
+-    expect(useCharacterStore.getState().caps).toBe(777);
+-    store.setCaps(-3);
+-    expect(useCharacterStore.getState().caps).toBe(0);
+-    store.setCaps('не число');
+-    expect(useCharacterStore.getState().caps).toBe(0);
+-  });
+-
+-  it('caps входит в partialize и переживает persist → rehydrate', async () => {
+-    useCharacterStore.getState().setCaps(123);
+-
+-    // Ждём асинхронную запись персиста и проверяем, что partialize
+-    // включил caps в сохраняемое состояние.
+-    const raw = await vi.waitFor(async () => {
+-      const data = await AsyncStorage.getItem('character-store');
+-      expect(data).not.toBeNull();
+-      expect(JSON.parse(data).state.caps).toBe(123);
+-      return data;
+-    });
+-    expect(JSON.parse(raw).version).toBe(CURRENT_SCHEMA_VERSION);
+-
+-    // Раундтрип в духе character-store-rehydration.test.js: пишем запись
+-    // руками (сброс стора сам перезаписал бы storage), ре-гидрация
+-    // возвращает крышки в стейт.
+-    useCharacterStore.getState().resetCharacterStore();
+-    expect(useCharacterStore.getState().caps).toBe(0);
+-    await AsyncStorage.setItem('character-store', raw);
+-    await useCharacterStore.persist.rehydrate();
+-    expect(useCharacterStore.getState().caps).toBe(123);
+-  });
+-
+-  it('resetCharacterStore сбрасывает крышки в 0', () => {
+-    useCharacterStore.getState().earnCaps(200);
+-    expect(useCharacterStore.getState().caps).toBe(200);
+-    useCharacterStore.getState().resetCharacterStore();
+-    expect(useCharacterStore.getState().caps).toBe(0);
+-  });
+-});
+diff --git a/__tests__/saves/currency-store-slice.test.js b/__tests__/saves/currency-store-slice.test.js
+new file mode 100644
+index 0000000..a0fd030
+--- /dev/null
++++ b/__tests__/saves/currency-store-slice.test.js
+@@ -0,0 +1,120 @@
++// Шаг миграции персонажного счётного ресурса из CharacterContext в
++// characterStore. Рантайм-имя нейтральное — currency (в Fallout это крышки:
++// имя/иконка/локализация остаются в UI-слое сеттинга). Форма — «каунтер» из
++// domain/counters.js (createCounter + restore для начисления); списание —
++// транзакционная операция с явным отказом при недостатке средств.
++//
++// НЕ в этом тесте: kit.caps / data.caps — Fallout-данные и персистентный
++// формат сейва, они не переименовываются (buildSnapshot маппит currency
++// обратно на caps).
++//
++// Покрывает:
++//  - начальное значение 0;
++//  - earnCurrency прибавляет (restore: отрицательные/мусорные суммы
++//    игнорируются);
++//  - spendCurrency транзакционный: перерасход ОТКЛОНЯЕТСЯ ({ok:false,
++//    reason:'not-enough-currency'}), баланс не меняется — «потратить больше,
++//    чем есть» невозможно ни по одному пути вызова (контракт
++//    spendAmmoForWeapon);
++//  - граничные суммы spendCurrency: ноль — ok (бесплатная «покупка»),
++//    отрицательная и NaN — no-op без порчи ресурса;
++//  - setCurrency — абсолютная установка при загрузке сейва (в т.ч. мусор → 0);
++//  - персист: currency входит в partialize и переживает rehydrate;
++//  - сброс через resetCharacterStore → 0.
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import useCharacterStore from '../../src/store/characterStore';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: слайс currency', () => {
++  it('начальное значение — 0', () => {
++    expect(useCharacterStore.getState().currency).toBe(0);
++  });
++
++  it('earnCurrency прибавляет, отрицательная сумма игнорируется', () => {
++    const store = useCharacterStore.getState();
++    store.earnCurrency(50);
++    expect(useCharacterStore.getState().currency).toBe(50);
++    // «Начислить минус пять» — ошибка вызывающего, а не скрытое списание
++    // (restore игнорирует amount <= 0).
++    store.earnCurrency(-5);
++    expect(useCharacterStore.getState().currency).toBe(50);
++  });
++
++  it('spendCurrency отклоняет перерасход: баланс не меняется, ok: false', () => {
++    const store = useCharacterStore.getState();
++    store.setCurrency(10);
++    store.spendCurrency(4);
++    expect(useCharacterStore.getState().currency).toBe(6);
++    // Ключевой кейс инварианта «нельзя потратить больше, чем есть»: списание
++    // больше остатка отклоняется, баланс НЕ тронут — ни зажима на 0, ни ухода
++    // в минус.
++    const rejected = store.spendCurrency(999);
++    expect(rejected).toEqual({ ok: false, reason: 'not-enough-currency' });
++    expect(useCharacterStore.getState().currency).toBe(6);
++    // Точная сумма проходит.
++    expect(store.spendCurrency(6)).toEqual({ ok: true });
++    expect(useCharacterStore.getState().currency).toBe(0);
++  });
++
++  it('spendCurrency: ноль — ok, отрицательная и NaN — no-op без порчи ресурса', () => {
++    const store = useCharacterStore.getState();
++    store.setCurrency(10);
++    // Бесплатная «покупка» (цена 0): валидна, баланс не меняется.
++    expect(store.spendCurrency(0)).toEqual({ ok: true });
++    expect(useCharacterStore.getState().currency).toBe(10);
++    // «Списать минус пять» — ошибка вызывающего, а не скрытое восполнение.
++    expect(store.spendCurrency(-5)).toEqual({ ok: true });
++    expect(useCharacterStore.getState().currency).toBe(10);
++    // Мусор (NaN) не превращает ресурс в NaN — no-op.
++    expect(store.spendCurrency(Number('мусор'))).toEqual({ ok: true });
++    expect(useCharacterStore.getState().currency).toBe(10);
++  });
++
++  it('setCurrency ставит абсолютное значение (загрузка сейва), мусор → 0', () => {
++    const store = useCharacterStore.getState();
++    store.earnCurrency(15);
++    store.setCurrency(777);
++    expect(useCharacterStore.getState().currency).toBe(777);
++    store.setCurrency(-3);
++    expect(useCharacterStore.getState().currency).toBe(0);
++    store.setCurrency('не число');
++    expect(useCharacterStore.getState().currency).toBe(0);
++  });
++
++  it('currency входит в partialize и переживает persist → rehydrate', async () => {
++    useCharacterStore.getState().setCurrency(123);
++
++    // Ждём асинхронную запись персиста и проверяем, что partialize включил
++    // currency в сохраняемое состояние.
++    const raw = await vi.waitFor(async () => {
++      const data = await AsyncStorage.getItem('character-store');
++      expect(data).not.toBeNull();
++      expect(JSON.parse(data).state.currency).toBe(123);
++      return data;
++    });
++    expect(JSON.parse(raw).version).toBe(CURRENT_SCHEMA_VERSION);
++
++    // Раундтрип в духе character-store-rehydration.test.js: пишем запись
++    // руками (сброс стора сам перезаписал бы storage), ре-гидрация
++    // возвращает ресурс в стейт.
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().currency).toBe(0);
++    await AsyncStorage.setItem('character-store', raw);
++    await useCharacterStore.persist.rehydrate();
++    expect(useCharacterStore.getState().currency).toBe(123);
++  });
++
++  it('resetCharacterStore сбрасывает ресурс в 0', () => {
++    useCharacterStore.getState().earnCurrency(200);
++    expect(useCharacterStore.getState().currency).toBe(200);
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().currency).toBe(0);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 49a177e..441436d 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -394,21 +394,27 @@ export const CharacterProvider = ({ children }) => {
+   const [currentHealth, setCurrentHealth] = useState(0);
+   const [radiation, setRadiationRaw] = useState(0);
+ 
+-  // Крышки: единственный источник — Zustand стор (Шаг 2 миграции из
+-  // CharacterContext). earnCaps/spendCaps — стор-экшены, не локальный setState.
+-  // Контекст — тонкий фасад для существующих экранов
+-  // (useCharacter().caps / earnCaps / spendCaps).
+-  const caps = useCharacterStore((s) => s.caps);
+-  const earnCaps = useCharacterStore((s) => s.earnCaps);
+-  const spendCaps = useCharacterStore((s) => s.spendCaps);
++  /**
++   * Ресурс (в Fallout — крышки): единственный источник — Zustand стор
++   * (Шаг 2 миграции из CharacterContext). earnCurrency/spendCurrency —
++   * стор-экшены, не локальный setState. Контекст — тонкий фасад для
++   * существующих экранов (useCharacter().currency / earnCurrency /
++   * spendCurrency).
++   * @type {number}
++   */
++  const currency = useCharacterStore((s) => s.currency);
++  /** @type {(amount: number) => void} */
++  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
++  /** @type {(amount: number) => import('../domain/types').SpendOutcome} */
++  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+ 
+   // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
+   // и в сейве лежит только текущее значение числом; потолок и нижняя граница
+   // — вычисляемые, они собираются здесь в момент операции.
+   // См. docs/architecture/counters-storage.md.
+   //
+-  // (Крышки мигрировали в стор — экшены earnCaps/spendCaps выше; правило
+-  // «не ниже нуля» теперь живёт в стор-слайсе.)
++  // (Ресурс мигрировал в стор — экшены earnCurrency/spendCurrency выше;
++  // правило «не ниже нуля» теперь живёт в стор-слайсе.)
+ 
+   // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
+   // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
+@@ -851,7 +857,10 @@ export const CharacterProvider = ({ children }) => {
+     equippedArmor,
+     equippedPowerArmor,
+     powerArmorRuntime,
+-    caps,
++    // Рантайм-имя ресурса — currency (стор), поле сейва остаётся caps:
++    // персистентный формат не меняем (совместимость со старыми сохранениями
++    // и migrations.js).
++    caps: currency,
+     currentHealth,
+     radiation,
+     modifiedItems,
+@@ -874,7 +883,7 @@ export const CharacterProvider = ({ children }) => {
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+-    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
++    currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+     conditions, chemDosesLog, sceneRiskStates, lastDiseaseResistAt, stateExtensions,
+   ]);
+@@ -913,7 +922,7 @@ export const CharacterProvider = ({ children }) => {
+     forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+-    caps, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
++    currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+     // Производные убраны и отсюда: они не попадают в снимок, а их пересчёт
+     // зря будил автосохранение (запись в БД + синхронизация с облаком).
+@@ -1031,9 +1040,10 @@ export const CharacterProvider = ({ children }) => {
+       setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
+       setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
+       setPendingCoreChoice(null);
+-      // Абсолютная установка из сейва: инкрементальные earnCaps/spendCaps
+-      // для этого не годятся (Шаг 2 миграции крышек в стор).
+-      useCharacterStore.getState().setCaps(data.caps ?? 0);
++      // Абсолютная установка из сейва: инкрементальные earnCurrency/spendCurrency
++      // для этого не годятся (Шаг 2 миграции ресурса в стор). Поле сейва —
++      // data.caps: персистентный формат не переименовываем.
++      useCharacterStore.getState().setCurrency(data.caps ?? 0);
+       setCurrentHealth(data.currentHealth ?? 0);
+       setRadiationRaw(Math.max(0, data.radiation ?? 0));
+       setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
+@@ -1767,7 +1777,7 @@ export const CharacterProvider = ({ children }) => {
+     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
+     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
+     setPendingCoreChoice(null);
+-    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
++    // Ресурс обнуляет resetCharacterStore (слайс currency, Шаг 2 миграции).
+     setSelectedPerks([]);
+     setConditions([]);
+     setChemDosesLog([]);
+@@ -1799,7 +1809,7 @@ export const CharacterProvider = ({ children }) => {
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+     setEquippedArmor(createEmptyEquippedArmor());
+-    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
++    // Ресурс обнуляет resetCharacterStore (слайс currency, Шаг 2 миграции).
+     // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
+     const { attributes: legacyAttributes, skills: legacySkills } =
+       denormalizeCharacterState(useCharacterStore.getState());
+@@ -1869,7 +1879,7 @@ export const CharacterProvider = ({ children }) => {
+     // Ресурсы наружу — числом, как и раньше. Менять их можно только
+     // именованными операциями: правило границ живёт в domain/counters.js,
+     // а не переписывается заново на каждом экране.
+-    caps, earnCaps, spendCaps,
++    currency, earnCurrency, spendCurrency,
+     currentHealth, healCharacter, damageCharacter, setCurrentHealth,
+     radiation, setRadiation, addRadiation, healRadiation,
+     luckPoints, setLuckPoints,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 3fd4d33..f3c1b40 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -79,7 +79,7 @@ const InventoryScreen = () => {
+     equippedWeapons, setEquippedWeapons, 
+     equippedArmor, setEquippedArmor,
+     equippedRobotSlots, setEquippedRobotSlots,
+-    caps, earnCaps, spendCaps,
++    currency, earnCurrency, spendCurrency,
+     equipment,
+     applyConsumableFull,
+     previewConsumableRadiation,
+@@ -376,11 +376,11 @@ const InventoryScreen = () => {
+   const handleSaveCaps = (amount) => {
+     if (capsOperationType === 'add') {
+       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
+-      earnCaps(amount + sumFoundItemBonus(bonusEvents));
++      earnCurrency(amount + sumFoundItemBonus(bonusEvents));
+       showFoundItemBonusAlerts(bonusEvents);
+       return;
+     }
+-    spendCaps(amount);
++    spendCurrency(amount);
+   };
+ 
+   const handleApplyConsumable = (item) => {
+@@ -485,7 +485,7 @@ const InventoryScreen = () => {
+   };
+ 
+   const handleConfirmSale = (quantity, finalPrice) => {
+-    earnCaps(finalPrice);
++    earnCurrency(finalPrice);
+ 
+     const stackKey = selectedItemForSale?.stackKey || getStackKey(selectedItemForSale);
+     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
+@@ -609,11 +609,11 @@ const InventoryScreen = () => {
+     // Списание атомарно (инвариант стора «нельзя купить на больше, чем
+     // есть»): при отказе предмет НЕ выдаётся. Модалка уже проверяет баланс —
+     // это вторая линия на случай иного пути вызова.
+-    const result = spendCaps(finalCost);
++    const result = spendCurrency(finalCost);
+     if (!result.ok) {
+       showAlert(
+         tInventory('modals.buyItemModal.notEnoughCapsTitle'),
+-        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps }),
++        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps: currency }),
+       );
+       return;
+     }
+@@ -1753,7 +1753,7 @@ const InventoryScreen = () => {
+       <SafeAreaView style={styles.safeArea}>
+         <View style={styles.container}>
+           <CapsSection 
+-            caps={caps}
++            caps={currency}
+             onAdd={() => handleOpenCapsModal('add')}
+             onSubtract={() => handleOpenCapsModal('subtract')}
+           />
+@@ -1779,7 +1779,7 @@ const InventoryScreen = () => {
+           onClose={() => setIsCapsModalVisible(false)}
+           onSave={handleSaveCaps}
+           operationType={capsOperationType}
+-          caps={caps}
++          caps={currency}
+         />
+         <SellItemModal
+             visible={isSellModalVisible}
+@@ -1802,7 +1802,7 @@ const InventoryScreen = () => {
+             setSelectedItemForBuy(null);
+           }}
+           item={selectedItemForBuy}
+-          caps={caps}
++          caps={currency}
+           onConfirmBuy={handleConfirmBuy}
+         />
+ 
+diff --git a/domain/skillRewards.js b/domain/skillRewards.js
+index 6b7e732..171e428 100644
+--- a/domain/skillRewards.js
++++ b/domain/skillRewards.js
+@@ -43,7 +43,7 @@ const resolveEntry = async (entry, catalog, kitContext) => {
+   }
+ 
+   // Currency (крышки) — идёт в счётчик крышек, а не в инвентарь (как у комплектов:
+-  // handleSelectKit делает setCaps(prev => prev + kit.caps)). В инвентаре крышек
++  // handleSelectKit делает earnCurrency(kit.caps)). В инвентаре крышек
+   // быть не должно — у них нет каталоговой записи, и «две стопки по 9 и 17»
+   // возникали именно отсюда.
+   if (entry.itemType === 'currency') {
+@@ -108,7 +108,8 @@ const resolveEntry = async (entry, catalog, kitContext) => {
+  * @param {object} [options] — { ammoFromKit?: string } (id патрона из комплекта)
+  * @returns {Promise<{ items: object[], caps: number }>}
+  *   items  — предметы для addNewItem;
+- *   caps   — крышки (BARTER), их надо провести через setCaps, а не addNewItem.
++ *   caps   — крышки (BARTER): экран проводит их через earnCurrency, а не addNewItem
++ *          (имя поля caps — формат данных награды, не рантайм-имя ресурса).
+  */
+ export const resolveSkillRewards = async (skillKeys, options = {}) => {
+   const catalog = getEquipmentCatalog();
+diff --git a/domain/types.js b/domain/types.js
+new file mode 100644
+index 0000000..6f2c39e
+--- /dev/null
++++ b/domain/types.js
+@@ -0,0 +1,24 @@
++// domain/types.js
++// Общие типы движка (JSDoc typedefs). Файл без рантайм-кода: типы нужны
++// редакторам и typecheck'у, описывают контракты, которые движок даёт слоям
++// выше (стору, экранам).
++
++/**
++ * Успешное списание ресурса (см. characterStore.spendCurrency).
++ *
++ * @typedef {Object} SpendResult
++ * @property {true} ok
++ */
++
++/**
++ * Отказ списания: баланс не тронут, вызывающий решает, как сообщить
++ * пользователю.
++ *
++ * @typedef {Object} SpendRejected
++ * @property {false} ok
++ * @property {string} reason - например, 'not-enough-currency'
++ */
++
++/** @typedef {SpendResult|SpendRejected} SpendOutcome */
++
++export {};
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 1a89a76..2f5e9ba 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -284,9 +284,9 @@ export default function CharacterScreen() {
+     setEquipment,
+     effects,
+     setEffects,
+-    caps,
+-    earnCaps,
+-    spendCaps,
++    currency,
++    earnCurrency,
++    spendCurrency,
+     setCurrentHealth,
+     luckPoints,
+     setLuckPoints,
+@@ -552,8 +552,8 @@ export default function CharacterScreen() {
+     if (kit.items && Array.isArray(kit.items)) {
+       kit.items.forEach(item => {
+         // Currency (caps) is not an inventory item — it is tracked separately via
+-        // setCaps below. Skip it so it never hits addNewItem (which would warn about
+-        // a missing id field).
++        // earnCurrency below. Skip it so it never hits addNewItem (which would warn
++        // about a missing id field).
+         debugLog('kits.select.candidate', {
+           name: item?.name,
+           itemType: item?.itemType,
+@@ -582,8 +582,8 @@ export default function CharacterScreen() {
+       purchaseMaxRarity: kit.purchaseMaxRarity ?? null,
+     });
+     
+-    // 3. Update caps
+-    earnCaps(kit.caps || 0);
++    // 3. Update currency (kit.caps — поле данных комплекта, остаётся как есть)
++    earnCurrency(kit.caps || 0);
+ 
+     // 4. Robot: apply slot/weapon/module state from initRobotSlots
+     if (kit.robotSlots) {
+@@ -623,7 +623,7 @@ export default function CharacterScreen() {
+       // Корзина структурно не даёт перерасхода (canAfford в startingPurchase),
+       // так что отказ возможен только при рассинхроне — логируем. Предметы
+       // всё равно выдаются: это выдача комплекта создания, а не сделка.
+-      const result = spendCaps(spent);
++      const result = spendCurrency(spent);
+       if (!result.ok) {
+         debugLog('kits.purchase.spendRejected', { spent, reason: result.reason });
+       }
+@@ -1133,7 +1133,7 @@ export default function CharacterScreen() {
+           const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
+           rewardItems.forEach(item => addNewItem(item));
+           // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
+-          if (rewardCaps) earnCaps(rewardCaps);
++          if (rewardCaps) earnCurrency(rewardCaps);
+           markSkillsAsRewarded(unrewardedSkills);
+         }
+       }
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 7637ed4..f069373 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -60,9 +60,10 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+-// Каунтеры ресурсов (domain/counters.js): крышки — число с нижней границей 0
+-// без потолка. Тот же паттерн, что раньше жил в CharacterContext.
+-import { createCounter, consume, restore, canConsume } from '../../domain/counters';
++// Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
++// число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
++// в CharacterContext.
++import { createCounter, restore } from '../../domain/counters';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
+@@ -218,10 +219,14 @@ const useCharacterStore = create(devtools(
+       // из useState в CharacterContext. Мутации — только через setEquipment
+       // (поддерживает и функциональный апдейтер prev => next).
+       equipment: null,
+-      // Крышки персонажа: ресурс без верхней границы, не ниже нуля
+-      // (мигрировано из CharacterContext, Шаг 2). Мутации — только через
+-      // earnCaps / spendCaps / setCaps.
+-      caps: 0,
++      /**
++       * Персонажный счётный ресурс без верхней границы (в Fallout — крышки).
++       * Единственный источник правды. Название нейтральное: движок не знает
++       * про крышки — конкретное имя/иконка/локализация остаются в UI-слое
++       * сеттинга (см. tInventory('screen.caps.title')).
++       * @type {number}
++       */
++      currency: 0,
+       selectedPerks: [],
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
+@@ -1034,39 +1039,42 @@ const useCharacterStore = create(devtools(
+       },
+ 
+       /**
+-       * Крышки персонажа: ресурс без верхней границы, не ниже нуля
+-       * (domain/counters.js — тот же паттерн, что и раньше в CharacterContext).
++       * Начислить ресурс. Без верхней границы; отрицательная/некорректная
++       * сумма — no-op.
++       * @param {number} amount
+        */
+-      earnCaps: (amount) => {
++      earnCurrency: (amount) => {
+         const state = get();
+-        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
+-        set({ caps: restore(counter, amount).current });
++        const counter = createCounter({ id: 'currency', current: state.currency, max: null });
++        set({ currency: restore(counter, amount).current });
+       },
+ 
+       /**
+-       * Списать крышки. Транзакционно: если amount больше остатка, списание
+-       * ОТКЛОНЯЕТСЯ ({ ok: false, reason: 'not-enough-caps' }), баланс не
+-       * меняется — покупка «в долг» невозможна ни по одному пути вызова
+-       * (тот же контракт, что у spendAmmoForWeapon). Нулевой/отрицательный
+-       * amount — no-op с { ok: true } (бесплатная покупка / «списать минус
+-       * пять» — ошибка вызывающего, а не скрытое восполнение).
++       * Потратить ресурс. Транзакционная операция: при недостатке средств
++       * баланс не меняется, возвращается явный отказ.
++       * @param {number} amount
++       * @returns {import('../../domain/types').SpendOutcome}
+        */
+-      spendCaps: (amount) => {
++      spendCurrency: (amount) => {
+         const state = get();
+-        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
+-        if (!canConsume(counter, amount)) {
+-          debugLog('store.caps.insufficient', { current: state.caps, amount });
+-          return { ok: false, reason: 'not-enough-caps' };
++        const delta = Number(amount);
++        // Мусор (NaN и т.п.) — ошибка вызывающего: no-op вместо порчи ресурса
++        // (раньше эту защиту давал toFiniteOrNull внутри consume).
++        if (!Number.isFinite(delta)) return { ok: true };
++        if (delta < 0) return { ok: true };
++        if (delta > state.currency) {
++          debugLog('store.currency.insufficient', { current: state.currency, amount });
++          return { ok: false, reason: 'not-enough-currency' };
+         }
+-        set({ caps: consume(counter, amount).current });
++        set({ currency: state.currency - delta });
+         return { ok: true };
+       },
+ 
+       /**
+-       * Абсолютная установка крышек (восстановление из сейва). Инкрементальные
+-       * earnCaps/spendCaps для этого не годятся.
++       * Установить абсолютное значение — только при загрузке сейва.
++       * @param {number} amount
+        */
+-      setCaps: (amount) => set({ caps: Math.max(0, Number(amount) || 0) }),
++      setCurrency: (amount) => set({ currency: Math.max(0, Number(amount) || 0) }),
+ 
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+@@ -1090,7 +1098,7 @@ const useCharacterStore = create(devtools(
+           perkBonuses: {},
+           derivedStats: {},
+           equipment: null,
+-          caps: 0,
++          currency: 0,
+           _characterContext: undefined,
+           ...createInitialRobotState(),
+         });
+@@ -1142,7 +1150,7 @@ const useCharacterStore = create(devtools(
+         robot: state.robot,
+         stateExtensions: state.stateExtensions,
+         equipment: state.equipment,
+-        caps: state.caps,
++        currency: state.currency,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
