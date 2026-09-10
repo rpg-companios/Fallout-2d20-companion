@@ -1,0 +1,373 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Thu, 10 Sep 2026 08:50:00 +0000
+Subject: [PATCH] патч 223: equippedWeapons в zustand-сторе, экраны читают/пишут
+ стор напрямую (фасад поле больше не отдаёт)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Шаг 3 миграции equippedWeapons из CharacterContext:
+
+- characterStore: equippedWeapons: [] (метаданные: встроенные кулаки,
+  манипуляторы, sourceSlot — «живые» предметы в items с equipped: true);
+  экшен setEquippedWeapons с функциональным апдейтером prev => next;
+  equippedWeapons в partialize и resetCharacterStore;
+- CharacterContext: useState убран; осталась подписка-селектор только ради
+  buildSnapshot/автосейва; loadCharacter пишет миграцию [null,null] →
+  динамический массив и инжекцию встроенного оружия через стор-экшен;
+  дублирующие сбросы в resetCharacter/resetKitAndRewards удалены;
+  из фасада useCharacter() поле больше не отдаётся;
+- экраны переведены на прямые селекторы/экшены стора: CharacterScreen
+  (unarmed-инжекция, robotWeapons), InventoryScreen (замена слота,
+  снятие), WeaponsAndArmorScreen (prev.map/prev.filter;
+  contextEquippedWeapons → equippedWeaponsMeta), LimbUpgradeModal;
+- mergeEquippedWeapons в автосейве сохранён;
+- тест equipped-weapons-store-slice: прямой сет, функциональные апдейтеры
+  обоих паттернов, persist-раундтрип, сброс.
+---
+ .../saves/equipped-weapons-store-slice.test.js     | 111 +++++++++++++++++++++
+ components/CharacterContext.js                     |  15 ++-
+ .../screens/InventoryScreen/InventoryScreen.js     |   5 +-
+ .../screens/CharacterScreen/CharacterScreen.js     |   4 +-
+ .../CharacterScreen/modals/LimbUpgradeModal.js     |   5 +-
+ .../WeaponsAndArmorScreen/WeaponsAndArmorScreen.js |  10 +-
+ src/store/characterStore.js                        |  20 ++++
+ 7 files changed, 158 insertions(+), 12 deletions(-)
+
+diff --git a/__tests__/saves/equipped-weapons-store-slice.test.js b/__tests__/saves/equipped-weapons-store-slice.test.js
+new file mode 100644
+index 0000000..284a394
+--- /dev/null
++++ b/__tests__/saves/equipped-weapons-store-slice.test.js
+@@ -0,0 +1,111 @@
++// Шаг 3 миграции equippedWeapons из CharacterContext в characterStore:
++// список надетого оружия — МЕТАДАННЫЕ (встроенные кулаки, манипуляторы,
++// sourceSlot), «живые» предметы лежат в items (equipped: true). Единственный
++// источник — стор; экраны (CharacterScreen, InventoryScreen,
++// WeaponsAndArmorScreen, LimbUpgradeModal) читают/пишут его напрямую,
++// фасад useCharacter() поле больше не отдаёт.
++//
++// НЕ в этом тесте: миграция сейвового формата [null, null] → динамический
++// массив и инжекция встроенного оружия — они остались в loadCharacter
++// контекста (React-lifecycle загрузки) и пишут через стор-экшен.
++//
++// Покрывает:
++//  - начальное значение — пустой массив;
++//  - прямой сет списка (робот: kit.robotWeapons);
++//  - функциональный апдейтер prev => next (паттерн CharacterScreen:
++//    дописать встроенное unarmed-оружие; WeaponsAndArmorScreen:
++//    prev.map/prev.filter при модификации/снятии);
++//  - персист: equippedWeapons входит в partialize и переживает rehydrate;
++//  - сброс через resetCharacterStore → [].
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import useCharacterStore from '../../src/store/characterStore';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: слайс equippedWeapons', () => {
++  it('начальное состояние — пустой массив', () => {
++    expect(useCharacterStore.getState().equippedWeapons).toEqual([]);
++  });
++
++  it('setEquippedWeapons сохраняет список (робот: kit.robotWeapons)', () => {
++    const robotWeapons = [
++      { id: 'robot_weapon_laser', isManipulator: true, sourceSlot: 'leftArm' },
++      { id: 'robot_weapon_flamer', sourceSlot: 'rightArm' },
++    ];
++    useCharacterStore.getState().setEquippedWeapons(robotWeapons);
++    expect(useCharacterStore.getState().equippedWeapons).toEqual(robotWeapons);
++  });
++
++  it('функциональный апдейтер: дописать встроенное unarmed-оружие без дублей', () => {
++    const store = useCharacterStore.getState();
++    // Паттерн CharacterScreen.handleSelectKit для не-роботов.
++    const unarmedId = 'weapon_fists';
++    store.setEquippedWeapons((prev) => {
++      const already = prev.some((w) => w?.id === unarmedId);
++      if (already) return prev;
++      return [{ id: unarmedId, isBuiltin: true }, ...prev];
++    });
++    expect(useCharacterStore.getState().equippedWeapons).toEqual([
++      { id: unarmedId, isBuiltin: true },
++    ]);
++    // Повторный вызов не плодит дублей (prev => prev).
++    useCharacterStore.getState().setEquippedWeapons((prev) => {
++      const already = prev.some((w) => w?.id === unarmedId);
++      if (already) return prev;
++      return [{ id: unarmedId, isBuiltin: true }, ...prev];
++    });
++    expect(useCharacterStore.getState().equippedWeapons).toHaveLength(1);
++  });
++
++  it('функциональный апдейтер: prev.map / prev.filter (WeaponsAndArmorScreen)', () => {
++    const store = useCharacterStore.getState();
++    store.setEquippedWeapons([
++      { id: 'weapon_a', appliedMods: {} },
++      { id: 'weapon_b', appliedMods: { Receiver: 'mod_1' } },
++    ]);
++    // Модификация оружия (prev.map).
++    store.setEquippedWeapons((prev) => prev.map((w) => (
++      w.id === 'weapon_a' ? { ...w, appliedMods: { Receiver: 'mod_9' } } : w
++    )));
++    expect(useCharacterStore.getState().equippedWeapons[0].appliedMods).toEqual({ Receiver: 'mod_9' });
++    // Снятие оружия (prev.filter).
++    store.setEquippedWeapons((prev) => prev.filter((w) => w.id !== 'weapon_b'));
++    expect(useCharacterStore.getState().equippedWeapons.map((w) => w.id)).toEqual(['weapon_a']);
++  });
++
++  it('equippedWeapons входит в partialize и переживает persist → rehydrate', async () => {
++    const weapons = [{ id: 'weapon_fists', isBuiltin: true }];
++    useCharacterStore.getState().setEquippedWeapons(weapons);
++
++    // Ждём асинхронную запись персиста и проверяем, что partialize включил
++    // equippedWeapons в сохраняемое состояние.
++    const raw = await vi.waitFor(async () => {
++      const data = await AsyncStorage.getItem('character-store');
++      expect(data).not.toBeNull();
++      expect(JSON.parse(data).state.equippedWeapons).toEqual(weapons);
++      return data;
++    });
++    expect(JSON.parse(raw).version).toBe(CURRENT_SCHEMA_VERSION);
++
++    // Раундтрип в духе character-store-rehydration.test.js: пишем запись
++    // руками (сброс стора сам перезаписал бы storage), ре-гидрация
++    // возвращает список в стейт.
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().equippedWeapons).toEqual([]);
++    await AsyncStorage.setItem('character-store', raw);
++    await useCharacterStore.persist.rehydrate();
++    expect(useCharacterStore.getState().equippedWeapons).toEqual(weapons);
++  });
++
++  it('resetCharacterStore сбрасывает список в []', () => {
++    useCharacterStore.getState().setEquippedWeapons([{ id: 'weapon_x' }]);
++    useCharacterStore.getState().resetCharacterStore();
++    expect(useCharacterStore.getState().equippedWeapons).toEqual([]);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 441436d..aa923cb 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -292,7 +292,6 @@ export const CharacterProvider = ({ children }) => {
+   const [effects, setEffects] = useState([]);
+   const [activeTimedEffects, setActiveTimedEffects] = useState([]);
+   const [sceneCounter, setSceneCounter] = useState(0);
+-  const [equippedWeapons, setEquippedWeapons] = useState([]);
+   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
+   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+   // Расширения состояния персонажа (src/store/stateExtensions.js): поля сейва,
+@@ -408,6 +407,12 @@ export const CharacterProvider = ({ children }) => {
+   /** @type {(amount: number) => import('../domain/types').SpendOutcome} */
+   const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+ 
++  // Надетое оружие (метаданные): единственный источник — Zustand стор
++  // (Шаг 3 миграции). Экраны читают/пишут стор НАПРЯМОУЮ (селектор/экшен
++  // useCharacterStore), фасад это поле больше не отдаёт; контекст держит
++  // подписку только ради buildSnapshot/автосейва.
++  const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
++
+   // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
+   // и в сейве лежит только текущее значение числом; потолок и нижняя граница
+   // — вычисляемые, они собираются здесь в момент операции.
+@@ -1022,7 +1027,7 @@ export const CharacterProvider = ({ children }) => {
+       if (builtin && !migratedWeapons.some(w => w?.id === builtin.id)) {
+         migratedWeapons = [builtin, ...migratedWeapons];
+       }
+-      setEquippedWeapons(migratedWeapons);
++      useCharacterStore.getState().setEquippedWeapons(migratedWeapons);
+       // Seed the store's robot body plan first so derived carry-weight resolves
+       // correctly, then mirror slots/modules through the wrapped setters.
+       useCharacterStore.getState().loadRobotState({
+@@ -1762,7 +1767,8 @@ export const CharacterProvider = ({ children }) => {
+     const emptySceneRiskStates = {};
+     sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
+     setSceneRiskStates(emptySceneRiskStates);
+-    setEquippedWeapons([]);
++    // Список надетого оружия обнуляет resetCharacterStore (слайс
++    // equippedWeapons, Шаг 3 миграции).
+     useCharacterStore.persist?.clearStorage?.();
+     useCharacterStore.getState().resetCharacterStore({
+       attributes: initialAttributes,
+@@ -1805,7 +1811,7 @@ export const CharacterProvider = ({ children }) => {
+   const resetKitAndRewards = useCallback((opts = {}) => {
+     const keepSkills = Boolean(opts.keepSkills);
+     setEquipment(null);
+-    setEquippedWeapons([]);
++    // equippedWeapons обнуляет resetCharacterStore (Шаг 3 миграции).
+     setEquippedRobotSlots(null);
+     setEquippedRobotModules([]);
+     setEquippedArmor(createEmptyEquippedArmor());
+@@ -1859,7 +1865,6 @@ export const CharacterProvider = ({ children }) => {
+     conditions, setConditions,
+     chemDosesLog,
+     advanceScene,
+-    equippedWeapons, setEquippedWeapons,
+     equippedRobotSlots, setEquippedRobotSlots,
+     equippedRobotModules, setEquippedRobotModules,
+     equippedArmor, setEquippedArmor,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index f3c1b40..4d0c77d 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -76,7 +76,6 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
+ 
+ const InventoryScreen = () => {
+   const { 
+-    equippedWeapons, setEquippedWeapons, 
+     equippedArmor, setEquippedArmor,
+     equippedRobotSlots, setEquippedRobotSlots,
+     currency, earnCurrency, spendCurrency,
+@@ -98,6 +97,10 @@ const InventoryScreen = () => {
+   } = useCharacter();
+ 
+   const storeItems = useCharacterStore((state) => state.items);
++  // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
++  // минуя фасад useCharacter().
++  const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
++  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+   // ОС Mk II (Секьюритрон): нерабочие ракетница/гранатомёт активируются
+   // драйвером из инвентаря; флаг живёт в robot-срезе стора (персистится).
+   const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 2f5e9ba..ec32e86 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -300,7 +300,6 @@ export default function CharacterScreen() {
+     resetKitAndRewards,
+     availablePerkAttributePoints,
+     commitAttributeChanges,
+-    setEquippedWeapons,
+     setEquippedRobotSlots,
+     setEquippedRobotModules,
+     equippedPowerArmor,
+@@ -310,6 +309,9 @@ export default function CharacterScreen() {
+   const moduleLocale = useModuleLocale();
+   const storeAttributes = useCharacterStore((state) => state.attributes);
+   const storeSkills = useCharacterStore((state) => state.skills);
++  // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
++  // (фасад useCharacter() это поле больше не отдаёт).
++  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+   const storeEffects = useCharacterStore((state) => state.effects);
+   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
+diff --git a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index f8d9964..3f1646b 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -1,3 +1,4 @@
++import useCharacterStore from '../../../../../src/store/characterStore';
+ import React, { useMemo } from 'react';
+ import {
+   Modal,
+@@ -115,8 +116,10 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
+  *   onClose      {function}
+  */
+ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
+-  const { equippedRobotSlots, setEquippedRobotSlots, setEquippedWeapons, equipment, setEquipment } =
++  const { equippedRobotSlots, setEquippedRobotSlots, equipment, setEquipment } =
+     useCharacter();
++  // Надетое оружие — Шаг 3 миграции: список пишется напрямую в стор.
++  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+   useLocale();
+   const moduleLocale = useModuleLocale();
+   const equipmentCatalog = useMemo(
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 790dc47..f1418c0 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -610,8 +610,6 @@ const WeaponsAndArmorScreen = () => {
+   const {
+     attributes,
+     level,
+-    equippedWeapons: contextEquippedWeapons,
+-    setEquippedWeapons,
+     equippedArmor: contextEquippedArmor,
+     setEquippedArmor,
+     equippedRobotSlots,
+@@ -635,6 +633,10 @@ const WeaponsAndArmorScreen = () => {
+   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
+   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
+   const storeEquippedArmor = useMemo(() => getEquippedArmor({ items: storeItems }), [storeItems]);
++  // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора
++  // (метаданные кулаков/манипуляторов дополняют items с equipped: true).
++  const equippedWeaponsMeta = useCharacterStore((s) => s.equippedWeapons);
++  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+   const updateItem = useCharacterStore((state) => state.updateItem);
+   const unequipItem = useCharacterStore((state) => state.unequipItem);
+ 
+@@ -649,13 +651,13 @@ const WeaponsAndArmorScreen = () => {
+     // источник. Люди: встроенные кулаки — в контекстном списке (как было).
+     const robotExtras = isRobot
+       ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
+-      : (contextEquippedWeapons || []).filter(
++      : (equippedWeaponsMeta || []).filter(
+           (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
+         );
+     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id));
+     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id));
+     return [...fromStore, ...extras];
+-  }, [storeEquippedWeapons, contextEquippedWeapons, isRobot, equippedRobotSlots]);
++  }, [storeEquippedWeapons, equippedWeaponsMeta, isRobot, equippedRobotSlots]);
+ 
+   const equippedArmor = useMemo(() => {
+     const hasStoreArmor = Object.values(storeEquippedArmor).some(
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index f069373..66d0653 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -230,6 +230,12 @@ const useCharacterStore = create(devtools(
+       selectedPerks: [],
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
++      // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
++      // sourceSlot и т.п.) — «живые» предметы лежат в items (equipped: true),
++      // этот список их дополняет (Шаг 3 миграции из CharacterContext).
++      // Мутации — только через setEquippedWeapons (поддерживает и
++      // функциональный апдейтер prev => next).
++      equippedWeapons: [],
+       derivedStats: {}, // Calculated derived stats
+ 
+       perkBonuses: {},
+@@ -1076,6 +1082,18 @@ const useCharacterStore = create(devtools(
+        */
+       setCurrency: (amount) => set({ currency: Math.max(0, Number(amount) || 0) }),
+ 
++      /**
++       * Список надетого оружия (метаданные: встроенные кулаки, манипуляторы,
++       * sourceSlot). Единственный источник — стор (Шаг 3 миграции из
++       * CharacterContext). Поддерживает функциональный апдейтер (prev => next)
++       * для обратной совместимости с существующими вызовами.
++       */
++      setEquippedWeapons: (updater) => {
++        set((state) => ({
++          equippedWeapons: typeof updater === 'function' ? updater(state.equippedWeapons) : updater,
++        }));
++      },
++
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+        *
+@@ -1099,6 +1117,7 @@ const useCharacterStore = create(devtools(
+           derivedStats: {},
+           equipment: null,
+           currency: 0,
++          equippedWeapons: [],
+           _characterContext: undefined,
+           ...createInitialRobotState(),
+         });
+@@ -1151,6 +1170,7 @@ const useCharacterStore = create(devtools(
+         stateExtensions: state.stateExtensions,
+         equipment: state.equipment,
+         currency: state.currency,
++        equippedWeapons: state.equippedWeapons,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
