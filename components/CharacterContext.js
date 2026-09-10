@@ -1,7 +1,6 @@
 import { debugLog } from '../src/debug/falloutDebug';
 import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 import * as db from '../db';
-import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
 import {
   createInitialAttributes,
   ALL_SKILLS,
@@ -16,22 +15,8 @@ import {
   getAttributeLimits,
 } from '../domain/characterCreation';
 
-// One-time migration: legacy saves stored skills with Russian display names as
-// `skill.name` (e.g. "Ремонт"). After the canonical-id refactor, identity is
-// the UPPER_SNAKE_CASE key (e.g. "REPAIR"). This bridge runs only at load.
-const RU_SKILL_NAME_TO_KEY = Object.entries(ruCharacterScreen?.skillsCatalog || {}).reduce(
-  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
-  {},
-);
-const migrateSkillsToCanonical = (rawSkills) => {
-  if (!Array.isArray(rawSkills)) return null;
-  return rawSkills.map((s) => {
-    if (!s || typeof s.name !== 'string') return s;
-    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
-    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
-    return canonical ? { ...s, name: canonical } : s;
-  });
-};
+// Мост канонизации навыков (legacy RU-имена → ключи) переехал в
+// domain/skillCanonical.js — тестируемый домен-модуль без React.
 
 const clampAttributesToRules = (rawAttributes, trait) => {
   const attributes = Array.isArray(rawAttributes) ? rawAttributes : createInitialAttributes();
@@ -73,6 +58,7 @@ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 
 import { resolveBodyPlan } from '../domain/bodyplan';
 import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
+import { migrateSkillsToCanonical } from '../domain/skillCanonical';
 import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
 import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
 import { resolveKitItems } from '../domain/kitResolver';

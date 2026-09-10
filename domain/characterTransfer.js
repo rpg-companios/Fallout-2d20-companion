@@ -1,3 +1,4 @@
+import { slimSaveData } from './saveSlimming';
 /**
  * domain/characterTransfer.js
  * Чистая доменная логика импорта/экспорта персонажей.
@@ -59,7 +60,7 @@ export const sanitizeFileName = (name) => {
  * Создает payload для экспорта.
  * @param {Object} characterRow - строка из БД: {id, name, level, origin_name, data}
  */
-export const createCharacterExportPayload = (characterRow) => ({
+export const createCharacterExportPayload = (characterRow, { getEntry } = {}) => ({
   format: 'rpg-companion-character',
   version: EXPORT_FORMAT_VERSION,
   exportedAt: new Date().toISOString(),
@@ -68,7 +69,13 @@ export const createCharacterExportPayload = (characterRow) => ({
     name: characterRow.name,
     level: characterRow.level ?? 1,
     originName: characterRow.origin_name ?? null,
-    data: characterRow.data,
+    // «Оземпик» тела сейва (слайм): в файл идёт только состояние экземпляров
+    // предметов (id, quantity, equipped, моды, прочность/заряды) — имя/цену/вес/
+    // статы импорт восстанавливает из каталога (restoreSaveData на загрузке).
+    // Формат не меняется: жирные (v18-) и худые экспорты грузятся одним кодом.
+    data: typeof getEntry === 'function'
+      ? slimSaveData(characterRow.data, { getEntry })
+      : characterRow.data,
   },
 });
 
