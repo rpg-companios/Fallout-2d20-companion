@@ -53,6 +53,7 @@ import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
 import { legacyEffectToStore } from './effectsSync.js';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
@@ -243,6 +244,10 @@ const useCharacterStore = create(devtools(
       // Robot equipment slice (slots / modules / bodyPlan). See robotSlice.js.
       ...createInitialRobotState(),
 
+      // Надетая броня / силовая броня / рантайм блока / диалог выбора блока.
+      // See powerArmorSlice.js (Шаг 4 миграции из CharacterContext).
+      ...createInitialPowerArmorState(),
+
       // Status flags (not part of persistence)
       isEffectsProcessing: false,
 
@@ -263,6 +268,9 @@ const useCharacterStore = create(devtools(
 
       // --- Actions: Robot equipment (delegated to robotSlice) ---
       ...createRobotActions(set, get),
+
+      // --- Actions: Equipped armor & power armor (delegated to powerArmorSlice) ---
+      ...createPowerArmorActions(set, get),
 
       // --- Actions: Attributes ---
 
@@ -1000,6 +1008,9 @@ const useCharacterStore = create(devtools(
         set({
           _characterContext: {
             trait: context.trait || null,
+            // origin нужен правилам экипировки слоя СБ (powerArmorSlice:
+            // робот/супермутант), см. characterRules().
+            origin: context.origin || null,
             level: context.level || 1,
             equipmentState: context.equipmentState || {},
           }
@@ -1120,6 +1131,7 @@ const useCharacterStore = create(devtools(
           equippedWeapons: [],
           _characterContext: undefined,
           ...createInitialRobotState(),
+          ...createInitialPowerArmorState(),
         });
 
         get().recalculatePerkBonuses();
@@ -1171,6 +1183,9 @@ const useCharacterStore = create(devtools(
         equipment: state.equipment,
         currency: state.currency,
         equippedWeapons: state.equippedWeapons,
+        equippedArmor: state.equippedArmor,
+        equippedPowerArmor: state.equippedPowerArmor,
+        powerArmorRuntime: state.powerArmorRuntime,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

@@ -302,7 +302,6 @@ export default function CharacterScreen() {
     commitAttributeChanges,
     setEquippedRobotSlots,
     setEquippedRobotModules,
-    equippedPowerArmor,
   } = useCharacter();
 
   const debugLocale = useLocale();
@@ -312,6 +311,9 @@ export default function CharacterScreen() {
   // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
   // (фасад useCharacter() это поле больше не отдаёт).
   const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+  // Пакет СБ — Шаг 4 миграции: напрямую из стора (модификаторы каркаса
+  // в атрибутах, applyFrameAttributeModifiers).
+  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
   const storeEffects = useCharacterStore((state) => state.effects);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);

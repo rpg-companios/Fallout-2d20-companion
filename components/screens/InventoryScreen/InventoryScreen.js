@@ -76,7 +76,6 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 
 const InventoryScreen = () => {
   const { 
-    equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
     currency, earnCurrency, spendCurrency,
     equipment,
@@ -86,17 +85,21 @@ const InventoryScreen = () => {
     trait,
     origin,
     carryWeight,
-    // Силовая броня: свой слой и свои действия (docs/architecture/power-armor-plan.md).
-    equippedPowerArmor,
-    equipPowerArmorPackage,
-    equipPowerArmorPiece,
-    unequipPowerArmorPackage,
-    unequipPowerArmorPieceAt,
-    repairPowerArmorPieceAt,
-    repairPowerArmorStack,
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
+  // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
+  // напрямую из стора (powerArmorSlice), минуя фасад useCharacter(). Имена
+  // локальные сохранены — точки вызова не менялись.
+  const equippedArmor = useCharacterStore((s) => s.equippedArmor);
+  const setEquippedArmor = useCharacterStore((s) => s.setEquippedArmor);
+  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
+  const equipPowerArmorPackage = useCharacterStore((s) => s.equipPowerArmorPackage);
+  const equipPowerArmorPiece = useCharacterStore((s) => s.equipPowerArmorPieceInto);
+  const unequipPowerArmorPackage = useCharacterStore((s) => s.unequipPowerArmorPackage);
+  const unequipPowerArmorPieceAt = useCharacterStore((s) => s.unequipPowerArmorPieceAt);
+  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
+  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
   // минуя фасад useCharacter().
   const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);

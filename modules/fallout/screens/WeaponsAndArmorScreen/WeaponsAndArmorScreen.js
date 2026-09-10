@@ -610,8 +610,6 @@ const WeaponsAndArmorScreen = () => {
   const {
     attributes,
     level,
-    equippedArmor: contextEquippedArmor,
-    setEquippedArmor,
     equippedRobotSlots,
     setEquippedRobotSlots,
     saveModifiedItem,
@@ -619,10 +617,6 @@ const WeaponsAndArmorScreen = () => {
     trait,
     origin,
     radiation,
-    // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
-    // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
-    equippedPowerArmor,
-    adjustPowerArmorDurability,
   } = useCharacter();
 
   // Выживание — поле расширения сеттинга (modules/fallout/survival/):
@@ -633,6 +627,13 @@ const WeaponsAndArmorScreen = () => {
   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
   const storeEquippedArmor = useMemo(() => getEquippedArmor({ items: storeItems }), [storeItems]);
+  // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
+  // напрямую из стора (powerArmorSlice), минуя фасад useCharacter().
+  // equippedArmorState — слайс надетой брони (в merged equippedArmor ниже).
+  const equippedArmorState = useCharacterStore((s) => s.equippedArmor);
+  const setEquippedArmor = useCharacterStore((s) => s.setEquippedArmor);
+  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
+  const adjustPowerArmorDurability = useCharacterStore((s) => s.adjustPowerArmorDurability);
   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора
   // (метаданные кулаков/манипуляторов дополняют items с equipped: true).
   const equippedWeaponsMeta = useCharacterStore((s) => s.equippedWeapons);
@@ -663,8 +664,8 @@ const WeaponsAndArmorScreen = () => {
     const hasStoreArmor = Object.values(storeEquippedArmor).some(
       (slot) => slot.armor || slot.clothing,
     );
-    return hasStoreArmor ? storeEquippedArmor : contextEquippedArmor;
-  }, [storeEquippedArmor, contextEquippedArmor]);
+    return hasStoreArmor ? storeEquippedArmor : equippedArmorState;
+  }, [storeEquippedArmor, equippedArmorState]);
 
   const storeEffects = useCharacterStore((state) => state.effects);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
