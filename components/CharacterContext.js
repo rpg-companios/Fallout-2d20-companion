@@ -391,21 +391,24 @@ export const CharacterProvider = ({ children }) => {
   useEffect(() => { powerArmorRuntimeRef.current = powerArmorRuntime; }, [powerArmorRuntime]);
   useEffect(() => { pendingCoreChoiceRef.current = pendingCoreChoice; }, [pendingCoreChoice]);
 
-  const [caps, setCaps] = useState(0);
   const [currentHealth, setCurrentHealth] = useState(0);
   const [radiation, setRadiationRaw] = useState(0);
+
+  // Крышки: единственный источник — Zustand стор (Шаг 2 миграции из
+  // CharacterContext). earnCaps/spendCaps — стор-экшены, не локальный setState.
+  // Контекст — тонкий фасад для существующих экранов
+  // (useCharacter().caps / earnCaps / spendCaps).
+  const caps = useCharacterStore((s) => s.caps);
+  const earnCaps = useCharacterStore((s) => s.earnCaps);
+  const spendCaps = useCharacterStore((s) => s.spendCaps);
 
   // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
   // и в сейве лежит только текущее значение числом; потолок и нижняя граница
   // — вычисляемые, они собираются здесь в момент операции.
   // См. docs/architecture/counters-storage.md.
   //
-  // Крышки: потолка нет. Правило «не ниже нуля» теперь одно на все места
-  // вызова — раньше каждый экран писал свой Math.max, и при покупке
-  // (InventoryScreen) зажим забыли, из-за чего крышки уходили в минус.
-  const capsCounter = () => createCounter({ id: 'caps', current: caps, max: null });
-  const earnCaps = (amount) => setCaps(restore(capsCounter(), amount).current);
-  const spendCaps = (amount) => setCaps(consume(capsCounter(), amount).current);
+  // (Крышки мигрировали в стор — экшены earnCaps/spendCaps выше; правило
+  // «не ниже нуля» теперь живёт в стор-слайсе.)
 
   // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
   // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
@@ -1028,7 +1031,9 @@ export const CharacterProvider = ({ children }) => {
       setEquippedPowerArmor(data.equippedPowerArmor || createEmptyEquippedPowerArmor());
       setPowerArmorRuntime(data.powerArmorRuntime || createEmptyPowerArmorRuntime());
       setPendingCoreChoice(null);
-      setCaps(data.caps ?? 0);
+      // Абсолютная установка из сейва: инкрементальные earnCaps/spendCaps
+      // для этого не годятся (Шаг 2 миграции крышек в стор).
+      useCharacterStore.getState().setCaps(data.caps ?? 0);
       setCurrentHealth(data.currentHealth ?? 0);
       setRadiationRaw(Math.max(0, data.radiation ?? 0));
       setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
@@ -1762,7 +1767,7 @@ export const CharacterProvider = ({ children }) => {
     setEquippedPowerArmor(createEmptyEquippedPowerArmor());
     setPowerArmorRuntime(createEmptyPowerArmorRuntime());
     setPendingCoreChoice(null);
-    setCaps(0);
+    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
     setSelectedPerks([]);
     setConditions([]);
     setChemDosesLog([]);
@@ -1794,7 +1799,7 @@ export const CharacterProvider = ({ children }) => {
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
     setEquippedArmor(createEmptyEquippedArmor());
-    setCaps(0);
+    // Крышки обнуляет resetCharacterStore (слайс caps, Шаг 2 миграции).
     // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
     const { attributes: legacyAttributes, skills: legacySkills } =
       denormalizeCharacterState(useCharacterStore.getState());

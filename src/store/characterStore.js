@@ -60,6 +60,9 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+// Каунтеры ресурсов (domain/counters.js): крышки — число с нижней границей 0
+// без потолка. Тот же паттерн, что раньше жил в CharacterContext.
+import { createCounter, consume, restore } from '../../domain/counters';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -215,6 +218,10 @@ const useCharacterStore = create(devtools(
       // из useState в CharacterContext. Мутации — только через setEquipment
       // (поддерживает и функциональный апдейтер prev => next).
       equipment: null,
+      // Крышки персонажа: ресурс без верхней границы, не ниже нуля
+      // (мигрировано из CharacterContext, Шаг 2). Мутации — только через
+      // earnCaps / spendCaps / setCaps.
+      caps: 0,
       selectedPerks: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
@@ -1027,6 +1034,28 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Крышки персонажа: ресурс без верхней границы, не ниже нуля
+       * (domain/counters.js — тот же паттерн, что и раньше в CharacterContext).
+       */
+      earnCaps: (amount) => {
+        const state = get();
+        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
+        set({ caps: restore(counter, amount).current });
+      },
+
+      spendCaps: (amount) => {
+        const state = get();
+        const counter = createCounter({ id: 'caps', current: state.caps, max: null });
+        set({ caps: consume(counter, amount).current });
+      },
+
+      /**
+       * Абсолютная установка крышек (восстановление из сейва). Инкрементальные
+       * earnCaps/spendCaps для этого не годятся.
+       */
+      setCaps: (amount) => set({ caps: Math.max(0, Number(amount) || 0) }),
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1048,6 +1077,7 @@ const useCharacterStore = create(devtools(
           perkBonuses: {},
           derivedStats: {},
           equipment: null,
+          caps: 0,
           _characterContext: undefined,
           ...createInitialRobotState(),
         });
@@ -1099,6 +1129,7 @@ const useCharacterStore = create(devtools(
         robot: state.robot,
         stateExtensions: state.stateExtensions,
         equipment: state.equipment,
+        caps: state.caps,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated
