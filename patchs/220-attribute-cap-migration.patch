@@ -1,0 +1,391 @@
+From 76fa30113d2a727539323bd6895fe2e6a4f56190 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Thu, 10 Sep 2026 06:36:45 +0000
+Subject: =?UTF-8?q?=D0=BF=D0=B0=D1=82=D1=87=20220:=20=D0=BC=D0=B8=D0=B3?=
+ =?UTF-8?q?=D1=80=D0=B0=D1=86=D0=B8=D1=8F=20v25=E2=86=92v26=20=E2=80=94=20?=
+ =?UTF-8?q?=D0=BA=D0=BB=D0=B0=D0=BC=D0=BF=20=D0=B7=D0=B0=D0=B2=D1=8B=D1=88?=
+ =?UTF-8?q?=D0=B5=D0=BD=D0=BD=D1=8B=D1=85=20=D0=B1=D0=B0=D0=B7=20=D0=B0?=
+ =?UTF-8?q?=D1=82=D1=80=D0=B8=D0=B1=D1=83=D1=82=D0=BE=D0=B2=20=D0=BA=20?=
+ =?UTF-8?q?=D0=BF=D0=BE=D1=82=D0=BE=D0=BB=D0=BA=D1=83=20=D1=87=D0=B5=D1=80?=
+ =?UTF-8?q?=D1=82=D1=8B=20(=D1=80=D0=B5=D0=BC=D0=BE=D0=BD=D1=82=20=D1=81?=
+ =?UTF-8?q?=D0=B5=D0=B9=D0=B2=D0=BE=D0=B2=20=D0=BF=D0=BE=D1=81=D0=BB=D0=B5?=
+ =?UTF-8?q?=20=D0=B4=D0=B5=D1=84=D0=B5=D0=BA=D1=82=D0=B0=20219)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                        |   3 +
+ .../perks/attribute-cap-migration.test.js     | 104 ++++++++++++++++++
+ .../robot/robot-arm-attachment-mode.test.js   |   4 +-
+ .../saves/character-folder-knowledge.test.js  |  10 +-
+ __tests__/saves/disease-ranks.test.js         |   4 +-
+ __tests__/survival/survival-migration.test.js |   8 +-
+ docs/architecture/zustand-diagnosis.md        |   5 +
+ modules/fallout/perks/migration.js            |  65 +++++++++++
+ src/store/migrations.js                       |   5 +
+ src/store/saveSchema.js                       |   7 +-
+ 10 files changed, 201 insertions(+), 14 deletions(-)
+ create mode 100644 __tests__/perks/attribute-cap-migration.test.js
+ create mode 100644 modules/fallout/perks/migration.js
+
+diff --git a/App.js b/App.js
+index c7c72a3..cae03ab 100644
+--- a/App.js
++++ b/App.js
+@@ -36,6 +36,9 @@ import './modules/fallout/survival';
+ // Болезни: миграция v24→v25 (ранги на эффектах болезней из каталога,
+ // патч 215) — та же точка регистрации, см. modules/fallout/diseases/migration.js.
+ import './modules/fallout/diseases/migration';
++// Миграция починки завышенных атрибутов (патч 220) — регистрируется тем же
++// образом, см. modules/fallout/perks/migration.js.
++import './modules/fallout/perks/migration';
+ import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
+ import useAppSettingsStore, {
+   selectBootScreenEnabled,
+diff --git a/__tests__/perks/attribute-cap-migration.test.js b/__tests__/perks/attribute-cap-migration.test.js
+new file mode 100644
+index 0000000..9d09571
+--- /dev/null
++++ b/__tests__/perks/attribute-cap-migration.test.js
+@@ -0,0 +1,104 @@
++// __tests__/perks/attribute-cap-migration.test.js
++//
++// Патч 220: починка сейвов с завышенными базами атрибутов. Дефект патча 219
++// (до починки) задваивал прибавку «Интенсивных тренировок»: ловкость 8 + два
++// ранга давали 11 вместо 10. Миграция v25 -> v26 клампит базу к потолку
++// черты из ДАННЫХ (modules/fallout/data/traits/traits.json).
++
++import { describe, expect, it } from 'vitest';
++import { migrateAttributeCaps } from '../../modules/fallout/perks/migration';
++// Регистрация в цепочку движка — side-effect импорта модуля (как в App.js).
++import '../../modules/fallout/perks/migration';
++import { migrateCharacterState } from '../../src/store/migrations';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++
++const attributes = (values) => Object.entries(values).map(([name, value]) => ({ name, value }));
++
++describe('migrateAttributeCaps (патч 220)', () => {
++  it('ловкость 11 при обычной черте клампится к 10', () => {
++    const state = {
++      trait: { id: 'brotherhood-chain-that-binds', name: 'Цепь, что связывает' },
++      attributes: attributes({ STR: 5, AGI: 11, LCK: 4 }),
++    };
++    const next = migrateAttributeCaps(state);
++    expect(next.attributes.find((a) => a.name === 'AGI').value).toBe(10);
++    expect(next.attributes.find((a) => a.name === 'STR').value).toBe(5);
++    expect(next.attributes.find((a) => a.name === 'LCK').value).toBe(4);
++  });
++
++  it('супермутант: СИЛ 11 законен (потолок 12), ХАР 7 и ИНТ 7 клампятся к 6', () => {
++    const state = {
++      trait: { id: 'supermutant-forced-evolution', name: 'Forced Evolution' },
++      attributes: attributes({ STR: 11, END: 6, CHA: 7, INT: 7 }),
++    };
++    const next = migrateAttributeCaps(state);
++    expect(next.attributes.find((a) => a.name === 'STR').value).toBe(11);
++    expect(next.attributes.find((a) => a.name === 'CHA').value).toBe(6);
++    expect(next.attributes.find((a) => a.name === 'INT').value).toBe(6);
++  });
++
++  it('тень: СИЛ 11 законен, ХАР 9 клампится к 8', () => {
++    const state = {
++      trait: { id: 'shadow', name: 'Shadow' },
++      attributes: attributes({ STR: 11, CHA: 9 }),
++    };
++    const next = migrateAttributeCaps(state);
++    expect(next.attributes.find((a) => a.name === 'STR').value).toBe(11);
++    expect(next.attributes.find((a) => a.name === 'CHA').value).toBe(8);
++  });
++
++  it('первичный id мульти-трейта берётся из ids[0]', () => {
++    const state = {
++      trait: { ids: ['shadow', 'survivor'], id: 'shadow', name: 'Тень' },
++      attributes: attributes({ CHA: 9 }),
++    };
++    expect(migrateAttributeCaps(state).attributes[0].value).toBe(8);
++  });
++
++  it('неизвестная черта — состояние не трогаем', () => {
++    const state = {
++      trait: { id: 'no-such-trait', name: '?' },
++      attributes: attributes({ AGI: 11 }),
++    };
++    expect(migrateAttributeCaps(state)).toBe(state);
++  });
++
++  it('идемпотентна: повторный прогон не меняет уже клампнутое', () => {
++    const state = {
++      trait: { id: 'shadow', name: 'Shadow' },
++      attributes: attributes({ CHA: 8, AGI: 10 }),
++    };
++    expect(migrateAttributeCaps(state)).toBe(state);
++    const inflated = migrateAttributeCaps({
++      trait: { id: 'shadow', name: 'Shadow' },
++      attributes: attributes({ CHA: 12 }),
++    });
++    expect(migrateAttributeCaps(inflated)).toBe(inflated);
++  });
++
++  it('в цепочке движка: сейв v25 с ЛОВ 11 мигрирует в v26 с ЛОВ 10', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(26);
++    const migrated = migrateCharacterState({
++      schemaVersion: 25,
++      trait: { id: 'shadow', name: 'Shadow' },
++      attributes: attributes({ STR: 5, CHA: 9, AGI: 11 }),
++      skills: [],
++      selectedSkills: [],
++    });
++    expect(migrated.schemaVersion).toBe(26);
++    expect(migrated.attributes.find((a) => a.name === 'AGI').value).toBe(10);
++    expect(migrated.attributes.find((a) => a.name === 'CHA').value).toBe(8);
++    expect(migrated.attributes.find((a) => a.name === 'STR').value).toBe(5);
++  });
++
++  it('мусорный вход не роняет: без массива атрибутов — как есть', () => {
++    expect(migrateAttributeCaps(null)).toBe(null);
++    expect(migrateAttributeCaps({})).toEqual({});
++    expect(migrateAttributeCaps({ trait: { id: 'shadow' } })).toEqual({ trait: { id: 'shadow' } });
++    const state = {
++      trait: { id: 'shadow' },
++      attributes: [null, { value: 12 }, { name: 'CHA', value: 'не число' }],
++    };
++    expect(migrateAttributeCaps(state)).toBe(state);
++  });
++});
+diff --git a/__tests__/robot/robot-arm-attachment-mode.test.js b/__tests__/robot/robot-arm-attachment-mode.test.js
+index ca5892e..6984347 100644
+--- a/__tests__/robot/robot-arm-attachment-mode.test.js
++++ b/__tests__/robot/robot-arm-attachment-mode.test.js
+@@ -226,8 +226,8 @@ describe('патч 191: навес — оружие на руке, а не ко
+     expect(migrated.equippedRobotSlots.leftArm.heldWeapon).toMatchObject({ id: 'robot_weapon_drill' });
+   });
+ 
+-  it('версия схемы — 25 (v22 навесы, v23 выживание, v24 каталог, v25 болезни)', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(25);
++  it('версия схемы — 26 (v22 навесы, v23 выживание, v24 каталог, v25 болезни, v26 починка атрибутов)', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(26);
+   });
+ 
+   // ------------------------------------------------------------------ настройка
+diff --git a/__tests__/saves/character-folder-knowledge.test.js b/__tests__/saves/character-folder-knowledge.test.js
+index ffeeeb4..3c53924 100644
+--- a/__tests__/saves/character-folder-knowledge.test.js
++++ b/__tests__/saves/character-folder-knowledge.test.js
+@@ -104,8 +104,8 @@ describe('characterFolders: наложение при записи (overlayFolde
+ });
+ 
+ describe('characterFolders: схема v25 и миграция', () => {
+-  it('текущая версия схемы — 25', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(25);
++  it('текущая версия схемы — 26', () => {
++    expect(CURRENT_SCHEMA_VERSION).toBe(26);
+   });
+ 
+   it('миграция v23→v24 идентична: поле folder проходит без изменений', () => {
+@@ -115,7 +115,7 @@ describe('characterFolders: схема v25 и миграция', () => {
+       folder: { id: 'folder_a', name: 'Рейдеры' },
+     };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(26);
+     expect(out.folder).toEqual({ id: 'folder_a', name: 'Рейдеры' });
+     expect(out.characterName).toBe('Курьер');
+   });
+@@ -123,14 +123,14 @@ describe('characterFolders: схема v25 и миграция', () => {
+   it('старый сейв без folder мигрирует без поля (корневой список)', () => {
+     const v23 = { schemaVersion: 23, characterName: 'Курьер' };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(26);
+     expect(Object.hasOwn(out, 'folder')).toBe(false);
+   });
+ 
+   it('сейв с folder: null остаётся null (явный корневой список)', () => {
+     const v23 = { schemaVersion: 23, characterName: 'Курьер', folder: null };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(26);
+     expect(out.folder).toBeNull();
+   });
+ });
+diff --git a/__tests__/saves/disease-ranks.test.js b/__tests__/saves/disease-ranks.test.js
+index 2a1bfd7..23da779 100644
+--- a/__tests__/saves/disease-ranks.test.js
++++ b/__tests__/saves/disease-ranks.test.js
+@@ -261,7 +261,7 @@ describe('болезни: миграция v24 → v25 (ранги из ката
+     expect(migrateDiseaseRanks(once)).toEqual(once);
+   });
+ 
+-  it('полная цепочка migrateCharacterState доводит сейв до v25', () => {
++  it('полная цепочка migrateCharacterState доводит сейв до v26', () => {
+     const v23 = {
+       schemaVersion: 23,
+       characterName: 'Курьер',
+@@ -270,7 +270,7 @@ describe('болезни: миграция v24 → v25 (ранги из ката
+       ],
+     };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(26);
+     expect(out.activeTimedEffects[0].rank).toBe(4);
+   });
+ });
+diff --git a/__tests__/survival/survival-migration.test.js b/__tests__/survival/survival-migration.test.js
+index 13f98fa..4ad721b 100644
+--- a/__tests__/survival/survival-migration.test.js
++++ b/__tests__/survival/survival-migration.test.js
+@@ -21,8 +21,8 @@ const maxState = () => ({
+ });
+ 
+ describe('survival: миграция v22 → v23', () => {
+-    it('версия схемы — 25 (поле выживания добавляется переходом v22→v23)', () => {
+-        expect(CURRENT_SCHEMA_VERSION).toBe(25);
++    it('версия схемы — 26 (поле выживания добавляется переходом v22→v23)', () => {
++        expect(CURRENT_SCHEMA_VERSION).toBe(26);
+     });
+ 
+     it.each([
+@@ -32,7 +32,7 @@ describe('survival: миграция v22 → v23', () => {
+         ['shadow', 'mutant'],
+     ])('органику %s (%s) — начальные максимумы', (originId) => {
+         const out = migrateCharacterState(v22({ id: originId }));
+-        expect(out.schemaVersion).toBe(25);
++        expect(out.schemaVersion).toBe(26);
+         expect(out.survival).toEqual(maxState());
+     });
+ 
+@@ -42,7 +42,7 @@ describe('survival: миграция v22 → v23', () => {
+         ['synth', 'cyborg'],
+     ])('роботу/киборгу %s (%s) — null, шкал нет', (originId) => {
+         const out = migrateCharacterState(v22({ id: originId }));
+-        expect(out.schemaVersion).toBe(25);
++        expect(out.schemaVersion).toBe(26);
+         expect(out.survival).toBeNull();
+     });
+ 
+diff --git a/docs/architecture/zustand-diagnosis.md b/docs/architecture/zustand-diagnosis.md
+index d34c192..d418a65 100644
+--- a/docs/architecture/zustand-diagnosis.md
++++ b/docs/architecture/zustand-diagnosis.md
+@@ -129,6 +129,11 @@ Store: `attributes` = dict `{ STR: {base, modifiers, total} }`.
+ (`domain/perkAttributeChanges`), а контекст синхронизируется в том же коммите.
+ Полный перевод атрибутов во владение стора остаётся отдельной работой.
+ 
++**Статус (патч 220):** сейвы, успевшие записать надутое значение (ловкость 11),
++чинит миграция v25 -> v26: базы атрибутов клампятся к потолку черты из данных
++(`modules/fallout/perks/migration.js`, лимиты — traits.json; супермутант/тень
++сохраняют свои повышенные потолки). Идемпотентна, старые сейвы совместимы.
++
+ ---
+ 
+ ## Рекомендованный порядок работ
+diff --git a/modules/fallout/perks/migration.js b/modules/fallout/perks/migration.js
+new file mode 100644
+index 0000000..d7f7249
+--- /dev/null
++++ b/modules/fallout/perks/migration.js
+@@ -0,0 +1,65 @@
++// Перки — модуль сеттинга Fallout (патч 220).
++//
++// Регистрирует сеттинговую миграцию v25 -> v26: починка завышенных баз
++// атрибутов из старых сейвов. Дефект патча 219 (до починки) задваивал
++// прибавку очков перков: два ранга «Интенсивных тренировок» давали +1 и +2,
++// и атрибут уезжал выше потолка (ловкость 11 при лимите 10).
++//
++// Миграция клампит базу атрибута к потолку черты из ДАННЫХ (лимиты черт
++// traits.json — единый источник, та же логика, что в domain/characterCreation
++// getAttributeLimits), не трогая значения в пределах лимитов. Идемпотентна:
++// повторный прогон ничего не меняет, атрибуты без превышения проходят как
++// есть. Неизвестная черта в сейве — ничего не додумываем, состояние
++// сохраняется без изменений.
++//
++// Импорт этого модуля — side-effect регистрации (App.js импортирует его
++// до монтирования CharacterProvider, рядом с modules/fallout/diseases/migration).
++
++import traitsFile from '../data/traits/traits.json';
++import { registerStateMigration } from '../../../src/store/stateExtensions';
++
++const DEFAULT_ATTRIBUTE_MAX = 10;
++
++const TRAITS = Array.isArray(traitsFile) ? traitsFile : [];
++
++const byId = new Map(TRAITS.map((trait) => [trait.id, trait]));
++
++// Потолок атрибута для черты: явный per-attribute лимит (modifiers.attributes)
++// сильнее словаря maxLimits; без явных лимитов — общий потолок 10.
++const attributeMaxForTrait = (trait, attributeCode) => {
++  const modifiers = trait?.modifiers || {};
++  const attrEntry = modifiers.attributes?.[attributeCode];
++  if (attrEntry && Number.isFinite(attrEntry.max)) return attrEntry.max;
++  const maxLimit = modifiers.maxLimits?.[attributeCode];
++  if (Number.isFinite(maxLimit)) return maxLimit;
++  return DEFAULT_ATTRIBUTE_MAX;
++};
++
++/**
++ * v25 -> v26: базы атрибутов выше потолка черты клампятся к потолку.
++ * Идемпотентна; изменяет только value у превысивших атрибутов.
++ */
++export const migrateAttributeCaps = (state) => {
++  if (!state || typeof state !== 'object') return state;
++  if (!Array.isArray(state.attributes)) return state;
++
++  const trait = state.trait;
++  const primaryId = typeof trait === 'string' ? trait : trait?.id ?? trait?.ids?.[0];
++  const traitRecord = primaryId ? byId.get(primaryId) : null;
++  if (!traitRecord) return state; // черту не знаем — лимиты неизвестны, не трогаем
++
++  let changed = false;
++  const attributes = state.attributes.map((attr) => {
++    if (!attr || typeof attr !== 'object') return attr;
++    if (typeof attr.name !== 'string' || !attr.name) return attr;
++    if (!Number.isFinite(attr.value)) return attr;
++    const max = attributeMaxForTrait(traitRecord, attr.name);
++    if (attr.value <= max) return attr;
++    changed = true;
++    return { ...attr, value: max };
++  });
++  return changed ? { ...state, attributes } : state;
++};
++
++// Переход v25 -> v26: место в цепочке — как в патче 215 (MIGRATIONS[25]).
++registerStateMigration(migrateAttributeCaps, 25);
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index 31d8eb9..54fff72 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -1270,6 +1270,11 @@ const MIGRATIONS = [
+   // же индекс, modules/fallout/diseases/migration.js).
+   (state) => state,
+ 
++  // v25 -> v26: починка завышенных баз атрибутов (патч 220). Движковая
++  // часть идентична: кламп к потолку черты делает сетевая миграция
++  // (вставка на тот же индекс, modules/fallout/perks/migration.js).
++  (state) => state,
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 724d4dd..75cc1b2 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -76,7 +76,12 @@
+ //       сопротивляться) и ранг на эффекте болезни (поле rank). Ранг старым
+ //       сейвам проставляет сетевая миграция modules/fallout/diseases/
+ //       migration.js (по каталогу); движковая миграция версии идентична.
+-export const CURRENT_SCHEMA_VERSION = 25;
++// v26 — починка завышенных баз атрибутов (патч 220): старые сейвы, где
++//       «Интенсивные тренировки» задваивали прибавку, несут атрибут выше
++//       потолка черты. Кламп к лимитам делает сетевая миграция
++//       modules/fallout/perks/migration.js (по traits.json); движковая
++//       миграция версии идентична.
++export const CURRENT_SCHEMA_VERSION = 26;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
+-- 
+2.39.5
+

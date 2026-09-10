@@ -36,6 +36,9 @@ import './modules/fallout/survival';
 // Болезни: миграция v24→v25 (ранги на эффектах болезней из каталога,
 // патч 215) — та же точка регистрации, см. modules/fallout/diseases/migration.js.
 import './modules/fallout/diseases/migration';
+// Миграция починки завышенных атрибутов (патч 220) — регистрируется тем же
+// образом, см. modules/fallout/perks/migration.js.
+import './modules/fallout/perks/migration';
 import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
 import useAppSettingsStore, {
   selectBootScreenEnabled,

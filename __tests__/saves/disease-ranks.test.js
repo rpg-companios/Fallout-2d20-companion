@@ -261,7 +261,7 @@ describe('болезни: миграция v24 → v25 (ранги из ката
     expect(migrateDiseaseRanks(once)).toEqual(once);
   });
 
-  it('полная цепочка migrateCharacterState доводит сейв до v25', () => {
+  it('полная цепочка migrateCharacterState доводит сейв до v26', () => {
     const v23 = {
       schemaVersion: 23,
       characterName: 'Курьер',
@@ -270,7 +270,7 @@ describe('болезни: миграция v24 → v25 (ранги из ката
       ],
     };
     const out = migrateCharacterState(v23);
-    expect(out.schemaVersion).toBe(25);
+    expect(out.schemaVersion).toBe(26);
     expect(out.activeTimedEffects[0].rank).toBe(4);
   });
 });
