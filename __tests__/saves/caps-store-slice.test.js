@@ -7,7 +7,9 @@
 // Покрывает:
 //  - начальное значение 0;
 //  - earnCaps прибавляет (restore: отрицательные/мусорные суммы игнорируются);
-//  - spendCaps зажимается на нуле — consume не даёт ресурсу уйти в минус;
+//  - spendCaps транзакционный: перерасход ОТКЛОНЯЕТСЯ ({ok:false}), баланс
+//    не меняется — «купить на больше, чем есть» невозможно ни по одному
+//    пути вызова (контракт spendAmmoForWeapon);
 //  - setCaps — абсолютная установка при загрузке сейва (в т.ч. мусор → 0);
 //  - персист: caps входит в partialize и переживает rehydrate;
 //  - сброс через resetCharacterStore → 0.
@@ -37,15 +39,32 @@ describe('characterStore: слайс caps', () => {
     expect(useCharacterStore.getState().caps).toBe(50);
   });
 
-  it('spendCaps списывает и не уходит в минус при недостатке крышек', () => {
+  it('spendCaps отклоняет перерасход: баланс не меняется, ok: false', () => {
     const store = useCharacterStore.getState();
     store.setCaps(10);
     store.spendCaps(4);
     expect(useCharacterStore.getState().caps).toBe(6);
-    // Ключевой кейс: списание больше остатка зажимается на нижней границе
-    // (consume → clampToBounds → min 0), а не даёт отрицательное число.
-    store.spendCaps(999);
+    // Ключевой кейс инварианта «нельзя списать больше, чем есть»: списание
+    // больше остатка отклоняется (как spendAmmoForWeapon), баланс НЕ тронут —
+    // ни зажима на 0, ни ухода в минус.
+    const rejected = store.spendCaps(999);
+    expect(rejected).toEqual({ ok: false, reason: 'not-enough-caps' });
+    expect(useCharacterStore.getState().caps).toBe(6);
+    // Точная сумма проходит.
+    expect(store.spendCaps(6)).toEqual({ ok: true });
     expect(useCharacterStore.getState().caps).toBe(0);
+  });
+
+  it('spendCaps: нулевая сумма — ok (бесплатная покупка), отрицательная — no-op без изменений', () => {
+    const store = useCharacterStore.getState();
+    store.setCaps(10);
+    // Бесплатная покупка (цена 0): валидна, баланс не меняется.
+    expect(store.spendCaps(0)).toEqual({ ok: true });
+    expect(useCharacterStore.getState().caps).toBe(10);
+    // «Списать минус пять» — ошибка вызывающего, а не скрытое восполнение:
+    // no-op, баланс прежний.
+    expect(store.spendCaps(-5)).toEqual({ ok: true });
+    expect(useCharacterStore.getState().caps).toBe(10);
   });
 
   it('setCaps ставит абсолютное значение (загрузка сейва), мусор → 0', () => {

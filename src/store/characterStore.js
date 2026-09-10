@@ -62,7 +62,7 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 // Каунтеры ресурсов (domain/counters.js): крышки — число с нижней границей 0
 // без потолка. Тот же паттерн, что раньше жил в CharacterContext.
-import { createCounter, consume, restore } from '../../domain/counters';
+import { createCounter, consume, restore, canConsume } from '../../domain/counters';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -1043,10 +1043,23 @@ const useCharacterStore = create(devtools(
         set({ caps: restore(counter, amount).current });
       },
 
+      /**
+       * Списать крышки. Транзакционно: если amount больше остатка, списание
+       * ОТКЛОНЯЕТСЯ ({ ok: false, reason: 'not-enough-caps' }), баланс не
+       * меняется — покупка «в долг» невозможна ни по одному пути вызова
+       * (тот же контракт, что у spendAmmoForWeapon). Нулевой/отрицательный
+       * amount — no-op с { ok: true } (бесплатная покупка / «списать минус
+       * пять» — ошибка вызывающего, а не скрытое восполнение).
+       */
       spendCaps: (amount) => {
         const state = get();
         const counter = createCounter({ id: 'caps', current: state.caps, max: null });
+        if (!canConsume(counter, amount)) {
+          debugLog('store.caps.insufficient', { current: state.caps, amount });
+          return { ok: false, reason: 'not-enough-caps' };
+        }
         set({ caps: consume(counter, amount).current });
+        return { ok: true };
       },
 
       /**

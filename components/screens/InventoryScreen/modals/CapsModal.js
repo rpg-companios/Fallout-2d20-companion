@@ -1,17 +1,29 @@
 import React, { useState } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { showRawAlert } from '../../../alerts/alertService';
-import { tInventory } from '../logic/inventoryI18n';
+import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
 import { useLocale } from '../../../../i18n/locale';
 
-const CapsModal = ({ visible, onClose, onSave, operationType }) => {
+const CapsModal = ({ visible, onClose, onSave, operationType, caps = 0 }) => {
   useLocale();
   const [amount, setAmount] = useState('');
 
   const handleSave = () => {
     const numericAmount = parseInt(amount, 10);
     if (!isNaN(numericAmount) && numericAmount > 0) {
-      onSave(numericAmount);
+      const result = onSave(numericAmount);
+      // Списание транзакционное: стор отклонил «вычесть больше, чем есть» —
+      // показываем алерт и оставляем модал открытым (баланс не тронут).
+      if (result && result.ok === false) {
+        showRawAlert({
+          title: tInventory('modals.capsModal.notEnoughCapsTitle'),
+          message: formatInventoryText(tInventory('modals.capsModal.notEnoughCapsMessage'), {
+            amount: numericAmount,
+            caps,
+          }),
+        });
+        return;
+      }
       setAmount('');
       onClose();
     } else {

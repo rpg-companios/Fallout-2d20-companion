@@ -606,7 +606,17 @@ const InventoryScreen = () => {
 
   const handleConfirmBuy = (quantity, unitPrice) => {
     const finalCost = quantity * unitPrice;
-    spendCaps(finalCost);
+    // Списание атомарно (инвариант стора «нельзя купить на больше, чем
+    // есть»): при отказе предмет НЕ выдаётся. Модалка уже проверяет баланс —
+    // это вторая линия на случай иного пути вызова.
+    const result = spendCaps(finalCost);
+    if (!result.ok) {
+      showAlert(
+        tInventory('modals.buyItemModal.notEnoughCapsTitle'),
+        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps }),
+      );
+      return;
+    }
     handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
     setIsBuyItemModalVisible(false);
     setSelectedItemForBuy(null);
@@ -1769,6 +1779,7 @@ const InventoryScreen = () => {
           onClose={() => setIsCapsModalVisible(false)}
           onSave={handleSaveCaps}
           operationType={capsOperationType}
+          caps={caps}
         />
         <SellItemModal
             visible={isSellModalVisible}

@@ -619,7 +619,15 @@ export default function CharacterScreen() {
     items.forEach((item) => {
       useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
     });
-    if (spent > 0) spendCaps(spent);
+    if (spent > 0) {
+      // Корзина структурно не даёт перерасхода (canAfford в startingPurchase),
+      // так что отказ возможен только при рассинхроне — логируем. Предметы
+      // всё равно выдаются: это выдача комплекта создания, а не сделка.
+      const result = spendCaps(spent);
+      if (!result.ok) {
+        debugLog('kits.purchase.spendRejected', { spent, reason: result.reason });
+      }
+    }
   };
 
   const handleToggleSkill = (skillName) => {
