@@ -210,6 +210,11 @@ const useCharacterStore = create(devtools(
       // селекторами. В сейв поля идут под своими ключами верхнего уровня
       // (buildSnapshot контекста раскладывает словарь).
       stateExtensions: {},
+      // Комплект снаряжения { id, name, weight, price, items,
+      // purchaseMaxRarity } | null — единственный источник истины, мигрирован
+      // из useState в CharacterContext. Мутации — только через setEquipment
+      // (поддерживает и функциональный апдейтер prev => next).
+      equipment: null,
       selectedPerks: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
@@ -1010,6 +1015,18 @@ const useCharacterStore = create(devtools(
       })),
 
       /**
+       * Комплект снаряжения персонажа: { id, name, weight, price, items,
+       * purchaseMaxRarity } | null. Единственный источник — стор (мигрировано
+       * из CharacterContext). Поддерживает функциональный апдейтер (prev => next)
+       * для обратной совместимости с существующими вызовами.
+       */
+      setEquipment: (updater) => {
+        set((state) => ({
+          equipment: typeof updater === 'function' ? updater(state.equipment) : updater,
+        }));
+      },
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1030,6 +1047,7 @@ const useCharacterStore = create(devtools(
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
           derivedStats: {},
+          equipment: null,
           _characterContext: undefined,
           ...createInitialRobotState(),
         });
@@ -1080,6 +1098,7 @@ const useCharacterStore = create(devtools(
         rewardedSkills: state.rewardedSkills,
         robot: state.robot,
         stateExtensions: state.stateExtensions,
+        equipment: state.equipment,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

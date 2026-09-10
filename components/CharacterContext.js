@@ -114,7 +114,7 @@ import { Platform } from 'react-native';
 
 // Zustand Store integration (Task 4.1)
 import useCharacterStore from '../src/store/characterStore';
-import { denormalizeCharacterState, migrateCharacterState, mergeEquipmentWithStore, mergeEquippedWeapons } from '../src/store/migrations.js';
+import { denormalizeCharacterState, migrateCharacterState, mergeEquippedWeapons } from '../src/store/migrations.js';
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/saveSchema.js';
 import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
 
@@ -270,7 +270,6 @@ const mergeSnapshotWithStoreData = (snapshot) => {
     ...snapshot,
     attributes: preferFilled(legacyData.attributes, snapshot.attributes),
     skills: preferFilled(legacyData.skills, snapshot.skills),
-    equipment: mergeEquipmentWithStore(snapshot.equipment, legacyData.equipment),
     equippedWeapons: mergeEquippedWeapons(snapshot.equippedWeapons, legacyData.equippedWeapons),
     activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
     rewardedSkills: legacyData.rewardedSkills,
@@ -290,7 +289,6 @@ export const CharacterProvider = ({ children }) => {
   const [forcedSelectedSkills, setForcedSelectedSkills] = useState([]);
   const [origin, setOrigin] = useState(null);
   const [trait, setTrait] = useState(null);
-  const [equipment, setEquipment] = useState(null);
   const [effects, setEffects] = useState([]);
   const [activeTimedEffects, setActiveTimedEffects] = useState([]);
   const [sceneCounter, setSceneCounter] = useState(0);
@@ -305,6 +303,12 @@ export const CharacterProvider = ({ children }) => {
   // мутации — только действия стора. Контекст читает слайс селектором и
   // раскладывает его в снапшот сейва под теми же ключами.
   const stateExtensions = useCharacterStore((s) => s.stateExtensions);
+
+  // Комплект снаряжения: единственный источник — Zustand стор (Шаг 1 миграции
+  // из CharacterContext). Context — тонкий фасад для обратной совместимости
+  // существующих экранов (useCharacter().equipment / setEquipment).
+  const equipment = useCharacterStore((s) => s.equipment);
+  const setEquipment = useCharacterStore((s) => s.setEquipment);
 
   // Новый персонаж: как только выбран ориджин — сеттинговые фабрики
   // заполняют ещё не созданные поля (null = «не создано»). При загрузке
