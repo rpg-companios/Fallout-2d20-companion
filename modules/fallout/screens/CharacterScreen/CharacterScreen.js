@@ -300,7 +300,6 @@ export default function CharacterScreen() {
     resetKitAndRewards,
     availablePerkAttributePoints,
     commitAttributeChanges,
-    setEquippedWeapons,
     setEquippedRobotSlots,
     setEquippedRobotModules,
     equippedPowerArmor,
@@ -310,6 +309,9 @@ export default function CharacterScreen() {
   const moduleLocale = useModuleLocale();
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
+  // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
+  // (фасад useCharacter() это поле больше не отдаёт).
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   const storeEffects = useCharacterStore((state) => state.effects);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);

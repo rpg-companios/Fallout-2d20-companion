@@ -610,8 +610,6 @@ const WeaponsAndArmorScreen = () => {
   const {
     attributes,
     level,
-    equippedWeapons: contextEquippedWeapons,
-    setEquippedWeapons,
     equippedArmor: contextEquippedArmor,
     setEquippedArmor,
     equippedRobotSlots,
@@ -635,6 +633,10 @@ const WeaponsAndArmorScreen = () => {
   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
   const storeEquippedArmor = useMemo(() => getEquippedArmor({ items: storeItems }), [storeItems]);
+  // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора
+  // (метаданные кулаков/манипуляторов дополняют items с equipped: true).
+  const equippedWeaponsMeta = useCharacterStore((s) => s.equippedWeapons);
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const unequipItem = useCharacterStore((state) => state.unequipItem);
 
@@ -649,13 +651,13 @@ const WeaponsAndArmorScreen = () => {
     // источник. Люди: встроенные кулаки — в контекстном списке (как было).
     const robotExtras = isRobot
       ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
-      : (contextEquippedWeapons || []).filter(
+      : (equippedWeaponsMeta || []).filter(
           (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
         );
     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id));
     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id));
     return [...fromStore, ...extras];
-  }, [storeEquippedWeapons, contextEquippedWeapons, isRobot, equippedRobotSlots]);
+  }, [storeEquippedWeapons, equippedWeaponsMeta, isRobot, equippedRobotSlots]);
 
   const equippedArmor = useMemo(() => {
     const hasStoreArmor = Object.values(storeEquippedArmor).some(

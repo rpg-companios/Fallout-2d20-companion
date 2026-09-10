@@ -292,7 +292,6 @@ export const CharacterProvider = ({ children }) => {
   const [effects, setEffects] = useState([]);
   const [activeTimedEffects, setActiveTimedEffects] = useState([]);
   const [sceneCounter, setSceneCounter] = useState(0);
-  const [equippedWeapons, setEquippedWeapons] = useState([]);
   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
   // Расширения состояния персонажа (src/store/stateExtensions.js): поля сейва,
@@ -407,6 +406,12 @@ export const CharacterProvider = ({ children }) => {
   const earnCurrency = useCharacterStore((s) => s.earnCurrency);
   /** @type {(amount: number) => import('../domain/types').SpendOutcome} */
   const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+
+  // Надетое оружие (метаданные): единственный источник — Zustand стор
+  // (Шаг 3 миграции). Экраны читают/пишут стор НАПРЯМОУЮ (селектор/экшен
+  // useCharacterStore), фасад это поле больше не отдаёт; контекст держит
+  // подписку только ради buildSnapshot/автосейва.
+  const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
 
   // Ресурсы персонажа — движковые каунтеры (domain/counters.js). В состоянии
   // и в сейве лежит только текущее значение числом; потолок и нижняя граница
@@ -1022,7 +1027,7 @@ export const CharacterProvider = ({ children }) => {
       if (builtin && !migratedWeapons.some(w => w?.id === builtin.id)) {
         migratedWeapons = [builtin, ...migratedWeapons];
       }
-      setEquippedWeapons(migratedWeapons);
+      useCharacterStore.getState().setEquippedWeapons(migratedWeapons);
       // Seed the store's robot body plan first so derived carry-weight resolves
       // correctly, then mirror slots/modules through the wrapped setters.
       useCharacterStore.getState().loadRobotState({
@@ -1762,7 +1767,8 @@ export const CharacterProvider = ({ children }) => {
     const emptySceneRiskStates = {};
     sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
     setSceneRiskStates(emptySceneRiskStates);
-    setEquippedWeapons([]);
+    // Список надетого оружия обнуляет resetCharacterStore (слайс
+    // equippedWeapons, Шаг 3 миграции).
     useCharacterStore.persist?.clearStorage?.();
     useCharacterStore.getState().resetCharacterStore({
       attributes: initialAttributes,
@@ -1805,7 +1811,7 @@ export const CharacterProvider = ({ children }) => {
   const resetKitAndRewards = useCallback((opts = {}) => {
     const keepSkills = Boolean(opts.keepSkills);
     setEquipment(null);
-    setEquippedWeapons([]);
+    // equippedWeapons обнуляет resetCharacterStore (Шаг 3 миграции).
     setEquippedRobotSlots(null);
     setEquippedRobotModules([]);
     setEquippedArmor(createEmptyEquippedArmor());
@@ -1859,7 +1865,6 @@ export const CharacterProvider = ({ children }) => {
     conditions, setConditions,
     chemDosesLog,
     advanceScene,
-    equippedWeapons, setEquippedWeapons,
     equippedRobotSlots, setEquippedRobotSlots,
     equippedRobotModules, setEquippedRobotModules,
     equippedArmor, setEquippedArmor,

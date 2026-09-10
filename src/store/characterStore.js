@@ -230,6 +230,12 @@ const useCharacterStore = create(devtools(
       selectedPerks: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
+      // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
+      // sourceSlot и т.п.) — «живые» предметы лежат в items (equipped: true),
+      // этот список их дополняет (Шаг 3 миграции из CharacterContext).
+      // Мутации — только через setEquippedWeapons (поддерживает и
+      // функциональный апдейтер prev => next).
+      equippedWeapons: [],
       derivedStats: {}, // Calculated derived stats
 
       perkBonuses: {},
@@ -1077,6 +1083,18 @@ const useCharacterStore = create(devtools(
       setCurrency: (amount) => set({ currency: Math.max(0, Number(amount) || 0) }),
 
       /**
+       * Список надетого оружия (метаданные: встроенные кулаки, манипуляторы,
+       * sourceSlot). Единственный источник — стор (Шаг 3 миграции из
+       * CharacterContext). Поддерживает функциональный апдейтер (prev => next)
+       * для обратной совместимости с существующими вызовами.
+       */
+      setEquippedWeapons: (updater) => {
+        set((state) => ({
+          equippedWeapons: typeof updater === 'function' ? updater(state.equippedWeapons) : updater,
+        }));
+      },
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1099,6 +1117,7 @@ const useCharacterStore = create(devtools(
           derivedStats: {},
           equipment: null,
           currency: 0,
+          equippedWeapons: [],
           _characterContext: undefined,
           ...createInitialRobotState(),
         });
@@ -1151,6 +1170,7 @@ const useCharacterStore = create(devtools(
         stateExtensions: state.stateExtensions,
         equipment: state.equipment,
         currency: state.currency,
+        equippedWeapons: state.equippedWeapons,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

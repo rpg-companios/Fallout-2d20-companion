@@ -76,7 +76,6 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 
 const InventoryScreen = () => {
   const { 
-    equippedWeapons, setEquippedWeapons, 
     equippedArmor, setEquippedArmor,
     equippedRobotSlots, setEquippedRobotSlots,
     currency, earnCurrency, spendCurrency,
@@ -98,6 +97,10 @@ const InventoryScreen = () => {
   } = useCharacter();
 
   const storeItems = useCharacterStore((state) => state.items);
+  // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
+  // минуя фасад useCharacter().
+  const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   // ОС Mk II (Секьюритрон): нерабочие ракетница/гранатомёт активируются
   // драйвером из инвентаря; флаг живёт в robot-срезе стора (персистится).
   const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);

@@ -1,3 +1,4 @@
+import useCharacterStore from '../../../../../src/store/characterStore';
 import React, { useMemo } from 'react';
 import {
   Modal,
@@ -115,8 +116,10 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
  *   onClose      {function}
  */
 const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
-  const { equippedRobotSlots, setEquippedRobotSlots, setEquippedWeapons, equipment, setEquipment } =
+  const { equippedRobotSlots, setEquippedRobotSlots, equipment, setEquipment } =
     useCharacter();
+  // Надетое оружие — Шаг 3 миграции: список пишется напрямую в стор.
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   useLocale();
   const moduleLocale = useModuleLocale();
   const equipmentCatalog = useMemo(
