@@ -1,0 +1,312 @@
+From fdd84a84eb6fea14203b88b0b17e8ed4b7d541ba Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 08:12:15 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A4=D0=B8=D0=BA=D1=81:=20=D0=B2=D0=BE=D0=B4?=
+ =?UTF-8?q?=D0=B0=20=D0=B8=D0=B7=20=D0=BA=D0=B8=D1=82=D0=BE=D0=B2=20BOS/NC?=
+ =?UTF-8?q?R=20=D0=BD=D0=B5=20=D1=81=D0=BD=D0=B8=D0=BC=D0=B0=D0=BB=D0=B0?=
+ =?UTF-8?q?=20=D0=B6=D0=B0=D0=B6=D0=B4=D1=83=20(=D0=B1=D0=B8=D1=82=D1=8B?=
+ =?UTF-8?q?=D0=B9=20itemId=20food=5Fpurified=5Fwater)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Причина (репорт владельца от 11.09): киты brotherhoodOutcast и ncr выдавали
+очищенную воду ссылкой { itemId: 'food_purified_water', itemType: 'food' } —
+предмета с таким id нет ни в одном каталоге (настоящая вода —
+'drink_purified_water', тип 'drinks'). Необогащаемый инстанс попадал в
+слушатель выживания веткой «еда»: +1 сытости, +0 воды; имя/вес/цена/лечение —
+нули. Дата-баг китов, существовал с их создания (файлы китов в миграцию
+не входили).
+
+Фикс (оба решения — от владельца):
+- данные китов: itemId → 'drink_purified_water', itemType → 'drinks'
+  (чинит новых персонажей);
+- мост канонизации при загрузке (domain/kitItemCanonical.js, по образцу
+  моста навыков 225): инстансы food_purified_water в equipment.items
+  переименовываются в настоящую воду, stackKey сбрасывается; версия схемы
+  сейва не меняется, преобразование идемпотентно (чинит старых персонажей).
+
+Тесты: kit-item-canonical (10) — мост (переименование/идемпотентность/
+не-мутирование/сквозной путь в стор) + регрессия данных китов.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/saves/kit-item-canonical.test.js    | 138 ++++++++++++++++++
+ components/CharacterContext.js                |   6 +-
+ domain/kitItemCanonical.js                    |  63 ++++++++
+ .../equipmentKits/brotherhoodOutcast.json     |   4 +-
+ modules/fallout/data/equipmentKits/ncr.json   |   4 +-
+ 5 files changed, 210 insertions(+), 5 deletions(-)
+ create mode 100644 __tests__/saves/kit-item-canonical.test.js
+ create mode 100644 domain/kitItemCanonical.js
+
+diff --git a/__tests__/saves/kit-item-canonical.test.js b/__tests__/saves/kit-item-canonical.test.js
+new file mode 100644
+index 0000000..11a9415
+--- /dev/null
++++ b/__tests__/saves/kit-item-canonical.test.js
+@@ -0,0 +1,138 @@
++// Баг-репорт владельца (2026-09-11): «выпил 4 очищенных воды — жажда осталась».
++//
++// Причина: киты brotherhoodOutcast/ncr выдавали воду битой ссылкой
++// { itemId: 'food_purified_water', itemType: 'food' } — предмета с таким id
++// нет ни в одном каталоге (настоящая — 'drink_purified_water', тип 'drinks').
++// Необогащаемый инстанс попадал в слушатель выживания веткой «еда»:
++// +1 сытости, +0 воды. Фикс: (1) данные китов указывают на настоящую воду;
++// (2) мост канонизации при загрузке переименовывает битые инстансы в инвентаре
++// старых сейвов (по образцу моста навыков, патч 225; версия схемы не меняется).
++
++import { afterEach, describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import {
++  LEGACY_KIT_ITEM_RENAMES,
++  canonizeKitItemInstance,
++  canonizeLoadedCharacterItems,
++} from '../../domain/kitItemCanonical';
++import useCharacterStore from '../../src/store/characterStore';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('kitItemCanonical: мост канонизации предметов китов', () => {
++  it('переименовывает битую воду в настоящую (id, тип)', () => {
++    const canon = canonizeKitItemInstance({ id: 'food_purified_water', itemType: 'food', quantity: 3 });
++    expect(canon).toEqual({ id: 'drink_purified_water', itemType: 'drinks', quantity: 3 });
++  });
++
++  it('сбрасывает stackKey фальшивки (подпись не должна клеиться с новой стопкой)', () => {
++    const canon = canonizeKitItemInstance({ id: 'food_purified_water', stackKey: 'food_purified_water', quantity: 1 });
++    expect(canon.stackKey).toBeUndefined();
++  });
++
++  it('чужие инстансы возвращаются как есть (тот же объект)', () => {
++    const steak = { id: 'food_deathclaw_steak', itemType: 'food', quantity: 2 };
++    const water = { id: 'drink_purified_water', itemType: 'drinks', quantity: 1 };
++    expect(canonizeKitItemInstance(steak)).toBe(steak);
++    expect(canonizeKitItemInstance(water)).toBe(water);
++    expect(canonizeKitItemInstance(null)).toBeNull();
++  });
++
++  it('canonizeLoadedCharacterItems: маппит equipment.items и не мутирует аргумент', () => {
++    const data = {
++      equipment: { items: [
++        { id: 'food_purified_water', itemType: 'food', quantity: 4 },
++        { id: 'weapon_laser_musket', itemType: 'weapon' },
++      ] },
++      level: 2,
++    };
++    const out = canonizeLoadedCharacterItems(data);
++    expect(out.equipment.items[0]).toEqual({ id: 'drink_purified_water', itemType: 'drinks', quantity: 4 });
++    expect(out.equipment.items[1]).toBe(data.equipment.items[1]);
++    expect(out.level).toBe(2);
++    // аргумент не тронут
++    expect(data.equipment.items[0].id).toBe('food_purified_water');
++  });
++
++  it('идемпотентен: чистый сейв возвращается той же ссылкой', () => {
++    const data = { equipment: { items: [{ id: 'drink_purified_water', itemType: 'drinks', quantity: 2 }] } };
++    expect(canonizeLoadedCharacterItems(data)).toBe(data);
++  });
++
++  it('без инвентаря — сейв возвращается как есть', () => {
++    const data = { level: 1 };
++    expect(canonizeLoadedCharacterItems(data)).toBe(data);
++    expect(canonizeLoadedCharacterItems(null)).toBe(null);
++  });
++
++  it('инстанс после моста проходит normalizeItems и попадает в стор напитком', async () => {
++    // Продакшн-последовательность loadCharacter: мост → normalizeForStore.
++    const { normalizeForStore } = await import('../../src/store/migrations');
++    const canonized = canonizeLoadedCharacterItems({
++      equipment: { items: [{ id: 'food_purified_water', itemType: 'food', quantity: 4 }] },
++    });
++    const normalized = normalizeForStore(canonized);
++    useCharacterStore.setState({ items: normalized.items });
++    const item = useCharacterStore.getState().items.drink_purified_water;
++    expect(item).toBeDefined();
++    expect(item.itemType).toBe('drinks');
++    expect(item.quantity).toBe(4);
++    expect(useCharacterStore.getState().items.food_purified_water).toBeUndefined();
++  });
++});
++
++describe('данные китов: вода ссылается на настоящий каталог', () => {
++  const kitsDir = path.resolve(__dirname, '../../modules/fallout/data/equipmentKits');
++
++  const kitJson = (name) => JSON.parse(
++    fs.readFileSync(path.join(kitsDir, `${name}.json`), 'utf8'),
++  );
++
++  const collectFixedItems = (obj, out = []) => {
++    if (!obj || typeof obj !== 'object') return out;
++    if (Array.isArray(obj)) {
++      obj.forEach((entry) => collectFixedItems(entry, out));
++      return out;
++    }
++    if (obj.itemId) out.push(obj);
++    Object.values(obj).forEach((value) => collectFixedItems(value, out));
++    return out;
++  };
++
++  it('ни один кит больше не ссылается на битый food_purified_water', () => {
++    const broken = [];
++    for (const file of fs.readdirSync(kitsDir)) {
++      if (!file.endsWith('.json')) continue;
++      const kit = kitJson(file.replace('.json', ''));
++      collectFixedItems(kit)
++        .filter((entry) => entry.itemId === 'food_purified_water')
++        .forEach((entry) => broken.push({ file, entry }));
++    }
++    expect(broken).toEqual([]);
++  });
++
++  it('brotherhoodOutcast и ncr выдают настоящую воду (drink_purified_water, drinks)', () => {
++    const drinks = require('../../modules/fallout/data/consumables/drinks.json');
++    const water = drinks.find((entry) => entry.id === 'drink_purified_water');
++    expect(water).toBeDefined();
++    expect(water.itemType).toBe('drinks');
++    expect(water.purified).toBe(true);
++
++    for (const name of ['brotherhoodOutcast', 'ncr']) {
++      const entries = collectFixedItems(kitJson(name))
++        .filter((entry) => entry.itemId === 'drink_purified_water');
++      expect(entries.length).toBeGreaterThanOrEqual(1);
++      for (const entry of entries) {
++        expect(entry.itemType).toBe('drinks');
++      }
++    }
++  });
++
++  it('таблица переименований покрывает ровно битые id (санити-чек)', () => {
++    expect(Object.keys(LEGACY_KIT_ITEM_RENAMES)).toEqual(['food_purified_water']);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 1ccec4d..c169d8f 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -63,6 +63,7 @@ import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selecto
+ import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
+ import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
+ import { resolveKitItems } from '../domain/kitResolver';
++import { canonizeLoadedCharacterItems } from '../domain/kitItemCanonical';
+ import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
+@@ -663,7 +664,10 @@ export const CharacterProvider = ({ children }) => {
+     try {
+       const row = await db.loadCharacterById(id);
+       if (!row) return false;
+-      const data = deserializeState(row.data);
++      // Мост канонизации (по образцу патча 225): битые id предметов китов
++      // (фальшивая вода food_purified_water) переименовываются в канонические.
++      // См. domain/kitItemCanonical.js; версия схемы сейва не меняется.
++      const data = canonizeLoadedCharacterItems(deserializeState(row.data));
+       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+       isSavedRef.current = false;
+ 
+diff --git a/domain/kitItemCanonical.js b/domain/kitItemCanonical.js
+new file mode 100644
+index 0000000..0598b55
+--- /dev/null
++++ b/domain/kitItemCanonical.js
+@@ -0,0 +1,63 @@
++// Канонизация предметов стартовых комплектов с битыми id (дата-баг данных).
++//
++// История: киты «Изгнанник Братства» (brotherhoodOutcast) и «НCR» (ncr) выдавали
++// очищенную воду записью { itemId: 'food_purified_water', itemType: 'food' }.
++// Предмета с таким id НЕТ ни в одном каталоге (настоящая вода —
++// 'drink_purified_water', каталог drinks). Необогащаемый инстанс:
++//   - имя = сырой id, вес/цена/лечение нулевые;
++//   - выживание ветвится по itemType 'food' → «пустая еда»: +1 сытости,
++//     +0 воды — «вода не снимает жажду» (репорт владельца, 2026-09-11).
++//
++// Мост (по образцу канонизации навыков, патч 225): при загрузке персонажа
++// инстансы с битыми id переименовываются в канонические. Версия схемы сейва
++// НЕ меняется — преобразование идемпотентно и безопасно повторять.
++//
++// Для НОВЫХ персонажей киты починены в данных (itemId: 'drink_purified_water',
++// itemType: 'drinks') — мост нужен только старым сейвам.
++
++/**
++ * Таблица переименований: битый itemId из китов → канонический предмет.
++ * Дополняется по мере обнаружения новых битых ссылок в kit-данных.
++ */
++export const LEGACY_KIT_ITEM_RENAMES = {
++  food_purified_water: { id: 'drink_purified_water', itemType: 'drinks' },
++};
++
++/**
++ * Переименовать инстанс предмета по таблице. Инстанс без попадания
++ * возвращается как есть (тот же объект). У переименованного сбрасывается
++ * stackKey (подпись старой «фальшивки» не должна склеиваться с новой стопкой;
++ * addNewItem доработает подпись, сравнение стека падает back на id).
++ *
++ * @param {object} instance — запись инвентаря (минимум: { id }).
++ * @returns {object} тот же инстанс или переименованная копия.
++ */
++export const canonizeKitItemInstance = (instance) => {
++  if (!instance || typeof instance !== 'object') return instance;
++  const rename = LEGACY_KIT_ITEM_RENAMES[instance.id];
++  if (!rename) return instance;
++  const { stackKey, ...rest } = instance;
++  return { ...rest, id: rename.id, itemType: rename.itemType };
++};
++
++/**
++ * Канонизация инвентаря загружаемого персонажа. Принимает данные сейва,
++ * возвращает НОВУЮ структуру с заменёнными item-ами в equipment.items
++ * (сам аргумент не мутируется). Форма сейва не меняется — только id/тип
++ * битых инстансов.
++ *
++ * @param {object} data — распарсенный сейв (после restore/deserialize).
++ * @returns {object} сейв с каноническим инвентарём.
++ */
++export const canonizeLoadedCharacterItems = (data) => {
++  const inventory = data?.equipment?.items;
++  if (!Array.isArray(inventory)) return data;
++  let changed = false;
++  const items = inventory.map((instance) => {
++    const canon = canonizeKitItemInstance(instance);
++    if (canon !== instance) changed = true;
++    return canon;
++  });
++  if (!changed) return data;
++  return { ...data, equipment: { ...data.equipment, items } };
++};
+diff --git a/modules/fallout/data/equipmentKits/brotherhoodOutcast.json b/modules/fallout/data/equipmentKits/brotherhoodOutcast.json
+index 09e578b..c081ca8 100644
+--- a/modules/fallout/data/equipmentKits/brotherhoodOutcast.json
++++ b/modules/fallout/data/equipmentKits/brotherhoodOutcast.json
+@@ -8,8 +8,8 @@
+       },
+       {
+         "type": "fixed",
+-        "itemId": "food_purified_water",
+-        "itemType": "food"
++        "itemId": "drink_purified_water",
++        "itemType": "drinks"
+       },
+       {
+         "type": "fixed",
+diff --git a/modules/fallout/data/equipmentKits/ncr.json b/modules/fallout/data/equipmentKits/ncr.json
+index 2c4b259..0b25813 100644
+--- a/modules/fallout/data/equipmentKits/ncr.json
++++ b/modules/fallout/data/equipmentKits/ncr.json
+@@ -75,8 +75,8 @@
+       },
+       {
+         "type": "fixed",
+-        "itemId": "food_purified_water",
+-        "itemType": "food"
++        "itemId": "drink_purified_water",
++        "itemType": "drinks"
+       },
+       {
+         "type": "fixed",
+-- 
+2.39.5
+
