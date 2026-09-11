@@ -1,0 +1,266 @@
+From 1b62577fc5b7c30b408d4ea7d92568874690360e Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 08:46:23 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=92=D1=8B=D0=B6=D0=B8=D0=B2=D0=B0=D0=BD?=
+ =?UTF-8?q?=D0=B8=D0=B5:=20=D1=81=D0=BE=D1=81=D1=82=D0=BE=D1=8F=D0=BD?=
+ =?UTF-8?q?=D0=B8=D1=8F=20=D0=BB=D0=B5=D1=81=D1=82=D0=BD=D0=B8=D1=86=20?=
+ =?UTF-8?q?=D0=BE=D0=BA=D1=80=D0=B0=D1=88=D0=B8=D0=B2=D0=B0=D1=8E=D1=82?=
+ =?UTF-8?q?=D1=81=D1=8F=20=D1=86=D0=B2=D0=B5=D1=82=D0=BE=D0=BC;=20=D1=81?=
+ =?UTF-8?q?=D0=BA=D0=BE=D0=B1=D0=BA=D0=B8=20=D0=B8=D1=81=D1=82=D0=BE=D1=87?=
+ =?UTF-8?q?=D0=BD=D0=B8=D0=BA=D0=BE=D0=B2=20=D1=83=D1=81=D1=82=D0=B0=D0=BB?=
+ =?UTF-8?q?=D0=BE=D1=81=D1=82=D0=B8=20=D1=83=D0=B1=D1=80=D0=B0=D0=BD=D1=8B?=
+ =?UTF-8?q?=20(=D0=BF=D0=B0=D1=82=D1=87=20231)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Решение владельца после репорта про «висящую» усталость: вместо текстовых
+подсказок — цветовая индикация. Правила снятия усталости НЕ менялись (канон
+§6: −1/игровой час при еда ≥2/вода ≥2/сон ≥3; сон ≥6 ч стирает усталость сна).
+
+- domain/survival.ts: ladderColorKey(ladder, value) — чистая функция цвета
+  состояния: ok → grey → yellow → orange → red; у воды (4 ступени)
+  «жёлто-красный» пропущен, дно сразу красное.
+- WeaponsAndArmorScreen: StatBox получил valueStyle; ряд Голод/Жажда/Сон
+  красит значения по лестнице; разбивка источников в скобках (патч 217)
+  снята с рендера — строка снова «Усталость N», происхождение усталости
+  видно по цветам состояний. Доменная разбивка и i18n-ключи 217 не тронуты.
+- Стили: survivalValueGrey/Yellow/Orange/Red.
+- Тесты (6): шкала цветов всех лестниц + статика экрана и словарей.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/survival/fatigue-colors.test.js     | 71 +++++++++++++++++++
+ .../WeaponsAndArmorScreen.js                  | 50 +++++++------
+ modules/fallout/survival/survival.ts          | 18 +++++
+ styles/WeaponsAndArmorScreen.styles.js        |  7 ++
+ 4 files changed, 124 insertions(+), 22 deletions(-)
+ create mode 100644 __tests__/survival/fatigue-colors.test.js
+
+diff --git a/__tests__/survival/fatigue-colors.test.js b/__tests__/survival/fatigue-colors.test.js
+new file mode 100644
+index 0000000..4a5f11b
+--- /dev/null
++++ b/__tests__/survival/fatigue-colors.test.js
+@@ -0,0 +1,71 @@
++// Патч 231 (решение владельца): индикация состояний выживания — цветом,
++// без текстовых подсказок. Шкала: потолок — обычный цвет ('ok'), дальше
++// серый, серо-жёлтый, жёлто-красный, на дне красный. У воды 4 ступени —
++// «жёлто-красный» пропущен (дно сразу красное).
++//
++// Заодно (тот же патч): разбивка источников усталости в скобках (патч 217)
++// убрана из панели «Эффекты» — происхождение усталости видно по цветам
++// состояний; строка снова просто «Усталость N». Доменная разбивка
++// (fatigueSourceBreakdown) и i18n-ключи 217 остаются — их не трогали.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { ladderColorKey } from '../../modules/fallout/survival/survival';
++
++describe('ladderColorKey: цвет состояния лестницы', () => {
++  it('еда и сон (5 ступеней): ok → grey → yellow → orange → red', () => {
++    for (const ladder of ['food', 'sleep']) {
++      expect(ladderColorKey(ladder, 5)).toBe('ok');
++      expect(ladderColorKey(ladder, 4)).toBe('grey');
++      expect(ladderColorKey(ladder, 3)).toBe('yellow');
++      expect(ladderColorKey(ladder, 2)).toBe('orange');
++      expect(ladderColorKey(ladder, 1)).toBe('red');
++    }
++  });
++
++  it('вода (4 ступени): жёлто-красный пропущен, дно сразу красное', () => {
++    expect(ladderColorKey('water', 4)).toBe('ok');
++    expect(ladderColorKey('water', 3)).toBe('grey');
++    expect(ladderColorKey('water', 2)).toBe('yellow');
++    expect(ladderColorKey('water', 1)).toBe('red');
++  });
++
++  it('выход за границы трактуется консервативно (выше потолка — ок)', () => {
++    expect(ladderColorKey('food', 6)).toBe('ok');
++  });
++});
++
++describe('экран: окраска значений и строка усталости без скобок', () => {
++  const source = fs.readFileSync(
++    path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
++    'utf8',
++  );
++  const stylesSource = fs.readFileSync(
++    path.resolve(__dirname, '../../styles/WeaponsAndArmorScreen.styles.js'),
++    'utf8',
++  );
++
++  it('значения Голод/Жажда/Сон окрашиваются через ladderColorKey', () => {
++    expect(source).toContain("ladderColorKey('food', survival.food)");
++    expect(source).toContain("ladderColorKey('water', survival.water)");
++    expect(source).toContain("ladderColorKey('sleep', survival.sleep)");
++    for (const key of ['survivalValueGrey', 'survivalValueYellow', 'survivalValueOrange', 'survivalValueRed']) {
++      expect(stylesSource).toContain(`${key}:`);
++    }
++  });
++
++  it('строка усталости — без разбивки источников (патч 217 снят с рендера)', () => {
++    expect(source).not.toContain('survival.fatigueSources');
++    expect(source).not.toContain('fatigueSourceJoin');
++    expect(source).toContain("tWeaponsAndArmorScreen(`survival.${row.key}`)");
++  });
++
++  it('i18n-ключи 217 не удалялись (формат словарей не менялся)', () => {
++    const ru = JSON.parse(fs.readFileSync(
++      path.resolve(__dirname, '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json'),
++      'utf8',
++    ));
++    expect(ru.survival.fatigueSources).toBe('Усталость {n} ({sources})');
++  });
++});
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index e3da08b..d3e6cb5 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -37,7 +37,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects,
+ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+-import { hpMaxPenaltyForFatigue, survivalEffectRows, totalFatigue } from '../../survival/survival';
++import { hpMaxPenaltyForFatigue, ladderColorKey, survivalEffectRows, totalFatigue } from '../../survival/survival';
+ import { useSurvivalState } from '../../survival/hooks';
+ import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
+ import SleepModal from './modals/SleepModal';
+@@ -330,14 +330,25 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
+ 
+ // --- Reusable Components ---
+ 
+-const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false }) => (
++// Патч 231: ключ цвета лестницы → стиль значения ('ok' — без перекраски).
++const SURVIVAL_VALUE_STYLES = {
++  ok: null,
++  grey: localStyles.survivalValueGrey,
++  yellow: localStyles.survivalValueYellow,
++  orange: localStyles.survivalValueOrange,
++  red: localStyles.survivalValueRed,
++};
++
++// Патч 231: valueStyle — дополнительный цвет значения (шкала состояний
++// выживания: от обычного на потолке до красного на дне).
++const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false, valueStyle }) => (
+   <View style={[localStyles.statBoxContainer, disabled && { opacity: 0.5 }]}>
+     <View style={localStyles.statBoxHeader}>
+       <Text style={styles.sectionTitle}>{title}</Text>
+     </View>
+     <View style={localStyles.statBoxValueContainer}>
+       <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+-        {highlightMeleeBonus ? renderTextWithIcons(String(value).replace('{CD}', ' {CD}'), styles.statValue) : <Text style={styles.statValue}>{value}</Text>}
++        {highlightMeleeBonus ? renderTextWithIcons(String(value).replace('{CD}', ' {CD}'), styles.statValue) : <Text style={[styles.statValue, valueStyle]}>{value}</Text>}
+         {children}
+       </View>
+     </View>
+@@ -945,26 +956,14 @@ const WeaponsAndArmorScreen = () => {
+ 
+   // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
+   // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
+-  // Патч 217: у строки «Усталость» в скобках активные источники —
+-  // «Усталость 5 (голод: 1 / жажда: 2 / сон: 1 / болезнь: 1)»; показываются
+-  // только источники с ненулевым вкладом.
++  // Патч 231 (решение владельца): разбивка источников в скобках убрана —
++  // происхождение усталости видно по цветам состояний лестниц (ряд
++  // Голод/Жажда/Сон выше); строка снова просто «Усталость N».
+   const survivalRows = useMemo(
+-    () => survivalEffectRows(survival).map((row) => {
+-      const text = tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n));
+-      if (row.key !== 'fatigue' || !row.sources || row.sources.length === 0) {
+-        return { key: `survival_${row.key}`, text };
+-      }
+-      const join = tWeaponsAndArmorScreen('survival.fatigueSourceJoin');
+-      const sources = row.sources
+-        .map((entry) => `${tWeaponsAndArmorScreen(`survival.fatigueSource.${entry.source}`)}: ${entry.amount}`)
+-        .join(join);
+-      return {
+-        key: `survival_${row.key}`,
+-        text: tWeaponsAndArmorScreen('survival.fatigueSources')
+-          .replace('{n}', String(row.n))
+-          .replace('{sources}', sources),
+-      };
+-    }),
++    () => survivalEffectRows(survival).map((row) => ({
++      key: `survival_${row.key}`,
++      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
++    })),
+     [survival]
+   );
+ 
+@@ -1122,17 +1121,24 @@ const WeaponsAndArmorScreen = () => {
+                 Роботы и киборги (survival === null) ряда не получают. */}
+             {survival ? (
+               <View style={[localStyles.statsRow, { marginTop: 8 }]}>
++                {/* Патч 231: значения окрашены по лестнице (решение владельца):
++                    потолок — обычный цвет, ниже — серый, серо-жёлтый,
++                    жёлто-красный, на дне — красный; у воды (4 ступени)
++                    жёлто-красный пропущен. */}
+                 <StatBox
+                   title={tWeaponsAndArmorScreen('survival.foodTitle')}
+                   value={tWeaponsAndArmorScreen(`survival.food.${survival.food}`)}
++                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('food', survival.food)]}
+                 />
+                 <StatBox
+                   title={tWeaponsAndArmorScreen('survival.waterTitle')}
+                   value={tWeaponsAndArmorScreen(`survival.water.${survival.water}`)}
++                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('water', survival.water)]}
+                 />
+                 <StatBox
+                   title={tWeaponsAndArmorScreen('survival.sleepTitle')}
+                   value={tWeaponsAndArmorScreen(`survival.sleep.${survival.sleep}`)}
++                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('sleep', survival.sleep)]}
+                 />
+               </View>
+             ) : null}
+diff --git a/modules/fallout/survival/survival.ts b/modules/fallout/survival/survival.ts
+index 82386ca..21fab2c 100644
+--- a/modules/fallout/survival/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -488,6 +488,24 @@ export function fatigueSourceBreakdown(state: SurvivalState): Array<{ source: Fa
+ // тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty /
+ // survival.maxHpPenalty). Патч 217: строка «Усталость» несёт разбивку по
+ // активным источникам (sources), UI добавляет её в скобках.
++// Цветовая шкала состояния лестницы (патч 231, решение владельца): значение
++// состояния красится от нейтрального (потолок) к красному (дно):
++// 'ok' → 'grey' → 'yellow' → 'orange' → 'red'. У 5-ступенчатых лестниц
++// (еда, сон) все 5 красок; у воды 4 ступени — «жёлто-красный» пропускается,
++// дно сразу красное (решение владельца).
++export function ladderColorKey(
++    ladder: SurvivalLadder,
++    value: number,
++): 'ok' | 'grey' | 'yellow' | 'orange' | 'red' {
++    const max = SURVIVAL_RULES.max[ladder];
++    const severity = max - value;
++    if (severity <= 0) return 'ok';
++    if (severity === 1) return 'grey';
++    if (severity === 2) return 'yellow';
++    if (max >= 5) return severity === 3 ? 'orange' : 'red';
++    return 'red';
++}
++
+ export function survivalEffectRows(
+     survival: SurvivalState | null | undefined,
+ ): Array<{ key: string; n: number; sources?: Array<{ source: string; amount: number }> }> {
+diff --git a/styles/WeaponsAndArmorScreen.styles.js b/styles/WeaponsAndArmorScreen.styles.js
+index 9971db4..382013c 100644
+--- a/styles/WeaponsAndArmorScreen.styles.js
++++ b/styles/WeaponsAndArmorScreen.styles.js
+@@ -118,6 +118,13 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     paddingVertical: 3,
+   },
++  // Патч 231: цветовая шкала состояний выживания (решение владельца) —
++  // потолок обычным цветом, дальше бледнее (серый), серо-жёлтый,
++  // жёлто-красный, на дне красный. «Ок» отдельного стиля не имеет.
++  survivalValueGrey: { color: '#9a9a9a' },
++  survivalValueYellow: { color: '#c9a227' },
++  survivalValueOrange: { color: '#e0762c' },
++  survivalValueRed: { color: '#D62828' },
+   // Болезнь (патч 215): название с рангом занимает всю свободную ширину
+   // строки и центрируется внутри неё (flex: 1 + textAlign center — цвет
+   // задан прямо в стиле, не зависит от effectKind эффекта); кнопка
+-- 
+2.39.5
+
