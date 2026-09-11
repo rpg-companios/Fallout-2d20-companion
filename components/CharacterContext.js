@@ -1,5 +1,5 @@
 import { debugLog } from '../src/debug/falloutDebug';
-import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as db from '../db';
 import {
   createInitialAttributes,
@@ -59,6 +59,7 @@ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 import { resolveBodyPlan } from '../domain/bodyplan';
 import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
 import { migrateSkillsToCanonical } from '../domain/skillCanonical';
+import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selectors';
 import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
 import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
 import { resolveKitItems } from '../domain/kitResolver';
@@ -200,11 +201,18 @@ export const CharacterProvider = ({ children }) => {
   const [isSaved, setIsSaved] = useState(false);
 
   const [level, setLevel] = useState(INITIAL_LEVEL);
-  const [attributes, setAttributes] = useState(createInitialAttributes());
-  const [skills, setSkills] = useState(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
-  const [selectedSkills, setSelectedSkills] = useState([]);
-  const [extraTaggedSkills, setExtraTaggedSkills] = useState([]);
-  const [forcedSelectedSkills, setForcedSelectedSkills] = useState([]);
+  // ═══ Атрибуты/навыки: стор-словари — единственный источник (Шаг 5). ═══
+  // Экраны пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills и
+  // selection-экшены); «массивы» здесь — производные представления словарей
+  // (selectLegacy*), нужны снапшоту сейва и доменным расчётам, чья сигнатура —
+  // legacy-массив. Фасад больше не отдаёт сеттеры этих полей.
+  const storeAttributes = useCharacterStore((s) => s.attributes);
+  const storeSkills = useCharacterStore((s) => s.skills);
+  const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+  const skills = useMemo(() => selectLegacySkills({ skills: storeSkills }), [storeSkills]);
+  const selectedSkills = useCharacterStore((s) => s.selectedSkills);
+  const extraTaggedSkills = useCharacterStore((s) => s.extraTaggedSkills);
+  const forcedSelectedSkills = useCharacterStore((s) => s.forcedSelectedSkills);
   const [origin, setOrigin] = useState(null);
   const [trait, setTrait] = useState(null);
   const [effects, setEffects] = useState([]);
@@ -430,14 +438,10 @@ export const CharacterProvider = ({ children }) => {
     queueMicrotask(() => {
       // re-read store inside the microtask: dependency values are captured
       // here, so this useEffect doesn't re-fire when these are stable.
+      // (Шаг 5) Подсев атрибутов «если dict пуст» убран: стор — единственный
+      // источник и сеется дефолтами в начальном состоянии/сбросе/загрузке;
+      // синхронизировать нечего.
       const current = useCharacterStore.getState();
-
-      // Подсев атрибутов в стор, если dict пуст, но в Context уже есть значения.
-      const dictEmpty = Object.keys(current.attributes || {}).length === 0;
-      const arrayHasValues = Array.isArray(attributes) && attributes.length > 0;
-      if (dictEmpty && arrayHasValues) {
-        current.loadFromLegacyData({ attributes });
-      }
 
       // Прокидываем реальный контекст → корректный пересчёт derivedStats.
       // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
@@ -661,11 +665,13 @@ export const CharacterProvider = ({ children }) => {
        setCharacterId(id);
       setCharacterName(row.name);
       setLevel(data.level ?? INITIAL_LEVEL);
-       setAttributes(loadedAttributes);
-      setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
-      setSelectedSkills(data.selectedSkills || []);
-      setExtraTaggedSkills(data.extraTaggedSkills || []);
-      setForcedSelectedSkills(data.forcedSelectedSkills || []);
+       // Базовые статы и selection-списки — напрямую в стор (Шаг 5).
+      const st = useCharacterStore.getState();
+      st.setBaseAttributes(loadedAttributes);
+      st.setBaseSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(sk => ({ ...sk, value: 0 })));
+      st.setSelectedSkills(data.selectedSkills || []);
+      st.setExtraTaggedSkills(data.extraTaggedSkills || []);
+      st.setForcedSelectedSkills(data.forcedSelectedSkills || []);
        setOrigin(data.origin || null);
        setTrait(loadedTrait);
       setEquipment(data.equipment || null);
@@ -1390,13 +1396,9 @@ export const CharacterProvider = ({ children }) => {
       }
     });
 
-    // Keep the legacy context mirror in sync with the canonical Zustand store.
-    // The character sheet reads attributes from the store, while the perks
-    // screen evaluates requirements through CharacterContext. Updating only
-    // Zustand here made the sheet show the new value (for example AGI 10)
-    // while perk requirements still saw the previous value (AGI 8).
-    setAttributes(committedAttributes);
-
+    // (Шаг 5) Зеркало setAttributes убрано: стор — единственный источник,
+    // производный массив контекста пересчитывается из словаря автоматически.
+    // Perk-экран оценивает требования через тот же производный массив.
     // Update other state fields
     setAvailablePerkAttributePoints(prev => prev - pointsSpent);
     const newLuck = getLuckPoints(committedAttributes, trait);
@@ -1415,11 +1417,7 @@ export const CharacterProvider = ({ children }) => {
     const initialLevel = INITIAL_LEVEL;
     setLevel(initialLevel);
     const initialSkills = ALL_SKILLS.map(s => ({ ...s, value: 0 }));
-    setAttributes(initialAttributes);
-    setSkills(initialSkills);
-    setSelectedSkills([]);
-    setExtraTaggedSkills([]);
-    setForcedSelectedSkills([]);
+    // Атрибуты/навыки/selection-списки сеет resetCharacterStore (слайс, Шаг 5).
     setAttributesSaved(false);
     setSkillsSaved(false);
     const initialLuck = getLuckPoints(initialAttributes);
@@ -1491,9 +1489,10 @@ export const CharacterProvider = ({ children }) => {
       rewardedSkills: [],
     });
     if (!keepSkills) {
-      setSelectedSkills([]);
-      setExtraTaggedSkills([]);
-      setForcedSelectedSkills([]);
+      const resetSt = useCharacterStore.getState();
+      resetSt.setSelectedSkills([]);
+      resetSt.setExtraTaggedSkills([]);
+      resetSt.setForcedSelectedSkills([]);
       setSkillsSaved(false);
     }
   }, []);
@@ -1512,11 +1511,13 @@ export const CharacterProvider = ({ children }) => {
     getCharactersList,
     deleteCharacter,
     level, setLevel,
-    attributes, setAttributes,
-    skills, setSkills,
-    selectedSkills, setSelectedSkills,
-    extraTaggedSkills, setExtraTaggedSkills,
-    forcedSelectedSkills, setForcedSelectedSkills,
+    // Атрибуты/навыки (данные) — Шаг 5: экраны читают производные массивы
+    // отсюда, пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills +
+    // selection-экшены useCharacterStore). Сеттеры из фасада убраны.
+    attributes, skills,
+    selectedSkills,
+    extraTaggedSkills,
+    forcedSelectedSkills,
     origin, setOrigin,
     trait, setTrait,
     equipment, setEquipment,

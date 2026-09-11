@@ -61,6 +61,10 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+// Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+// стор-словари единственный источник, производный legacy-массив обязан быть
+// валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
 // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
 // в CharacterContext.
@@ -203,8 +207,16 @@ const useCharacterStore = create(devtools(
   persist(
     (set, get) => ({
       // --- Initial State ---
-      attributes: {},
-      skills: {},
+      // Атрибуты/навыки — Parameter-словари, единственный источник (Шаг 5).
+      // Сеются дефолтами создания: «пустой словарь при открытом UI» — недопустимое
+      // состояние (производный legacy-массив обязан содержать все атрибуты/навыки).
+      ...normalizeForStore({
+        attributes: createInitialAttributes(),
+        skills: ALL_SKILLS.map((skill) => ({ ...skill, value: 0 })),
+      }),
+      selectedSkills: [],
+      extraTaggedSkills: [],
+      forcedSelectedSkills: [],
       items: {},
       effects: {},
       // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
@@ -1106,6 +1118,49 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Абсолютная запись базовых атрибутов из legacy-массива [{name, value}]
+       * (создание персонажа, смена трейта, загрузка сейва). Словарь —
+       * единственный источник (Шаг 5); дельта-обновления поверх — updateAttribute.
+       */
+      setBaseAttributes: (legacyArray) => {
+        const normalized = normalizeForStore({ attributes: legacyArray });
+        set({ attributes: normalized.attributes });
+        get().recalculateDerivedStats();
+      },
+
+      /**
+       * Абсолютная запись базовых навыков из legacy-массива [{name, value}]
+       * (тегирование, прокачка, загрузка сейва). Дельта-обновления — updateSkill.
+       */
+      setBaseSkills: (legacyArray) => {
+        const normalized = normalizeForStore({ skills: legacyArray });
+        set({ skills: normalized.skills });
+        get().recalculateDerivedStats();
+      },
+
+      /**
+       * Отмеченные (tagged) навыки — список имён. Поддерживает функциональный
+       * апдейтер (прецедент setEquippedWeapons): (prev) => next.
+       */
+      setSelectedSkills: (updater) => {
+        set((state) => ({
+          selectedSkills: typeof updater === 'function' ? updater(state.selectedSkills) : [...(updater || [])],
+        }));
+      },
+      /** Дополнительные тегированные (трейт/перк) — как setSelectedSkills. */
+      setExtraTaggedSkills: (updater) => {
+        set((state) => ({
+          extraTaggedSkills: typeof updater === 'function' ? updater(state.extraTaggedSkills) : [...(updater || [])],
+        }));
+      },
+      /** Навязанные трейтом (forced) — как setSelectedSkills. */
+      setForcedSelectedSkills: (updater) => {
+        set((state) => ({
+          forcedSelectedSkills: typeof updater === 'function' ? updater(state.forcedSelectedSkills) : [...(updater || [])],
+        }));
+      },
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1114,11 +1169,19 @@ const useCharacterStore = create(devtools(
        * opened character cannot refill an empty store with stale values.
        */
       resetCharacterStore: (legacyDefaults = {}) => {
-        const normalizedDefaults = normalizeForStore(legacyDefaults);
+        // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+        // Вызывающий не передал дефолты → сеем стартовые значения создания.
+        const defaultsSource = (legacyDefaults && (legacyDefaults.attributes || legacyDefaults.skills))
+          ? legacyDefaults
+          : { attributes: createInitialAttributes(), skills: ALL_SKILLS.map((skill) => ({ ...skill, value: 0 })) };
+        const normalizedDefaults = normalizeForStore(defaultsSource);
 
         set({
           attributes: normalizedDefaults.attributes || {},
           skills: normalizedDefaults.skills || {},
+          selectedSkills: [],
+          extraTaggedSkills: [],
+          forcedSelectedSkills: [],
           items: {},
           effects: {},
           stateExtensions: {},
@@ -1186,6 +1249,9 @@ const useCharacterStore = create(devtools(
         equippedArmor: state.equippedArmor,
         equippedPowerArmor: state.equippedPowerArmor,
         powerArmorRuntime: state.powerArmorRuntime,
+        selectedSkills: state.selectedSkills,
+        extraTaggedSkills: state.extraTaggedSkills,
+        forcedSelectedSkills: state.forcedSelectedSkills,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

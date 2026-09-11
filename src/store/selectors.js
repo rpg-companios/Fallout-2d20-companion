@@ -5,6 +5,11 @@ import { debugLog } from '../debug/falloutDebug';
 import { effectsDictToLegacyArray } from './effectsSync.js';
 import { resolveWeaponRangeFields } from '../../domain/range.js';
 import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
+import { ALL_SKILLS } from '../../domain/characterCreation.js';
+
+// ── Шаг 5 миграции: стор-словари (Parameter-формат) — единственный источник
+// атрибутов/навыков. Экранам и снапшоту сейва нужен legacy-массив — выводится
+// ЭТИМИ селекторами (одна реализация на провайдер и экраны).
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
@@ -176,3 +181,24 @@ export const selectSkillTotal = (state, skillId) => {
 export const selectActiveTimedEffects = (state) => {
   return effectsDictToLegacyArray(state.effects);
 };
+
+
+/**
+ * Словарь атрибутов (Parameter-формат) → legacy-массив [{name, value}].
+ * @param {{attributes?: Record<string, {id: string, base: number}>}} state
+ * @returns {Array<{name: string, value: number}>}
+ */
+export const selectLegacyAttributes = ({ attributes = {} } = {}) =>
+  Object.values(attributes).map((attr) => ({ name: attr.id, value: attr.base }));
+
+/**
+ * Словарь навыков (Parameter-формат) → legacy-массив: каталожные записи
+ * ALL_SKILLS (порядок и метаданные) + value из base словаря.
+ * @param {{skills?: Record<string, {base: number}>}} state
+ * @returns {Array<object>}
+ */
+export const selectLegacySkills = ({ skills = {} } = {}) =>
+  ALL_SKILLS.map((skill) => {
+    const stored = skills[skill.name];
+    return stored ? { ...skill, value: stored.base } : { ...skill, value: 0 };
+  });
