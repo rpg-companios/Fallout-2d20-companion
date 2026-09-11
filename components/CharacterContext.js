@@ -63,6 +63,7 @@ import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selecto
 import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
 import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
 import { resolveKitItems } from '../domain/kitResolver';
+import { canonizeLoadedCharacterItems } from '../domain/kitItemCanonical';
 import { getCurrentLocale, getCurrentModuleLocale } from '../i18n/locale';
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import ruPerksAndTraitsScreen from '../i18n/ru-RU/screens/perksAndTraits/screen.json';
@@ -663,7 +664,10 @@ export const CharacterProvider = ({ children }) => {
     try {
       const row = await db.loadCharacterById(id);
       if (!row) return false;
-      const data = deserializeState(row.data);
+      // Мост канонизации (по образцу патча 225): битые id предметов китов
+      // (фальшивая вода food_purified_water) переименовываются в канонические.
+      // См. domain/kitItemCanonical.js; версия схемы сейва не меняется.
+      const data = canonizeLoadedCharacterItems(deserializeState(row.data));
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       isSavedRef.current = false;
 
