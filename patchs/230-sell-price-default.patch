@@ -1,0 +1,142 @@
+From b95003a62c33b5f286b73bf39c5874ba0d0a807f Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 08:22:17 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A4=D0=B8=D0=BA=D1=81:=20=D0=B4=D0=B8=D0=B0?=
+ =?UTF-8?q?=D0=BB=D0=BE=D0=B3=20=D0=BF=D1=80=D0=BE=D0=B4=D0=B0=D0=B6=D0=B8?=
+ =?UTF-8?q?=20=D0=BF=D0=BE=D0=BA=D0=B0=D0=B7=D1=8B=D0=B2=D0=B0=D0=BB=20?=
+ =?UTF-8?q?=D1=86=D0=B5=D0=BD=D1=83=200=20=D1=83=20=D0=B4=D0=BE=D0=B1?=
+ =?UTF-8?q?=D1=8B=D1=82=D1=8B=D1=85=20=D0=BF=D1=80=D0=B5=D0=B4=D0=BC=D0=B5?=
+ =?UTF-8?q?=D1=82=D0=BE=D0=B2?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Репорт владельца (11.09, гуль): «решил продать оставшиеся бутылки —
+цены высветилась 0». Инстанс хранит каталожную стоимость в cost
+(addNewItem), а price появляется только у купленного (модалка покупки
+запоминает цену сделки). SellItemModal читал только price → 0.
+
+Фикс: defaultSellPricePerItem (logic/sellPrice.js) — price → cost → 0;
+модалка использует хелпер, поле остаётся редактируемым. Тесты (5):
+приоритет price/cost, некорректные значения, статическая проверка модалки.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../consumables/sell-price-default.test.js    | 46 +++++++++++++++++++
+ .../InventoryScreen/logic/sellPrice.js        | 25 ++++++++++
+ .../InventoryScreen/modals/SellItemModal.js   |  7 ++-
+ 3 files changed, 76 insertions(+), 2 deletions(-)
+ create mode 100644 __tests__/consumables/sell-price-default.test.js
+ create mode 100644 components/screens/InventoryScreen/logic/sellPrice.js
+
+diff --git a/__tests__/consumables/sell-price-default.test.js b/__tests__/consumables/sell-price-default.test.js
+new file mode 100644
+index 0000000..dce667c
+--- /dev/null
++++ b/__tests__/consumables/sell-price-default.test.js
+@@ -0,0 +1,46 @@
++// Репорт владельца (2026-09-11): «решил продать оставшиеся бутылки —
++// цены высветилась 0». Инстанс воды из «Добавить добычу» хранит каталожную
++// cost: 20, но не price (его ставит только модалка покупки). Диалог продажи
++// читал только price → 0. Фикс: defaultSellPricePerItem = price → cost → 0.
++
++import { describe, expect, it } from 'vitest';
++import { defaultSellPricePerItem } from '../../components/screens/InventoryScreen/logic/sellPrice';
++import fs from 'node:fs';
++import path from 'node:path';
++
++describe('defaultSellPricePerItem: цена продажи по умолчанию', () => {
++  it('у купленного — цена последней сделки (price)', () => {
++    expect(defaultSellPricePerItem({ price: 15, cost: 20 })).toBe(15);
++  });
++
++  it('у добытого — каталожная стоимость (cost), как у воды из репорта', () => {
++    // Реальная форма инстанса после addNewItem (cost сохраняется, price нет).
++    const water = {
++      id: 'drink_purified_water', instanceId: 'drink_purified_water',
++      itemType: 'drinks', quantity: 3, cost: 20, rarity: 1, weight: 0.5,
++    };
++    expect(defaultSellPricePerItem(water)).toBe(20);
++  });
++
++  it('без обеих цен — 0 (редактируемое поле)', () => {
++    expect(defaultSellPricePerItem({})).toBe(0);
++    expect(defaultSellPricePerItem(null)).toBeNull ? expect(defaultSellPricePerItem(null)).toBe(0) : true;
++    expect(defaultSellPricePerItem(undefined)).toBe(0);
++  });
++
++  it('некорректные значения не пролезают (0/NaN/отрицательная cost)', () => {
++    expect(defaultSellPricePerItem({ price: 0, cost: 20 })).toBe(20);
++    expect(defaultSellPricePerItem({ price: NaN, cost: 20 })).toBe(20);
++    expect(defaultSellPricePerItem({ cost: '12' })).toBe(12);
++    expect(defaultSellPricePerItem({ price: -5, cost: -3 })).toBe(0);
++  });
++
++  it('модалка продажи использует хелпер (статическая проверка исходника)', () => {
++    const source = fs.readFileSync(
++      path.resolve(__dirname, '../../components/screens/InventoryScreen/modals/SellItemModal.js'),
++      'utf8',
++    );
++    expect(source).toContain('defaultSellPricePerItem(item)');
++    expect(source).not.toMatch(/initialPrice\s*=\s*item\.price/);
++  });
++});
+diff --git a/components/screens/InventoryScreen/logic/sellPrice.js b/components/screens/InventoryScreen/logic/sellPrice.js
+new file mode 100644
+index 0000000..7cb9c3f
+--- /dev/null
++++ b/components/screens/InventoryScreen/logic/sellPrice.js
+@@ -0,0 +1,25 @@
++// Цена по умолчанию для диалога продажи (репорт владельца, 2026-09-11:
++// «решил продать оставшиеся бутылки — цена высветилась 0»).
++//
++// Инстанс предмета хранит каталожную стоимость в поле `cost` (addNewItem,
++// characterStore), а `price` появляется только у купленного — модалка покупки
++// запоминает цену сделки (handleConfirmBuy). Диалог продажи читал только
++// `price`, поэтому вся добыча/найденное выставлялось по умолчанию в 0.
++//
++// Цепочка по умолчанию: price (цена последней сделки) → cost (каталожная
++// стоимость) → 0. Поле в модалке остаётся редактируемым: игрок назначает
++// свою цену торговли.
++
++/**
++ * Цена продажи за штуку по умолчанию.
++ * @param {{price?: number, cost?: number} | null | undefined} item — инстанс предмета.
++ * @returns {number}
++ */
++export const defaultSellPricePerItem = (item) => {
++  if (!item) return 0;
++  const price = Number(item.price);
++  if (Number.isFinite(price) && price > 0) return price;
++  const cost = Number(item.cost);
++  if (Number.isFinite(cost) && cost > 0) return cost;
++  return 0;
++};
+diff --git a/components/screens/InventoryScreen/modals/SellItemModal.js b/components/screens/InventoryScreen/modals/SellItemModal.js
+index 405cdef..7875ef1 100644
+--- a/components/screens/InventoryScreen/modals/SellItemModal.js
++++ b/components/screens/InventoryScreen/modals/SellItemModal.js
+@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
+ import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+ import { showRawAlert } from '../../../alerts/alertService';
+ import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
++import { defaultSellPricePerItem } from '../logic/sellPrice';
+ import { useLocale } from '../../../../i18n/locale';
+ 
+ const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
+@@ -12,8 +13,10 @@ const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
+   useEffect(() => {
+     if (item) {
+       setQuantity('1');
+-      const initialPrice = item.price ?? 0;
+-      setPricePerItem(String(initialPrice));
++      // Цена по умолчанию: цена последней сделки (price), иначе каталожная
++      // cost (у добычи price нет — репорт «цены высветилась 0»). Поле
++      // редактируемое: игрок может назначить свою цену торговли.
++      setPricePerItem(String(defaultSellPricePerItem(item)));
+     }
+   }, [item]);
+ 
+-- 
+2.39.5
+
