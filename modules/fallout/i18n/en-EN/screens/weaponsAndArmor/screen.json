@@ -246,7 +246,6 @@
       "disease": "disease"
     },
     "apPenalty": "Action Points gained −{n}",
-    "maxHpPenalty": "Max HP: −{n}",
     "foodTitle": "Hunger",
     "waterTitle": "Thirst",
     "sleepTitle": "Sleep",
@@ -268,6 +267,7 @@
     "drink": {
       "title": "Drinks",
       "empty": "No drinks in inventory"
-    }
+    },
+    "hpPerHour": "Each game hour: −{n} HP"
   }
 }

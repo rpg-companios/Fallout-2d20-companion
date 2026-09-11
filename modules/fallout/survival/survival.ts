@@ -228,8 +228,22 @@ export function clearFatigueSource(state: SurvivalState, source: FatigueSource):
 // МАКСИМУМ ОЗ, а не текущие — величина производная от текущего N:
 // пересчитывается каждый игровой час (шаг 3 тика), отдельного аккумулятора
 // в состоянии нет; при снятии Усталости максимум возвращается сам.
+// Патч 232 (решение владельца, по книге): усталость — потеря ТЕКУЩИХ ОЗ
+// «на начале сцены»: N/2 без сопротивлений. В приложении сцены не тикают
+// (advanceScene — спящий код), поэтому потеря привязана к игровому часу
+// тика выживания (каденция «сцена -> час» — как у снятия усталости); часы
+// сна потерь не дают (сцены для спящего не начинаются). Функция возвращает
+// величину потери за час/сцену; применяет её SurvivalClock.
 export function hpMaxPenaltyForFatigue(fatigueTotal: number): number {
     return Math.floor(fatigueTotal / 2);
+}
+
+// Суммарная потеря ОЗ по событиям часового тика (SurvivalClock применяет её
+// к текущим ОЗ через applySurvivalHpLoss; rest()/сон события не применяет).
+export function fatigueHpLossFromEvents(events: SurvivalEvent[]): number {
+    return events
+        .filter((e) => e.type === 'hpMaxPenalty')
+        .reduce((sum, e) => sum + (typeof e.amount === 'number' ? e.amount : 0), 0);
 }
 
 // Смена секции (в любую сторону) — счётчик времени в состоянии с нуля.
@@ -307,6 +321,8 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEven
     }
     // 3. Снижение максимума ОЗ по итоговому N (патч 213): производная
     //    ⌊N/2⌋ — событие для наблюдателей/тестов, состояние не пишется.
+    // Патч 232: событие = потеря текущих ОЗ за этот игровой час (применяет
+    // SurvivalClock; часы сна потерь не дают).
     const maxPenalty = hpMaxPenaltyForFatigue(totalFatigue(state));
     if (maxPenalty > 0) events.push({ type: 'hpMaxPenalty', amount: maxPenalty });
     return events;
@@ -516,7 +532,8 @@ export function survivalEffectRows(
         { key: 'fatigue', n, sources: fatigueSourceBreakdown(survival) },
         { key: 'apPenalty', n },
     ];
+    // Патч 232: строка «потеря ОЗ за игровой час» вместо «Максимум ОЗ: -P».
     const maxPenalty = hpMaxPenaltyForFatigue(n);
-    if (maxPenalty > 0) rows.push({ key: 'maxHpPenalty', n: maxPenalty });
+    if (maxPenalty > 0) rows.push({ key: 'hpPerHour', n: maxPenalty });
     return rows;
 }

@@ -31,7 +31,7 @@ describe('survival: строки эффектов (§6)', () => {
                 ],
             },
             { key: 'apPenalty', n: 3 },
-            { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
+            { key: 'hpPerHour', n: 1 }, // ⌊3/2⌋ (патч 232)
         ]);
     });
 });
@@ -80,7 +80,7 @@ describe('survival: i18n шкал (ru/en)', () => {
     it.each(Object.entries(locales))('%s: шаблоны строк эффектов с {n}', (loc, dict) => {
         expect(dict.survival.fatigue).toContain('{n}');
         expect(dict.survival.apPenalty).toContain('{n}');
-        expect(dict.survival.maxHpPenalty).toContain('{n}'); // патч 213
+        expect(dict.survival.hpPerHour).toContain('{n}'); // патч 232
     });
 
     it.each(Object.entries(locales))('%s: заголовки областей Голод/Жажда/Сон', (loc, dict) => {

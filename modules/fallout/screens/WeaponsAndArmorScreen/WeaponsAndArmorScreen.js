@@ -37,7 +37,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
-import { hpMaxPenaltyForFatigue, ladderColorKey, survivalEffectRows, totalFatigue } from '../../survival/survival';
+import { ladderColorKey, survivalEffectRows } from '../../survival/survival';
 import { useSurvivalState } from '../../survival/hooks';
 import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
 import SleepModal from './modals/SleepModal';
@@ -699,13 +699,11 @@ const WeaponsAndArmorScreen = () => {
   // Выживание (§4 дока): «прекрасно отдохнувший» даёт +2 к макс. ОЗ
   // до следующего сна — hpBonus в состоянии survival.
   const survivalHpBonus = survival?.hpBonus || 0;
-  // Усталость снижает МАКСИМУМ ОЗ, а не текущие (§6, патч 213): −⌊N/2⌋,
-  // производная от текущей усталости; текущие ОЗ не трогаются (как радиация,
-  // законно быть выше максимума). Не ниже нуля.
-  const survivalMaxHpPenalty = survival ? hpMaxPenaltyForFatigue(totalFatigue(survival)) : 0;
+  // Патч 232: усталость больше не снижает максимум ОЗ — по книге она
+  // теряет ТЕКУЩИЕ ОЗ за игровой час (SurvivalClock → applySurvivalHpLoss).
   const effectiveMaxHealth = Math.max(
     0,
-    maxHealth + timedMaxHpBonus + survivalHpBonus - survivalMaxHpPenalty,
+    maxHealth + timedMaxHpBonus + survivalHpBonus,
   );
   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
   

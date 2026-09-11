@@ -515,6 +515,15 @@ export const CharacterProvider = ({ children }) => {
   }, []);
 
 
+  // Патч 232 (по книге, решение владельца): усталость — потеря ТЕКУЩИХ ОЗ.
+  // Каденция — игровой час тика выживания (сцены в приложении не тикают);
+  // часы сна потерь не дают (rest() события hpMaxPenalty не применяет).
+  // Без сопротивлений; до нуля включительно. Зовёт SurvivalClock.
+  const applySurvivalHpLoss = useCallback((loss) => {
+    if (!(loss > 0)) return;
+    setCurrentHealth(prev => Math.max(0, prev - loss));
+  }, []);
+
   // Build a full character state snapshot.
   const buildSnapshot = useCallback(() => ({
     characterName,
@@ -1531,6 +1540,7 @@ export const CharacterProvider = ({ children }) => {
     previewConsumableRadiation,
     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
     advanceScene,
+    applySurvivalHpLoss,
     equippedRobotSlots, setEquippedRobotSlots,
     equippedRobotModules, setEquippedRobotModules,
     // Броня и силовая броня (состояние, рантайм блока, диалог выбора блока и
