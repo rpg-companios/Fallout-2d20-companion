@@ -217,6 +217,11 @@ const useCharacterStore = create(devtools(
       selectedSkills: [],
       extraTaggedSkills: [],
       forcedSelectedSkills: [],
+      // Заболевания/состояния — Шаг 6 миграции (источник — стор).
+      conditions: [],
+      chemDosesLog: [],
+      lastDiseaseResistAt: null,
+      sceneRiskStates: {},
       items: {},
       effects: {},
       // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
@@ -1161,6 +1166,37 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Состояния персонажа (['addicted', 'diseased', ...]) — Шаг 6.
+       * Поддерживает функциональный апдейтер (прецедент setEquippedWeapons).
+       */
+      setConditions: (updater) => {
+        set((state) => ({
+          conditions: typeof updater === 'function' ? updater(state.conditions) : [...(updater || [])],
+        }));
+      },
+
+      /** Журнал доз препаратов ([{ chemId, takenAt }]) — Шаг 6. */
+      setChemDosesLog: (updater) => {
+        set((state) => ({
+          chemDosesLog: typeof updater === 'function' ? updater(state.chemDosesLog) : [...(updater || [])],
+        }));
+      },
+
+      /** Момент последней проверки «Сопротивляться» болезни (v25) — Шаг 6. */
+      setLastDiseaseResistAt: (updater) => {
+        set((state) => ({
+          lastDiseaseResistAt: typeof updater === 'function' ? updater(state.lastDiseaseResistAt) : (updater ?? null),
+        }));
+      },
+
+      /** Состояния проверок риска сцен (ruleId → scene state) — Шаг 6. */
+      setSceneRiskStates: (updater) => {
+        set((state) => ({
+          sceneRiskStates: typeof updater === 'function' ? updater(state.sceneRiskStates) : { ...(updater || {}) },
+        }));
+      },
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1182,6 +1218,10 @@ const useCharacterStore = create(devtools(
           selectedSkills: [],
           extraTaggedSkills: [],
           forcedSelectedSkills: [],
+          conditions: [],
+          chemDosesLog: [],
+          lastDiseaseResistAt: null,
+          sceneRiskStates: {},
           items: {},
           effects: {},
           stateExtensions: {},
@@ -1252,6 +1292,10 @@ const useCharacterStore = create(devtools(
         selectedSkills: state.selectedSkills,
         extraTaggedSkills: state.extraTaggedSkills,
         forcedSelectedSkills: state.forcedSelectedSkills,
+        conditions: state.conditions,
+        chemDosesLog: state.chemDosesLog,
+        lastDiseaseResistAt: state.lastDiseaseResistAt,
+        sceneRiskStates: state.sceneRiskStates,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

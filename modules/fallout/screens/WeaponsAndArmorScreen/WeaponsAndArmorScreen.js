@@ -191,7 +191,9 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
   const moduleLocale = useModuleLocale();
-  const { resistDisease, lastDiseaseResistAt } = useCharacter();
+  const { resistDisease } = useCharacter();
+  // lastDiseaseResistAt — Шаг 6 миграции: состояние в сторе, экран читает напрямую.
+  const lastDiseaseResistAt = useCharacterStore((state) => state.lastDiseaseResistAt);
   const diseasesById = useMemo(() => new Map(
     getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
   ), [moduleLocale]);
