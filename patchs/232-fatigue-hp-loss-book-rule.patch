@@ -1,0 +1,518 @@
+From 05ac155db61050ad53ee09e9fddf230009a20488 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 10:56:42 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A3=D1=81=D1=82=D0=B0=D0=BB=D0=BE=D1=81?=
+ =?UTF-8?q?=D1=82=D1=8C:=20=D0=BF=D0=BE=D1=82=D0=B5=D1=80=D1=8F=20=D0=A2?=
+ =?UTF-8?q?=D0=95=D0=9A=D0=A3=D0=A9=D0=98=D0=A5=20=D0=9E=D0=97=20=D0=B7?=
+ =?UTF-8?q?=D0=B0=20=D0=B8=D0=B3=D1=80=D0=BE=D0=B2=D0=BE=D0=B9=20=D1=87?=
+ =?UTF-8?q?=D0=B0=D1=81=20(=D0=BF=D0=BE=20=D0=BA=D0=BD=D0=B8=D0=B3=D0=B5,?=
+ =?UTF-8?q?=20=D0=BF=D0=B0=D1=82=D1=87=20232);=20=D1=83=D1=82=D0=BE=D1=87?=
+ =?UTF-8?q?=D0=BD=D0=B5=D0=BD=D0=B8=D0=B5=20=D0=BF=D1=80=D0=B0=D0=B2=D0=B8?=
+ =?UTF-8?q?=D0=BB=D0=B0=206=20=D1=87=20=D1=81=D0=BD=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Цитата владельца (11.09) опровергла чтение патча 213: книга говорит
+«Whenever you begin a scene with Fatigue, you lose 1 HP for every 2
+Fatigue» — теряются ТЕКУЩИЕ ОЗ на начале сцены, а не максимум. Решения
+владельца по итогам сверки всей усталостной главы с книгой:
+
+- ОЗ: −⌊N/2⌋ ТЕКУЩИХ ОЗ за игровой час тика выживания (сцены в приложении
+  не тикают — advanceScene спящий код, каденция «сцена → час» как у
+  усталостного слива). Часы сна потерь не дают (сцены для спящего не
+  начинаются). Без сопротивлений, до 0 включительно.
+  - survival.ts: fatigueHpLossFromEvents (сумма событий hpMaxPenalty);
+  - SurvivalClock: применяет потерю через applySurvivalHpLoss контекста;
+  - фасад: + applySurvivalHpLoss; W&A/экран сна: максимум ОЗ от усталости
+    больше не зависит; строка эффектов «maxHpPenalty» → «hpPerHour»
+    («Каждый игровой час: −{n} ОЗ»).
+- Правило 6 ч сна: адаптация ОСТАВЛЕНА (сон ≥6 ч стирает усталость
+  источника «сон» безусловно); в сноску дока §6 внесена точная цитата
+  книги и обоснование (общий слив при недосыпе заблокирован — адаптация
+  сохраняет роль правила и не создаёт «мёртвой ночи»).
+- Док §5/§6/§4 переписан под книжную семантику; история версий 0.4.8.
+
+Лестницы/тайминги сверены с книгой владельца — совпадают полностью.
+Тесты: fatigue-hp-loss (5) + обновлены breakdown/ui-тесты.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/survival/fatigue-breakdown.test.js  |  2 +-
+ __tests__/survival/fatigue-hp-loss.test.js    | 57 ++++++++++++++++
+ __tests__/survival/survival-ui.test.js        |  4 +-
+ components/CharacterContext.js                | 10 +++
+ docs/survival-system-design.md                | 67 ++++++++++++-------
+ .../en-EN/screens/weaponsAndArmor/screen.json |  6 +-
+ .../ru-RU/screens/weaponsAndArmor/screen.json |  6 +-
+ .../WeaponsAndArmorScreen.js                  | 10 ++-
+ .../modals/SleepModal.tsx                     | 13 ++--
+ modules/fallout/survival/SurvivalClock.js     | 14 +++-
+ modules/fallout/survival/survival.ts          | 19 +++++-
+ 11 files changed, 161 insertions(+), 47 deletions(-)
+ create mode 100644 __tests__/survival/fatigue-hp-loss.test.js
+
+diff --git a/__tests__/survival/fatigue-breakdown.test.js b/__tests__/survival/fatigue-breakdown.test.js
+index d58001c..aed3f2b 100644
+--- a/__tests__/survival/fatigue-breakdown.test.js
++++ b/__tests__/survival/fatigue-breakdown.test.js
+@@ -70,7 +70,7 @@ describe('survival: разбивка усталости по источника
+         ],
+       },
+       { key: 'apPenalty', n: 3 },
+-      { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
++      { key: 'hpPerHour', n: 1 }, // ⌊3/2⌋ — потеря ОЗ за игровой час (патч 232)
+     ]);
+     expect(rows[1].sources).toBeUndefined();
+     expect(rows[2].sources).toBeUndefined();
+diff --git a/__tests__/survival/fatigue-hp-loss.test.js b/__tests__/survival/fatigue-hp-loss.test.js
+new file mode 100644
+index 0000000..68a8e32
+--- /dev/null
++++ b/__tests__/survival/fatigue-hp-loss.test.js
+@@ -0,0 +1,57 @@
++// Патч 232 (решение владельца, по книге): усталость — потеря ТЕКУЩИХ ОЗ
++// «на начале сцены» (⌊N/2⌋, без сопротивлений). Сцены в приложении не
++// тикают (advanceScene — спящий код), поэтому потеря привязана к игровому
++// часу тика выживания: SurvivalClock суммирует события hpMaxPenalty за тик
++// (fatigueHpLossFromEvents) и применяет через applySurvivalHpLoss контекста
++// (до 0 включительно). Часы сна потерь не дают: rest() события не применяет.
++//
++// История: патч 213 снижал МАКСИМУМ ОЗ («по книге») — цитата владельца от
++// 2026-09-11 опровергла: книга отнимает текущие ОЗ на начале сцены.
++
++import { describe, expect, it } from 'vitest';
++import {
++  createSurvivalState,
++  addFatigue,
++  advanceHours,
++  fatigueHpLossFromEvents,
++  hpMaxPenaltyForFatigue,
++} from '../../modules/fallout/survival/survival';
++
++describe('усталость → потеря текущих ОЗ (патч 232)', () => {
++  it('величина потери: ⌊N/2⌋', () => {
++    expect(hpMaxPenaltyForFatigue(0)).toBe(0);
++    expect(hpMaxPenaltyForFatigue(1)).toBe(0);
++    expect(hpMaxPenaltyForFatigue(2)).toBe(1);
++    expect(hpMaxPenaltyForFatigue(5)).toBe(2);
++  });
++
++  it('часовой тик с усталостью 3 даёт событие потери 1 ОЗ', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'food', 3);
++    const { events } = advanceHours(s, 1);
++    const loss = fatigueHpLossFromEvents(events);
++    expect(loss).toBe(1);
++  });
++
++  it('без усталости потерь нет', () => {
++    const { events } = advanceHours(createSurvivalState('human'), 2);
++    expect(fatigueHpLossFromEvents(events)).toBe(0);
++  });
++
++  it('за N часов — по потере на каждый час (усталость не снята)', () => {
++    // Усталость 4 на дне еды: слив заморожен (еда 1 < 2), потери каждый час.
++    const s = createSurvivalState('human');
++    s.food = 1;
++    addFatigue(s, 'food', 4);
++    const { events } = advanceHours(s, 3);
++    expect(fatigueHpLossFromEvents(events)).toBe(2 * 3); // ⌊4/2⌋ = 2 за час × 3
++  });
++
++  it('после снятия усталости потери прекращаются', () => {
++    const s = createSurvivalState('human');
++    addFatigue(s, 'sleep', 1);
++    // Все лестницы в норме → усталость снимется в первый же час, потерь не будет.
++    const { events } = advanceHours(s, 2);
++    expect(fatigueHpLossFromEvents(events)).toBe(0);
++  });
++});
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+index bc15869..1ee6748 100644
+--- a/__tests__/survival/survival-ui.test.js
++++ b/__tests__/survival/survival-ui.test.js
+@@ -31,7 +31,7 @@ describe('survival: строки эффектов (§6)', () => {
+                 ],
+             },
+             { key: 'apPenalty', n: 3 },
+-            { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
++            { key: 'hpPerHour', n: 1 }, // ⌊3/2⌋ (патч 232)
+         ]);
+     });
+ });
+@@ -80,7 +80,7 @@ describe('survival: i18n шкал (ru/en)', () => {
+     it.each(Object.entries(locales))('%s: шаблоны строк эффектов с {n}', (loc, dict) => {
+         expect(dict.survival.fatigue).toContain('{n}');
+         expect(dict.survival.apPenalty).toContain('{n}');
+-        expect(dict.survival.maxHpPenalty).toContain('{n}'); // патч 213
++        expect(dict.survival.hpPerHour).toContain('{n}'); // патч 232
+     });
+ 
+     it.each(Object.entries(locales))('%s: заголовки областей Голод/Жажда/Сон', (loc, dict) => {
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index c169d8f..fbc1efe 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -515,6 +515,15 @@ export const CharacterProvider = ({ children }) => {
+   }, []);
+ 
+ 
++  // Патч 232 (по книге, решение владельца): усталость — потеря ТЕКУЩИХ ОЗ.
++  // Каденция — игровой час тика выживания (сцены в приложении не тикают);
++  // часы сна потерь не дают (rest() события hpMaxPenalty не применяет).
++  // Без сопротивлений; до нуля включительно. Зовёт SurvivalClock.
++  const applySurvivalHpLoss = useCallback((loss) => {
++    if (!(loss > 0)) return;
++    setCurrentHealth(prev => Math.max(0, prev - loss));
++  }, []);
++
+   // Build a full character state snapshot.
+   const buildSnapshot = useCallback(() => ({
+     characterName,
+@@ -1531,6 +1540,7 @@ export const CharacterProvider = ({ children }) => {
+     previewConsumableRadiation,
+     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
+     advanceScene,
++    applySurvivalHpLoss,
+     equippedRobotSlots, setEquippedRobotSlots,
+     equippedRobotModules, setEquippedRobotModules,
+     // Броня и силовая броня (состояние, рантайм блока, диалог выбора блока и
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 4aee7bb..876eb21 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -6,9 +6,10 @@
+ родовой механизм расширений состояния движка; употребление еды/напитков
+ любым путём двигает шкалы (патч 208 — слушатель расходников); состояние
+ выживания живёт в зустанд-слайсе `stateExtensions` стора (патч 209);
+-усталость снижает МАКСИМУМ ОЗ, а не текущие — по книге (патч 213);
++усталость отнимает ТЕКУЩИЕ ОЗ за игровой час — по книге, патч 232
++(в 213 ошибочно считалось, что книга снижает максимум — см. §6);
+ болезни с рангами — лечение, усталость от болезни и сопротивление
+-(патч 215).
++(патч 215). Цветовая индикация лестниц и строка «−ОЗ за час» — патч 231/232.
+ Настройки системы и реальный тик времени — патч 210 (этап 5).
+ Следующий шаг — этап 6 (движок ОД без UI, §8).
+ 
+@@ -155,8 +156,9 @@ human/mutant — шкалы им положены по правилу типа.
+    переходы в штрафные зоны и периодические очки на дне;
+ 2. Снятие Усталости: −1 очко, если по итоговым состояниям еда ≥ 2,
+    вода ≥ 2, сон ≥ 3 (не ниже 0);
+-3. Снижение максимума ОЗ: −⌊N/2⌋ по итоговому N, без сопротивлений
+-   (см. §6); текущие ОЗ не трогаются.
++3. Потеря текущих ОЗ: −⌊N/2⌋ по итоговому N, без сопротивлений
++   (см. §6); применяется SurvivalClock через applySurvivalHpLoss.
++   Часы сна потерь не дают (сцены для спящего не начинаются).
+ 
+ ---
+ 
+@@ -176,14 +178,20 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ - каждый набор ОД — на 1 меньше за каждое очко Усталости, до минимума 0
+   (правило движка ОД, §8; в UI отображается строкой, считает игрок/движок);
+-- **снижение максимума ОЗ на ⌊N/2⌋** (1 за каждые 2 очка), без
+-  сопротивлений — по книге усталость дренирует максимум ОЗ, а не текущие
+-  (патч 213); ранее решением владельца вместо книги («начало сцены»)
+-  величина пересчитывалась почасово, но вычиталась из ТЕКУЩИХ ОЗ —
+-  исправлено. Величина производная от текущего N: отдельного аккумулятора
+-  нет, при снятии Усталости максимум возвращается сам;
+-- **текущие ОЗ не трогаются**: если они выше сниженного максимума — законное
+-  состояние (как радиация); лечение упирается в сниженный максимум.
++- **потеря текущих ОЗ: −⌊N/2⌋ на начале каждой сцены с Усталостью**
++  (1 за каждые 2 очка), без сопротивлений — дословно по книге: «Whenever
++  you begin a scene with Fatigue, you lose 1 HP for every 2 Fatigue you
++  have. This is not reduced by any form of damage resistance». Величина
++  производная от текущего N: отдельного аккумулятора нет, при снятии
++  Усталости потери прекращаются сами. Патч 232 вернул книжное чтение
++  (текущие ОЗ): в 213 ошибочно считалось, что «по книге» снижается
++  МАКСИМУМ ОЗ, — цитата владельца 2026-09-11 это опровергла;
++- **каденция в приложении** (решение владельца, 2026-09-11): сцены в
++  приложении не тикают (`advanceScene` — спящий код, UI нет), поэтому
++  потеря привязана к игровому часу тика выживания — та же замена
++  «сцена → час», что и для снятия Усталости. Часы сна потерь не дают:
++  сон идёт через `rest()` и события `hpMaxPenalty` не применяет.
++  Текущие ОЗ могут упасть до 0 — Усталость снова стала опасной.
+ 
+ **Снятие:**
+ 
+@@ -192,9 +200,17 @@ human/mutant — шкалы им положены по правилу типа.
+ - сон ≥6 ч — списывается **вся усталость источника `sleep`**, на 6-м
+   накопленном часе сна; усталость от голода/жажды остаётся.
+ 
+-Сноска: «снимаете всю усталость, вызванную недосыпанием и усталостью» —
+-принято как единый источник «сон» (лестница сна и есть недосып), второй
+-член — артефакт перевода.
++Сноска (уточнена владельцем 2026-09-11 по оригиналу): книга говорит
++«If you sleep for six or more hours, you remove **all** Fatigue **as long
++as you had no sources of Fatigue other than sleep deprivation** (which is
++solved by sleeping) before you started sleeping» — то есть ВСЯ усталость,
++но ТОЛЬКО если других источников не было. В приложении принята адаптация
++(решение владельца): 6+ ч сна списывают усталость источника `sleep`
++безусловно. Обоснование: в книге общий слив (−1) при недосыпе заблокирован
++(«free from all sources»), поэтому правило 6 ч — единственный механизм
++снятия усталости сна; адаптация сохраняет эту роль и не создаёт «мёртвой
++ночи» (буквальная книга + часовой слив: лёг измождённым и голодным — за
++ночь не сдвинется ничего, т.к. слив заблокирован лестницей сна < 3).
+ 
+ Правило книги «−1 за конец небоевой сцены» **заменено** часовым снятием
+ (решение владельца) — различение боевых/небоевых сцен для выживания
+@@ -202,16 +218,16 @@ human/mutant — шкалы им положены по правилу типа.
+ 
+ **Усталость во сне:** часы сна — те же игровые часы: усталость во сне
+ начисляется и снимается как обычно (на 6-м часе — вся усталость источника
+-«сон»), снижение максимума ОЗ пересчитывается вместе с N. Текущие ОЗ сон
+-не трогает — предупреждение о достижении 0 ОЗ из модали убрано (патч 213);
+-прогноз показывает итоговый максимум ОЗ.
++«сон»). Потерь ОЗ во сне нет: сцены для спящего не начинаются (патч 232);
++прогноз сна показывает максимум ОЗ (от усталости не зависит — только
++бонус «прекрасно отдохнувшего»).
+ 
+ **UI:** в секции «Эффекты» карточки персонажа:
+ 
+ ```
+ Усталость N            (при N ≥ 1)
+ Количество получаемых ОД −M   (M = N, при N ≥ 1)
+-Максимум ОЗ: −P        (P = ⌊N/2⌋, при P ≥ 1)
++Каждый игровой час: −P ОЗ   (P = ⌊N/2⌋, при P ≥ 1; патч 232)
+ ```
+ 
+ У строки «Усталость» в скобках — активные источники (патч 217):
+@@ -252,8 +268,8 @@ human/mutant — шкалы им положены по правилу типа.
+   механике** — событие `sleepOnGround` правила `diseaseExposure`
+   (`modules/fallout/data/rules/diseaseExposure.json`: END + SURVIVAL,
+   rollD20, таблица болезней, иммунитет «disease»). Новых правил не вводим.
+-- Перед подтверждением — прогноз: шаг всех шкал, усталость, итоговый
+-  максимум ОЗ (§6); текущие ОЗ сон не трогает (патч 213).
++- Перед подтверждением — прогноз: шаг всех шкал, усталость, максимум ОЗ
++  (от усталости не зависит — патч 232); потерь ОЗ во сне нет.
+ 
+ ### Болезни — ранги, лечение, сопротивление (патч 215)
+ 
+@@ -503,8 +519,13 @@ survival: {
+   часовое снятие её не трогает); кнопка «Сопротивляться» — 2d20 против
+   ВЫН + Выживание, грань 1 и отмеченный навык дают 2 успеха, успехи ≥ ранга
+   излечивают, 20 повышает ранг; раз в сутки.
+-- **0.4.5 (2026-09-08):** усталость снижает максимум ОЗ, а не текущие —
+-  по книге (патч 213); прогноз сна показывает максимум ОЗ.
++- **0.4.5 (2026-09-08):** усталость снижает максимум ОЗ — позднее
++  признано ошибочным чтением книги (патч 232 вернул текущие ОЗ);
++  прогноз сна показывает максимум ОЗ.
++- **0.4.8 (2026-09-11):** патч 232 — усталость снова отнимает ТЕКУЩИЕ ОЗ
++  (−⌊N/2⌋ за игровой час тика, сон исключён; каденция «сцена → час»);
++  сноска правила 6 ч сна уточнена точной цитатой книги (адаптация
++  сохранена решением владельца).
+ - **0.4.4 (2026-09-07):** этап 5 — настройки и реальный тик (патч 210).
+   Раздел «Выживание» в настройках: `survivalModeEnabled` (выкл по
+   умолчанию; выкл = шкалы скрыты, трекинг заморожен, состояние в сейве
+diff --git a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 6d0a24d..56bb43b 100644
+--- a/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -246,7 +246,6 @@
+       "disease": "disease"
+     },
+     "apPenalty": "Action Points gained −{n}",
+-    "maxHpPenalty": "Max HP: −{n}",
+     "foodTitle": "Hunger",
+     "waterTitle": "Thirst",
+     "sleepTitle": "Sleep",
+@@ -268,6 +267,7 @@
+     "drink": {
+       "title": "Drinks",
+       "empty": "No drinks in inventory"
+-    }
++    },
++    "hpPerHour": "Each game hour: −{n} HP"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 097249f..08106d7 100644
+--- a/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -246,7 +246,6 @@
+       "disease": "болезнь"
+     },
+     "apPenalty": "Количество получаемых ОД −{n}",
+-    "maxHpPenalty": "Максимум ОЗ: −{n}",
+     "foodTitle": "Голод",
+     "waterTitle": "Жажда",
+     "sleepTitle": "Сон",
+@@ -268,6 +267,7 @@
+     "drink": {
+       "title": "Питьё",
+       "empty": "В инвентаре нет напитков"
+-    }
++    },
++    "hpPerHour": "Каждый игровой час: −{n} ОЗ"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index d3e6cb5..b0a3910 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -37,7 +37,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects,
+ import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
+ import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+ import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
+-import { hpMaxPenaltyForFatigue, ladderColorKey, survivalEffectRows, totalFatigue } from '../../survival/survival';
++import { ladderColorKey, survivalEffectRows } from '../../survival/survival';
+ import { useSurvivalState } from '../../survival/hooks';
+ import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
+ import SleepModal from './modals/SleepModal';
+@@ -699,13 +699,11 @@ const WeaponsAndArmorScreen = () => {
+   // Выживание (§4 дока): «прекрасно отдохнувший» даёт +2 к макс. ОЗ
+   // до следующего сна — hpBonus в состоянии survival.
+   const survivalHpBonus = survival?.hpBonus || 0;
+-  // Усталость снижает МАКСИМУМ ОЗ, а не текущие (§6, патч 213): −⌊N/2⌋,
+-  // производная от текущей усталости; текущие ОЗ не трогаются (как радиация,
+-  // законно быть выше максимума). Не ниже нуля.
+-  const survivalMaxHpPenalty = survival ? hpMaxPenaltyForFatigue(totalFatigue(survival)) : 0;
++  // Патч 232: усталость больше не снижает максимум ОЗ — по книге она
++  // теряет ТЕКУЩИЕ ОЗ за игровой час (SurvivalClock → applySurvivalHpLoss).
+   const effectiveMaxHealth = Math.max(
+     0,
+-    maxHealth + timedMaxHpBonus + survivalHpBonus - survivalMaxHpPenalty,
++    maxHealth + timedMaxHpBonus + survivalHpBonus,
+   );
+   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
+   
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+index d03c46a..43df8fb 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -1,8 +1,8 @@
+ // Модалка сна выживания (docs/survival-system-design.md §4, §5, §7).
+ //
+ // Место (кровать/пустошь) и часы 1–24. Перед подтверждением — прогноз
+-// чистым доменом forecastSleep (шаг шкал, усталость, итоговый максимум ОЗ:
+-// усталость снижает МАКСИМУМ ОЗ, а не текущие — патч 213, §6). Подтверждение
++// чистым доменом forecastSleep (шаг шкал, усталость; максимум ОЗ от
++// усталости не зависит — патч 232). Подтверждение
+ // — операция контекста sleepSurvival: применяет rest(), двигает таймеры
+ // эффектов на N × 12 сцен (мост контуров, §5) и в пустоши проверяет болезнь
+ // по имеющейся механике (событие sleepOnGround).
+@@ -13,9 +13,7 @@ import { useCharacter } from '../../../../../components/CharacterContext';
+ import { calculateMaxHealth } from '../../../../../domain/characterCreation';
+ import {
+     forecastSleep,
+-    hpMaxPenaltyForFatigue,
+     SURVIVAL_RULES,
+-    totalFatigue,
+     type SleepPlace,
+     type SurvivalState,
+     type RestResult,
+@@ -42,10 +40,11 @@ interface ForecastLine {
+     tone: 'neutral' | 'positive' | 'negative';
+ }
+ 
+-// Максимум ОЗ после сна: базовый + бонус «прекрасно отдохнувший» −
+-// снижение от усталости (⌊N/2⌋, патч 213). Не ниже нуля.
++// Максимум ОЗ после сна: базовый + бонус «прекрасно отдохнувший».
++// Патч 232: усталость больше не снижает максимум (потеря текущих ОЗ
++// за игровой час — SurvivalClock). Не ниже нуля.
+ const maxHpAfterSleep = (state: SurvivalState, baseMaxHealth: number): number =>
+-    Math.max(0, baseMaxHealth + state.hpBonus - hpMaxPenaltyForFatigue(totalFatigue(state)));
++    Math.max(0, baseMaxHealth + state.hpBonus);
+ 
+ const buildForecastLines = (forecast: RestResult, baseMaxHealth: number): ForecastLine[] => {
+     const lines: ForecastLine[] = [
+diff --git a/modules/fallout/survival/SurvivalClock.js b/modules/fallout/survival/SurvivalClock.js
+index 7e1769d..62427fb 100644
+--- a/modules/fallout/survival/SurvivalClock.js
++++ b/modules/fallout/survival/SurvivalClock.js
+@@ -14,6 +14,12 @@
+ // не трогаются: усталость снижает МАКСИМУМ ОЗ (производная от N, патч 213),
+ // и это пересчитывается в сторе самим тиком.
+ //
++// Патч 232 (решение владельца, по книге): усталость — потеря ТЕКУЩИХ ОЗ
++// «на начале сцены» (N/2 без сопротивлений). Сцены в приложении не тикают,
++// поэтому потеря привязана к игровому часу тика (сумма событий hpMaxPenalty)
++// и применяется через applySurvivalHpLoss контекста. Часы сна потерь не
++// дают: сон идёт через rest() (sleepSurvival), а не через эти тики.
++//
+ // Движок не знает правил: компонент читает настройки через общий стор,
+ // состояние — из слайса stateExtensions.
+ 
+@@ -21,12 +27,14 @@ import { useEffect } from 'react';
+ import { AppState } from 'react-native';
+ import useCharacterStore from '../../../src/store/characterStore';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+-import { advanceRealMinutes } from './survival';
++import { advanceRealMinutes, fatigueHpLossFromEvents } from './survival';
++import { useCharacter } from '../../../components/CharacterContext';
+ 
+ const TICK_INTERVAL_MS = 30_000;
+ const MAX_REAL_MINUTES_PER_TICK = 5;
+ 
+ const SurvivalClock = () => {
++  const { applySurvivalHpLoss } = useCharacter();
+   useEffect(() => {
+     let lastTickAt = null;
+     let timer = null;
+@@ -50,6 +58,10 @@ const SurvivalClock = () => {
+       if (!(course > 0)) return; // страховка: домен бросает на неположительном курсе
+       const result = advanceRealMinutes(survival, elapsedRealMinutes, course);
+       store.setStateExtension('survival', result.state);
++
++      // Патч 232: потеря текущих ОЗ от усталости за прошедшие игровые часы.
++      const hpLoss = fatigueHpLossFromEvents(result.events);
++      if (hpLoss > 0) applySurvivalHpLoss(hpLoss);
+     };
+ 
+     const stop = () => {
+diff --git a/modules/fallout/survival/survival.ts b/modules/fallout/survival/survival.ts
+index 21fab2c..444702b 100644
+--- a/modules/fallout/survival/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -228,10 +228,24 @@ export function clearFatigueSource(state: SurvivalState, source: FatigueSource):
+ // МАКСИМУМ ОЗ, а не текущие — величина производная от текущего N:
+ // пересчитывается каждый игровой час (шаг 3 тика), отдельного аккумулятора
+ // в состоянии нет; при снятии Усталости максимум возвращается сам.
++// Патч 232 (решение владельца, по книге): усталость — потеря ТЕКУЩИХ ОЗ
++// «на начале сцены»: N/2 без сопротивлений. В приложении сцены не тикают
++// (advanceScene — спящий код), поэтому потеря привязана к игровому часу
++// тика выживания (каденция «сцена -> час» — как у снятия усталости); часы
++// сна потерь не дают (сцены для спящего не начинаются). Функция возвращает
++// величину потери за час/сцену; применяет её SurvivalClock.
+ export function hpMaxPenaltyForFatigue(fatigueTotal: number): number {
+     return Math.floor(fatigueTotal / 2);
+ }
+ 
++// Суммарная потеря ОЗ по событиям часового тика (SurvivalClock применяет её
++// к текущим ОЗ через applySurvivalHpLoss; rest()/сон события не применяет).
++export function fatigueHpLossFromEvents(events: SurvivalEvent[]): number {
++    return events
++        .filter((e) => e.type === 'hpMaxPenalty')
++        .reduce((sum, e) => sum + (typeof e.amount === 'number' ? e.amount : 0), 0);
++}
++
+ // Смена секции (в любую сторону) — счётчик времени в состоянии с нуля.
+ function bumpLadder(state: SurvivalState, key: SurvivalLadder, delta: number): number {
+     const max = SURVIVAL_RULES.max[key];
+@@ -307,6 +321,8 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEven
+     }
+     // 3. Снижение максимума ОЗ по итоговому N (патч 213): производная
+     //    ⌊N/2⌋ — событие для наблюдателей/тестов, состояние не пишется.
++    // Патч 232: событие = потеря текущих ОЗ за этот игровой час (применяет
++    // SurvivalClock; часы сна потерь не дают).
+     const maxPenalty = hpMaxPenaltyForFatigue(totalFatigue(state));
+     if (maxPenalty > 0) events.push({ type: 'hpMaxPenalty', amount: maxPenalty });
+     return events;
+@@ -516,7 +532,8 @@ export function survivalEffectRows(
+         { key: 'fatigue', n, sources: fatigueSourceBreakdown(survival) },
+         { key: 'apPenalty', n },
+     ];
++    // Патч 232: строка «потеря ОЗ за игровой час» вместо «Максимум ОЗ: -P».
+     const maxPenalty = hpMaxPenaltyForFatigue(n);
+-    if (maxPenalty > 0) rows.push({ key: 'maxHpPenalty', n: maxPenalty });
++    if (maxPenalty > 0) rows.push({ key: 'hpPerHour', n: maxPenalty });
+     return rows;
+ }
+-- 
+2.39.5
+
