@@ -1,0 +1,955 @@
+From 502007b24d1a87b23c1e6bdb72828983c6dabead Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 05:02:31 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A8=D0=B0=D0=B3=205=20=D0=BC=D0=B8=D0=B3?=
+ =?UTF-8?q?=D1=80=D0=B0=D1=86=D0=B8=D0=B8:=20attributes/skills=20+=20selec?=
+ =?UTF-8?q?tion-=D1=81=D0=BF=D0=B8=D1=81=D0=BA=D0=B8=20=E2=80=94=20=D0=B2?=
+ =?UTF-8?q?=20characterStore?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- characterStore: начальный стейт сеется дефолтами создания (7 атрибутов,
+  полный каталог навыков со значением 0); setBaseAttributes/setBaseSkills —
+  абсолютная запись; selection-списки (selectedSkills/extraTaggedSkills/
+  forcedSelectedSkills) в сторе, сеттеры с функциональным апдейтером;
+  partialize и resetCharacterStore расширены (сброс без аргументов сеет дефолты).
+- selectors: selectLegacyAttributes/selectLegacySkills — единая реализация
+  вывода legacy-массивов из словарей (провайдер и экраны).
+- CharacterContext: пять useState убраны, массивы — производные (memo по
+  словарям стора); подсевающий эффект «если dict пуст» удалён (queueMicrotask
+  сохранён ради setCharacterContext); loadCharacter/resetCharacter/resetKit
+  пишут через стор; зеркало setAttributes в commitAttributeChanges убрано.
+- CharacterScreen: экран напрямую на стор; двойной мост dict→array и
+  дельта-зеркала (syncSkillStore/syncTraitSkillDelta/loadFromLegacyData-
+  подсевы/updateAttribute/updateSkill) удалены; хендлеры toggle/changeValue/
+  changeAttribute/трейт-конфирм/reset делают одну абсолютную запись.
+- Формат сейва не менялся: buildSnapshot читает производные массивы.
+- Тесты: attributes-skills-store-slice (12) + AST-контракт фасада (8).
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../attributes-skills-store-slice.test.js     | 145 ++++++++++++
+ .../character-context-step5-facade.test.js    | 136 +++++++++++
+ components/CharacterContext.js                |  77 ++++---
+ .../CharacterScreen/CharacterScreen.js        | 216 ++++++------------
+ src/store/characterStore.js                   |  72 +++++-
+ src/store/selectors.js                        |  26 +++
+ 6 files changed, 487 insertions(+), 185 deletions(-)
+ create mode 100644 __tests__/saves/attributes-skills-store-slice.test.js
+ create mode 100644 __tests__/saves/character-context-step5-facade.test.js
+
+diff --git a/__tests__/saves/attributes-skills-store-slice.test.js b/__tests__/saves/attributes-skills-store-slice.test.js
+new file mode 100644
+index 0000000..1c47832
+--- /dev/null
++++ b/__tests__/saves/attributes-skills-store-slice.test.js
+@@ -0,0 +1,145 @@
++// Шаг 5 миграции attributes/skills из CharacterContext в characterStore:
++// словари Parameter-формата — ЕДИНЫЙ источник; legacy-массивы — производные
++// (селекторы selectLegacyAttributes/selectLegacySkills, общие для провайдера
++// и экранов). Начальный стейт сеется дефолтами создания, «пустой словарь при
++// открытом UI» — недопустимое состояние (снимает подсевающий эффект из
++// CharacterProvider). Запись — абсолютная (setBaseAttributes/setBaseSkills),
++// дельта-зеркала (updateAttribute/updateSkill + loadFromLegacyData-подсев)
++// из экранов убраны. Selection-списки (selectedSkills/extraTaggedSkills/
++// forcedSelectedSkills) тоже переехали: сеттеры поддерживают функциональный
++// апдейтер (прецедент setEquippedWeapons).
++//
++// НЕ в этом тесте: фасад useCharacter() (проверяется статически по AST в
++// character-context-step5-facade.test.js — CharacterContext в vitest не
++// импортируется, react-native Flow).
++
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import { selectLegacyAttributes, selectLegacySkills } from '../../src/store/selectors';
++import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: слайс attributes/skills (Шаг 5)', () => {
++  it('начальный стейт сеется дефолтами создания: 7 атрибутов по 4', () => {
++    const { attributes } = useCharacterStore.getState();
++    expect(Object.keys(attributes).sort()).toEqual(['AGI', 'CHA', 'END', 'INT', 'LCK', 'PER', 'STR']);
++    expect(selectLegacyAttributes({ attributes })).toEqual(createInitialAttributes());
++  });
++
++  it('начальный стейт сеется полным каталогом навыков со значением 0', () => {
++    const { skills } = useCharacterStore.getState();
++    expect(Object.keys(skills).length).toBe(ALL_SKILLS.length);
++    const legacy = selectLegacySkills({ skills });
++    expect(legacy.map((s) => s.name)).toEqual(ALL_SKILLS.map((s) => s.name));
++    expect(legacy.every((s) => s.value === 0)).toBe(true);
++  });
++
++  it('selectLegacyAttributes выводит {name, value} из словаря {id, base}', () => {
++    useCharacterStore.getState().setBaseAttributes([
++      { name: 'STR', value: 7 },
++      { name: 'LCK', value: 5 },
++    ]);
++    const legacy = selectLegacyAttributes({ attributes: useCharacterStore.getState().attributes });
++    expect(legacy).toEqual([
++      { name: 'STR', value: 7 },
++      { name: 'LCK', value: 5 },
++    ]);
++  });
++
++  it('selectLegacySkills сохраняет порядок каталога и подставляет value из base', () => {
++    useCharacterStore.getState().setBaseSkills([
++      { name: ALL_SKILLS[0].name, value: 3 },
++      { name: ALL_SKILLS[2].name, value: 2 },
++    ]);
++    const legacy = selectLegacySkills({ skills: useCharacterStore.getState().skills });
++    expect(legacy.map((s) => s.name)).toEqual(ALL_SKILLS.map((s) => s.name));
++    expect(legacy[0].value).toBe(3);
++    expect(legacy[2].value).toBe(2);
++    expect(legacy[1].value).toBe(0);
++  });
++
++  it('setBaseAttributes — абсолютная запись: ключи вне нового массива исчезают', () => {
++    useCharacterStore.getState().setBaseAttributes(createInitialAttributes());
++    useCharacterStore.getState().setBaseAttributes([{ name: 'STR', value: 8 }]);
++    expect(Object.keys(useCharacterStore.getState().attributes)).toEqual(['STR']);
++  });
++
++  it('setBaseSkills — абсолютная запись: заменяет словарь целиком', () => {
++    useCharacterStore.getState().setBaseSkills([
++      { name: ALL_SKILLS[0].name, value: 6 },
++      { name: ALL_SKILLS[1].name, value: 5 },
++    ]);
++    const { skills } = useCharacterStore.getState();
++    expect(Object.keys(skills).sort()).toEqual([ALL_SKILLS[0].name, ALL_SKILLS[1].name].sort());
++  });
++
++  it('resetCharacterStore() без аргументов сеет дефолты (инвариант непустого словаря)', () => {
++    useCharacterStore.getState().setBaseAttributes([{ name: 'STR', value: 8 }]);
++    useCharacterStore.getState().resetCharacterStore();
++    const { attributes, skills } = useCharacterStore.getState();
++    expect(selectLegacyAttributes({ attributes })).toEqual(createInitialAttributes());
++    expect(Object.keys(skills).length).toBe(ALL_SKILLS.length);
++  });
++
++  it('resetCharacterStore(legacyDefaults) использует переданные дефолты и чистит selection-списки', () => {
++    const store = useCharacterStore.getState();
++    store.setSelectedSkills(['barter']);
++    store.setExtraTaggedSkills(['lockpick']);
++    store.setForcedSelectedSkills(['melee']);
++    store.resetCharacterStore({
++      attributes: [{ name: 'STR', value: 6 }],
++      skills: [{ name: ALL_SKILLS[0].name, value: 3 }],
++    });
++    const state = useCharacterStore.getState();
++    expect(selectLegacyAttributes({ attributes: state.attributes })).toEqual([{ name: 'STR', value: 6 }]);
++    expect(state.selectedSkills).toEqual([]);
++    expect(state.extraTaggedSkills).toEqual([]);
++    expect(state.forcedSelectedSkills).toEqual([]);
++  });
++});
++
++describe('characterStore: selection-списки навыков (Шаг 5)', () => {
++  it('начальные списки пусты', () => {
++    const state = useCharacterStore.getState();
++    expect(state.selectedSkills).toEqual([]);
++    expect(state.extraTaggedSkills).toEqual([]);
++    expect(state.forcedSelectedSkills).toEqual([]);
++  });
++
++  it('прямой сет списка (абсолютная запись)', () => {
++    const store = useCharacterStore.getState();
++    store.setSelectedSkills(['barter', 'science']);
++    store.setExtraTaggedSkills(['lockpick']);
++    store.setForcedSelectedSkills(['melee']);
++    const state = useCharacterStore.getState();
++    expect(state.selectedSkills).toEqual(['barter', 'science']);
++    expect(state.extraTaggedSkills).toEqual(['lockpick']);
++    expect(state.forcedSelectedSkills).toEqual(['melee']);
++  });
++
++  it('функциональный апдейтер prev => next (паттерн экрана)', () => {
++    const store = useCharacterStore.getState();
++    store.setSelectedSkills(['barter']);
++    store.setSelectedSkills((prev) => [...prev, 'science']);
++    store.setExtraTaggedSkills((prev) => prev.filter((s) => s !== 'lockpick'));
++    store.setForcedSelectedSkills((prev) => [...new Set([...prev, 'melee'])]);
++    const state = useCharacterStore.getState();
++    expect(state.selectedSkills).toEqual(['barter', 'science']);
++    expect(state.extraTaggedSkills).toEqual([]);
++    expect(state.forcedSelectedSkills).toEqual(['melee']);
++  });
++
++  it('selection-списки входят в partialize (переживают rehydrate)', async () => {
++    const store = useCharacterStore.getState();
++    store.setSelectedSkills(['barter']);
++    store.setForcedSelectedSkills(['melee']);
++    await useCharacterStore.persist.rehydrate();
++    const state = useCharacterStore.getState();
++    expect(state.selectedSkills).toEqual(['barter']);
++    expect(state.forcedSelectedSkills).toEqual(['melee']);
++  });
++});
+diff --git a/__tests__/saves/character-context-step5-facade.test.js b/__tests__/saves/character-context-step5-facade.test.js
+new file mode 100644
+index 0000000..cb45e11
+--- /dev/null
++++ b/__tests__/saves/character-context-step5-facade.test.js
+@@ -0,0 +1,136 @@
++// Шаг 5 миграции attributes/skills: фасад useCharacter() больше не отдаёт
++// сеттеры полей, ставших словарями стора (setAttributes/setSkills +
++// selection-списки setSelectedSkills/setExtraTaggedSkills/setForcedSelectedSkills).
++// Экраны читают производные массивы из контекста, пишут ТОЛЬКО в стор
++// (setBaseAttributes/setBaseSkills + стор-экшены selection-списков).
++// Дельта-зеркала (updateAttribute/updateSkill + подсев loadFromLegacyData)
++// из CharacterScreen убраны: стор — единственный источник.
++//
++// CharacterContext в vitest не импортируется (react-native Flow), поэтому
++// контракт проверяется статически по AST, как в
++// character-context-updater-purity.test.js и survival/character-context-imports.test.js.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { parseSync } from '@babel/core';
++import jsxPlugin from '@babel/plugin-transform-react-jsx';
++
++const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
++const SCREEN_FILE = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js');
++
++const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
++  filename: file,
++  babelrc: false,
++  configFile: false,
++  sourceType: 'module',
++  plugins: [jsxPlugin],
++});
++
++const walk = (node, visit) => {
++  if (!node || typeof node !== 'object') return;
++  if (Array.isArray(node)) {
++    node.forEach((child) => walk(child, visit));
++    return;
++  }
++  if (typeof node.type === 'string') visit(node);
++  Object.values(node).forEach((value) => walk(value, visit));
++};
++
++const propertyName = (prop) => {
++  if (!prop) return null;
++  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
++    const key = prop.key;
++    if (key.type === 'Identifier') return key.name;
++    if (key.type === 'StringLiteral') return key.value;
++  }
++  return null;
++};
++
++// ─── Фасад контекста ───
++
++describe('Шаг 5: фасад useCharacter() без сеттеров атрибутов/навыков', () => {
++  const ast = parse(CONTEXT_FILE);
++
++  const valueObjects = [];
++  walk(ast, (node) => {
++    if (node.type === 'ObjectExpression'
++      && node.properties.some((prop) => propertyName(prop) === 'attributesSaved')) {
++      valueObjects.push(node);
++    }
++  });
++
++  it('объект value провайдера найден', () => {
++    expect(valueObjects.length).toBeGreaterThanOrEqual(1);
++  });
++
++  it('в value нет setAttributes/setSkills и сеттеров selection-списков', () => {
++    const forbidden = ['setAttributes', 'setSkills', 'setSelectedSkills', 'setExtraTaggedSkills', 'setForcedSelectedSkills'];
++    for (const object of valueObjects) {
++      const names = object.properties.map(propertyName);
++      expect(names.filter((name) => forbidden.includes(name))).toEqual([]);
++    }
++  });
++
++  it('в value остались только чтения: атрибуты/навыки/selection-списки', () => {
++    const required = ['attributes', 'skills', 'selectedSkills', 'extraTaggedSkills', 'forcedSelectedSkills'];
++    const names = valueObjects.flatMap((object) => object.properties.map(propertyName));
++    for (const name of required) {
++      expect(names).toContain(name);
++    }
++  });
++
++  it('массивы контекста производятся селекторами стора (единая реализация)', () => {
++    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
++    expect(source).toContain("import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selectors'");
++  });
++});
++
++// ─── CharacterScreen: пишем только в стор ───
++
++describe('Шаг 5: CharacterScreen пишет в стор напрямую', () => {
++  const ast = parse(SCREEN_FILE);
++  const source = fs.readFileSync(SCREEN_FILE, 'utf8');
++
++  it('useCharacter() не деструктурирует сеттеры Шага 5', () => {
++    const forbidden = ['setAttributes', 'setSkills', 'setSelectedSkills', 'setExtraTaggedSkills', 'setForcedSelectedSkills'];
++    const violations = [];
++    walk(ast, (node) => {
++      if (node.type === 'VariableDeclarator'
++        && node.id?.type === 'ObjectPattern'
++        && node.init?.type === 'CallExpression'
++        && node.init.callee?.type === 'Identifier'
++        && node.init.callee.name === 'useCharacter') {
++        for (const prop of node.id.properties) {
++          const name = propertyName(prop) ?? prop.argument?.name ?? null;
++          if (forbidden.includes(name)) violations.push(name);
++        }
++      }
++    });
++    expect(violations).toEqual([]);
++  });
++
++  it('дельта-зеркала из экрана убраны (updateAttribute/updateSkill/подсев loadFromLegacyData)', () => {
++    const calls = [];
++    walk(ast, (node) => {
++      if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression'
++        && node.callee.property?.type === 'Identifier') {
++        calls.push(node.callee.property.name);
++      }
++    });
++    expect(calls.filter((name) => ['updateAttribute', 'updateSkill', 'loadFromLegacyData'].includes(name))).toEqual([]);
++  });
++
++  it('записи идут через стор-экшены setBaseAttributes/setBaseSkills', () => {
++    expect(source).toContain('const setBaseAttributes = useCharacterStore');
++    expect(source).toContain('const setBaseSkills = useCharacterStore');
++    expect(source).toContain('setBaseAttributes(nextAttributes)');
++    expect(source).toContain('setBaseSkills(');
++  });
++
++  it('selection-списки читаются из стора, writer-ы — стор-экшены', () => {
++    expect(source).toContain("useCharacterStore((s) => s.selectedSkills)");
++    expect(source).toContain("useCharacterStore((s) => s.extraTaggedSkills)");
++    expect(source).toContain("useCharacterStore((s) => s.forcedSelectedSkills)");
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 57d0e17..57ec139 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1,5 +1,5 @@
+ import { debugLog } from '../src/debug/falloutDebug';
+-import React, { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
++import React, { createContext, useState, useContext, useEffect, useRef, useCallback, useMemo } from 'react';
+ import * as db from '../db';
+ import {
+   createInitialAttributes,
+@@ -59,6 +59,7 @@ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ import { resolveBodyPlan } from '../domain/bodyplan';
+ import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
+ import { migrateSkillsToCanonical } from '../domain/skillCanonical';
++import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selectors';
+ import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
+ import { slimSaveData, restoreSaveData } from '../domain/saveSlimming';
+ import { resolveKitItems } from '../domain/kitResolver';
+@@ -200,11 +201,18 @@ export const CharacterProvider = ({ children }) => {
+   const [isSaved, setIsSaved] = useState(false);
+ 
+   const [level, setLevel] = useState(INITIAL_LEVEL);
+-  const [attributes, setAttributes] = useState(createInitialAttributes());
+-  const [skills, setSkills] = useState(ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+-  const [selectedSkills, setSelectedSkills] = useState([]);
+-  const [extraTaggedSkills, setExtraTaggedSkills] = useState([]);
+-  const [forcedSelectedSkills, setForcedSelectedSkills] = useState([]);
++  // ═══ Атрибуты/навыки: стор-словари — единственный источник (Шаг 5). ═══
++  // Экраны пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills и
++  // selection-экшены); «массивы» здесь — производные представления словарей
++  // (selectLegacy*), нужны снапшоту сейва и доменным расчётам, чья сигнатура —
++  // legacy-массив. Фасад больше не отдаёт сеттеры этих полей.
++  const storeAttributes = useCharacterStore((s) => s.attributes);
++  const storeSkills = useCharacterStore((s) => s.skills);
++  const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
++  const skills = useMemo(() => selectLegacySkills({ skills: storeSkills }), [storeSkills]);
++  const selectedSkills = useCharacterStore((s) => s.selectedSkills);
++  const extraTaggedSkills = useCharacterStore((s) => s.extraTaggedSkills);
++  const forcedSelectedSkills = useCharacterStore((s) => s.forcedSelectedSkills);
+   const [origin, setOrigin] = useState(null);
+   const [trait, setTrait] = useState(null);
+   const [effects, setEffects] = useState([]);
+@@ -430,15 +438,11 @@ export const CharacterProvider = ({ children }) => {
+     queueMicrotask(() => {
+       // re-read store inside the microtask: dependency values are captured
+       // here, so this useEffect doesn't re-fire when these are stable.
++      // (Шаг 5) Подсев атрибутов «если dict пуст» убран: стор — единственный
++      // источник и сеется дефолтами в начальном состоянии/сбросе/загрузке;
++      // синхронизировать нечего.
+       const current = useCharacterStore.getState();
+ 
+-      // Подсев атрибутов в стор, если dict пуст, но в Context уже есть значения.
+-      const dictEmpty = Object.keys(current.attributes || {}).length === 0;
+-      const arrayHasValues = Array.isArray(attributes) && attributes.length > 0;
+-      if (dictEmpty && arrayHasValues) {
+-        current.loadFromLegacyData({ attributes });
+-      }
+-
+       // Прокидываем реальный контекст → корректный пересчёт derivedStats.
+       // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
+       const isRobot = isRobotCharacter({ origin, trait });
+@@ -661,11 +665,13 @@ export const CharacterProvider = ({ children }) => {
+        setCharacterId(id);
+       setCharacterName(row.name);
+       setLevel(data.level ?? INITIAL_LEVEL);
+-       setAttributes(loadedAttributes);
+-      setSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(s => ({ ...s, value: 0 })));
+-      setSelectedSkills(data.selectedSkills || []);
+-      setExtraTaggedSkills(data.extraTaggedSkills || []);
+-      setForcedSelectedSkills(data.forcedSelectedSkills || []);
++       // Базовые статы и selection-списки — напрямую в стор (Шаг 5).
++      const st = useCharacterStore.getState();
++      st.setBaseAttributes(loadedAttributes);
++      st.setBaseSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map(sk => ({ ...sk, value: 0 })));
++      st.setSelectedSkills(data.selectedSkills || []);
++      st.setExtraTaggedSkills(data.extraTaggedSkills || []);
++      st.setForcedSelectedSkills(data.forcedSelectedSkills || []);
+        setOrigin(data.origin || null);
+        setTrait(loadedTrait);
+       setEquipment(data.equipment || null);
+@@ -1390,13 +1396,9 @@ export const CharacterProvider = ({ children }) => {
+       }
+     });
+ 
+-    // Keep the legacy context mirror in sync with the canonical Zustand store.
+-    // The character sheet reads attributes from the store, while the perks
+-    // screen evaluates requirements through CharacterContext. Updating only
+-    // Zustand here made the sheet show the new value (for example AGI 10)
+-    // while perk requirements still saw the previous value (AGI 8).
+-    setAttributes(committedAttributes);
+-
++    // (Шаг 5) Зеркало setAttributes убрано: стор — единственный источник,
++    // производный массив контекста пересчитывается из словаря автоматически.
++    // Perk-экран оценивает требования через тот же производный массив.
+     // Update other state fields
+     setAvailablePerkAttributePoints(prev => prev - pointsSpent);
+     const newLuck = getLuckPoints(committedAttributes, trait);
+@@ -1415,11 +1417,7 @@ export const CharacterProvider = ({ children }) => {
+     const initialLevel = INITIAL_LEVEL;
+     setLevel(initialLevel);
+     const initialSkills = ALL_SKILLS.map(s => ({ ...s, value: 0 }));
+-    setAttributes(initialAttributes);
+-    setSkills(initialSkills);
+-    setSelectedSkills([]);
+-    setExtraTaggedSkills([]);
+-    setForcedSelectedSkills([]);
++    // Атрибуты/навыки/selection-списки сеет resetCharacterStore (слайс, Шаг 5).
+     setAttributesSaved(false);
+     setSkillsSaved(false);
+     const initialLuck = getLuckPoints(initialAttributes);
+@@ -1491,9 +1489,10 @@ export const CharacterProvider = ({ children }) => {
+       rewardedSkills: [],
+     });
+     if (!keepSkills) {
+-      setSelectedSkills([]);
+-      setExtraTaggedSkills([]);
+-      setForcedSelectedSkills([]);
++      const resetSt = useCharacterStore.getState();
++      resetSt.setSelectedSkills([]);
++      resetSt.setExtraTaggedSkills([]);
++      resetSt.setForcedSelectedSkills([]);
+       setSkillsSaved(false);
+     }
+   }, []);
+@@ -1512,11 +1511,13 @@ export const CharacterProvider = ({ children }) => {
+     getCharactersList,
+     deleteCharacter,
+     level, setLevel,
+-    attributes, setAttributes,
+-    skills, setSkills,
+-    selectedSkills, setSelectedSkills,
+-    extraTaggedSkills, setExtraTaggedSkills,
+-    forcedSelectedSkills, setForcedSelectedSkills,
++    // Атрибуты/навыки (данные) — Шаг 5: экраны читают производные массивы
++    // отсюда, пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills +
++    // selection-экшены useCharacterStore). Сеттеры из фасада убраны.
++    attributes, skills,
++    selectedSkills,
++    extraTaggedSkills,
++    forcedSelectedSkills,
+     origin, setOrigin,
+     trait, setTrait,
+     equipment, setEquipment,
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 099973d..814f62a 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -14,6 +14,7 @@ import {
+ import { useCharacter } from "../../../../components/CharacterContext";
+ import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
+ import useCharacterStore from "../../../../src/store/characterStore";
++import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
+ import { selectActiveTimedEffects } from "../../../../src/store/selectors";
+ import { useShallow } from 'zustand/react/shallow';
+ import OriginModal from "./modals/OriginModal";
+@@ -266,16 +267,7 @@ export default function CharacterScreen() {
+     saveCharacter,
+     level,
+     setLevel,
+-    attributes: contextAttributes,
+-    setAttributes,
+-    skills: contextSkills,
+-    setSkills,
+-    selectedSkills,
+-    setSelectedSkills,
+-    extraTaggedSkills,
+-    setExtraTaggedSkills,
+-    forcedSelectedSkills,
+-    setForcedSelectedSkills,
++
+     origin,
+     setOrigin,
+     trait,
+@@ -318,23 +310,25 @@ export default function CharacterScreen() {
+   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
+ 
+-  const attributes = useMemo(() => {
+-    const fromStore = Object.values(storeAttributes);
+-    if (fromStore.length > 0) {
+-      return fromStore.map((attr) => ({ name: attr.id, value: attr.base }));
+-    }
+-    return contextAttributes;
+-  }, [storeAttributes, contextAttributes]);
+-
+-  const skills = useMemo(() => {
+-    if (Object.keys(storeSkills).length > 0) {
+-      return ALL_SKILLS.map((skill) => {
+-        const stored = storeSkills[skill.name];
+-        return stored ? { name: skill.name, value: stored.base } : { ...skill };
+-      });
+-    }
+-    return contextSkills;
+-  }, [storeSkills, contextSkills]);
++  // Шаг 5: стор-словари — единственный источник; legacy-массивы — производные
++  // (ЕДИНЫЕ селекторы с провайдером). Дублирующее чтение контекста убрано.
++  const attributes = useMemo(
++    () => selectLegacyAttributes({ attributes: storeAttributes }),
++    [storeAttributes],
++  );
++  const skills = useMemo(
++    () => selectLegacySkills({ skills: storeSkills }),
++    [storeSkills],
++  );
++  const selectedSkills = useCharacterStore((s) => s.selectedSkills);
++  const extraTaggedSkills = useCharacterStore((s) => s.extraTaggedSkills);
++  const forcedSelectedSkills = useCharacterStore((s) => s.forcedSelectedSkills);
++  // Писатели — только стор-экшены.
++  const setBaseAttributes = useCharacterStore((s) => s.setBaseAttributes);
++  const setBaseSkills = useCharacterStore((s) => s.setBaseSkills);
++  const setSelectedSkills = useCharacterStore((s) => s.setSelectedSkills);
++  const setExtraTaggedSkills = useCharacterStore((s) => s.setExtraTaggedSkills);
++  const setForcedSelectedSkills = useCharacterStore((s) => s.setForcedSelectedSkills);
+ 
+   useEffect(() => {
+     debugLog('character.renderState', {
+@@ -684,14 +678,6 @@ export default function CharacterScreen() {
+     const isBonusFromSkillPick = isSkillPickActive && skillPickSelected.includes(skillName);
+     const capForThis = isSkillPickActive && isInSkillPickGroup && !isBonusFromSkillPick ? 4 : undefined;
+ 
+-    const syncSkillStore = (delta) => {
+-      const store = useCharacterStore.getState();
+-      if (!store.skills?.[skillName]) {
+-        store.loadFromLegacyData({ skills });
+-      }
+-      useCharacterStore.getState().updateSkill(skillName, delta);
+-    };
+-
+     if (!isCurrentlySelected) {
+       const unclampedNextValue = currentSkill.value + 2;
+       if (unclampedNextValue > skillMax) {
+@@ -706,10 +692,11 @@ export default function CharacterScreen() {
+         return;
+       }
+ 
++      // (Шаг 5) Писатели — стор-экшены, абсолютные списки (апдейтеров больше нет).
+       if (isForcedSkill) {
+-        setExtraTaggedSkills((prev) => [...prev, skillName]);
++        setExtraTaggedSkills([...extraTaggedSkills, skillName]);
+       } else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
+-        setSelectedSkills((prev) => [...prev, skillName]);
++        setSelectedSkills([...selectedSkills, skillName]);
+       } else {
+         const extraSkillsFromTrait = trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
+         const extraSkillsFromPerk = Number(storePerkBonuses?.extraTaggedSkills) || 0;
+@@ -720,7 +707,7 @@ export default function CharacterScreen() {
+           (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
+ 
+         if (canSelectAsExtra && extraTaggedSkills.length < totalExtraSkillSlots) {
+-          setExtraTaggedSkills((prev) => [...prev, skillName]);
++          setExtraTaggedSkills([...extraTaggedSkills, skillName]);
+         } else {
+           const extraText = canSelectAsExtra
+             ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable") + ": " + (totalExtraSkillSlots - extraTaggedSkills.length)
+@@ -732,27 +719,20 @@ export default function CharacterScreen() {
+         }
+       }
+ 
+-      const appliedDelta = nextValue - currentSkill.value;
+-      debugLog('skill.toggle.apply', { skillName, before: currentSkill.value, nextValue, appliedDelta, capForThis, skillMax });
+-      setSkills((prev) =>
+-        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
+-      );
+-      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
++      debugLog('skill.toggle.apply', { skillName, before: currentSkill.value, nextValue, capForThis, skillMax });
++      // (Шаг 5) Одна абсолютная запись в стор; словарь — единственный источник.
++      setBaseSkills(skills.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)));
+     } else {
+       if (isInMainSkills) {
+-        setSelectedSkills((prev) => prev.filter((s) => s !== skillName));
++        setSelectedSkills(selectedSkills.filter((s) => s !== skillName));
+       }
+       if (isInExtraSkills) {
+-        setExtraTaggedSkills((prev) => prev.filter((s) => s !== skillName));
++        setExtraTaggedSkills(extraTaggedSkills.filter((s) => s !== skillName));
+       }
+ 
+       const nextValue = Math.max(0, currentSkill.value - 2);
+-      const appliedDelta = nextValue - currentSkill.value;
+-      debugLog('skill.toggle.remove', { skillName, before: currentSkill.value, nextValue, appliedDelta });
+-      setSkills((prev) =>
+-        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
+-      );
+-      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
++      debugLog('skill.toggle.remove', { skillName, before: currentSkill.value, nextValue });
++      setBaseSkills(skills.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)));
+     }
+   };
+ 
+@@ -786,19 +766,11 @@ export default function CharacterScreen() {
+     }
+     if (nextVal === skill.value) return;
+ 
+-    const appliedDelta = nextVal - skill.value;
+-    debugLog('skill.changeValue.apply', { skillName: skill.name, before: skill.value, nextVal, requestedDelta: delta, appliedDelta, capForThis });
+-    setSkills((prev) => {
+-      const newSkills = [...prev];
+-      newSkills[index] = { ...skill, value: nextVal };
+-      return newSkills;
+-    });
+-
+-    const store = useCharacterStore.getState();
+-    if (!store.skills?.[skill.name]) {
+-      store.loadFromLegacyData({ skills });
+-    }
+-    useCharacterStore.getState().updateSkill(skill.name, appliedDelta);
++    debugLog('skill.changeValue.apply', { skillName: skill.name, before: skill.value, nextVal, requestedDelta: delta, capForThis });
++    // (Шаг 5) Абсолютная запись; дельта-зеркала loadFromLegacyData/updateSkill убраны.
++    const nextSkills = [...skills];
++    nextSkills[index] = { ...skill, value: nextVal };
++    setBaseSkills(nextSkills);
+   };
+ 
+   const handleChangeAttribute = (index, delta) => {
+@@ -809,17 +781,9 @@ export default function CharacterScreen() {
+     if (newValue < min || newValue > max) return;
+     if (delta > 0 && remainingInitialPoints <= 0) return;
+ 
+-    const store = useCharacterStore.getState();
+-    if (!store.attributes[attr.name]) {
+-      store.loadFromLegacyData({ attributes });
+-    }
+-    store.updateAttribute(attr.name, delta);
+-
+-    setAttributes((prev) => {
+-      const newAttributes = [...prev];
+-      newAttributes[index] = { ...newAttributes[index], value: newValue };
+-      return newAttributes;
+-    });
++    // (Шаг 5) Одна абсолютная запись в стор.
++    const nextAttributes = attributes.map((a, i) => (i === index ? { ...a, value: newValue } : a));
++    setBaseAttributes(nextAttributes);
+   };
+ 
+   // Возвращает true если для данного origin есть трейт-модал
+@@ -903,85 +867,49 @@ export default function CharacterScreen() {
+       );
+       return { ...attr, value: attr.value - oldBonus + newBonus };
+     });
+-    setAttributes(nextAttributes);
+-
+-    // Синхронизируем атрибуты в Zustand store, иначе CharacterScreen продолжит
+-    // читать старые значения из store и remaining points будут считаться неверно.
+-    const store = useCharacterStore.getState();
+-    const storeAttributes = store.attributes || {};
+-    nextAttributes.forEach((attr) => {
+-      const storeAttr = storeAttributes[attr.name];
+-      const storeValue = storeAttr?.base ?? 4;
+-      const delta = attr.value - storeValue;
+-      if (delta !== 0) {
+-        store.updateAttribute(attr.name, delta);
+-      }
+-    });
++    // (Шаг 5) Одна абсолютная запись в стор — двойная синхронизация убрана.
++    setBaseAttributes(nextAttributes);
+ 
+     const oldForcedSkills = oldTrait?.modifiers?.forcedSkills || [];
+     const newForcedSkills = newTrait?.modifiers?.forcedSkills || [];
+     const oldSelectedExtraSkills = oldTrait?.modifiers?.selectedExtraSkills || [];
+     const newSelectedExtraSkills = newTrait?.modifiers?.selectedExtraSkills || [];
+ 
+-    // Обновляем список обязательных навыков
+-    setForcedSelectedSkills((currentForced) => {
+-      const withoutOld = currentForced.filter(
+-        (skill) => !oldForcedSkills.includes(skill),
+-      );
+-      return [...new Set([...withoutOld, ...newForcedSkills])];
+-    });
++    // (Шаг 5) Писатели — стор-экшены, абсолютные списки.
++    setForcedSelectedSkills([...new Set([
++      ...forcedSelectedSkills.filter((skill) => !oldForcedSkills.includes(skill)),
++      ...newForcedSkills,
++    ])]);
+ 
+-    // Обновляем отмеченные навыки и их значения
+-    setSelectedSkills((currentSelected) => {
+-      const withoutOld = currentSelected.filter(
+-        (skill) => !oldForcedSkills.includes(skill),
+-      );
+-      return withoutOld; // Forced skills go to extraTaggedSkills now
+-    });
++    // Forced skills go to extraTaggedSkills now
++    setSelectedSkills(selectedSkills.filter((skill) => !oldForcedSkills.includes(skill)));
+ 
+-    // Обновляем экстра навыки (forced skills теперь идут сюда)
+-    setExtraTaggedSkills((currentExtra) => {
+-      const withoutOld = currentExtra.filter(
++    setExtraTaggedSkills([...new Set([
++      ...extraTaggedSkills.filter(
+         (skill) => !oldForcedSkills.includes(skill) && !oldSelectedExtraSkills.includes(skill),
+-      );
+-      return [...new Set([...withoutOld, ...newForcedSkills, ...newSelectedExtraSkills])];
++      ),
++      ...newForcedSkills,
++      ...newSelectedExtraSkills,
++    ])]);
++
++    // (Шаг 5) ±2 обязательных навыка — одна абсолютная запись в стор.
++    let nextTraitSkills = [...skills];
++    // Отменяем +2 от старых обязательных навыков
++    [...oldForcedSkills, ...oldSelectedExtraSkills].forEach((skillName) => {
++      const index = nextTraitSkills.findIndex((s) => s.name === skillName);
++      if (index > -1) {
++        const next = Math.max(0, nextTraitSkills[index].value - 2);
++        nextTraitSkills[index] = { ...nextTraitSkills[index], value: next };
++      }
+     });
+-
+-    const syncTraitSkillDelta = (skillName, delta) => {
+-      if (!delta) return;
+-      const store = useCharacterStore.getState();
+-      if (!store.skills?.[skillName]) {
+-        store.loadFromLegacyData({ skills });
++    // Применяем +2 к новым обязательным навыкам (если их значение < 2)
++    [...newForcedSkills, ...newSelectedExtraSkills].forEach((skillName) => {
++      const index = nextTraitSkills.findIndex((s) => s.name === skillName);
++      if (index > -1 && nextTraitSkills[index].value < 2) {
++        nextTraitSkills[index] = { ...nextTraitSkills[index], value: 2 };
+       }
+-      useCharacterStore.getState().updateSkill(skillName, delta);
+-    };
+-
+-    setSkills((currentSkills) => {
+-      let tempSkills = [...currentSkills];
+-      // Отменяем +2 от старых обязательных навыков
+-      [...oldForcedSkills, ...oldSelectedExtraSkills].forEach((skillName) => {
+-        const index = tempSkills.findIndex((s) => s.name === skillName);
+-        if (index > -1) {
+-          const before = tempSkills[index].value;
+-          const next = Math.max(0, before - 2);
+-          tempSkills[index] = {
+-            ...tempSkills[index],
+-            value: next,
+-          };
+-          syncTraitSkillDelta(skillName, next - before);
+-        }
+-      });
+-      // Применяем +2 к новым об��зательным навыкам (если их значение < 2)
+-      [...newForcedSkills, ...newSelectedExtraSkills].forEach((skillName) => {
+-        const index = tempSkills.findIndex((s) => s.name === skillName);
+-        if (index > -1 && tempSkills[index].value < 2) {
+-          const before = tempSkills[index].value;
+-          tempSkills[index] = { ...tempSkills[index], value: 2 };
+-          syncTraitSkillDelta(skillName, 2 - before);
+-        }
+-      });
+-      return tempSkills;
+     });
++    setBaseSkills(nextTraitSkills);
+ 
+     // Обновляем эффекты
+     setEffects((currentEffects) => {
+@@ -1174,7 +1102,7 @@ export default function CharacterScreen() {
+         ...skill,
+         value: forcedSelectedSkills.includes(skill.name) ? 2 : 0,
+       }));
+-      setSkills(newSkills);
++      setBaseSkills(newSkills);
+       setSelectedSkills([]);
+       setExtraTaggedSkills([...forcedSelectedSkills]);
+       setSkillsSaved(false);
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 0b30a9a..24aa310 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -61,6 +61,10 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
++// Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
++// стор-словари единственный источник, производный legacy-массив обязан быть
++// валиден всегда, «пустой словарь» больше не допустимое состояние UI).
++import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
+ // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
+ // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
+ // в CharacterContext.
+@@ -203,8 +207,16 @@ const useCharacterStore = create(devtools(
+   persist(
+     (set, get) => ({
+       // --- Initial State ---
+-      attributes: {},
+-      skills: {},
++      // Атрибуты/навыки — Parameter-словари, единственный источник (Шаг 5).
++      // Сеются дефолтами создания: «пустой словарь при открытом UI» — недопустимое
++      // состояние (производный legacy-массив обязан содержать все атрибуты/навыки).
++      ...normalizeForStore({
++        attributes: createInitialAttributes(),
++        skills: ALL_SKILLS.map((skill) => ({ ...skill, value: 0 })),
++      }),
++      selectedSkills: [],
++      extraTaggedSkills: [],
++      forcedSelectedSkills: [],
+       items: {},
+       effects: {},
+       // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
+@@ -1105,6 +1117,49 @@ const useCharacterStore = create(devtools(
+         }));
+       },
+ 
++      /**
++       * Абсолютная запись базовых атрибутов из legacy-массива [{name, value}]
++       * (создание персонажа, смена трейта, загрузка сейва). Словарь —
++       * единственный источник (Шаг 5); дельта-обновления поверх — updateAttribute.
++       */
++      setBaseAttributes: (legacyArray) => {
++        const normalized = normalizeForStore({ attributes: legacyArray });
++        set({ attributes: normalized.attributes });
++        get().recalculateDerivedStats();
++      },
++
++      /**
++       * Абсолютная запись базовых навыков из legacy-массива [{name, value}]
++       * (тегирование, прокачка, загрузка сейва). Дельта-обновления — updateSkill.
++       */
++      setBaseSkills: (legacyArray) => {
++        const normalized = normalizeForStore({ skills: legacyArray });
++        set({ skills: normalized.skills });
++        get().recalculateDerivedStats();
++      },
++
++      /**
++       * Отмеченные (tagged) навыки — список имён. Поддерживает функциональный
++       * апдейтер (прецедент setEquippedWeapons): (prev) => next.
++       */
++      setSelectedSkills: (updater) => {
++        set((state) => ({
++          selectedSkills: typeof updater === 'function' ? updater(state.selectedSkills) : [...(updater || [])],
++        }));
++      },
++      /** Дополнительные тегированные (трейт/перк) — как setSelectedSkills. */
++      setExtraTaggedSkills: (updater) => {
++        set((state) => ({
++          extraTaggedSkills: typeof updater === 'function' ? updater(state.extraTaggedSkills) : [...(updater || [])],
++        }));
++      },
++      /** Навязанные трейтом (forced) — как setSelectedSkills. */
++      setForcedSelectedSkills: (updater) => {
++        set((state) => ({
++          forcedSelectedSkills: typeof updater === 'function' ? updater(state.forcedSelectedSkills) : [...(updater || [])],
++        }));
++      },
++
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+        *
+@@ -1114,11 +1169,19 @@ const useCharacterStore = create(devtools(
+        * opened character cannot refill an empty store with stale values.
+        */
+       resetCharacterStore: (legacyDefaults = {}) => {
+-        const normalizedDefaults = normalizeForStore(legacyDefaults);
++        // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
++        // Вызывающий не передал дефолты → сеем стартовые значения создания.
++        const defaultsSource = (legacyDefaults && (legacyDefaults.attributes || legacyDefaults.skills))
++          ? legacyDefaults
++          : { attributes: createInitialAttributes(), skills: ALL_SKILLS.map((skill) => ({ ...skill, value: 0 })) };
++        const normalizedDefaults = normalizeForStore(defaultsSource);
+ 
+         set({
+           attributes: normalizedDefaults.attributes || {},
+           skills: normalizedDefaults.skills || {},
++          selectedSkills: [],
++          extraTaggedSkills: [],
++          forcedSelectedSkills: [],
+           items: {},
+           effects: {},
+           stateExtensions: {},
+@@ -1186,6 +1249,9 @@ const useCharacterStore = create(devtools(
+         equippedArmor: state.equippedArmor,
+         equippedPowerArmor: state.equippedPowerArmor,
+         powerArmorRuntime: state.powerArmorRuntime,
++        selectedSkills: state.selectedSkills,
++        extraTaggedSkills: state.extraTaggedSkills,
++        forcedSelectedSkills: state.forcedSelectedSkills,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index a7a56e3..61e3e03 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -5,6 +5,11 @@ import { debugLog } from '../debug/falloutDebug';
+ import { effectsDictToLegacyArray } from './effectsSync.js';
+ import { resolveWeaponRangeFields } from '../../domain/range.js';
+ import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
++import { ALL_SKILLS } from '../../domain/characterCreation.js';
++
++// ── Шаг 5 миграции: стор-словари (Parameter-формат) — единственный источник
++// атрибутов/навыков. Экранам и снапшоту сейва нужен legacy-массив — выводится
++// ЭТИМИ селекторами (одна реализация на провайдер и экраны).
+ 
+ const PARAM_FIELDS = [
+   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
+@@ -176,3 +181,24 @@ export const selectSkillTotal = (state, skillId) => {
+ export const selectActiveTimedEffects = (state) => {
+   return effectsDictToLegacyArray(state.effects);
+ };
++
++
++/**
++ * Словарь атрибутов (Parameter-формат) → legacy-массив [{name, value}].
++ * @param {{attributes?: Record<string, {id: string, base: number}>}} state
++ * @returns {Array<{name: string, value: number}>}
++ */
++export const selectLegacyAttributes = ({ attributes = {} } = {}) =>
++  Object.values(attributes).map((attr) => ({ name: attr.id, value: attr.base }));
++
++/**
++ * Словарь навыков (Parameter-формат) → legacy-массив: каталожные записи
++ * ALL_SKILLS (порядок и метаданные) + value из base словаря.
++ * @param {{skills?: Record<string, {base: number}>}} state
++ * @returns {Array<object>}
++ */
++export const selectLegacySkills = ({ skills = {} } = {}) =>
++  ALL_SKILLS.map((skill) => {
++    const stored = skills[skill.name];
++    return stored ? { ...skill, value: stored.base } : { ...skill, value: 0 };
++  });
+-- 
+2.39.5
+
