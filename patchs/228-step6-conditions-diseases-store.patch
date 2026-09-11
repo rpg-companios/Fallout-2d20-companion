@@ -1,0 +1,624 @@
+From e06b12adf8b4105f42107454348cfe51c20723a7 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 11 Sep 2026 06:05:45 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A8=D0=B0=D0=B3=206=20=D0=BC=D0=B8=D0=B3?=
+ =?UTF-8?q?=D1=80=D0=B0=D1=86=D0=B8=D0=B8:=20conditions/chemDosesLog/lastD?=
+ =?UTF-8?q?iseaseResistAt/sceneRiskStates=20=E2=80=94=20=D0=B2=20character?=
+ =?UTF-8?q?Store;=20=D1=82=D0=B5=D0=BD=D1=8C=20activeTimedEffects=20=D1=83?=
+ =?UTF-8?q?=D0=B4=D0=B0=D0=BB=D0=B5=D0=BD=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- characterStore: 4 поля состояний/заболеваний (начальные значения,
+  setConditions/setChemDosesLog/setLastDiseaseResistAt/setSceneRiskStates
+  с функциональным апдейтером), partialize и resetCharacterStore расширены.
+- CharacterContext: четыре useState убраны (значения и сеттеры — стор,
+  точки записи не менялись); тень activeTimedEffects удалена (решение
+  владельца, вариант А): канон — словарь effects стора, все 13 записей тени
+  шли парой с syncTimedEffectsToStore; секундный тик тени удалён (словарь
+  он не трогал); снапшот: activeTimedEffects = denormalizeEffects(storeEffects);
+  автосейв будится storeEffects (лечение постелью не пишет контекстных полей);
+  трекер риска инициализируется из стора, replaceStates на load/reset сохранён.
+- Фасад: поля и сеттеры Шага 6 сняты; колбэки болезней (resistDisease,
+  reducePersistentDiseaseRanks, resolveSceneRiskEventById,
+  advanceEffectsByGameHours) остались — потребители DI survival и W&A.
+- WeaponsAndArmorScreen: lastDiseaseResistAt — напрямую из стора.
+- Формат сейва не менялся: все 5 полей снапшота пишутся как прежде;
+  migrations.js не тронут (normalizeEffects/denormalizeEffects — прежние пути).
+- Тесты: conditions-store-slice (7) + AST-контракт Шага 6 (8).
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-step6-facade.test.js    | 140 ++++++++++++++++++
+ .../saves/conditions-store-slice.test.js      |  99 +++++++++++++
+ components/CharacterContext.js                |  71 +++++----
+ .../WeaponsAndArmorScreen.js                  |   4 +-
+ src/store/characterStore.js                   |  44 ++++++
+ 5 files changed, 319 insertions(+), 39 deletions(-)
+ create mode 100644 __tests__/saves/character-context-step6-facade.test.js
+ create mode 100644 __tests__/saves/conditions-store-slice.test.js
+
+diff --git a/__tests__/saves/character-context-step6-facade.test.js b/__tests__/saves/character-context-step6-facade.test.js
+new file mode 100644
+index 0000000..f4b298c
+--- /dev/null
++++ b/__tests__/saves/character-context-step6-facade.test.js
+@@ -0,0 +1,140 @@
++// Шаг 6 миграции: фасад useCharacter() больше не отдаёт поля условий/
++// заболеваний (conditions, chemDosesLog, lastDiseaseResistAt, sceneRiskStates,
++// activeTimedEffects) и их сеттеры. Экраны читают стор напрямую
++// (WeaponsAndArmorScreen → lastDiseaseResistAt).
++//
++// Тень activeTimedEffects удалена (решение владельца, вариант А): канон —
++// словарь effects стора; секундный тик тени удалён; массив для сейва —
++// денормализация словаря (denormalizeEffects(storeEffects)).
++//
++// CharacterContext в vitest не импортируется (react-native Flow) — контракт
++// проверяется статически по AST, как в character-context-step5-facade.test.js.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { parseSync } from '@babel/core';
++import jsxPlugin from '@babel/plugin-transform-react-jsx';
++
++const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
++const WA_FILE = path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js');
++
++const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
++  filename: file,
++  babelrc: false,
++  configFile: false,
++  sourceType: 'module',
++  plugins: [jsxPlugin],
++});
++
++const walk = (node, visit) => {
++  if (!node || typeof node !== 'object') return;
++  if (Array.isArray(node)) {
++    node.forEach((child) => walk(child, visit));
++    return;
++  }
++  if (typeof node.type === 'string') visit(node);
++  Object.values(node).forEach((value) => walk(value, visit));
++};
++
++const propertyName = (prop) => {
++  if (!prop) return null;
++  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
++    const key = prop.key;
++    if (key.type === 'Identifier') return key.name;
++    if (key.type === 'StringLiteral') return key.value;
++  }
++  return null;
++};
++
++describe('Шаг 6: фасад useCharacter() без полей условий/заболеваний', () => {
++  const ast = parse(CONTEXT_FILE);
++  const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
++
++  const valueObjects = [];
++  walk(ast, (node) => {
++    if (node.type === 'ObjectExpression'
++      && node.properties.some((prop) => propertyName(prop) === 'attributesSaved')) {
++      valueObjects.push(node);
++    }
++  });
++
++  it('объект value провайдера найден', () => {
++    expect(valueObjects.length).toBeGreaterThanOrEqual(1);
++  });
++
++  it('в value нет полей и сеттеров Шага 6 (buildSnapshot не считаем: формат сейва)', () => {
++    // Сеттеры запрещены в ЛЮБОМ объекте с маркером.
++    const forbiddenSetters = [
++      'setActiveTimedEffects', 'setConditions', 'setChemDosesLog',
++      'setLastDiseaseResistAt', 'setSceneRiskStates',
++    ];
++    // Читаемые поля Шага 6 запрещены только во фасадном value. Объект
++    // buildSnapshot тоже содержит attributesSaved (формат сейва) и обязан
++    // сохранять эти поля как поля сейва — его не проверяем.
++    const forbiddenReads = [
++      'activeTimedEffects', 'conditions', 'chemDosesLog',
++      'lastDiseaseResistAt', 'sceneRiskStates',
++    ];
++    const facadeValues = valueObjects.filter((object) =>
++      object.properties.map(propertyName).includes('resetCharacter'));
++    expect(facadeValues.length).toBeGreaterThanOrEqual(1);
++    for (const object of valueObjects) {
++      const names = object.properties.map(propertyName);
++      expect(names.filter((name) => forbiddenSetters.includes(name))).toEqual([]);
++    }
++    for (const object of facadeValues) {
++      const names = object.properties.map(propertyName);
++      expect(names.filter((name) => forbiddenReads.includes(name))).toEqual([]);
++    }
++  });
++
++  it('в контексте нет ни одного вызова setActiveTimedEffects (тень удалена)', () => {
++    const calls = [];
++    walk(ast, (node) => {
++      if (node.type === 'Identifier' && node.name === 'setActiveTimedEffects') calls.push(node);
++    });
++    expect(calls).toEqual([]);
++  });
++
++  it('поля Шага 6 больше не useState провайдера', () => {
++    const names = [];
++    walk(ast, (node) => {
++      if (node.type === 'VariableDeclarator'
++        && node.id?.type === 'ArrayPattern'
++        && node.init?.type === 'CallExpression'
++        && node.init.callee?.type === 'Identifier'
++        && node.init.callee.name === 'useState') {
++        node.id.elements.forEach((element) => {
++          if (element?.type === 'Identifier') names.push(element.name);
++        });
++      }
++    });
++    for (const name of ['conditions', 'chemDosesLog', 'lastDiseaseResistAt', 'sceneRiskStates', 'activeTimedEffects']) {
++      expect(names).not.toContain(name);
++    }
++  });
++
++  it('снапшот берёт activeTimedEffects из словаря стора (денормализация)', () => {
++    expect(source).toContain('activeTimedEffects: denormalizeEffects(storeEffects)');
++  });
++
++  it('секундный тик тени удалён (остался только тик Ядерного блока)', () => {
++    expect(source.split('setInterval').length - 1).toBe(1);
++  });
++
++  it('колбэки болезней остались на фасаде (их потребители — DI survival и W&A)', () => {
++    for (const name of ['advanceEffectsByGameHours', 'resolveSceneRiskEventById', 'reducePersistentDiseaseRanks', 'resistDisease']) {
++      expect(source).toContain(name);
++    }
++  });
++});
++
++describe('Шаг 6: WeaponsAndArmorScreen читает стор напрямую', () => {
++  const source = fs.readFileSync(WA_FILE, 'utf8');
++
++  it('lastDiseaseResistAt — из useCharacterStore, не из useCharacter()', () => {
++    expect(source).toContain('const { resistDisease } = useCharacter();');
++    expect(source).toContain('useCharacterStore((state) => state.lastDiseaseResistAt)');
++  });
++});
+diff --git a/__tests__/saves/conditions-store-slice.test.js b/__tests__/saves/conditions-store-slice.test.js
+new file mode 100644
+index 0000000..b7ad135
+--- /dev/null
++++ b/__tests__/saves/conditions-store-slice.test.js
+@@ -0,0 +1,99 @@
++// Шаг 6 миграции: условия (conditions), журнал доз препаратов (chemDosesLog),
++// момент последней проверки «Сопротивляться» (lastDiseaseResistAt) и состояния
++// проверок риска сцен (sceneRiskStates) — в characterStore. Единственный
++// источник — стор; фасад useCharacter() эти поля (и их сеттеры) больше не
++// отдаёт, экраны читают стор напрямую (WeaponsAndArmorScreen:
++// lastDiseaseResistAt). Сеттеры поддерживают функциональный апдейтер
++// (прецедент setEquippedWeapons).
++//
++// Тень activeTimedEffects удалена (решение владельца, вариант А): канон —
++// словарь effects стора, массив для сейва — денормализация (denormalizeEffects).
++
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: слайс условий/доз/болезней/рисков (Шаг 6)', () => {
++  it('начальные значения: пустые списки, null, пустые состояния сцен', () => {
++    const state = useCharacterStore.getState();
++    expect(state.conditions).toEqual([]);
++    expect(state.chemDosesLog).toEqual([]);
++    expect(state.lastDiseaseResistAt).toBeNull();
++    expect(state.sceneRiskStates).toEqual({});
++  });
++
++  it('setConditions: прямой сет и функциональный апдейтер (добавить/убрать)', () => {
++    const store = useCharacterStore.getState();
++    store.setConditions(['addicted']);
++    store.setConditions((prev) => (prev.includes('diseased') ? prev : [...prev, 'diseased']));
++    expect(useCharacterStore.getState().conditions).toEqual(['addicted', 'diseased']);
++    store.setConditions((prev) => prev.filter((c) => c !== 'addicted'));
++    expect(useCharacterStore.getState().conditions).toEqual(['diseased']);
++  });
++
++  it('setChemDosesLog: прямой сет и функциональный апдейтер (запись дозы)', () => {
++    const store = useCharacterStore.getState();
++    const dose = { chemId: 'psycho', takenAt: 1000 };
++    store.setChemDosesLog([dose]);
++    store.setChemDosesLog((prev) => [...prev, { chemId: 'med-x', takenAt: 2000 }]);
++    expect(useCharacterStore.getState().chemDosesLog).toEqual([
++      dose,
++      { chemId: 'med-x', takenAt: 2000 },
++    ]);
++  });
++
++  it('setLastDiseaseResistAt: timestamp и сброс в null', () => {
++    const store = useCharacterStore.getState();
++    store.setLastDiseaseResistAt(1726000000000);
++    expect(useCharacterStore.getState().lastDiseaseResistAt).toBe(1726000000000);
++    store.setLastDiseaseResistAt(null);
++    expect(useCharacterStore.getState().lastDiseaseResistAt).toBeNull();
++  });
++
++  it('setSceneRiskStates: прямой сет и функциональный апдейтер (resolveEvent)', () => {
++    const store = useCharacterStore.getState();
++    store.setSceneRiskStates({ sleepOnGround: { progress: 1 } });
++    store.setSceneRiskStates((prev) => ({
++      ...prev,
++      drinkDirtyWater: { progress: 2 },
++    }));
++    expect(useCharacterStore.getState().sceneRiskStates).toEqual({
++      sleepOnGround: { progress: 1 },
++      drinkDirtyWater: { progress: 2 },
++    });
++  });
++
++  it('поля входят в partialize (переживают rehydrate)', async () => {
++    const store = useCharacterStore.getState();
++    store.setConditions(['diseased']);
++    store.setChemDosesLog([{ chemId: 'psycho', takenAt: 1 }]);
++    store.setLastDiseaseResistAt(42);
++    store.setSceneRiskStates({ sleepOnGround: { progress: 3 } });
++    await useCharacterStore.persist.rehydrate();
++    const state = useCharacterStore.getState();
++    expect(state.conditions).toEqual(['diseased']);
++    expect(state.chemDosesLog).toEqual([{ chemId: 'psycho', takenAt: 1 }]);
++    expect(state.lastDiseaseResistAt).toBe(42);
++    expect(state.sceneRiskStates).toEqual({ sleepOnGround: { progress: 3 } });
++  });
++
++  it('resetCharacterStore сбрасывает все четыре поля', () => {
++    const store = useCharacterStore.getState();
++    store.setConditions(['addicted']);
++    store.setChemDosesLog([{ chemId: 'psycho', takenAt: 1 }]);
++    store.setLastDiseaseResistAt(42);
++    store.setSceneRiskStates({ sleepOnGround: { progress: 1 } });
++    store.resetCharacterStore();
++    const state = useCharacterStore.getState();
++    expect(state.conditions).toEqual([]);
++    expect(state.chemDosesLog).toEqual([]);
++    expect(state.lastDiseaseResistAt).toBeNull();
++    expect(state.sceneRiskStates).toEqual({});
++    // Инвариант Шага 5 не задет: атрибуты/навыки сеются дефолтами.
++    expect(Object.keys(state.attributes).length).toBe(7);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 57ec139..1ccec4d 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -73,7 +73,7 @@ import { Platform } from 'react-native';
+ // Zustand Store integration (Task 4.1)
+ import useCharacterStore from '../src/store/characterStore';
+ import { showRawAlert } from './alerts/alertService';
+-import { denormalizeCharacterState, migrateCharacterState, mergeEquippedWeapons } from '../src/store/migrations.js';
++import { denormalizeCharacterState, denormalizeEffects, migrateCharacterState, mergeEquippedWeapons } from '../src/store/migrations.js';
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../src/store/saveSchema.js';
+ import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../src/store/effectsSync.js';
+ 
+@@ -216,7 +216,6 @@ export const CharacterProvider = ({ children }) => {
+   const [origin, setOrigin] = useState(null);
+   const [trait, setTrait] = useState(null);
+   const [effects, setEffects] = useState([]);
+-  const [activeTimedEffects, setActiveTimedEffects] = useState([]);
+   const [sceneCounter, setSceneCounter] = useState(0);
+   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
+   const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+@@ -395,15 +394,30 @@ export const CharacterProvider = ({ children }) => {
+   const [meleeBonus, setMeleeBonus] = useState(0);
+   const [initiative, setInitiative] = useState(0);
+   const [defense, setDefense] = useState(1);
+-  const [conditions, setConditions] = useState([]);       // ['addicted', 'diseased', ...]
+-  const [chemDosesLog, setChemDosesLog] = useState([]);   // [{ chemId, takenAt }]
++  // ═══ Заболевания/состояния: стор-словари — единственный источник (Шаг 6). ═══
++  // Сеттеры — стор-экшены (поддерживают функциональный апдейтер), поэтому
++  // точки записи ниже не менялись. Тень activeTimedEffects удалена: канон —
++  // словарь effects стора (каждая запись шла парой syncTimedEffectsToStore +
++  // сеттер тени; экраны выводят эффекты из словаря; сейв предпочитал стор).
++  const conditions = useCharacterStore((s) => s.conditions);
++  const setConditions = useCharacterStore((s) => s.setConditions);
++  // Журнал доз препаратов [{ chemId, takenAt }].
++  const chemDosesLog = useCharacterStore((s) => s.chemDosesLog);
++  const setChemDosesLog = useCharacterStore((s) => s.setChemDosesLog);
+   // Момент последней попытки «Сопротивляться» болезни (патч 215): одна
+   // попытка в сутки; null = сопротивляться можно. Поле сейва (v25).
+-  const [lastDiseaseResistAt, setLastDiseaseResistAt] = useState(null);
+-  const [sceneRiskStates, setSceneRiskStates] = useState({});
++  const lastDiseaseResistAt = useCharacterStore((s) => s.lastDiseaseResistAt);
++  const setLastDiseaseResistAt = useCharacterStore((s) => s.setLastDiseaseResistAt);
++  // Состояния проверок риска сцен (ruleId → scene state).
++  const sceneRiskStates = useCharacterStore((s) => s.sceneRiskStates);
++  const setSceneRiskStates = useCharacterStore((s) => s.setSceneRiskStates);
++  // Словарь effects стора: канон временных эффектов (Шаг 6). Нужен провайдеру
++  // для снапшота сейва (activeTimedEffects) и пробуждения автосейва при
++  // изменениях эффектов (лечение постелью больше не пишет контекстных полей).
++  const storeEffects = useCharacterStore((s) => s.effects);
+   const sceneRiskTrackerRef = useRef(null);
+   if (sceneRiskTrackerRef.current === null) {
+-    sceneRiskTrackerRef.current = createSceneRiskTracker(sceneRiskStates);
++    sceneRiskTrackerRef.current = createSceneRiskTracker(useCharacterStore.getState().sceneRiskStates || {});
+   }
+ 
+   const isSavedRef = useRef(isSaved);
+@@ -483,16 +497,9 @@ export const CharacterProvider = ({ children }) => {
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [attributes, trait, equippedArmor, equippedRobotSlots]);
+ 
+-  useEffect(() => {
+-    const interval = setInterval(() => {
+-      setActiveTimedEffects((prev) => {
+-        const { effects: nextEffects, changed } = pruneExpiredTimedEffects(prev);
+-        return changed ? nextEffects : prev;
+-      });
+-    }, 1000);
+-
+-    return () => clearInterval(interval);
+-  }, []);
++  // (Шаг 6) Секундный тик тени activeTimedEffects удалён: тень больше не
++  // существует, а словарь effects стора он не трогал никогда; все пути
++  // чтения/записи временных эффектов делают pruneExpiredTimedEffects на месте.
+ 
+   // ═══ Силовая броня: состояние и действия — в стор-слайсе (Шаг 4 миграции,   ═══
+   // powerArmorSlice.js: equip/unequip пакета и частей, починка, диалог блока). ═══
+@@ -520,7 +527,8 @@ export const CharacterProvider = ({ children }) => {
+     trait,
+     equipment,
+     effects,
+-    activeTimedEffects,
++    // Временные эффекты — из словаря стора (Шаг 6): денормализация dict→array.
++    activeTimedEffects: denormalizeEffects(storeEffects),
+     sceneCounter,
+     equippedWeapons,
+     equippedRobotSlots,
+@@ -553,7 +561,7 @@ export const CharacterProvider = ({ children }) => {
+     ...stateExtensions,
+   }), [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+-    forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
++    forcedSelectedSkills, origin, trait, equipment, effects, storeEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+@@ -592,7 +600,7 @@ export const CharacterProvider = ({ children }) => {
+     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+   }, [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+-    forcedSelectedSkills, origin, trait, equipment, effects, activeTimedEffects,
++    forcedSelectedSkills, origin, trait, equipment, effects, storeEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+     currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
+@@ -676,7 +684,8 @@ export const CharacterProvider = ({ children }) => {
+        setTrait(loadedTrait);
+       setEquipment(data.equipment || null);
+       setEffects(data.effects || []);
+-      setActiveTimedEffects(pruneExpiredTimedEffects(data.activeTimedEffects || []).effects);
++      // activeTimedEffects: тени больше нет — массив из сейва уходит в словарь
++      // effects стора через loadFromLegacyData (normalizeEffects), см. ниже.
+       setSceneCounter(data.sceneCounter ?? 0);
+       sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
+       setSceneRiskStates(data.sceneRiskStates);
+@@ -926,7 +935,6 @@ export const CharacterProvider = ({ children }) => {
+     const applied = addPersistentDiseaseEffect(currentEffects, disease);
+     if (applied.added) {
+       syncTimedEffectsToStore(applied.effects, store);
+-      setActiveTimedEffects(applied.effects);
+     }
+     setConditions((previous) => (
+       previous.includes('diseased') ? previous : [...previous, 'diseased']
+@@ -963,7 +971,6 @@ export const CharacterProvider = ({ children }) => {
+     const currentEffects = pruneExpiredTimedEffects(effectsDictToLegacyArray(storeNow.effects)).effects;
+     const treated = reduceDiseaseRanks(currentEffects, amount);
+     syncTimedEffectsToStore(treated.effects, storeNow);
+-    setActiveTimedEffects(treated.effects);
+     for (const conditionId of treated.healed) {
+       notifyConditionEvent(
+         { kind: 'disease', event: 'cured', conditionId },
+@@ -1018,7 +1025,6 @@ export const CharacterProvider = ({ children }) => {
+     if (roll.cured) {
+       const withoutDisease = currentEffects.filter((e) => e !== effect);
+       syncTimedEffectsToStore(withoutDisease, storeNow);
+-      setActiveTimedEffects(withoutDisease);
+       notifyConditionEvent(
+         { kind: 'disease', event: 'cured', conditionId },
+         { stateExtensions, setStateExtension },
+@@ -1030,7 +1036,6 @@ export const CharacterProvider = ({ children }) => {
+       rankAfter = rankBefore + roll.rankIncrease;
+       const withRank = increaseDiseaseRank(currentEffects, conditionId, roll.rankIncrease);
+       syncTimedEffectsToStore(withRank, storeNow);
+-      setActiveTimedEffects(withRank);
+     }
+ 
+     return {
+@@ -1078,7 +1083,6 @@ export const CharacterProvider = ({ children }) => {
+       hours * SCENE_RULES.SCENES_PER_GAME_HOUR,
+     );
+     syncTimedEffectsToStore(nextEffects, store);
+-    setActiveTimedEffects(nextEffects);
+     return { effects: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+   };
+ 
+@@ -1160,7 +1164,6 @@ export const CharacterProvider = ({ children }) => {
+     const timedResult = applyConsumableToEffects(item, normalizedCurrent.effects);
+     const normalizedResult = pruneExpiredTimedEffects(timedResult.effects);
+     syncTimedEffectsToStore(normalizedResult.effects, store);
+-    setActiveTimedEffects(normalizedResult.effects);
+ 
+     // 3. removeCondition (аддиктол, антибиотики)
+     const {
+@@ -1202,7 +1205,6 @@ export const CharacterProvider = ({ children }) => {
+           (effect) => !(effect.isPermanent && String(effect.effectName || '').includes('Зависимость')),
+         );
+         syncTimedEffectsToStore(withoutAddiction, storeNow);
+-        setActiveTimedEffects(withoutAddiction);
+       }
+       if (removedRaw.includes('diseased')) {
+         // Не-антибиотик, снимающий болезни целиком (историческое поведение):
+@@ -1212,7 +1214,6 @@ export const CharacterProvider = ({ children }) => {
+         const currentEffects = effectsDictToLegacyArray(storeNow.effects);
+         const withoutDiseases = removePersistentDiseaseEffects(currentEffects);
+         syncTimedEffectsToStore(withoutDiseases.effects, storeNow);
+-        setActiveTimedEffects(withoutDiseases.effects);
+         for (const cured of withoutDiseases.removed) {
+           notifyConditionEvent(
+             { kind: 'disease', event: 'cured', conditionId: cured.conditionId },
+@@ -1272,7 +1273,6 @@ export const CharacterProvider = ({ children }) => {
+           };
+           const store2 = useCharacterStore.getState();
+           syncTimedEffectsToStore([...normalizedResult.effects, addictionEffect], store2);
+-          setActiveTimedEffects([...normalizedResult.effects, addictionEffect]);
+         }
+       }
+     }
+@@ -1321,7 +1321,6 @@ export const CharacterProvider = ({ children }) => {
+     const result = applyConsumableToEffects(item, normalizedCurrent.effects);
+     const normalizedResult = pruneExpiredTimedEffects(result.effects);
+     syncTimedEffectsToStore(normalizedResult.effects, store);
+-    setActiveTimedEffects(normalizedResult.effects);
+ 
+     if (normalizedResult.effects.length > 0) {
+       const timerPreview = normalizedResult.effects
+@@ -1357,7 +1356,6 @@ export const CharacterProvider = ({ children }) => {
+       }
+     });
+ 
+-    setActiveTimedEffects(nextEffects);
+     setSceneCounter((prev) => prev + 1);
+     store.triggerDependentCalculations();
+     return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+@@ -1427,7 +1425,6 @@ export const CharacterProvider = ({ children }) => {
+     setTrait(null);
+     setEquipment(null);
+     setEffects([]);
+-    setActiveTimedEffects([]);
+     setSceneCounter(0);
+     const emptySceneRiskStates = {};
+     sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
+@@ -1522,15 +1519,13 @@ export const CharacterProvider = ({ children }) => {
+     trait, setTrait,
+     equipment, setEquipment,
+     effects, setEffects,
+-    activeTimedEffects, setActiveTimedEffects,
+     sceneCounter,
+-    sceneRiskStates,
++    // sceneRiskStates — Шаг 6: экраны читают стор напрямую (useCharacterStore).
+     sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
+     applyConsumableTimedEffects,
+     applyConsumableFull,
+     previewConsumableRadiation,
+-    conditions, setConditions,
+-    chemDosesLog,
++    // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
+     advanceScene,
+     equippedRobotSlots, setEquippedRobotSlots,
+     equippedRobotModules, setEquippedRobotModules,
+@@ -1577,7 +1572,7 @@ export const CharacterProvider = ({ children }) => {
+     // остаются в модуле Fallout (уведомления о событиях состояний).
+     reducePersistentDiseaseRanks,
+     resistDisease,
+-    lastDiseaseResistAt,
++    // lastDiseaseResistAt — Шаг 6: экраны читают стор напрямую.
+     resetCharacter,
+     resetKitAndRewards,
+     resetKitOnly,
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 312e233..e3da08b 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -191,7 +191,9 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
+   const [isOpen, setIsOpen] = useState(false);
+   useLocale();
+   const moduleLocale = useModuleLocale();
+-  const { resistDisease, lastDiseaseResistAt } = useCharacter();
++  const { resistDisease } = useCharacter();
++  // lastDiseaseResistAt — Шаг 6 миграции: состояние в сторе, экран читает напрямую.
++  const lastDiseaseResistAt = useCharacterStore((state) => state.lastDiseaseResistAt);
+   const diseasesById = useMemo(() => new Map(
+     getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
+   ), [moduleLocale]);
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 24aa310..e86aef8 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -217,6 +217,11 @@ const useCharacterStore = create(devtools(
+       selectedSkills: [],
+       extraTaggedSkills: [],
+       forcedSelectedSkills: [],
++      // Заболевания/состояния — Шаг 6 миграции (источник — стор).
++      conditions: [],
++      chemDosesLog: [],
++      lastDiseaseResistAt: null,
++      sceneRiskStates: {},
+       items: {},
+       effects: {},
+       // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
+@@ -1160,6 +1165,37 @@ const useCharacterStore = create(devtools(
+         }));
+       },
+ 
++      /**
++       * Состояния персонажа (['addicted', 'diseased', ...]) — Шаг 6.
++       * Поддерживает функциональный апдейтер (прецедент setEquippedWeapons).
++       */
++      setConditions: (updater) => {
++        set((state) => ({
++          conditions: typeof updater === 'function' ? updater(state.conditions) : [...(updater || [])],
++        }));
++      },
++
++      /** Журнал доз препаратов ([{ chemId, takenAt }]) — Шаг 6. */
++      setChemDosesLog: (updater) => {
++        set((state) => ({
++          chemDosesLog: typeof updater === 'function' ? updater(state.chemDosesLog) : [...(updater || [])],
++        }));
++      },
++
++      /** Момент последней проверки «Сопротивляться» болезни (v25) — Шаг 6. */
++      setLastDiseaseResistAt: (updater) => {
++        set((state) => ({
++          lastDiseaseResistAt: typeof updater === 'function' ? updater(state.lastDiseaseResistAt) : (updater ?? null),
++        }));
++      },
++
++      /** Состояния проверок риска сцен (ruleId → scene state) — Шаг 6. */
++      setSceneRiskStates: (updater) => {
++        set((state) => ({
++          sceneRiskStates: typeof updater === 'function' ? updater(state.sceneRiskStates) : { ...(updater || {}) },
++        }));
++      },
++
+       /**
+        * Reset all per-character Zustand data before starting a new character.
+        *
+@@ -1182,6 +1218,10 @@ const useCharacterStore = create(devtools(
+           selectedSkills: [],
+           extraTaggedSkills: [],
+           forcedSelectedSkills: [],
++          conditions: [],
++          chemDosesLog: [],
++          lastDiseaseResistAt: null,
++          sceneRiskStates: {},
+           items: {},
+           effects: {},
+           stateExtensions: {},
+@@ -1252,6 +1292,10 @@ const useCharacterStore = create(devtools(
+         selectedSkills: state.selectedSkills,
+         extraTaggedSkills: state.extraTaggedSkills,
+         forcedSelectedSkills: state.forcedSelectedSkills,
++        conditions: state.conditions,
++        chemDosesLog: state.chemDosesLog,
++        lastDiseaseResistAt: state.lastDiseaseResistAt,
++        sceneRiskStates: state.sceneRiskStates,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
+-- 
+2.39.5
+
