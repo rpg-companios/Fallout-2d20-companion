@@ -37,7 +37,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
-import { hpMaxPenaltyForFatigue, survivalEffectRows, totalFatigue } from '../../survival/survival';
+import { hpMaxPenaltyForFatigue, ladderColorKey, survivalEffectRows, totalFatigue } from '../../survival/survival';
 import { useSurvivalState } from '../../survival/hooks';
 import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
 import SleepModal from './modals/SleepModal';
@@ -330,14 +330,25 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
 
 // --- Reusable Components ---
 
-const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false }) => (
+// Патч 231: ключ цвета лестницы → стиль значения ('ok' — без перекраски).
+const SURVIVAL_VALUE_STYLES = {
+  ok: null,
+  grey: localStyles.survivalValueGrey,
+  yellow: localStyles.survivalValueYellow,
+  orange: localStyles.survivalValueOrange,
+  red: localStyles.survivalValueRed,
+};
+
+// Патч 231: valueStyle — дополнительный цвет значения (шкала состояний
+// выживания: от обычного на потолке до красного на дне).
+const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false, valueStyle }) => (
   <View style={[localStyles.statBoxContainer, disabled && { opacity: 0.5 }]}>
     <View style={localStyles.statBoxHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
     </View>
     <View style={localStyles.statBoxValueContainer}>
       <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-        {highlightMeleeBonus ? renderTextWithIcons(String(value).replace('{CD}', ' {CD}'), styles.statValue) : <Text style={styles.statValue}>{value}</Text>}
+        {highlightMeleeBonus ? renderTextWithIcons(String(value).replace('{CD}', ' {CD}'), styles.statValue) : <Text style={[styles.statValue, valueStyle]}>{value}</Text>}
         {children}
       </View>
     </View>
@@ -945,26 +956,14 @@ const WeaponsAndArmorScreen = () => {
 
   // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
   // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
-  // Патч 217: у строки «Усталость» в скобках активные источники —
-  // «Усталость 5 (голод: 1 / жажда: 2 / сон: 1 / болезнь: 1)»; показываются
-  // только источники с ненулевым вкладом.
+  // Патч 231 (решение владельца): разбивка источников в скобках убрана —
+  // происхождение усталости видно по цветам состояний лестниц (ряд
+  // Голод/Жажда/Сон выше); строка снова просто «Усталость N».
   const survivalRows = useMemo(
-    () => survivalEffectRows(survival).map((row) => {
-      const text = tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n));
-      if (row.key !== 'fatigue' || !row.sources || row.sources.length === 0) {
-        return { key: `survival_${row.key}`, text };
-      }
-      const join = tWeaponsAndArmorScreen('survival.fatigueSourceJoin');
-      const sources = row.sources
-        .map((entry) => `${tWeaponsAndArmorScreen(`survival.fatigueSource.${entry.source}`)}: ${entry.amount}`)
-        .join(join);
-      return {
-        key: `survival_${row.key}`,
-        text: tWeaponsAndArmorScreen('survival.fatigueSources')
-          .replace('{n}', String(row.n))
-          .replace('{sources}', sources),
-      };
-    }),
+    () => survivalEffectRows(survival).map((row) => ({
+      key: `survival_${row.key}`,
+      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
+    })),
     [survival]
   );
 
@@ -1122,17 +1121,24 @@ const WeaponsAndArmorScreen = () => {
                 Роботы и киборги (survival === null) ряда не получают. */}
             {survival ? (
               <View style={[localStyles.statsRow, { marginTop: 8 }]}>
+                {/* Патч 231: значения окрашены по лестнице (решение владельца):
+                    потолок — обычный цвет, ниже — серый, серо-жёлтый,
+                    жёлто-красный, на дне — красный; у воды (4 ступени)
+                    жёлто-красный пропущен. */}
                 <StatBox
                   title={tWeaponsAndArmorScreen('survival.foodTitle')}
                   value={tWeaponsAndArmorScreen(`survival.food.${survival.food}`)}
+                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('food', survival.food)]}
                 />
                 <StatBox
                   title={tWeaponsAndArmorScreen('survival.waterTitle')}
                   value={tWeaponsAndArmorScreen(`survival.water.${survival.water}`)}
+                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('water', survival.water)]}
                 />
                 <StatBox
                   title={tWeaponsAndArmorScreen('survival.sleepTitle')}
                   value={tWeaponsAndArmorScreen(`survival.sleep.${survival.sleep}`)}
+                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('sleep', survival.sleep)]}
                 />
               </View>
             ) : null}

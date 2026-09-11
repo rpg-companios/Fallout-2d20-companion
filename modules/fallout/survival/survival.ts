@@ -488,6 +488,24 @@ export function fatigueSourceBreakdown(state: SurvivalState): Array<{ source: Fa
 // тексты накладывает UI через i18n (survival.fatigue / survival.apPenalty /
 // survival.maxHpPenalty). Патч 217: строка «Усталость» несёт разбивку по
 // активным источникам (sources), UI добавляет её в скобках.
+// Цветовая шкала состояния лестницы (патч 231, решение владельца): значение
+// состояния красится от нейтрального (потолок) к красному (дно):
+// 'ok' → 'grey' → 'yellow' → 'orange' → 'red'. У 5-ступенчатых лестниц
+// (еда, сон) все 5 красок; у воды 4 ступени — «жёлто-красный» пропускается,
+// дно сразу красное (решение владельца).
+export function ladderColorKey(
+    ladder: SurvivalLadder,
+    value: number,
+): 'ok' | 'grey' | 'yellow' | 'orange' | 'red' {
+    const max = SURVIVAL_RULES.max[ladder];
+    const severity = max - value;
+    if (severity <= 0) return 'ok';
+    if (severity === 1) return 'grey';
+    if (severity === 2) return 'yellow';
+    if (max >= 5) return severity === 3 ? 'orange' : 'red';
+    return 'red';
+}
+
 export function survivalEffectRows(
     survival: SurvivalState | null | undefined,
 ): Array<{ key: string; n: number; sources?: Array<{ source: string; amount: number }> }> {
