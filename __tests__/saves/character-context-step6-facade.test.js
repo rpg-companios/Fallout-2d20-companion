@@ -54,7 +54,7 @@ describe('Шаг 6: фасад useCharacter() без полей условий/�
   const valueObjects = [];
   walk(ast, (node) => {
     if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'attributesSaved')) {
+      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')) {
       valueObjects.push(node);
     }
   });

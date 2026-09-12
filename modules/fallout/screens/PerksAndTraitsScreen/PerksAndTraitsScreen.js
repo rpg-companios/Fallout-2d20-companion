@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useCharacter } from '../../../../components/CharacterContext';
+import useCharacterStore from '../../../../src/store/characterStore';
 import { showRawAlert } from '../../../../components/alerts/alertService';
 import { getTraitI18nById } from '../../../../domain/traits';
 import {
@@ -27,9 +28,13 @@ const toPerkId = (selected) => {
 
 const PerksAndTraitsScreen = () => {
   const {
-    trait, level, selectedPerks, setSelectedPerks, annotatePerks,
-    addPerkAttributePoints, attributesSaved,
+    selectedPerks, setSelectedPerks, annotatePerks,
   } = useCharacter();
+  // Шаг 7: trait/level/attributesSaved — стор; addPerkAttributePoints — стор-экшен.
+  const trait = useCharacterStore((s) => s.trait);
+  const level = useCharacterStore((s) => s.level);
+  const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+  const addPerkAttributePoints = useCharacterStore((s) => s.addPerkAttributePoints);
   useLocale();
   const moduleLocale = useModuleLocale();
   const [isPerkModalVisible, setPerkModalVisible] = useState(false);

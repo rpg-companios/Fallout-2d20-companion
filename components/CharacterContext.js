@@ -37,7 +37,7 @@ const clampAttributesToRules = (rawAttributes, trait) => {
     return { ...attribute, value: max };
   });
 };
-import { findEnrichedOrigin, isRobotCharacter, getBuiltinBaseWeapon } from '../domain/origins';
+import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../domain/origins';
 import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConditionEvent, notifyConsumableApplied } from '../src/store/stateExtensions';
 import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
@@ -197,11 +197,16 @@ const mergeSnapshotWithStoreData = (snapshot) => {
 };
 
 export const CharacterProvider = ({ children }) => {
-  const [characterName, setCharacterName] = useState('');
+  // ═══ Профиль персонажа: стор — единственный источник (Шаг 7). ═══
+  // Сеттеры — стор-экшены (функциональный апдейтер), точки записи не менялись.
+  // Фасад эти поля больше не отдаёт: экраны читают/пишут стор напрямую.
+  const characterName = useCharacterStore((s) => s.characterName);
+  const setCharacterName = useCharacterStore((s) => s.setCharacterName);
   const [characterId, setCharacterId] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
 
-  const [level, setLevel] = useState(INITIAL_LEVEL);
+  const level = useCharacterStore((s) => s.level);
+  const setLevel = useCharacterStore((s) => s.setLevel);
   // ═══ Атрибуты/навыки: стор-словари — единственный источник (Шаг 5). ═══
   // Экраны пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills и
   // selection-экшены); «массивы» здесь — производные представления словарей
@@ -214,8 +219,10 @@ export const CharacterProvider = ({ children }) => {
   const selectedSkills = useCharacterStore((s) => s.selectedSkills);
   const extraTaggedSkills = useCharacterStore((s) => s.extraTaggedSkills);
   const forcedSelectedSkills = useCharacterStore((s) => s.forcedSelectedSkills);
-  const [origin, setOrigin] = useState(null);
-  const [trait, setTrait] = useState(null);
+  const origin = useCharacterStore((s) => s.origin);
+  const setOrigin = useCharacterStore((s) => s.setOrigin);
+  const trait = useCharacterStore((s) => s.trait);
+  const setTrait = useCharacterStore((s) => s.setTrait);
   const [effects, setEffects] = useState([]);
   const [sceneCounter, setSceneCounter] = useState(0);
   const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
@@ -372,11 +379,16 @@ export const CharacterProvider = ({ children }) => {
     return setCounter({ id: 'radiation', current: prev, max: null, min: 0 }, next).current;
   });
   const [modifiedItems, setModifiedItems] = useState(new Map());
-  const [availablePerkAttributePoints, setAvailablePerkAttributePoints] = useState(0);
-  const [luckPoints, setLuckPoints] = useState(0);
-  const [maxLuckPoints, setMaxLuckPoints] = useState(0);
-  const [attributesSaved, setAttributesSaved] = useState(false);
-  const [skillsSaved, setSkillsSaved] = useState(false);
+  const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
+  const setAvailablePerkAttributePoints = useCharacterStore((s) => s.setAvailablePerkAttributePoints);
+  const luckPoints = useCharacterStore((s) => s.luckPoints);
+  const setLuckPoints = useCharacterStore((s) => s.setLuckPoints);
+  const maxLuckPoints = useCharacterStore((s) => s.maxLuckPoints);
+  const setMaxLuckPoints = useCharacterStore((s) => s.setMaxLuckPoints);
+  const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+  const setAttributesSaved = useCharacterStore((s) => s.setAttributesSaved);
+  const skillsSaved = useCharacterStore((s) => s.skillsSaved);
+  const setSkillsSaved = useCharacterStore((s) => s.setSkillsSaved);
   const [selectedPerks, setSelectedPerksRaw] = useState([]);
   const setSelectedPerks = useCallback((updater) => {
     setSelectedPerksRaw((prev) => {
@@ -458,20 +470,13 @@ export const CharacterProvider = ({ children }) => {
       // синхронизировать нечего.
       const current = useCharacterStore.getState();
 
-      // Прокидываем реальный контекст → корректный пересчёт derivedStats.
-      // isRobot управляет правилом переносимого веса (от корпуса/брони, без STR).
-      const isRobot = isRobotCharacter({ origin, trait });
+      // Прокидываем производственные данные экипировки → пересчёт derivedStats.
+      // Шаг 7: trait/level/origin не зеркалируются — стор читает их сам;
+      // isRobot считается внутри recalculateDerivedStats.
       current.setCharacterContext({
-        trait,
-        level,
-        // origin нужен правилам экипировки слоя СБ (powerArmorSlice.characterRules).
-        origin,
-        isRobot,
-        // Надетый каркас СБ → модификаторы атрибутов (СИЛ=set 11) в производных, §5.6.
         equipmentState: {
           equippedArmor,
           equippedRobotSlots,
-          isRobot,
           powerArmorFrameId: equippedPowerArmor?.frame ? equippedPowerArmor.frame.catalogId : null,
         },
       });
@@ -870,9 +875,7 @@ export const CharacterProvider = ({ children }) => {
     });
   };
 
-  const addPerkAttributePoints = (points) => {
-    setAvailablePerkAttributePoints(prev => Math.max(0, prev + points));
-  };
+  // addPerkAttributePoints — Шаг 7: стор-экшен, перковый экран зовёт напрямую.
 
   /**
    * Записывает дозу препарата и возвращает общий размер пула доз за последние 24 ч.
@@ -1425,17 +1428,14 @@ export const CharacterProvider = ({ children }) => {
 
   const resetCharacter = (preserveOrigin = false) => {
     const initialAttributes = createInitialAttributes();
-    const initialLevel = INITIAL_LEVEL;
-    setLevel(initialLevel);
     const initialSkills = ALL_SKILLS.map(s => ({ ...s, value: 0 }));
-    // Атрибуты/навыки/selection-списки сеет resetCharacterStore (слайс, Шаг 5).
-    setAttributesSaved(false);
-    setSkillsSaved(false);
+    // Профиль (уровень/имя/флаги/origin/trait/удача-в-ноль) сеет
+    // resetCharacterStore (Шаги 5/7); ниже — потолок удачи по стартовым
+    // атрибутам. preserveOrigin исторически сохранял ориджин выборочно —
+    // полный сброс его обнуляет (семейство reset* уточняется в Шаге 8).
     const initialLuck = getLuckPoints(initialAttributes);
     setMaxLuckPoints(initialLuck);
     setLuckPoints(initialLuck);
-    if (!preserveOrigin) setOrigin(null);
-    setTrait(null);
     setEquipment(null);
     setEffects([]);
     setSceneCounter(0);
@@ -1513,14 +1513,14 @@ export const CharacterProvider = ({ children }) => {
   }, [resetKitAndRewards]);
 
   const value = {
-    characterName, setCharacterName,
+    // characterName/setCharacterName — Шаг 7: только в сторе.
     characterId,
     isSaved,
     saveCharacter,
     loadCharacter,
     getCharactersList,
     deleteCharacter,
-    level, setLevel,
+    // level/setLevel — Шаг 7: только в сторе.
     // Атрибуты/навыки (данные) — Шаг 5: экраны читают производные массивы
     // отсюда, пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills +
     // selection-экшены useCharacterStore). Сеттеры из фасада убраны.
@@ -1528,8 +1528,7 @@ export const CharacterProvider = ({ children }) => {
     selectedSkills,
     extraTaggedSkills,
     forcedSelectedSkills,
-    origin, setOrigin,
-    trait, setTrait,
+    // origin/setOrigin/trait/setTrait — Шаг 7: только в сторе.
     equipment, setEquipment,
     effects, setEffects,
     sceneCounter,
@@ -1553,10 +1552,7 @@ export const CharacterProvider = ({ children }) => {
     currency, earnCurrency, spendCurrency,
     currentHealth, healCharacter, damageCharacter, setCurrentHealth,
     radiation, setRadiation, addRadiation, healRadiation,
-    luckPoints, setLuckPoints,
-    maxLuckPoints, setMaxLuckPoints,
-    attributesSaved, setAttributesSaved,
-    skillsSaved, setSkillsSaved,
+    // luckPoints/maxLuckPoints/attributesSaved/skillsSaved — Шаг 7: только в сторе.
     selectedPerks, setSelectedPerks,
     modifiedItems, setModifiedItems,
     carryWeight,
@@ -1590,8 +1586,7 @@ export const CharacterProvider = ({ children }) => {
     resetCharacter,
     resetKitAndRewards,
     resetKitOnly,
-    availablePerkAttributePoints,
-    addPerkAttributePoints,
+    // availablePerkAttributePoints/addPerkAttributePoints — Шаг 7: только в сторе.
     commitAttributeChanges,
     meetsPerkRequirements: (perk, options) => meetsPerkRequirements(perk, attributes, level, selectedPerks, options),
     getPerkUnmetReasons: (perk, options) => getPerkUnmetReasons(perk, attributes, level, selectedPerks, options),

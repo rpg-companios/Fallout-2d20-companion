@@ -58,9 +58,10 @@ const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalPr
     const {
         applyConsumableFull,
         previewConsumableRadiation,
-        origin,
-        trait,
     } = useCharacter();
+    // Шаг 7: origin/trait — стор напрямую.
+    const origin = useCharacterStore((state) => state.origin);
+    const trait = useCharacterStore((state) => state.trait);
     const survival = useSurvivalState();
     const storeItems = useCharacterStore((state) => state.items);
     const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);

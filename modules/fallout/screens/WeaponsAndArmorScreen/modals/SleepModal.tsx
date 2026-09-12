@@ -10,6 +10,7 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
 import { useCharacter } from '../../../../../components/CharacterContext';
+import useCharacterStore from '../../../../../src/store/characterStore';
 import { calculateMaxHealth } from '../../../../../domain/characterCreation';
 import {
     forecastSleep,
@@ -96,7 +97,10 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
     useModuleLocale();
     const survival = useSurvivalState();
     const { sleepSurvival } = useSurvivalActions();
-    const { attributes, level, attributesSaved } = useCharacter();
+    const { attributes } = useCharacter();
+    // Шаг 7: level/attributesSaved — стор напрямую.
+    const level = useCharacterStore((state) => state.level);
+    const attributesSaved = useCharacterStore((state) => state.attributesSaved);
     const [place, setPlace] = useState<SleepPlace>('bed');
     const [hours, setHours] = useState(8);
 

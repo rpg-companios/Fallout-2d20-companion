@@ -155,10 +155,11 @@ export const createPowerArmorActions = (set, get) => {
   // проверки — осознанно: loadPowerArmorState доверяет валидированному
   // состоянию. Если появится автозапуск equip — сначала добавить fail-closed
   // (отклонение 'context-not-ready' при _characterContext === undefined).
-  const characterRules = () => {
-    const ctx = get()._characterContext || {};
-    return { origin: ctx.origin || null, trait: ctx.trait || null };
-  };
+  const characterRules = () => ({
+    // Шаг 7: origin/trait — публичные поля стора (мигрировали из контекста).
+    origin: get().origin || null,
+    trait: get().trait || null,
+  });
 
   return {
     // ── Базовые сеттеры (в том числе для эффекта таймера и загрузки сейва) ──

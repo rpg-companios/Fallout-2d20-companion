@@ -55,7 +55,7 @@ describe('Шаг 5: фасад useCharacter() без сеттеров атриб
   const valueObjects = [];
   walk(ast, (node) => {
     if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'attributesSaved')) {
+      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')) {
       valueObjects.push(node);
     }
   });

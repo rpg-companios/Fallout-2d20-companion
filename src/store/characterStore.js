@@ -65,6 +65,7 @@ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
 import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
+import { isRobotCharacter } from '../../domain/origins';
 // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
 // в CharacterContext.
@@ -191,17 +192,6 @@ const applyModModifiers = (item, appliedMods = {}) => {
   return updatedItem;
 };
 
-// Helper to get trait, level, and equipment state from context (to be provided by components)
-const getCharacterContext = () => {
-  // These would come from the CharacterContext or props in real usage
-  // For now, return defaults
-  return {
-    trait: null,
-    level: 1,
-    equipmentState: {},
-  };
-};
-
 // Main store creation
 const useCharacterStore = create(devtools(
   persist(
@@ -217,6 +207,16 @@ const useCharacterStore = create(devtools(
       selectedSkills: [],
       extraTaggedSkills: [],
       forcedSelectedSkills: [],
+      // Профиль персонажа — Шаг 7 миграции (источник — стор).
+      origin: null,
+      trait: null,
+      level: 1,
+      characterName: '',
+      attributesSaved: false,
+      skillsSaved: false,
+      luckPoints: 0,
+      maxLuckPoints: 0,
+      availablePerkAttributePoints: 0,
       // Заболевания/состояния — Шаг 6 миграции (источник — стор).
       conditions: [],
       chemDosesLog: [],
@@ -989,8 +989,11 @@ const useCharacterStore = create(devtools(
         // Merge provided options with the last context pushed via setCharacterContext,
         // falling back to defaults. (Previously this used a stub that always returned
         // trait:null/level:1 — see Fix #4.)
+        // Шаг 7: trait/level/origin — публичные поля стора; зеркало
+        // _characterContext хранит только equipmentState (эффект провайдера).
         const context = {
-          ...getCharacterContext(),
+          trait: state.trait,
+          level: state.level,
           ...(state._characterContext || {}),
           ...options,
         };
@@ -999,7 +1002,7 @@ const useCharacterStore = create(devtools(
         // (the robot slice is the single source of truth — Fix #2).
         const equipmentState = {
           ...(context.equipmentState || {}),
-          isRobot: Boolean(context.isRobot ?? context.equipmentState?.isRobot),
+          isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
           robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
         };
 
@@ -1019,16 +1022,12 @@ const useCharacterStore = create(devtools(
        * Set character context for derived stats calculation
        * @param {Object} context - { trait, level, equipmentState }
        */
-      setCharacterContext: (context) => {
-        // Store context for derived stats calculation
-        // This would typically be called by CharacterContext
+      setCharacterContext: (context = {}) => {
+        // Шаг 7: зеркалируются ТОЛЬКО производственные данные экипировки
+        // (переносимый вес/СБ); trait/level/origin — публичные поля стора,
+        // читаются recalculateDerivedStats и characterRules напрямую.
         set({
           _characterContext: {
-            trait: context.trait || null,
-            // origin нужен правилам экипировки слоя СБ (powerArmorSlice:
-            // робот/супермутант), см. characterRules().
-            origin: context.origin || null,
-            level: context.level || 1,
             equipmentState: context.equipmentState || {},
           }
         });
@@ -1196,6 +1195,47 @@ const useCharacterStore = create(devtools(
         }));
       },
 
+      // ── Профиль персонажа (Шаг 7): сеттеры с функциональным апдейтером ──
+
+      /** Ориджин (объект каталога | null). */
+      setOrigin: (updater) => set((state) => ({
+        origin: typeof updater === 'function' ? updater(state.origin) : updater,
+      })),
+      /** Трейт (объект каталога | null). */
+      setTrait: (updater) => set((state) => ({
+        trait: typeof updater === 'function' ? updater(state.trait) : updater,
+      })),
+      /** Уровень персонажа. */
+      setLevel: (updater) => set((state) => ({
+        level: typeof updater === 'function' ? updater(state.level) : updater,
+      })),
+      /** Имя персонажа. */
+      setCharacterName: (updater) => set((state) => ({
+        characterName: typeof updater === 'function' ? updater(state.characterName) : updater,
+      })),
+      /** Флаг «атрибуты сохранены» (UI создания). */
+      setAttributesSaved: (value) => set({ attributesSaved: Boolean(value) }),
+      /** Флаг «навыки сохранены» (UI создания). */
+      setSkillsSaved: (value) => set({ skillsSaved: Boolean(value) }),
+      /** Текущие очки удачи (current; потолок — производная, не персистится). */
+      setLuckPoints: (updater) => set((state) => ({
+        luckPoints: typeof updater === 'function' ? updater(state.luckPoints) : updater,
+      })),
+      /** Потолок очков удачи (производная getLuckPoints; хранится для UI). */
+      setMaxLuckPoints: (updater) => set((state) => ({
+        maxLuckPoints: typeof updater === 'function' ? updater(state.maxLuckPoints) : updater,
+      })),
+      /** Свободные очки атрибутов перков. */
+      setAvailablePerkAttributePoints: (updater) => set((state) => ({
+        availablePerkAttributePoints: typeof updater === 'function'
+          ? updater(state.availablePerkAttributePoints)
+          : updater,
+      })),
+      /** Начислить/списать очки атрибутов перков (не ниже 0). */
+      addPerkAttributePoints: (points = 0) => set((state) => ({
+        availablePerkAttributePoints: Math.max(0, state.availablePerkAttributePoints + points),
+      })),
+
       /**
        * Reset all per-character Zustand data before starting a new character.
        *
@@ -1222,6 +1262,16 @@ const useCharacterStore = create(devtools(
           chemDosesLog: [],
           lastDiseaseResistAt: null,
           sceneRiskStates: {},
+          // Профиль — Шаг 7.
+          origin: null,
+          trait: null,
+          level: 1,
+          characterName: '',
+          attributesSaved: false,
+          skillsSaved: false,
+          luckPoints: 0,
+          maxLuckPoints: 0,
+          availablePerkAttributePoints: 0,
           items: {},
           effects: {},
           stateExtensions: {},
@@ -1296,6 +1346,16 @@ const useCharacterStore = create(devtools(
         chemDosesLog: state.chemDosesLog,
         lastDiseaseResistAt: state.lastDiseaseResistAt,
         sceneRiskStates: state.sceneRiskStates,
+        // Профиль — Шаг 7 (maxLuckPoints не персистится: производная,
+        // правило 1 counters-storage.md).
+        origin: state.origin,
+        trait: state.trait,
+        level: state.level,
+        characterName: state.characterName,
+        attributesSaved: state.attributesSaved,
+        skillsSaved: state.skillsSaved,
+        luckPoints: state.luckPoints,
+        availablePerkAttributePoints: state.availablePerkAttributePoints,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

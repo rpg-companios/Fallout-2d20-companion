@@ -262,16 +262,8 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
 export default function CharacterScreen() {
 
   const {
-    characterName, setCharacterName,
     isSaved,
     saveCharacter,
-    level,
-    setLevel,
-
-    origin,
-    setOrigin,
-    trait,
-    setTrait,
     equipment,
     setEquipment,
     effects,
@@ -280,21 +272,32 @@ export default function CharacterScreen() {
     earnCurrency,
     spendCurrency,
     setCurrentHealth,
-    luckPoints,
-    setLuckPoints,
-    maxLuckPoints,
-    setMaxLuckPoints,
-    attributesSaved,
-    setAttributesSaved,
-    skillsSaved,
-    setSkillsSaved,
     resetCharacter,
     resetKitAndRewards,
-    availablePerkAttributePoints,
     commitAttributeChanges,
     setEquippedRobotSlots,
     setEquippedRobotModules,
   } = useCharacter();
+
+  // Шаг 7: профиль персонажа (origin/trait/level/имя, флаги сохранения,
+  // удача, очки перков) — стор; фасад useCharacter() поля не отдаёт.
+  const characterName = useCharacterStore((s) => s.characterName);
+  const setCharacterName = useCharacterStore((s) => s.setCharacterName);
+  const level = useCharacterStore((s) => s.level);
+  const setLevel = useCharacterStore((s) => s.setLevel);
+  const origin = useCharacterStore((s) => s.origin);
+  const setOrigin = useCharacterStore((s) => s.setOrigin);
+  const trait = useCharacterStore((s) => s.trait);
+  const setTrait = useCharacterStore((s) => s.setTrait);
+  const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+  const setAttributesSaved = useCharacterStore((s) => s.setAttributesSaved);
+  const skillsSaved = useCharacterStore((s) => s.skillsSaved);
+  const setSkillsSaved = useCharacterStore((s) => s.setSkillsSaved);
+  const luckPoints = useCharacterStore((s) => s.luckPoints);
+  const setLuckPoints = useCharacterStore((s) => s.setLuckPoints);
+  const maxLuckPoints = useCharacterStore((s) => s.maxLuckPoints);
+  const setMaxLuckPoints = useCharacterStore((s) => s.setMaxLuckPoints);
+  const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
 
   const debugLocale = useLocale();
   const moduleLocale = useModuleLocale();

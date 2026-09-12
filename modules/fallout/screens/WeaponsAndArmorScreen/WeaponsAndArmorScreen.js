@@ -387,7 +387,8 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 
 export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
-    const { hasTrait, attributes, skills, trait } = useCharacter();
+    const { hasTrait, attributes, skills } = useCharacter();
+    const trait = useCharacterStore((state) => state.trait); // Шаг 7
     const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
     const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
     // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
@@ -622,15 +623,16 @@ const resolveStoreItemId = (weapon) => {
 const WeaponsAndArmorScreen = () => {
   const {
     attributes,
-    level,
     equippedRobotSlots,
     setEquippedRobotSlots,
     saveModifiedItem,
-    attributesSaved,
-    trait,
-    origin,
     radiation,
   } = useCharacter();
+  // Шаг 7: level/attributesSaved/trait/origin — стор напрямую.
+  const level = useCharacterStore((s) => s.level);
+  const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+  const trait = useCharacterStore((s) => s.trait);
+  const origin = useCharacterStore((s) => s.origin);
 
   // Выживание — поле расширения сеттинга (modules/fallout/survival/):
   // движок хранит его в stateExtensions, модуль читает через свой хук.

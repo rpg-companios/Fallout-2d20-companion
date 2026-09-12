@@ -82,10 +82,11 @@ const InventoryScreen = () => {
     applyConsumableFull,
     previewConsumableRadiation,
     getModifiedItem,
-    trait,
-    origin,
     carryWeight,
   } = useCharacter();
+  // Шаг 7: origin/trait — стор напрямую.
+  const trait = useCharacterStore((s) => s.trait);
+  const origin = useCharacterStore((s) => s.origin);
 
   const storeItems = useCharacterStore((state) => state.items);
   // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
