@@ -1,0 +1,698 @@
+From da4979e3931688bdd0fc4ad8ddb7b0b63f526ee1 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Sun, 13 Sep 2026 05:49:17 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A8=D0=B0=D0=B3=208=D0=B0:=20=D0=B7=D0=B4?=
+ =?UTF-8?q?=D0=BE=D1=80=D0=BE=D0=B2=D1=8C=D0=B5/=D1=80=D0=B0=D0=B4=D0=B8?=
+ =?UTF-8?q?=D0=B0=D1=86=D0=B8=D1=8F=20=E2=80=94=20=D1=81=D1=82=D0=BE=D1=80?=
+ =?UTF-8?q?-=D0=BA=D0=B0=D1=83=D0=BD=D1=82=D0=B5=D1=80=D1=8B=20(=D0=BA?=
+ =?UTF-8?q?=D0=B0=D1=83=D0=BD=D1=82=D0=B5=D1=80=D1=8B=20=D0=B8=D0=B7=20?=
+ =?UTF-8?q?=D0=BA=D0=BE=D0=BD=D1=82=D0=B5=D0=BA=D1=81=D1=82=D0=B0=20=D0=B2?=
+ =?UTF-8?q?=20characterStore)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- characterStore: currentHealth/radiation в состоянии; экшены
+  setCurrentHealth (функциональный апдейтер), healCharacter (потолок —
+  формула сеттинга или переданный displayMax), damageCharacter (только
+  нижняя граница), addRadiation/healRadiation/setRadiation (min 0),
+  applySurvivalHpLoss (патч 232); resetCharacterStore чистит счётчики —
+  радиация больше не переживает полный сброс (остаточное состояние до сих пор)
+- частичный фикс регрессии Шага 7: в resetCharacter осталась ссылка на
+  удалённую переменную initialLevel (ловилась только в рантайме)
+- CharacterContext: useState счётчиков и локальные каунтер-хелперы сняты —
+  стор-селекторы; фасад поля/действия больше не отдаёт; мёртвый импорт
+  domain/counters убран
+- Экраны напрямую: CharacterScreen (setCurrentHealth), WeaponsAndArmorScreen
+  (health-регулятор + радиация, включая деструктуру основного компонента);
+  SurvivalClock зовёт стор напрямую — циклическая ссылка на контекст разорвана
+- Семантика domain/counters.js сохранена 1-в-1 (createCounter зажимает
+  current при сборке — поведение документировано тестом)
+- Формат сейва не менялся: buildSnapshot/загрузка — те же ключи
+- Тесты: counters-store-slice (10), character-context-step8a-facade (7);
+  vitest 666/666 (66 файлов), tsc чист; док counters-storage.md — история
+- Шаг 8 (решение владельца): контекст удаляем совсем; 8а = простые
+  таблички/кнопки, 8б = сохранения, 8в = демонтаж файла
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-step8a-facade.test.js   | 127 ++++++++++++++++++
+ __tests__/saves/counters-store-slice.test.js  | 126 +++++++++++++++++
+ components/CharacterContext.js                |  61 +++------
+ docs/architecture/counters-storage.md         |  10 ++
+ .../CharacterScreen/CharacterScreen.js        |   3 +-
+ .../WeaponsAndArmorScreen.js                  |  11 +-
+ modules/fallout/survival/SurvivalClock.js     |   7 +-
+ src/store/characterStore.js                   | 101 +++++++++++++-
+ 8 files changed, 391 insertions(+), 55 deletions(-)
+ create mode 100644 __tests__/saves/character-context-step8a-facade.test.js
+ create mode 100644 __tests__/saves/counters-store-slice.test.js
+
+diff --git a/__tests__/saves/character-context-step8a-facade.test.js b/__tests__/saves/character-context-step8a-facade.test.js
+new file mode 100644
+index 0000000..fd15416
+--- /dev/null
++++ b/__tests__/saves/character-context-step8a-facade.test.js
+@@ -0,0 +1,127 @@
++// Шаг 8а миграции: здоровье/радиация — стор-каунтеры. Фасад useCharacter()
++// поля и действия больше не отдаёт; экраны (CharacterScreen, WeaponsAndArmorScreen)
++// и SurvivalClock зовут стор напрямую. Поведение каунтеров — в
++// counters-store-slice.test.js; формат сейва не менялся (buildSnapshot
++// сохраняет currentHealth/radiation под прежними ключами).
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { parseSync } from '@babel/core';
++import jsxPlugin from '@babel/plugin-transform-react-jsx';
++
++const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
++const SCREENS = {
++  CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
++  WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
++  SurvivalClock: path.resolve(__dirname, '../../modules/fallout/survival/SurvivalClock.js'),
++};
++
++// TS-плагин — только .tsx (на .js он трактует <…> как типовые дженерики).
++const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
++  filename: file,
++  babelrc: false,
++  configFile: false,
++  sourceType: 'module',
++  plugins: [jsxPlugin, ...(file.endsWith('.tsx') ? [['@babel/plugin-transform-typescript', { isTSX: true }]] : [])],
++});
++
++const walk = (node, visit) => {
++  if (!node || typeof node !== 'object') return;
++  if (Array.isArray(node)) {
++    node.forEach((child) => walk(child, visit));
++    return;
++  }
++  if (typeof node.type === 'string') visit(node);
++  Object.values(node).forEach((value) => walk(value, visit));
++};
++
++const propertyName = (prop) => {
++  if (!prop) return null;
++  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
++    const key = prop.key;
++    if (key.type === 'Identifier') return key.name;
++    if (key.type === 'StringLiteral') return key.value;
++  }
++  return null;
++};
++
++const STEP8A_MEMBERS = [
++  'currentHealth', 'setCurrentHealth', 'healCharacter', 'damageCharacter',
++  'radiation', 'setRadiation', 'addRadiation', 'healRadiation',
++  'applySurvivalHpLoss',
++];
++
++describe('Шаг 8а: фасад useCharacter() без счётчиков', () => {
++  const ast = parse(CONTEXT_FILE);
++  const facadeValues = [];
++  walk(ast, (node) => {
++    if (node.type === 'ObjectExpression'
++      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')
++      && node.properties.some((prop) => propertyName(prop) === 'characterId')) {
++      facadeValues.push(node);
++    }
++  });
++
++  it('фасадный value найден ровно один', () => {
++    expect(facadeValues.length).toBe(1);
++  });
++
++  it('в value нет полей/действий счётчиков', () => {
++    const names = facadeValues[0].properties.map(propertyName);
++    expect(names.filter((name) => STEP8A_MEMBERS.includes(name))).toEqual([]);
++  });
++
++  it('снапшот сейва сохраняет currentHealth/radiation (формат не менялся)', () => {
++    const snapshots = [];
++    walk(ast, (node) => {
++      if (node.type === 'ObjectExpression'
++        && node.properties.some((prop) => propertyName(prop) === 'currentHealth')
++        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')) {
++        snapshots.push(node);
++      }
++    });
++    expect(snapshots.length).toBe(1);
++  });
++
++  it('счётчики в контексте — стор-селекторы', () => {
++    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
++    expect(source).toContain('useCharacterStore((s) => s.currentHealth)');
++    expect(source).toContain('useCharacterStore((s) => s.radiation)');
++    expect(source).not.toContain('setRadiationRaw');
++  });
++});
++
++describe('Шаг 8а: потребители — напрямую на стор', () => {
++  it('экраны не берут счётчики из фасада', () => {
++    const violations = [];
++    for (const [name, file] of Object.entries(SCREENS)) {
++      walk(parse(file), (node) => {
++        if (node.type === 'VariableDeclarator'
++          && node.id?.type === 'ObjectPattern'
++          && node.init?.type === 'CallExpression'
++          && node.init.callee?.type === 'Identifier'
++          && node.init.callee.name === 'useCharacter') {
++          for (const prop of node.id.properties) {
++            const propName = propertyName(prop) ?? prop.argument?.name ?? null;
++            if (STEP8A_MEMBERS.includes(propName)) violations.push(`${name}: ${propName}`);
++          }
++        }
++      });
++    }
++    expect(violations).toEqual([]);
++  });
++
++  it('SurvivalClock больше не импортирует контекст (цикл разорван)', () => {
++    const source = fs.readFileSync(SCREENS.SurvivalClock, 'utf8');
++    expect(source).not.toContain('CharacterContext');
++    expect(source).toContain('useCharacterStore.getState().applySurvivalHpLoss');
++  });
++
++  it('store-слайс экспортирует действия счётчиков', () => {
++    const source = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
++    for (const action of ['setCurrentHealth:', 'healCharacter:', 'damageCharacter:', 'addRadiation:', 'healRadiation:', 'setRadiation:', 'applySurvivalHpLoss:']) {
++      expect(source).toContain(action);
++    }
++  });
++});
+diff --git a/__tests__/saves/counters-store-slice.test.js b/__tests__/saves/counters-store-slice.test.js
+new file mode 100644
+index 0000000..71b1782
+--- /dev/null
++++ b/__tests__/saves/counters-store-slice.test.js
+@@ -0,0 +1,126 @@
++// Шаг 8а миграции: здоровье/радиация — стор-каунтеры (domain/counters.js).
++// В состоянии лежит только текущее значение числом; потолок и границы
++// собираются в момент операции (docs/architecture/counters-storage.md).
++// Особенности, зафиксированные тестами:
++//   - потолок лечения — формула сеттинга ВЫНОСЛИВОСТЬ + УДАЧА + (уровень−1);
++//   - лечение не снимает «законно избыточное» здоровье (радиация опускает
++//     максимум, не нанося урона; бонус отдыха повышает текущее выше базового);
++//   - урон списывает до нуля без урезания по базовому потолку;
++//   - радиация — ресурс «наоборот», нижняя граница 0, потолка нет;
++//   - applySurvivalHpLoss (патч 232, по книге) — до нуля включительно, ноль
++//     потерь — no-op;
++//   - resetCharacterStore чистит счётчики (радиация больше не переживает
++//     полный сброс — остаточное состояние до Шага 8а).
++//
++// Фасад useCharacter() поля больше не отдаёт — AST-контракт в
++// character-context-step8a-facade.test.js.
++
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++
++const setVitals = ({ END = 5, LCK = 4, level = 1 }) => {
++  useCharacterStore.getState().setBaseAttributes([
++    { name: 'END', value: END },
++    { name: 'LCK', value: LCK },
++  ]);
++  useCharacterStore.getState().setLevel(level);
++};
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: каунтеры здоровье/радиация (Шаг 8а)', () => {
++  it('начальное состояние: 0/0', () => {
++    const s = useCharacterStore.getState();
++    expect(s.currentHealth).toBe(0);
++    expect(s.radiation).toBe(0);
++  });
++
++  it('потолок лечения: END + LCK + (уровень − 1)', () => {
++    setVitals({ END: 5, LCK: 4, level: 3 });
++    useCharacterStore.getState().healCharacter(99); // лечит до потолка 5+4+2=11
++    expect(useCharacterStore.getState().currentHealth).toBe(11);
++  });
++
++  it(' healCharacter не превышает переданный потолок (радиация уменьшает max)', () => {
++    setVitals({ END: 5, LCK: 4, level: 1 });
++    useCharacterStore.getState().healCharacter(99, 7); // displayMax = 9−2
++    expect(useCharacterStore.getState().currentHealth).toBe(7);
++  });
++
++  it('семантика restore сохранена 1-в-1: лечение зажимает к потолку и сверху', () => {
++    // Легаси-поведение контекста 1-в-1: createCounter зажимает current к
++    // границам при сборке (clampToBounds), поэтому heal при current выше
++    // потолка возвращает потолок. «Законно избыточное» ОЗ защищает UI
++    // (WeaponsAndArmorScreen: кнопка лечения disabled при
++    // currentHealth >= displayMax), а не каунтер — контракт не менялся.
++    setVitals({ END: 5, LCK: 4, level: 1 });
++    const store = useCharacterStore.getState();
++    store.setCurrentHealth(12); // выше базового потолка 9
++    store.healCharacter(3);
++    expect(useCharacterStore.getState().currentHealth).toBe(9);
++  });
++
++  it('урон: до нуля включительно, без урезания по базовому потолку', () => {
++    setVitals({ END: 5, LCK: 4, level: 1 });
++    const store = useCharacterStore.getState();
++    store.setCurrentHealth(12);
++    store.damageCharacter(5); // 12 выше потолка 9 — зажим отрезал бы 3
++    expect(useCharacterStore.getState().currentHealth).toBe(7);
++    store.damageCharacter(50);
++    expect(useCharacterStore.getState().currentHealth).toBe(0);
++  });
++
++  it('setCurrentHealth поддерживает функциональный апдейтер', () => {
++    const store = useCharacterStore.getState();
++    store.setCurrentHealth(5);
++    store.setCurrentHealth((prev) => prev - 2);
++    expect(useCharacterStore.getState().currentHealth).toBe(3);
++  });
++
++  it('радиация: add/heal, нижняя граница 0', () => {
++    const store = useCharacterStore.getState();
++    store.addRadiation(4);
++    expect(useCharacterStore.getState().radiation).toBe(4);
++    store.healRadiation(6); // лечим больше, чем есть — в минус не уходит
++    expect(useCharacterStore.getState().radiation).toBe(0);
++    store.setRadiation((prev) => prev + 3);
++    expect(useCharacterStore.getState().radiation).toBe(3);
++    store.setRadiation(-10); // кламп к 0
++    expect(useCharacterStore.getState().radiation).toBe(0);
++  });
++
++  it('applySurvivalHpLoss: списывает текущие ОЗ до нуля; ноль потерь — no-op', () => {
++    const store = useCharacterStore.getState();
++    store.setCurrentHealth(7);
++    store.applySurvivalHpLoss(3);
++    expect(useCharacterStore.getState().currentHealth).toBe(4);
++    store.applySurvivalHpLoss(99);
++    expect(useCharacterStore.getState().currentHealth).toBe(0);
++    store.applySurvivalHpLoss(0);
++    store.applySurvivalHpLoss(null);
++    expect(useCharacterStore.getState().currentHealth).toBe(0);
++  });
++
++  it('resetCharacterStore чистит счётчики (радиация не переживает сброс)', () => {
++    const store = useCharacterStore.getState();
++    store.setCurrentHealth(9);
++    store.addRadiation(5);
++    store.resetCharacterStore();
++    const s = useCharacterStore.getState();
++    expect(s.currentHealth).toBe(0);
++    expect(s.radiation).toBe(0);
++  });
++
++  it('счётчики персистятся (текущее значение — данные, не производная)', async () => {
++    const store = useCharacterStore.getState();
++    store.setCurrentHealth(6);
++    store.addRadiation(2);
++    const raw = JSON.parse(await AsyncStorage.getItem('character-store'));
++    expect(raw.state.currentHealth).toBe(6);
++    expect(raw.state.radiation).toBe(2);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 5ae632b..d05ce12 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -57,7 +57,6 @@ import {
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ 
+ import { resolveBodyPlan } from '../domain/bodyplan';
+-import { createCounter, consume, restore, set as setCounter } from '../domain/counters';
+ import { migrateSkillsToCanonical } from '../domain/skillCanonical';
+ import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selectors';
+ import { resolveItem, findCatalogEntry } from '../domain/resolveItem';
+@@ -309,8 +308,14 @@ export const CharacterProvider = ({ children }) => {
+     });
+   }, []);
+ 
+-  const [currentHealth, setCurrentHealth] = useState(0);
+-  const [radiation, setRadiationRaw] = useState(0);
++  // ═══ Здоровье/радиация: стор-каунтеры — единственный источник (Шаг 8а). ═══
++  // Потолки/границы собирают стор-экшены (domain/counters.js); здесь —
++  // подписки для снапшота сейва, автосейва и оркестратора расходников.
++  // Экраны читают/пишут стор напрямую, фасад эти поля больше не отдаёт.
++  const currentHealth = useCharacterStore((s) => s.currentHealth);
++  const setCurrentHealth = useCharacterStore((s) => s.setCurrentHealth);
++  const radiation = useCharacterStore((s) => s.radiation);
++  const setRadiation = useCharacterStore((s) => s.setRadiation);
+ 
+   /**
+    * Ресурс (в Fallout — крышки): единственный источник — Zustand стор
+@@ -349,35 +354,9 @@ export const CharacterProvider = ({ children }) => {
+   // (Ресурс мигрировал в стор — экшены earnCurrency/spendCurrency выше;
+   // правило «не ниже нуля» теперь живёт в стор-слайсе.)
+ 
+-  // Здоровье: потолок — формула сеттинга от атрибутов и уровня. Текущее
+-  // значение может оказаться ВЫШЕ потолка (радиация опускает максимум ОЗ,
+-  // не нанося урона) — это законное состояние, лечение его не снимает и,
+-  // что важно, не уменьшает здоровье.
+-  // maxOverride — потолок, уже уменьшенный вызывающим (экран вычитает
+-  // радиацию). Без него берётся базовая формула сеттинга.
+-  const healthCounter = (maxOverride) => createCounter({
+-    id: 'health',
+-    current: currentHealth,
+-    max: maxOverride ?? calculateMaxHealth(attributes, level),
+-  });
+-  const healCharacter = (amount, maxOverride) =>
+-    setCurrentHealth(restore(healthCounter(maxOverride), amount).current);
+-  // Урон списывается без потолка базовой формулы: текущее ОЗ может быть
+-  // законно ВЫШЕ базового максимума (бонус «прекрасно отдохнувший», патч 213
+-  // снижает максимум от усталости) — зажим createCounter к базовому max
+-  // молча отрезал бы разницу. Ограничение — только нижняя граница 0.
+-  const damageCharacter = (amount) =>
+-    setCurrentHealth(consume(createCounter({ id: 'health', current: currentHealth, max: null }), amount).current);
+-
+-  // Радиация: ресурс с обратным знаком — «хорошо» быть у нуля. Потолка нет,
+-  // ограничение только снизу.
+-  const radiationCounter = () => createCounter({ id: 'radiation', current: radiation, max: null });
+-  const addRadiation = (amount) => setRadiationRaw(restore(radiationCounter(), amount).current);
+-  const healRadiation = (amount) => setRadiationRaw(consume(radiationCounter(), amount).current);
+-  const setRadiation = (updater) => setRadiationRaw((prev) => {
+-    const next = typeof updater === 'function' ? updater(prev) : updater;
+-    return setCounter({ id: 'radiation', current: prev, max: null, min: 0 }, next).current;
+-  });
++  // healCharacter/damageCharacter/addRadiation/healRadiation — Шаг 8а:
++  // стор-экшены (правила каунтеров — domain/counters.js в слайсе стора).
++
+   const [modifiedItems, setModifiedItems] = useState(new Map());
+   const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
+   const setAvailablePerkAttributePoints = useCharacterStore((s) => s.setAvailablePerkAttributePoints);
+@@ -520,14 +499,7 @@ export const CharacterProvider = ({ children }) => {
+   }, []);
+ 
+ 
+-  // Патч 232 (по книге, решение владельца): усталость — потеря ТЕКУЩИХ ОЗ.
+-  // Каденция — игровой час тика выживания (сцены в приложении не тикают);
+-  // часы сна потерь не дают (rest() события hpMaxPenalty не применяет).
+-  // Без сопротивлений; до нуля включительно. Зовёт SurvivalClock.
+-  const applySurvivalHpLoss = useCallback((loss) => {
+-    if (!(loss > 0)) return;
+-    setCurrentHealth(prev => Math.max(0, prev - loss));
+-  }, []);
++  // applySurvivalHpLoss — Шаг 8а: стор-экшен (патч 232, правило книги).
+ 
+   // Build a full character state snapshot.
+   const buildSnapshot = useCallback(() => ({
+@@ -750,7 +722,7 @@ export const CharacterProvider = ({ children }) => {
+       // data.caps: персистентный формат не переименовываем.
+       useCharacterStore.getState().setCurrency(data.caps ?? 0);
+       setCurrentHealth(data.currentHealth ?? 0);
+-      setRadiationRaw(Math.max(0, data.radiation ?? 0));
++      setRadiation(Math.max(0, data.radiation ?? 0));
+       setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
+       setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
+       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
+@@ -1463,7 +1435,8 @@ export const CharacterProvider = ({ children }) => {
+     setMeleeBonus(0);
+     setInitiative(calculateInitiative(initialAttributes));
+     setDefense(calculateDefense(initialAttributes));
+-    const currentMaxHealth = calculateMaxHealth(initialAttributes, initialLevel);
++    // Фикс регрессии Шага 7: initialLevel был удалён вместе с useState.
++    const currentMaxHealth = calculateMaxHealth(initialAttributes, INITIAL_LEVEL);
+     setCurrentHealth(currentMaxHealth);
+     setModifiedItems(new Map());
+     // Reset save status.
+@@ -1539,7 +1512,6 @@ export const CharacterProvider = ({ children }) => {
+     previewConsumableRadiation,
+     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
+     advanceScene,
+-    applySurvivalHpLoss,
+     equippedRobotSlots, setEquippedRobotSlots,
+     equippedRobotModules, setEquippedRobotModules,
+     // Броня и силовая броня (состояние, рантайм блока, диалог выбора блока и
+@@ -1550,8 +1522,7 @@ export const CharacterProvider = ({ children }) => {
+     // именованными операциями: правило границ живёт в domain/counters.js,
+     // а не переписывается заново на каждом экране.
+     currency, earnCurrency, spendCurrency,
+-    currentHealth, healCharacter, damageCharacter, setCurrentHealth,
+-    radiation, setRadiation, addRadiation, healRadiation,
++    // currentHealth/radiation и их действия — Шаг 8а: только в сторе.
+     // luckPoints/maxLuckPoints/attributesSaved/skillsSaved — Шаг 7: только в сторе.
+     selectedPerks, setSelectedPerks,
+     modifiedItems, setModifiedItems,
+diff --git a/docs/architecture/counters-storage.md b/docs/architecture/counters-storage.md
+index d3ae186..b6ae512 100644
+--- a/docs/architecture/counters-storage.md
++++ b/docs/architecture/counters-storage.md
+@@ -103,3 +103,13 @@
+ Не сохраняем — всё вычисляемое:
+ любые `max`, `carryWeight`, `meleeBonus`, `initiative`, `defense`,
+ `maxLuckPoints`.
++
++## История
++
++- **Шаг 8а миграции (патч 234)**: `currentHealth` и `radiation` переехали
++  из CharacterContext в слайс characterStore — правила каунтеров
++  (`domain/counters.js`) теперь собирают потолки внутри стор-экшенов
++  (`healCharacter`/`damageCharacter`/`addRadiation`/`healRadiation`/
++  `setRadiation`/`applySurvivalHpLoss`). Семантика 1-в-1; формат сейва
++  не менялся. Попутный фикс: полный сброс персонажа теперь чистит и
++  радиацию (раньше она переживала сброс как остаточное состояние).
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 1c5295e..6406803 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -271,7 +271,6 @@ export default function CharacterScreen() {
+     currency,
+     earnCurrency,
+     spendCurrency,
+-    setCurrentHealth,
+     resetCharacter,
+     resetKitAndRewards,
+     commitAttributeChanges,
+@@ -298,6 +297,8 @@ export default function CharacterScreen() {
+   const maxLuckPoints = useCharacterStore((s) => s.maxLuckPoints);
+   const setMaxLuckPoints = useCharacterStore((s) => s.setMaxLuckPoints);
+   const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
++  // Шаг 8а: здоровье — стор-каунтер (подтверждение атрибутов ставит полное ОЗ).
++  const setCurrentHealth = useCharacterStore((s) => s.setCurrentHealth);
+ 
+   const debugLocale = useLocale();
+   const moduleLocale = useModuleLocale();
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 551db5a..1ea5de6 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -70,7 +70,10 @@ import { isAmmoWeapon } from '../../../../domain/weaponDurability';
+ 
+ 
+ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
+-  const { currentHealth, healCharacter, damageCharacter } = useCharacter();
++  // Шаг 8а: здоровье/радиация — стор-каунтеры напрямую.
++  const currentHealth = useCharacterStore((state) => state.currentHealth);
++  const healCharacter = useCharacterStore((state) => state.healCharacter);
++  const damageCharacter = useCharacterStore((state) => state.damageCharacter);
+   // Радиация опускает потолок ОЗ, не нанося урона: текущее здоровье может
+   // остаться выше него. Лечение до этого потолка не поднимает и — важно —
+   // не уменьшает уже набранное. Правило живёт в domain/counters.js.
+@@ -108,7 +111,8 @@ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
+ };
+ 
+ const RadiationCounter = ({ isEnabled }) => {
+-  const { radiation, setRadiation } = useCharacter();
++  const radiation = useCharacterStore((state) => state.radiation);
++  const setRadiation = useCharacterStore((state) => state.setRadiation);
+   const canDecrease = isEnabled && radiation > 0;
+ 
+   const handleAdjust = (amount) => {
+@@ -626,10 +630,11 @@ const WeaponsAndArmorScreen = () => {
+     equippedRobotSlots,
+     setEquippedRobotSlots,
+     saveModifiedItem,
+-    radiation,
+   } = useCharacter();
+   // Шаг 7: level/attributesSaved/trait/origin — стор напрямую.
+   const level = useCharacterStore((s) => s.level);
++  // Шаг 8а: радиация — стор-каунтер.
++  const radiation = useCharacterStore((s) => s.radiation);
+   const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+   const trait = useCharacterStore((s) => s.trait);
+   const origin = useCharacterStore((s) => s.origin);
+diff --git a/modules/fallout/survival/SurvivalClock.js b/modules/fallout/survival/SurvivalClock.js
+index 62427fb..38bcc01 100644
+--- a/modules/fallout/survival/SurvivalClock.js
++++ b/modules/fallout/survival/SurvivalClock.js
+@@ -17,7 +17,7 @@
+ // Патч 232 (решение владельца, по книге): усталость — потеря ТЕКУЩИХ ОЗ
+ // «на начале сцены» (N/2 без сопротивлений). Сцены в приложении не тикают,
+ // поэтому потеря привязана к игровому часу тика (сумма событий hpMaxPenalty)
+-// и применяется через applySurvivalHpLoss контекста. Часы сна потерь не
++// и применяется через applySurvivalHpLoss стора. Часы сна потерь не
+ // дают: сон идёт через rest() (sleepSurvival), а не через эти тики.
+ //
+ // Движок не знает правил: компонент читает настройки через общий стор,
+@@ -28,13 +28,11 @@ import { AppState } from 'react-native';
+ import useCharacterStore from '../../../src/store/characterStore';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+ import { advanceRealMinutes, fatigueHpLossFromEvents } from './survival';
+-import { useCharacter } from '../../../components/CharacterContext';
+ 
+ const TICK_INTERVAL_MS = 30_000;
+ const MAX_REAL_MINUTES_PER_TICK = 5;
+ 
+ const SurvivalClock = () => {
+-  const { applySurvivalHpLoss } = useCharacter();
+   useEffect(() => {
+     let lastTickAt = null;
+     let timer = null;
+@@ -61,7 +59,8 @@ const SurvivalClock = () => {
+ 
+       // Патч 232: потеря текущих ОЗ от усталости за прошедшие игровые часы.
+       const hpLoss = fatigueHpLossFromEvents(result.events);
+-      if (hpLoss > 0) applySurvivalHpLoss(hpLoss);
++      // Шаг 8а: прямо в стор — циклическая ссылка на контекст не нужна.
++      if (hpLoss > 0) useCharacterStore.getState().applySurvivalHpLoss(hpLoss);
+     };
+ 
+     const stop = () => {
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index b814460..668ad24 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -64,12 +64,13 @@ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+ // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+ // стор-словари единственный источник, производный legacy-массив обязан быть
+ // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+-import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
++import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth } from '../../domain/characterCreation';
+ import { isRobotCharacter } from '../../domain/origins';
+ // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
+ // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
+ // в CharacterContext.
+-import { createCounter, restore } from '../../domain/counters';
++import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
++import { selectLegacyAttributes } from './selectors.js';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
+@@ -217,6 +218,14 @@ const useCharacterStore = create(devtools(
+       luckPoints: 0,
+       maxLuckPoints: 0,
+       availablePerkAttributePoints: 0,
++      // ═══ Каунтеры персонажа — Шаг 8а миграции (источник — стор). ═══
++      // В состоянии лежит только текущее значение числом; потолок и границы
++      // собираются в момент операции (domain/counters.js,
++      // docs/architecture/counters-storage.md). Здоровье может быть законно
++      // ВЫШЕ базового потолка (радиация опускает максимум, не нанося урона;
++      // бонус отдыха повышает) — экшены это учитывают.
++      currentHealth: 0,
++      radiation: 0,
+       // Заболевания/состояния — Шаг 6 миграции (источник — стор).
+       conditions: [],
+       chemDosesLog: [],
+@@ -1244,6 +1253,85 @@ const useCharacterStore = create(devtools(
+        * and skills immediately so queued React effects from the previously
+        * opened character cannot refill an empty store with stale values.
+        */
++      // ── Каунтеры: здоровье/радиация (Шаг 8а миграции из CharacterContext) ──
++      /**
++       * Прямая установка здоровья (значение или функция от предыдущего).
++       * Без клампов: вызывающий отвечает за границы (оркестратор расходников
++       * передаёт посчитанный результат, выживание режет в 0).
++       */
++      setCurrentHealth: (valueOrUpdater) => set((state) => ({
++        currentHealth: typeof valueOrUpdater === 'function'
++          ? valueOrUpdater(state.currentHealth)
++          : valueOrUpdater,
++      })),
++      /**
++       * Лечение до потолка. Потолок — переданный вызывающим (уже уменьшенный
++       * на радиацию) либо формула сеттинга от атрибутов и уровня.
++       */
++      healCharacter: (amount, maxOverride) => {
++        const state = get();
++        const legacyAttributes = selectLegacyAttributes({ attributes: state.attributes });
++        const ceiling = maxOverride ?? calculateMaxHealth(legacyAttributes, state.level);
++        set({
++          currentHealth: restore(
++            createCounter({ id: 'health', current: state.currentHealth, max: ceiling }),
++            amount,
++          ).current,
++        });
++      },
++      /**
++       * Урон — без потолка базовой формулы: текущее ОЗ может быть законно
++       * ВЫШЕ базового максимума (бонус «прекрасно отдохнувший», патч 213,
++       * радиация опускает максимум, не нанося урона). Граница — только 0.
++       */
++      damageCharacter: (amount) => {
++        const state = get();
++        set({
++          currentHealth: consume(
++            createCounter({ id: 'health', current: state.currentHealth, max: null }),
++            amount,
++          ).current,
++        });
++      },
++      /** Радиация: ресурс «наоборот» — «хорошо» быть у нуля. Потолка нет. */
++      addRadiation: (amount) => {
++        const state = get();
++        set({
++          radiation: restore(
++            createCounter({ id: 'radiation', current: state.radiation, max: null }),
++            amount,
++          ).current,
++        });
++      },
++      healRadiation: (amount) => {
++        const state = get();
++        set({
++          radiation: consume(
++            createCounter({ id: 'radiation', current: state.radiation, max: null }),
++            amount,
++          ).current,
++        });
++      },
++      /** Установка радиации (значение или функция), нижняя граница 0. */
++      setRadiation: (updater) => set((state) => {
++        const requested = typeof updater === 'function' ? updater(state.radiation) : updater;
++        return {
++          radiation: setCounter(
++            { id: 'radiation', current: state.radiation, max: null, min: 0 },
++            requested,
++          ).current,
++        };
++      }),
++      /**
++       * Потеря ТЕКУЩИХ ОЗ от усталости за игровой час (патч 232, решение
++       * владельца — по книге): без сопротивлений, до нуля включительно.
++       * Зовёт SurvivalClock (тип выживания) и часы сна потерь не дают.
++       */
++      applySurvivalHpLoss: (loss) => {
++        if (!(loss > 0)) return;
++        set((state) => ({ currentHealth: Math.max(0, state.currentHealth - loss) }));
++      },
++
+       resetCharacterStore: (legacyDefaults = {}) => {
+         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+         // Вызывающий не передал дефолты → сеем стартовые значения создания.
+@@ -1275,6 +1363,12 @@ const useCharacterStore = create(devtools(
+           items: {},
+           effects: {},
+           stateExtensions: {},
++          // Счётчики — Шаг 8а: новый персонаж начинается со здоровьем по
++          // формуле (дозирует resetCharacter контекста сразу после сброса)
++          // и нулевой радиацией. Раньше радиация переживала полный сброс —
++          // остаточное состояние; теперь чистится консистентно.
++          currentHealth: 0,
++          radiation: 0,
+           selectedPerks: legacyDefaults?.selectedPerks || [],
+           rewardedSkills: legacyDefaults?.rewardedSkills || [],
+           perkBonuses: {},
+@@ -1356,6 +1450,9 @@ const useCharacterStore = create(devtools(
+         skillsSaved: state.skillsSaved,
+         luckPoints: state.luckPoints,
+         availablePerkAttributePoints: state.availablePerkAttributePoints,
++        // Счётчики — Шаг 8а (текущее значение — данные, не производная).
++        currentHealth: state.currentHealth,
++        radiation: state.radiation,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
+-- 
+2.39.5
+
