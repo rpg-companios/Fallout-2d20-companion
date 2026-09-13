@@ -116,8 +116,10 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
  *   onClose      {function}
  */
 const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
-  const { equippedRobotSlots, setEquippedRobotSlots, equipment, setEquipment } =
-    useCharacter();
+  // Шаг 8а: слоты робота — слайс robot стора напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const { equipment, setEquipment } = useCharacter();
   // Надетое оружие — Шаг 3 миграции: список пишется напрямую в стор.
   const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   useLocale();

@@ -8,7 +8,8 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { useCharacter, useRobotBodyPlan } from '../../../../../components/CharacterContext';
+import { useRobotBodyPlan } from '../../../../../components/CharacterContext';
+import useCharacterStore from '../../../../../src/store/characterStore';
 import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
 import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
@@ -108,7 +109,9 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
  *   onClose      {function}
  */
 const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
-  const { equippedRobotSlots, setEquippedRobotSlots } = useCharacter();
+  // Шаг 8а: слоты робота — слайс robot стора напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
   const bodyPlan = useRobotBodyPlan();
   useLocale();
   const moduleLocale = useModuleLocale();

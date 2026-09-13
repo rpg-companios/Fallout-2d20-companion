@@ -7,10 +7,6 @@ import {
   ALL_SKILL_KEYS,
   getLuckPoints,
   calculateMaxHealth,
-  calculateInitiative,
-  calculateDefense,
-  calculateMeleeBonus,
-  calculateCarryWeight,
   getAttributeValue,
   getAttributeLimits,
 } from '../domain/characterCreation';
@@ -39,7 +35,7 @@ const clampAttributesToRules = (rawAttributes, trait) => {
 };
 import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../domain/origins';
 import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields, notifyConditionEvent, notifyConsumableApplied } from '../src/store/stateExtensions';
-import { meetsPerkRequirements, getPerkUnmetReasons, annotatePerks, inspectSelectedPerkRecords } from '../domain/perks';
+import { inspectSelectedPerkRecords } from '../domain/perks';
 import { applyConsumableToEffects, recordDoseWithinWindow, checkAddiction, applyRemoveConditions, advanceEffectsByScene, advanceEffectsByScenes, pruneExpiredTimedEffects, resolveConsumableRadiationRoll, resolveConsumableVitalChanges, SCENE_RULES } from '../domain/effects';
 import { hasDamageImmunity, hasRadiationImmunity } from '../domain/immunities';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../domain/sceneRiskChecks';
@@ -224,8 +220,15 @@ export const CharacterProvider = ({ children }) => {
   const setTrait = useCharacterStore((s) => s.setTrait);
   const [effects, setEffects] = useState([]);
   const [sceneCounter, setSceneCounter] = useState(0);
-  const [equippedRobotSlots, setEquippedRobotSlotsRaw] = useState(null);
-  const [equippedRobotModules, setEquippedRobotModulesRaw] = useState([]);
+  // ═══ Робот: состояние — слайс robot стора (слайс жил там с патча 218; ═══
+  // Шаг 8а: прямые действия setEquippedRobotSlots/setEquippedRobotModules).
+  // Контекст держит подписку только ради снапшота сейва и derived-пуша;
+  // экраны читают/пишут стор напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const equippedRobotModules = useCharacterStore((s) => s.robot?.modules ?? []);
+  // Сеттеры — для внутренних вызовов (загрузка сейва, сброс); на фасад не выходят.
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const setEquippedRobotModules = useCharacterStore((s) => s.setEquippedRobotModules);
   // Расширения состояния персонажа (src/store/stateExtensions.js): поля сейва,
   // которыми владеют сеттинги (например, survival у Fallout). Движок правил
   // не знает — применяет фабрики/hydrate/reset из реестра.
@@ -266,47 +269,9 @@ export const CharacterProvider = ({ children }) => {
     useCharacterStore.getState().setStateExtension(fieldKey, value);
   }, []);
 
-  // ── Robot equipment: single source of truth = Zustand robot slice ──────────
-  // These wrappers keep the legacy useState (used by buildSnapshot / DB save) in
-  // sync while ALSO writing through to the store. Screens keep calling the same
-  // setter name; data flows into one place (Fix #2, Step 3). Functional updates
-  // (prev => next) are preserved.
-  const setEquippedRobotSlots = useCallback((updater) => {
-    setEquippedRobotSlotsRaw((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      // Mirror into the store slice. ВАЖНО (патч 218): апдейтер useState
-      // исполняется React'ом ВО ВРЕМЯ рендера — стор-действие внутри него
-      // обновляло стор прямо из рендера и давало
-      // «Cannot update a component (CharacterProvider) while rendering a
-      // different component (CharacterProvider)». Микротаск выполняется после
-      // commit-фазы, до передачи управления event loop (тот же приём, что и
-      // для синхронизации derivedStats ниже).
-      queueMicrotask(() => {
-        useCharacterStore.getState().loadRobotState({
-          bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
-          slots: next || {},
-          modules: useCharacterStore.getState().robot?.modules ?? [],
-        });
-      });
-      return next;
-    });
-  }, []);
-
-  const setEquippedRobotModules = useCallback((updater) => {
-    setEquippedRobotModulesRaw((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      // Зеркало в стор — в микрозадаче: стор-действие в апдейтере исполняется
-      // во время рендера (патч 218, см. setEquippedRobotSlots выше).
-      queueMicrotask(() => {
-        useCharacterStore.getState().loadRobotState({
-          bodyPlan: useCharacterStore.getState().robot?.bodyPlan ?? null,
-          slots: useCharacterStore.getState().robot?.slots ?? {},
-          modules: next || [],
-        });
-      });
-      return next;
-    });
-  }, []);
+  // setEquippedRobotSlots/setEquippedRobotModules — Шаг 8а: действия слайса
+  // robot стора (сеттеры с функциональным апдейтером); useState-обёртки с
+  // зеркалом loadRobotState и микрозадачей (патч 218) сняты.
 
   // ═══ Здоровье/радиация: стор-каунтеры — единственный источник (Шаг 8а). ═══
   // Потолки/границы собирают стор-экшены (domain/counters.js); здесь —
@@ -368,24 +333,15 @@ export const CharacterProvider = ({ children }) => {
   const setAttributesSaved = useCharacterStore((s) => s.setAttributesSaved);
   const skillsSaved = useCharacterStore((s) => s.skillsSaved);
   const setSkillsSaved = useCharacterStore((s) => s.setSkillsSaved);
-  const [selectedPerks, setSelectedPerksRaw] = useState([]);
-  const setSelectedPerks = useCallback((updater) => {
-    setSelectedPerksRaw((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      // Зеркало в стор — в микрозадаче: стор-действие в апдейтере исполняется
-      // во время рендера (патч 218, см. setEquippedRobotSlots выше).
-      queueMicrotask(() => {
-        useCharacterStore.getState().setSelectedPerks(next || []);
-      });
-      return next || [];
-    });
-  }, []);
-  const [carryWeight, setCarryWeight] = useState(
-    calculateCarryWeight(attributes, null),
-  );
-  const [meleeBonus, setMeleeBonus] = useState(0);
-  const [initiative, setInitiative] = useState(0);
-  const [defense, setDefense] = useState(1);
+  // Выбранные перки — стор (Шаг 8а): экшен setSelectedPerks поддерживает
+  // функциональный апдейтер и пересчитывает perkBonuses/derivedStats.
+  // Сеттер — для внутренних вызовов (загрузка сейва, сброс); на фасад не выходит.
+  const setSelectedPerks = useCharacterStore((s) => s.setSelectedPerks);
+
+  // carryWeight/meleeBonus/initiative/defense — Шаг 8а: зеркала derivedStats
+  // сняты. В API фасада они не были нужны никому, кроме carryWeight инвентаря
+  // (селектор selectCarryWeight); W&A считает производные локально.
+
   // ═══ Заболевания/состояния: стор-словари — единственный источник (Шаг 6). ═══
   // Сеттеры — стор-экшены (поддерживают функциональный апдейтер), поэтому
   // точки записи ниже не менялись. Тень activeTimedEffects удалена: канон —
@@ -465,22 +421,10 @@ export const CharacterProvider = ({ children }) => {
   // Подписываемся на derivedStats стора и зеркалим их в локальный стейт,
   // чтобы все экраны, читающие carryWeight/meleeBonus/defense/initiative из
   // useCharacter(), получали ЕДИНОЕ каноническое значение из стора.
-  useEffect(() => {
-    const applyDerived = (derivedStats) => {
-      if (!derivedStats) return;
-      const num = (p, fallback) =>
-        typeof p === 'number' ? p : (p && typeof p.total === 'number' ? p.total : fallback);
-      setCarryWeight(num(derivedStats.carryWeight, calculateCarryWeight(attributes, trait, { equippedArmor, equippedRobotSlots })));
-      setMeleeBonus(num(derivedStats.meleeBonus, 0));
-      setInitiative(num(derivedStats.initiative, 0));
-      setDefense(num(derivedStats.defense, 1));
-    };
-    // применить сразу + подписаться на дальнейшие изменения
-    applyDerived(useCharacterStore.getState().derivedStats);
-    const unsub = useCharacterStore.subscribe((state) => applyDerived(state.derivedStats));
-    return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attributes, trait, equippedArmor, equippedRobotSlots]);
+  // (Шаг 8а) derived-мост-подписка (applyDerived → локальные зеркала) снят:
+  // зеркал больше нет, экраны читают derivedStats стора селекторами.
+
+
 
   // (Шаг 6) Секундный тик тени activeTimedEffects удалён: тень больше не
   // существует, а словарь effects стора он не трогал никогда; все пути
@@ -518,7 +462,11 @@ export const CharacterProvider = ({ children }) => {
     activeTimedEffects: denormalizeEffects(storeEffects),
     sceneCounter,
     equippedWeapons,
-    equippedRobotSlots,
+    // Слоты робота: пустой словарь («робота нет») пишется как null —
+    // прежний формат сейва не меняется (раньше здесь жил useState с null).
+    equippedRobotSlots: (equippedRobotSlots && Object.keys(equippedRobotSlots).length > 0)
+      ? equippedRobotSlots
+      : null,
     equippedRobotModules,
     // ОС Mk II (Секьюритрон) — часть robot-состояния, обязана переживать сейв/загрузку.
     mk2Installed: useCharacterStore.getState().robot?.mk2Installed ?? false,
@@ -1390,10 +1338,8 @@ export const CharacterProvider = ({ children }) => {
     const newLuck = getLuckPoints(committedAttributes, trait);
     setMaxLuckPoints(newLuck);
     setLuckPoints(prevLuck => Math.min(prevLuck, newLuck));
-    setCarryWeight(calculateCarryWeight(committedAttributes, trait, { equippedArmor, equippedRobotSlots }));
-    setMeleeBonus(calculateMeleeBonus(committedAttributes, trait));
-    setInitiative(calculateInitiative(committedAttributes));
-    setDefense(calculateDefense(committedAttributes));
+    // Производные (вес/ближний бой/инициатива/защита) пересчитывает
+    // recalculateDerivedStats внутри store.updateAttribute (Шаг 8а).
     const newMaxHealth = calculateMaxHealth(newAttributes, level);
     setCurrentHealth(prevHealth => Math.min(prevHealth, newMaxHealth));
   };
@@ -1432,9 +1378,7 @@ export const CharacterProvider = ({ children }) => {
     setConditions([]);
     setChemDosesLog([]);
     setLastDiseaseResistAt(null);
-    setMeleeBonus(0);
-    setInitiative(calculateInitiative(initialAttributes));
-    setDefense(calculateDefense(initialAttributes));
+    // Производные пересчитывает resetCharacterStore → recalculateAll (Шаг 8а).
     // Фикс регрессии Шага 7: initialLevel был удалён вместе с useState.
     const currentMaxHealth = calculateMaxHealth(initialAttributes, INITIAL_LEVEL);
     setCurrentHealth(currentMaxHealth);
@@ -1512,8 +1456,7 @@ export const CharacterProvider = ({ children }) => {
     previewConsumableRadiation,
     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
     advanceScene,
-    equippedRobotSlots, setEquippedRobotSlots,
-    equippedRobotModules, setEquippedRobotModules,
+    // equippedRobotSlots/Modules и их сеттеры — Шаг 8а: только в сторе.
     // Броня и силовая броня (состояние, рантайм блока, диалог выбора блока и
     // действия слоя) — Шаг 4 миграции: экраны читают/пишут стор напрямую
     // (useCharacterStore: equippedArmor/equippedPowerArmor/powerArmorRuntime,
@@ -1524,20 +1467,13 @@ export const CharacterProvider = ({ children }) => {
     currency, earnCurrency, spendCurrency,
     // currentHealth/radiation и их действия — Шаг 8а: только в сторе.
     // luckPoints/maxLuckPoints/attributesSaved/skillsSaved — Шаг 7: только в сторе.
-    selectedPerks, setSelectedPerks,
+    // selectedPerks/setSelectedPerks — Шаг 8а: только в сторе.
     modifiedItems, setModifiedItems,
-    carryWeight,
-    meleeBonus,
-    initiative,
-    defense,
+    // carryWeight/meleeBonus/initiative/defense — Шаг 8а: зеркала сняты
+    // (derivedStats стора; carryWeight инвентаря — selectCarryWeight).
     // Canonical id only. No alias/fallback to localized name.
     // Single-trait: trait.id matches. Multi-trait (NCR/Survivor): trait.ids[] contains it.
-    hasTrait: (id) => !!(
-      trait && (
-        trait.id === id ||
-        (Array.isArray(trait?.ids) && trait.ids.includes(id))
-      )
-    ),
+    // hasTrait — Шаг 8а: экраны проверяют трейт сами (store.trait).
     getItemId,
     getModifiedItem,
     saveModifiedItem,
@@ -1559,9 +1495,8 @@ export const CharacterProvider = ({ children }) => {
     resetKitOnly,
     // availablePerkAttributePoints/addPerkAttributePoints — Шаг 7: только в сторе.
     commitAttributeChanges,
-    meetsPerkRequirements: (perk, options) => meetsPerkRequirements(perk, attributes, level, selectedPerks, options),
-    getPerkUnmetReasons: (perk, options) => getPerkUnmetReasons(perk, attributes, level, selectedPerks, options),
-    annotatePerks: (perks, options) => annotatePerks(perks, attributes, level, selectedPerks, options),
+    // meetsPerkRequirements/getPerkUnmetReasons/annotatePerks — Шаг 8а:
+    // доменные функции domain/perks.js, экран зовёт напрямую со стор-данными.
   };
 
   return (

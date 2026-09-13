@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
 import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
+import { selectCarryWeight } from '../../../src/store/selectors';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import CapsModal from './modals/CapsModal';
@@ -75,16 +76,18 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 );
 
 const InventoryScreen = () => {
-  const { 
-    equippedRobotSlots, setEquippedRobotSlots,
+  const {
     currency, earnCurrency, spendCurrency,
     equipment,
     applyConsumableFull,
     previewConsumableRadiation,
     getModifiedItem,
-    carryWeight,
   } = useCharacter();
   // Шаг 7: origin/trait — стор напрямую.
+  // Шаг 8а: слоты робота и производный вес — стор напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const carryWeight = useCharacterStore(selectCarryWeight);
   const trait = useCharacterStore((s) => s.trait);
   const origin = useCharacterStore((s) => s.origin);
 

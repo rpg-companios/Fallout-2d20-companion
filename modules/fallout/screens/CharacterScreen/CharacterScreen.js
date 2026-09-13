@@ -274,9 +274,10 @@ export default function CharacterScreen() {
     resetCharacter,
     resetKitAndRewards,
     commitAttributeChanges,
-    setEquippedRobotSlots,
-    setEquippedRobotModules,
   } = useCharacter();
+  // Шаг 8а: слоты/модули робота — слайс robot стора напрямую.
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const setEquippedRobotModules = useCharacterStore((s) => s.setEquippedRobotModules);
 
   // Шаг 7: профиль персонажа (origin/trait/level/имя, флаги сохранения,
   // удача, очки перков) — стор; фасад useCharacter() поля не отдаёт.

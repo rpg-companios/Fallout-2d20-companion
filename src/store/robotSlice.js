@@ -97,6 +97,30 @@ export const createRobotActions = (set, get) => ({
     });
   },
 
+  /**
+   * Заменить слоты робота целиком: значением или функцией от предыдущих
+   * (функциональный апдейтер — обязательное требование к новым сеттерам,
+   * прецедент setEquippedWeapons). bodyPlan и mk2Installed сохраняются.
+   * До Шага 8а экраны писали через useState-обёртку CharacterContext с
+   * зеркалом в loadRobotState; теперь это прямое действие стора.
+   */
+  setEquippedRobotSlots: (updater) => {
+    const robot = get().robot || createInitialRobotState().robot;
+    const prev = robot.slots || {};
+    const next = typeof updater === 'function' ? updater(prev) : (updater || {});
+    set({ robot: { ...robot, slots: next || {} } });
+    get().recalculateDerivedStats?.();
+  },
+
+  /** Заменить модули робота целиком (значение или функция); остальное robot сохраняет. */
+  setEquippedRobotModules: (updater) => {
+    const robot = get().robot || createInitialRobotState().robot;
+    const prev = Array.isArray(robot.modules) ? robot.modules : [];
+    const next = typeof updater === 'function' ? updater(prev) : (updater || []);
+    set({ robot: { ...robot, modules: next || [] } });
+    get().recalculateDerivedStats?.();
+  },
+
   resetRobot: () => set(createInitialRobotState()),
 
   // --- Mk II operating system (Securitron) ---

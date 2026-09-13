@@ -391,8 +391,15 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 
 export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
-    const { hasTrait, attributes, skills } = useCharacter();
+    const { attributes, skills } = useCharacter();
     const trait = useCharacterStore((state) => state.trait); // Шаг 7
+    // Шаг 8а: проверка трейта — по store.trait (замыкание фасада hasTrait снято).
+    const hasTrait = (id) => !!(
+      trait && (
+        trait.id === id ||
+        (Array.isArray(trait?.ids) && trait.ids.includes(id))
+      )
+    );
     const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
     const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
     // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
@@ -627,10 +634,11 @@ const resolveStoreItemId = (weapon) => {
 const WeaponsAndArmorScreen = () => {
   const {
     attributes,
-    equippedRobotSlots,
-    setEquippedRobotSlots,
     saveModifiedItem,
   } = useCharacter();
+  // Шаг 8а: слоты робота — слайс robot стора напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
   // Шаг 7: level/attributesSaved/trait/origin — стор напрямую.
   const level = useCharacterStore((s) => s.level);
   // Шаг 8а: радиация — стор-каунтер.

@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { useCharacter } from '../../../../components/CharacterContext';
 import useCharacterStore from '../../../../src/store/characterStore';
+import { selectLegacyAttributes } from '../../../../src/store/selectors';
 import { showRawAlert } from '../../../../components/alerts/alertService';
 import { getTraitI18nById } from '../../../../domain/traits';
 import {
+  annotatePerks,
   applyPerkSelection,
   collapseSelectedPerks,
   getPerkMaxRanks,
@@ -27,12 +28,16 @@ const toPerkId = (selected) => {
 };
 
 const PerksAndTraitsScreen = () => {
-  const {
-    selectedPerks, setSelectedPerks, annotatePerks,
-  } = useCharacter();
   // Шаг 7: trait/level/attributesSaved — стор; addPerkAttributePoints — стор-экшен.
+  // Шаг 8а: выбранные перки и перковые помощники — стор/домен напрямую
+  // (экран больше не зависит от контекста useCharacter()).
   const trait = useCharacterStore((s) => s.trait);
   const level = useCharacterStore((s) => s.level);
+  const selectedPerks = useCharacterStore((s) => s.selectedPerks);
+  const setSelectedPerks = useCharacterStore((s) => s.setSelectedPerks);
+  // Атрибуты (legacy-массив) — для проверки требований перков (annotatePerks).
+  const storeAttributes = useCharacterStore((s) => s.attributes);
+  const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
   const attributesSaved = useCharacterStore((s) => s.attributesSaved);
   const addPerkAttributePoints = useCharacterStore((s) => s.addPerkAttributePoints);
   useLocale();
@@ -86,7 +91,7 @@ const PerksAndTraitsScreen = () => {
   }, [trait, moduleLocale]);
 
   const annotatedPerks = useMemo(
-    () => annotatePerks(perksData, { replaceIndex: replacingIndex }).map((entry) => {
+    () => annotatePerks(perksData, attributes, level, selectedPerks, { replaceIndex: replacingIndex }).map((entry) => {
       const perkId = entry.perk?.id;
       const taken = getPerkSelectionCount(selectedPerks, perkId, { ignoreIndex: replacingIndex });
       const maxRanks = getPerkMaxRanks(entry.perk);
@@ -96,7 +101,7 @@ const PerksAndTraitsScreen = () => {
         maxRanks,
       };
     }),
-    [annotatePerks, selectedPerks, replacingIndex],
+    [annotatePerks, attributes, level, selectedPerks, replacingIndex],
   );
 
   // Показ через общий AlertHost — одинаково на вебе и на нативе.

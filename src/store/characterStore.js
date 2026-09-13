@@ -278,8 +278,14 @@ const useCharacterStore = create(devtools(
       isEffectsProcessing: false,
 
       // --- Actions: Perks ---
-      setSelectedPerks: (selectedPerks = []) => {
-        set({ selectedPerks });
+      /**
+       * Выбранные перки: массивом или функцией от предыдущего (Шаг 8а;
+       * функциональный апдейтер — обязательное требование к сеттерам).
+       */
+      setSelectedPerks: (updater) => {
+        const prev = get().selectedPerks || [];
+        const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
+        set({ selectedPerks: next });
         get().recalculatePerkBonuses();
         get().recalculateDerivedStats();
       },

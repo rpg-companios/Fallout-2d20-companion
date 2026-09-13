@@ -1,24 +1,29 @@
-// Патч 218: стор-действия не должны исполняться внутри апдейтеров useState.
+// Инвариант «апдейтеры не пишут в стор из рендера» (патч 218) — ПОСЛЕ Шага 8а.
 //
-// Обёртки-сеттеры CharacterProvider (setEquippedRobotSlots / setEquippedRobotModules /
-// setSelectedPerks) зеркалят значение в зустанд-стор. Раньше зеркало вызывалось прямо
-// в функциональном апдейтере setState: React исполняет апдейтер ВО ВРЕМЯ рендера,
-// стор обновлялся из рендера, и подписка CharacterProvider получала
-// «Cannot update a component (CharacterProvider) while rendering a different
-// component (CharacterProvider)» (React 19 dev). Зеркало обязано быть
-// отложенным (queueMicrotask), а не выполняться в апдейтере.
+// История. Обёртки-сеттеры CharacterProvider (setEquippedRobotSlots /
+// setEquippedRobotModules / setSelectedPerks) держали useState + зеркало в
+// зустанд-стор через queueMicrotask: стор-действие внутри функционального
+// апдейтера исполнялось React'ом во время рендера и падало с
+// «Cannot update a component (CharacterProvider) while rendering a
+// different component (CharacterProvider)».
 //
-// Импортировать CharacterContext в vitest нельзя (react-native — Flow), поэтому
-// инвариант проверяется статически по AST, как в
-// __tests__/survival/character-context-imports.test.js.
+// Шаг 8а снял обёртки: сеттеры — прямые действия стора (robotSlice /
+// characterStore), функциональный апдейтер исполняет сам стор, React-рендер
+// в запись не вовлечён. Контракт проверяется:
+//   1) статически: в CharacterContext не осталось Raw-обёрток и
+//      queueMicrotask-зеркал для этих сеттеров;
+//   2) динамически: стор-действия принимают функциональный апдейтер
+//      (обязательное требование к сеттерам, прецедент setEquippedWeapons).
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseSync } from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
+import useCharacterStore from '../../src/store/characterStore';
 
 const FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+const SETTERS = ['setEquippedRobotSlots', 'setEquippedRobotModules', 'setSelectedPerks'];
 
 const parse = () => parseSync(fs.readFileSync(FILE, 'utf8'), {
   filename: FILE,
@@ -28,108 +33,46 @@ const parse = () => parseSync(fs.readFileSync(FILE, 'utf8'), {
   plugins: [jsxPlugin],
 });
 
-const WRAPPED_SETTERS = ['setEquippedRobotSlots', 'setEquippedRobotModules', 'setSelectedPerks'];
+afterEach(async () => {
+  useCharacterStore.getState().resetCharacterStore();
+  await useCharacterStore.persist.clearStorage();
+});
 
-const isCallTo = (node, calleeName) =>
-  node?.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === calleeName;
-
-// Вызов useCharacterStore.getState().<anything>(...) — запись/чтение через стор.
-const isStoreGetStateCall = (node) => {
-  if (node?.type !== 'CallExpression') return false;
-  const callee = node.callee;
-  if (callee?.type !== 'MemberExpression') return false;
-  const object = callee.object;
-  return (
-    object?.type === 'CallExpression'
-    && object.callee?.type === 'MemberExpression'
-    && object.callee.object?.type === 'Identifier'
-    && object.callee.object.name === 'useCharacterStore'
-    && object.callee.property?.name === 'getState'
-  );
-};
-
-// Ищем апдейтер-стрелку, переданный в setXxxRaw, внутри тела обёртки.
-const findUpdaterArrows = (ast, setterName) => {
-  const rawName = `${setterName}Raw`;
-  const found = [];
-  const walk = (node) => {
-    if (!node || typeof node !== 'object') return;
-    if (node.type === 'CallExpression' && node.callee?.type === 'Identifier' && node.callee.name === rawName) {
-      for (const arg of node.arguments) {
-        if (arg?.type === 'ArrowFunctionExpression' || arg?.type === 'FunctionExpression') found.push(arg);
-      }
+describe('Шаг 8а: Raw-обёртки патча 218 сняты, стор-действия принимают апдейтер', () => {
+  it('в CharacterContext нет Raw-обёрток мигрированных сеттеров', () => {
+    const source = fs.readFileSync(FILE, 'utf8');
+    for (const setterName of SETTERS) {
+      expect(source).not.toContain(`${setterName}Raw`);
     }
-    for (const key of Object.keys(node)) {
-      if (key === 'loc' || key === 'start' || key === 'end') continue;
-      const child = node[key];
-      if (Array.isArray(child)) child.forEach(walk);
-      else if (child && typeof child === 'object' && child.type) walk(child);
-    }
-  };
-  walk(ast);
-  return found;
-};
-
-// Стор-вызовы внутри апдейтера, не обёрнутые в queueMicrotask.
-const collectStoreWritesOutsideMicrotask = (updater) => {
-  const violations = [];
-  const walk = (node, inMicrotask) => {
-    if (!node || typeof node !== 'object') return;
-    if (isStoreGetStateCall(node) && !inMicrotask) {
-      violations.push(node.loc.start.line);
-    }
-    const nextIn = inMicrotask || isCallTo(node, 'queueMicrotask');
-    for (const key of Object.keys(node)) {
-      if (key === 'loc' || key === 'start' || key === 'end') continue;
-      const child = node[key];
-      if (Array.isArray(child)) child.forEach((c) => walk(c, nextIn));
-      else if (child && typeof child === 'object' && child.type) walk(child, nextIn);
-    }
-  };
-  walk(updater, false);
-  return violations;
-};
-
-describe('CharacterContext: апдейтеры useState не пишут в стор из рендера (патч 218)', () => {
-  const ast = parse();
-
-  it.each(WRAPPED_SETTERS)('%s существует и передаёт функциональный апдейтер', (setterName) => {
-    const updaters = findUpdaterArrows(ast, setterName);
-    expect(updaters.length).toBeGreaterThan(0);
+    // Обёртки содержали отложенные зеркала — их тоже быть не должно.
+    expect(source).not.toContain("setSelectedPerks(next || [])");
   });
 
-  it.each(WRAPPED_SETTERS)('%s: стор-действия только внутри queueMicrotask', (setterName) => {
-    const updaters = findUpdaterArrows(ast, setterName);
-    for (const updater of updaters) {
-      const violations = collectStoreWritesOutsideMicrotask(updater);
-      expect(
-        violations,
-        `useCharacterStore.getState() вызывается в апдейтере ${setterName} вне queueMicrotask (строки: ${violations.join(', ')})`,
-      ).toEqual([]);
+  it('контекст получает сеттеры из стора (селекторы, не локальные функции)', () => {
+    const source = fs.readFileSync(FILE, 'utf8');
+    for (const setterName of SETTERS) {
+      expect(source).toContain(`useCharacterStore((s) => s.${setterName})`);
     }
   });
 
-  it('зеркало в стор по-прежнему присутствует (отложенно)', () => {
-    const src = fs.readFileSync(FILE, 'utf8');
-    expect(src).toContain('loadRobotState');
-    expect(src).toContain('setSelectedPerks(next || [])');
-    for (const setterName of WRAPPED_SETTERS) {
-      const updaters = findUpdaterArrows(ast, setterName);
-      let microtasks = 0;
-      for (const updater of updaters) {
-        const walk = (node) => {
-          if (!node || typeof node !== 'object') return;
-          if (isCallTo(node, 'queueMicrotask')) microtasks += 1;
-          for (const key of Object.keys(node)) {
-            if (key === 'loc' || key === 'start' || key === 'end') continue;
-            const child = node[key];
-            if (Array.isArray(child)) child.forEach(walk);
-            else if (child && typeof child === 'object' && child.type) walk(child);
-          }
-        };
-        walk(updater);
-      }
-      expect(microtasks, `${setterName}: ожидается отложенное зеркало в стор`).toBeGreaterThan(0);
+  it.each(SETTERS)('%s: функциональный апдейтер исполняет стор', (setterName) => {
+    const store = useCharacterStore.getState();
+    const initial = setterName === 'setSelectedPerks' ? [] : setterName === 'setEquippedRobotModules' ? [] : {};
+    expect(store[setterName]).toBeTypeOf('function');
+    // (prev) => next — апдейтер видит предыдущее значение стора.
+    store[setterName]((prev) => {
+      expect(prev).toEqual(initial);
+      if (setterName === 'setSelectedPerks') return [{ perkId: 'x', index: 0 }];
+      if (setterName === 'setEquippedRobotSlots') return { legs: { limb: {} } };
+      return [{ id: 'm1' }];
+    });
+    const state = useCharacterStore.getState();
+    if (setterName === 'setSelectedPerks') {
+      expect(state.selectedPerks).toEqual([{ perkId: 'x', index: 0 }]);
+    } else if (setterName === 'setEquippedRobotSlots') {
+      expect(state.robot.slots).toEqual({ legs: { limb: {} } });
+    } else {
+      expect(state.robot.modules).toEqual([{ id: 'm1' }]);
     }
   });
 });
