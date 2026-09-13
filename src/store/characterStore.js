@@ -64,12 +64,13 @@ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
-import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
+import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth } from '../../domain/characterCreation';
 import { isRobotCharacter } from '../../domain/origins';
 // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
 // в CharacterContext.
-import { createCounter, restore } from '../../domain/counters';
+import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
+import { selectLegacyAttributes } from './selectors.js';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -217,6 +218,14 @@ const useCharacterStore = create(devtools(
       luckPoints: 0,
       maxLuckPoints: 0,
       availablePerkAttributePoints: 0,
+      // ═══ Каунтеры персонажа — Шаг 8а миграции (источник — стор). ═══
+      // В состоянии лежит только текущее значение числом; потолок и границы
+      // собираются в момент операции (domain/counters.js,
+      // docs/architecture/counters-storage.md). Здоровье может быть законно
+      // ВЫШЕ базового потолка (радиация опускает максимум, не нанося урона;
+      // бонус отдыха повышает) — экшены это учитывают.
+      currentHealth: 0,
+      radiation: 0,
       // Заболевания/состояния — Шаг 6 миграции (источник — стор).
       conditions: [],
       chemDosesLog: [],
@@ -1244,6 +1253,85 @@ const useCharacterStore = create(devtools(
        * and skills immediately so queued React effects from the previously
        * opened character cannot refill an empty store with stale values.
        */
+      // ── Каунтеры: здоровье/радиация (Шаг 8а миграции из CharacterContext) ──
+      /**
+       * Прямая установка здоровья (значение или функция от предыдущего).
+       * Без клампов: вызывающий отвечает за границы (оркестратор расходников
+       * передаёт посчитанный результат, выживание режет в 0).
+       */
+      setCurrentHealth: (valueOrUpdater) => set((state) => ({
+        currentHealth: typeof valueOrUpdater === 'function'
+          ? valueOrUpdater(state.currentHealth)
+          : valueOrUpdater,
+      })),
+      /**
+       * Лечение до потолка. Потолок — переданный вызывающим (уже уменьшенный
+       * на радиацию) либо формула сеттинга от атрибутов и уровня.
+       */
+      healCharacter: (amount, maxOverride) => {
+        const state = get();
+        const legacyAttributes = selectLegacyAttributes({ attributes: state.attributes });
+        const ceiling = maxOverride ?? calculateMaxHealth(legacyAttributes, state.level);
+        set({
+          currentHealth: restore(
+            createCounter({ id: 'health', current: state.currentHealth, max: ceiling }),
+            amount,
+          ).current,
+        });
+      },
+      /**
+       * Урон — без потолка базовой формулы: текущее ОЗ может быть законно
+       * ВЫШЕ базового максимума (бонус «прекрасно отдохнувший», патч 213,
+       * радиация опускает максимум, не нанося урона). Граница — только 0.
+       */
+      damageCharacter: (amount) => {
+        const state = get();
+        set({
+          currentHealth: consume(
+            createCounter({ id: 'health', current: state.currentHealth, max: null }),
+            amount,
+          ).current,
+        });
+      },
+      /** Радиация: ресурс «наоборот» — «хорошо» быть у нуля. Потолка нет. */
+      addRadiation: (amount) => {
+        const state = get();
+        set({
+          radiation: restore(
+            createCounter({ id: 'radiation', current: state.radiation, max: null }),
+            amount,
+          ).current,
+        });
+      },
+      healRadiation: (amount) => {
+        const state = get();
+        set({
+          radiation: consume(
+            createCounter({ id: 'radiation', current: state.radiation, max: null }),
+            amount,
+          ).current,
+        });
+      },
+      /** Установка радиации (значение или функция), нижняя граница 0. */
+      setRadiation: (updater) => set((state) => {
+        const requested = typeof updater === 'function' ? updater(state.radiation) : updater;
+        return {
+          radiation: setCounter(
+            { id: 'radiation', current: state.radiation, max: null, min: 0 },
+            requested,
+          ).current,
+        };
+      }),
+      /**
+       * Потеря ТЕКУЩИХ ОЗ от усталости за игровой час (патч 232, решение
+       * владельца — по книге): без сопротивлений, до нуля включительно.
+       * Зовёт SurvivalClock (тип выживания) и часы сна потерь не дают.
+       */
+      applySurvivalHpLoss: (loss) => {
+        if (!(loss > 0)) return;
+        set((state) => ({ currentHealth: Math.max(0, state.currentHealth - loss) }));
+      },
+
       resetCharacterStore: (legacyDefaults = {}) => {
         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
         // Вызывающий не передал дефолты → сеем стартовые значения создания.
@@ -1275,6 +1363,12 @@ const useCharacterStore = create(devtools(
           items: {},
           effects: {},
           stateExtensions: {},
+          // Счётчики — Шаг 8а: новый персонаж начинается со здоровьем по
+          // формуле (дозирует resetCharacter контекста сразу после сброса)
+          // и нулевой радиацией. Раньше радиация переживала полный сброс —
+          // остаточное состояние; теперь чистится консистентно.
+          currentHealth: 0,
+          radiation: 0,
           selectedPerks: legacyDefaults?.selectedPerks || [],
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
@@ -1356,6 +1450,9 @@ const useCharacterStore = create(devtools(
         skillsSaved: state.skillsSaved,
         luckPoints: state.luckPoints,
         availablePerkAttributePoints: state.availablePerkAttributePoints,
+        // Счётчики — Шаг 8а (текущее значение — данные, не производная).
+        currentHealth: state.currentHealth,
+        radiation: state.radiation,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

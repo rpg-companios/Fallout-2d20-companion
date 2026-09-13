@@ -271,7 +271,6 @@ export default function CharacterScreen() {
     currency,
     earnCurrency,
     spendCurrency,
-    setCurrentHealth,
     resetCharacter,
     resetKitAndRewards,
     commitAttributeChanges,
@@ -298,6 +297,8 @@ export default function CharacterScreen() {
   const maxLuckPoints = useCharacterStore((s) => s.maxLuckPoints);
   const setMaxLuckPoints = useCharacterStore((s) => s.setMaxLuckPoints);
   const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
+  // Шаг 8а: здоровье — стор-каунтер (подтверждение атрибутов ставит полное ОЗ).
+  const setCurrentHealth = useCharacterStore((s) => s.setCurrentHealth);
 
   const debugLocale = useLocale();
   const moduleLocale = useModuleLocale();

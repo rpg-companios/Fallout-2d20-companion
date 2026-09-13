@@ -17,7 +17,7 @@
 // Патч 232 (решение владельца, по книге): усталость — потеря ТЕКУЩИХ ОЗ
 // «на начале сцены» (N/2 без сопротивлений). Сцены в приложении не тикают,
 // поэтому потеря привязана к игровому часу тика (сумма событий hpMaxPenalty)
-// и применяется через applySurvivalHpLoss контекста. Часы сна потерь не
+// и применяется через applySurvivalHpLoss стора. Часы сна потерь не
 // дают: сон идёт через rest() (sleepSurvival), а не через эти тики.
 //
 // Движок не знает правил: компонент читает настройки через общий стор,
@@ -28,13 +28,11 @@ import { AppState } from 'react-native';
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { advanceRealMinutes, fatigueHpLossFromEvents } from './survival';
-import { useCharacter } from '../../../components/CharacterContext';
 
 const TICK_INTERVAL_MS = 30_000;
 const MAX_REAL_MINUTES_PER_TICK = 5;
 
 const SurvivalClock = () => {
-  const { applySurvivalHpLoss } = useCharacter();
   useEffect(() => {
     let lastTickAt = null;
     let timer = null;
@@ -61,7 +59,8 @@ const SurvivalClock = () => {
 
       // Патч 232: потеря текущих ОЗ от усталости за прошедшие игровые часы.
       const hpLoss = fatigueHpLossFromEvents(result.events);
-      if (hpLoss > 0) applySurvivalHpLoss(hpLoss);
+      // Шаг 8а: прямо в стор — циклическая ссылка на контекст не нужна.
+      if (hpLoss > 0) useCharacterStore.getState().applySurvivalHpLoss(hpLoss);
     };
 
     const stop = () => {

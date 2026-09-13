@@ -70,7 +70,10 @@ import { isAmmoWeapon } from '../../../../domain/weaponDurability';
 
 
 const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
-  const { currentHealth, healCharacter, damageCharacter } = useCharacter();
+  // Шаг 8а: здоровье/радиация — стор-каунтеры напрямую.
+  const currentHealth = useCharacterStore((state) => state.currentHealth);
+  const healCharacter = useCharacterStore((state) => state.healCharacter);
+  const damageCharacter = useCharacterStore((state) => state.damageCharacter);
   // Радиация опускает потолок ОЗ, не нанося урона: текущее здоровье может
   // остаться выше него. Лечение до этого потолка не поднимает и — важно —
   // не уменьшает уже набранное. Правило живёт в domain/counters.js.
@@ -108,7 +111,8 @@ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
 };
 
 const RadiationCounter = ({ isEnabled }) => {
-  const { radiation, setRadiation } = useCharacter();
+  const radiation = useCharacterStore((state) => state.radiation);
+  const setRadiation = useCharacterStore((state) => state.setRadiation);
   const canDecrease = isEnabled && radiation > 0;
 
   const handleAdjust = (amount) => {
@@ -626,10 +630,11 @@ const WeaponsAndArmorScreen = () => {
     equippedRobotSlots,
     setEquippedRobotSlots,
     saveModifiedItem,
-    radiation,
   } = useCharacter();
   // Шаг 7: level/attributesSaved/trait/origin — стор напрямую.
   const level = useCharacterStore((s) => s.level);
+  // Шаг 8а: радиация — стор-каунтер.
+  const radiation = useCharacterStore((s) => s.radiation);
   const attributesSaved = useCharacterStore((s) => s.attributesSaved);
   const trait = useCharacterStore((s) => s.trait);
   const origin = useCharacterStore((s) => s.origin);

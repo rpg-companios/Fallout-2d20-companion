@@ -103,3 +103,13 @@
 Не сохраняем — всё вычисляемое:
 любые `max`, `carryWeight`, `meleeBonus`, `initiative`, `defense`,
 `maxLuckPoints`.
+
+## История
+
+- **Шаг 8а миграции (патч 234)**: `currentHealth` и `radiation` переехали
+  из CharacterContext в слайс characterStore — правила каунтеров
+  (`domain/counters.js`) теперь собирают потолки внутри стор-экшенов
+  (`healCharacter`/`damageCharacter`/`addRadiation`/`healRadiation`/
+  `setRadiation`/`applySurvivalHpLoss`). Семантика 1-в-1; формат сейва
+  не менялся. Попутный фикс: полный сброс персонажа теперь чистит и
+  радиацию (раньше она переживала сброс как остаточное состояние).
