@@ -1,0 +1,713 @@
+From 521293314dd7a843615b8713965b87d9638e99c9 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 05:19:15 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=A8=D0=B0=D0=B3=208=D0=B0=20(=D1=87=D0=B0?=
+ =?UTF-8?q?=D1=81=D1=82=D1=8C=203):=20=D0=BA=D0=BE=D0=BC=D0=BF=D0=BB=D0=B5?=
+ =?UTF-8?q?=D0=BA=D1=82,=20=D1=81=D1=86=D0=B5=D0=BD=D1=8B,=20=D1=8D=D1=84?=
+ =?UTF-8?q?=D1=84=D0=B5=D0=BA=D1=82=D1=8B=20=D1=82=D1=80=D0=B5=D0=B9=D1=82?=
+ =?UTF-8?q?=D0=BE=D0=B2,=20=D0=BC=D0=BE=D0=B4=D0=B8=D1=84=D0=B8=D0=BA?=
+ =?UTF-8?q?=D0=B0=D1=86=D0=B8=D0=B8=20=D0=BF=D1=80=D0=B5=D0=B4=D0=BC=D0=B5?=
+ =?UTF-8?q?=D1=82=D0=BE=D0=B2=20=E2=80=94=20=D0=B2=20=D1=81=D1=82=D0=BE?=
+ =?UTF-8?q?=D1=80?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- characterStore: +sceneCounter/setSceneCounter, traitEffects/setTraitEffects
+  (в сейве исторический ключ effects — формат не менялся), modifiedItems как
+  JSON-дружелюбный словарь { [itemId]: item } + setModifiedItems/
+  saveModifiedItem/removeModifiedItem (save/remove по каноническому id);
+  resetCharacterStore и partialize — все три поля
+- domain/itemIdentity: +getItemId (канонический id; была локальной функцией
+  контекста — переезд в домен, контракт прежний)
+- CharacterContext: useState сцены/эффекты/модификации и хелперы
+  getModifiedItem/saveModifiedItem/removeModifiedItem сняты; buildSnapshot:
+  effects ← traitEffects, modifiedItems — Map из словаря стора (формат сейва
+  1-в-1); фасад не отдаёт 11 членов
+- Экраны напрямую: CharacterScreen (комплект + смена трейта через
+  setTraitEffects), InventoryScreen (комплект, read-хелпер модификаций из
+  словаря стора), W&A (saveModifiedItem — стор-экшен), LimbUpgradeModal —
+  второй экран, полностью отвязавшийся от контекста
+- Тесты: scene-effects-modified-store-slice (7), step8a-3-facade (9);
+  vitest 695/695 (70 файлов), tsc чист
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-step8a-3-facade.test.js | 148 ++++++++++++++++++
+ ...scene-effects-modified-store-slice.test.js | 101 ++++++++++++
+ components/CharacterContext.js                |  83 ++++------
+ .../InventoryScreen/InventoryScreen.js        |   9 +-
+ domain/itemIdentity.js                        |  11 ++
+ .../CharacterScreen/CharacterScreen.js        |  11 +-
+ .../modals/LimbUpgradeModal.js                |   6 +-
+ .../WeaponsAndArmorScreen.js                  |   3 +-
+ src/store/characterStore.js                   |  56 ++++++-
+ 9 files changed, 366 insertions(+), 62 deletions(-)
+ create mode 100644 __tests__/saves/character-context-step8a-3-facade.test.js
+ create mode 100644 __tests__/saves/scene-effects-modified-store-slice.test.js
+
+diff --git a/__tests__/saves/character-context-step8a-3-facade.test.js b/__tests__/saves/character-context-step8a-3-facade.test.js
+new file mode 100644
+index 0000000..603265a
+--- /dev/null
++++ b/__tests__/saves/character-context-step8a-3-facade.test.js
+@@ -0,0 +1,148 @@
++// Шаг 8а (часть 3): комплект (сквозной прогон к стору с Шага 1), сцены,
++// «эффекты трейтов», изменённые предметы. Фасад useCharacter() больше не
++// отдаёт: equipment/setEquipment, effects/setEffects, sceneCounter,
++// modifiedItems/setModifiedItems, getModifiedItem/saveModifiedItem/
++// removeModifiedItem/getItemId. LimbUpgradeModal — второй экран, полностью
++// отвязавшийся от контекста (после PerksAndTraitsScreen).
++//
++// Формат сейва не менялся: в снапшоте исторические ключи effects
++// (источник — стор-поле traitEffects) и modifiedItems (Map → массив пар).
++// Поведение слайсов — в scene-effects-modified-store-slice.test.js.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import { parseSync } from '@babel/core';
++import jsxPlugin from '@babel/plugin-transform-react-jsx';
++
++const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
++const SCREENS = {
++  CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
++  WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
++  InventoryScreen: path.resolve(__dirname, '../../components/screens/InventoryScreen/InventoryScreen.js'),
++};
++const LIMB_MODAL = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js');
++
++const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
++  filename: file,
++  babelrc: false,
++  configFile: false,
++  sourceType: 'module',
++  plugins: [jsxPlugin, ...(file.endsWith('.tsx') ? [['@babel/plugin-transform-typescript', { isTSX: true }]] : [])],
++});
++
++const walk = (node, visit) => {
++  if (!node || typeof node !== 'object') return;
++  if (Array.isArray(node)) {
++    node.forEach((child) => walk(child, visit));
++    return;
++  }
++  if (typeof node.type === 'string') visit(node);
++  Object.values(node).forEach((value) => walk(value, visit));
++};
++
++const propertyName = (prop) => {
++  if (!prop) return null;
++  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
++    const key = prop.key;
++    if (key.type === 'Identifier') return key.name;
++    if (key.type === 'StringLiteral') return key.value;
++  }
++  return null;
++};
++
++const REMOVED_MEMBERS = [
++  'equipment', 'setEquipment',
++  'effects', 'setEffects', 'sceneCounter',
++  'modifiedItems', 'setModifiedItems',
++  'getModifiedItem', 'saveModifiedItem', 'removeModifiedItem', 'getItemId',
++];
++
++describe('Шаг 8а (часть 3): фасад без комплекта/сцен/эффектов/модификаций', () => {
++  const ast = parse(CONTEXT_FILE);
++  const facadeValues = [];
++  walk(ast, (node) => {
++    if (node.type === 'ObjectExpression'
++      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')
++      && node.properties.some((prop) => propertyName(prop) === 'characterId')) {
++      facadeValues.push(node);
++    }
++  });
++
++  it('фасадный value найден ровно один', () => {
++    expect(facadeValues.length).toBe(1);
++  });
++
++  it('в value нет членов Шага 8а (часть 3)', () => {
++    const names = facadeValues[0].properties.map(propertyName);
++    expect(names.filter((name) => REMOVED_MEMBERS.includes(name))).toEqual([]);
++  });
++
++  it('снапшот сейва сохраняет исторические ключи effects/modifiedItems/sceneCounter', () => {
++    const snapshots = [];
++    walk(ast, (node) => {
++      if (node.type === 'ObjectExpression'
++        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
++        && node.properties.some((prop) => propertyName(prop) === 'effects')
++        && node.properties.some((prop) => propertyName(prop) === 'modifiedItems')
++        && node.properties.some((prop) => propertyName(prop) === 'sceneCounter')) {
++        snapshots.push(node);
++      }
++    });
++    expect(snapshots.length).toBe(1);
++  });
++
++  it('effects в контексте — алиас traitEffects (стор), модификации — Map из словаря стора', () => {
++    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
++    expect(source).toContain('const traitEffects = useCharacterStore((s) => s.traitEffects)');
++    expect(source).toContain('effects: traitEffects');
++    expect(source).toContain('new Map(Object.entries(storeModifiedItems || {}))');
++  });
++});
++
++describe('Шаг 8а (часть 3): экраны — напрямую на стор', () => {
++  it('экраны не деструктурируют снятые члены из useCharacter()', () => {
++    const violations = [];
++    for (const [name, file] of Object.entries(SCREENS)) {
++      walk(parse(file), (node) => {
++        if (node.type === 'VariableDeclarator'
++          && node.id?.type === 'ObjectPattern'
++          && node.init?.type === 'CallExpression'
++          && node.init.callee?.type === 'Identifier'
++          && node.init.callee.name === 'useCharacter') {
++          for (const prop of node.id.properties) {
++            const propName = propertyName(prop) ?? prop.argument?.name ?? null;
++            if (REMOVED_MEMBERS.includes(propName)) violations.push(`${name}: ${propName}`);
++          }
++        }
++      });
++    }
++    expect(violations).toEqual([]);
++  });
++
++  it('LimbUpgradeModal — второй экран, полностью отвязавшийся от контекста', () => {
++    const source = fs.readFileSync(LIMB_MODAL, 'utf8');
++    expect(source).not.toContain('CharacterContext');
++  });
++
++  it('CharacterScreen пишет «эффекты трейтов» через стор (setTraitEffects)', () => {
++    const source = fs.readFileSync(SCREENS.CharacterScreen, 'utf8');
++    expect(source).toContain('useCharacterStore((s) => s.setTraitEffects)');
++    expect(source).toContain('setTraitEffects((currentEffects)');
++  });
++
++  it('Inventory собирает read-хелпер модификаций из стор-словаря', () => {
++    const source = fs.readFileSync(SCREENS.InventoryScreen, 'utf8');
++    expect(source).toContain('useCharacterStore((s) => s.modifiedItems)');
++    expect(source).toContain("storeModifiedItems[getItemId(item)] || item");
++  });
++
++  it('store/itemIdentity: экшены modifiedItems и канонический getItemId в домене', () => {
++    const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
++    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'saveModifiedItem:', 'removeModifiedItem:']) {
++      expect(store).toContain(action);
++    }
++    const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');
++    expect(identity).toContain('export const getItemId');
++  });
++});
+diff --git a/__tests__/saves/scene-effects-modified-store-slice.test.js b/__tests__/saves/scene-effects-modified-store-slice.test.js
+new file mode 100644
+index 0000000..9edce05
+--- /dev/null
++++ b/__tests__/saves/scene-effects-modified-store-slice.test.js
+@@ -0,0 +1,101 @@
++// Шаг 8а (часть 3): счётчик сцен, «эффекты трейтов», изменённые предметы — стор.
++//
++// - sceneCounter: данные (сколько сцен сменилось), персистится;
++// - traitEffects: в сейве ключ effects (формат не менялся); пишутся только
++//   из логики смены трейта (вычесть старые, дописать новые);
++// - modifiedItems: в сторе JSON-дружелюбный словарь { [itemId]: item };
++//   провайдер кладёт в снапшот Map → массив пар (прежний формат сейва).
++//
++// Стор-поле effects занято словарём timed-эффектов (Шаг 6) — поэтому
++// «эффекты трейтов» названы traitEffects; фасадные имена effects/setEffects
++// с фасада сняты (AST: character-context-step8a-3-facade.test.js).
++
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: сцены/эффекты трейтов/модификации (Шаг 8а, часть 3)', () => {
++  it('начальное состояние: 0 / [] / {}', () => {
++    const s = useCharacterStore.getState();
++    expect(s.sceneCounter).toBe(0);
++    expect(s.traitEffects).toEqual([]);
++    expect(s.modifiedItems).toEqual({});
++  });
++
++  it('sceneCounter: значением и апдейтером (advanceScene = +1 за сцену)', () => {
++    const store = useCharacterStore.getState();
++    store.setSceneCounter(5);
++    expect(useCharacterStore.getState().sceneCounter).toBe(5);
++    store.setSceneCounter((prev) => prev + 1);
++    expect(useCharacterStore.getState().sceneCounter).toBe(6);
++  });
++
++  it('traitEffects: апдейтер «вычесть старые трейт-эффекты, дописать новые»', () => {
++    const store = useCharacterStore.getState();
++    store.setTraitEffects(['fast_metabolism', 'iron_gut']);
++    store.setTraitEffects((current) => {
++      const oldEffects = ['fast_metabolism'];
++      const newEffects = ['gifted'];
++      const withoutOld = current.filter((e) => !oldEffects.includes(e));
++      return [...new Set([...withoutOld, ...newEffects])];
++    });
++    expect(useCharacterStore.getState().traitEffects).toEqual(['iron_gut', 'gifted']);
++  });
++
++  it('modifiedItems: save/remove по каноническому id оригинала', () => {
++    const store = useCharacterStore.getState();
++    store.saveModifiedItem({ weaponId: 'weapon_switchblade' }, { weaponId: 'weapon_switchblade', name: 'Клинок+' });
++    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade).toEqual({
++      weaponId: 'weapon_switchblade',
++      name: 'Клинок+',
++    });
++    // Повторное сохранение того же предмета перезаписывает (Map-семантика).
++    store.saveModifiedItem({ weaponId: 'weapon_switchblade' }, { weaponId: 'weapon_switchblade', name: 'Клинок++' });
++    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade.name).toBe('Клинок++');
++    store.saveModifiedItem({ id: 'armor_leather' }, { id: 'armor_leather', name: 'Кожанка+' });
++    expect(Object.keys(useCharacterStore.getState().modifiedItems)).toEqual([
++      'weapon_switchblade',
++      'armor_leather',
++    ]);
++    store.removeModifiedItem({ weaponId: 'weapon_switchblade' });
++    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade).toBeUndefined();
++  });
++
++  it('modifiedItems: setModifiedItems объектом/апдейтером (путь загрузки сейва)', () => {
++    const store = useCharacterStore.getState();
++    store.setModifiedItems(Object.fromEntries([['w1', { id: 'w1' }]]));
++    store.setModifiedItems((prev) => ({ ...prev, a1: { id: 'a1' } }));
++    expect(useCharacterStore.getState().modifiedItems).toEqual({
++      w1: { id: 'w1' },
++      a1: { id: 'a1' },
++    });
++  });
++
++  it('resetCharacterStore чистит сцены/эффекты/модификации', () => {
++    const store = useCharacterStore.getState();
++    store.setSceneCounter(9);
++    store.setTraitEffects(['x']);
++    store.saveModifiedItem({ id: 'w1' }, { id: 'w1' });
++    store.resetCharacterStore();
++    const s = useCharacterStore.getState();
++    expect(s.sceneCounter).toBe(0);
++    expect(s.traitEffects).toEqual([]);
++    expect(s.modifiedItems).toEqual({});
++  });
++
++  it('поля персистятся (данные, не производные)', async () => {
++    const store = useCharacterStore.getState();
++    store.setSceneCounter(3);
++    store.setTraitEffects(['gifted']);
++    store.saveModifiedItem({ id: 'w1' }, { id: 'w1', name: 'Мод' });
++    const raw = JSON.parse(await AsyncStorage.getItem('character-store'));
++    expect(raw.state.sceneCounter).toBe(3);
++    expect(raw.state.traitEffects).toEqual(['gifted']);
++    expect(raw.state.modifiedItems).toEqual({ w1: { id: 'w1', name: 'Мод' } });
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 793f07e..6884c34 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -218,8 +218,13 @@ export const CharacterProvider = ({ children }) => {
+   const setOrigin = useCharacterStore((s) => s.setOrigin);
+   const trait = useCharacterStore((s) => s.trait);
+   const setTrait = useCharacterStore((s) => s.setTrait);
+-  const [effects, setEffects] = useState([]);
+-  const [sceneCounter, setSceneCounter] = useState(0);
++  // ═══ Шаг 8а (часть 3): сцены и «эффекты трейтов» — стор. ═══
++  // В снапшоте сейва traitEffects лежит под историческим ключом effects
++  // (формат не менялся); timed-эффекты — отдельный словарь effects стора.
++  const traitEffects = useCharacterStore((s) => s.traitEffects);
++  const setTraitEffects = useCharacterStore((s) => s.setTraitEffects);
++  const sceneCounter = useCharacterStore((s) => s.sceneCounter);
++  const setSceneCounter = useCharacterStore((s) => s.setSceneCounter);
+   // ═══ Робот: состояние — слайс robot стора (слайс жил там с патча 218; ═══
+   // Шаг 8а: прямые действия setEquippedRobotSlots/setEquippedRobotModules).
+   // Контекст держит подписку только ради снапшота сейва и derived-пуша;
+@@ -322,7 +327,14 @@ export const CharacterProvider = ({ children }) => {
+   // healCharacter/damageCharacter/addRadiation/healRadiation — Шаг 8а:
+   // стор-экшены (правила каунтеров — domain/counters.js в слайсе стора).
+ 
+-  const [modifiedItems, setModifiedItems] = useState(new Map());
++  // Изменённые предметы: в сторе — словарь { [itemId]: item }; здесь —
++  // Map для снапшота сейва (формат: массив пар) и подписка на изменения.
++  const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
++  const setModifiedItems = useCharacterStore((s) => s.setModifiedItems);
++  const modifiedItems = useMemo(
++    () => new Map(Object.entries(storeModifiedItems || {})),
++    [storeModifiedItems],
++  );
+   const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
+   const setAvailablePerkAttributePoints = useCharacterStore((s) => s.setAvailablePerkAttributePoints);
+   const luckPoints = useCharacterStore((s) => s.luckPoints);
+@@ -457,7 +469,8 @@ export const CharacterProvider = ({ children }) => {
+     origin,
+     trait,
+     equipment,
+-    effects,
++    // «Эффекты трейтов» — стор-поле traitEffects (Шаг 8а); сейв-ключ effects.
++    effects: traitEffects,
+     // Временные эффекты — из словаря стора (Шаг 6): денормализация dict→array.
+     activeTimedEffects: denormalizeEffects(storeEffects),
+     sceneCounter,
+@@ -496,10 +509,10 @@ export const CharacterProvider = ({ children }) => {
+     ...stateExtensions,
+   }), [
+     characterName, level, attributes, skills, selectedSkills, extraTaggedSkills,
+-    forcedSelectedSkills, origin, trait, equipment, effects, storeEffects,
++    forcedSelectedSkills, origin, trait, equipment, traitEffects, storeEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+-    currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
++    currency, currentHealth, radiation, storeModifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+     conditions, chemDosesLog, sceneRiskStates, lastDiseaseResistAt, stateExtensions,
+   ]);
+@@ -538,7 +551,7 @@ export const CharacterProvider = ({ children }) => {
+     forcedSelectedSkills, origin, trait, equipment, effects, storeEffects,
+     sceneCounter, equippedWeapons, equippedRobotSlots, equippedRobotModules,
+     equippedArmor, equippedPowerArmor, powerArmorRuntime,
+-    currency, currentHealth, radiation, modifiedItems, availablePerkAttributePoints,
++    currency, currentHealth, radiation, storeModifiedItems, availablePerkAttributePoints,
+     luckPoints, attributesSaved, skillsSaved, selectedPerks,
+     // Производные убраны и отсюда: они не попадают в снимок, а их пересчёт
+     // зря будил автосохранение (запись в БД + синхронизация с облаком).
+@@ -621,10 +634,10 @@ export const CharacterProvider = ({ children }) => {
+        setOrigin(data.origin || null);
+        setTrait(loadedTrait);
+       setEquipment(data.equipment || null);
+-      setEffects(data.effects || []);
++      setTraitEffects(data.effects || []); // сейв-ключ effects → traitEffects (Шаг 8а)
+       // activeTimedEffects: тени больше нет — массив из сейва уходит в словарь
+       // effects стора через loadFromLegacyData (normalizeEffects), см. ниже.
+-      setSceneCounter(data.sceneCounter ?? 0);
++      setSceneCounter(data.sceneCounter ?? 0); // стор-экшен (Шаг 8а)
+       sceneRiskTrackerRef.current.replaceStates(data.sceneRiskStates);
+       setSceneRiskStates(data.sceneRiskStates);
+       // Поля сеттинговых расширений: hydrate расширения сам решает, как
+@@ -672,7 +685,11 @@ export const CharacterProvider = ({ children }) => {
+       setCurrentHealth(data.currentHealth ?? 0);
+       setRadiation(Math.max(0, data.radiation ?? 0));
+       setLastDiseaseResistAt(data.lastDiseaseResistAt ?? null);
+-      setModifiedItems(data.modifiedItems instanceof Map ? data.modifiedItems : new Map());
++      setModifiedItems(Object.fromEntries(
++        data.modifiedItems instanceof Map
++          ? data.modifiedItems.entries()
++          : (Array.isArray(data.modifiedItems) ? data.modifiedItems : []),
++      ));
+       setAvailablePerkAttributePoints(data.availablePerkAttributePoints ?? 0);
+       setLuckPoints(data.luckPoints ?? 0);
+       // Максимум удачи — производная (атрибуты + трейт), а не хранимое
+@@ -768,32 +785,8 @@ export const CharacterProvider = ({ children }) => {
+     }
+   }, []);
+ 
+-  const getItemId = (item) => {
+-    if (item.uniqueId) return item.uniqueId;
+-    return item.weaponId || item.code || item.id || item.Name;
+-  };
+-
+-  const getModifiedItem = (item) => {
+-    const itemId = getItemId(item);
+-    const modifiedItem = modifiedItems.get(itemId);
+-    if (modifiedItem) return modifiedItem;
+-    if (item.itemType !== 'weapon' && item.itemType !== 'armor' && item.itemType !== 'clothing') return item;
+-    return item;
+-  };
+-
+-  const saveModifiedItem = (originalItem, modifiedItem) => {
+-    const itemId = getItemId(originalItem);
+-    setModifiedItems(prev => new Map(prev).set(itemId, modifiedItem));
+-  };
+-
+-  const removeModifiedItem = (item) => {
+-    const itemId = getItemId(item);
+-    setModifiedItems(prev => {
+-      const newMap = new Map(prev);
+-      newMap.delete(itemId);
+-      return newMap;
+-    });
+-  };
++  // getModifiedItem/saveModifiedItem/removeModifiedItem/getItemId — Шаг 8а
++  // (часть 3): стор-экшены modifiedItems и domain/itemIdentity.
+ 
+   // addPerkAttributePoints — Шаг 7: стор-экшен, перковый экран зовёт напрямую.
+ 
+@@ -1355,7 +1348,7 @@ export const CharacterProvider = ({ children }) => {
+     setMaxLuckPoints(initialLuck);
+     setLuckPoints(initialLuck);
+     setEquipment(null);
+-    setEffects([]);
++    setTraitEffects([]);
+     setSceneCounter(0);
+     const emptySceneRiskStates = {};
+     sceneRiskTrackerRef.current.replaceStates(emptySceneRiskStates);
+@@ -1382,7 +1375,7 @@ export const CharacterProvider = ({ children }) => {
+     // Фикс регрессии Шага 7: initialLevel был удалён вместе с useState.
+     const currentMaxHealth = calculateMaxHealth(initialAttributes, INITIAL_LEVEL);
+     setCurrentHealth(currentMaxHealth);
+-    setModifiedItems(new Map());
++    setModifiedItems({});
+     // Reset save status.
+     setCharacterName('');
+     setCharacterId(null);
+@@ -1446,9 +1439,8 @@ export const CharacterProvider = ({ children }) => {
+     extraTaggedSkills,
+     forcedSelectedSkills,
+     // origin/setOrigin/trait/setTrait — Шаг 7: только в сторе.
+-    equipment, setEquipment,
+-    effects, setEffects,
+-    sceneCounter,
++    // equipment/setEquipment, effects/setEffects (→ traitEffects), sceneCounter —
++    // Шаг 8а (часть 3): стор напрямую (поле equipment живёт в сторе с Шага 1).
+     // sceneRiskStates — Шаг 6: экраны читают стор напрямую (useCharacterStore).
+     sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
+     applyConsumableTimedEffects,
+@@ -1468,16 +1460,9 @@ export const CharacterProvider = ({ children }) => {
+     // currentHealth/radiation и их действия — Шаг 8а: только в сторе.
+     // luckPoints/maxLuckPoints/attributesSaved/skillsSaved — Шаг 7: только в сторе.
+     // selectedPerks/setSelectedPerks — Шаг 8а: только в сторе.
+-    modifiedItems, setModifiedItems,
++    // modifiedItems/setModifiedItems/getModifiedItem — Шаг 8а (часть 3): стор.
+     // carryWeight/meleeBonus/initiative/defense — Шаг 8а: зеркала сняты
+     // (derivedStats стора; carryWeight инвентаря — selectCarryWeight).
+-    // Canonical id only. No alias/fallback to localized name.
+-    // Single-trait: trait.id matches. Multi-trait (NCR/Survivor): trait.ids[] contains it.
+-    // hasTrait — Шаг 8а: экраны проверяют трейт сами (store.trait).
+-    getItemId,
+-    getModifiedItem,
+-    saveModifiedItem,
+-    removeModifiedItem,
+     // Расширения состояния (src/store/stateExtensions.js): сеттинги
+     // регистрируют поля и читают/меняют их через эти методы.
+     stateExtensions,
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 65bd8ea..188a0d6 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -31,7 +31,7 @@ import { getPerkDisplay } from '../../../modules/fallout/screens/PerksAndTraitsS
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { useLocale, useModuleLocale } from '../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+-import { generateStackKey } from '../../../domain/itemIdentity';
++import { generateStackKey, getItemId } from '../../../domain/itemIdentity';
+ import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
+ import { isRobotCharacter } from '../../../domain/origins';
+ import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
+@@ -78,11 +78,14 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
+ const InventoryScreen = () => {
+   const {
+     currency, earnCurrency, spendCurrency,
+-    equipment,
+     applyConsumableFull,
+     previewConsumableRadiation,
+-    getModifiedItem,
+   } = useCharacter();
++  // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
++  const equipment = useCharacterStore((s) => s.equipment);
++  const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
++  // Read-хелпер модификаций: стор-словарь { [itemId]: item } (Шаг 8а, часть 3).
++  const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
+   // Шаг 7: origin/trait — стор напрямую.
+   // Шаг 8а: слоты робота и производный вес — стор напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+diff --git a/domain/itemIdentity.js b/domain/itemIdentity.js
+index f71dd95..2fca375 100644
+--- a/domain/itemIdentity.js
++++ b/domain/itemIdentity.js
+@@ -20,6 +20,17 @@
+ 
+ const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+ 
++/**
++ * Канонический id предмета (Шаг 8а, часть 3): ключ модификаций в сейве
++ * (modifiedItems) и вообще «какой это предмет». Порядок проверок — прежний
++ * (была локальная функция CharacterContext): уникальный id экземпляра
++ * важнее канонического кода; Name (с заглавной) — легаси-поле старых сейвов.
++ */
++export const getItemId = (item = {}) => {
++  if (item.uniqueId) return item.uniqueId;
++  return item.weaponId || item.code || item.id || item.Name;
++};
++
+ /** slug для имени в ключе: читаемый, без пробелов/спецсимволов. */
+ export const slugifyBaseName = (baseName = '') => String(baseName)
+   .toLowerCase()
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index ce68fd7..77e9905 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -264,10 +264,6 @@ export default function CharacterScreen() {
+   const {
+     isSaved,
+     saveCharacter,
+-    equipment,
+-    setEquipment,
+-    effects,
+-    setEffects,
+     currency,
+     earnCurrency,
+     spendCurrency,
+@@ -275,6 +271,10 @@ export default function CharacterScreen() {
+     resetKitAndRewards,
+     commitAttributeChanges,
+   } = useCharacter();
++  // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.
++  const equipment = useCharacterStore((s) => s.equipment);
++  const setEquipment = useCharacterStore((s) => s.setEquipment);
++  const setTraitEffects = useCharacterStore((s) => s.setTraitEffects);
+   // Шаг 8а: слоты/модули робота — слайс robot стора напрямую.
+   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+   const setEquippedRobotModules = useCharacterStore((s) => s.setEquippedRobotModules);
+@@ -917,7 +917,8 @@ export default function CharacterScreen() {
+     setBaseSkills(nextTraitSkills);
+ 
+     // Обновляем эффекты
+-    setEffects((currentEffects) => {
++    // Шаг 8а (часть 3): «эффекты трейтов» — стор (в сейве ключ effects).
++    setTraitEffects((currentEffects) => {
+       const oldEffects = oldTrait?.modifiers?.effects || [];
+       const newEffects = newTrait?.modifiers?.effects || [];
+       const withoutOld = currentEffects.filter((e) => !oldEffects.includes(e));
+diff --git a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+index 1b0ccdd..6227282 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js
+@@ -9,7 +9,6 @@ import {
+   StyleSheet,
+   Pressable,
+ } from 'react-native';
+-import { useCharacter } from '../../../../../components/CharacterContext';
+ import { applyLimbReplacement } from '../../../../../domain/robotEquip';
+ import { limbOptionsForSlot } from '../../../../../domain/robotSlots';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+@@ -116,10 +115,11 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
+  *   onClose      {function}
+  */
+ const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
+-  // Шаг 8а: слоты робота — слайс robot стора напрямую.
++  // Шаг 8а: слоты робота и комплект — слайсы стора напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+-  const { equipment, setEquipment } = useCharacter();
++  const equipment = useCharacterStore((s) => s.equipment);
++  const setEquipment = useCharacterStore((s) => s.setEquipment);
+   // Надетое оружие — Шаг 3 миграции: список пишется напрямую в стор.
+   const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+   useLocale();
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 197c9ce..3140ff7 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -634,8 +634,9 @@ const resolveStoreItemId = (weapon) => {
+ const WeaponsAndArmorScreen = () => {
+   const {
+     attributes,
+-    saveModifiedItem,
+   } = useCharacter();
++  // Шаг 8а (часть 3): модификации предметов — стор-экшен.
++  const saveModifiedItem = useCharacterStore((s) => s.saveModifiedItem);
+   // Шаг 8а: слоты робота — слайс robot стора напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index fea6837..f9ed82a 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -60,7 +60,7 @@ import { selectPerkBonuses } from '../../domain/perks.js';
+ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+-import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
++import { generateItemId, generateStackKey, getItemId } from '../../domain/itemIdentity';
+ // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+ // стор-словари единственный источник, производный legacy-массив обязан быть
+ // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+@@ -226,6 +226,16 @@ const useCharacterStore = create(devtools(
+       // бонус отдыха повышает) — экшены это учитывают.
+       currentHealth: 0,
+       radiation: 0,
++      // ═══ Шаг 8а (часть 3): счётчик сцен, эффекты трейтов, изменённые предметы. ═══
++      // sceneCounter — сколько сцен сменилось с начала персонажа (данные).
++      // traitEffects — «эффекты трейтов» (в сейве ключ effects; смена трейта
++      // вычитает старые и дописывает новые — пишутся только из trait-логики).
++      // modifiedItems — модифицированные предметы: словарь { [itemId]: item };
++      // в снапшот сейва идёт как Map→массив пар (формат не менялся), поэтому
++      // в сторе держим JSON-дружелюбный объект, а не Map.
++      sceneCounter: 0,
++      traitEffects: [],
++      modifiedItems: {},
+       // Заболевания/состояния — Шаг 6 миграции (источник — стор).
+       conditions: [],
+       chemDosesLog: [],
+@@ -1338,6 +1348,42 @@ const useCharacterStore = create(devtools(
+         set((state) => ({ currentHealth: Math.max(0, state.currentHealth - loss) }));
+       },
+ 
++      /** Счётчик сменённых сцен: значением или функцией от предыдущего. */
++      setSceneCounter: (valueOrUpdater) => set((state) => ({
++        sceneCounter: typeof valueOrUpdater === 'function'
++          ? valueOrUpdater(state.sceneCounter)
++          : valueOrUpdater,
++      })),
++      /**
++       * «Эффекты трейтов» (в сейве — ключ effects; поле traitEffects): значением
++       * или функцией. Пишутся только из логики смены трейта (CharacterScreen).
++       */
++      setTraitEffects: (valueOrUpdater) => set((state) => ({
++        traitEffects: typeof valueOrUpdater === 'function'
++          ? (valueOrUpdater(state.traitEffects) || [])
++          : (valueOrUpdater || []),
++      })),
++      /**
++       * Модифицированные предметы: словарь { [itemId]: item } (значение или
++       * функция). В снапшот сейва провайдер кладёт Map→массив пар — формат
++       * сейва не менялся.
++       */
++      setModifiedItems: (valueOrUpdater) => set((state) => ({
++        modifiedItems: typeof valueOrUpdater === 'function'
++          ? (valueOrUpdater(state.modifiedItems) || {})
++          : (valueOrUpdater || {}),
++      })),
++      /** Сохранить модификацию предмета по каноническому id оригинала. */
++      saveModifiedItem: (originalItem, modifiedItem) => set((state) => ({
++        modifiedItems: { ...state.modifiedItems, [getItemId(originalItem)]: modifiedItem },
++      })),
++      /** Удалить модификацию предмета. */
++      removeModifiedItem: (item) => set((state) => {
++        const next = { ...state.modifiedItems };
++        delete next[getItemId(item)];
++        return { modifiedItems: next };
++      }),
++
+       resetCharacterStore: (legacyDefaults = {}) => {
+         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+         // Вызывающий не передал дефолты → сеем стартовые значения создания.
+@@ -1375,6 +1421,10 @@ const useCharacterStore = create(devtools(
+           // остаточное состояние; теперь чистится консистентно.
+           currentHealth: 0,
+           radiation: 0,
++          // Шаг 8а (часть 3).
++          sceneCounter: 0,
++          traitEffects: [],
++          modifiedItems: {},
+           selectedPerks: legacyDefaults?.selectedPerks || [],
+           rewardedSkills: legacyDefaults?.rewardedSkills || [],
+           perkBonuses: {},
+@@ -1459,6 +1509,10 @@ const useCharacterStore = create(devtools(
+         // Счётчики — Шаг 8а (текущее значение — данные, не производная).
+         currentHealth: state.currentHealth,
+         radiation: state.radiation,
++        // Шаг 8а (часть 3): сцены/эффекты трейтов/модификации предметов.
++        sceneCounter: state.sceneCounter,
++        traitEffects: state.traitEffects,
++        modifiedItems: state.modifiedItems,
+         schemaVersion: CURRENT_SCHEMA_VERSION,
+       }),
+       // On rehydrate, ensure all totals are recalculated
+-- 
+2.39.5
+
