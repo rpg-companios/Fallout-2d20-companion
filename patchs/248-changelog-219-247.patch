@@ -1,0 +1,112 @@
+From e9d3ebb105a4ef7c506de3a3434906f24e88584c Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 18:05:49 +0000
+Subject: [PATCH] =?UTF-8?q?248:=20=D1=87=D0=B5=D0=B9=D0=BD=D0=B4=D0=B6?=
+ =?UTF-8?q?=D0=BB=D0=BE=D0=B3=20219=E2=80=93247=20(docs/changelog.ru.md=20?=
+ =?UTF-8?q?+=20changelog.en.md)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Сводная запись эпохи миграции: единое хранилище (219–243), игровые
+фиксы и решения по книге (229–241), модуль сохранений (242), паспорта
+данных и операций + фикс повторной выдачи наград (244–246), Формат-v2
+с мостом для старых героев (247). Игровые формулировки для владельца.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ docs/changelog.en.md | 33 +++++++++++++++++++++++++++++++++
+ docs/changelog.ru.md | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
+
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 51405d5..805e0f0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,39 @@
+ 
+ ---
+ 
++## Update — Reworking the game's core: unified store, saves, data passports (patches 219–247)
++
++> Major behind-the-scenes work: everything the game remembers about a character moved into a unified store, saves became a standalone module, and data/operations got machine-readable "passports". For players: quieter, more reliable, plus several gameplay fixes; the save format did not change (old saves keep loading).
++
++### Unified character store (219–243)
++- The entire character state — profile (name, origin, trait, level), attributes/skills, health/radiation, caps, inventory and equipped gear, equipment kit, robot, power armor, perks, diseases and conditions, scene counter, timed effects, modified items, "saved" flags — moved from a React wrapper into a unified store (Zustand). Screens read and write it directly, with no mirrors or middlemen.
++- The migration went step by step (each patch = one group of fields, the app kept working), and at the end (243) the old "dispatcher" file and its entry-point wrapper were deleted entirely — about 1,300 lines and a whole class of desync bugs gone.
++- Operation rules are now anchored in the store: spending returns "done / rejected with reason" and never touches the balance on rejection ("you cannot buy more than you have"); all setters accept value-or-updater form; the Fusion Core drain ticks only while the app is open.
++
++### Gameplay fixes and rulebook decisions (229–241)
++- 229 — "fake water": a broken purified-water item from old saves is repaired on load.
++- 230 — items with no price in the rules now sell for a sensible default instead of 0.
++- 231 — the fatigue ladder indicates its level by color, without text hints.
++- 232 — fatigue per the book: −⌊N/2⌋ current HP per game hour of activity; sleep removed from the rule (bed rest heals).
++- 237 — item scheme "base + mod ids on the item": the catalog composes the name (e.g. `weapon_huntingRifle_05_76_48_35` → ".50 long-barreled high-capacity suppressed hunting rifle"); the workbench updates the item in place.
++- 238 — confirming attributes: a single operation with rule clamps and a health recalculation.
++- 239–240 — scenes and time: timed effects tick by scenes and game hours; consumables apply as one operation (heal → radiation → effects → infection risk); radiation preview before use; resisting a disease once per day; treatment lowers disease ranks.
++- 241 — "change kit" no longer wipes health/radiation/scenes/conditions/chem dose log; tagged skills survive a kit change (while a full reset honestly clears everything).
++
++### Saves (242)
++- The save notebook (save/load/list/delete/autosave) is a standalone module with no React ties. Autosave writes only already-saved characters, after a half-second debounce, and skips unchanged state; cloud sync runs in the background.
++
++### Data & action passports (244–246, TypeScript)
++- The store and the save format got machine-readable "passports" with strict checking: a new field or action missing from the passport fails a contract test — sneaking past is no longer possible.
++- The passport immediately exposed a live defect (244): the "one-time skill rewards issued" journal was written into saves but never read back — after save → load → confirming skills, the game could hand out starting rewards a second time. Fixed (save format untouched).
++- 246 — the action passport now covers all 98 store actions, with a unified "done / rejected with reason" outcome contract.
++
++### Format v2: saves without the mod album (247)
++- The legacy modified-items album was removed from save writing — a duplicate ledger left over from the old scheme (writing stopped in 237; now the key is gone entirely). Nothing visible changes: names and mods are restored from the item id via the catalog.
++- A bridge for old characters: when loading a pre-237 save, the album contents are transferred onto the items themselves once; entries for lost/sold items stay in the read-only inventory album. After a re-save the save is album-free. Schema version and the migration chain are untouched.
++
++---
++
+ ## Update — Assaultron equipment kits
+ 
+ ### Origin "Assaultron" (content)
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e51565f..c307d51 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,39 @@
+ 
+ ---
+ 
++## Обновление — Переустройство «сердца» игры: единое хранилище, сохранения, паспорта данных (патчи 219–247)
++
++> Большая закулисная работа: всё, что игра помнит о персонаже, переехало в единое хранилище, сохранения стали самостоятельным модулем, у данных и операций появились машинные «описи». Игроку — тише, надёжнее и несколько игровых фиксов; формат сейвов не менялся (старые сейвы загружаются).
++
++### Единое хранилище персонажа (219–243)
++- Всё состояние персонажа — профиль (имя, происхождение, черта, уровень), атрибуты/навыки, здоровье/радиация, крышки, инвентарь и надетое, комплект, робот, силовая броня, перки, болезни и состояния, счётчик сцен, временные эффекты, изменённые предметы, отметки «сохранено» — переехало из React-обёртки в единое хранилище (Zustand). Экраны читают и пишут напрямую, без зеркал и посредников.
++- Переезд шёл шагами (каждый патч — группа полей, приложение рабочее после каждого), в финале (243) старый файл-«раздатчик» и его обёртка в точке входа удалены целиком — минус ~1300 строк и целый класс ошибок рассинхрона.
++- Правила операций закреплены в хранилище: списание возвращает «куплено/отказ с причиной» и не трогает кошелёк при отказе («нельзя купить на больше, чем есть»); все сеттеры принимают и «от текущего значения»; таймер Ядерного блока тикает только при открытом приложении.
++
++### Игровые фиксы и решения по книге (229–241)
++- 229 — «фальшивая вода»: битый предмет очищенной воды из старых сейвов чинится при загрузке.
++- 230 — предметы без цены в правилах продаются за разумный дефолт, а не за 0.
++- 231 — лестница усталости показывает уровень цветом, без текстовых подсказок.
++- 232 — усталость по книге: −⌊N/2⌋ текущих ОЗ за игровой час активности; сон из правила исключён (лечение — постелью).
++- 237 — схема предмета «база + id модов на предмете»: имя собирает каталог (пример: `weapon_huntingRifle_05_76_48_35` → «.50 длинноствольная охотничья высокоемкая тихая винтовка»); верстак обновляет предмет на месте.
++- 238 — подтверждение атрибутов: единая операция с проверкой границ и пересчётом здоровья.
++- 239–240 — сцены и время: эффекты тикают от сцен и игровых часов; расходники применяются одной операцией (лечение → радиация → эффекты → риск заражения); превью радиации до применения; «Сопротивляться» болезни — одна попытка в сутки; лечение снижает ранги болезни.
++- 241 — «смена комплекта» больше не обнуляет здоровье/радиацию/сцены/условия/журнал доз; tagged-навыки при смене комплекта сохраняются (а полный сброс честно чистит всё).
++
++### Сохранения (242)
++- Блокнот сохранений (сохранить/загрузить/список/удалить/автосохранение) — отдельный модуль без привязки к React. Автосейв пишет только уже сохранённого героя, с паузой полсекунды, и не перезаписывает сейв, если ничего не изменилось; облако синхронизируется фоном.
++
++### «Паспорта» данных и операций (244–246, TypeScript)
++- У хранилища и формата сейва появились машинные «описи» со строгой проверкой: новое поле или операция без записи в опись роняет контрактный тест — «тихо проскочить мимо» больше нельзя.
++- Опись сразу нашла живой дефект (244): журнал «подарки за отмеченные навыки выданы» писался в сейв, но при загрузке не читался — цепочка «сохранился → загрузился → подтвердил навыки» могла вручить стартовые подарки второй раз. Исправлено (формат сейва не тронут).
++- 246 — опись операций доведена до полного покрытия (все 98 действий хранилища), введён единый контракт ответа «сделано / отказ с причиной».
++
++### Формат-v2: сейвы без картотеки модов (247)
++- Из записи сейвов убрана старая картотека изменённых предметов — дублирующий учёт, оставшийся от прежней схемы (запись прекратилась ещё в 237, теперь ключа в сейве нет вовсе). Ничего видимого не меняется: имя и моды восстанавливаются каталогом из id предмета.
++- Мост для старых героев: при загрузке сейва до-237 эпохи содержимое картотеки один раз переносится на сами предметы; записи о потерянных/проданных предметах остаются в read-only картотеке инвентаря. После пересохранения сейв уже без картотеки. Версия схемы и цепочка миграций не тронуты.
++
++---
++
+ ## Обновление — Комплекты снаряжения Штурмотрона
+ 
+ ### Ориджин «Штурмотрон» (контент)
+-- 
+2.39.5
+
