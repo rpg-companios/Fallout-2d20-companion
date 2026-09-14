@@ -11,7 +11,10 @@
 //   - caps (не currency): ресурс назывался крышками до переименования рантайма;
 //   - effects — «эффекты трейтов» (в сторе поле traitEffects);
 //   - attributes/skills — legacy-массивы { name, value };
-//   - modifiedItems — массив пар [itemId, item] (Map деструктурируется);
+//   - Формат-v2 (патч 247): ключ modifiedItems В ЗАПИСЬ НЕ ПИШЕТСЯ —
+//     моды живут на предметах (id+моды). Читающая сторона по-прежнему
+//     принимает пары [itemId, item] из старых сейвов и переносит их на
+//     предметы при загрузке (мост в deserializeState);
 //   - origin — { id } без локализованных полей;
 //   - maxLuckPoints в сейв НЕ пишется (Правило 1 counters-storage.md);
 //   - rewardedSkills едет в сейве «попутным грузом»: конвейер мерджит
@@ -43,9 +46,6 @@ export interface LegacyParameterRecord {
   name: string;
   value: number;
 }
-
-/** Пара альбома модификаций: [itemId, item]. */
-export type ModifiedItemPair = [string, StoreItem];
 
 /**
  * Снапшот сейва на диске (schemaVersion CURRENT, saveSchema.js).
@@ -80,7 +80,6 @@ export type CharacterSaveData = {
   caps: number;
   currentHealth: number;
   radiation: number;
-  modifiedItems: ModifiedItemPair[];
   availablePerkAttributePoints: number;
   luckPoints: number;
   attributesSaved: boolean;
@@ -126,7 +125,6 @@ export const CHARACTER_SAVE_KEYS = [
   'caps',
   'currentHealth',
   'radiation',
-  'modifiedItems',
   'availablePerkAttributePoints',
   'luckPoints',
   'attributesSaved',

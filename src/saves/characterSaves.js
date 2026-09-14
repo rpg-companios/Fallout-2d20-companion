@@ -34,6 +34,7 @@ import {
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../store/saveSchema.js';
 import { slimSaveData, restoreSaveData } from '../../domain/saveSlimming';
 import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
+import { getItemId } from '../../domain/itemIdentity';
 import { canonizeLoadedCharacterItems } from '../../domain/kitItemCanonical';
 import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../../domain/origins';
 import {
@@ -103,14 +104,19 @@ const clampAttributesToRules = (rawAttributes, trait) => {
   });
 };
 
-const serializeState = (state) => ({
-  ...state,
-  origin: state.origin?.id ? { id: state.origin.id } : null,
-  modifiedItems: state.modifiedItems instanceof Map
-    ? Array.from(state.modifiedItems.entries())
-    : (Array.isArray(state.modifiedItems) ? state.modifiedItems : []),
-  schemaVersion: CURRENT_SCHEMA_VERSION,
-});
+const serializeState = (state) => {
+  const serialized = {
+    ...state,
+    origin: state.origin?.id ? { id: state.origin.id } : null,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+  };
+  // Формат-v2 (патч 247): картотека модификаций в запись не идёт — ключ
+  // отсутствует целиком; миграции/загрузка трактуют отсутствие как
+  // «альбома нет». Нормализация Map→пары при чтении сохранена для старых
+  // сейвов (см. deserializeState).
+  delete serialized.modifiedItems;
+  return serialized;
+};
 
 // Каталог активной локали. Если построение каталога падает (дефект данных),
 // возвращаем null и ужимание/восстановление просто пропускается — сейв
@@ -149,6 +155,29 @@ const deserializeState = (data) => {
   const restored = catalog
     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
     : migrated;
+  // ── Формат-v2 (патч 247): мост картотеки модификаций НА ПРЕДМЕТЫ ──
+  // Картотека (modifiedItems) в запись сейва больше не пишется; в СТАРЫХ
+  // сейвах (до патча 237) в ней лежат полные копии модифицированных
+  // предметов той эпохи. Один раз при загрузке переносим их на сами
+  // предметы (схема «база + id модов на предмете»): запись альбома
+  // заменяет худую запись в комплекте и на надетом оружии — дальше сейв
+  // пересохранится уже без картотеки, а предметы не потеряют вид.
+  // Записи без пары (предмет продан/потерян) оседают в стор-альбоме
+  // как раньше (read-only поддержка инвентаря). Мост стоит ДО
+  // канонизации id (canonizeLoadedCharacterItems), чтобы переехавшие
+  // предметы прошли починку битых id на общих основаниях.
+  const albumPairs = Array.isArray(restored.modifiedItems) ? restored.modifiedItems : [];
+  if (albumPairs.length > 0) {
+    const albumById = new Map(albumPairs.map(([albumItemId, albumItem]) => [albumItemId, albumItem]));
+    const applyAlbumEntry = (item) => (item ? (albumById.get(getItemId(item)) || item) : item);
+    if (Array.isArray(restored.equipment?.items)) {
+      restored.equipment.items = restored.equipment.items.map(applyAlbumEntry);
+    }
+    if (Array.isArray(restored.equippedWeapons)) {
+      restored.equippedWeapons = restored.equippedWeapons.map(applyAlbumEntry);
+    }
+  }
+
   return {
     ...restored,
     origin: resolveOrigin(restored.origin),
@@ -227,7 +256,9 @@ export const buildSnapshot = () => {
     caps: state.currency,
     currentHealth: state.currentHealth,
     radiation: state.radiation,
-    modifiedItems: new Map(Object.entries(state.modifiedItems || {})),
+    // Формат-v2 (247): картотека модификаций в снапшот не входит —
+    // моды живут на предметах (id+моды); содержимое старых сейвов
+    // переносится на предметы при загрузке (мост в deserializeState).
     availablePerkAttributePoints: state.availablePerkAttributePoints,
     luckPoints: state.luckPoints,
     attributesSaved: state.attributesSaved,

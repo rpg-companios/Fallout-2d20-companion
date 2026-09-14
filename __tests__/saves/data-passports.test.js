@@ -15,8 +15,11 @@
 //      с CHARACTER_SAVE_KEYS: паспорт ⊆ сейв, сейв \ паспорт = только
 //      расширения сеттингов. Исторические инварианты формата — caps (не
 //      currency), effects (= traitEffects стора), legacy-массивы
-//      { name, value }, origin = { id }, modifiedItems — пары, и
-//      maxLuckPoints НЕ пишется (Правило 1 counters-storage.md).
+//      { name, value }, origin = { id }, и maxLuckPoints НЕ пишется
+//      (Правило 1 counters-storage.md). Формат-v2 (патч 247): ключ
+//      modifiedItems (картотека модов) в запись НЕ идёт вовсе — даже
+//      когда в сторе есть унаследованные записи (они переносятся на
+//      предметы при загрузке старых сейвов).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -174,7 +177,7 @@ describe('патч 244: паспорт сейва против реальной 
     expect(saved.maxLuckPoints).toBeUndefined();
   });
 
-  it('исторические инварианты: caps/effects/legacy-массивы/origin={id}/пары модов', async () => {
+  it('исторические инварианты: caps/effects/legacy-массивы/origin={id}', async () => {
     seedStore();
     const saved = await saveOnce();
 
@@ -189,11 +192,13 @@ describe('патч 244: паспорт сейва против реальной 
     expect(saved.attributes[0]).toHaveProperty('value');
     // Ориджин — { id } без локализованных полей.
     expect(saved.origin).toEqual({ id: 'minuteman' });
-    // Альбом модификаций — массив пар.
-    expect(Array.isArray(saved.modifiedItems)).toBe(true);
-    expect(saved.modifiedItems[0][0]).toBe('weapon_x_01_22');
-    expect(saved.modifiedItems[0][1].name).toBe('Винтовка');
     // Версия схемы проставлена.
     expect(Number.isInteger(saved.schemaVersion)).toBe(true);
+  });
+
+  it('формат-v2: картотека модов (modifiedItems) в запись не идёт', async () => {
+    seedStore(); // в сторе есть унаследованные записи картотеки
+    const saved = await saveOnce();
+    expect(saved.modifiedItems).toBeUndefined(); // ключа нет целиком
   });
 });

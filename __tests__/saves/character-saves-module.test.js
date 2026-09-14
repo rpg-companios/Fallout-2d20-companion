@@ -82,7 +82,11 @@ const seedStore = () => {
     sceneCounter: 3,
     traitEffects: [{ id: 'trait_glow', name: 'Светящийся' }],
     effects: { eff1: { id: 'eff1', active: true, name: 'Психо', durationLeft: 60 } },
-    modifiedItems: { weapon_x_01_22: { id: 'weapon_x_01_22', name: 'Винтовка' } },
+    // Картотека с унаследованной записью (эмуляция старого героя) +
+    // предмет-основа в комплекте: мост при загрузке должен перенести
+    // содержимое картотеки НА ПРЕДМЕТ.
+    modifiedItems: { weapon_x_01_22: { id: 'weapon_x_01_22', name: 'Винтовка мод.', damage: 9 } },
+    equipment: { id: 'kit_minuteman', name: 'Застрельщик', items: [{ id: 'weapon_x_01_22', name: 'Винтовка' }] },
     chemDosesLog: [{ chemId: 'psycho', takenAt: Date.now() - 1000 }], // свежая доза (окно CLEAN_DOSE)
     lastDiseaseResistAt: 999,
     conditions: { disease1: { id: 'disease1', ranks: 1 } },
@@ -118,9 +122,9 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     // Timed-эффекты — денормализация словаря стора (массив).
     expect(Array.isArray(snapshot.activeTimedEffects)).toBe(true);
     expect(snapshot.activeTimedEffects[0]?.id).toBe('eff1');
-    // Изменённые предметы — Map пар (формат сейва).
-    expect(snapshot.modifiedItems).toBeInstanceOf(Map);
-    expect(snapshot.modifiedItems.get('weapon_x_01_22')?.name).toBe('Винтовка');
+    // Формат-v2 (247): картотека модов в снапшот не входит (моды — на
+    // предметах; старые записи переносятся на предметы при загрузке).
+    expect(snapshot.modifiedItems).toBeUndefined();
     // Каунтеры/сцены/журнал доз — на месте.
     expect(snapshot.currentHealth).toBe(12);
     expect(snapshot.radiation).toBe(4);
@@ -150,6 +154,11 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     const parsed = typeof rowData === 'string' ? JSON.parse(rowData) : rowData;
     expect(parsed.caps).toBe(77);
     expect(parsed.characterName).toBe('Минутмен');
+    // Формат-v2: картотека в запись не идёт.
+    expect(parsed.modifiedItems).toBeUndefined();
+    // Зато предмет-основа едет в комплекте (мосту есть с чем работать).
+    const savedItem = parsed.equipment?.items?.find((it) => it.id === 'weapon_x_01_22');
+    expect(savedItem?.name).toBe('Винтовка');
   });
 
   it('loadCharacter: восстанавливает стор из сейв-ключей (effects → traitEffects), глушит автосейв', async () => {
@@ -174,6 +183,45 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     expect(state().chemDosesLog[0].chemId).toBe('psycho');
     // Журнал выданных наград не потерялся (патч 244) — повторного вручения не будет.
     expect(state().rewardedSkills).toEqual(['small_guns', 'repair']);
+  });
+
+  it('формат-v2, мост: картотека старого сейва переносится на предметы при загрузке', async () => {
+    // Готовим «старый» сейв руками: худой предмет в комплекте + полная
+    // копия в картотеке (как до патча 237).
+    db.saveCharacter.mockClear();
+    await db.saveCharacter('char_old', 'Ветеран', 2, 'minuteman', {
+      schemaVersion: 27,
+      characterName: 'Ветеран',
+      level: 2,
+      origin: { id: 'minuteman' },
+      trait: null,
+      equipment: { id: 'kit_old', name: 'Старый комплект', items: [{ id: 'weapon_x_01_22', name: 'Винтовка' }] },
+      equippedWeapons: [{ id: 'weapon_x_01_22_dupe', name: 'Дублёр' }],
+      modifiedItems: [
+        ['weapon_x_01_22', { id: 'weapon_x_01_22', name: 'Винтовка мод.', damage: 9 }],
+        ['weapon_orphan', { id: 'weapon_orphan', name: 'Потеряшка' }],
+      ],
+      caps: 5,
+    });
+
+    const ok = await loadCharacter('char_old');
+    expect(ok).toBe(true);
+
+    // Мост: предмет в словаре стора обогащён картотекой (моды видны).
+    // damage нормализуется параметрами стора в форму { base, modifiers, total }.
+    expect(state().items.weapon_x_01_22?.name).toBe('Винтовка мод.');
+    expect(state().items.weapon_x_01_22?.damage?.base).toBe(9);
+    // Комплект тоже несёт обогащённую запись.
+    const kitItem = state().equipment?.items?.find((it) => it.id === 'weapon_x_01_22');
+    expect(kitItem?.name).toBe('Винтовка мод.');
+    // Запись без пары (предмет потерян) оседает в стор-альбоме — read-only.
+    expect(state().modifiedItems.weapon_orphan?.name).toBe('Потеряшка');
+
+    // Пересохранение: картотека в запись больше не попадает (v2), а
+    // обогащённый предмет — да; повторная загрузка ничего не теряет.
+    await saveCharacter('Ветеран');
+    const resent = db.saveCharacter.mock.calls.at(-1)[4];
+    expect(resent.modifiedItems).toBeUndefined();
   });
 
   it('список и удаление: прокидываются в db', async () => {
