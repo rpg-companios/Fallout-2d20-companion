@@ -1,0 +1,277 @@
+From 396594f254db7d4f17ea32922a4db2c2b25e6dad Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 06:08:45 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=9F=D0=B0=D1=82=D1=87=20238:=20commitAttribu?=
+ =?UTF-8?q?teChanges=20=E2=80=94=20=D1=81=D1=82=D0=BE=D1=80-=D1=8D=D0=BA?=
+ =?UTF-8?q?=D1=88=D0=B5=D0=BD=20(=D1=8D=D0=BA=D1=80=D0=B0=D0=BD=20=D1=81?=
+ =?UTF-8?q?=D0=BE=D0=B7=D0=B4=D0=B0=D0=BD=D0=B8=D1=8F=20=D0=B7=D0=BE=D0=B2?=
+ =?UTF-8?q?=D1=91=D1=82=20=D0=BD=D0=B0=D0=BF=D1=80=D1=8F=D0=BC=D1=83=D1=8E?=
+ =?UTF-8?q?)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- characterStore: +commitAttributeChanges(newAttributes, pointsSpent) —
+  1-в-1 из контекста: кламп к потолку трейта, дельты через updateAttribute
+  (производные там же), списание perk-очков, потолок удачи за УДАЧ+трейт
+  с подрезкой текущей, здоровье подрезается к новому потолку; локальное
+  зеркало-массив контекста не нужно — текущие значения из словаря стора
+- CharacterContext: функция и член фасада сняты
+- CharacterScreen: useCharacterStore((s) => s.commitAttributeChanges)
+- Тесты: character-store-commit-attributes (5: дельты/кламп/удача/здоровье);
+  step8a-3-facade: +commitAttributeChanges в REMOVED_MEMBERS и проверку экшена
+- vitest 701/701 (71 файл), tsc чист
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-step8a-3-facade.test.js |  3 +-
+ .../character-store-commit-attributes.test.js | 69 +++++++++++++++++++
+ components/CharacterContext.js                | 50 +-------------
+ .../CharacterScreen/CharacterScreen.js        |  3 +-
+ src/store/characterStore.js                   | 43 +++++++++++-
+ 5 files changed, 118 insertions(+), 50 deletions(-)
+ create mode 100644 __tests__/saves/character-store-commit-attributes.test.js
+
+diff --git a/__tests__/saves/character-context-step8a-3-facade.test.js b/__tests__/saves/character-context-step8a-3-facade.test.js
+index 44bfc06..1b2e01d 100644
+--- a/__tests__/saves/character-context-step8a-3-facade.test.js
++++ b/__tests__/saves/character-context-step8a-3-facade.test.js
+@@ -56,6 +56,7 @@ const REMOVED_MEMBERS = [
+   'effects', 'setEffects', 'sceneCounter',
+   'modifiedItems', 'setModifiedItems',
+   'getModifiedItem', 'saveModifiedItem', 'removeModifiedItem', 'getItemId',
++  'commitAttributeChanges', // патч 238
+ ];
+ 
+ describe('Шаг 8а (часть 3): фасад без комплекта/сцен/эффектов/модификаций', () => {
+@@ -139,7 +140,7 @@ describe('Шаг 8а (часть 3): экраны — напрямую на ст
+ 
+   it('store/itemIdentity: слайс сцены/эффекты/модификации, getItemId в домене', () => {
+     const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
+-    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:']) {
++    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'commitAttributeChanges:']) {
+       expect(store).toContain(action);
+     }
+     const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');
+diff --git a/__tests__/saves/character-store-commit-attributes.test.js b/__tests__/saves/character-store-commit-attributes.test.js
+new file mode 100644
+index 0000000..7c52033
+--- /dev/null
++++ b/__tests__/saves/character-store-commit-attributes.test.js
+@@ -0,0 +1,69 @@
++// Патч 238: commitAttributeChanges переехал из CharacterContext в стор.
++// Контракт (1-в-1 с прежней реализацией контекста):
++//   - значения клампятся к потолку трейта;
++//   - дельты пишутся через updateAttribute (производные пересчитываются там же);
++//   - очки perk-атрибутов списываются (без клампа — как было);
++//   - потолок удачи = УДАЧ + модификатор трейта; текущая удача подрезается сверху;
++//   - здоровье подрезается к новому потолку (потолок по «сырому» массиву — так было).
++
++import { afterEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import { selectCarryWeight } from '../../src/store/selectors';
++import { getAttributeLimits } from '../../domain/characterCreation';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('characterStore: commitAttributeChanges (патч 238)', () => {
++  it('пишет дельты в словарь и списывает perk-очки', () => {
++    const store = useCharacterStore.getState();
++    store.setAvailablePerkAttributePoints(3);
++    // Стартовая СИЛ 4 → подтверждаем 6.
++    store.commitAttributeChanges([{ name: 'STR', value: 6 }], 2);
++    const s = useCharacterStore.getState();
++    expect(selectCarryWeight(s)).toBe(150 + 10 * 6); // вес пересчитался от СИЛ 6
++    expect(s.availablePerkAttributePoints).toBe(1);
++  });
++
++  it('клампит значение к потолку трейта', () => {
++    const { max } = getAttributeLimits(null, 'STR');
++    useCharacterStore.getState().commitAttributeChanges([{ name: 'STR', value: 99 }], 0);
++    const state = useCharacterStore.getState();
++    expect(state.attributes.STR.base).toBe(max);
++  });
++
++  it('потолок удачи следует за УДАЧ, текущая подрезается сверху', () => {
++    const store = useCharacterStore.getState();
++    store.setLuckPoints(4);
++    store.setMaxLuckPoints(4);
++    store.commitAttributeChanges([{ name: 'LCK', value: 8 }], 0);
++    let s = useCharacterStore.getState();
++    expect(s.maxLuckPoints).toBe(8);
++    expect(s.luckPoints).toBe(4); // меньше потолка — не тронута
++    // Понижение УДАЧ: потолок падает, «лишние» очки отбираются.
++    store.setLuckPoints(8);
++    store.commitAttributeChanges([{ name: 'LCK', value: 3 }], 0);
++    s = useCharacterStore.getState();
++    expect(s.maxLuckPoints).toBe(3);
++    expect(s.luckPoints).toBe(3);
++  });
++
++  it('здоровье подрезается к новому потолку (УДАЧ/ВЫН/уровень вниз)', () => {
++    const store = useCharacterStore.getState();
++    store.setLevel(5);
++    store.setCurrentHealth(20);
++    // Экран передаёт ПОЛНЫЙ массив распределения. Потолок = END + LCK + (уровень−1);
++    // после сброса ВЫН в 0: 0 + 4 + 4 = 8.
++    store.commitAttributeChanges([
++      { name: 'END', value: 0 },
++      { name: 'LCK', value: 4 },
++    ], 0);
++    expect(useCharacterStore.getState().currentHealth).toBe(8);
++  });
++
++  it('commitAttributeChanges отсутствует в фасаде (AST-контракт — step8a-3-facade)', () => {
++    expect(useCharacterStore.getState().commitAttributeChanges).toBeTypeOf('function');
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 6884c34..e42e042 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -1290,52 +1290,8 @@ export const CharacterProvider = ({ children }) => {
+     return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+   };
+ 
+-  const commitAttributeChanges = (newAttributes, pointsSpent) => {
+-    debugLog('ctx.deprecatedCommitAttributeChanges');
+-
+-    // Calculate deltas from the canonical store, not from the legacy Context
+-    // mirror. The mirror can lag by one render and otherwise makes a second
+-    // +1 allocation become +2 in the store.
+-    const currentAttributesArray = attributes;
+-    const currentAttributesMap = {};
+-    currentAttributesArray.forEach(attr => {
+-      currentAttributesMap[attr.name] = attr.value;
+-    });
+-
+-    const store = useCharacterStore.getState();
+-    const committedAttributes = (newAttributes || []).map((newAttr) => {
+-      if (!newAttr?.name) return newAttr;
+-      const { max } = getAttributeLimits(trait, newAttr.name);
+-      const value = Math.min(Number(newAttr.value) || 0, max);
+-      return value === newAttr.value ? newAttr : { ...newAttr, value };
+-    });
+-
+-    committedAttributes.forEach(newAttr => {
+-      if (!newAttr?.name) return;
+-      const currentAttr = store.attributes?.[newAttr.name]?.base
+-        ?? currentAttributesMap[newAttr.name]
+-        ?? 0;
+-      const delta = newAttr.value - currentAttr;
+-
+-      if (delta !== 0) {
+-        // Use Zustand Store action
+-        store.updateAttribute(newAttr.name, delta);
+-      }
+-    });
+-
+-    // (Шаг 5) Зеркало setAttributes убрано: стор — единственный источник,
+-    // производный массив контекста пересчитывается из словаря автоматически.
+-    // Perk-экран оценивает требования через тот же производный массив.
+-    // Update other state fields
+-    setAvailablePerkAttributePoints(prev => prev - pointsSpent);
+-    const newLuck = getLuckPoints(committedAttributes, trait);
+-    setMaxLuckPoints(newLuck);
+-    setLuckPoints(prevLuck => Math.min(prevLuck, newLuck));
+-    // Производные (вес/ближний бой/инициатива/защита) пересчитывает
+-    // recalculateDerivedStats внутри store.updateAttribute (Шаг 8а).
+-    const newMaxHealth = calculateMaxHealth(newAttributes, level);
+-    setCurrentHealth(prevHealth => Math.min(prevHealth, newMaxHealth));
+-  };
++  // commitAttributeChanges — Шаг 8а (патч 238): стор-экшен, экран создания
++  // персонажа зовёт напрямую.
+ 
+   const resetCharacter = (preserveOrigin = false) => {
+     const initialAttributes = createInitialAttributes();
+@@ -1479,7 +1435,7 @@ export const CharacterProvider = ({ children }) => {
+     resetKitAndRewards,
+     resetKitOnly,
+     // availablePerkAttributePoints/addPerkAttributePoints — Шаг 7: только в сторе.
+-    commitAttributeChanges,
++    // commitAttributeChanges — Шаг 8а (патч 238): только в сторе.
+     // meetsPerkRequirements/getPerkUnmetReasons/annotatePerks — Шаг 8а:
+     // доменные функции domain/perks.js, экран зовёт напрямую со стор-данными.
+   };
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 77e9905..0165d77 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -269,8 +269,9 @@ export default function CharacterScreen() {
+     spendCurrency,
+     resetCharacter,
+     resetKitAndRewards,
+-    commitAttributeChanges,
+   } = useCharacter();
++  // Шаг 8а (патч 238): подтверждение атрибутов — стор-экшен напрямую.
++  const commitAttributeChanges = useCharacterStore((s) => s.commitAttributeChanges);
+   // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.
+   const equipment = useCharacterStore((s) => s.equipment);
+   const setEquipment = useCharacterStore((s) => s.setEquipment);
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index c3d6424..c9c3e77 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -64,7 +64,7 @@ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+ // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+ // стор-словари единственный источник, производный legacy-массив обязан быть
+ // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+-import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth } from '../../domain/characterCreation';
++import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
+ import { isRobotCharacter } from '../../domain/origins';
+ // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
+ // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
+@@ -1379,6 +1379,47 @@ const useCharacterStore = create(devtools(
+           : (valueOrUpdater || {}),
+       })),
+ 
++      /**
++       * Подтвердить распределение атрибутов (экран создания персонажа).
++       * Принимает legacy-массив нового распределения и потраченные perk-очки:
++       *   - значения клампятся к потолку трейта (getAttributeLimits);
++       *   - дельты пишутся в стор через updateAttribute (тот сам пересчитывает
++       *     производные — perkBonuses, вес, инициативу и т.д.);
++       *   - списываются очки perk-атрибутов;
++       *   - потолок удачи следует за УДАЧ+модификатором трейта, текущая
++       *     удача подрезается сверху (понижение УДАЧ не возвращает очки);
++       *   - здоровье подрезается к новому потолку (уровень мог упасть).
++       * Шаг 8а (патч 238): переехал из CharacterContext 1-в-1; в контексте
++       * при этом ушла работа с локальным зеркалом-массивом — теперь и «текущие
++       * значения» берутся из словаря стора напрямую.
++       */
++      commitAttributeChanges: (newAttributes, pointsSpent) => {
++        const state = get();
++        const { trait } = state;
++        const committedAttributes = (newAttributes || []).map((newAttr) => {
++          if (!newAttr?.name) return newAttr;
++          const { max } = getAttributeLimits(trait, newAttr.name);
++          const value = Math.min(Number(newAttr.value) || 0, max);
++          return value === newAttr.value ? newAttr : { ...newAttr, value };
++        });
++
++        committedAttributes.forEach((newAttr) => {
++          if (!newAttr?.name) return;
++          const currentAttr = state.attributes?.[newAttr.name]?.base ?? 0;
++          const delta = newAttr.value - currentAttr;
++          if (delta !== 0) get().updateAttribute(newAttr.name, delta);
++        });
++
++        set((s) => ({ availablePerkAttributePoints: s.availablePerkAttributePoints - pointsSpent }));
++        const newLuck = getLuckPoints(committedAttributes, trait);
++        set((s) => ({
++          maxLuckPoints: newLuck,
++          luckPoints: Math.min(s.luckPoints, newLuck),
++        }));
++        const newMaxHealth = calculateMaxHealth(newAttributes, get().level);
++        set((s) => ({ currentHealth: Math.min(s.currentHealth, newMaxHealth) }));
++      },
++
+       resetCharacterStore: (legacyDefaults = {}) => {
+         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+         // Вызывающий не передал дефолты → сеем стартовые значения создания.
+-- 
+2.39.5
+
