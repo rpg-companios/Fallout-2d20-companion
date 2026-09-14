@@ -269,8 +269,9 @@ export default function CharacterScreen() {
     spendCurrency,
     resetCharacter,
     resetKitAndRewards,
-    commitAttributeChanges,
   } = useCharacter();
+  // Шаг 8а (патч 238): подтверждение атрибутов — стор-экшен напрямую.
+  const commitAttributeChanges = useCharacterStore((s) => s.commitAttributeChanges);
   // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.
   const equipment = useCharacterStore((s) => s.equipment);
   const setEquipment = useCharacterStore((s) => s.setEquipment);

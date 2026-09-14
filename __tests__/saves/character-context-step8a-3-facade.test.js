@@ -56,6 +56,7 @@ const REMOVED_MEMBERS = [
   'effects', 'setEffects', 'sceneCounter',
   'modifiedItems', 'setModifiedItems',
   'getModifiedItem', 'saveModifiedItem', 'removeModifiedItem', 'getItemId',
+  'commitAttributeChanges', // патч 238
 ];
 
 describe('Шаг 8а (часть 3): фасад без комплекта/сцен/эффектов/модификаций', () => {
@@ -139,7 +140,7 @@ describe('Шаг 8а (часть 3): экраны — напрямую на ст
 
   it('store/itemIdentity: слайс сцены/эффекты/модификации, getItemId в домене', () => {
     const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
-    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:']) {
+    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'commitAttributeChanges:']) {
       expect(store).toContain(action);
     }
     const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');

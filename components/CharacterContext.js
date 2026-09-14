@@ -1290,52 +1290,8 @@ export const CharacterProvider = ({ children }) => {
     return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
   };
 
-  const commitAttributeChanges = (newAttributes, pointsSpent) => {
-    debugLog('ctx.deprecatedCommitAttributeChanges');
-
-    // Calculate deltas from the canonical store, not from the legacy Context
-    // mirror. The mirror can lag by one render and otherwise makes a second
-    // +1 allocation become +2 in the store.
-    const currentAttributesArray = attributes;
-    const currentAttributesMap = {};
-    currentAttributesArray.forEach(attr => {
-      currentAttributesMap[attr.name] = attr.value;
-    });
-
-    const store = useCharacterStore.getState();
-    const committedAttributes = (newAttributes || []).map((newAttr) => {
-      if (!newAttr?.name) return newAttr;
-      const { max } = getAttributeLimits(trait, newAttr.name);
-      const value = Math.min(Number(newAttr.value) || 0, max);
-      return value === newAttr.value ? newAttr : { ...newAttr, value };
-    });
-
-    committedAttributes.forEach(newAttr => {
-      if (!newAttr?.name) return;
-      const currentAttr = store.attributes?.[newAttr.name]?.base
-        ?? currentAttributesMap[newAttr.name]
-        ?? 0;
-      const delta = newAttr.value - currentAttr;
-
-      if (delta !== 0) {
-        // Use Zustand Store action
-        store.updateAttribute(newAttr.name, delta);
-      }
-    });
-
-    // (Шаг 5) Зеркало setAttributes убрано: стор — единственный источник,
-    // производный массив контекста пересчитывается из словаря автоматически.
-    // Perk-экран оценивает требования через тот же производный массив.
-    // Update other state fields
-    setAvailablePerkAttributePoints(prev => prev - pointsSpent);
-    const newLuck = getLuckPoints(committedAttributes, trait);
-    setMaxLuckPoints(newLuck);
-    setLuckPoints(prevLuck => Math.min(prevLuck, newLuck));
-    // Производные (вес/ближний бой/инициатива/защита) пересчитывает
-    // recalculateDerivedStats внутри store.updateAttribute (Шаг 8а).
-    const newMaxHealth = calculateMaxHealth(newAttributes, level);
-    setCurrentHealth(prevHealth => Math.min(prevHealth, newMaxHealth));
-  };
+  // commitAttributeChanges — Шаг 8а (патч 238): стор-экшен, экран создания
+  // персонажа зовёт напрямую.
 
   const resetCharacter = (preserveOrigin = false) => {
     const initialAttributes = createInitialAttributes();
@@ -1479,7 +1435,7 @@ export const CharacterProvider = ({ children }) => {
     resetKitAndRewards,
     resetKitOnly,
     // availablePerkAttributePoints/addPerkAttributePoints — Шаг 7: только в сторе.
-    commitAttributeChanges,
+    // commitAttributeChanges — Шаг 8а (патч 238): только в сторе.
     // meetsPerkRequirements/getPerkUnmetReasons/annotatePerks — Шаг 8а:
     // доменные функции domain/perks.js, экран зовёт напрямую со стор-данными.
   };

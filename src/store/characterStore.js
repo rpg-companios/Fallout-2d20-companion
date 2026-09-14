@@ -64,7 +64,7 @@ import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
-import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth } from '../../domain/characterCreation';
+import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
 import { isRobotCharacter } from '../../domain/origins';
 // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
@@ -1378,6 +1378,47 @@ const useCharacterStore = create(devtools(
           ? (valueOrUpdater(state.modifiedItems) || {})
           : (valueOrUpdater || {}),
       })),
+
+      /**
+       * Подтвердить распределение атрибутов (экран создания персонажа).
+       * Принимает legacy-массив нового распределения и потраченные perk-очки:
+       *   - значения клампятся к потолку трейта (getAttributeLimits);
+       *   - дельты пишутся в стор через updateAttribute (тот сам пересчитывает
+       *     производные — perkBonuses, вес, инициативу и т.д.);
+       *   - списываются очки perk-атрибутов;
+       *   - потолок удачи следует за УДАЧ+модификатором трейта, текущая
+       *     удача подрезается сверху (понижение УДАЧ не возвращает очки);
+       *   - здоровье подрезается к новому потолку (уровень мог упасть).
+       * Шаг 8а (патч 238): переехал из CharacterContext 1-в-1; в контексте
+       * при этом ушла работа с локальным зеркалом-массивом — теперь и «текущие
+       * значения» берутся из словаря стора напрямую.
+       */
+      commitAttributeChanges: (newAttributes, pointsSpent) => {
+        const state = get();
+        const { trait } = state;
+        const committedAttributes = (newAttributes || []).map((newAttr) => {
+          if (!newAttr?.name) return newAttr;
+          const { max } = getAttributeLimits(trait, newAttr.name);
+          const value = Math.min(Number(newAttr.value) || 0, max);
+          return value === newAttr.value ? newAttr : { ...newAttr, value };
+        });
+
+        committedAttributes.forEach((newAttr) => {
+          if (!newAttr?.name) return;
+          const currentAttr = state.attributes?.[newAttr.name]?.base ?? 0;
+          const delta = newAttr.value - currentAttr;
+          if (delta !== 0) get().updateAttribute(newAttr.name, delta);
+        });
+
+        set((s) => ({ availablePerkAttributePoints: s.availablePerkAttributePoints - pointsSpent }));
+        const newLuck = getLuckPoints(committedAttributes, trait);
+        set((s) => ({
+          maxLuckPoints: newLuck,
+          luckPoints: Math.min(s.luckPoints, newLuck),
+        }));
+        const newMaxHealth = calculateMaxHealth(newAttributes, get().level);
+        set((s) => ({ currentHealth: Math.min(s.currentHealth, newMaxHealth) }));
+      },
 
       resetCharacterStore: (legacyDefaults = {}) => {
         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
