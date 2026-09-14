@@ -20,7 +20,9 @@
   },
   "include": [
     "modules/fallout/survival",
-    "modules/fallout/screens/WeaponsAndArmorScreen/modals"
+    "modules/fallout/screens/WeaponsAndArmorScreen/modals",
+    "src/store/characterState.ts",
+    "src/saves/saveSnapshot.ts"
   ],
   "extends": "expo/tsconfig.base"
 }

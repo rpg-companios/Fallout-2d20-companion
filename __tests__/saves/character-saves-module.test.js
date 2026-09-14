@@ -87,6 +87,8 @@ const seedStore = () => {
     lastDiseaseResistAt: 999,
     conditions: { disease1: { id: 'disease1', ranks: 1 } },
     selectedPerks: [],
+    // Журнал «награды за tagged-навыки выданы» (патч 244: восстанавливается).
+    rewardedSkills: ['small_guns', 'repair'],
     // Расширение сеттинга (survival) — слайс stateExtensions стора.
     stateExtensions: { survival: { day: 2 } },
   });
@@ -170,6 +172,8 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     // Журнал доз/условия вернулись.
     expect(state().chemDosesLog).toHaveLength(1);
     expect(state().chemDosesLog[0].chemId).toBe('psycho');
+    // Журнал выданных наград не потерялся (патч 244) — повторного вручения не будет.
+    expect(state().rewardedSkills).toEqual(['small_guns', 'repair']);
   });
 
   it('список и удаление: прокидываются в db', async () => {

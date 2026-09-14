@@ -398,6 +398,12 @@ export const loadCharacter = async (id) => {
       skillsSaved: data.skillsSaved ?? false,
       conditions: data.conditions || [],
       chemDosesLog: (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS),
+      // Журнал «одноразовые награды за tagged-навыки выданы» (патч 244:
+      // паспорт сейва вскрыл рассинхрон — ключ писался мерджем со стором,
+      // но загрузкой не читался; после сейв→загрузка игра забывала о
+      // выданных наградах и могла вручить их заново). Старые сейвы без
+      // ключа дают [] — поведение прежнее.
+      rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
     });
     st.setSelectedPerks(data.selectedPerks || []);
     if (data.pendingPerkDuplicateNotice) {
