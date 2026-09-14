@@ -634,8 +634,9 @@ const resolveStoreItemId = (weapon) => {
 const WeaponsAndArmorScreen = () => {
   const {
     attributes,
-    saveModifiedItem,
   } = useCharacter();
+  // Шаг 8а (часть 3): модификации предметов — стор-экшен.
+  const saveModifiedItem = useCharacterStore((s) => s.saveModifiedItem);
   // Шаг 8а: слоты робота — слайс robot стора напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);

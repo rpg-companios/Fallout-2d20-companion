@@ -60,7 +60,7 @@ import { selectPerkBonuses } from '../../domain/perks.js';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
-import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+import { generateItemId, generateStackKey, getItemId } from '../../domain/itemIdentity';
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
@@ -226,6 +226,16 @@ const useCharacterStore = create(devtools(
       // бонус отдыха повышает) — экшены это учитывают.
       currentHealth: 0,
       radiation: 0,
+      // ═══ Шаг 8а (часть 3): счётчик сцен, эффекты трейтов, изменённые предметы. ═══
+      // sceneCounter — сколько сцен сменилось с начала персонажа (данные).
+      // traitEffects — «эффекты трейтов» (в сейве ключ effects; смена трейта
+      // вычитает старые и дописывает новые — пишутся только из trait-логики).
+      // modifiedItems — модифицированные предметы: словарь { [itemId]: item };
+      // в снапшот сейва идёт как Map→массив пар (формат не менялся), поэтому
+      // в сторе держим JSON-дружелюбный объект, а не Map.
+      sceneCounter: 0,
+      traitEffects: [],
+      modifiedItems: {},
       // Заболевания/состояния — Шаг 6 миграции (источник — стор).
       conditions: [],
       chemDosesLog: [],
@@ -1338,6 +1348,42 @@ const useCharacterStore = create(devtools(
         set((state) => ({ currentHealth: Math.max(0, state.currentHealth - loss) }));
       },
 
+      /** Счётчик сменённых сцен: значением или функцией от предыдущего. */
+      setSceneCounter: (valueOrUpdater) => set((state) => ({
+        sceneCounter: typeof valueOrUpdater === 'function'
+          ? valueOrUpdater(state.sceneCounter)
+          : valueOrUpdater,
+      })),
+      /**
+       * «Эффекты трейтов» (в сейве — ключ effects; поле traitEffects): значением
+       * или функцией. Пишутся только из логики смены трейта (CharacterScreen).
+       */
+      setTraitEffects: (valueOrUpdater) => set((state) => ({
+        traitEffects: typeof valueOrUpdater === 'function'
+          ? (valueOrUpdater(state.traitEffects) || [])
+          : (valueOrUpdater || []),
+      })),
+      /**
+       * Модифицированные предметы: словарь { [itemId]: item } (значение или
+       * функция). В снапшот сейва провайдер кладёт Map→массив пар — формат
+       * сейва не менялся.
+       */
+      setModifiedItems: (valueOrUpdater) => set((state) => ({
+        modifiedItems: typeof valueOrUpdater === 'function'
+          ? (valueOrUpdater(state.modifiedItems) || {})
+          : (valueOrUpdater || {}),
+      })),
+      /** Сохранить модификацию предмета по каноническому id оригинала. */
+      saveModifiedItem: (originalItem, modifiedItem) => set((state) => ({
+        modifiedItems: { ...state.modifiedItems, [getItemId(originalItem)]: modifiedItem },
+      })),
+      /** Удалить модификацию предмета. */
+      removeModifiedItem: (item) => set((state) => {
+        const next = { ...state.modifiedItems };
+        delete next[getItemId(item)];
+        return { modifiedItems: next };
+      }),
+
       resetCharacterStore: (legacyDefaults = {}) => {
         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
         // Вызывающий не передал дефолты → сеем стартовые значения создания.
@@ -1375,6 +1421,10 @@ const useCharacterStore = create(devtools(
           // остаточное состояние; теперь чистится консистентно.
           currentHealth: 0,
           radiation: 0,
+          // Шаг 8а (часть 3).
+          sceneCounter: 0,
+          traitEffects: [],
+          modifiedItems: {},
           selectedPerks: legacyDefaults?.selectedPerks || [],
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
@@ -1459,6 +1509,10 @@ const useCharacterStore = create(devtools(
         // Счётчики — Шаг 8а (текущее значение — данные, не производная).
         currentHealth: state.currentHealth,
         radiation: state.radiation,
+        // Шаг 8а (часть 3): сцены/эффекты трейтов/модификации предметов.
+        sceneCounter: state.sceneCounter,
+        traitEffects: state.traitEffects,
+        modifiedItems: state.modifiedItems,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated

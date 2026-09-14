@@ -264,10 +264,6 @@ export default function CharacterScreen() {
   const {
     isSaved,
     saveCharacter,
-    equipment,
-    setEquipment,
-    effects,
-    setEffects,
     currency,
     earnCurrency,
     spendCurrency,
@@ -275,6 +271,10 @@ export default function CharacterScreen() {
     resetKitAndRewards,
     commitAttributeChanges,
   } = useCharacter();
+  // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.
+  const equipment = useCharacterStore((s) => s.equipment);
+  const setEquipment = useCharacterStore((s) => s.setEquipment);
+  const setTraitEffects = useCharacterStore((s) => s.setTraitEffects);
   // Шаг 8а: слоты/модули робота — слайс robot стора напрямую.
   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
   const setEquippedRobotModules = useCharacterStore((s) => s.setEquippedRobotModules);
@@ -917,7 +917,8 @@ export default function CharacterScreen() {
     setBaseSkills(nextTraitSkills);
 
     // Обновляем эффекты
-    setEffects((currentEffects) => {
+    // Шаг 8а (часть 3): «эффекты трейтов» — стор (в сейве ключ effects).
+    setTraitEffects((currentEffects) => {
       const oldEffects = oldTrait?.modifiers?.effects || [];
       const newEffects = newTrait?.modifiers?.effects || [];
       const withoutOld = currentEffects.filter((e) => !oldEffects.includes(e));

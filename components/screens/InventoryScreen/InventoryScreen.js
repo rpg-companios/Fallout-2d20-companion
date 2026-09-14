@@ -31,7 +31,7 @@ import { getPerkDisplay } from '../../../modules/fallout/screens/PerksAndTraitsS
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { generateStackKey } from '../../../domain/itemIdentity';
+import { generateStackKey, getItemId } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
@@ -78,11 +78,14 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 const InventoryScreen = () => {
   const {
     currency, earnCurrency, spendCurrency,
-    equipment,
     applyConsumableFull,
     previewConsumableRadiation,
-    getModifiedItem,
   } = useCharacter();
+  // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
+  const equipment = useCharacterStore((s) => s.equipment);
+  const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
+  // Read-хелпер модификаций: стор-словарь { [itemId]: item } (Шаг 8а, часть 3).
+  const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
   // Шаг 7: origin/trait — стор напрямую.
   // Шаг 8а: слоты робота и производный вес — стор напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
