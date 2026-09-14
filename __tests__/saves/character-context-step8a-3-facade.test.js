@@ -137,12 +137,24 @@ describe('Шаг 8а (часть 3): экраны — напрямую на ст
     expect(source).toContain("storeModifiedItems[getItemId(item)] || item");
   });
 
-  it('store/itemIdentity: экшены modifiedItems и канонический getItemId в домене', () => {
+  it('store/itemIdentity: слайс сцены/эффекты/модификации, getItemId в домене', () => {
     const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
-    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'saveModifiedItem:', 'removeModifiedItem:']) {
+    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:']) {
       expect(store).toContain(action);
     }
     const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');
     expect(identity).toContain('export const getItemId');
+  });
+
+  it('патч 237: экраны не пишут альбом модификаций (схема id+моды)', () => {
+    const wa = fs.readFileSync(SCREENS.WeaponsAndArmorScreen, 'utf8');
+    expect(wa).not.toContain('saveModifiedItem');
+    // Предмет несёт id модов на себе (appliedArmorModId/…) — сборщик домена
+    // (applyArmorMods/resolveEffectiveItem) пересобирает статы при загрузке.
+    const modal = fs.readFileSync(
+      path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js'),
+      'utf8',
+    );
+    expect(modal).toContain('[stdKey]: selectedStd || null');
   });
 });

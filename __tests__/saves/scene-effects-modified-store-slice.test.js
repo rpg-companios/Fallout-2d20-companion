@@ -3,8 +3,11 @@
 // - sceneCounter: данные (сколько сцен сменилось), персистится;
 // - traitEffects: в сейве ключ effects (формат не менялся); пишутся только
 //   из логики смены трейта (вычесть старые, дописать новые);
-// - modifiedItems: в сторе JSON-дружелюбный словарь { [itemId]: item };
-//   провайдер кладёт в снапшот Map → массив пар (прежний формат сейва).
+// - modifiedItems: JSON-дружелюбный словарь { [itemId]: item }. Патч 237:
+//   альбом ТОЛЬКО ЧИТАЕТСЯ (старые сейвы); моды пишутся прямо на предмет по
+//   схеме id+моды (appliedMods/appliedArmorModId/…), сборка — домен
+//   (applyModModifiers/applyArmorMods/resolveEffectiveItem). Провайдер кладёт
+//   в снапшот Map → массив пар (прежний формат сейва).
 //
 // Стор-поле effects занято словарём timed-эффектов (Шаг 6) — поэтому
 // «эффекты трейтов» названы traitEffects; фасадные имена effects/setEffects
@@ -47,23 +50,13 @@ describe('characterStore: сцены/эффекты трейтов/модифи�
     expect(useCharacterStore.getState().traitEffects).toEqual(['iron_gut', 'gifted']);
   });
 
-  it('modifiedItems: save/remove по каноническому id оригинала', () => {
+  it('патч 237: альбом read-only — saveModifiedItem/removeModifiedItem удалены', () => {
     const store = useCharacterStore.getState();
-    store.saveModifiedItem({ weaponId: 'weapon_switchblade' }, { weaponId: 'weapon_switchblade', name: 'Клинок+' });
-    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade).toEqual({
-      weaponId: 'weapon_switchblade',
-      name: 'Клинок+',
-    });
-    // Повторное сохранение того же предмета перезаписывает (Map-семантика).
-    store.saveModifiedItem({ weaponId: 'weapon_switchblade' }, { weaponId: 'weapon_switchblade', name: 'Клинок++' });
-    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade.name).toBe('Клинок++');
-    store.saveModifiedItem({ id: 'armor_leather' }, { id: 'armor_leather', name: 'Кожанка+' });
-    expect(Object.keys(useCharacterStore.getState().modifiedItems)).toEqual([
-      'weapon_switchblade',
-      'armor_leather',
-    ]);
-    store.removeModifiedItem({ weaponId: 'weapon_switchblade' });
-    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade).toBeUndefined();
+    expect(store.saveModifiedItem).toBeUndefined();
+    expect(store.removeModifiedItem).toBeUndefined();
+    // Чтение старых сейвов работает: записи альбома видны через словарь.
+    store.setModifiedItems({ weapon_switchblade: { weaponId: 'weapon_switchblade', name: 'Клинок+' } });
+    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade.name).toBe('Клинок+');
   });
 
   it('modifiedItems: setModifiedItems объектом/апдейтером (путь загрузки сейва)', () => {
@@ -80,7 +73,7 @@ describe('characterStore: сцены/эффекты трейтов/модифи�
     const store = useCharacterStore.getState();
     store.setSceneCounter(9);
     store.setTraitEffects(['x']);
-    store.saveModifiedItem({ id: 'w1' }, { id: 'w1' });
+    store.setModifiedItems({ w1: { id: 'w1' } });
     store.resetCharacterStore();
     const s = useCharacterStore.getState();
     expect(s.sceneCounter).toBe(0);
@@ -92,7 +85,7 @@ describe('characterStore: сцены/эффекты трейтов/модифи�
     const store = useCharacterStore.getState();
     store.setSceneCounter(3);
     store.setTraitEffects(['gifted']);
-    store.saveModifiedItem({ id: 'w1' }, { id: 'w1', name: 'Мод' });
+    store.setModifiedItems({ w1: { id: 'w1', name: 'Мод' } });
     const raw = JSON.parse(await AsyncStorage.getItem('character-store'));
     expect(raw.state.sceneCounter).toBe(3);
     expect(raw.state.traitEffects).toEqual(['gifted']);

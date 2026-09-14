@@ -84,7 +84,8 @@ const InventoryScreen = () => {
   // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
   const equipment = useCharacterStore((s) => s.equipment);
   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
-  // Read-хелпер модификаций: стор-словарь { [itemId]: item } (Шаг 8а, часть 3).
+  // Read-хелпер альбома модификаций: с патча 237 альбом только читается
+  // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
   const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
   // Шаг 7: origin/trait — стор напрямую.
   // Шаг 8а: слоты робота и производный вес — стор напрямую.

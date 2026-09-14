@@ -635,8 +635,6 @@ const WeaponsAndArmorScreen = () => {
   const {
     attributes,
   } = useCharacter();
-  // Шаг 8а (часть 3): модификации предметов — стор-экшен.
-  const saveModifiedItem = useCharacterStore((s) => s.saveModifiedItem);
   // Шаг 8а: слоты робота — слайс robot стора напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
@@ -882,13 +880,14 @@ const WeaponsAndArmorScreen = () => {
       return;
     }
 
-    saveModifiedItem(selectedWeaponForModification, modifiedWeapon);
+    // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
+    // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
     setEquippedWeapons((prev) => prev.map((w) => (
       w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId
         ? modifiedWeapon
         : w
     )));
-  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, saveModifiedItem, setEquippedWeapons]);
+  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
 
   const handleUnequipWeapon = useCallback((weapon) => {
     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
@@ -910,9 +909,8 @@ const WeaponsAndArmorScreen = () => {
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;
     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
-    const original = equippedArmor?.[selectedArmorSlot]?.[field];
-    if (original) saveModifiedItem(original, modifiedItem);
-
+    // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
+    // appliedUniqueArmorModId (схема id+моды); сборщик пересоберёт при загрузке.
     setEquippedArmor((prev) => ({
       ...prev,
       [selectedArmorSlot]: {

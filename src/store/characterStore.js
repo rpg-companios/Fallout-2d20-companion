@@ -60,7 +60,7 @@ import { selectPerkBonuses } from '../../domain/perks.js';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
-import { generateItemId, generateStackKey, getItemId } from '../../domain/itemIdentity';
+import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
@@ -1365,24 +1365,19 @@ const useCharacterStore = create(devtools(
       })),
       /**
        * Модифицированные предметы: словарь { [itemId]: item } (значение или
-       * функция). В снапшот сейва провайдер кладёт Map→массив пар — формат
-       * сейва не менялся.
+       * функция). Патч 237: альбом ПЕРЕСТАЛ ПИСАТЬСЯ — моды кладутся прямо на
+       * предмет (схема id+моды: appliedMods/appliedArmorModId/…), собирает их
+       * доменный конвейер (applyModModifiers/applyArmorMods/resolveEffectiveItem).
+       * Осталась роль: ЧТЕНИЕ старых сейвов (записи альбома продолжают
+       * работать через getModifiedItem инвентаря) + загрузка сейва
+       * (setModifiedItems). В снапшот сейва провайдер кладёт Map→массив пар —
+       * формат сейва не менялся.
        */
       setModifiedItems: (valueOrUpdater) => set((state) => ({
         modifiedItems: typeof valueOrUpdater === 'function'
           ? (valueOrUpdater(state.modifiedItems) || {})
           : (valueOrUpdater || {}),
       })),
-      /** Сохранить модификацию предмета по каноническому id оригинала. */
-      saveModifiedItem: (originalItem, modifiedItem) => set((state) => ({
-        modifiedItems: { ...state.modifiedItems, [getItemId(originalItem)]: modifiedItem },
-      })),
-      /** Удалить модификацию предмета. */
-      removeModifiedItem: (item) => set((state) => {
-        const next = { ...state.modifiedItems };
-        delete next[getItemId(item)];
-        return { modifiedItems: next };
-      }),
 
       resetCharacterStore: (legacyDefaults = {}) => {
         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
