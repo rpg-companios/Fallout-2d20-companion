@@ -1,11 +1,11 @@
-// Паспорт операций стора (серия «Стор на TypeScript», патч 245).
+// Паспорт операций стора (серия «Стор на TypeScript», патчи 245–246).
 //
 // Проверяет паспорт src/store/characterActions.ts против живого стора:
 //
-//   1) ПОЛНОЕ покрытие: паспорт (сеттеры-апдейтеры + запись с семантикой +
-//      именованные операции) ∪ исключения = ВСЕ действия стора, в обе
-//      стороны. Новое действие без паспорта/исключения падает тестом —
-//      «тихо проскочить мимо типизации» не выйдет;
+//   1) ПОЛНОЕ покрытие (с части 3 — без исключений): сеттеры-апдейтеры +
+//      запись с семантикой + именованные операции + CRUD/робот/СБ =
+//      ВСЕ действия стора, в обе стороны. Новое действие без паспорта
+//      падает тестом — «тихо проскочить мимо типизации» не выйдет;
 //   2) семья апдейтеров: каждый сеттер из SETTER_UPDATER_KEYS принимает
 //     функциональный апдейтер — вызов с identity (prev => prev) не падает
 //     и не меняет состояние (обязательное требование владельца,
@@ -22,7 +22,7 @@ import {
   SETTER_UPDATER_KEYS,
   SETTER_VALUE_KEYS,
   NAMED_OP_KEYS,
-  EXEMPT_ACTION_KEYS,
+  CRUD_OP_KEYS,
 } from '../../src/store/characterActions';
 
 const state = () => useCharacterStore.getState();
@@ -40,23 +40,20 @@ afterEach(async () => {
 });
 
 describe('патч 245: паспорт операций против живого стора', () => {
-  it('паспорт ∪ исключения покрывают ВСЕ действия стора (обе стороны)', () => {
-    const passported = new Set([
+  it('паспорт (все четыре семьи) покрывает ВСЕ действия стора (обе стороны)', () => {
+    const families = new Set([
       ...SETTER_UPDATER_KEYS,
       ...SETTER_VALUE_KEYS,
       ...NAMED_OP_KEYS,
+      ...CRUD_OP_KEYS,
     ]);
-    const exempt = new Set(EXEMPT_ACTION_KEYS);
     const store = actionKeys();
 
-    const notInStore = [...passported, ...exempt].filter((key) => !store.has(key));
+    const notInStore = [...families].filter((key) => !store.has(key));
     expect(notInStore).toEqual([]); // паспорт не оторвался от стора
 
-    const notCovered = [...store].filter((key) => !passported.has(key) && !exempt.has(key));
+    const notCovered = [...store].filter((key) => !families.has(key));
     expect(notCovered).toEqual([]); // в сторе нет действий мимо паспорта
-
-    const doubles = [...passported].filter((key) => exempt.has(key));
-    expect(doubles).toEqual([]); // действие не может быть и в паспорте, и в исключениях
   });
 
   it.each([...SETTER_UPDATER_KEYS])('%s принимает функциональный апдейтер (identity)', (key) => {
@@ -103,8 +100,55 @@ describe('патч 245: паспорт операций против живог�
 
   it('именованные операции существуют и являются функциями', () => {
     const store = actionKeys();
-    for (const key of [...NAMED_OP_KEYS, ...SETTER_VALUE_KEYS]) {
+    for (const key of [...NAMED_OP_KEYS, ...SETTER_VALUE_KEYS, ...CRUD_OP_KEYS]) {
       expect(store.has(key)).toBe(true);
     }
+  });
+
+  it('часть 3, смоук: предмет/эффект/модификатор/робот/отказы с reason', () => {
+    // addNewItem возвращает id, предмет появляется в словаре.
+    const id = state().addNewItem({ id: 'probe_item', name: 'Пробный предмет' });
+    expect(id).toBe('probe_item');
+    expect(state().items.probe_item?.name).toBe('Пробный предмет');
+    state().updateItem('probe_item', { quantity: 3 });
+    expect(state().items.probe_item.quantity).toBe(3);
+
+    // Эффект: добавить → погасить → словарь пуст.
+    state().addEffect({ id: 'eff_probe', active: true, name: 'Проба' });
+    expect(state().effects.eff_probe).toBeTruthy();
+    state().expireEffect('eff_probe');
+
+    // Модификатор параметра: добавить и снять.
+    state().addAttributeModifier('STR', 'probe_source', 1, '+');
+    state().removeAttributeModifier('STR', 'probe_source');
+
+    // Дельта параметра с клампом: STR 4 → 5.
+    state().updateAttribute('STR', 1);
+    expect(state().attributes.STR.base).toBe(5);
+
+    // Робот: инициализация плана и сброс.
+    state().initRobot('protectron');
+    expect(state().robot.bodyPlan).toBe('protectron');
+    state().resetRobot();
+    expect(state().robot.bodyPlan).toBeNull();
+
+    // Отказы с reason (инвариант {ok,reason}):
+    const mk2 = state().applyMk2Driver('mk2_chip');
+    expect(mk2.ok).toBe(false);
+    expect(typeof mk2.reason).toBe('string');
+
+    const ammo = state().spendAmmoForWeapon({
+      weaponInstanceId: 'no_such_weapon',
+      ammoIds: ['ammo_10mm'],
+      ammoAmount: 1,
+      durabilityEnabled: false,
+      baseLossPer10Shots: 1,
+    });
+    expect(ammo.ok).toBe(false);
+    expect(ammo.reason).toBe('weapon-not-found');
+
+    const held = state().equipHeldWeapon('no_such_slot', { id: 'w' }, { origin: null, trait: null });
+    expect(held.ok).toBe(false);
+    expect(typeof held.reason).toBe('string');
   });
 });
