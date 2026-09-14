@@ -1,4 +1,4 @@
-// Инвариант «апдейтеры не пишут в стор из рендера» (патч 218) — ПОСЛЕ Шага 8а.
+// Инвариант «апдейтеры не пишут в стор из рендера» (патч 218) — ПОСЛЕ Шага 8в.
 //
 // История. Обёртки-сеттеры CharacterProvider (setEquippedRobotSlots /
 // setEquippedRobotModules / setSelectedPerks) держали useState + зеркало в
@@ -7,34 +7,22 @@
 // «Cannot update a component (CharacterProvider) while rendering a
 // different component (CharacterProvider)».
 //
-// Шаг 8а снял обёртки: сеттеры — прямые действия стора (robotSlice /
-// characterStore), функциональный апдейтер исполняет сам стор, React-рендер
-// в запись не вовлечён. Контракт проверяется:
-//   1) статически: в CharacterContext не осталось Raw-обёрток и
-//      queueMicrotask-зеркал для этих сеттеров;
-//   2) динамически: стор-действия принимают функциональный апдейтер
-//      (обязательное требование к сеттерам, прецедент setEquippedWeapons).
+// Шаг 8а снял обёртки, Шаг 8в (патч 243) снёс сам CharacterContext:
+// сеттеры — прямые действия стора (robotSlice / characterStore),
+// функциональный апдейтер исполняет сам стор, React-рендер в запись не
+// вовлечён. Статические проверки контекста умерли вместе с файлом;
+// остались селекторы экранов и динамические проверки апдейтеров
+// (обязательное требование к сеттерам, прецедент setEquippedWeapons).
 
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseSync } from '@babel/core';
-import jsxPlugin from '@babel/plugin-transform-react-jsx';
 import useCharacterStore from '../../src/store/characterStore';
 
-const FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
-// Патч 242: контекст пуст; сеттеры берёт напрямую CharacterScreen.
+// Патч 243: контекст снесён; сеттеры берут напрямую экраны-потребители.
 const SCREEN_FILE = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js');
 const PERKS_FILE = path.resolve(__dirname, '../../modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js');
 const SETTERS = ['setEquippedRobotSlots', 'setEquippedRobotModules', 'setSelectedPerks'];
-
-const parse = () => parseSync(fs.readFileSync(FILE, 'utf8'), {
-  filename: FILE,
-  babelrc: false,
-  configFile: false,
-  sourceType: 'module',
-  plugins: [jsxPlugin],
-});
 
 afterEach(async () => {
   useCharacterStore.getState().resetCharacterStore();
@@ -42,15 +30,6 @@ afterEach(async () => {
 });
 
 describe('Шаг 8а: Raw-обёртки патча 218 сняты, стор-действия принимают апдейтер', () => {
-  it('в CharacterContext нет Raw-обёрток мигрированных сеттеров', () => {
-    const source = fs.readFileSync(FILE, 'utf8');
-    for (const setterName of SETTERS) {
-      expect(source).not.toContain(`${setterName}Raw`);
-    }
-    // Обёртки содержали отложенные зеркала — их тоже быть не должно.
-    expect(source).not.toContain("setSelectedPerks(next || [])");
-  });
-
   it('экраны получают сеттеры из стора (селекторы, не локальные функции)', () => {
     // Патч 242: контекст пуст; селекторы живут в экранах-потребителях.
     const sources = {

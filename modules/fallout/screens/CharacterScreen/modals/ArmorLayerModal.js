@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { useRobotBodyPlan } from '../../../../../components/CharacterContext';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
 import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
@@ -112,7 +111,8 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
   // Шаг 8а: слоты робота — слайс robot стора напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
-  const bodyPlan = useRobotBodyPlan();
+  // Шаг 8в (патч 243): контекст снесён — bodyPlan читается из стора напрямую.
+  const bodyPlan = useCharacterStore((s) => s.robot?.bodyPlan ?? null);
   useLocale();
   const moduleLocale = useModuleLocale();
   const equipmentCatalog = useMemo(

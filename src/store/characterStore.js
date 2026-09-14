@@ -75,6 +75,7 @@ import { isRobotCharacter } from '../../domain/origins';
 // в CharacterContext.
 import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
 import { selectLegacyAttributes } from './selectors.js';
+import { createStateExtensionFields } from './stateExtensions.js';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -1053,6 +1054,30 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Шаг 8в (патч 243): заполнить ещё не созданные поля сеттинговых
+       * расширений (src/store/stateExtensions.js) по текущим origin/trait.
+       * Раньше это делал эффект CharacterProvider (патч 207); после сноса
+       * контекста действие зовут setOrigin/setTrait и колбэк реидратации.
+       * null = «не создано»: фабрика заполняет ТОЛЬКО отсутствующие поля
+       * (undefined/null); заданные сейвом/миграциями не трогает.
+       */
+      ensureStateExtensionFields: () => {
+        const { origin, trait, stateExtensions } = get();
+        if (!origin) return;
+        const created = createStateExtensionFields({ origin, trait });
+        let changed = false;
+        const merged = { ...stateExtensions };
+        for (const [fieldKey, value] of Object.entries(created)) {
+          if (merged[fieldKey] === undefined || merged[fieldKey] === null) {
+            if (merged[fieldKey] === value) continue; // null → null: менять нечего
+            merged[fieldKey] = value;
+            changed = true;
+          }
+        }
+        if (changed) set({ stateExtensions: merged });
+      },
+
+      /**
        * Set character context for derived stats calculation
        * @param {Object} context - { trait, level, equipmentState }
        */
@@ -1232,13 +1257,21 @@ const useCharacterStore = create(devtools(
       // ── Профиль персонажа (Шаг 7): сеттеры с функциональным апдейтером ──
 
       /** Ориджин (объект каталога | null). */
-      setOrigin: (updater) => set((state) => ({
-        origin: typeof updater === 'function' ? updater(state.origin) : updater,
-      })),
+      setOrigin: (updater) => {
+        set((state) => ({
+          origin: typeof updater === 'function' ? updater(state.origin) : updater,
+        }));
+        // Шаг 8в (патч 243): эффект провайдера снесён — фабрики полей
+        // сеттингов заполняются действием стора.
+        get().ensureStateExtensionFields();
+      },
       /** Трейт (объект каталога | null). */
-      setTrait: (updater) => set((state) => ({
-        trait: typeof updater === 'function' ? updater(state.trait) : updater,
-      })),
+      setTrait: (updater) => {
+        set((state) => ({
+          trait: typeof updater === 'function' ? updater(state.trait) : updater,
+        }));
+        get().ensureStateExtensionFields();
+      },
       /** Уровень персонажа. */
       setLevel: (updater) => set((state) => ({
         level: typeof updater === 'function' ? updater(state.level) : updater,
@@ -1730,6 +1763,9 @@ const useCharacterStore = create(devtools(
           // stale equipped item must not make the whole PWA fail before the
           // canonical character row can be loaded from SQLite.
           try {
+            // Шаг 8в (патч 243): сначала фабрики расширений (эффект
+            // провайдера снесён), затем пересчёт производных.
+            state.ensureStateExtensionFields?.();
             state.recalculateAll();
           } catch (error) {
             debugLog('characterStore.rehydrate.recalculateFailed', {
@@ -1751,5 +1787,51 @@ const useCharacterStore = create(devtools(
     enabled: process.env.NODE_ENV !== 'production',
   }
 ));
+
+// ── Шаг 8в (патч 243): derived-самосинхронизация стора ─────────────────────
+// Эффект CharacterProvider (пуш equipmentState → setCharacterContext) снесён
+// вместе с контекстом: стор сам следит за экипировкой/профилем и пересчитывает
+// производные. Наблюдаемые ключи — deps бывшего эффекта провайдера (атрибуты
+// не смотрим: их стор-действия зовут recalculateDerivedStats сами). Подписка
+// срабатывает вне рендера (микрозадача патча 218 больше не нужна), повторный
+// пуш с теми же ссылками гасится сравнением сигнатуры — цикла нет.
+const derivedSnapshot = (state) => [
+  state.trait,
+  state.level,
+  state.origin,
+  state.equippedArmor,
+  state.robot?.slots ?? null,
+  state.equippedPowerArmor,
+];
+
+const pushDerivedContext = () => {
+  const state = useCharacterStore.getState();
+  useCharacterStore.getState().setCharacterContext({
+    equipmentState: {
+      equippedArmor: state.equippedArmor,
+      equippedRobotSlots: state.robot?.slots ?? null,
+      powerArmorFrameId: state.equippedPowerArmor?.frame
+        ? state.equippedPowerArmor.frame.catalogId
+        : null,
+    },
+  });
+};
+
+let lastDerivedSignature = null;
+useCharacterStore.subscribe((state) => {
+  const signature = derivedSnapshot(state);
+  if (lastDerivedSignature !== null
+    && signature.length === lastDerivedSignature.length
+    && signature.every((value, index) => value === lastDerivedSignature[index])) {
+    return;
+  }
+  lastDerivedSignature = signature;
+  pushDerivedContext();
+});
+
+// Стартовый пуш — эквивалент монтирования провайдера: derivedStats не пустые
+// до первого действия пользователя (свежая установка без реидратации).
+pushDerivedContext();
+lastDerivedSignature = derivedSnapshot(useCharacterStore.getState());
 
 export default useCharacterStore;

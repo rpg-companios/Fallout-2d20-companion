@@ -11,7 +11,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, View, StyleSheet, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
-import { CharacterProvider } from './components/CharacterContext';
 // Шаг 8б (патч 242): автосейв — модуль src/saves/characterSaves.js (zustand-subscribe).
 import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
@@ -136,6 +135,17 @@ function App() {
     return startCharacterAutosave();
   }, [dbReady, characterStoreReady]);
 
+  // Шаг 8в (патч 243): таймер расхода блока силовой брони (§5.3/§5.4) —
+  // бывший эффект CharacterProvider. Тикает только пока приложение открыто
+  // («приложение закрыто — отсчёт на паузе»); состояние — в powerArmorSlice.
+  useEffect(() => {
+    const PA_CORE_TICK_MS = 1000;
+    const interval = setInterval(() => {
+      useCharacterStore.getState().tickPowerArmorCore(PA_CORE_TICK_MS);
+    }, PA_CORE_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     async function initDb() {
@@ -181,7 +191,6 @@ function App() {
   return (
     <PaperProvider>
       <SafeAreaProvider>
-        <CharacterProvider>
           <NavigationContainer
             key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}
             // Единый бренд приложения в заголовке вкладки браузера (Google-брендинг):
@@ -285,7 +294,6 @@ function App() {
           <FusionCoreChoiceModal />
           <AlertHost />
           <SurvivalClock />
-        </CharacterProvider>
       </SafeAreaProvider>
     </PaperProvider>
   );

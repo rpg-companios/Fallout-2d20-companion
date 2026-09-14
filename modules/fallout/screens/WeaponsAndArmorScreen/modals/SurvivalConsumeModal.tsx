@@ -15,7 +15,6 @@
 
 import React, { useMemo } from 'react';
 import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
-import { useCharacter } from '../../../../../components/CharacterContext';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { selectItemsByEquipped } from '../../../../../src/store/selectors';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
