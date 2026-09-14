@@ -1,0 +1,1787 @@
+From a43d2d0c10a293896da487fa45bb85ad8901cfb9 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 08:24:33 +0000
+Subject: [PATCH] =?UTF-8?q?243=20(=D0=A8=D0=B0=D0=B3=208=D0=B2):=20Charact?=
+ =?UTF-8?q?erContext=20=D1=81=D0=BD=D0=B5=D1=81=D1=91=D0=BD=20=E2=80=94=20?=
+ =?UTF-8?q?=D1=81=D1=82=D0=BE=D1=80=20=D1=81=D0=B0=D0=BC=D0=BE=D0=B4=D0=BE?=
+ =?UTF-8?q?=D1=81=D1=82=D0=B0=D1=82=D0=BE=D1=87=D0=B5=D0=BD?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Демонтаж (последний шаг миграции, патчи 219–243):
+- components/CharacterContext.js УДАЛЁН (фасад useCharacter пуст с 242;
+  провайдер держал 2 эффекта и пустой value);
+- App.js: обёртка <CharacterProvider> снята; таймер расхода блока СБ
+  (§5.3/§5.4, тик только при открытом приложении) переехал в useEffect App;
+- ArmorLayerModal: useRobotBodyPlan → стор-селектор robot.bodyPlan;
+- SurvivalConsumeModal: мёртвый импорт useCharacter снят.
+
+Стор — самодостаточный (компенсация снесённых эффектов провайдера):
+- derived-самосинхронизация: модульная подписка на стор (deps бывшего
+  эффекта: trait/level/origin/equippedArmor/robot.slots/equippedPowerArmor)
+  пушит setCharacterContext({ equipmentState }); повторные пуши гасятся
+  сравнением сигнатуры; стартовый пуш = эквивалент монтирования провайдера
+  (derivedStats не пустые до первого действия). Подписка вне рендера —
+  микрозадача патча 218 больше не нужна;
+- ensureStateExtensionFields(): фабрика полей сеттинговых расширений
+  (патч 207) — действие стора; зовут setOrigin/setTrait и колбэк
+  реидратации (заполняет ТОЛЬКО отсутствующие null/undefined поля).
+
+Тесты: 6 facade-тестов Шагов 5–8а и survival/character-context-imports
+удалены (контракт interim-состояния исчерпан); updater-purity — статика
+контекста срезана, живы селекторы экранов и динамические апдейтеры.
+Новый character-context-demolished.test.js (9 тестов): файла нет,
+импортов/вызовов useCharacter нет, App/ArmorLayerModal/SurvivalConsumeModal
+на новых домах, derived-пуш без провайдера (экипировка будит, имя — нет),
+фабрика расширений (setOrigin создаёт survival, заданное поле хранит).
+
+vitest 677/677 (68 файлов), tsc чист.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ App.js                                        |  14 +-
+ .../character-context-demolished.test.js      | 162 +++++++++++++++
+ .../character-context-step5-facade.test.js    | 139 -------------
+ .../character-context-step6-facade.test.js    | 146 --------------
+ .../character-context-step7-facade.test.js    | 183 -----------------
+ .../character-context-step8a-2-facade.test.js | 146 --------------
+ .../character-context-step8a-3-facade.test.js | 172 ----------------
+ .../character-context-step8a-facade.test.js   | 134 -------------
+ .../character-context-updater-purity.test.js  |  37 +---
+ .../character-context-imports.test.js         | 116 -----------
+ components/CharacterContext.js                | 185 ------------------
+ .../CharacterScreen/modals/ArmorLayerModal.js |   4 +-
+ .../modals/SurvivalConsumeModal.tsx           |   1 -
+ src/store/characterStore.js                   |  94 ++++++++-
+ 14 files changed, 271 insertions(+), 1262 deletions(-)
+ create mode 100644 __tests__/saves/character-context-demolished.test.js
+ delete mode 100644 __tests__/saves/character-context-step5-facade.test.js
+ delete mode 100644 __tests__/saves/character-context-step6-facade.test.js
+ delete mode 100644 __tests__/saves/character-context-step7-facade.test.js
+ delete mode 100644 __tests__/saves/character-context-step8a-2-facade.test.js
+ delete mode 100644 __tests__/saves/character-context-step8a-3-facade.test.js
+ delete mode 100644 __tests__/saves/character-context-step8a-facade.test.js
+ delete mode 100644 __tests__/survival/character-context-imports.test.js
+ delete mode 100644 components/CharacterContext.js
+
+diff --git a/App.js b/App.js
+index f657111..e6ff6ba 100644
+--- a/App.js
++++ b/App.js
+@@ -11,7 +11,6 @@ import { Ionicons } from '@expo/vector-icons';
+ import { Text, View, StyleSheet, ImageBackground, ActivityIndicator } from 'react-native';
+ import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+ import { Provider as PaperProvider } from 'react-native-paper';
+-import { CharacterProvider } from './components/CharacterContext';
+ // Шаг 8б (патч 242): автосейв — модуль src/saves/characterSaves.js (zustand-subscribe).
+ import { startCharacterAutosave } from './src/saves/characterSaves';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+@@ -136,6 +135,17 @@ function App() {
+     return startCharacterAutosave();
+   }, [dbReady, characterStoreReady]);
+ 
++  // Шаг 8в (патч 243): таймер расхода блока силовой брони (§5.3/§5.4) —
++  // бывший эффект CharacterProvider. Тикает только пока приложение открыто
++  // («приложение закрыто — отсчёт на паузе»); состояние — в powerArmorSlice.
++  useEffect(() => {
++    const PA_CORE_TICK_MS = 1000;
++    const interval = setInterval(() => {
++      useCharacterStore.getState().tickPowerArmorCore(PA_CORE_TICK_MS);
++    }, PA_CORE_TICK_MS);
++    return () => clearInterval(interval);
++  }, []);
++
+   useEffect(() => {
+     let cancelled = false;
+     async function initDb() {
+@@ -181,7 +191,6 @@ function App() {
+   return (
+     <PaperProvider>
+       <SafeAreaProvider>
+-        <CharacterProvider>
+           <NavigationContainer
+             key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}
+             // Единый бренд приложения в заголовке вкладки браузера (Google-брендинг):
+@@ -285,7 +294,6 @@ function App() {
+           <FusionCoreChoiceModal />
+           <AlertHost />
+           <SurvivalClock />
+-        </CharacterProvider>
+       </SafeAreaProvider>
+     </PaperProvider>
+   );
+diff --git a/__tests__/saves/character-context-demolished.test.js b/__tests__/saves/character-context-demolished.test.js
+new file mode 100644
+index 0000000..d9406a5
+--- /dev/null
++++ b/__tests__/saves/character-context-demolished.test.js
+@@ -0,0 +1,162 @@
++// Шаг 8в (патч 243): CharacterContext СНЕСЁН.
++//
++// История. До Шага 8 файл components/CharacterContext.js был «раздатчиком»
++// всего состояния персонажа (40+ полей через useCharacter()). Миграция
++// Шаги 1–8б (патчи 219–242) расселила данные по слайсам characterStore,
++// сохранения — в src/saves/characterSaves.js, оркестраторы — в
++// orchestratorsSlice. Патч 243 демонтировал сам файл:
++//
++//   - обёртка <CharacterProvider> в App.js снята (остались PaperProvider/
++//     SafeAreaProvider/NavigationContainer);
++//   - таймер расхода блока СБ — useEffect в App.js (тикает, пока приложение
++//     открыто);
++//   - derived-пуш экипировки (setCharacterContext) — подписка самого стора
++//     (модульная, вне рендера; микрозадача патча 218 больше не нужна);
++//   - фабрика полей сеттинговых расширений (патч 207) — действие стора
++//     ensureStateExtensionFields: зовут setOrigin/setTrait и колбэк
++//     реидратации;
++//   - хук useRobotBodyPlan переехал в ArmorLayerModal стор-селектором.
++//
++// Тест фиксирует: файла нет, импортов нет, новые дома живут.
++
++import { afterEach, describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++
++import useCharacterStore from '../../src/store/characterStore';
++// Импорт регистрирует survival-расширение (fieldKey 'survival') в реестре.
++import '../../modules/fallout/survival';
++
++const ROOT = path.resolve(__dirname, '../..');
++const APP_FILE = path.join(ROOT, 'App.js');
++const ARMOR_MODAL = path.join(ROOT, 'modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js');
++const SURVIVAL_MODAL = path.join(ROOT, 'modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx');
++
++const state = () => useCharacterStore.getState();
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('Шаг 8в: CharacterContext снесён', () => {
++  it('файла components/CharacterContext.js не существует', () => {
++    expect(fs.existsSync(path.join(ROOT, 'components/CharacterContext.js'))).toBe(false);
++  });
++
++  it('ни один модуль приложения не импортирует CharacterContext', () => {
++    const offenders = [];
++    const scan = (dir) => {
++      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
++        const full = path.join(dir, entry.name);
++        if (entry.isDirectory()) {
++          if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
++          scan(full);
++          continue;
++        }
++        if (!/\.(js|tsx?)$/.test(entry.name)) continue;
++        const source = fs.readFileSync(full, 'utf8');
++        if (/from\s+['"][^'"]*CharacterContext['"]/.test(source)
++          || /import\(\s*['"][^'"]*CharacterContext['"]\s*\)/.test(source)) {
++          offenders.push(path.relative(ROOT, full));
++        }
++      }
++    };
++    scan(path.join(ROOT, 'components'));
++    scan(path.join(ROOT, 'modules'));
++    scan(path.join(ROOT, 'src'));
++    if (/from\s+['"][^'"]*CharacterContext['"]/.test(fs.readFileSync(APP_FILE, 'utf8'))) {
++      offenders.push('App.js');
++    }
++    expect(offenders).toEqual([]);
++  });
++
++  it('хука useCharacter больше нет нигде в приложении (не считая комментариев-истории)', () => {
++    // Реальный вызов: импорт имени или присваивание вызова. Упоминания
++    // «фасад useCharacter()» в докстрингах-истории не считаются.
++    const IMPORT_RE = /import\s*\{[^}]*\buseCharacter\b[^}]*\}\s*from/;
++    const CALL_RE = /=\s*useCharacter\s*\(\s*\)/;
++    const offenders = [];
++    const scan = (dir) => {
++      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
++        const full = path.join(dir, entry.name);
++        if (entry.isDirectory()) {
++          if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
++          scan(full);
++          continue;
++        }
++        if (!/\.(js|tsx?)$/.test(entry.name)) continue;
++        const source = fs.readFileSync(full, 'utf8');
++        if (IMPORT_RE.test(source) || CALL_RE.test(source)) offenders.push(path.relative(ROOT, full));
++      }
++    };
++    scan(path.join(ROOT, 'components'));
++    scan(path.join(ROOT, 'modules'));
++    expect(offenders).toEqual([]);
++  });
++
++  it('App.js: обёртки провайдера нет, таймер блока СБ переехал', () => {
++    const source = fs.readFileSync(APP_FILE, 'utf8');
++    expect(source).not.toMatch(/<CharacterProvider/); // упоминания в истории — ок
++    expect(source).not.toMatch(/from\s+['"][^'"]*CharacterContext['"]/);
++    expect(source).toContain('tickPowerArmorCore');
++    expect(source).toContain('startCharacterAutosave');
++  });
++
++  it('ArmorLayerModal читает bodyPlan стор-селектором, SurvivalConsumeModal не знает useCharacter', () => {
++    const armor = fs.readFileSync(ARMOR_MODAL, 'utf8');
++    expect(armor).toContain('useCharacterStore((s) => s.robot?.bodyPlan ?? null)');
++    expect(armor).not.toMatch(/from\s+['"][^'"]*CharacterContext['"]/);
++    const survival = fs.readFileSync(SURVIVAL_MODAL, 'utf8');
++    // useCharacterStore разрешён (это стор); сам хук useCharacter — нет.
++    expect(survival).not.toMatch(/useCharacter(?!Store)/);
++  });
++});
++
++describe('Шаг 8в: derived-самосинхронизация стора', () => {
++  it('смена экипировки сама пушит equipmentState (_characterContext), без провайдера', () => {
++    // Стартовый пуш при создании стора уже заполнил зеркало; сбрасываем —
++    // подписка не должна перезаполнять его БЕЗ изменения наблюдаемых ключей.
++    useCharacterStore.setState({ _characterContext: undefined });
++    expect(state()._characterContext).toBeUndefined();
++
++    const armor = { id: 'armor_leather', name: 'Кожаная броня' };
++    state().setEquippedArmor(armor);
++    const mirror = state()._characterContext?.equipmentState;
++    expect(mirror?.equippedArmor).toEqual(armor);
++
++    // Мутации, не входящие в наблюдаемые ключи, пуш не будят.
++    useCharacterStore.setState({ _characterContext: undefined });
++    state().setCharacterName('Художник');
++    expect(state()._characterContext).toBeUndefined();
++  });
++
++  it('смена трейта будит пересчёт (зеркало восстанавливается)', () => {
++    useCharacterStore.setState({ _characterContext: undefined });
++    state().setTrait({ id: 'toughness', name: 'Крепкий' });
++    expect(state()._characterContext?.equipmentState).toBeDefined();
++  });
++});
++
++describe('Шаг 8в: фабрика расширений — действие стора', () => {
++  it('setOrigin заполняет отсутствующие поля (survival), заданные не трогает', () => {
++    // «Поле уже создано» — фабрика его не перезапишет.
++    useCharacterStore.setState({ stateExtensions: { survival: { day: 9 } } });
++    state().setOrigin({ id: 'vault_dweller', name: 'Уроженец Убежища', characterType: 'human' });
++    const survival = state().stateExtensions.survival;
++    expect(survival).toBeTruthy();
++    expect(survival.day).toBe(9); // заданное поле сохранилось
++
++    // Сброс (origin → null) и повторный выбор: отсутствующее поле создаётся.
++    state().resetCharacterStore();
++    expect(state().stateExtensions).toEqual({});
++    state().setOrigin({ id: 'vault_dweller', name: 'Уроженец Убежища', characterType: 'human' });
++    expect(state().stateExtensions.survival).toBeTruthy();
++  });
++
++  it('без ориджина фабрика не работает (null = «не создано»)', () => {
++    state().resetCharacterStore();
++    state().setTrait({ id: 'toughness', name: 'Крепкий' });
++    expect(state().stateExtensions.survival).toBeUndefined();
++  });
++});
+diff --git a/__tests__/saves/character-context-step5-facade.test.js b/__tests__/saves/character-context-step5-facade.test.js
+deleted file mode 100644
+index 4586ee8..0000000
+--- a/__tests__/saves/character-context-step5-facade.test.js
++++ /dev/null
+@@ -1,139 +0,0 @@
+-// Шаг 5 миграции attributes/skills: фасад useCharacter() больше не отдаёт
+-// сеттеры полей, ставших словарями стора (setAttributes/setSkills +
+-// selection-списки setSelectedSkills/setExtraTaggedSkills/setForcedSelectedSkills).
+-// Экраны читают производные массивы из контекста, пишут ТОЛЬКО в стор
+-// (setBaseAttributes/setBaseSkills + стор-экшены selection-списков).
+-// Дельта-зеркала (updateAttribute/updateSkill + подсев loadFromLegacyData)
+-// из CharacterScreen убраны: стор — единственный источник.
+-//
+-// CharacterContext в vitest не импортируется (react-native Flow), поэтому
+-// контракт проверяется статически по AST, как в
+-// character-context-updater-purity.test.js и survival/character-context-imports.test.js.
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-
+-const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-const SCREEN_FILE = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js');
+-
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-  filename: file,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin],
+-});
+-
+-const walk = (node, visit) => {
+-  if (!node || typeof node !== 'object') return;
+-  if (Array.isArray(node)) {
+-    node.forEach((child) => walk(child, visit));
+-    return;
+-  }
+-  if (typeof node.type === 'string') visit(node);
+-  Object.values(node).forEach((value) => walk(value, visit));
+-};
+-
+-const propertyName = (prop) => {
+-  if (!prop) return null;
+-  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
+-    const key = prop.key;
+-    if (key.type === 'Identifier') return key.name;
+-    if (key.type === 'StringLiteral') return key.value;
+-  }
+-  return null;
+-};
+-
+-// ─── Фасад контекста ───
+-
+-describe('Шаг 5: фасад useCharacter() без сеттеров атрибутов/навыков', () => {
+-  const ast = parse(CONTEXT_FILE);
+-
+-  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
+-  const valueObjects = [];
+-  walk(ast, (node) => {
+-    if (node.type === 'VariableDeclarator'
+-      && node.id?.type === 'Identifier'
+-      && node.id.name === 'value'
+-      && node.init?.type === 'ObjectExpression') {
+-      valueObjects.push(node.init);
+-    }
+-  });
+-
+-  it('объект value провайдера найден', () => {
+-    expect(valueObjects.length).toBeGreaterThanOrEqual(1);
+-  });
+-
+-  it('в value нет setAttributes/setSkills и сеттеров selection-списков', () => {
+-    const forbidden = ['setAttributes', 'setSkills', 'setSelectedSkills', 'setExtraTaggedSkills', 'setForcedSelectedSkills'];
+-    for (const object of valueObjects) {
+-      const names = object.properties.map(propertyName);
+-      expect(names.filter((name) => forbidden.includes(name))).toEqual([]);
+-    }
+-  });
+-
+-  it('патч 241: чтения атрибутов/навыков/selection тоже ушли в стор', () => {
+-    const forbidden = ['attributes', 'skills', 'selectedSkills', 'extraTaggedSkills', 'forcedSelectedSkills'];
+-    const names = valueObjects.flatMap((object) => object.properties.map(propertyName));
+-    for (const name of forbidden) {
+-      expect(names).not.toContain(name);
+-    }
+-  });
+-
+-  it('массивы контекста производятся селекторами стора (единая реализация)', () => {
+-    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
+-    expect(source).toContain("import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selectors'");
+-  });
+-});
+-
+-// ─── CharacterScreen: пишем только в стор ───
+-
+-describe('Шаг 5: CharacterScreen пишет в стор напрямую', () => {
+-  const ast = parse(SCREEN_FILE);
+-  const source = fs.readFileSync(SCREEN_FILE, 'utf8');
+-
+-  it('useCharacter() не деструктурирует сеттеры Шага 5', () => {
+-    const forbidden = ['setAttributes', 'setSkills', 'setSelectedSkills', 'setExtraTaggedSkills', 'setForcedSelectedSkills'];
+-    const violations = [];
+-    walk(ast, (node) => {
+-      if (node.type === 'VariableDeclarator'
+-        && node.id?.type === 'ObjectPattern'
+-        && node.init?.type === 'CallExpression'
+-        && node.init.callee?.type === 'Identifier'
+-        && node.init.callee.name === 'useCharacter') {
+-        for (const prop of node.id.properties) {
+-          const name = propertyName(prop) ?? prop.argument?.name ?? null;
+-          if (forbidden.includes(name)) violations.push(name);
+-        }
+-      }
+-    });
+-    expect(violations).toEqual([]);
+-  });
+-
+-  it('дельта-зеркала из экрана убраны (updateAttribute/updateSkill/подсев loadFromLegacyData)', () => {
+-    const calls = [];
+-    walk(ast, (node) => {
+-      if (node.type === 'CallExpression' && node.callee?.type === 'MemberExpression'
+-        && node.callee.property?.type === 'Identifier') {
+-        calls.push(node.callee.property.name);
+-      }
+-    });
+-    expect(calls.filter((name) => ['updateAttribute', 'updateSkill', 'loadFromLegacyData'].includes(name))).toEqual([]);
+-  });
+-
+-  it('записи идут через стор-экшены setBaseAttributes/setBaseSkills', () => {
+-    expect(source).toContain('const setBaseAttributes = useCharacterStore');
+-    expect(source).toContain('const setBaseSkills = useCharacterStore');
+-    expect(source).toContain('setBaseAttributes(nextAttributes)');
+-    expect(source).toContain('setBaseSkills(');
+-  });
+-
+-  it('selection-списки читаются из стора, writer-ы — стор-экшены', () => {
+-    expect(source).toContain("useCharacterStore((s) => s.selectedSkills)");
+-    expect(source).toContain("useCharacterStore((s) => s.extraTaggedSkills)");
+-    expect(source).toContain("useCharacterStore((s) => s.forcedSelectedSkills)");
+-  });
+-});
+diff --git a/__tests__/saves/character-context-step6-facade.test.js b/__tests__/saves/character-context-step6-facade.test.js
+deleted file mode 100644
+index a5c117e..0000000
+--- a/__tests__/saves/character-context-step6-facade.test.js
++++ /dev/null
+@@ -1,146 +0,0 @@
+-// Шаг 6 миграции: фасад useCharacter() больше не отдаёт поля условий/
+-// заболеваний (conditions, chemDosesLog, lastDiseaseResistAt, sceneRiskStates,
+-// activeTimedEffects) и их сеттеры. Экраны читают стор напрямую
+-// (WeaponsAndArmorScreen → lastDiseaseResistAt).
+-//
+-// Тень activeTimedEffects удалена (решение владельца, вариант А): канон —
+-// словарь effects стора; секундный тик тени удалён; массив для сейва —
+-// денормализация словаря (denormalizeEffects(storeEffects)).
+-//
+-// CharacterContext в vitest не импортируется (react-native Flow) — контракт
+-// проверяется статически по AST, как в character-context-step5-facade.test.js.
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-
+-const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
+-const WA_FILE = path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js');
+-
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-  filename: file,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin],
+-});
+-
+-const walk = (node, visit) => {
+-  if (!node || typeof node !== 'object') return;
+-  if (Array.isArray(node)) {
+-    node.forEach((child) => walk(child, visit));
+-    return;
+-  }
+-  if (typeof node.type === 'string') visit(node);
+-  Object.values(node).forEach((value) => walk(value, visit));
+-};
+-
+-const propertyName = (prop) => {
+-  if (!prop) return null;
+-  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
+-    const key = prop.key;
+-    if (key.type === 'Identifier') return key.name;
+-    if (key.type === 'StringLiteral') return key.value;
+-  }
+-  return null;
+-};
+-
+-describe('Шаг 6: фасад useCharacter() без полей условий/заболеваний', () => {
+-  const ast = parse(CONTEXT_FILE);
+-  const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
+-  const savesSource = fs.readFileSync(SAVES_FILE, 'utf8');
+-
+-  const valueObjects = [];
+-  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
+-  walk(ast, (node) => {
+-    if (node.type === 'VariableDeclarator'
+-      && node.id?.type === 'Identifier'
+-      && node.id.name === 'value'
+-      && node.init?.type === 'ObjectExpression') {
+-      valueObjects.push(node.init);
+-    }
+-  });
+-
+-  it('объект value провайдера найден', () => {
+-    expect(valueObjects.length).toBeGreaterThanOrEqual(1);
+-  });
+-
+-  it('в value нет полей и сеттеров Шага 6 (buildSnapshot не считаем: формат сейва)', () => {
+-    // Сеттеры запрещены в ЛЮБОМ объекте с маркером.
+-    const forbiddenSetters = [
+-      'setActiveTimedEffects', 'setConditions', 'setChemDosesLog',
+-      'setLastDiseaseResistAt', 'setSceneRiskStates',
+-    ];
+-    // Читаемые поля Шага 6 запрещены только во фасадном value. Объект
+-    // buildSnapshot тоже содержит attributesSaved (формат сейва) и обязан
+-    // сохранять эти поля как поля сейва — его не проверяем.
+-    const forbiddenReads = [
+-      'activeTimedEffects', 'conditions', 'chemDosesLog',
+-      'lastDiseaseResistAt', 'sceneRiskStates',
+-    ];
+-    const facadeValues = valueObjects;
+-    expect(facadeValues.length).toBeGreaterThanOrEqual(1);
+-    for (const object of valueObjects) {
+-      const names = object.properties.map(propertyName);
+-      expect(names.filter((name) => forbiddenSetters.includes(name))).toEqual([]);
+-    }
+-    for (const object of facadeValues) {
+-      const names = object.properties.map(propertyName);
+-      expect(names.filter((name) => forbiddenReads.includes(name))).toEqual([]);
+-    }
+-  });
+-
+-  it('в контексте нет ни одного вызова setActiveTimedEffects (тень удалена)', () => {
+-    const calls = [];
+-    walk(ast, (node) => {
+-      if (node.type === 'Identifier' && node.name === 'setActiveTimedEffects') calls.push(node);
+-    });
+-    expect(calls).toEqual([]);
+-  });
+-
+-  it('поля Шага 6 больше не useState провайдера', () => {
+-    const names = [];
+-    walk(ast, (node) => {
+-      if (node.type === 'VariableDeclarator'
+-        && node.id?.type === 'ArrayPattern'
+-        && node.init?.type === 'CallExpression'
+-        && node.init.callee?.type === 'Identifier'
+-        && node.init.callee.name === 'useState') {
+-        node.id.elements.forEach((element) => {
+-          if (element?.type === 'Identifier') names.push(element.name);
+-        });
+-      }
+-    });
+-    for (const name of ['conditions', 'chemDosesLog', 'lastDiseaseResistAt', 'sceneRiskStates', 'activeTimedEffects']) {
+-      expect(names).not.toContain(name);
+-    }
+-  });
+-
+-  it('снапшот берёт activeTimedEffects из словаря стора (денормализация)', () => {
+-    // Патч 242: buildSnapshot переехал в src/saves/characterSaves.js.
+-    expect(savesSource).toContain('activeTimedEffects: denormalizeEffects(state.effects || {})');
+-  });
+-
+-  it('секундный тик тени удалён (остался только тик Ядерного блока)', () => {
+-    expect(source.split('setInterval').length - 1).toBe(1);
+-  });
+-
+-  it('патч 240: колбэки болезней ушли в стор (orchestratorsSlice), на фасаде их нет', () => {
+-    for (const name of ['advanceEffectsByGameHours', 'resolveSceneRiskEventById', 'reducePersistentDiseaseRanks', 'resistDisease']) {
+-      // Члены фасада — код; упоминания в комментариях-истории допустимы.
+-      expect(new RegExp(`\\n\\s*${name}[,:}]`).test(source)).toBe(false);
+-    }
+-  });
+-});
+-
+-describe('Шаг 6: WeaponsAndArmorScreen читает стор напрямую', () => {
+-  const source = fs.readFileSync(WA_FILE, 'utf8');
+-
+-  it('lastDiseaseResistAt и resistDisease — из useCharacterStore, не из useCharacter()', () => {
+-    expect(source).toContain('useCharacterStore((state) => state.resistDisease)');
+-    expect(source).toContain('useCharacterStore((state) => state.lastDiseaseResistAt)');
+-  });
+-});
+diff --git a/__tests__/saves/character-context-step7-facade.test.js b/__tests__/saves/character-context-step7-facade.test.js
+deleted file mode 100644
+index 3006086..0000000
+--- a/__tests__/saves/character-context-step7-facade.test.js
++++ /dev/null
+@@ -1,183 +0,0 @@
+-// Шаг 7 миграции: профиль персонажа (origin/trait/level/characterName,
+-// attributesSaved/skillsSaved, luckPoints/maxLuckPoints,
+-// availablePerkAttributePoints/addPerkAttributePoints) — в characterStore.
+-// Фасад useCharacter() поля и их сеттеры больше не отдаёт; экраны читают/
+-// пишут стор напрямую (CharacterScreen, PerksAndTraitsScreen, InventoryScreen,
+-// WeaponsAndArmorScreen, SurvivalConsumeModal).
+-//
+-// buildSnapshot сохраняет все поля профиля — формат сейва не менялся
+-// (поэтому value-маркер поиска в старых тестах переведён на resetCharacter,
+-// а здесь фасадный объект ищется строго по resetCharacter).
+-//
+-// Зеркало _characterContext подрезано до equipmentState (решение владельца):
+-// recalculateDerivedStats читает trait/level сам, powerArmorSlice.characterRules —
+-// origin/trait напрямую. Снапшот-поле формата сейва не тестируем здесь —
+-// оно покрыто save-тестами.
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-import tsPlugin from '@babel/plugin-transform-typescript';
+-
+-const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
+-const SCREENS = {
+-  CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
+-  PerksAndTraitsScreen: path.resolve(__dirname, '../../modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js'),
+-  InventoryScreen: path.resolve(__dirname, '../../components/screens/InventoryScreen/InventoryScreen.js'),
+-  WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
+-  SurvivalConsumeModal: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx'),
+-};
+-
+-// TS-плагин — только .tsx (на .js он трактует <…> как типовые дженерики).
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-  filename: file,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin, ...(file.endsWith('.tsx') ? [[tsPlugin, { isTSX: true }]] : [])],
+-});
+-
+-const walk = (node, visit) => {
+-  if (!node || typeof node !== 'object') return;
+-  if (Array.isArray(node)) {
+-    node.forEach((child) => walk(child, visit));
+-    return;
+-  }
+-  if (typeof node.type === 'string') visit(node);
+-  Object.values(node).forEach((value) => walk(value, visit));
+-};
+-
+-const propertyName = (prop) => {
+-  if (!prop) return null;
+-  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
+-    const key = prop.key;
+-    if (key.type === 'Identifier') return key.name;
+-    if (key.type === 'StringLiteral') return key.value;
+-  }
+-  return null;
+-};
+-
+-const STEP7_FIELDS = [
+-  'origin', 'trait', 'level', 'characterName',
+-  'attributesSaved', 'skillsSaved',
+-  'luckPoints', 'maxLuckPoints',
+-  'availablePerkAttributePoints',
+-];
+-const STEP7_SETTERS = [
+-  'setOrigin', 'setTrait', 'setLevel', 'setCharacterName',
+-  'setAttributesSaved', 'setSkillsSaved',
+-  'setLuckPoints', 'setMaxLuckPoints',
+-  'setAvailablePerkAttributePoints', 'addPerkAttributePoints',
+-];
+-
+-describe('Шаг 7: фасад useCharacter() без полей профиля', () => {
+-  const ast = parse(CONTEXT_FILE);
+-
+-  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
+-  const facadeValues = [];
+-  walk(ast, (node) => {
+-    if (node.type === 'VariableDeclarator'
+-      && node.id?.type === 'Identifier'
+-      && node.id.name === 'value'
+-      && node.init?.type === 'ObjectExpression') {
+-      facadeValues.push(node.init);
+-    }
+-  });
+-
+-  it('фасадный value найден ровно один', () => {
+-    expect(facadeValues.length).toBe(1);
+-  });
+-
+-  it('в value нет полей и сеттеров Шага 7', () => {
+-    const names = facadeValues[0].properties.map(propertyName);
+-    expect(names.filter((name) => STEP7_FIELDS.includes(name))).toEqual([]);
+-    expect(names.filter((name) => STEP7_SETTERS.includes(name))).toEqual([]);
+-  });
+-
+-  it('уровень/имя/origin/trait/флаги/удача/перки — стор-селекторы (экран, модуль сейвов)', () => {
+-    // Патч 242: контекст пуст; профиль читают CharacterScreen и buildSnapshot.
+-    const cs = fs.readFileSync(SCREENS.CharacterScreen, 'utf8');
+-    for (const field of ['origin', 'trait', 'level', 'characterName', 'attributesSaved', 'skillsSaved', 'luckPoints', 'maxLuckPoints']) {
+-      expect(cs).toContain(`useCharacterStore((s) => s.${field})`);
+-    }
+-    const saves = fs.readFileSync(SAVES_FILE, 'utf8');
+-    for (const field of ['characterName', 'level', 'origin', 'trait', 'attributesSaved', 'skillsSaved', 'luckPoints', 'availablePerkAttributePoints']) {
+-      expect(saves).toContain(`state.${field}`);
+-    }
+-  });
+-
+-  it('зеркало _characterContext подрезано: setCharacterContext не получает trait/level/origin', () => {
+-    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
+-    expect(source).toContain('setCharacterContext({\n        equipmentState:');
+-    expect(source).not.toMatch(/setCharacterContext\(\{\s*\n\s*trait,/);
+-  });
+-
+-  it('buildSnapshot (модуль сейвов, патч 242) сохраняет поля профиля (формат сейва не менялся)', () => {
+-    const snapshots = [];
+-    walk(parse(SAVES_FILE), (node) => {
+-      if (node.type === 'ObjectExpression'
+-        && node.properties.some((prop) => propertyName(prop) === 'attributesSaved')
+-        && node.properties.some((prop) => propertyName(prop) === 'luckPoints')
+-        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
+-        && node.properties.some((prop) => propertyName(prop) === 'activeTimedEffects')) {
+-        snapshots.push(node);
+-      }
+-    });
+-    expect(snapshots.length).toBe(1);
+-    const names = snapshots[0].properties.map(propertyName);
+-    for (const name of [...STEP7_FIELDS.slice(0, 9), 'availablePerkAttributePoints']) {
+-      if (name === 'maxLuckPoints') continue; // потолок в сейв не пишется (правило 1)
+-      expect(names).toContain(name);
+-    }
+-  });
+-});
+-
+-describe('Шаг 7: экраны — напрямую на стор', () => {
+-  it('ни один экран не деструктурирует поля/сеттеры Шага 7 из useCharacter()', () => {
+-    const violations = [];
+-    for (const [name, file] of Object.entries(SCREENS)) {
+-      walk(parse(file), (node) => {
+-        if (node.type === 'VariableDeclarator'
+-          && node.id?.type === 'ObjectPattern'
+-          && node.init?.type === 'CallExpression'
+-          && node.init.callee?.type === 'Identifier'
+-          && node.init.callee.name === 'useCharacter') {
+-          for (const prop of node.id.properties) {
+-            const propName = propertyName(prop) ?? prop.argument?.name ?? null;
+-            if ([...STEP7_FIELDS, ...STEP7_SETTERS].includes(propName)) {
+-              violations.push(`${name}: ${propName}`);
+-            }
+-          }
+-        }
+-      });
+-    }
+-    expect(violations).toEqual([]);
+-  });
+-
+-  it('экраны читают профиль из стора', () => {
+-    const cs = fs.readFileSync(SCREENS.CharacterScreen, 'utf8');
+-    expect(cs).toContain('useCharacterStore((s) => s.characterName)');
+-    expect(cs).toContain('useCharacterStore((s) => s.luckPoints)');
+-    const perks = fs.readFileSync(SCREENS.PerksAndTraitsScreen, 'utf8');
+-    expect(perks).toContain('useCharacterStore((s) => s.addPerkAttributePoints)');
+-    expect(perks).toContain('useCharacterStore((s) => s.attributesSaved)');
+-    const inv = fs.readFileSync(SCREENS.InventoryScreen, 'utf8');
+-    expect(inv).toContain('useCharacterStore((s) => s.origin)');
+-    expect(inv).toContain('useCharacterStore((s) => s.trait)');
+-    const wa = fs.readFileSync(SCREENS.WeaponsAndArmorScreen, 'utf8');
+-    expect(wa).toContain('useCharacterStore((s) => s.level)');
+-  });
+-
+-  it('powerArmorSlice.characterRules читает публичные поля стора', () => {
+-    const source = fs.readFileSync(
+-      path.resolve(__dirname, '../../src/store/powerArmorSlice.js'),
+-      'utf8',
+-    );
+-    expect(source).toContain('origin: get().origin || null');
+-    expect(source).toContain('trait: get().trait || null');
+-    expect(source).not.toContain('_characterContext || {}');
+-  });
+-});
+diff --git a/__tests__/saves/character-context-step8a-2-facade.test.js b/__tests__/saves/character-context-step8a-2-facade.test.js
+deleted file mode 100644
+index bb5b215..0000000
+--- a/__tests__/saves/character-context-step8a-2-facade.test.js
++++ /dev/null
+@@ -1,146 +0,0 @@
+-// Шаг 8а (часть 2): слоты/модули робота, выбранные перки, зеркала производных —
+-// стор. Фасад useCharacter() больше не отдаёт: equippedRobotSlots/Modules и их
+-// сеттеры, selectedPerks/setSelectedPerks, carryWeight/meleeBonus/initiative/
+-// defense, hasTrait-замыкание, перковые лямбды. PerksAndTraitsScreen первым
+-// полностью перестаёт импортировать контекст. Поведение слайсов — в
+-// robot-perks-store-slice.test.js; формат сейва не менялся (пустой словарь
+-// слотов пишется в снапшот как null — как раньше).
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-
+-const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
+-const SCREENS = {
+-  CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
+-  WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
+-  InventoryScreen: path.resolve(__dirname, '../../components/screens/InventoryScreen/InventoryScreen.js'),
+-  ArmorLayerModal: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js'),
+-  LimbUpgradeModal: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js'),
+-};
+-const PERKS_SCREEN = path.resolve(__dirname, '../../modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js');
+-
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-  filename: file,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin, ...(file.endsWith('.tsx') ? [['@babel/plugin-transform-typescript', { isTSX: true }]] : [])],
+-});
+-
+-const walk = (node, visit) => {
+-  if (!node || typeof node !== 'object') return;
+-  if (Array.isArray(node)) {
+-    node.forEach((child) => walk(child, visit));
+-    return;
+-  }
+-  if (typeof node.type === 'string') visit(node);
+-  Object.values(node).forEach((value) => walk(value, visit));
+-};
+-
+-const propertyName = (prop) => {
+-  if (!prop) return null;
+-  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
+-    const key = prop.key;
+-    if (key.type === 'Identifier') return key.name;
+-    if (key.type === 'StringLiteral') return key.value;
+-  }
+-  return null;
+-};
+-
+-const REMOVED_MEMBERS = [
+-  'equippedRobotSlots', 'setEquippedRobotSlots',
+-  'equippedRobotModules', 'setEquippedRobotModules',
+-  'selectedPerks', 'setSelectedPerks',
+-  'carryWeight', 'meleeBonus', 'initiative', 'defense',
+-  'hasTrait', 'annotatePerks', 'meetsPerkRequirements', 'getPerkUnmetReasons',
+-];
+-
+-describe('Шаг 8а (часть 2): фасад без робота/перков/зеркал', () => {
+-  const ast = parse(CONTEXT_FILE);
+-  const facadeValues = [];
+-  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
+-  walk(ast, (node) => {
+-    if (node.type === 'VariableDeclarator'
+-      && node.id?.type === 'Identifier'
+-      && node.id.name === 'value'
+-      && node.init?.type === 'ObjectExpression') {
+-      facadeValues.push(node.init);
+-    }
+-  });
+-
+-  it('фасадный value найден ровно один', () => {
+-    expect(facadeValues.length).toBe(1);
+-  });
+-
+-  it('в value нет членов Шага 8а (часть 2)', () => {
+-    const names = facadeValues[0].properties.map(propertyName);
+-    expect(names.filter((name) => REMOVED_MEMBERS.includes(name))).toEqual([]);
+-  });
+-
+-  it('снапшот сейва сохраняет ключи робота (формат не менялся)', () => {
+-    const snapshots = [];
+-    walk(parse(SAVES_FILE), (node) => {  // патч 242: buildSnapshot в модуле сейвов
+-      if (node.type === 'ObjectExpression'
+-        && node.properties.some((prop) => propertyName(prop) === 'equippedRobotSlots')
+-        && node.properties.some((prop) => propertyName(prop) === 'equippedRobotModules')
+-        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')) {
+-        snapshots.push(node);
+-      }
+-    });
+-    expect(snapshots.length).toBe(1);
+-  });
+-
+-  it('в контексте не осталось зеркал-калькуляторов (useState производных)', () => {
+-    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
+-    // (вхождения в комментариях-истории не считаются: ищем только код)
+-    for (const dead of ['setCarryWeight(', 'setMeleeBonus(', 'setInitiative(', 'setDefense(', 'const applyDerived']) {
+-      expect(source).not.toContain(dead);
+-    }
+-  });
+-});
+-
+-describe('Шаг 8а (часть 2): экраны — напрямую на стор', () => {
+-  it('экраны не деструктурируют снятые члены из useCharacter()', () => {
+-    const violations = [];
+-    for (const [name, file] of Object.entries(SCREENS)) {
+-      walk(parse(file), (node) => {
+-        if (node.type === 'VariableDeclarator'
+-          && node.id?.type === 'ObjectPattern'
+-          && node.init?.type === 'CallExpression'
+-          && node.init.callee?.type === 'Identifier'
+-          && node.init.callee.name === 'useCharacter') {
+-          for (const prop of node.id.properties) {
+-            const propName = propertyName(prop) ?? prop.argument?.name ?? null;
+-            if (REMOVED_MEMBERS.includes(propName)) violations.push(`${name}: ${propName}`);
+-          }
+-        }
+-      });
+-    }
+-    expect(violations).toEqual([]);
+-  });
+-
+-  it('PerksAndTraitsScreen первым полностью отвязался от контекста', () => {
+-    const source = fs.readFileSync(PERKS_SCREEN, 'utf8');
+-    expect(source).not.toContain('CharacterContext');
+-    expect(source).toContain("useCharacterStore((s) => s.selectedPerks)");
+-    expect(source).toContain("annotatePerks(perksData, attributes, level, selectedPerks,");
+-  });
+-
+-  it('InventoryScreen берёт вес через selectCarryWeight', () => {
+-    const source = fs.readFileSync(SCREENS.InventoryScreen, 'utf8');
+-    expect(source).toContain('useCharacterStore(selectCarryWeight)');
+-  });
+-
+-  it('robotSlice экспортирует прямые действия слотов/модулей', () => {
+-    const source = fs.readFileSync(
+-      path.resolve(__dirname, '../../src/store/robotSlice.js'),
+-      'utf8',
+-    );
+-    expect(source).toContain('setEquippedRobotSlots: (updater)');
+-    expect(source).toContain('setEquippedRobotModules: (updater)');
+-  });
+-});
+diff --git a/__tests__/saves/character-context-step8a-3-facade.test.js b/__tests__/saves/character-context-step8a-3-facade.test.js
+deleted file mode 100644
+index bfc49b6..0000000
+--- a/__tests__/saves/character-context-step8a-3-facade.test.js
++++ /dev/null
+@@ -1,172 +0,0 @@
+-// Шаг 8а (часть 3): комплект (сквозной прогон к стору с Шага 1), сцены,
+-// «эффекты трейтов», изменённые предметы. Фасад useCharacter() больше не
+-// отдаёт: equipment/setEquipment, effects/setEffects, sceneCounter,
+-// modifiedItems/setModifiedItems, getModifiedItem/saveModifiedItem/
+-// removeModifiedItem/getItemId. LimbUpgradeModal — второй экран, полностью
+-// отвязавшийся от контекста (после PerksAndTraitsScreen).
+-//
+-// Формат сейва не менялся: в снапшоте исторические ключи effects
+-// (источник — стор-поле traitEffects) и modifiedItems (Map → массив пар).
+-// Поведение слайсов — в scene-effects-modified-store-slice.test.js.
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-
+-const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
+-const SCREENS = {
+-  CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
+-  WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
+-  InventoryScreen: path.resolve(__dirname, '../../components/screens/InventoryScreen/InventoryScreen.js'),
+-};
+-const LIMB_MODAL = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/modals/LimbUpgradeModal.js');
+-
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-  filename: file,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin, ...(file.endsWith('.tsx') ? [['@babel/plugin-transform-typescript', { isTSX: true }]] : [])],
+-});
+-
+-const walk = (node, visit) => {
+-  if (!node || typeof node !== 'object') return;
+-  if (Array.isArray(node)) {
+-    node.forEach((child) => walk(child, visit));
+-    return;
+-  }
+-  if (typeof node.type === 'string') visit(node);
+-  Object.values(node).forEach((value) => walk(value, visit));
+-};
+-
+-const propertyName = (prop) => {
+-  if (!prop) return null;
+-  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
+-    const key = prop.key;
+-    if (key.type === 'Identifier') return key.name;
+-    if (key.type === 'StringLiteral') return key.value;
+-  }
+-  return null;
+-};
+-
+-const REMOVED_MEMBERS = [
+-  'equipment', 'setEquipment',
+-  'effects', 'setEffects', 'sceneCounter',
+-  'modifiedItems', 'setModifiedItems',
+-  'getModifiedItem', 'saveModifiedItem', 'removeModifiedItem', 'getItemId',
+-  'commitAttributeChanges', // патч 238
+-  // патч 240: оркестраторы — orchestratorsSlice
+-  'applyConsumableFull', 'reducePersistentDiseaseRanks', 'resistDisease',
+-  'advanceEffectsByGameHours', 'resolveSceneRiskEventById',
+-  'stateExtensions', 'setStateExtension',
+-];
+-
+-describe('Шаг 8а (часть 3): фасад без комплекта/сцен/эффектов/модификаций', () => {
+-  const ast = parse(CONTEXT_FILE);
+-  const facadeValues = [];
+-  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
+-  walk(ast, (node) => {
+-    if (node.type === 'VariableDeclarator'
+-      && node.id?.type === 'Identifier'
+-      && node.id.name === 'value'
+-      && node.init?.type === 'ObjectExpression') {
+-      facadeValues.push(node.init);
+-    }
+-  });
+-
+-  it('фасадный value найден ровно один', () => {
+-    expect(facadeValues.length).toBe(1);
+-  });
+-
+-  it('в value нет членов Шага 8а (часть 3)', () => {
+-    const names = facadeValues[0].properties.map(propertyName);
+-    expect(names.filter((name) => REMOVED_MEMBERS.includes(name))).toEqual([]);
+-  });
+-
+-  it('снапшот сейва сохраняет исторические ключи effects/modifiedItems/sceneCounter', () => {
+-    const snapshots = [];
+-    walk(parse(SAVES_FILE), (node) => {  // патч 242: buildSnapshot в модуле сейвов
+-      if (node.type === 'ObjectExpression'
+-        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
+-        && node.properties.some((prop) => propertyName(prop) === 'effects')
+-        && node.properties.some((prop) => propertyName(prop) === 'modifiedItems')
+-        && node.properties.some((prop) => propertyName(prop) === 'sceneCounter')) {
+-        snapshots.push(node);
+-      }
+-    });
+-    expect(snapshots.length).toBe(1);
+-  });
+-
+-  it('effects — алиас traitEffects (стор), модификации — Map из словаря стора (модуль сейвов)', () => {
+-    // Патч 242: и то и другое теперь в buildSnapshot модуля сейвов.
+-    const source = fs.readFileSync(SAVES_FILE, 'utf8');
+-    expect(source).toContain('effects: state.traitEffects');
+-    expect(source).toContain('modifiedItems: new Map(Object.entries(state.modifiedItems || {}))');
+-  });
+-});
+-
+-describe('Шаг 8а (часть 3): экраны — напрямую на стор', () => {
+-  it('экраны не деструктурируют снятые члены из useCharacter()', () => {
+-    const violations = [];
+-    for (const [name, file] of Object.entries(SCREENS)) {
+-      walk(parse(file), (node) => {
+-        if (node.type === 'VariableDeclarator'
+-          && node.id?.type === 'ObjectPattern'
+-          && node.init?.type === 'CallExpression'
+-          && node.init.callee?.type === 'Identifier'
+-          && node.init.callee.name === 'useCharacter') {
+-          for (const prop of node.id.properties) {
+-            const propName = propertyName(prop) ?? prop.argument?.name ?? null;
+-            if (REMOVED_MEMBERS.includes(propName)) violations.push(`${name}: ${propName}`);
+-          }
+-        }
+-      });
+-    }
+-    expect(violations).toEqual([]);
+-  });
+-
+-  it('LimbUpgradeModal — второй экран, полностью отвязавшийся от контекста', () => {
+-    const source = fs.readFileSync(LIMB_MODAL, 'utf8');
+-    expect(source).not.toContain('CharacterContext');
+-  });
+-
+-  it('CharacterScreen пишет «эффекты трейтов» через стор (setTraitEffects)', () => {
+-    const source = fs.readFileSync(SCREENS.CharacterScreen, 'utf8');
+-    expect(source).toContain('useCharacterStore((s) => s.setTraitEffects)');
+-    expect(source).toContain('setTraitEffects((currentEffects)');
+-  });
+-
+-  it('Inventory собирает read-хелпер модификаций из стор-словаря', () => {
+-    const source = fs.readFileSync(SCREENS.InventoryScreen, 'utf8');
+-    expect(source).toContain('useCharacterStore((s) => s.modifiedItems)');
+-    expect(source).toContain("storeModifiedItems[getItemId(item)] || item");
+-  });
+-
+-  it('store/itemIdentity: слайс сцены/эффекты/модификации, getItemId в домене', () => {
+-    const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
+-    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'commitAttributeChanges:']) {
+-      expect(store).toContain(action);
+-    }
+-    const orchestrators = fs.readFileSync(path.resolve(__dirname, '../../src/store/orchestratorsSlice.js'), 'utf8');
+-    for (const action of ['const applyConsumableFull', 'const resistDisease', 'const reducePersistentDiseaseRanks', 'const advanceEffectsByGameHours']) {
+-      expect(orchestrators).toContain(action);
+-    }
+-    const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');
+-    expect(identity).toContain('export const getItemId');
+-  });
+-
+-  it('патч 237: экраны не пишут альбом модификаций (схема id+моды)', () => {
+-    const wa = fs.readFileSync(SCREENS.WeaponsAndArmorScreen, 'utf8');
+-    expect(wa).not.toContain('saveModifiedItem');
+-    // Предмет несёт id модов на себе (appliedArmorModId/…) — сборщик домена
+-    // (applyArmorMods/resolveEffectiveItem) пересобирает статы при загрузке.
+-    const modal = fs.readFileSync(
+-      path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js'),
+-      'utf8',
+-    );
+-    expect(modal).toContain('[stdKey]: selectedStd || null');
+-  });
+-});
+diff --git a/__tests__/saves/character-context-step8a-facade.test.js b/__tests__/saves/character-context-step8a-facade.test.js
+deleted file mode 100644
+index 89f5fcd..0000000
+--- a/__tests__/saves/character-context-step8a-facade.test.js
++++ /dev/null
+@@ -1,134 +0,0 @@
+-// Шаг 8а миграции: здоровье/радиация — стор-каунтеры. Фасад useCharacter()
+-// поля и действия больше не отдаёт; экраны (CharacterScreen, WeaponsAndArmorScreen)
+-// и SurvivalClock зовут стор напрямую. Поведение каунтеров — в
+-// counters-store-slice.test.js; формат сейва не менялся (buildSnapshot
+-// сохраняет currentHealth/radiation под прежними ключами).
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-
+-const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
+-const SCREENS = {
+-  CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
+-  WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
+-  SurvivalClock: path.resolve(__dirname, '../../modules/fallout/survival/SurvivalClock.js'),
+-};
+-
+-// TS-плагин — только .tsx (на .js он трактует <…> как типовые дженерики).
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-  filename: file,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin, ...(file.endsWith('.tsx') ? [['@babel/plugin-transform-typescript', { isTSX: true }]] : [])],
+-});
+-
+-const walk = (node, visit) => {
+-  if (!node || typeof node !== 'object') return;
+-  if (Array.isArray(node)) {
+-    node.forEach((child) => walk(child, visit));
+-    return;
+-  }
+-  if (typeof node.type === 'string') visit(node);
+-  Object.values(node).forEach((value) => walk(value, visit));
+-};
+-
+-const propertyName = (prop) => {
+-  if (!prop) return null;
+-  if (prop.type === 'ObjectProperty' || prop.type === 'ObjectMethod') {
+-    const key = prop.key;
+-    if (key.type === 'Identifier') return key.name;
+-    if (key.type === 'StringLiteral') return key.value;
+-  }
+-  return null;
+-};
+-
+-const STEP8A_MEMBERS = [
+-  'currentHealth', 'setCurrentHealth', 'healCharacter', 'damageCharacter',
+-  'radiation', 'setRadiation', 'addRadiation', 'healRadiation',
+-  'applySurvivalHpLoss',
+-];
+-
+-describe('Шаг 8а: фасад useCharacter() без счётчиков', () => {
+-  const ast = parse(CONTEXT_FILE);
+-  const facadeValues = [];
+-  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
+-  walk(ast, (node) => {
+-    if (node.type === 'VariableDeclarator'
+-      && node.id?.type === 'Identifier'
+-      && node.id.name === 'value'
+-      && node.init?.type === 'ObjectExpression') {
+-      facadeValues.push(node.init);
+-    }
+-  });
+-
+-  it('фасадный value найден ровно один', () => {
+-    expect(facadeValues.length).toBe(1);
+-  });
+-
+-  it('в value нет полей/действий счётчиков', () => {
+-    const names = facadeValues[0].properties.map(propertyName);
+-    expect(names.filter((name) => STEP8A_MEMBERS.includes(name))).toEqual([]);
+-  });
+-
+-  it('снапшот сейва сохраняет currentHealth/radiation (формат не менялся)', () => {
+-    const snapshots = [];
+-    walk(parse(SAVES_FILE), (node) => {  // патч 242: buildSnapshot в модуле сейвов
+-      if (node.type === 'ObjectExpression'
+-        && node.properties.some((prop) => propertyName(prop) === 'currentHealth')
+-        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
+-        && node.properties.some((prop) => propertyName(prop) === 'equipment')) {
+-        snapshots.push(node);
+-      }
+-    });
+-    expect(snapshots.length).toBe(1);
+-  });
+-
+-  it('счётчики — стор; снапшот читает state.currentHealth/state.radiation', () => {
+-    // Патч 242: контекст пуст; экраны (CharacterScreen) читают стор напрямую.
+-    const cs = fs.readFileSync(SCREENS.WeaponsAndArmorScreen, 'utf8');
+-    expect(cs).toContain('useCharacterStore((state) => state.currentHealth)');
+-    const saves = fs.readFileSync(SAVES_FILE, 'utf8');
+-    expect(saves).toContain('currentHealth: state.currentHealth');
+-    expect(saves).toContain('radiation: state.radiation');
+-    expect(saves).not.toContain('setRadiationRaw');
+-  });
+-});
+-
+-describe('Шаг 8а: потребители — напрямую на стор', () => {
+-  it('экраны не берут счётчики из фасада', () => {
+-    const violations = [];
+-    for (const [name, file] of Object.entries(SCREENS)) {
+-      walk(parse(file), (node) => {
+-        if (node.type === 'VariableDeclarator'
+-          && node.id?.type === 'ObjectPattern'
+-          && node.init?.type === 'CallExpression'
+-          && node.init.callee?.type === 'Identifier'
+-          && node.init.callee.name === 'useCharacter') {
+-          for (const prop of node.id.properties) {
+-            const propName = propertyName(prop) ?? prop.argument?.name ?? null;
+-            if (STEP8A_MEMBERS.includes(propName)) violations.push(`${name}: ${propName}`);
+-          }
+-        }
+-      });
+-    }
+-    expect(violations).toEqual([]);
+-  });
+-
+-  it('SurvivalClock больше не импортирует контекст (цикл разорван)', () => {
+-    const source = fs.readFileSync(SCREENS.SurvivalClock, 'utf8');
+-    expect(source).not.toContain('CharacterContext');
+-    expect(source).toContain('useCharacterStore.getState().applySurvivalHpLoss');
+-  });
+-
+-  it('store-слайс экспортирует действия счётчиков', () => {
+-    const source = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
+-    for (const action of ['setCurrentHealth:', 'healCharacter:', 'damageCharacter:', 'addRadiation:', 'healRadiation:', 'setRadiation:', 'applySurvivalHpLoss:']) {
+-      expect(source).toContain(action);
+-    }
+-  });
+-});
+diff --git a/__tests__/saves/character-context-updater-purity.test.js b/__tests__/saves/character-context-updater-purity.test.js
+index 805366a..c62bedc 100644
+--- a/__tests__/saves/character-context-updater-purity.test.js
++++ b/__tests__/saves/character-context-updater-purity.test.js
+@@ -1,4 +1,4 @@
+-// Инвариант «апдейтеры не пишут в стор из рендера» (патч 218) — ПОСЛЕ Шага 8а.
++// Инвариант «апдейтеры не пишут в стор из рендера» (патч 218) — ПОСЛЕ Шага 8в.
+ //
+ // История. Обёртки-сеттеры CharacterProvider (setEquippedRobotSlots /
+ // setEquippedRobotModules / setSelectedPerks) держали useState + зеркало в
+@@ -7,50 +7,29 @@
+ // «Cannot update a component (CharacterProvider) while rendering a
+ // different component (CharacterProvider)».
+ //
+-// Шаг 8а снял обёртки: сеттеры — прямые действия стора (robotSlice /
+-// characterStore), функциональный апдейтер исполняет сам стор, React-рендер
+-// в запись не вовлечён. Контракт проверяется:
+-//   1) статически: в CharacterContext не осталось Raw-обёрток и
+-//      queueMicrotask-зеркал для этих сеттеров;
+-//   2) динамически: стор-действия принимают функциональный апдейтер
+-//      (обязательное требование к сеттерам, прецедент setEquippedWeapons).
++// Шаг 8а снял обёртки, Шаг 8в (патч 243) снёс сам CharacterContext:
++// сеттеры — прямые действия стора (robotSlice / characterStore),
++// функциональный апдейтер исполняет сам стор, React-рендер в запись не
++// вовлечён. Статические проверки контекста умерли вместе с файлом;
++// остались селекторы экранов и динамические проверки апдейтеров
++// (обязательное требование к сеттерам, прецедент setEquippedWeapons).
+ 
+ import { afterEach, describe, expect, it } from 'vitest';
+ import fs from 'node:fs';
+ import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+ import useCharacterStore from '../../src/store/characterStore';
+ 
+-const FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+-// Патч 242: контекст пуст; сеттеры берёт напрямую CharacterScreen.
++// Патч 243: контекст снесён; сеттеры берут напрямую экраны-потребители.
+ const SCREEN_FILE = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js');
+ const PERKS_FILE = path.resolve(__dirname, '../../modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js');
+ const SETTERS = ['setEquippedRobotSlots', 'setEquippedRobotModules', 'setSelectedPerks'];
+ 
+-const parse = () => parseSync(fs.readFileSync(FILE, 'utf8'), {
+-  filename: FILE,
+-  babelrc: false,
+-  configFile: false,
+-  sourceType: 'module',
+-  plugins: [jsxPlugin],
+-});
+-
+ afterEach(async () => {
+   useCharacterStore.getState().resetCharacterStore();
+   await useCharacterStore.persist.clearStorage();
+ });
+ 
+ describe('Шаг 8а: Raw-обёртки патча 218 сняты, стор-действия принимают апдейтер', () => {
+-  it('в CharacterContext нет Raw-обёрток мигрированных сеттеров', () => {
+-    const source = fs.readFileSync(FILE, 'utf8');
+-    for (const setterName of SETTERS) {
+-      expect(source).not.toContain(`${setterName}Raw`);
+-    }
+-    // Обёртки содержали отложенные зеркала — их тоже быть не должно.
+-    expect(source).not.toContain("setSelectedPerks(next || [])");
+-  });
+-
+   it('экраны получают сеттеры из стора (селекторы, не локальные функции)', () => {
+     // Патч 242: контекст пуст; селекторы живут в экранах-потребителях.
+     const sources = {
+diff --git a/__tests__/survival/character-context-imports.test.js b/__tests__/survival/character-context-imports.test.js
+deleted file mode 100644
+index 66debfe..0000000
+--- a/__tests__/survival/character-context-imports.test.js
++++ /dev/null
+@@ -1,116 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { parseSync } from '@babel/core';
+-import jsxPlugin from '@babel/plugin-transform-react-jsx';
+-import ts from 'typescript';
+-
+-// Регрессия патча 198: в CharacterContext был импортирован несуществующий
+-// getCharacterArchetype (функция зовётся getCharacterType) — эффект
+-// инициализации выживания падал TypeError при загрузке сейва и ломал
+-// загрузку дальше по цепочке. Импортировать сам модуль в vitest нельзя
+-// (react-native — Flow), поэтому проверяем целостность именованных
+-// импортов статически: каждое имя из локального '../…' должно быть
+-// экспортировано целевым файлом. С патча 206 целевой модуль может быть
+-// .ts (домен выживания) — такие файлы разбираем TypeScript-парсером.
+-
+-const ROOT = path.resolve(__dirname, '../..');
+-const FILE = path.join(ROOT, 'components/CharacterContext.js');
+-
+-const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
+-    filename: file,
+-    babelrc: false,
+-    configFile: false,
+-    sourceType: 'module',
+-    plugins: [jsxPlugin],
+-    parserOpts: { allowReturnOutsideFunction: true },
+-});
+-
+-const exportedNames = (ast) => {
+-    const names = new Set();
+-    for (const node of ast.program.body) {
+-        if (node.type === 'ExportNamedDeclaration') {
+-            if (node.specifiers.length) {
+-                node.specifiers.forEach((s) => names.add(s.exported.name));
+-            }
+-            const decl = node.declaration;
+-            if (decl) {
+-                if (decl.id) names.add(decl.id.name); // function/class
+-                if (decl.declarations) {
+-                    decl.declarations.forEach((d) => {
+-                        if (d.id.type === 'Identifier') names.add(d.id.name);
+-                    });
+-                }
+-            }
+-        }
+-        if (node.type === 'ExportDefaultDeclaration') names.add('default');
+-    }
+-    return names;
+-};
+-
+-const exportedNamesFromTs = (file) => {
+-    const source = ts.createSourceFile(
+-        file,
+-        fs.readFileSync(file, 'utf8'),
+-        ts.ScriptTarget.Latest,
+-        true,
+-        ts.ScriptKind.TS,
+-    );
+-    const names = new Set();
+-    const collect = (node) => {
+-        if (ts.isExportDeclaration(node)) {
+-            if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+-                node.exportClause.elements.forEach((el) => names.add(el.name.text));
+-            }
+-        } else if (ts.isExportAssignment(node)) {
+-            names.add('default');
+-        } else if (node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) {
+-            if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) {
+-                if (node.name) names.add(node.name.text);
+-            } else if (ts.isVariableStatement(node)) {
+-                node.declarationList.declarations.forEach((d) => {
+-                    if (ts.isIdentifier(d.name)) names.add(d.name.text);
+-                });
+-            } else if (
+-                ts.isInterfaceDeclaration(node)
+-                || ts.isTypeAliasDeclaration(node)
+-                || ts.isEnumDeclaration(node)
+-            ) {
+-                names.add(node.name.text);
+-            }
+-        }
+-        ts.forEachChild(node, collect);
+-    };
+-    collect(source);
+-    return names;
+-};
+-
+-// Целевой модуль импорта: .js или (с патча 206) .ts.
+-const resolveTarget = (base) => {
+-    if (fs.existsSync(`${base}.js`)) return { file: `${base}.js`, isTs: false };
+-    if (fs.existsSync(`${base}.ts`)) return { file: `${base}.ts`, isTs: true };
+-    return null;
+-};
+-
+-describe('CharacterContext: целостность именованных импортов', () => {
+-    it('каждое импортируемое имя существует в целевом локальном модуле', () => {
+-        const ast = parse(FILE);
+-        const problems = [];
+-        for (const node of ast.program.body) {
+-            if (node.type !== 'ImportDeclaration') continue;
+-            if (!node.source.value.startsWith('.')) continue; // только локальные
+-            const target = resolveTarget(path.resolve(path.dirname(FILE), node.source.value));
+-            if (!target) continue; // индексы/пакеты — не наш случай
+-            const available = target.isTs
+-                ? exportedNamesFromTs(target.file)
+-                : exportedNames(parse(target.file));
+-            for (const spec of node.specifiers) {
+-                if (spec.type !== 'ImportSpecifier') continue;
+-                if (!available.has(spec.imported.name)) {
+-                    problems.push(`${node.source.value}: ${spec.imported.name}`);
+-                }
+-            }
+-        }
+-        expect(problems).toEqual([]);
+-    });
+-});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+deleted file mode 100644
+index 368ef85..0000000
+--- a/components/CharacterContext.js
++++ /dev/null
+@@ -1,185 +0,0 @@
+-import { debugLog } from '../src/debug/falloutDebug';
+-import React, { createContext, useContext, useEffect, useMemo } from 'react';
+-import useCharacterStore from '../src/store/characterStore';
+-import { selectLegacyAttributes, selectLegacySkills } from '../src/store/selectors';
+-import { createStateExtensionFields } from '../src/store/stateExtensions';
+-
+-// История: до Шага 8 этот файл был «раздатчиком» всего состояния персонажа
+-// (40+ полей через useCharacter()). Миграция Шаги 1–8б (патчи 219–242)
+-// расселила данные по слайсам characterStore, сохранения — в
+-// src/saves/characterSaves.js, оркестраторы — в orchestratorsSlice.
+-// Остались два React-эффекта:
+-//   1) пуш экипировки в derived-пересчёт стора (пересчёт — очередь микрозадач,
+-//      см. историю патча 218: стор-действия нельзя звать из рендера);
+-//   2) фабрика полей сеттинговых расширений при выборе ориджина (патч 207).
+-// Экраны читают стор напрямую (useCharacterStore), сейвы — модуль
+-// src/saves/characterSaves.js. Фасад useCharacter() пуст и остался только
+-// чтобы напоминать о себе в истории; демонтируется Шагом 8в.
+-
+-const PA_CORE_TICK_MS = 1000;
+-
+-export const CharacterProvider = ({ children }) => {
+-  // Подписки для derived-пуша (2) и фабрики расширений (1).
+-  const attributes = useCharacterStore((s) => s.attributes);
+-  const legacyAttributes = useMemo(
+-    () => selectLegacyAttributes({ attributes }),
+-    [attributes],
+-  );
+-  const level = useCharacterStore((s) => s.level);
+-  const origin = useCharacterStore((s) => s.origin);
+-  const trait = useCharacterStore((s) => s.trait);
+-  const equippedArmor = useCharacterStore((s) => s.equippedArmor);
+-  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
+-  const robotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+-  const stateExtensions = useCharacterStore((s) => s.stateExtensions);
+-
+-  // Новый персонаж: как только выбран ориджин — сеттинговые фабрики
+-  // заполняют ещё не созданные поля (null = «не создано»). При загрузке
+-  // сейва поля заданы миграцией/гидратацией — эффект их не трогает.
+-  useEffect(() => {
+-    if (!origin) return;
+-    const created = createStateExtensionFields({ origin, trait });
+-    let changed = false;
+-    const merged = { ...stateExtensions };
+-    for (const [fieldKey, value] of Object.entries(created)) {
+-      if (merged[fieldKey] === undefined || merged[fieldKey] === null) {
+-        if (merged[fieldKey] === value) continue; // null → null: менять нечего
+-        merged[fieldKey] = value;
+-        changed = true;
+-      }
+-    }
+-    if (changed) useCharacterStore.getState().setStateExtensions(merged);
+-  }, [origin, trait, stateExtensions]);
+-
+-  // Derived-пуш: прокидываем производственные данные экипировки → пересчёт
+-  // derivedStats. Шаг 7: trait/level/origin не зеркалируются — стор читает их
+-  // сам; isRobot считается внутри recalculateDerivedStats. Микротаск выводит
+-  // стор-действие за пределы commit-фазы (патч 218: «Cannot update a
+-  // component while rendering a different component»).
+-  useEffect(() => {
+-    queueMicrotask(() => {
+-      useCharacterStore.getState().setCharacterContext({
+-        equipmentState: {
+-          equippedArmor,
+-          equippedRobotSlots: robotSlots,
+-          powerArmorFrameId: equippedPowerArmor?.frame ? equippedPowerArmor.frame.catalogId : null,
+-        },
+-      });
+-    });
+-  }, [legacyAttributes, trait, level, origin, equippedArmor, robotSlots, equippedPowerArmor]);
+-
+-  // Таймер расхода блока силовой брони (§5.3/§5.4): тикает только пока
+-  // приложение открыто; состояние — в powerArmorSlice (Шаг 4 миграции).
+-  useEffect(() => {
+-    const interval = setInterval(() => {
+-      useCharacterStore.getState().tickPowerArmorCore(PA_CORE_TICK_MS);
+-    }, PA_CORE_TICK_MS);
+-    return () => clearInterval(interval);
+-  }, []);
+-
+-  // Фасад пуст: все поля переехали в стор/модули (см. историю выше).
+-  const value = {};
+-
+-  return (
+-    <CharacterContext.Provider value={value}>
+-      {children}
+-    </CharacterContext.Provider>
+-  );
+-};
+-
+-export const useCharacter = () => {
+-  return useContext(CharacterContext);
+-};
+-
+-// --- Wrapper Hooks for Zustand Store (Task 4.1) ---
+-
+-/**
+- * Hook to access character attributes through Zustand Store
+- * @param {string} attrId - Attribute ID (e.g., 'STR', 'END', 'PER')
+- * @returns {Object} Attribute with base, modifiers, and total
+- */
+-export const useCharacterAttribute = (attrId) => {
+-  const attribute = useCharacterStore((state) => state.attributes[attrId]);
+-
+-  // Warn if attribute doesn't exist (should be created on load)
+-  if (!attribute) {
+-    debugLog('store.attrNotFound', { attrId, where: 'useCharacterAttribute' });
+-  }
+-
+-  return attribute;
+-};
+-
+-/**
+- * Hook to access character items through Zustand Store
+- * @param {string} itemId - Item ID
+- * @returns {Object} Item object with all parameters
+- */
+-export const useCharacterItem = (itemId) => {
+-  const item = useCharacterStore((state) => state.items[itemId]);
+-
+-  // Warn if item doesn't exist
+-  if (!item) {
+-    debugLog('store.itemNotFound', { itemId, where: 'useCharacterItem' });
+-  }
+-
+-  return item;
+-};
+-
+-/**
+- * Hook to access active effects through Zustand Store
+- * @param {string} effectId - Effect ID
+- * @returns {Object} Effect object with parameters
+- */
+-export const useCharacterEffect = (effectId) => {
+-  const effect = useCharacterStore((state) => state.effects[effectId]);
+-
+-  // Warn if effect doesn't exist
+-  if (!effect) {
+-    debugLog('store.effectNotFound', { effectId, where: 'useCharacterEffect' });
+-  }
+-
+-  return effect;
+-};
+-
+-/**
+- * Hook to get all attributes from Zustand Store
+- * @returns {Object} Dictionary of all attributes
+- */
+-export const useCharacterAttributes = () => {
+-  return useCharacterStore((state) => state.attributes);
+-};
+-
+-/**
+- * Hook to get all items from Zustand Store
+- * @returns {Object} Dictionary of all items
+- */
+-export const useCharacterItems = () => {
+-  return useCharacterStore((state) => state.items);
+-};
+-
+-/**
+- * Hook to get all active effects from Zustand Store
+- * @returns {Object} Dictionary of all active effects
+- */
+-export const useCharacterEffects = () => {
+-  return useCharacterStore((state) => state.effects);
+-};
+-
+-// ── Robot selectors (read-only) — экраны читают робо-состояние из стора ──────
+-// Используйте эти хуки вместо чтения equippedRobotSlots/Modules из useCharacter(),
+-// чтобы UI реактивно обновлялся из единого источника правды и не мутировал данные.
+-
+-/** Все слоты робота { [slotKey]: SlotData }. */
+-export const useRobotSlots = () => {
+-  return useCharacterStore((state) => state.robot?.slots || {});
+-};
+-
+-/** Установленные модули робота. */
+-export const useRobotModules = () => {
+-  return useCharacterStore((state) => state.robot?.modules || []);
+-};
+-
+-/** Текущий body plan робота (e.g. 'protectron'). */
+-export const useRobotBodyPlan = () => {
+-  return useCharacterStore((state) => state.robot?.bodyPlan ?? null);
+-};
+diff --git a/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js b/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
+index 33f29a8..5a91b89 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
+@@ -8,7 +8,6 @@ import {
+   StyleSheet,
+   Pressable,
+ } from 'react-native';
+-import { useRobotBodyPlan } from '../../../../../components/CharacterContext';
+ import useCharacterStore from '../../../../../src/store/characterStore';
+ import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
+ import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
+@@ -112,7 +111,8 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+   // Шаг 8а: слоты робота — слайс robot стора напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+-  const bodyPlan = useRobotBodyPlan();
++  // Шаг 8в (патч 243): контекст снесён — bodyPlan читается из стора напрямую.
++  const bodyPlan = useCharacterStore((s) => s.robot?.bodyPlan ?? null);
+   useLocale();
+   const moduleLocale = useModuleLocale();
+   const equipmentCatalog = useMemo(
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+index 264018d..7466171 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SurvivalConsumeModal.tsx
+@@ -15,7 +15,6 @@
+ 
+ import React, { useMemo } from 'react';
+ import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
+-import { useCharacter } from '../../../../../components/CharacterContext';
+ import useCharacterStore from '../../../../../src/store/characterStore';
+ import { selectItemsByEquipped } from '../../../../../src/store/selectors';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 4ffb921..10989bc 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -75,6 +75,7 @@ import { isRobotCharacter } from '../../domain/origins';
+ // в CharacterContext.
+ import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
+ import { selectLegacyAttributes } from './selectors.js';
++import { createStateExtensionFields } from './stateExtensions.js';
+ import { catalogGetWeaponModById } from '../../db/catalogSource';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
+@@ -1052,6 +1053,30 @@ const useCharacterStore = create(devtools(
+         set({ derivedStats });
+       },
+ 
++      /**
++       * Шаг 8в (патч 243): заполнить ещё не созданные поля сеттинговых
++       * расширений (src/store/stateExtensions.js) по текущим origin/trait.
++       * Раньше это делал эффект CharacterProvider (патч 207); после сноса
++       * контекста действие зовут setOrigin/setTrait и колбэк реидратации.
++       * null = «не создано»: фабрика заполняет ТОЛЬКО отсутствующие поля
++       * (undefined/null); заданные сейвом/миграциями не трогает.
++       */
++      ensureStateExtensionFields: () => {
++        const { origin, trait, stateExtensions } = get();
++        if (!origin) return;
++        const created = createStateExtensionFields({ origin, trait });
++        let changed = false;
++        const merged = { ...stateExtensions };
++        for (const [fieldKey, value] of Object.entries(created)) {
++          if (merged[fieldKey] === undefined || merged[fieldKey] === null) {
++            if (merged[fieldKey] === value) continue; // null → null: менять нечего
++            merged[fieldKey] = value;
++            changed = true;
++          }
++        }
++        if (changed) set({ stateExtensions: merged });
++      },
++
+       /**
+        * Set character context for derived stats calculation
+        * @param {Object} context - { trait, level, equipmentState }
+@@ -1232,13 +1257,21 @@ const useCharacterStore = create(devtools(
+       // ── Профиль персонажа (Шаг 7): сеттеры с функциональным апдейтером ──
+ 
+       /** Ориджин (объект каталога | null). */
+-      setOrigin: (updater) => set((state) => ({
+-        origin: typeof updater === 'function' ? updater(state.origin) : updater,
+-      })),
++      setOrigin: (updater) => {
++        set((state) => ({
++          origin: typeof updater === 'function' ? updater(state.origin) : updater,
++        }));
++        // Шаг 8в (патч 243): эффект провайдера снесён — фабрики полей
++        // сеттингов заполняются действием стора.
++        get().ensureStateExtensionFields();
++      },
+       /** Трейт (объект каталога | null). */
+-      setTrait: (updater) => set((state) => ({
+-        trait: typeof updater === 'function' ? updater(state.trait) : updater,
+-      })),
++      setTrait: (updater) => {
++        set((state) => ({
++          trait: typeof updater === 'function' ? updater(state.trait) : updater,
++        }));
++        get().ensureStateExtensionFields();
++      },
+       /** Уровень персонажа. */
+       setLevel: (updater) => set((state) => ({
+         level: typeof updater === 'function' ? updater(state.level) : updater,
+@@ -1730,6 +1763,9 @@ const useCharacterStore = create(devtools(
+           // stale equipped item must not make the whole PWA fail before the
+           // canonical character row can be loaded from SQLite.
+           try {
++            // Шаг 8в (патч 243): сначала фабрики расширений (эффект
++            // провайдера снесён), затем пересчёт производных.
++            state.ensureStateExtensionFields?.();
+             state.recalculateAll();
+           } catch (error) {
+             debugLog('characterStore.rehydrate.recalculateFailed', {
+@@ -1752,4 +1788,50 @@ const useCharacterStore = create(devtools(
+   }
+ ));
+ 
++// ── Шаг 8в (патч 243): derived-самосинхронизация стора ─────────────────────
++// Эффект CharacterProvider (пуш equipmentState → setCharacterContext) снесён
++// вместе с контекстом: стор сам следит за экипировкой/профилем и пересчитывает
++// производные. Наблюдаемые ключи — deps бывшего эффекта провайдера (атрибуты
++// не смотрим: их стор-действия зовут recalculateDerivedStats сами). Подписка
++// срабатывает вне рендера (микрозадача патча 218 больше не нужна), повторный
++// пуш с теми же ссылками гасится сравнением сигнатуры — цикла нет.
++const derivedSnapshot = (state) => [
++  state.trait,
++  state.level,
++  state.origin,
++  state.equippedArmor,
++  state.robot?.slots ?? null,
++  state.equippedPowerArmor,
++];
++
++const pushDerivedContext = () => {
++  const state = useCharacterStore.getState();
++  useCharacterStore.getState().setCharacterContext({
++    equipmentState: {
++      equippedArmor: state.equippedArmor,
++      equippedRobotSlots: state.robot?.slots ?? null,
++      powerArmorFrameId: state.equippedPowerArmor?.frame
++        ? state.equippedPowerArmor.frame.catalogId
++        : null,
++    },
++  });
++};
++
++let lastDerivedSignature = null;
++useCharacterStore.subscribe((state) => {
++  const signature = derivedSnapshot(state);
++  if (lastDerivedSignature !== null
++    && signature.length === lastDerivedSignature.length
++    && signature.every((value, index) => value === lastDerivedSignature[index])) {
++    return;
++  }
++  lastDerivedSignature = signature;
++  pushDerivedContext();
++});
++
++// Стартовый пуш — эквивалент монтирования провайдера: derivedStats не пустые
++// до первого действия пользователя (свежая установка без реидратации).
++pushDerivedContext();
++lastDerivedSignature = derivedSnapshot(useCharacterStore.getState());
++
+ export default useCharacterStore;
+-- 
+2.39.5
+
