@@ -78,8 +78,9 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 const InventoryScreen = () => {
   const {
     currency, earnCurrency, spendCurrency,
-    applyConsumableFull,
   } = useCharacter();
+  // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
+  const applyConsumableFull = useCharacterStore((s) => s.applyConsumableFull);
   // Шаг 8а (патч 239): превью радиации — стор-экшен.
   const previewConsumableRadiation = useCharacterStore((s) => s.previewConsumableRadiation);
   // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.

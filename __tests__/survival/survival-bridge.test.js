@@ -153,16 +153,8 @@ describe('survival: гейт настройкой survivalModeEnabled (этап 
     start.sleep = 2;
     setStoreSurvival(start);
     setSurvivalEnabled(false);
-    const result = sleepSurvival(
-      {
-        setStateExtension: useCharacterStore.getState().setStateExtension,
-        currentHealth: 20,
-        setCurrentHealth: () => {},
-        advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
-        resolveSceneRiskEventById: () => null,
-      },
-      { place: 'bed', hours: 8 },
-    );
+    // Патч 240: sleepSurvival(options) — все зависимости из стора.
+    const result = sleepSurvival({ place: 'bed', hours: 8 });
     expect(result).toEqual({ ok: false, reason: 'disabled' });
     expect(storeSurvival().sleep).toBe(2);
   });
@@ -173,36 +165,28 @@ describe('sleepSurvival: сон применяется к слайсу стор�
     const start = createSurvivalState('human');
     start.sleep = 2;
     setStoreSurvival(start);
-    const hpApplied = [];
-    const result = sleepSurvival(
-      {
-        setStateExtension: useCharacterStore.getState().setStateExtension,
-        setCurrentHealth: (hp) => hpApplied.push(hp),
-        advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
-        resolveSceneRiskEventById: () => null,
-      },
-      { place: 'bed', hours: 8 },
-    );
+    useCharacterStore.setState({ currentHealth: 20 });
+    const result = sleepSurvival({ place: 'bed', hours: 8 });
     expect(result.ok).toBe(true);
     expect(storeSurvival().sleep).toBe(5);
     expect(storeSurvival().hpBonus).toBe(SURVIVAL_RULES.sleep.hpBonus);
     expect(result.diseaseRiskResult).toBeNull(); // кровать — без проверки болезни
     // Усталость снижает максимум ОЗ (производная), сон текущие ОЗ не пишет.
-    expect(hpApplied).toEqual([]);
+    expect(useCharacterStore.getState().currentHealth).toBe(20);
   });
 
   it('сон в пустоши — проверка болезни', () => {
     const start = createSurvivalState('human');
     setStoreSurvival(start);
+    // Проверку болезни подменяем стор-экшен (броски случая — не для теста).
     const disease = { status: 'passed' };
-    const result = sleepSurvival(
-      {
-        setStateExtension: useCharacterStore.getState().setStateExtension,
-        advanceEffectsByGameHours: () => ({ effects: [], expired: [] }),
-        resolveSceneRiskEventById: () => disease,
-      },
-      { place: 'wasteland', hours: 4 },
-    );
+    const realCheck = useCharacterStore.getState().applyDiseaseExposureEvent;
+    useCharacterStore.setState({ applyDiseaseExposureEvent: () => disease });
+    try {
+      var result = sleepSurvival({ place: 'wasteland', hours: 4 });
+    } finally {
+      useCharacterStore.setState({ applyDiseaseExposureEvent: realCheck });
+    }
     expect(result.ok).toBe(true);
     expect(result.diseaseRiskResult).toBe(disease);
     // пустошь: потолок «отдохнувший», бонуса нет

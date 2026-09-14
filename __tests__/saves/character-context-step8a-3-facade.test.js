@@ -57,6 +57,10 @@ const REMOVED_MEMBERS = [
   'modifiedItems', 'setModifiedItems',
   'getModifiedItem', 'saveModifiedItem', 'removeModifiedItem', 'getItemId',
   'commitAttributeChanges', // патч 238
+  // патч 240: оркестраторы — orchestratorsSlice
+  'applyConsumableFull', 'reducePersistentDiseaseRanks', 'resistDisease',
+  'advanceEffectsByGameHours', 'resolveSceneRiskEventById',
+  'stateExtensions', 'setStateExtension',
 ];
 
 describe('Шаг 8а (часть 3): фасад без комплекта/сцен/эффектов/модификаций', () => {
@@ -142,6 +146,10 @@ describe('Шаг 8а (часть 3): экраны — напрямую на ст
     const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
     for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'commitAttributeChanges:']) {
       expect(store).toContain(action);
+    }
+    const orchestrators = fs.readFileSync(path.resolve(__dirname, '../../src/store/orchestratorsSlice.js'), 'utf8');
+    for (const action of ['const applyConsumableFull', 'const resistDisease', 'const reducePersistentDiseaseRanks', 'const advanceEffectsByGameHours']) {
+      expect(orchestrators).toContain(action);
     }
     const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');
     expect(identity).toContain('export const getItemId');

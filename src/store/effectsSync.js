@@ -21,6 +21,10 @@ export const legacyEffectToStore = (effect) => ({
   sourceName: effect.sourceName,
   effectType: effect.effectType,
   conditionId: effect.conditionId,
+  // Патч 240: ранг болезни (патч 215) обязан переживать словарь↔массив:
+  // без него effectDiseaseRank считал любую болезнь рангом 1 — антибиотик
+  // и «Сопротивляться» лечили многоранговые болезни с одной попытки.
+  rank: effect.rank,
 });
 
 export const storeEffectToLegacy = (effect) => ({
@@ -39,6 +43,7 @@ export const storeEffectToLegacy = (effect) => ({
   sourceName: effect.sourceName,
   effectType: effect.effectType,
   conditionId: effect.conditionId,
+  rank: effect.rank,
 });
 
 export const legacyEffectsArrayToStore = (effectsArray = []) => {

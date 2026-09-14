@@ -55,9 +55,8 @@ const t = (path: string): string => tWeaponsAndArmorScreen(path);
 const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalProps) => {
     useLocale();
     const moduleLocale = useModuleLocale();
-    const {
-        applyConsumableFull,
-    } = useCharacter();
+    // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
+    const applyConsumableFull = useCharacterStore((state) => state.applyConsumableFull);
     // Шаг 8а (патч 239): превью радиации — стор-экшен.
     const previewConsumableRadiation = useCharacterStore((state) => state.previewConsumableRadiation);
     // Шаг 7: origin/trait — стор напрямую.

@@ -123,9 +123,10 @@ describe('Шаг 6: фасад useCharacter() без полей условий/�
     expect(source.split('setInterval').length - 1).toBe(1);
   });
 
-  it('колбэки болезней остались на фасаде (их потребители — DI survival и W&A)', () => {
+  it('патч 240: колбэки болезней ушли в стор (orchestratorsSlice), на фасаде их нет', () => {
     for (const name of ['advanceEffectsByGameHours', 'resolveSceneRiskEventById', 'reducePersistentDiseaseRanks', 'resistDisease']) {
-      expect(source).toContain(name);
+      // Члены фасада — код; упоминания в комментариях-истории допустимы.
+      expect(new RegExp(`\\n\\s*${name}[,:}]`).test(source)).toBe(false);
     }
   });
 });
@@ -133,8 +134,8 @@ describe('Шаг 6: фасад useCharacter() без полей условий/�
 describe('Шаг 6: WeaponsAndArmorScreen читает стор напрямую', () => {
   const source = fs.readFileSync(WA_FILE, 'utf8');
 
-  it('lastDiseaseResistAt — из useCharacterStore, не из useCharacter()', () => {
-    expect(source).toContain('const { resistDisease } = useCharacter();');
+  it('lastDiseaseResistAt и resistDisease — из useCharacterStore, не из useCharacter()', () => {
+    expect(source).toContain('useCharacterStore((state) => state.resistDisease)');
     expect(source).toContain('useCharacterStore((state) => state.lastDiseaseResistAt)');
   });
 });

@@ -55,6 +55,7 @@ import { legacyEffectToStore, effectsDictToLegacyArray, syncTimedEffectsToStore 
 import { advanceEffectsByScene, applyConsumableToEffects, pruneExpiredTimedEffects, resolveConsumableRadiationRoll } from '../../domain/effects';
 import { hasRadiationImmunity } from '../../domain/immunities';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+import { createOrchestrationActions } from './orchestratorsSlice.js';
 import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
@@ -315,6 +316,7 @@ const useCharacterStore = create(devtools(
 
       // --- Actions: Equipped armor & power armor (delegated to powerArmorSlice) ---
       ...createPowerArmorActions(set, get),
+      ...createOrchestrationActions(set, get),
 
       // --- Actions: Attributes ---
 

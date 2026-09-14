@@ -195,7 +195,8 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
   const moduleLocale = useModuleLocale();
-  const { resistDisease } = useCharacter();
+  // Шаг 8а (патч 240): «Сопротивляться» болезни — стор-экшен.
+  const resistDisease = useCharacterStore((state) => state.resistDisease);
   // lastDiseaseResistAt — Шаг 6 миграции: состояние в сторе, экран читает напрямую.
   const lastDiseaseResistAt = useCharacterStore((state) => state.lastDiseaseResistAt);
   const diseasesById = useMemo(() => new Map(

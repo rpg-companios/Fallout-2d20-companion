@@ -9,7 +9,6 @@
 
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore, { selectSurvivalModeEnabled } from '../../../src/store/appSettingsStore';
-import { useCharacter } from '../../../components/CharacterContext';
 import { sleepSurvival } from './operations';
 
 /** Текущее состояние выживания (null: выключено настройкой, робот/киборг, не создано). */
@@ -21,9 +20,8 @@ export const useSurvivalState = () => {
 
 /** Операции выживания: смена состояния поля (действие стора) и сон. */
 export const useSurvivalActions = () => {
-  const ctx = useCharacter();
   return {
     setSurvival: (state) => useCharacterStore.getState().setStateExtension('survival', state),
-    sleepSurvival: (options) => sleepSurvival(ctx, options),
+    sleepSurvival: (options) => sleepSurvival(options),
   };
 };
