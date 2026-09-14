@@ -18,7 +18,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCharacter } from '../../CharacterContext';
+import useCharacterStore from '../../src/store/characterStore';
+// Шаг 8б (патч 242): сохранения — обычный модуль без React.
+import * as savesModule from '../../src/saves/characterSaves';
 import { findEnrichedOrigin } from '../../../domain/origins';
 import {
   SUPPORTED_LOCALES,
@@ -203,7 +205,12 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 export default function HomeScreen({ navigation }) {
   const locale = useLocale();
   const moduleLocale = useModuleLocale();
-  const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
+  // Шаг 8б (патч 242): папка сохранений — модуль src/saves/characterSaves.js,
+  // сброс — стор-экшен; фасад useCharacter() сейв-члены больше не отдаёт.
+  const getCharactersList = savesModule.getCharactersList;
+  const loadCharacter = savesModule.loadCharacter;
+  const deleteCharacter = savesModule.deleteCharacter;
+  const resetCharacter = useCharacterStore((s) => s.resetCharacter);
   const [characters, setCharacters] = useState([]);
   const [folders, setFolders] = useState([]);
   const [folderCounts, setFolderCounts] = useState({});

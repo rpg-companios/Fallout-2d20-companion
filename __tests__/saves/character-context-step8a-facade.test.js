@@ -11,6 +11,7 @@ import { parseSync } from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
 
 const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
 const SCREENS = {
   CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
   WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
@@ -55,11 +56,13 @@ const STEP8A_MEMBERS = [
 describe('Шаг 8а: фасад useCharacter() без счётчиков', () => {
   const ast = parse(CONTEXT_FILE);
   const facadeValues = [];
+  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
   walk(ast, (node) => {
-    if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')
-      && node.properties.some((prop) => propertyName(prop) === 'characterId')) {
-      facadeValues.push(node);
+    if (node.type === 'VariableDeclarator'
+      && node.id?.type === 'Identifier'
+      && node.id.name === 'value'
+      && node.init?.type === 'ObjectExpression') {
+      facadeValues.push(node.init);
     }
   });
 
@@ -74,21 +77,25 @@ describe('Шаг 8а: фасад useCharacter() без счётчиков', () =
 
   it('снапшот сейва сохраняет currentHealth/radiation (формат не менялся)', () => {
     const snapshots = [];
-    walk(ast, (node) => {
+    walk(parse(SAVES_FILE), (node) => {  // патч 242: buildSnapshot в модуле сейвов
       if (node.type === 'ObjectExpression'
         && node.properties.some((prop) => propertyName(prop) === 'currentHealth')
-        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')) {
+        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
+        && node.properties.some((prop) => propertyName(prop) === 'equipment')) {
         snapshots.push(node);
       }
     });
     expect(snapshots.length).toBe(1);
   });
 
-  it('счётчики в контексте — стор-селекторы', () => {
-    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
-    expect(source).toContain('useCharacterStore((s) => s.currentHealth)');
-    expect(source).toContain('useCharacterStore((s) => s.radiation)');
-    expect(source).not.toContain('setRadiationRaw');
+  it('счётчики — стор; снапшот читает state.currentHealth/state.radiation', () => {
+    // Патч 242: контекст пуст; экраны (CharacterScreen) читают стор напрямую.
+    const cs = fs.readFileSync(SCREENS.WeaponsAndArmorScreen, 'utf8');
+    expect(cs).toContain('useCharacterStore((state) => state.currentHealth)');
+    const saves = fs.readFileSync(SAVES_FILE, 'utf8');
+    expect(saves).toContain('currentHealth: state.currentHealth');
+    expect(saves).toContain('radiation: state.radiation');
+    expect(saves).not.toContain('setRadiationRaw');
   });
 });
 

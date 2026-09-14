@@ -16,6 +16,7 @@ import { parseSync } from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
 
 const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
 const SCREENS = {
   CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
   WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
@@ -66,11 +67,13 @@ const REMOVED_MEMBERS = [
 describe('Шаг 8а (часть 3): фасад без комплекта/сцен/эффектов/модификаций', () => {
   const ast = parse(CONTEXT_FILE);
   const facadeValues = [];
+  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
   walk(ast, (node) => {
-    if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')
-      && node.properties.some((prop) => propertyName(prop) === 'characterId')) {
-      facadeValues.push(node);
+    if (node.type === 'VariableDeclarator'
+      && node.id?.type === 'Identifier'
+      && node.id.name === 'value'
+      && node.init?.type === 'ObjectExpression') {
+      facadeValues.push(node.init);
     }
   });
 
@@ -85,7 +88,7 @@ describe('Шаг 8а (часть 3): фасад без комплекта/сце
 
   it('снапшот сейва сохраняет исторические ключи effects/modifiedItems/sceneCounter', () => {
     const snapshots = [];
-    walk(ast, (node) => {
+    walk(parse(SAVES_FILE), (node) => {  // патч 242: buildSnapshot в модуле сейвов
       if (node.type === 'ObjectExpression'
         && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
         && node.properties.some((prop) => propertyName(prop) === 'effects')
@@ -97,11 +100,11 @@ describe('Шаг 8а (часть 3): фасад без комплекта/сце
     expect(snapshots.length).toBe(1);
   });
 
-  it('effects в контексте — алиас traitEffects (стор), модификации — Map из словаря стора', () => {
-    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
-    expect(source).toContain('const traitEffects = useCharacterStore((s) => s.traitEffects)');
-    expect(source).toContain('effects: traitEffects');
-    expect(source).toContain('new Map(Object.entries(storeModifiedItems || {}))');
+  it('effects — алиас traitEffects (стор), модификации — Map из словаря стора (модуль сейвов)', () => {
+    // Патч 242: и то и другое теперь в buildSnapshot модуля сейвов.
+    const source = fs.readFileSync(SAVES_FILE, 'utf8');
+    expect(source).toContain('effects: state.traitEffects');
+    expect(source).toContain('modifiedItems: new Map(Object.entries(state.modifiedItems || {}))');
   });
 });
 

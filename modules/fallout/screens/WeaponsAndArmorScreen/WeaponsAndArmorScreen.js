@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCharacter } from '../../../../components/CharacterContext';
 import { showRawAlert } from '../../../../components/alerts/alertService';
 import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../../../domain/diseaseConditions';
 import useCharacterStore from '../../../../src/store/characterStore';

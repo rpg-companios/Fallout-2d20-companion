@@ -240,6 +240,10 @@ const useCharacterStore = create(devtools(
       sceneCounter: 0,
       traitEffects: [],
       modifiedItems: {},
+      // Текущий сейв — runtime-состояние (НЕ персистится): персонаж выбирается
+      // из списка при старте; автосейв работает только для isSaved+id.
+      currentCharacterId: null,
+      isSaved: false,
       // Заболевания/состояния — Шаг 6 миграции (источник — стор).
       conditions: [],
       chemDosesLog: [],
@@ -1514,6 +1518,28 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Полный сброс персонажа («создать нового»): стартовые атрибуты/навыки,
+       * здоровье на полный потолок, удача по стартовым атрибутам, чистый сейв-
+       * статус. Шаг 8б (патч 242): переехал из CharacterContext; вся рутинная
+       * часть — resetCharacterStore (профиль/счётчики/условия/снаряжение/робот/
+       * броня/расширения), здесь — только то, что он не сеет.
+       * Параметр preserveOrigin исторический: полному сбросу нечего сохранять.
+       */
+      resetCharacter: () => {
+        useCharacterStore.persist?.clearStorage?.();
+        get().resetCharacterStore({});
+        const initialAttributes = createInitialAttributes();
+        const initialLuck = getLuckPoints(initialAttributes);
+        set({
+          currentHealth: calculateMaxHealth(initialAttributes, 1),
+          maxLuckPoints: initialLuck,
+          luckPoints: initialLuck,
+          currentCharacterId: null,
+          isSaved: false,
+        });
+      },
+
+      /**
        * Сброс комплекта снаряжения (смена ориджина/комплекта): очищает
        * инвентарь, награды за навыки, снаряжение, слоты робота, броню/СБ,
        * крышки — но СОХРАНЯЕТ атрибуты/навыки/профиль/здоровье.
@@ -1604,6 +1630,9 @@ const useCharacterStore = create(devtools(
           sceneCounter: 0,
           traitEffects: [],
           modifiedItems: {},
+          // Текущий сейв — runtime (Шаг 8б).
+          currentCharacterId: null,
+          isSaved: false,
           selectedPerks: legacyDefaults?.selectedPerks || [],
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},

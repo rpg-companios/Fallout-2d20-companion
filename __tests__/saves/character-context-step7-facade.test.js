@@ -22,6 +22,7 @@ import jsxPlugin from '@babel/plugin-transform-react-jsx';
 import tsPlugin from '@babel/plugin-transform-typescript';
 
 const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
 const SCREENS = {
   CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
   PerksAndTraitsScreen: path.resolve(__dirname, '../../modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js'),
@@ -75,12 +76,14 @@ const STEP7_SETTERS = [
 describe('Шаг 7: фасад useCharacter() без полей профиля', () => {
   const ast = parse(CONTEXT_FILE);
 
+  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
   const facadeValues = [];
   walk(ast, (node) => {
-    if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')
-      && node.properties.some((prop) => propertyName(prop) === 'characterId')) {
-      facadeValues.push(node);
+    if (node.type === 'VariableDeclarator'
+      && node.id?.type === 'Identifier'
+      && node.id.name === 'value'
+      && node.init?.type === 'ObjectExpression') {
+      facadeValues.push(node.init);
     }
   });
 
@@ -94,26 +97,32 @@ describe('Шаг 7: фасад useCharacter() без полей профиля',
     expect(names.filter((name) => STEP7_SETTERS.includes(name))).toEqual([]);
   });
 
-  it('уровень/имя/origin/trait/флаги/удача/перки в контексте — стор-селекторы', () => {
-    const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
-    for (const field of STEP7_FIELDS) {
-      expect(source).toContain(`useCharacterStore((s) => s.${field})`);
+  it('уровень/имя/origin/trait/флаги/удача/перки — стор-селекторы (экран, модуль сейвов)', () => {
+    // Патч 242: контекст пуст; профиль читают CharacterScreen и buildSnapshot.
+    const cs = fs.readFileSync(SCREENS.CharacterScreen, 'utf8');
+    for (const field of ['origin', 'trait', 'level', 'characterName', 'attributesSaved', 'skillsSaved', 'luckPoints', 'maxLuckPoints']) {
+      expect(cs).toContain(`useCharacterStore((s) => s.${field})`);
+    }
+    const saves = fs.readFileSync(SAVES_FILE, 'utf8');
+    for (const field of ['characterName', 'level', 'origin', 'trait', 'attributesSaved', 'skillsSaved', 'luckPoints', 'availablePerkAttributePoints']) {
+      expect(saves).toContain(`state.${field}`);
     }
   });
 
   it('зеркало _characterContext подрезано: setCharacterContext не получает trait/level/origin', () => {
     const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
-    expect(source).toContain('current.setCharacterContext({\n        equipmentState:');
+    expect(source).toContain('setCharacterContext({\n        equipmentState:');
     expect(source).not.toMatch(/setCharacterContext\(\{\s*\n\s*trait,/);
   });
 
-  it('buildSnapshot сохраняет поля профиля (формат сейва не менялся)', () => {
+  it('buildSnapshot (модуль сейвов, патч 242) сохраняет поля профиля (формат сейва не менялся)', () => {
     const snapshots = [];
-    walk(ast, (node) => {
+    walk(parse(SAVES_FILE), (node) => {
       if (node.type === 'ObjectExpression'
         && node.properties.some((prop) => propertyName(prop) === 'attributesSaved')
         && node.properties.some((prop) => propertyName(prop) === 'luckPoints')
-        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')) {
+        && node.properties.some((prop) => propertyName(prop) === 'chemDosesLog')
+        && node.properties.some((prop) => propertyName(prop) === 'activeTimedEffects')) {
         snapshots.push(node);
       }
     });

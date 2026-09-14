@@ -23,6 +23,9 @@ import jsxPlugin from '@babel/plugin-transform-react-jsx';
 import useCharacterStore from '../../src/store/characterStore';
 
 const FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+// Патч 242: контекст пуст; сеттеры берёт напрямую CharacterScreen.
+const SCREEN_FILE = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js');
+const PERKS_FILE = path.resolve(__dirname, '../../modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js');
 const SETTERS = ['setEquippedRobotSlots', 'setEquippedRobotModules', 'setSelectedPerks'];
 
 const parse = () => parseSync(fs.readFileSync(FILE, 'utf8'), {
@@ -48,10 +51,15 @@ describe('Шаг 8а: Raw-обёртки патча 218 сняты, стор-д�
     expect(source).not.toContain("setSelectedPerks(next || [])");
   });
 
-  it('контекст получает сеттеры из стора (селекторы, не локальные функции)', () => {
-    const source = fs.readFileSync(FILE, 'utf8');
+  it('экраны получают сеттеры из стора (селекторы, не локальные функции)', () => {
+    // Патч 242: контекст пуст; селекторы живут в экранах-потребителях.
+    const sources = {
+      setEquippedRobotSlots: fs.readFileSync(SCREEN_FILE, 'utf8'),
+      setEquippedRobotModules: fs.readFileSync(SCREEN_FILE, 'utf8'),
+      setSelectedPerks: fs.readFileSync(PERKS_FILE, 'utf8'),
+    };
     for (const setterName of SETTERS) {
-      expect(source).toContain(`useCharacterStore((s) => s.${setterName})`);
+      expect(sources[setterName]).toContain(`useCharacterStore((s) => s.${setterName})`);
     }
   });
 

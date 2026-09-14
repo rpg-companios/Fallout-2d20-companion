@@ -13,6 +13,7 @@ import { parseSync } from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
 
 const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
 const SCREENS = {
   CharacterScreen: path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js'),
   WeaponsAndArmorScreen: path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
@@ -61,11 +62,13 @@ const REMOVED_MEMBERS = [
 describe('Шаг 8а (часть 2): фасад без робота/перков/зеркал', () => {
   const ast = parse(CONTEXT_FILE);
   const facadeValues = [];
+  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
   walk(ast, (node) => {
-    if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')
-      && node.properties.some((prop) => propertyName(prop) === 'characterId')) {
-      facadeValues.push(node);
+    if (node.type === 'VariableDeclarator'
+      && node.id?.type === 'Identifier'
+      && node.id.name === 'value'
+      && node.init?.type === 'ObjectExpression') {
+      facadeValues.push(node.init);
     }
   });
 
@@ -80,7 +83,7 @@ describe('Шаг 8а (часть 2): фасад без робота/перков
 
   it('снапшот сейва сохраняет ключи робота (формат не менялся)', () => {
     const snapshots = [];
-    walk(ast, (node) => {
+    walk(parse(SAVES_FILE), (node) => {  // патч 242: buildSnapshot в модуле сейвов
       if (node.type === 'ObjectExpression'
         && node.properties.some((prop) => propertyName(prop) === 'equippedRobotSlots')
         && node.properties.some((prop) => propertyName(prop) === 'equippedRobotModules')

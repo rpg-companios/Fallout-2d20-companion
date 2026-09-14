@@ -52,11 +52,14 @@ const propertyName = (prop) => {
 describe('Шаг 5: фасад useCharacter() без сеттеров атрибутов/навыков', () => {
   const ast = parse(CONTEXT_FILE);
 
+  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
   const valueObjects = [];
   walk(ast, (node) => {
-    if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')) {
-      valueObjects.push(node);
+    if (node.type === 'VariableDeclarator'
+      && node.id?.type === 'Identifier'
+      && node.id.name === 'value'
+      && node.init?.type === 'ObjectExpression') {
+      valueObjects.push(node.init);
     }
   });
 

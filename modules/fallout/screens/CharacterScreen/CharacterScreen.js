@@ -11,7 +11,8 @@ import {
   Modal,
   TextInput,
 } from "react-native";
-import { useCharacter } from "../../../../components/CharacterContext";
+// Шаг 8б (патч 242): сохранение — модуль сейвов (без React).
+import { saveCharacter } from "../../../../src/saves/characterSaves";
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
 import useCharacterStore from "../../../../src/store/characterStore";
 import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
@@ -261,11 +262,9 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
 
 export default function CharacterScreen() {
 
-  const {
-    isSaved,
-    saveCharacter,
-    resetCharacter,
-  } = useCharacter();
+  // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
+  const isSaved = useCharacterStore((s) => s.isSaved);
+  const resetCharacter = useCharacterStore((s) => s.resetCharacter);
   // Шаг 8а (патч 241): деньги и сброс комплекта — стор напрямую (с Шага 2/8а).
   const currency = useCharacterStore((s) => s.currency);
   const earnCurrency = useCharacterStore((s) => s.earnCurrency);

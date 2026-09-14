@@ -17,6 +17,7 @@ import { parseSync } from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
 
 const CONTEXT_FILE = path.resolve(__dirname, '../../components/CharacterContext.js');
+const SAVES_FILE = path.resolve(__dirname, '../../src/saves/characterSaves.js');
 const WA_FILE = path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js');
 
 const parse = (file) => parseSync(fs.readFileSync(file, 'utf8'), {
@@ -50,12 +51,16 @@ const propertyName = (prop) => {
 describe('Шаг 6: фасад useCharacter() без полей условий/заболеваний', () => {
   const ast = parse(CONTEXT_FILE);
   const source = fs.readFileSync(CONTEXT_FILE, 'utf8');
+  const savesSource = fs.readFileSync(SAVES_FILE, 'utf8');
 
   const valueObjects = [];
+  // Патч 242: фасад пуст (value = {}) — ищем объект по имени переменной.
   walk(ast, (node) => {
-    if (node.type === 'ObjectExpression'
-      && node.properties.some((prop) => propertyName(prop) === 'resetCharacter')) {
-      valueObjects.push(node);
+    if (node.type === 'VariableDeclarator'
+      && node.id?.type === 'Identifier'
+      && node.id.name === 'value'
+      && node.init?.type === 'ObjectExpression') {
+      valueObjects.push(node.init);
     }
   });
 
@@ -76,8 +81,7 @@ describe('Шаг 6: фасад useCharacter() без полей условий/�
       'activeTimedEffects', 'conditions', 'chemDosesLog',
       'lastDiseaseResistAt', 'sceneRiskStates',
     ];
-    const facadeValues = valueObjects.filter((object) =>
-      object.properties.map(propertyName).includes('resetCharacter'));
+    const facadeValues = valueObjects;
     expect(facadeValues.length).toBeGreaterThanOrEqual(1);
     for (const object of valueObjects) {
       const names = object.properties.map(propertyName);
@@ -116,7 +120,8 @@ describe('Шаг 6: фасад useCharacter() без полей условий/�
   });
 
   it('снапшот берёт activeTimedEffects из словаря стора (денормализация)', () => {
-    expect(source).toContain('activeTimedEffects: denormalizeEffects(storeEffects)');
+    // Патч 242: buildSnapshot переехал в src/saves/characterSaves.js.
+    expect(savesSource).toContain('activeTimedEffects: denormalizeEffects(state.effects || {})');
   });
 
   it('секундный тик тени удалён (остался только тик Ядерного блока)', () => {

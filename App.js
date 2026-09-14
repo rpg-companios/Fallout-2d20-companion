@@ -12,6 +12,8 @@ import { Text, View, StyleSheet, ImageBackground, ActivityIndicator } from 'reac
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { CharacterProvider } from './components/CharacterContext';
+// Шаг 8б (патч 242): автосейв — модуль src/saves/characterSaves.js (zustand-subscribe).
+import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
 // Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
@@ -126,6 +128,13 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  // Шаг 8б (патч 242): автосейв активен с готовностью базы и стора;
+  // подписка живёт в модуле сейвов (zustand-subscribe, debounce 500 мс).
+  useEffect(() => {
+    if (!dbReady || !characterStoreReady) return undefined;
+    return startCharacterAutosave();
+  }, [dbReady, characterStoreReady]);
 
   useEffect(() => {
     let cancelled = false;
