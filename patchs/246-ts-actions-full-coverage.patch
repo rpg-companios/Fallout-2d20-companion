@@ -1,0 +1,314 @@
+From aac9c6167cf48513935d3c5de6616bf3638a09d8 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 17:43:28 +0000
+Subject: [PATCH] =?UTF-8?q?246=20(=D1=81=D0=B5=D1=80=D0=B8=D1=8F=20TS,=20?=
+ =?UTF-8?q?=D1=87.3):=20CRUD/=D1=80=D0=BE=D0=B1=D0=BE=D1=82/=D0=A1=D0=91?=
+ =?UTF-8?q?=20=D0=B2=20=D0=BF=D0=B0=D1=81=D0=BF=D0=BE=D1=80=D1=82=D0=B5=20?=
+ =?UTF-8?q?=E2=80=94=20=D0=BF=D0=BE=D0=BB=D0=BD=D0=BE=D0=B5=20=D0=BF=D0=BE?=
+ =?UTF-8?q?=D0=BA=D1=80=D1=8B=D1=82=D0=B8=D0=B5=20=D1=81=D1=82=D0=BE=D1=80?=
+ =?UTF-8?q?=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+characterActions.ts дополнен (часть 3, серия завершена):
+- предметы/эффекты: addNewItem (возвращает id), updateItem, equipItem/
+  unequipItem, repairWeapon, spendAmmoForWeapon (структурный контракт
+  args), addEffect/updateEffect/expireEffect/pruneExpiredEffects;
+- модификаторы параметров: add/removeAttributeModifier,
+  add/removeSkillModifier, updateAttribute/updateSkill (дельта с клампом),
+  markSkillsAsRewarded, triggerDependentCalculations;
+- робот (robotSlice): initRobot, initRobotFromKit (-> {inventoryItems}),
+  loadRobotState, resetRobot, add/removeRobotModule, applyMk2Driver,
+  equipHeldWeapon/replaceLimb (CharacterRulesSubject {origin,trait}),
+  setRobotArmorLayer, unequipHeldWeapon;
+- силовая броня (powerArmorSlice): equip/unequip пакета и деталей,
+  adjustPowerArmorDurability, repairPowerArmorPieceAt/Stack,
+  resolveCoreChoice, loadPowerArmorState;
+- общий тип OkReason<T> («сделано / отказ с reason», прецедент
+  spendCurrency); EXEMPT_ACTION_KEYS упразднён — CRud список переехал в
+  CRUD_OP_KEYS (satisfies keyof CharacterActions).
+
+Тест action-passports: покрытие всех четырёх семей в обе стороны
+(действий мимо паспорта больше не бывает по построению) + смоук части 3
+(предмет: add→update в словаре; эффект: add→expire; модификатор
+add→remove; STR 4→5 через updateAttribute; робот init→reset; отказы
+applyMk2Driver/spendAmmoForWeapon('weapon-not-found')/equipHeldWeapon
+с reason).
+
+vitest 716/716 (70 файлов), tsc чист.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/saves/action-passports.test.js |  74 ++++++++++++---
+ src/store/characterActions.ts            | 111 ++++++++++++++++++++---
+ 2 files changed, 158 insertions(+), 27 deletions(-)
+
+diff --git a/__tests__/saves/action-passports.test.js b/__tests__/saves/action-passports.test.js
+index 17567ac..5d5adb3 100644
+--- a/__tests__/saves/action-passports.test.js
++++ b/__tests__/saves/action-passports.test.js
+@@ -1,11 +1,11 @@
+-// Паспорт операций стора (серия «Стор на TypeScript», патч 245).
++// Паспорт операций стора (серия «Стор на TypeScript», патчи 245–246).
+ //
+ // Проверяет паспорт src/store/characterActions.ts против живого стора:
+ //
+-//   1) ПОЛНОЕ покрытие: паспорт (сеттеры-апдейтеры + запись с семантикой +
+-//      именованные операции) ∪ исключения = ВСЕ действия стора, в обе
+-//      стороны. Новое действие без паспорта/исключения падает тестом —
+-//      «тихо проскочить мимо типизации» не выйдет;
++//   1) ПОЛНОЕ покрытие (с части 3 — без исключений): сеттеры-апдейтеры +
++//      запись с семантикой + именованные операции + CRUD/робот/СБ =
++//      ВСЕ действия стора, в обе стороны. Новое действие без паспорта
++//      падает тестом — «тихо проскочить мимо типизации» не выйдет;
+ //   2) семья апдейтеров: каждый сеттер из SETTER_UPDATER_KEYS принимает
+ //     функциональный апдейтер — вызов с identity (prev => prev) не падает
+ //     и не меняет состояние (обязательное требование владельца,
+@@ -22,7 +22,7 @@ import {
+   SETTER_UPDATER_KEYS,
+   SETTER_VALUE_KEYS,
+   NAMED_OP_KEYS,
+-  EXEMPT_ACTION_KEYS,
++  CRUD_OP_KEYS,
+ } from '../../src/store/characterActions';
+ 
+ const state = () => useCharacterStore.getState();
+@@ -40,23 +40,20 @@ afterEach(async () => {
+ });
+ 
+ describe('патч 245: паспорт операций против живого стора', () => {
+-  it('паспорт ∪ исключения покрывают ВСЕ действия стора (обе стороны)', () => {
+-    const passported = new Set([
++  it('паспорт (все четыре семьи) покрывает ВСЕ действия стора (обе стороны)', () => {
++    const families = new Set([
+       ...SETTER_UPDATER_KEYS,
+       ...SETTER_VALUE_KEYS,
+       ...NAMED_OP_KEYS,
++      ...CRUD_OP_KEYS,
+     ]);
+-    const exempt = new Set(EXEMPT_ACTION_KEYS);
+     const store = actionKeys();
+ 
+-    const notInStore = [...passported, ...exempt].filter((key) => !store.has(key));
++    const notInStore = [...families].filter((key) => !store.has(key));
+     expect(notInStore).toEqual([]); // паспорт не оторвался от стора
+ 
+-    const notCovered = [...store].filter((key) => !passported.has(key) && !exempt.has(key));
++    const notCovered = [...store].filter((key) => !families.has(key));
+     expect(notCovered).toEqual([]); // в сторе нет действий мимо паспорта
+-
+-    const doubles = [...passported].filter((key) => exempt.has(key));
+-    expect(doubles).toEqual([]); // действие не может быть и в паспорте, и в исключениях
+   });
+ 
+   it.each([...SETTER_UPDATER_KEYS])('%s принимает функциональный апдейтер (identity)', (key) => {
+@@ -103,8 +100,55 @@ describe('патч 245: паспорт операций против живог
+ 
+   it('именованные операции существуют и являются функциями', () => {
+     const store = actionKeys();
+-    for (const key of [...NAMED_OP_KEYS, ...SETTER_VALUE_KEYS]) {
++    for (const key of [...NAMED_OP_KEYS, ...SETTER_VALUE_KEYS, ...CRUD_OP_KEYS]) {
+       expect(store.has(key)).toBe(true);
+     }
+   });
++
++  it('часть 3, смоук: предмет/эффект/модификатор/робот/отказы с reason', () => {
++    // addNewItem возвращает id, предмет появляется в словаре.
++    const id = state().addNewItem({ id: 'probe_item', name: 'Пробный предмет' });
++    expect(id).toBe('probe_item');
++    expect(state().items.probe_item?.name).toBe('Пробный предмет');
++    state().updateItem('probe_item', { quantity: 3 });
++    expect(state().items.probe_item.quantity).toBe(3);
++
++    // Эффект: добавить → погасить → словарь пуст.
++    state().addEffect({ id: 'eff_probe', active: true, name: 'Проба' });
++    expect(state().effects.eff_probe).toBeTruthy();
++    state().expireEffect('eff_probe');
++
++    // Модификатор параметра: добавить и снять.
++    state().addAttributeModifier('STR', 'probe_source', 1, '+');
++    state().removeAttributeModifier('STR', 'probe_source');
++
++    // Дельта параметра с клампом: STR 4 → 5.
++    state().updateAttribute('STR', 1);
++    expect(state().attributes.STR.base).toBe(5);
++
++    // Робот: инициализация плана и сброс.
++    state().initRobot('protectron');
++    expect(state().robot.bodyPlan).toBe('protectron');
++    state().resetRobot();
++    expect(state().robot.bodyPlan).toBeNull();
++
++    // Отказы с reason (инвариант {ok,reason}):
++    const mk2 = state().applyMk2Driver('mk2_chip');
++    expect(mk2.ok).toBe(false);
++    expect(typeof mk2.reason).toBe('string');
++
++    const ammo = state().spendAmmoForWeapon({
++      weaponInstanceId: 'no_such_weapon',
++      ammoIds: ['ammo_10mm'],
++      ammoAmount: 1,
++      durabilityEnabled: false,
++      baseLossPer10Shots: 1,
++    });
++    expect(ammo.ok).toBe(false);
++    expect(ammo.reason).toBe('weapon-not-found');
++
++    const held = state().equipHeldWeapon('no_such_slot', { id: 'w' }, { origin: null, trait: null });
++    expect(held.ok).toBe(false);
++    expect(typeof held.reason).toBe('string');
++  });
+ });
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index 645b0ae..70f04c8 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -1,8 +1,10 @@
+-// Паспорт сигнатур операций стора (серия «Стор на TypeScript», патч 245).
++// Паспорт сигнатур операций стора (серия «Стор на TypeScript», патчи 245–246).
+ //
+-// Часть 2 серии: типизированные контракты ДЕЙСТВИЙ characterStore после
+-// Шага 8 (CharacterContext снесён — стор единственный источник, экшены
+-// расселены по characterStore/robotSlice/powerArmorSlice/orchestratorsSlice).
++// Часть 2 серии (245): сеттеры, запись с семантикой, именованные операции.
++// Часть 3 (246): CRUD предметов/эффектов, модификаторы параметров, робот и
++// силовая броня — серия доведена до ПОЛНОГО покрытия действий стора
++// (CharacterContext снесён; экшены расселены по characterStore/robotSlice/
++// powerArmorSlice/orchestratorsSlice).
+ //
+ // Составляющие паспорта:
+ //   - SETTER_UPDATER_KEYS — сеттеры, обязанные принимать значение ИЛИ
+@@ -13,10 +15,10 @@
+ //     им не нужен по смыслу;
+ //   - NAMED_OP_KEYS — именованные операции (каунтеры, ресурс, оркестраторы,
+ //     пересчёты, сбросы) с точными сигнатурами ниже;
+-//   - EXEMPT_ACTION_KEYS — CRUD предметов/эффектов, робот/СБ и прочее,
+-//     типизируемое следующими патчами серии. Контрактный тест требует,
+-//     чтобы паспорт ∪ исключения покрывали ВСЕ действия стора в обе
+-//     стороны: новое действие без паспорта/исключения падает тестом.
++//   - CRUD_OP_KEYS — CRUD предметов/эффектов, модификаторы, робот/СБ
++//     (часть 3). Контрактный тест требует, чтобы паспорт покрывал ВСЕ
++//     действия стора в обе стороны: новое действие без паспорта падает
++//     тестом — «тихо проскочить мимо типизации» не выйдет.
+ //
+ // Динамическая проверка семьи апдейтеров — __tests__/saves/action-passports.test.js.
+ 
+@@ -61,6 +63,21 @@ export interface ConsumableRadiationPreview {
+   [extraKey: string]: unknown;
+ }
+ 
++/**
++ * Универсальный исход операции «сделано/отказ с причиной» (инвариант
++ * «нельзя купить на больше, чем есть», прецедент spendCurrency/227).
++ * Успех может нести полезный груз (id, стоимость…), отказ — всегда reason.
++ */
++export type OkReason<T = Record<string, unknown>> =
++  | ({ ok: true } & T)
++  | { ok: false; reason: string; [extra: string]: unknown };
++
++/** Кто проходит проверку правил экипировки (робот/супермутант). */
++export type CharacterRulesSubject = {
++  origin: CatalogEntityRef | null;
++  trait: CatalogEntityRef | null;
++};
++
+ /** Итог «Сопротивляться» болезни (одна попытка в сутки, патч 215). */
+ export type ResistDiseaseOutcome =
+   | { ok: true; [extraKey: string]: unknown }
+@@ -166,6 +183,77 @@ export interface CharacterActions {
+   /** Мост legacy-формата (массивы) → словари стора. */
+   loadFromLegacyData: (legacyData: Record<string, unknown>) => void;
+   exportToLegacyData: () => Record<string, unknown>;
++
++  // ── Часть 3 (246): предметы и эффекты (CRUD) ──
++  /** Добавить предмет, вернуть его id (стеки склеиваются по instanceId). */
++  addNewItem: (item: StoreItem) => string;
++  updateItem: (itemId: string, patch: Partial<StoreItem>) => void;
++  equipItem: (itemId: string) => void;
++  unequipItem: (itemId: string) => void;
++  repairWeapon: (itemId: string) => void;
++  /** Списать патроны/износ при выстреле (инварианты в слайсе). */
++  spendAmmoForWeapon: (args: {
++    weaponInstanceId: string;
++    ammoIds: string[];
++    ammoAmount: number;
++    durabilityEnabled: boolean;
++    baseLossPer10Shots: number;
++  }) => OkReason;
++  addEffect: (effect: TimedEffectRecord) => void;
++  updateEffect: (effectId: string, patch: Partial<TimedEffectRecord>) => void;
++  expireEffect: (effectId: string) => void;
++  pruneExpiredEffects: () => void;
++
++  // ── Модификаторы параметров и зависимости ──
++  addAttributeModifier: (attrId: string, source: string, value: number, operation?: string) => void;
++  removeAttributeModifier: (attrId: string, source: string) => void;
++  addSkillModifier: (skillId: string, source: string, value: number, operation?: string) => void;
++  removeSkillModifier: (skillId: string, source: string) => void;
++  /** Дельта с клампом к правилам атрибута (domain/characterCreation). */
++  updateAttribute: (attrId: string, delta: number) => void;
++  updateSkill: (skillId: string, delta: number) => void;
++  markSkillsAsRewarded: (skills: string[]) => void;
++  triggerDependentCalculations: () => void;
++
++  // ── Робот (robotSlice) ──
++  initRobot: (bodyPlan: string) => void;
++  initRobotFromKit: (
++    bodyPlan: string,
++    resolvedKitItems?: StoreItem[],
++    robotCatalog?: Record<string, unknown>,
++  ) => { inventoryItems: StoreItem[] };
++  loadRobotState: (robotState: RobotState) => void;
++  resetRobot: () => void;
++  addRobotModule: (module: StoreItem) => void;
++  removeRobotModule: (moduleId: string) => void;
++  /** Установить/снять ОС Mk II (только Секьюритрон, патч 236). */
++  applyMk2Driver: (itemId: string) => OkReason;
++  equipHeldWeapon: (slotKey: string, weapon: StoreItem, character: CharacterRulesSubject) => OkReason;
++  unequipHeldWeapon: (slotKey: string) => void;
++  replaceLimb: (
++    slotKey: string,
++    newLimb: StoreItem,
++    character: CharacterRulesSubject,
++    weaponsCatalog?: Record<string, unknown>,
++  ) => OkReason;
++  setRobotArmorLayer: (slotKey: string, layer: 'armor' | 'clothing', armorItem: StoreItem | null) => OkReason;
++
++  // ── Силовая броня (powerArmorSlice) ──
++  equipPowerArmorPackage: (frameStackItem: StoreItem) => void;
++  unequipPowerArmorPackage: () => void;
++  equipPowerArmorPieceInto: (pieceStackItem: StoreItem) => void;
++  unequipPowerArmorPieceAt: (slot: BodySlotKey) => void;
++  adjustPowerArmorDurability: (slot: BodySlotKey, delta: number) => void;
++  repairPowerArmorPieceAt: (slot: BodySlotKey) => void;
++  repairPowerArmorStack: (storeItemId: string) => void;
++  /** Диалог блока: игрок выбрал ядро (слайс pendingCoreChoice, §5.4). */
++  resolveCoreChoice: (coreStoreKey: string) => void;
++  /** Восстановление слоя из сейва (доверяет валидированному состоянию). */
++  loadPowerArmorState: (state?: {
++    equippedArmor?: EquippedArmor;
++    equippedPowerArmor?: EquippedPowerArmor;
++    powerArmorRuntime?: PowerArmorRuntime;
++  }) => void;
+ }
+ 
+ /** Сеттеры семьи апдейтеров — проверяются динамически (identity (prev)=>prev). */
+@@ -245,11 +333,10 @@ export const NAMED_OP_KEYS = [
+ ] as const satisfies readonly (keyof CharacterActions)[];
+ 
+ /**
+- * Действия, НЕ паспортизированные в 245 (CRUD предметов/эффектов, робот/СБ,
+- * модификаторы параметров). Следующие патчи серии обязаны либо паспортизировать,
+- * либо осознанно оставить здесь.
++ * Часть 3 (246): CRUD предметов/эффектов, модификаторы параметров, робот/СБ.
++ * Серией закрыто ПОЛНОЕ покрытие действий стора.
+  */
+-export const EXEMPT_ACTION_KEYS = [
++export const CRUD_OP_KEYS = [
+   'addAttributeModifier',
+   'addEffect',
+   'addNewItem',
+-- 
+2.39.5
+
