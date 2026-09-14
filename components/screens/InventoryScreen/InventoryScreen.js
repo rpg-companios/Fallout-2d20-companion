@@ -79,8 +79,9 @@ const InventoryScreen = () => {
   const {
     currency, earnCurrency, spendCurrency,
     applyConsumableFull,
-    previewConsumableRadiation,
   } = useCharacter();
+  // Шаг 8а (патч 239): превью радиации — стор-экшен.
+  const previewConsumableRadiation = useCharacterStore((s) => s.previewConsumableRadiation);
   // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
   const equipment = useCharacterStore((s) => s.equipment);
   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);

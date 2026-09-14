@@ -57,8 +57,9 @@ const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalPr
     const moduleLocale = useModuleLocale();
     const {
         applyConsumableFull,
-        previewConsumableRadiation,
     } = useCharacter();
+    // Шаг 8а (патч 239): превью радиации — стор-экшен.
+    const previewConsumableRadiation = useCharacterStore((state) => state.previewConsumableRadiation);
     // Шаг 7: origin/trait — стор напрямую.
     const origin = useCharacterStore((state) => state.origin);
     const trait = useCharacterStore((state) => state.trait);

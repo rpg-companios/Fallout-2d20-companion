@@ -51,7 +51,9 @@ import {
 
 import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './migrations.js';
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
-import { legacyEffectToStore } from './effectsSync.js';
+import { legacyEffectToStore, effectsDictToLegacyArray, syncTimedEffectsToStore } from './effectsSync.js';
+import { advanceEffectsByScene, applyConsumableToEffects, pruneExpiredTimedEffects, resolveConsumableRadiationRoll } from '../../domain/effects';
+import { hasRadiationImmunity } from '../../domain/immunities';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
@@ -1418,6 +1420,94 @@ const useCharacterStore = create(devtools(
         }));
         const newMaxHealth = calculateMaxHealth(newAttributes, get().level);
         set((s) => ({ currentHealth: Math.min(s.currentHealth, newMaxHealth) }));
+      },
+
+      // ── Сцены/эффекты/расходники-превью (Шаг 8а, патч 239) ──────────────
+      /**
+       * Превью радиации расходника (без применения): бросок и «сколько получит
+       * фактически» с учётом текущей радиации и перков. Зовут инвентарь и
+       * модалка выживания для диалога переброса.
+       */
+      previewConsumableRadiation: (item) => {
+        const state = get();
+        const {
+          irradiatedConsumableRadiationImmune = false,
+          irradiatedConsumableRadiationRerollIfDamage = 0,
+        } = state.perkBonuses || {};
+        const roll = resolveConsumableRadiationRoll(item, {
+          radiationImmune: hasRadiationImmunity({ origin: state.origin, trait: state.trait }),
+          skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+        });
+        const receivedRadiationDamage = roll.requestedAmount == null
+          ? 0
+          : Math.max(0, state.radiation + roll.requestedAmount) - state.radiation;
+        return {
+          requestedAmount: roll.requestedAmount,
+          receivedRadiationDamage,
+          rolls: roll.rolls,
+          canOfferReroll: Boolean(
+            item?.irradiated
+            && Number(irradiatedConsumableRadiationRerollIfDamage) > 0
+            && receivedRadiationDamage > 0
+            && Array.isArray(roll.rolls)
+          ),
+        };
+      },
+
+      /**
+       * Применить ТОЛЬКО временные эффекты расходника (без витальных,
+       * условий и журнала доз). Истёкшие эффекты гасятся до применения.
+       */
+      applyConsumableTimedEffects: (item) => {
+        const store = get();
+        const currentLegacy = effectsDictToLegacyArray(store.effects);
+        const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+        normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+        const result = applyConsumableToEffects(item, normalizedCurrent.effects);
+        const normalizedResult = pruneExpiredTimedEffects(result.effects);
+        syncTimedEffectsToStore(normalizedResult.effects, store);
+
+        if (normalizedResult.effects.length > 0) {
+          const timerPreview = normalizedResult.effects
+            .map((effect) => `${effect.effectName || effect.effectLabel}: ${effect.scenesLeft} scenes`)
+            .join(' | ');
+          debugLog('consumable.timedEffects', { timerPreview });
+        } else {
+          debugLog('consumable.timedEffects', { timerPreview: null });
+        }
+
+        return { ...result, expired: normalizedCurrent.expired };
+      },
+
+      /**
+       * Смена сцены: тик временных эффектов (истёкшие гаснут, у живых
+       * уменьшается счётчик) и +1 к счётчику сцен. Сцены в приложении не
+       * тикают сами (выживание тикает игровыми часами) — действие оставлено
+       * для полноты конвейера (спящий код, как и раньше).
+       */
+      advanceScene: () => {
+        const store = get();
+        const currentLegacy = effectsDictToLegacyArray(store.effects);
+        const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+        normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+        const { effects: nextEffects, expired } = advanceEffectsByScene(normalizedCurrent.effects);
+        expired.forEach((effect) => store.expireEffect(effect.id));
+
+        nextEffects.forEach((effect) => {
+          if (store.effects[effect.id]) {
+            store.updateEffect(effect.id, {
+              scenesLeft: effect.scenesLeft,
+              expiresAt: effect.expiresAt,
+              durationMs: effect.durationMs,
+            });
+          }
+        });
+
+        set((state) => ({ sceneCounter: state.sceneCounter + 1 }));
+        get().triggerDependentCalculations();
+        return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
       },
 
       resetCharacterStore: (legacyDefaults = {}) => {

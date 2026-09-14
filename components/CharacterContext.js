@@ -1019,30 +1019,7 @@ export const CharacterProvider = ({ children }) => {
    * Применяет расходник: мгновенное лечение/радиация, timed-эффекты,
    * removeCondition, проверку зависимости и явно объявленный риск заражения.
    */
-  const previewConsumableRadiation = (item) => {
-    const {
-      irradiatedConsumableRadiationImmune = false,
-      irradiatedConsumableRadiationRerollIfDamage = 0,
-    } = useCharacterStore.getState().perkBonuses || {};
-    const roll = resolveConsumableRadiationRoll(item, {
-      radiationImmune: hasRadiationImmunity({ origin, trait }),
-      skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
-    });
-    const receivedRadiationDamage = roll.requestedAmount == null
-      ? 0
-      : Math.max(0, radiation + roll.requestedAmount) - radiation;
-    return {
-      requestedAmount: roll.requestedAmount,
-      receivedRadiationDamage,
-      rolls: roll.rolls,
-      canOfferReroll: Boolean(
-        item?.irradiated
-        && Number(irradiatedConsumableRadiationRerollIfDamage) > 0
-        && receivedRadiationDamage > 0
-        && Array.isArray(roll.rolls)
-      ),
-    };
-  };
+  // previewConsumableRadiation — Шаг 8а (патч 239): стор-экшен.
 
   const applyConsumableFull = (item, options = {}) => {
     debugLog('consumable.apply.start', {
@@ -1241,54 +1218,8 @@ export const CharacterProvider = ({ children }) => {
     };
   };
 
-  const applyConsumableTimedEffects = (item) => {
-    const store = useCharacterStore.getState();
-    const currentLegacy = effectsDictToLegacyArray(store.effects);
-    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
-    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
-
-    const result = applyConsumableToEffects(item, normalizedCurrent.effects);
-    const normalizedResult = pruneExpiredTimedEffects(result.effects);
-    syncTimedEffectsToStore(normalizedResult.effects, store);
-
-    if (normalizedResult.effects.length > 0) {
-      const timerPreview = normalizedResult.effects
-        .map((effect) => `${effect.effectName || effect.effectLabel}: ${effect.scenesLeft} scenes`)
-        .join(' | ');
-      debugLog('consumable.timedEffects', { timerPreview });
-    } else {
-      debugLog('consumable.timedEffects', { timerPreview: null });
-    }
-
-    return {
-      ...result,
-      expired: normalizedCurrent.expired,
-    };
-  };
-
-  const advanceScene = () => {
-    const store = useCharacterStore.getState();
-    const currentLegacy = effectsDictToLegacyArray(store.effects);
-    const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
-    normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
-
-    const { effects: nextEffects, expired } = advanceEffectsByScene(normalizedCurrent.effects);
-    expired.forEach((effect) => store.expireEffect(effect.id));
-
-    nextEffects.forEach((effect) => {
-      if (store.effects[effect.id]) {
-        store.updateEffect(effect.id, {
-          scenesLeft: effect.scenesLeft,
-          expiresAt: effect.expiresAt,
-          durationMs: effect.durationMs,
-        });
-      }
-    });
-
-    setSceneCounter((prev) => prev + 1);
-    store.triggerDependentCalculations();
-    return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
-  };
+  // advanceScene/applyConsumableTimedEffects/previewConsumableRadiation —
+  // Шаг 8а (патч 239): стор-экшены; тик сцен/эффектов живёт в сторе.
 
   // commitAttributeChanges — Шаг 8а (патч 238): стор-экшен, экран создания
   // персонажа зовёт напрямую.
@@ -1399,11 +1330,10 @@ export const CharacterProvider = ({ children }) => {
     // Шаг 8а (часть 3): стор напрямую (поле equipment живёт в сторе с Шага 1).
     // sceneRiskStates — Шаг 6: экраны читают стор напрямую (useCharacterStore).
     sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
-    applyConsumableTimedEffects,
+    // previewConsumableRadiation/applyConsumableTimedEffects — Шаг 8а (патч 239): стор.
     applyConsumableFull,
-    previewConsumableRadiation,
     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
-    advanceScene,
+    // advanceScene — Шаг 8а (патч 239): стор.
     // equippedRobotSlots/Modules и их сеттеры — Шаг 8а: только в сторе.
     // Броня и силовая броня (состояние, рантайм блока, диалог выбора блока и
     // действия слоя) — Шаг 4 миграции: экраны читают/пишут стор напрямую
