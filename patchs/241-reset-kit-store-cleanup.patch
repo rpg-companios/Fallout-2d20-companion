@@ -1,0 +1,398 @@
+From cb4386c83b92ab8bc7571b4656cef812c4f9c144 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 07:05:09 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=9F=D0=B0=D1=82=D1=87=20241:=20=D1=81=D0=B1?=
+ =?UTF-8?q?=D1=80=D0=BE=D1=81=20=D0=BA=D0=BE=D0=BC=D0=BF=D0=BB=D0=B5=D0=BA?=
+ =?UTF-8?q?=D1=82=D0=B0=20=E2=80=94=20=D1=81=D1=82=D0=BE=D1=80;=20=D0=BF?=
+ =?UTF-8?q?=D1=80=D0=BE=D1=85=D0=BE=D0=B4=D0=BD=D1=8B=D0=B5=20=D0=BF=D0=BE?=
+ =?UTF-8?q?=D0=BB=D1=8F=20=D1=8D=D0=BA=D1=80=D0=B0=D0=BD=D0=BE=D0=B2;=20?=
+ =?UTF-8?q?=D0=B7=D0=B0=D1=87=D0=B8=D1=81=D1=82=D0=BA=D0=B0=20=D1=84=D0=B0?=
+ =?UTF-8?q?=D1=81=D0=B0=D0=B4=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- characterStore: +resetKitAndRewards(opts) — 1-в-1 из контекста, с
+  «выжившими полями» смены комплекта (здоровье/радиация/сцены/эффекты
+  трейтов/модификации/условия/журнал доз/расширения/tagged-skills)
+- БАГФИКСЫ регресса миграции (пойманы новым тестом):
+  * 234–240: resetCharacterStore обнулял здоровье/радиацию/сцены/условия →
+    «смена комплекта» убивала текущие показатели; восстановлено
+  * с Шага 5: keepSkills не работал (resetCharacterStore затирал
+    selection-списки) — смена комплекта сбрасывала tagged-навыки; восстановлено
+- CharacterContext: resetKitAndRewards/resetKitOnly (мёртв — удалён),
+  attributes/skills/selection-списки, sceneDurationMinutes (мёртв — удалён),
+  currency/earnCurrency/spendCurrency сняты с фасада; мёртвый импорт
+  SCENE_RULES зачищен
+- Экраны: CharacterScreen (деньги+сброс комплекта), W&A (attributes/skills
+  через useMemo-селекторы), SleepModal (attributes) — стор напрямую;
+  InventoryScreen полностью отвязался от контекста (третий экран после
+  PerksAndTraitsScreen и LimbUpgradeModal)
+- Тесты: resetKitAndRewards (выжившие поля + keepSkills), step5-facade
+  переведён (чтений на фасаде нет); vitest 714/714, tsc чист
+- Фасад остался с: characterId/isSaved, save/load/list/delete (8б),
+  resetCharacter
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-step5-facade.test.js    |  8 +--
+ __tests__/saves/orchestrators-slice.test.js   | 44 +++++++++++++++
+ components/CharacterContext.js                | 53 +++----------------
+ .../InventoryScreen/InventoryScreen.js        |  8 +--
+ .../CharacterScreen/CharacterScreen.js        |  9 ++--
+ .../WeaponsAndArmorScreen.js                  | 14 +++--
+ .../modals/SleepModal.tsx                     |  6 ++-
+ src/store/characterStore.js                   | 51 ++++++++++++++++++
+ 8 files changed, 129 insertions(+), 64 deletions(-)
+
+diff --git a/__tests__/saves/character-context-step5-facade.test.js b/__tests__/saves/character-context-step5-facade.test.js
+index 129ea75..721d87b 100644
+--- a/__tests__/saves/character-context-step5-facade.test.js
++++ b/__tests__/saves/character-context-step5-facade.test.js
+@@ -72,11 +72,11 @@ describe('Шаг 5: фасад useCharacter() без сеттеров атриб
+     }
+   });
+ 
+-  it('в value остались только чтения: атрибуты/навыки/selection-списки', () => {
+-    const required = ['attributes', 'skills', 'selectedSkills', 'extraTaggedSkills', 'forcedSelectedSkills'];
++  it('патч 241: чтения атрибутов/навыков/selection тоже ушли в стор', () => {
++    const forbidden = ['attributes', 'skills', 'selectedSkills', 'extraTaggedSkills', 'forcedSelectedSkills'];
+     const names = valueObjects.flatMap((object) => object.properties.map(propertyName));
+-    for (const name of required) {
+-      expect(names).toContain(name);
++    for (const name of forbidden) {
++      expect(names).not.toContain(name);
+     }
+   });
+ 
+diff --git a/__tests__/saves/orchestrators-slice.test.js b/__tests__/saves/orchestrators-slice.test.js
+index f634176..a4fba3a 100644
+--- a/__tests__/saves/orchestrators-slice.test.js
++++ b/__tests__/saves/orchestrators-slice.test.js
+@@ -117,3 +117,47 @@ describe('orchestratorsSlice: расходник и мост времени (п
+     }
+   });
+ });
++
++describe('characterStore: resetKitAndRewards (патч 241)', () => {
++  it('чистит комплект/награды/крышки, сохраняет атрибуты/навыки/здоровье; keepSkills', () => {
++    const store = useCharacterStore.getState();
++    store.setBaseAttributes([{ name: 'STR', value: 7 }]);
++    store.setBaseSkills([{ name: 'Ближний бой', value: 3 }]);
++    store.addNewItem({ id: 'stimpack', itemType: 'consumable', quantity: 2 });
++    store.markSkillsAsRewarded(['Ближний бой']);
++    store.earnCurrency(500);
++    store.setCurrentHealth(9);
++    store.setSelectedSkills(['Ближний бой']);
++    store.setSkillsSaved(true);
++    store.setSceneCounter(4);
++    store.setConditions(['diseased']);
++    store.setChemDosesLog([{ chemId: 'x', takenAt: Date.now() }]);
++    store.setCurrentHealth(9);
++    store.addRadiation(2);
++
++    store.resetKitAndRewards({ keepSkills: true });
++    let s = useCharacterStore.getState();
++    expect(s.items).toEqual({});               // инвентарь пуст
++    expect(s.rewardedSkills).toEqual([]);      // награды очищены
++    expect(s.currency).toBe(0);                // крышки обнулены
++    expect(s.attributes.STR.base).toBe(7);     // атрибуты выжили
++    expect(s.skills['Ближний бой']?.base).toBe(3); // навыки выжили
++    // «Выжившие поля» смены комплекта (до миграции жили в контексте и
++    // resetCharacterStore не трогались): здоровье/радиация/сцены/условия/
++    // журнал доз — регресс 234–240 пойман тестом и починен в 241.
++    expect(s.currentHealth).toBe(9);
++    expect(s.radiation).toBe(2);
++    expect(s.sceneCounter).toBe(4);
++    expect(s.conditions).toEqual(['diseased']);
++    expect(s.chemDosesLog.length).toBe(1);
++    expect(s.selectedSkills).toEqual(['Ближний бой']); // keepSkills: tagged живы
++    expect(s.skillsSaved).toBe(true);
++
++    store.resetKitAndRewards();                // без keepSkills: tagged чистятся
++    s = useCharacterStore.getState();
++    expect(s.selectedSkills).toEqual([]);
++    expect(s.extraTaggedSkills).toEqual([]);
++    expect(s.forcedSelectedSkills).toEqual([]);
++    expect(s.skillsSaved).toBe(false);
++  });
++});
+diff --git a/components/CharacterContext.js b/components/CharacterContext.js
+index 6602d7b..3f0bbfe 100644
+--- a/components/CharacterContext.js
++++ b/components/CharacterContext.js
+@@ -37,7 +37,7 @@ import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../domain/origins';
+ import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields } from '../src/store/stateExtensions';
+ import { CHEM_DOSE_WINDOW_MS } from '../src/store/orchestratorsSlice';
+ import { inspectSelectedPerkRecords } from '../domain/perks';
+-import { pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
++import { pruneExpiredTimedEffects } from '../domain/effects';
+ import { createSceneRiskTracker } from '../domain/sceneRiskChecks';
+ import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
+ 
+@@ -836,43 +836,8 @@ export const CharacterProvider = ({ children }) => {
+     characterIdRef.current = null;
+   };
+ 
+-  /**
+-   * Сброс комплекта снаряжения (при смене ориджина или комплекта):
+-   * очищает инвентарь, награды за навыки (rewardedSkills), снаряжение, слоты
+-   * робота и крышки. Атрибуты/навыки и сам персонаж сохраняются.
+-   * @param {object} opts - { keepSkills: boolean } — если true, не сбрасывает tagged skills и skillsSaved (смена комплекта без сброса персонажа)
+-   */
+-  const resetKitAndRewards = useCallback((opts = {}) => {
+-    const keepSkills = Boolean(opts.keepSkills);
+-    setEquipment(null);
+-    // equippedWeapons обнуляет resetCharacterStore (Шаг 3 миграции).
+-    setEquippedRobotSlots(null);
+-    setEquippedRobotModules([]);
+-    // Броня/СБ/рантайм блока сбрасываются resetCharacterStore (Шаг 4 миграции;
+-    // раньше надетый пакет СБ здесь не сбрасывался и «повисал» над пустым
+-    // инвентарём — теперь консистентно спадает).
+-    // Ресурс обнуляет resetCharacterStore (слайс currency, Шаг 2 миграции).
+-    // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
+-    const { attributes: legacyAttributes, skills: legacySkills } =
+-      denormalizeCharacterState(useCharacterStore.getState());
+-    useCharacterStore.getState().resetCharacterStore({
+-      attributes: legacyAttributes,
+-      skills: legacySkills,
+-      rewardedSkills: [],
+-    });
+-    if (!keepSkills) {
+-      const resetSt = useCharacterStore.getState();
+-      resetSt.setSelectedSkills([]);
+-      resetSt.setExtraTaggedSkills([]);
+-      resetSt.setForcedSelectedSkills([]);
+-      setSkillsSaved(false);
+-    }
+-  }, []);
+-
+-  // Сброс только комплекта без сброса навыков (для смены комплекта без сброса персонажа)
+-  const resetKitOnly = useCallback(() => {
+-    resetKitAndRewards({ keepSkills: true });
+-  }, [resetKitAndRewards]);
++  // resetKitAndRewards/resetKitOnly — Шаг 8а (патч 241): стор-экшен
++  // (resetKitOnly был мёртв — удалён вовсе).
+ 
+   const value = {
+     // characterName/setCharacterName — Шаг 7: только в сторе.
+@@ -886,15 +851,12 @@ export const CharacterProvider = ({ children }) => {
+     // Атрибуты/навыки (данные) — Шаг 5: экраны читают производные массивы
+     // отсюда, пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills +
+     // selection-экшены useCharacterStore). Сеттеры из фасада убраны.
+-    attributes, skills,
+-    selectedSkills,
+-    extraTaggedSkills,
+-    forcedSelectedSkills,
++    // attributes/skills/selection-списки — Шаг 8а (патч 241): стор-селекторы.
+     // origin/setOrigin/trait/setTrait — Шаг 7: только в сторе.
+     // equipment/setEquipment, effects/setEffects (→ traitEffects), sceneCounter —
+     // Шаг 8а (часть 3): стор напрямую (поле equipment живёт в сторе с Шага 1).
+     // sceneRiskStates — Шаг 6: экраны читают стор напрямую (useCharacterStore).
+-    sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
++    // sceneDurationMinutes удалён (мёртвый член).
+     // previewConsumableRadiation/applyConsumableTimedEffects/applyConsumableFull —
+     // Шаг 8а (патчи 239/240): стор.
+     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
+@@ -907,7 +869,7 @@ export const CharacterProvider = ({ children }) => {
+     // Ресурсы наружу — числом, как и раньше. Менять их можно только
+     // именованными операциями: правило границ живёт в domain/counters.js,
+     // а не переписывается заново на каждом экране.
+-    currency, earnCurrency, spendCurrency,
++    // currency/earnCurrency/spendCurrency — Шаг 8а (патч 241): стор (с Шага 2).
+     // currentHealth/radiation и их действия — Шаг 8а: только в сторе.
+     // luckPoints/maxLuckPoints/attributesSaved/skillsSaved — Шаг 7: только в сторе.
+     // selectedPerks/setSelectedPerks — Шаг 8а: только в сторе.
+@@ -921,8 +883,7 @@ export const CharacterProvider = ({ children }) => {
+     // applyDiseaseExposureEvent (resolveSceneRiskEventById) — Шаг 8а (патч 240): стор.
+     // lastDiseaseResistAt — Шаг 6: экраны читают стор напрямую.
+     resetCharacter,
+-    resetKitAndRewards,
+-    resetKitOnly,
++    // resetKitAndRewards — Шаг 8а (патч 241): стор; resetKitOnly удалён (мёртв).
+     // availablePerkAttributePoints/addPerkAttributePoints — Шаг 7: только в сторе.
+     // commitAttributeChanges — Шаг 8а (патч 238): только в сторе.
+     // meetsPerkRequirements/getPerkUnmetReasons/annotatePerks — Шаг 8а:
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index f45c6d6..96e7040 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1,6 +1,5 @@
+ import React, { useState, useMemo, useCallback } from 'react';
+ import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+-import { useCharacter } from '../../CharacterContext';
+ import useCharacterStore from '../../../src/store/characterStore';
+ import { selectCarryWeight } from '../../../src/store/selectors';
+ import { selectItemsByEquipped } from '../../../src/store/selectors';
+@@ -76,9 +75,10 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
+ );
+ 
+ const InventoryScreen = () => {
+-  const {
+-    currency, earnCurrency, spendCurrency,
+-  } = useCharacter();
++  // Деньги — стор напрямую (Шаг 8а, патч 241; поле в сторе с Шага 2).
++  const currency = useCharacterStore((s) => s.currency);
++  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
++  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+   // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
+   const applyConsumableFull = useCharacterStore((s) => s.applyConsumableFull);
+   // Шаг 8а (патч 239): превью радиации — стор-экшен.
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 0165d77..52b00e9 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -264,12 +264,13 @@ export default function CharacterScreen() {
+   const {
+     isSaved,
+     saveCharacter,
+-    currency,
+-    earnCurrency,
+-    spendCurrency,
+     resetCharacter,
+-    resetKitAndRewards,
+   } = useCharacter();
++  // Шаг 8а (патч 241): деньги и сброс комплекта — стор напрямую (с Шага 2/8а).
++  const currency = useCharacterStore((s) => s.currency);
++  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
++  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
++  const resetKitAndRewards = useCharacterStore((s) => s.resetKitAndRewards);
+   // Шаг 8а (патч 238): подтверждение атрибутов — стор-экшен напрямую.
+   const commitAttributeChanges = useCharacterStore((s) => s.commitAttributeChanges);
+   // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 14f87ae..e539e5b 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -12,6 +12,8 @@ import {
+   storeItemToWeaponDisplay,
+   weaponModPatchToStore,
+   selectActiveTimedEffects,
++  selectLegacyAttributes,
++  selectLegacySkills,
+ } from '../../../../src/store/selectors';
+ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../../domain/characterCreation';
+ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
+@@ -392,7 +394,11 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
+ 
+ 
+ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
+-    const { attributes, skills } = useCharacter();
++    // Шаг 8а (патч 241): атрибуты/навыки — стор напрямую.
++    const storeAttributes = useCharacterStore((state) => state.attributes);
++    const storeSkills = useCharacterStore((state) => state.skills);
++    const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
++    const skills = useMemo(() => selectLegacySkills({ skills: storeSkills }), [storeSkills]);
+     const trait = useCharacterStore((state) => state.trait); // Шаг 7
+     // Шаг 8а: проверка трейта — по store.trait (замыкание фасада hasTrait снято).
+     const hasTrait = (id) => !!(
+@@ -633,9 +639,9 @@ const resolveStoreItemId = (weapon) => {
+ };
+ 
+ const WeaponsAndArmorScreen = () => {
+-  const {
+-    attributes,
+-  } = useCharacter();
++  // Шаг 8а (патч 241): атрибуты (legacy-массив) — из стор-словаря.
++  const storeAttributes = useCharacterStore((s) => s.attributes);
++  const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+   // Шаг 8а: слоты робота — слайс robot стора напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+index 3887b2a..5281a19 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -9,8 +9,8 @@
+ 
+ import React, { useMemo, useState } from 'react';
+ import { Modal, Text, TouchableOpacity, View } from 'react-native';
+-import { useCharacter } from '../../../../../components/CharacterContext';
+ import useCharacterStore from '../../../../../src/store/characterStore';
++import { selectLegacyAttributes } from '../../../../../src/store/selectors';
+ import { calculateMaxHealth } from '../../../../../domain/characterCreation';
+ import {
+     forecastSleep,
+@@ -97,7 +97,9 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
+     useModuleLocale();
+     const survival = useSurvivalState();
+     const { sleepSurvival } = useSurvivalActions();
+-    const { attributes } = useCharacter();
++    // Шаг 8а (патч 241): атрибуты — из стор-словаря (legacy-массив).
++    const storeAttributes = useCharacterStore((state) => state.attributes);
++    const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+     // Шаг 7: level/attributesSaved — стор напрямую.
+     const level = useCharacterStore((state) => state.level);
+     const attributesSaved = useCharacterStore((state) => state.attributesSaved);
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 4f5fa51..492d308 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -56,6 +56,7 @@ import { advanceEffectsByScene, applyConsumableToEffects, pruneExpiredTimedEffec
+ import { hasRadiationImmunity } from '../../domain/immunities';
+ import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+ import { createOrchestrationActions } from './orchestratorsSlice.js';
++import { denormalizeCharacterState } from './migrations.js';
+ import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
+ import { debugLog } from '../debug/falloutDebug.js';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
+@@ -1512,6 +1513,56 @@ const useCharacterStore = create(devtools(
+         return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+       },
+ 
++      /**
++       * Сброс комплекта снаряжения (смена ориджина/комплекта): очищает
++       * инвентарь, награды за навыки, снаряжение, слоты робота, броню/СБ,
++       * крышки — но СОХРАНЯЕТ атрибуты/навыки/профиль/здоровье.
++       * keepSkills: true — не чистит tagged-skills и skillsSaved (смена
++       * комплекта без сброса навыков). Шаг 8а (патч 241): переехал из
++       * CharacterContext 1-в-1.
++       */
++      resetKitAndRewards: (opts = {}) => {
++        const keepSkills = Boolean(opts.keepSkills);
++        const legacy = denormalizeCharacterState(get());
++        // resetCharacterStore сеет «полный сброс», но смена комплекта — НЕ
++        // полный сброс: пока эти поля жили в CharacterContext, они сброс
++        // переживали (в противоположность инвентарю/крышкам/наградам).
++        // Захватываем и возвращаем — поведение 1-в-1 с до-миграционным.
++        const survivorState = {
++          currentHealth: get().currentHealth,
++          radiation: get().radiation,
++          sceneCounter: get().sceneCounter,
++          traitEffects: get().traitEffects,
++          modifiedItems: get().modifiedItems,
++          conditions: get().conditions,
++          chemDosesLog: get().chemDosesLog,
++          lastDiseaseResistAt: get().lastDiseaseResistAt,
++          stateExtensions: get().stateExtensions,
++          // Tagged-skills и skillsSaved: при keepSkills выживают (смена
++          // комплекта без сброса навыков); при !keepSkills чистятся ниже.
++          // С Шага 5 resetCharacterStore их затирал — keepSkills не работал,
++          // восстановлено в 241.
++          selectedSkills: get().selectedSkills,
++          extraTaggedSkills: get().extraTaggedSkills,
++          forcedSelectedSkills: get().forcedSelectedSkills,
++          skillsSaved: get().skillsSaved,
++        };
++        get().resetCharacterStore({
++          attributes: legacy.attributes,
++          skills: legacy.skills,
++          rewardedSkills: [],
++        });
++        set(survivorState);
++        if (!keepSkills) {
++          set({
++            selectedSkills: [],
++            extraTaggedSkills: [],
++            forcedSelectedSkills: [],
++            skillsSaved: false,
++          });
++        }
++      },
++
+       resetCharacterStore: (legacyDefaults = {}) => {
+         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+         // Вызывающий не передал дефолты → сеем стартовые значения создания.
+-- 
+2.39.5
+
