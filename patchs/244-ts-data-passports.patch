@@ -1,0 +1,700 @@
+From 11dd2f1ca5c13575f0e8b8eba0ae96cfd7671cd7 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 08:32:52 +0000
+Subject: [PATCH] =?UTF-8?q?244=20(=D1=81=D0=B5=D1=80=D0=B8=D1=8F=20TS,=20?=
+ =?UTF-8?q?=D1=87.1):=20=D0=BF=D0=B0=D1=81=D0=BF=D0=BE=D1=80=D1=82=D0=B0?=
+ =?UTF-8?q?=20=D0=B4=D0=B0=D0=BD=D0=BD=D1=8B=D1=85=20=D1=81=D1=82=D0=BE?=
+ =?UTF-8?q?=D1=80=D0=B0=20=D0=B8=20=D1=81=D0=B5=D0=B9=D0=B2-=D1=81=D0=BD?=
+ =?UTF-8?q?=D0=B0=D0=BF=D1=88=D0=BE=D1=82=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Новые TS-модули (strict, tsc включён в tsconfig):
+- src/store/characterState.ts — паспорт данных стора: CharacterPersistedData
+  (ровно partialize: словари параметров, робот, СБ, условия, профиль,
+  счётчики, schemaVersion) + CharacterRuntimeData (currentCharacterId/
+  isSaved, НЕ персистятся). Непрозрачные payload'ы — StoreItem { id, …}.
+  CHARACTER_PERSISTED_KEYS/RUNTIME_KEYS — runtime-зеркала,
+  держит их в сходимости с интерфейсом на компиляции;
+- src/saves/saveSnapshot.ts — паспорт записи на диске (post-serializeState,
+  до слима): исторические ключи (caps, effects=traitEffects, legacy-массивы
+  {name,value}, origin={id}, modifiedItems — пары, schemaVersion) +
+  попутный rewardedSkills; расширения сеттингов — индексной подписью;
+  maxLuckPoints не входит (Правило 1).
+
+Контрактный тест __tests__/saves/data-passports.test.js (6):
+- ключи РЕАЛЬНОГО persist-JSON (AsyncStorage) = CHARACTER_PERSISTED_KEYS
+  в обе стороны — новое поле стора без обновления паспорта падает тестом;
+- runtime-поля в состоянии, но не на диске;
+- реальный сейв (mock-db): паспорт ⊆ сейв, сейв \ паспорт = только
+  расширения сеттингов; maxLuckPoints отсутствует; инварианты caps/
+  effects/origin={id}/пары модов.
+
+Игровой фикс (вскрыт паспортом): loadCharacter восстанавливает
+rewardedSkills — журнал «одноразовые награды за tagged-навыки выданы»
+писался в сейв (мердж со стором), но загрузкой не читался: после
+сейв→загрузка игра забывала о выданных наградах и могла вручить их
+заново при повторном подтверждении навыков. Формат сейва не менялся
+(ключ уже в записях); старые сейвы без ключа — поведение прежнее.
+Roundtrip-тест модуля дополнен проверкой.
+
+vitest 683/683 (69 файлов), tsc чист.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../saves/character-saves-module.test.js      |   4 +
+ __tests__/saves/data-passports.test.js        | 199 +++++++++++++++
+ src/saves/characterSaves.js                   |   6 +
+ src/saves/saveSnapshot.ts                     | 141 +++++++++++
+ src/store/characterState.ts                   | 229 ++++++++++++++++++
+ tsconfig.json                                 |   4 +-
+ 6 files changed, 582 insertions(+), 1 deletion(-)
+ create mode 100644 __tests__/saves/data-passports.test.js
+ create mode 100644 src/saves/saveSnapshot.ts
+ create mode 100644 src/store/characterState.ts
+
+diff --git a/__tests__/saves/character-saves-module.test.js b/__tests__/saves/character-saves-module.test.js
+index 9dd151f..c6964b4 100644
+--- a/__tests__/saves/character-saves-module.test.js
++++ b/__tests__/saves/character-saves-module.test.js
+@@ -87,6 +87,8 @@ const seedStore = () => {
+     lastDiseaseResistAt: 999,
+     conditions: { disease1: { id: 'disease1', ranks: 1 } },
+     selectedPerks: [],
++    // Журнал «награды за tagged-навыки выданы» (патч 244: восстанавливается).
++    rewardedSkills: ['small_guns', 'repair'],
+     // Расширение сеттинга (survival) — слайс stateExtensions стора.
+     stateExtensions: { survival: { day: 2 } },
+   });
+@@ -170,6 +172,8 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
+     // Журнал доз/условия вернулись.
+     expect(state().chemDosesLog).toHaveLength(1);
+     expect(state().chemDosesLog[0].chemId).toBe('psycho');
++    // Журнал выданных наград не потерялся (патч 244) — повторного вручения не будет.
++    expect(state().rewardedSkills).toEqual(['small_guns', 'repair']);
+   });
+ 
+   it('список и удаление: прокидываются в db', async () => {
+diff --git a/__tests__/saves/data-passports.test.js b/__tests__/saves/data-passports.test.js
+new file mode 100644
+index 0000000..6a745cf
+--- /dev/null
++++ b/__tests__/saves/data-passports.test.js
+@@ -0,0 +1,199 @@
++// Паспорта данных (серия «Стор на TypeScript», патч 244).
++//
++// Паспорт без проверки — просто бумажка. Тест держит два паспорта
++// в сходимости с реальностью:
++//
++//   1) паспорт СТОРА (src/store/characterState.ts) против персист-байтов:
++//      пишем состояние в AsyncStorage (persist character-store) и сверяем
++//      состав ключей записанного JSON с CHARACTER_PERSISTED_KEYS в ОБЕ
++//      стороны — новое поле стора без обновления паспорта падает тестом,
++//      устаревший ключ паспорта — тоже. Runtime-поля
++//      (currentCharacterId/isSaved) обязаны быть в состоянии и НЕ обязаны
++//      попадать на диск;
++//   2) паспорт СЕЙВА (src/saves/saveSnapshot.ts) против реальной записи:
++//      saveCharacter (db замокан) → распарсенная строка data сверяется
++//      с CHARACTER_SAVE_KEYS: паспорт ⊆ сейв, сейв \ паспорт = только
++//      расширения сеттингов. Исторические инварианты формата — caps (не
++//      currency), effects (= traitEffects стора), legacy-массивы
++//      { name, value }, origin = { id }, modifiedItems — пары, и
++//      maxLuckPoints НЕ пишется (Правило 1 counters-storage.md).
++
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('../../db', () => {
++  const rows = new Map();
++  return {
++    saveCharacter: vi.fn(async (id, name, level, originName, data) => {
++      rows.set(id, {
++        id,
++        name,
++        level,
++        originName,
++        data: typeof data === 'string' ? JSON.parse(data) : data,
++        folderId: null,
++        renamePending: false,
++      });
++      return id;
++    }),
++    loadCharacterById: vi.fn(async (id) => rows.get(id) ?? null),
++    getCharactersList: vi.fn(async () => Array.from(rows.values())),
++    deleteCharacter: vi.fn(async (id) => {
++      rows.delete(id);
++    }),
++    clearCharacterRenameRequest: vi.fn(async () => {}),
++  };
++});
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn(async () => {}),
++}));
++
++// kitResolver импортирует db/Database напрямую; Database.js тянет
++// react-native (Flow) — в node-тесте недопустимо. Каталоги не используются.
++vi.mock('../../db/Database', () => ({
++  getWeaponById: vi.fn(async () => null),
++  getWeaponModById: vi.fn(async () => null),
++  getAmmoById: vi.fn(async () => null),
++  getItemByName: vi.fn(async () => null),
++  getCharactersList: vi.fn(async () => []),
++}));
++
++import * as db from '../../db';
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  CHARACTER_PERSISTED_KEYS,
++  CHARACTER_RUNTIME_KEYS,
++} from '../../src/store/characterState';
++import { CHARACTER_SAVE_KEYS } from '../../src/saves/saveSnapshot';
++
++const PERSIST_KEY = 'character-store';
++const state = () => useCharacterStore.getState();
++
++// Мок сетапа держит in-memory Map; читаем через API AsyncStorage
++// (тот же замокан), т.е. ровно те байты, что persist положил на «диск».
++const readPersistedState = async () => {
++  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
++  const stored = await AsyncStorage.getItem(PERSIST_KEY);
++  return stored ? JSON.parse(stored).state : null;
++};
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++  vi.clearAllMocks();
++});
++
++describe('патч 244: паспорт данных стора против персист-байтов', () => {
++  it('ключи записанного persist-JSON = CHARACTER_PERSISTED_KEYS (в обе стороны)', async () => {
++    // Реальное изменение — persist пишет partialize(state) в хранилище.
++    state().setCharacterName('Минутмен');
++    await vi.waitFor(async () => {
++      expect(await readPersistedState()).toBeTruthy();
++    });
++
++    const persisted = await readPersistedState();
++    const persistedKeys = Object.keys(persisted).sort();
++    const passportKeys = [...CHARACTER_PERSISTED_KEYS].sort();
++
++    const extraOnDisk = persistedKeys.filter((key) => !passportKeys.includes(key));
++    const missingOnDisk = passportKeys.filter((key) => !persistedKeys.includes(key));
++    // Дефект ЛЮБОГО направления = паспорт разошёлся со стором.
++    expect(extraOnDisk).toEqual([]);
++    expect(missingOnDisk).toEqual([]);
++  });
++
++  it('runtime-поля (currentCharacterId/isSaved) в состоянии, но НЕ на диске', async () => {
++    state().setCharacterName('Минутмен');
++    useCharacterStore.setState({ currentCharacterId: 'char_x', isSaved: true });
++    await vi.waitFor(async () => {
++      expect(await readPersistedState()).toBeTruthy();
++    });
++
++    const stateKeys = Object.keys(state());
++    for (const key of CHARACTER_RUNTIME_KEYS) {
++      expect(stateKeys).toContain(key);
++    }
++
++    const persisted = await readPersistedState();
++    for (const key of CHARACTER_RUNTIME_KEYS) {
++      expect(Object.keys(persisted)).not.toContain(key);
++    }
++  });
++
++  it('каждый ключ паспорта существует в состоянии стора', () => {
++    const stateKeys = new Set(Object.keys(state()));
++    const ghosts = CHARACTER_PERSISTED_KEYS.filter((key) => !stateKeys.has(key));
++    expect(ghosts).toEqual([]);
++  });
++});
++
++describe('патч 244: паспорт сейва против реальной записи', () => {
++  const seedStore = () => {
++    useCharacterStore.setState({
++      characterName: 'Минутмен',
++      level: 3,
++      origin: { id: 'minuteman', name: 'Минитмен' },
++      currency: 77,
++      radiation: 4,
++      traitEffects: [{ id: 'trait_glow', name: 'Светящийся' }],
++      modifiedItems: { weapon_x_01_22: { id: 'weapon_x_01_22', name: 'Винтовка' } },
++      // Расширение сеттинга — в сейв идёт верхним уровнем.
++      stateExtensions: { survival: { day: 2 } },
++    });
++  };
++
++  const saveOnce = async () => {
++    const id = await (await import('../../src/saves/characterSaves')).saveCharacter('Минутмен');
++    expect(id).toBeTruthy();
++    expect(db.saveCharacter).toHaveBeenCalledTimes(1);
++    return db.saveCharacter.mock.calls[0][4]; // data: распарсенный объект
++  };
++
++  it('паспорт ⊆ сейв; сейв \\ паспорт = только расширения сеттингов', async () => {
++    seedStore();
++    const saved = await saveOnce();
++    const savedKeys = Object.keys(saved);
++
++    const notInSave = CHARACTER_SAVE_KEYS.filter((key) => !savedKeys.includes(key));
++    expect(notInSave).toEqual([]); // паспорт не оторвался от формата
++
++    const settingFields = Object.keys(state().stateExtensions);
++    const outsidePassport = savedKeys.filter(
++      (key) => !CHARACTER_SAVE_KEYS.includes(key) && !settingFields.includes(key),
++    );
++    expect(outsidePassport).toEqual([]); // в сейве нет неизвестных движку ключей
++  });
++
++  it('maxLuckPoints в сейв НЕ пишется (Правило 1 counters-storage.md)', async () => {
++    seedStore();
++    const saved = await saveOnce();
++    expect(saved.maxLuckPoints).toBeUndefined();
++  });
++
++  it('исторические инварианты: caps/effects/legacy-массивы/origin={id}/пары модов', async () => {
++    seedStore();
++    const saved = await saveOnce();
++
++    // Рантайм-имя currency, поле сейва caps.
++    expect(saved.caps).toBe(77);
++    expect(saved.currency).toBeUndefined();
++    // «Эффекты трейтов» — под ключом effects.
++    expect(saved.effects).toEqual([{ id: 'trait_glow', name: 'Светящийся' }]);
++    // Атрибуты/навыки — legacy-массивы { name, value }.
++    expect(Array.isArray(saved.attributes)).toBe(true);
++    expect(saved.attributes[0]).toHaveProperty('name');
++    expect(saved.attributes[0]).toHaveProperty('value');
++    // Ориджин — { id } без локализованных полей.
++    expect(saved.origin).toEqual({ id: 'minuteman' });
++    // Альбом модификаций — массив пар.
++    expect(Array.isArray(saved.modifiedItems)).toBe(true);
++    expect(saved.modifiedItems[0][0]).toBe('weapon_x_01_22');
++    expect(saved.modifiedItems[0][1].name).toBe('Винтовка');
++    // Версия схемы проставлена.
++    expect(Number.isInteger(saved.schemaVersion)).toBe(true);
++  });
++});
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index af1e644..276f65a 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -398,6 +398,12 @@ export const loadCharacter = async (id) => {
+       skillsSaved: data.skillsSaved ?? false,
+       conditions: data.conditions || [],
+       chemDosesLog: (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS),
++      // Журнал «одноразовые награды за tagged-навыки выданы» (патч 244:
++      // паспорт сейва вскрыл рассинхрон — ключ писался мерджем со стором,
++      // но загрузкой не читался; после сейв→загрузка игра забывала о
++      // выданных наградах и могла вручить их заново). Старые сейвы без
++      // ключа дают [] — поведение прежнее.
++      rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
+     });
+     st.setSelectedPerks(data.selectedPerks || []);
+     if (data.pendingPerkDuplicateNotice) {
+diff --git a/src/saves/saveSnapshot.ts b/src/saves/saveSnapshot.ts
+new file mode 100644
+index 0000000..c763d6e
+--- /dev/null
++++ b/src/saves/saveSnapshot.ts
+@@ -0,0 +1,141 @@
++// Паспорт снапшота сейва персонажа (серия «Стор на TypeScript», патч 244).
++//
++// Описывает форму записи НА ДИСКЕ (строка data в SQLite / облаке / файловом
++// экспорте) в текущей версии схемы. Конвейер записи (src/saves/characterSaves.js):
++//   buildSnapshot() → mergeSnapshotWithStoreData → serializeState → slimSaveData;
++// паспорт соответствует результату serializeState (до слима — слим убирает
++// только восстановимые по каталогу поля предметов, ключи верхнего уровня
++// не трогает).
++//
++// Исторические особенности формата (НЕ менять без владельца — формат сейва):
++//   - caps (не currency): ресурс назывался крышками до переименования рантайма;
++//   - effects — «эффекты трейтов» (в сторе поле traitEffects);
++//   - attributes/skills — legacy-массивы { name, value };
++//   - modifiedItems — массив пар [itemId, item] (Map деструктурируется);
++//   - origin — { id } без локализованных полей;
++//   - maxLuckPoints в сейв НЕ пишется (Правило 1 counters-storage.md);
++//   - rewardedSkills едет в сейве «попутным грузом»: конвейер мерджит
++//     снапшот со стором (mergeSnapshotWithStoreData) и стор-ключ попадает
++//     в запись; загрузкой не читается (награды восстанавливаются иначе) —
++//     ключ задокументирован, чтобы паспорт не расходился с байтами;
++//   - schemaVersion проставляет serializeState (CURRENT_SCHEMA_VERSION);
++//   - поля расширений сеттингов (survival и др.) лежат рядом, верхним уровнем.
++//
++// Контрактная проверка паспорта — __tests__/saves/data-passports.test.js:
++// реальный сейв (mock-db) сверяется с CHARACTER_SAVE_KEYS в обе стороны.
++
++import type {
++  CatalogEntityRef,
++  ChemDoseEntry,
++  ConditionRecord,
++  EquippedArmor,
++  EquippedPowerArmor,
++  EquipmentKit,
++  PowerArmorRuntime,
++  SelectedPerkRecord,
++  StoreItem,
++  TimedEffectRecord,
++  TraitEffectRecord,
++} from '../store/characterState';
++
++/** Legacy-запись параметра сейва: { name: 'STR', value: 4 }. */
++export interface LegacyParameterRecord {
++  name: string;
++  value: number;
++}
++
++/** Пара альбома модификаций: [itemId, item]. */
++export type ModifiedItemPair = [string, StoreItem];
++
++/**
++ * Снапшот сейва на диске (schemaVersion CURRENT, saveSchema.js).
++ * Расширения сеттингов приходят верхним уровнем — потому индексная подпись.
++ */
++export type CharacterSaveData = {
++  characterName: string;
++  level: number;
++  attributes: LegacyParameterRecord[];
++  skills: LegacyParameterRecord[];
++  selectedSkills: string[];
++  extraTaggedSkills: string[];
++  forcedSelectedSkills: string[];
++  origin: { id: string } | null;
++  trait: CatalogEntityRef | null;
++  equipment: EquipmentKit | null;
++  /** «Эффекты трейтов» — исторический ключ (в сторе traitEffects). */
++  effects: TraitEffectRecord[];
++  /** Timed-эффекты — денормализация словаря стора в массив. */
++  activeTimedEffects: TimedEffectRecord[];
++  sceneCounter: number;
++  equippedWeapons: StoreItem[];
++  /** Пустой словарь слотов пишется как null («робота нет»). */
++  equippedRobotSlots: Record<string, Record<string, unknown>> | null;
++  equippedRobotModules: StoreItem[];
++  /** ОС Mk II (Секьюритрон) обязана переживать сейв/загрузку. */
++  mk2Installed: boolean;
++  equippedArmor: EquippedArmor;
++  equippedPowerArmor: EquippedPowerArmor;
++  powerArmorRuntime: PowerArmorRuntime;
++  /** Персистентный контракт: рантайм-имя currency, поле сейва caps. */
++  caps: number;
++  currentHealth: number;
++  radiation: number;
++  modifiedItems: ModifiedItemPair[];
++  availablePerkAttributePoints: number;
++  luckPoints: number;
++  attributesSaved: boolean;
++  skillsSaved: boolean;
++  selectedPerks: SelectedPerkRecord[];
++  conditions: ConditionRecord[];
++  chemDosesLog: ChemDoseEntry[];
++  /** Попутный ключ мерджа со стором (загрузкой не читается). */
++  rewardedSkills: string[];
++  sceneRiskStates: Record<string, Record<string, unknown>>;
++  lastDiseaseResistAt: number | null;
++  schemaVersion: number;
++} & {
++  /** Поля расширений сеттингов ({ survival: … } и т.п.) — верхним уровнем. */
++  [settingField: string]: unknown;
++};
++
++/**
++ * Ключи паспорта сейва (без расширений сеттингов — они принадлежат сеттингам,
++ * не движку). Рантайм-зеркало для контрактного теста.
++ */
++export const CHARACTER_SAVE_KEYS = [
++  'characterName',
++  'level',
++  'attributes',
++  'skills',
++  'selectedSkills',
++  'extraTaggedSkills',
++  'forcedSelectedSkills',
++  'origin',
++  'trait',
++  'equipment',
++  'effects',
++  'activeTimedEffects',
++  'sceneCounter',
++  'equippedWeapons',
++  'equippedRobotSlots',
++  'equippedRobotModules',
++  'mk2Installed',
++  'equippedArmor',
++  'equippedPowerArmor',
++  'powerArmorRuntime',
++  'caps',
++  'currentHealth',
++  'radiation',
++  'modifiedItems',
++  'availablePerkAttributePoints',
++  'luckPoints',
++  'attributesSaved',
++  'skillsSaved',
++  'selectedPerks',
++  'conditions',
++  'chemDosesLog',
++  'rewardedSkills',
++  'sceneRiskStates',
++  'lastDiseaseResistAt',
++  'schemaVersion',
++] as const;
+diff --git a/src/store/characterState.ts b/src/store/characterState.ts
+new file mode 100644
+index 0000000..102440d
+--- /dev/null
++++ b/src/store/characterState.ts
+@@ -0,0 +1,229 @@
++// Паспорт данных персонажа в Zustand-сторе (серия «Стор на TypeScript»,
++// патч 244 — Шаг 8 завершён, CharacterContext снесён).
++//
++// Паспорт = структурный контракт ДАННЫХ стора: то, что движок хранит и
++// персистирует (partialize в characterStore.js) плюс runtime-идентификация
++// текущего сейва. Сигнатуры операций (действий) в паспорт не входят — они
++// составят следующий патч серии.
++//
++// Держать паспорт в сходимости со стором обязан контрактный тест
++// __tests__/saves/data-passports.test.js: расхождение состава ключей
++// partialize с CHARACTER_PERSISTED_KEYS падает тестом. Константа
++// CHARACTER_PERSISTED_KEYS проверяется и компилятором (`satisfies`):
++// переименуешь поле в интерфейсе — tsc укажет на устаревший список.
++//
++// Производные/служебные поля состояния (maxLuckPoints — Правило 1
++// counters-storage.md, derivedStats, perkBonuses, pendingCoreChoice,
++// isEffectsProcessing, _characterContext) в паспорт не входят: это кеш и
++// рантайм-мостики, они не данные.
++//
++// Формы, которые движок держит «непрозрачными» (payload предметов, эффектов,
++// расширений сеттингов), типизированы минимально: обязательный идентификатор
++// + индексная подпись. Ужесточение — по мере перевода слоёв на TS.
++
++/**
++ * Предмет инвентаря/экипировки. Схема «база + id модов НА ПРЕДМЕТЕ»
++ * (патч 237): id кодирует экземпляр и установленные моды, каталог даёт
++ * остальное (имя/цену/вес — восстанавливаются на загрузке).
++ */
++export interface StoreItem {
++  id: string;
++  [payloadKey: string]: unknown;
++}
++
++/** Параметр словаря атрибутов/навыков стора (Шаг 5 миграции). */
++export interface ParameterEntry {
++  id: string;
++  base: number;
++  modifiers: unknown[];
++  total: number;
++}
++
++/** Слот надетой брони (domain/equippedArmor.js). */
++export interface ArmorSlot {
++  armor: StoreItem | null;
++  clothing: StoreItem | null;
++}
++
++export type BodySlotKey = 'head' | 'body' | 'leftArm' | 'rightArm' | 'leftLeg' | 'rightLeg';
++
++export type EquippedArmor = Record<BodySlotKey, ArmorSlot>;
++
++/** Надетый пакет силовой брони (domain/powerArmor.js). */
++export interface EquippedPowerArmor {
++  frame: StoreItem | null;
++  pieces: Record<BodySlotKey, StoreItem | null>;
++}
++
++/** Накопитель расхода Ядерного блока (§5.3, персистентный). */
++export interface PowerArmorRuntime {
++  coreAccumulatorMs: number;
++}
++
++/** Робо-слайс (robotSlice.js): корпус, слоты конечностей, модули, ОС Mk II. */
++export interface RobotState {
++  bodyPlan: string | null;
++  slots: Record<string, Record<string, unknown>>;
++  modules: StoreItem[];
++  mk2Installed: boolean;
++}
++
++/** «Эффект трейта» (стор-поле traitEffects; в сейве ключ effects). */
++export interface TraitEffectRecord {
++  id: string;
++  [payloadKey: string]: unknown;
++}
++
++/** Запись словаря timed-эффектов (стор-поле effects). */
++export interface TimedEffectRecord {
++  id: string;
++  active?: boolean;
++  [payloadKey: string]: unknown;
++}
++
++/** Заболевание/состояние (Шаг 6 миграции). */
++export interface ConditionRecord {
++  id: string;
++  [payloadKey: string]: unknown;
++}
++
++/** Запись журнала доз препаратов: одна попытка «Сопротивляться» в сутки. */
++export interface ChemDoseEntry {
++  chemId: string;
++  takenAt: number;
++}
++
++/** Выбранный перк (с индексом колонки). */
++export interface SelectedPerkRecord {
++  perkId: string;
++  [payloadKey: string]: unknown;
++}
++
++/** Комплект снаряжения (слайс equipment, Шаг 1 миграции). */
++export interface EquipmentKit {
++  id: string;
++  name: string;
++  [payloadKey: string]: unknown;
++}
++
++/** Ориджин/трейт — объекты каталога: идентичность только по id. */
++export interface CatalogEntityRef {
++  id: string;
++  [payloadKey: string]: unknown;
++}
++
++/**
++ * Персистируемые данные персонажа — ровно то, что выписывает partialize()
++ * characterStore ( AsyncStorage-кеш; canonical-источник — строка SQLite).
++ */
++export interface CharacterPersistedData {
++  /** Словари параметров — единственный источник (Шаг 5), никогда не пусты. */
++  attributes: Record<string, ParameterEntry>;
++  skills: Record<string, ParameterEntry>;
++  /** Словарь «живых» предметов (equipped: true — надето). */
++  items: Record<string, StoreItem>;
++  /** Словарь timed-эффектов (канон, Шаг 6): dict, не массив. */
++  effects: Record<string, TimedEffectRecord>;
++  selectedPerks: SelectedPerkRecord[];
++  /** Tagged-навыки, чья стартовая награда уже выдана. */
++  rewardedSkills: string[];
++  robot: RobotState;
++  /** Поля расширений сеттингов ({ survival } у Fallout и т.д.), патч 209. */
++  stateExtensions: Record<string, unknown>;
++  equipment: EquipmentKit | null;
++  /** Персональный счётный ресурс (в Fallout — крышки); границ нет. */
++  currency: number;
++  /** Метаданные надетого оружия (кулаки/манипуляторы); предметы — в items. */
++  equippedWeapons: StoreItem[];
++  equippedArmor: EquippedArmor;
++  equippedPowerArmor: EquippedPowerArmor;
++  powerArmorRuntime: PowerArmorRuntime;
++  /** Selection-списки создания персонажа (Шаг 5). */
++  selectedSkills: string[];
++  extraTaggedSkills: string[];
++  forcedSelectedSkills: string[];
++  conditions: ConditionRecord[];
++  chemDosesLog: ChemDoseEntry[];
++  /** Момент последней попытки «Сопротивляться» болезни; null = можно. */
++  lastDiseaseResistAt: number | null;
++  /** Состояния проверок риска сцен: ruleId → состояние сцены. */
++  sceneRiskStates: Record<string, Record<string, unknown>>;
++  origin: CatalogEntityRef | null;
++  trait: CatalogEntityRef | null;
++  level: number;
++  characterName: string;
++  attributesSaved: boolean;
++  skillsSaved: boolean;
++  luckPoints: number;
++  availablePerkAttributePoints: number;
++  /** Текущие ОЗ (может быть ВЫШЕ базового потолка) и радиация. */
++  currentHealth: number;
++  radiation: number;
++  /** Сколько сцен сменилось с начала персонажа. */
++  sceneCounter: number;
++  traitEffects: TraitEffectRecord[];
++  /** Модифицированные предметы: { [itemId]: item }; в сейв — массив пар. */
++  modifiedItems: Record<string, StoreItem>;
++  /** Версия схемы сейва (CURRENT_SCHEMA_VERSION, saveSchema.js). */
++  schemaVersion: number;
++}
++
++/**
++ * Runtime-поля стора (НЕ персистятся): идентификация текущего сейва.
++ * currentCharacterId ставят saveCharacter/loadCharacter; isSaved=true
++ * разрешает автосейв (src/saves/characterSaves.js).
++ */
++export interface CharacterRuntimeData {
++  currentCharacterId: string | null;
++  isSaved: boolean;
++}
++
++/**
++ * Ключи персистируемого слоя — рантайм-зеркало паспорта для контрактного
++ * теста. `satisfies` держит список в сходимости с интерфейсом: поле из
++ * CHARACTER_PERSISTED_KEYS, отсутствующее в CharacterPersistedData (или
++ * опечатка), ломает tsc.
++ */
++export const CHARACTER_PERSISTED_KEYS = [
++  'attributes',
++  'skills',
++  'items',
++  'effects',
++  'selectedPerks',
++  'rewardedSkills',
++  'robot',
++  'stateExtensions',
++  'equipment',
++  'currency',
++  'equippedWeapons',
++  'equippedArmor',
++  'equippedPowerArmor',
++  'powerArmorRuntime',
++  'selectedSkills',
++  'extraTaggedSkills',
++  'forcedSelectedSkills',
++  'conditions',
++  'chemDosesLog',
++  'lastDiseaseResistAt',
++  'sceneRiskStates',
++  'origin',
++  'trait',
++  'level',
++  'characterName',
++  'attributesSaved',
++  'skillsSaved',
++  'luckPoints',
++  'availablePerkAttributePoints',
++  'currentHealth',
++  'radiation',
++  'sceneCounter',
++  'traitEffects',
++  'modifiedItems',
++  'schemaVersion',
++] as const satisfies readonly (keyof CharacterPersistedData)[];
++
++/** Ключи runtime-слоя (НЕ входят в partialize). */
++export const CHARACTER_RUNTIME_KEYS = [
++  'currentCharacterId',
++  'isSaved',
++] as const satisfies readonly (keyof CharacterRuntimeData)[];
+diff --git a/tsconfig.json b/tsconfig.json
+index c113b09..21011a7 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -20,7 +20,9 @@
+   },
+   "include": [
+     "modules/fallout/survival",
+-    "modules/fallout/screens/WeaponsAndArmorScreen/modals"
++    "modules/fallout/screens/WeaponsAndArmorScreen/modals",
++    "src/store/characterState.ts",
++    "src/saves/saveSnapshot.ts"
+   ],
+   "extends": "expo/tsconfig.base"
+ }
+-- 
+2.39.5
+
