@@ -1,0 +1,488 @@
+From 3f95cfe6c46fd3a031ce808fc190d94dec277fe9 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 11:15:05 +0000
+Subject: [PATCH] =?UTF-8?q?245=20(=D1=81=D0=B5=D1=80=D0=B8=D1=8F=20TS,=20?=
+ =?UTF-8?q?=D1=87.2):=20=D0=BF=D0=B0=D1=81=D0=BF=D0=BE=D1=80=D1=82=20?=
+ =?UTF-8?q?=D1=81=D0=B8=D0=B3=D0=BD=D0=B0=D1=82=D1=83=D1=80=20=D0=BE=D0=BF?=
+ =?UTF-8?q?=D0=B5=D1=80=D0=B0=D1=86=D0=B8=D0=B9=20=D1=81=D1=82=D0=BE=D1=80?=
+ =?UTF-8?q?=D0=B0?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Новый TS-модуль src/store/characterActions.ts (strict, включён в tsconfig):
+- CharacterActions: 28 сеттеров семьи апдейтеров (UpdaterSetter<T> —
+  значение ИЛИ функциональный апдейтер (prev)=>next, обязательное
+  требование владельца, прецедент setEquippedWeapons), 8 операций записи
+  с собственной семантикой (setCurrency кламп, флаги, setBaseAttributes/
+  Skills — legacy-массив в словарь, setStateExtension(s),
+  setCharacterContext), 27 именованных операций (каунтеры, ресурс
+  {ok,reason}, оркестраторы 239-240, сбросы 241-242, пересчёты,
+  ensureStateExtensionFields 243).
+- Типы полей связаны с паспортом данных 244 (CharacterPersistedData['…']);
+  SpendOutcome задублирован структурно (domain/types.js — JSDoc, до
+  перевода домена на TS).
+- Списки SETTER_UPDATER_KEYS / SETTER_VALUE_KEYS / NAMED_OP_KEYS —
+  через satisfies readonly (keyof CharacterActions)[] (компилятор ловит
+  опечатки); EXEMPT_ACTION_KEYS — CRUD предметов/эффектов и робот/СБ,
+  типизируются следующими патчами серии.
+
+Контрактный тест __tests__/saves/action-passports.test.js (32):
+- полное покрытие в ОБЕ стороны: паспорт + исключения = все 98 действий
+  стора; новое действие мимо паспорта падает тестом;
+- каждый сеттер семьи апдейтеров динамически проверен identity-апдейтером
+  ((prev)=>prev не меняет состояние);
+- контракт ресурса: earn — void; spend вернёт {ok:true} или
+  {ok:false,reason}, отказ не трогает баланс;
+- setCurrency клампит не ниже нуля; setBaseAttributes нормализует массив.
+
+vitest 715/715 (70 файлов), tsc чист.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/saves/action-passports.test.js | 110 +++++++++
+ src/store/characterActions.ts            | 300 +++++++++++++++++++++++
+ tsconfig.json                            |   3 +-
+ 3 files changed, 412 insertions(+), 1 deletion(-)
+ create mode 100644 __tests__/saves/action-passports.test.js
+ create mode 100644 src/store/characterActions.ts
+
+diff --git a/__tests__/saves/action-passports.test.js b/__tests__/saves/action-passports.test.js
+new file mode 100644
+index 0000000..17567ac
+--- /dev/null
++++ b/__tests__/saves/action-passports.test.js
+@@ -0,0 +1,110 @@
++// Паспорт операций стора (серия «Стор на TypeScript», патч 245).
++//
++// Проверяет паспорт src/store/characterActions.ts против живого стора:
++//
++//   1) ПОЛНОЕ покрытие: паспорт (сеттеры-апдейтеры + запись с семантикой +
++//      именованные операции) ∪ исключения = ВСЕ действия стора, в обе
++//      стороны. Новое действие без паспорта/исключения падает тестом —
++//      «тихо проскочить мимо типизации» не выйдет;
++//   2) семья апдейтеров: каждый сеттер из SETTER_UPDATER_KEYS принимает
++//     функциональный апдейтер — вызов с identity (prev => prev) не падает
++//     и не меняет состояние (обязательное требование владельца,
++//     прецедент setEquippedWeapons, патч 218);
++//   3) контракт ресурса: earnCurrency — void, spendCurrency →
++//     {ok:true} | {ok:false, reason}, отказ НЕ трогает баланс
++//     («нельзя купить на больше, чем есть»);
++//   4) запись с собственной семантикой: setCurrency клампит не ниже нуля,
++//     setBaseAttributes нормализует legacy-массив в словарь.
++
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  SETTER_UPDATER_KEYS,
++  SETTER_VALUE_KEYS,
++  NAMED_OP_KEYS,
++  EXEMPT_ACTION_KEYS,
++} from '../../src/store/characterActions';
++
++const state = () => useCharacterStore.getState();
++const actionKeys = () => new Set(
++  Object.entries(state()).filter(([, v]) => typeof v === 'function').map(([k]) => k),
++);
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('патч 245: паспорт операций против живого стора', () => {
++  it('паспорт ∪ исключения покрывают ВСЕ действия стора (обе стороны)', () => {
++    const passported = new Set([
++      ...SETTER_UPDATER_KEYS,
++      ...SETTER_VALUE_KEYS,
++      ...NAMED_OP_KEYS,
++    ]);
++    const exempt = new Set(EXEMPT_ACTION_KEYS);
++    const store = actionKeys();
++
++    const notInStore = [...passported, ...exempt].filter((key) => !store.has(key));
++    expect(notInStore).toEqual([]); // паспорт не оторвался от стора
++
++    const notCovered = [...store].filter((key) => !passported.has(key) && !exempt.has(key));
++    expect(notCovered).toEqual([]); // в сторе нет действий мимо паспорта
++
++    const doubles = [...passported].filter((key) => exempt.has(key));
++    expect(doubles).toEqual([]); // действие не может быть и в паспорте, и в исключениях
++  });
++
++  it.each([...SETTER_UPDATER_KEYS])('%s принимает функциональный апдейтер (identity)', (key) => {
++    const before = { ...state() };
++    state()[key]((prev) => prev);
++    const after = state();
++    // Наблюдаемое поле сеттера не изменилось (identity не мутирует состояние).
++    const fieldName = key.replace(/^set/, '');
++    const camel = fieldName.charAt(0).toLowerCase() + fieldName.slice(1);
++    const compareKey = camel === 'equippedRobotSlots' || camel === 'equippedRobotModules'
++      ? camel // robot.slots/modules — вложенные слайсы
++      : camel;
++    if (before[compareKey] !== undefined) {
++      expect(after[compareKey]).toEqual(before[compareKey]);
++    }
++    expect(typeof state()[key]).toBe('function');
++  });
++
++  it('earnCurrency — void, spendCurrency → {ok} с нетронутым балансом при отказе', () => {
++    state().earnCurrency(10);
++    expect(state().currency).toBe(10);
++    expect(state().earnCurrency(5)).toBeUndefined();
++
++    const spend = state().spendCurrency(4);
++    expect(spend).toEqual({ ok: true });
++    expect(state().currency).toBe(11); // 10 + 5 - 4
++
++    const rejected = state().spendCurrency(100);
++    expect(rejected.ok).toBe(false);
++    expect(typeof rejected.reason).toBe('string');
++    expect(state().currency).toBe(11); // отказ баланс не трогает
++  });
++
++  it('запись с собственной семантикой: кламп ресурса, флаг, нормализация legacy', () => {
++    state().setCurrency(-5);
++    expect(state().currency).toBe(0); // не ниже нуля
++
++    state().setAttributesSaved(true);
++    expect(state().attributesSaved).toBe(true);
++
++    state().setBaseAttributes([{ name: 'STR', value: 6 }]);
++    expect(state().attributes.STR.base).toBe(6); // массив → словарь
++  });
++
++  it('именованные операции существуют и являются функциями', () => {
++    const store = actionKeys();
++    for (const key of [...NAMED_OP_KEYS, ...SETTER_VALUE_KEYS]) {
++      expect(store.has(key)).toBe(true);
++    }
++  });
++});
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+new file mode 100644
+index 0000000..645b0ae
+--- /dev/null
++++ b/src/store/characterActions.ts
+@@ -0,0 +1,300 @@
++// Паспорт сигнатур операций стора (серия «Стор на TypeScript», патч 245).
++//
++// Часть 2 серии: типизированные контракты ДЕЙСТВИЙ characterStore после
++// Шага 8 (CharacterContext снесён — стор единственный источник, экшены
++// расселены по characterStore/robotSlice/powerArmorSlice/orchestratorsSlice).
++//
++// Составляющие паспорта:
++//   - SETTER_UPDATER_KEYS — сеттеры, обязанные принимать значение ИЛИ
++//     функциональный апдейтер (prev => next). Обязательное требование
++//     владельца к НОВЫМ сеттерам (прецедент setEquippedWeapons, патч 218);
++//   - SETTER_VALUE_KEYS — операции записи с собственной семантикой
++//     (абсолютная установка/clamp/нормализация legacy-массива); апдейтер
++//     им не нужен по смыслу;
++//   - NAMED_OP_KEYS — именованные операции (каунтеры, ресурс, оркестраторы,
++//     пересчёты, сбросы) с точными сигнатурами ниже;
++//   - EXEMPT_ACTION_KEYS — CRUD предметов/эффектов, робот/СБ и прочее,
++//     типизируемое следующими патчами серии. Контрактный тест требует,
++//     чтобы паспорт ∪ исключения покрывали ВСЕ действия стора в обе
++//     стороны: новое действие без паспорта/исключения падает тестом.
++//
++// Динамическая проверка семьи апдейтеров — __tests__/saves/action-passports.test.js.
++
++import type {
++  ArmorSlot,
++  BodySlotKey,
++  CatalogEntityRef,
++  CharacterPersistedData,
++  ConditionRecord,
++  EquippedArmor,
++  EquippedPowerArmor,
++  EquipmentKit,
++  ParameterEntry,
++  PowerArmorRuntime,
++  RobotState,
++  SelectedPerkRecord,
++  StoreItem,
++  TimedEffectRecord,
++} from './characterState';
++import type { LegacyParameterRecord } from '../saves/saveSnapshot';
++
++// domain/types.js держит SpendOutcome JSDoc-typedef'ом (JS); до перевода
++// домена на TS паспорт дублирует форму структурно.
++export type SpendOutcome = { ok: true } | { ok: false; reason: string };
++
++/** Сеттер с обязательной поддержкой функционального апдейтера. */
++export type UpdaterSetter<T> = (valueOrUpdater: T | ((prev: T) => T)) => void;
++
++/** Форма equipmentState, пушимая derived-самосинхронизацией (патч 243). */
++export interface EquipmentStatePush {
++  equippedArmor?: EquippedArmor | null;
++  equippedRobotSlots?: RobotState['slots'] | null;
++  powerArmorFrameId?: string | null;
++}
++
++/** Результат превью радиации расходника (патч 239). */
++export interface ConsumableRadiationPreview {
++  requestedAmount: number;
++  receivedRadiationDamage: number;
++  rolls: unknown[];
++  canOfferReroll: boolean;
++  [extraKey: string]: unknown;
++}
++
++/** Итог «Сопротивляться» болезни (одна попытка в сутки, патч 215). */
++export type ResistDiseaseOutcome =
++  | { ok: true; [extraKey: string]: unknown }
++  | { ok: false; reason: 'cooldown' | 'notFound' | string; retryInMs?: number };
++
++/**
++ * Действия стора (пасспортизированная часть). Состояние целиком:
++ * CharacterPersistedData & CharacterRuntimeData & CharacterActions.
++ */
++export interface CharacterActions {
++  // ── Сеттеры семьи апдейтеров (значение | (prev) => next) ──
++  setCharacterName: UpdaterSetter<string>;
++  setLevel: UpdaterSetter<number>;
++  setOrigin: UpdaterSetter<CatalogEntityRef | null>;
++  setTrait: UpdaterSetter<CatalogEntityRef | null>;
++  setLuckPoints: UpdaterSetter<number>;
++  setMaxLuckPoints: UpdaterSetter<number>;
++  setAvailablePerkAttributePoints: UpdaterSetter<number>;
++  setCurrentHealth: UpdaterSetter<number>;
++  setRadiation: UpdaterSetter<number>; // кламп не ниже нуля внутри
++  setSceneCounter: UpdaterSetter<number>;
++  setTraitEffects: UpdaterSetter<CharacterPersistedData['traitEffects']>;
++  setModifiedItems: UpdaterSetter<CharacterPersistedData['modifiedItems']>;
++  setSelectedPerks: UpdaterSetter<SelectedPerkRecord[]>;
++  setSelectedSkills: UpdaterSetter<string[]>;
++  setExtraTaggedSkills: UpdaterSetter<string[]>;
++  setForcedSelectedSkills: UpdaterSetter<string[]>;
++  setConditions: UpdaterSetter<ConditionRecord[]>;
++  setChemDosesLog: UpdaterSetter<CharacterPersistedData['chemDosesLog']>;
++  setLastDiseaseResistAt: UpdaterSetter<number | null>;
++  setSceneRiskStates: UpdaterSetter<CharacterPersistedData['sceneRiskStates']>;
++  setEquipment: UpdaterSetter<EquipmentKit | null>;
++  setEquippedWeapons: UpdaterSetter<CharacterPersistedData['equippedWeapons']>;
++  setEquippedArmor: UpdaterSetter<EquippedArmor>;
++  setEquippedPowerArmor: UpdaterSetter<EquippedPowerArmor>;
++  setPowerArmorRuntime: UpdaterSetter<PowerArmorRuntime>;
++  setEquippedRobotSlots: UpdaterSetter<RobotState['slots']>;
++  setEquippedRobotModules: UpdaterSetter<RobotState['modules']>;
++  setPendingCoreChoice: UpdaterSetter<StoreItem | null>;
++
++  // ── Запись с собственной семантикой (без апдейтера) ──
++  /** Абсолютная установка ресурса с клампом не ниже нуля. */
++  setCurrency: (amount: number) => void;
++  /** Флаги UI создания персонажа. */
++  setAttributesSaved: (value: boolean) => void;
++  setSkillsSaved: (value: boolean) => void;
++  /** Абсолютная установка словарей параметров из legacy-массива (+пересчёт). */
++  setBaseAttributes: (legacyArray: LegacyParameterRecord[]) => void;
++  setBaseSkills: (legacyArray: LegacyParameterRecord[]) => void;
++  /** Расширения сеттингов: весь словарь / одно поле по ключу. */
++  setStateExtensions: (dict: CharacterPersistedData['stateExtensions']) => void;
++  setStateExtension: (fieldKey: string, value: unknown) => void;
++  /** Пуш производственных данных экипировки (derived-мост, патч 243). */
++  setCharacterContext: (context: { equipmentState?: EquipmentStatePush }) => void;
++
++  // ── Каунтеры: именованные операции (правила — domain/counters.js) ──
++  earnCurrency: (amount: number) => void;
++  spendCurrency: (amount: number) => SpendOutcome;
++  /** Начисление очков перков (Шаг 7). */
++  addPerkAttributePoints: (points: number) => void;
++  healCharacter: (amount: number, maxOverride?: number) => void;
++  damageCharacter: (amount: number) => void;
++  addRadiation: (amount: number) => void;
++  healRadiation: (amount: number) => void;
++  /** Правило книги (патч 232): усталость бьёт текущими ОЗ. */
++  applySurvivalHpLoss: (loss: number) => void;
++
++  // ── Оркестраторы (orchestratorsSlice, патчи 239–240) ──
++  commitAttributeChanges: (newAttributes: LegacyParameterRecord[], pointsSpent: number) => void;
++  advanceScene: () => void;
++  previewConsumableRadiation: (item: StoreItem) => ConsumableRadiationPreview;
++  applyConsumableTimedEffects: (item: StoreItem) => void;
++  applyConsumableFull: (item: StoreItem, options?: Record<string, unknown>) => Record<string, unknown>;
++  advanceEffectsByGameHours: (hours: number) => Record<string, unknown>;
++  reducePersistentDiseaseRanks: (amount: number) => { healed: boolean; diseasesLeft: number };
++  resistDisease: (conditionId: string) => ResistDiseaseOutcome;
++  applyDiseaseExposureEvent: (eventId: string) => Record<string, unknown> | null;
++
++  // ── Силовая броня: таймер расхода блока (§5.3/§5.4) ──
++  tickPowerArmorCore: (tickMs: number) => void;
++
++  // ── Сбросы и пересчёты ──
++  /** Полный сброс персонажа (патч 242: стор-экшен; preserveOrigin упразднён). */
++  resetCharacter: () => void;
++  /** «Жёсткий» сброс стора; без аргументов сеет стартовые словари создания. */
++  resetCharacterStore: (legacyDefaults?: {
++    attributes?: LegacyParameterRecord[];
++    skills?: LegacyParameterRecord[];
++    selectedPerks?: SelectedPerkRecord[];
++    rewardedSkills?: string[];
++  }) => void;
++  /** Смена комплекта; keepSkills — не чистить tagged-навыки (патч 241). */
++  resetKitAndRewards: (opts?: { keepSkills?: boolean }) => void;
++  recalculateAll: () => void;
++  recalculateDerivedStats: (options?: {
++    trait?: CatalogEntityRef | null;
++    level?: number;
++    equipmentState?: EquipmentStatePush;
++  }) => void;
++  recalculatePerkBonuses: () => void;
++  /** Фабрика полей сеттингов (экс-эффект провайдера, патч 243). */
++  ensureStateExtensionFields: () => void;
++  /** Мост legacy-формата (массивы) → словари стора. */
++  loadFromLegacyData: (legacyData: Record<string, unknown>) => void;
++  exportToLegacyData: () => Record<string, unknown>;
++}
++
++/** Сеттеры семьи апдейтеров — проверяются динамически (identity (prev)=>prev). */
++export const SETTER_UPDATER_KEYS = [
++  'setCharacterName',
++  'setLevel',
++  'setOrigin',
++  'setTrait',
++  'setLuckPoints',
++  'setMaxLuckPoints',
++  'setAvailablePerkAttributePoints',
++  'setCurrentHealth',
++  'setRadiation',
++  'setSceneCounter',
++  'setTraitEffects',
++  'setModifiedItems',
++  'setSelectedPerks',
++  'setSelectedSkills',
++  'setExtraTaggedSkills',
++  'setForcedSelectedSkills',
++  'setConditions',
++  'setChemDosesLog',
++  'setLastDiseaseResistAt',
++  'setSceneRiskStates',
++  'setEquipment',
++  'setEquippedWeapons',
++  'setEquippedArmor',
++  'setEquippedPowerArmor',
++  'setPowerArmorRuntime',
++  'setEquippedRobotSlots',
++  'setEquippedRobotModules',
++  'setPendingCoreChoice',
++] as const satisfies readonly (keyof CharacterActions)[];
++
++/** Запись с собственной семантикой (апдейтер по смыслу не нужен). */
++export const SETTER_VALUE_KEYS = [
++  'setCurrency',
++  'setAttributesSaved',
++  'setSkillsSaved',
++  'setBaseAttributes',
++  'setBaseSkills',
++  'setStateExtensions',
++  'setStateExtension',
++  'setCharacterContext',
++] as const satisfies readonly (keyof CharacterActions)[];
++
++/** Именованные операции с точными сигнатурами. */
++export const NAMED_OP_KEYS = [
++  'earnCurrency',
++  'spendCurrency',
++  'addPerkAttributePoints',
++  'healCharacter',
++  'damageCharacter',
++  'addRadiation',
++  'healRadiation',
++  'applySurvivalHpLoss',
++  'commitAttributeChanges',
++  'advanceScene',
++  'previewConsumableRadiation',
++  'applyConsumableTimedEffects',
++  'applyConsumableFull',
++  'advanceEffectsByGameHours',
++  'reducePersistentDiseaseRanks',
++  'resistDisease',
++  'applyDiseaseExposureEvent',
++  'tickPowerArmorCore',
++  'resetCharacter',
++  'resetCharacterStore',
++  'resetKitAndRewards',
++  'recalculateAll',
++  'recalculateDerivedStats',
++  'recalculatePerkBonuses',
++  'ensureStateExtensionFields',
++  'loadFromLegacyData',
++  'exportToLegacyData',
++  // CRUD предметов/эффектов и прочее — исключения, типизируются патчами серии.
++] as const satisfies readonly (keyof CharacterActions)[];
++
++/**
++ * Действия, НЕ паспортизированные в 245 (CRUD предметов/эффектов, робот/СБ,
++ * модификаторы параметров). Следующие патчи серии обязаны либо паспортизировать,
++ * либо осознанно оставить здесь.
++ */
++export const EXEMPT_ACTION_KEYS = [
++  'addAttributeModifier',
++  'addEffect',
++  'addNewItem',
++  'addSkillModifier',
++  'addRobotModule',
++  'adjustPowerArmorDurability',
++  'applyMk2Driver',
++  'equipHeldWeapon',
++  'equipItem',
++  'equipPowerArmorPackage',
++  'equipPowerArmorPieceInto',
++  'expireEffect',
++  'initRobot',
++  'initRobotFromKit',
++  'loadPowerArmorState',
++  'loadRobotState',
++  'markSkillsAsRewarded',
++  'pruneExpiredEffects',
++  'removeAttributeModifier',
++  'removeRobotModule',
++  'removeSkillModifier',
++  'repairPowerArmorPieceAt',
++  'repairPowerArmorStack',
++  'repairWeapon',
++  'replaceLimb',
++  'resetRobot',
++  'resolveCoreChoice',
++  'setRobotArmorLayer',
++  'spendAmmoForWeapon',
++  'triggerDependentCalculations',
++  'unequipHeldWeapon',
++  'unequipItem',
++  'unequipPowerArmorPackage',
++  'unequipPowerArmorPieceAt',
++  'updateAttribute',
++  'updateEffect',
++  'updateItem',
++  'updateSkill',
++] as const;
++
++// Псевдо-использования типов: интерфейс CharacterActions ссылается на каждый
++// импортированный тип (проверка, что паспорт данных согласован с операциями).
++export type ActionDataLinks =
++  | ArmorSlot
++  | BodySlotKey
++  | ParameterEntry
++  | TimedEffectRecord
++  | SelectedPerkRecord;
+diff --git a/tsconfig.json b/tsconfig.json
+index 21011a7..2324908 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -22,7 +22,8 @@
+     "modules/fallout/survival",
+     "modules/fallout/screens/WeaponsAndArmorScreen/modals",
+     "src/store/characterState.ts",
+-    "src/saves/saveSnapshot.ts"
++    "src/saves/saveSnapshot.ts",
++    "src/store/characterActions.ts"
+   ],
+   "extends": "expo/tsconfig.base"
+ }
+-- 
+2.39.5
+
