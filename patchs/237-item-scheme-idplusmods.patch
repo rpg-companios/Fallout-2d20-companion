@@ -1,0 +1,241 @@
+From f8850c13514594f9350052ce69dde1907c35ffd1 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 05:59:54 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=9F=D0=B0=D1=82=D1=87=20237:=20=D0=B0=D0=BB?=
+ =?UTF-8?q?=D1=8C=D0=B1=D0=BE=D0=BC=20=D0=BC=D0=BE=D0=B4=D0=B8=D1=84=D0=B8?=
+ =?UTF-8?q?=D0=BA=D0=B0=D1=86=D0=B8=D0=B9=20=D0=B1=D0=BE=D0=BB=D1=8C=D1=88?=
+ =?UTF-8?q?=D0=B5=20=D0=BD=D0=B5=20=D0=BF=D0=B8=D1=88=D0=B5=D1=82=D1=81?=
+ =?UTF-8?q?=D1=8F=20=E2=80=94=20=D1=81=D1=85=D0=B5=D0=BC=D0=B0=20id+=D0=BC?=
+ =?UTF-8?q?=D0=BE=D0=B4=D1=8B=20=D0=B2=D0=B5=D0=B7=D0=B4=D0=B5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Решение владельца (годичной давности) окончательно становится единственной
+схемой: предмет = базовый id + id модов (appliedMods/appliedArmorModId/
+appliedUniqueArmorModId/appliedClothingModId), статы собирает доменный
+конвейер (applyModModifiers/applyArmorMods/resolveEffectiveItem), сейв хранит
+id+моды (saveSlimming: SAVE_STATE_FIELDS), имя пересобирается при показе.
+
+- W&A: последние два письма в альбом сняты (оружие надетого списка, броня
+  слота) — предмет и так обновлялся на месте с id модов; альбомная запись
+  была дублём
+- characterStore: экшены saveModifiedItem/removeModifiedItem удалены;
+  modifiedItems остаётся ТОЛЬКО для чтения старых сейвов (setModifiedItems —
+  путь загрузки), docstring с историей
+- InventoryScreen: getModifiedItem помечен как read-only (старые сейвы)
+- Тесты: слайс — альбом read-only; facade — экраны не пишут альбом,
+  модалка брони кладёт id модов на предмет
+- vitest 696/696 (70 файлов), tsc чист; формат сейва не менялся
+  (альбом в старых сейвах читается, новые записи не создаются)
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../character-context-step8a-3-facade.test.js | 16 +++++++--
+ ...scene-effects-modified-store-slice.test.js | 33 ++++++++-----------
+ .../InventoryScreen/InventoryScreen.js        |  3 +-
+ .../WeaponsAndArmorScreen.js                  | 12 +++----
+ src/store/characterStore.js                   | 21 +++++-------
+ 5 files changed, 42 insertions(+), 43 deletions(-)
+
+diff --git a/__tests__/saves/character-context-step8a-3-facade.test.js b/__tests__/saves/character-context-step8a-3-facade.test.js
+index 603265a..44bfc06 100644
+--- a/__tests__/saves/character-context-step8a-3-facade.test.js
++++ b/__tests__/saves/character-context-step8a-3-facade.test.js
+@@ -137,12 +137,24 @@ describe('Шаг 8а (часть 3): экраны — напрямую на ст
+     expect(source).toContain("storeModifiedItems[getItemId(item)] || item");
+   });
+ 
+-  it('store/itemIdentity: экшены modifiedItems и канонический getItemId в домене', () => {
++  it('store/itemIdentity: слайс сцены/эффекты/модификации, getItemId в домене', () => {
+     const store = fs.readFileSync(path.resolve(__dirname, '../../src/store/characterStore.js'), 'utf8');
+-    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:', 'saveModifiedItem:', 'removeModifiedItem:']) {
++    for (const action of ['setSceneCounter:', 'setTraitEffects:', 'setModifiedItems:']) {
+       expect(store).toContain(action);
+     }
+     const identity = fs.readFileSync(path.resolve(__dirname, '../../domain/itemIdentity.js'), 'utf8');
+     expect(identity).toContain('export const getItemId');
+   });
++
++  it('патч 237: экраны не пишут альбом модификаций (схема id+моды)', () => {
++    const wa = fs.readFileSync(SCREENS.WeaponsAndArmorScreen, 'utf8');
++    expect(wa).not.toContain('saveModifiedItem');
++    // Предмет несёт id модов на себе (appliedArmorModId/…) — сборщик домена
++    // (applyArmorMods/resolveEffectiveItem) пересобирает статы при загрузке.
++    const modal = fs.readFileSync(
++      path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js'),
++      'utf8',
++    );
++    expect(modal).toContain('[stdKey]: selectedStd || null');
++  });
+ });
+diff --git a/__tests__/saves/scene-effects-modified-store-slice.test.js b/__tests__/saves/scene-effects-modified-store-slice.test.js
+index 9edce05..25046da 100644
+--- a/__tests__/saves/scene-effects-modified-store-slice.test.js
++++ b/__tests__/saves/scene-effects-modified-store-slice.test.js
+@@ -3,8 +3,11 @@
+ // - sceneCounter: данные (сколько сцен сменилось), персистится;
+ // - traitEffects: в сейве ключ effects (формат не менялся); пишутся только
+ //   из логики смены трейта (вычесть старые, дописать новые);
+-// - modifiedItems: в сторе JSON-дружелюбный словарь { [itemId]: item };
+-//   провайдер кладёт в снапшот Map → массив пар (прежний формат сейва).
++// - modifiedItems: JSON-дружелюбный словарь { [itemId]: item }. Патч 237:
++//   альбом ТОЛЬКО ЧИТАЕТСЯ (старые сейвы); моды пишутся прямо на предмет по
++//   схеме id+моды (appliedMods/appliedArmorModId/…), сборка — домен
++//   (applyModModifiers/applyArmorMods/resolveEffectiveItem). Провайдер кладёт
++//   в снапшот Map → массив пар (прежний формат сейва).
+ //
+ // Стор-поле effects занято словарём timed-эффектов (Шаг 6) — поэтому
+ // «эффекты трейтов» названы traitEffects; фасадные имена effects/setEffects
+@@ -47,23 +50,13 @@ describe('characterStore: сцены/эффекты трейтов/модифи
+     expect(useCharacterStore.getState().traitEffects).toEqual(['iron_gut', 'gifted']);
+   });
+ 
+-  it('modifiedItems: save/remove по каноническому id оригинала', () => {
++  it('патч 237: альбом read-only — saveModifiedItem/removeModifiedItem удалены', () => {
+     const store = useCharacterStore.getState();
+-    store.saveModifiedItem({ weaponId: 'weapon_switchblade' }, { weaponId: 'weapon_switchblade', name: 'Клинок+' });
+-    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade).toEqual({
+-      weaponId: 'weapon_switchblade',
+-      name: 'Клинок+',
+-    });
+-    // Повторное сохранение того же предмета перезаписывает (Map-семантика).
+-    store.saveModifiedItem({ weaponId: 'weapon_switchblade' }, { weaponId: 'weapon_switchblade', name: 'Клинок++' });
+-    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade.name).toBe('Клинок++');
+-    store.saveModifiedItem({ id: 'armor_leather' }, { id: 'armor_leather', name: 'Кожанка+' });
+-    expect(Object.keys(useCharacterStore.getState().modifiedItems)).toEqual([
+-      'weapon_switchblade',
+-      'armor_leather',
+-    ]);
+-    store.removeModifiedItem({ weaponId: 'weapon_switchblade' });
+-    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade).toBeUndefined();
++    expect(store.saveModifiedItem).toBeUndefined();
++    expect(store.removeModifiedItem).toBeUndefined();
++    // Чтение старых сейвов работает: записи альбома видны через словарь.
++    store.setModifiedItems({ weapon_switchblade: { weaponId: 'weapon_switchblade', name: 'Клинок+' } });
++    expect(useCharacterStore.getState().modifiedItems.weapon_switchblade.name).toBe('Клинок+');
+   });
+ 
+   it('modifiedItems: setModifiedItems объектом/апдейтером (путь загрузки сейва)', () => {
+@@ -80,7 +73,7 @@ describe('characterStore: сцены/эффекты трейтов/модифи
+     const store = useCharacterStore.getState();
+     store.setSceneCounter(9);
+     store.setTraitEffects(['x']);
+-    store.saveModifiedItem({ id: 'w1' }, { id: 'w1' });
++    store.setModifiedItems({ w1: { id: 'w1' } });
+     store.resetCharacterStore();
+     const s = useCharacterStore.getState();
+     expect(s.sceneCounter).toBe(0);
+@@ -92,7 +85,7 @@ describe('characterStore: сцены/эффекты трейтов/модифи
+     const store = useCharacterStore.getState();
+     store.setSceneCounter(3);
+     store.setTraitEffects(['gifted']);
+-    store.saveModifiedItem({ id: 'w1' }, { id: 'w1', name: 'Мод' });
++    store.setModifiedItems({ w1: { id: 'w1', name: 'Мод' } });
+     const raw = JSON.parse(await AsyncStorage.getItem('character-store'));
+     expect(raw.state.sceneCounter).toBe(3);
+     expect(raw.state.traitEffects).toEqual(['gifted']);
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 188a0d6..d4f2bd8 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -84,7 +84,8 @@ const InventoryScreen = () => {
+   // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
+   const equipment = useCharacterStore((s) => s.equipment);
+   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
+-  // Read-хелпер модификаций: стор-словарь { [itemId]: item } (Шаг 8а, часть 3).
++  // Read-хелпер альбома модификаций: с патча 237 альбом только читается
++  // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
+   const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
+   // Шаг 7: origin/trait — стор напрямую.
+   // Шаг 8а: слоты робота и производный вес — стор напрямую.
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 3140ff7..9932e0c 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -635,8 +635,6 @@ const WeaponsAndArmorScreen = () => {
+   const {
+     attributes,
+   } = useCharacter();
+-  // Шаг 8а (часть 3): модификации предметов — стор-экшен.
+-  const saveModifiedItem = useCharacterStore((s) => s.saveModifiedItem);
+   // Шаг 8а: слоты робота — слайс robot стора напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+@@ -882,13 +880,14 @@ const WeaponsAndArmorScreen = () => {
+       return;
+     }
+ 
+-    saveModifiedItem(selectedWeaponForModification, modifiedWeapon);
++    // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
++    // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
+     setEquippedWeapons((prev) => prev.map((w) => (
+       w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId
+         ? modifiedWeapon
+         : w
+     )));
+-  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, saveModifiedItem, setEquippedWeapons]);
++  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
+ 
+   const handleUnequipWeapon = useCallback((weapon) => {
+     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
+@@ -910,9 +909,8 @@ const WeaponsAndArmorScreen = () => {
+   const handleApplyArmorModification = (modifiedItem) => {
+     if (!selectedArmorSlot) return;
+     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
+-    const original = equippedArmor?.[selectedArmorSlot]?.[field];
+-    if (original) saveModifiedItem(original, modifiedItem);
+-
++    // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
++    // appliedUniqueArmorModId (схема id+моды); сборщик пересоберёт при загрузке.
+     setEquippedArmor((prev) => ({
+       ...prev,
+       [selectedArmorSlot]: {
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index f9ed82a..c3d6424 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -60,7 +60,7 @@ import { selectPerkBonuses } from '../../domain/perks.js';
+ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+-import { generateItemId, generateStackKey, getItemId } from '../../domain/itemIdentity';
++import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+ // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+ // стор-словари единственный источник, производный legacy-массив обязан быть
+ // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+@@ -1365,24 +1365,19 @@ const useCharacterStore = create(devtools(
+       })),
+       /**
+        * Модифицированные предметы: словарь { [itemId]: item } (значение или
+-       * функция). В снапшот сейва провайдер кладёт Map→массив пар — формат
+-       * сейва не менялся.
++       * функция). Патч 237: альбом ПЕРЕСТАЛ ПИСАТЬСЯ — моды кладутся прямо на
++       * предмет (схема id+моды: appliedMods/appliedArmorModId/…), собирает их
++       * доменный конвейер (applyModModifiers/applyArmorMods/resolveEffectiveItem).
++       * Осталась роль: ЧТЕНИЕ старых сейвов (записи альбома продолжают
++       * работать через getModifiedItem инвентаря) + загрузка сейва
++       * (setModifiedItems). В снапшот сейва провайдер кладёт Map→массив пар —
++       * формат сейва не менялся.
+        */
+       setModifiedItems: (valueOrUpdater) => set((state) => ({
+         modifiedItems: typeof valueOrUpdater === 'function'
+           ? (valueOrUpdater(state.modifiedItems) || {})
+           : (valueOrUpdater || {}),
+       })),
+-      /** Сохранить модификацию предмета по каноническому id оригинала. */
+-      saveModifiedItem: (originalItem, modifiedItem) => set((state) => ({
+-        modifiedItems: { ...state.modifiedItems, [getItemId(originalItem)]: modifiedItem },
+-      })),
+-      /** Удалить модификацию предмета. */
+-      removeModifiedItem: (item) => set((state) => {
+-        const next = { ...state.modifiedItems };
+-        delete next[getItemId(item)];
+-        return { modifiedItems: next };
+-      }),
+ 
+       resetCharacterStore: (legacyDefaults = {}) => {
+         // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+-- 
+2.39.5
+
