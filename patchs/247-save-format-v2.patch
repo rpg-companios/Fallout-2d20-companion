@@ -1,0 +1,314 @@
+From 09fe98cec97ca811de4409da98546df973b2f455 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Mon, 14 Sep 2026 18:04:45 +0000
+Subject: [PATCH] =?UTF-8?q?247=20(=D0=A4=D0=BE=D1=80=D0=BC=D0=B0=D1=82-v2)?=
+ =?UTF-8?q?:=20=D0=BA=D0=B0=D1=80=D1=82=D0=BE=D1=82=D0=B5=D0=BA=D0=B0=20?=
+ =?UTF-8?q?=D0=BC=D0=BE=D0=B4=D0=BE=D0=B2=20=D1=81=D0=BD=D1=8F=D1=82=D0=B0?=
+ =?UTF-8?q?=20=D1=81=20=D0=B7=D0=B0=D0=BF=D0=B8=D1=81=D0=B8=20=D1=81=D0=B5?=
+ =?UTF-8?q?=D0=B9=D0=B2=D0=BE=D0=B2;=20=D0=BC=D0=BE=D1=81=D1=82=20=D0=B4?=
+ =?UTF-8?q?=D0=BB=D1=8F=20=D1=81=D1=82=D0=B0=D1=80=D1=8B=D1=85=20=D0=B3?=
+ =?UTF-8?q?=D0=B5=D1=80=D0=BE=D0=B5=D0=B2?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Запись (v2):
+- buildSnapshot: ключ modifiedItems больше не входит в снапшот;
+- serializeState: ключ отсутствует целиком (не пустой массив — его
+  отсутствие миграции/загрузка трактуют как «альбома нет»);
+- моды живут на предметах (схема «база + id модов на предмете», 237);
+  новый сейв несёт только предметы.
+
+Мост (чтение старых сейвов, deserializeState):
+- записи картотеки (полные копии предметов до-237 эпохи) ОДИН раз при
+  загрузке переносятся на сами предметы: запись альбома заменяет худую
+  запись в equipment.items и equippedWeapons (по getItemId);
+- мост стоит ДО канонизации id — переехавшие предметы проходят починку
+  битых id на общих основаниях;
+- записи без пары (предмет продан/потерян) оседают в стор-альбоме как
+  раньше (read-only поддержка инвентаря не тронута);
+- после моста сейв пересохраняется уже без картотеки — формат v2
+  самоподдерживающийся, миграции и версия схемы НЕ тронуты (MIGRATIONS
+  без изменений, CURRENT_SCHEMA_VERSION прежний).
+
+Паспорт сейва (saveSnapshot.ts): modifiedItems выведен из
+CharacterSaveData и CHARACTER_SAVE_KEYS.
+
+Тесты:
+- data-passports: новый инвариант «даже при унаследованных записях
+  картотеки в сейве ключа нет»; парные ассерты сняты;
+- character-saves-module: roundtrip-тест несёт предмет в комплекте;
+  новый тест моста — рукотворный «старый» сейв (худой предмет + полная
+  копия в картотеке + потерянный предмет): загрузка обогащает предмет
+  (name/damage), комплект несёт обогащённую запись, осиротевшая запись
+  остаётся в стор-альбоме, пересохранение — без картотеки.
+
+vitest 718/718 (70 файлов), tsc чист.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../saves/character-saves-module.test.js      | 56 +++++++++++++++++--
+ __tests__/saves/data-passports.test.js        | 19 ++++---
+ src/saves/characterSaves.js                   | 49 +++++++++++++---
+ src/saves/saveSnapshot.ts                     | 10 ++--
+ 4 files changed, 108 insertions(+), 26 deletions(-)
+
+diff --git a/__tests__/saves/character-saves-module.test.js b/__tests__/saves/character-saves-module.test.js
+index c6964b4..f4a947f 100644
+--- a/__tests__/saves/character-saves-module.test.js
++++ b/__tests__/saves/character-saves-module.test.js
+@@ -82,7 +82,11 @@ const seedStore = () => {
+     sceneCounter: 3,
+     traitEffects: [{ id: 'trait_glow', name: 'Светящийся' }],
+     effects: { eff1: { id: 'eff1', active: true, name: 'Психо', durationLeft: 60 } },
+-    modifiedItems: { weapon_x_01_22: { id: 'weapon_x_01_22', name: 'Винтовка' } },
++    // Картотека с унаследованной записью (эмуляция старого героя) +
++    // предмет-основа в комплекте: мост при загрузке должен перенести
++    // содержимое картотеки НА ПРЕДМЕТ.
++    modifiedItems: { weapon_x_01_22: { id: 'weapon_x_01_22', name: 'Винтовка мод.', damage: 9 } },
++    equipment: { id: 'kit_minuteman', name: 'Застрельщик', items: [{ id: 'weapon_x_01_22', name: 'Винтовка' }] },
+     chemDosesLog: [{ chemId: 'psycho', takenAt: Date.now() - 1000 }], // свежая доза (окно CLEAN_DOSE)
+     lastDiseaseResistAt: 999,
+     conditions: { disease1: { id: 'disease1', ranks: 1 } },
+@@ -118,9 +122,9 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
+     // Timed-эффекты — денормализация словаря стора (массив).
+     expect(Array.isArray(snapshot.activeTimedEffects)).toBe(true);
+     expect(snapshot.activeTimedEffects[0]?.id).toBe('eff1');
+-    // Изменённые предметы — Map пар (формат сейва).
+-    expect(snapshot.modifiedItems).toBeInstanceOf(Map);
+-    expect(snapshot.modifiedItems.get('weapon_x_01_22')?.name).toBe('Винтовка');
++    // Формат-v2 (247): картотека модов в снапшот не входит (моды — на
++    // предметах; старые записи переносятся на предметы при загрузке).
++    expect(snapshot.modifiedItems).toBeUndefined();
+     // Каунтеры/сцены/журнал доз — на месте.
+     expect(snapshot.currentHealth).toBe(12);
+     expect(snapshot.radiation).toBe(4);
+@@ -150,6 +154,11 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
+     const parsed = typeof rowData === 'string' ? JSON.parse(rowData) : rowData;
+     expect(parsed.caps).toBe(77);
+     expect(parsed.characterName).toBe('Минутмен');
++    // Формат-v2: картотека в запись не идёт.
++    expect(parsed.modifiedItems).toBeUndefined();
++    // Зато предмет-основа едет в комплекте (мосту есть с чем работать).
++    const savedItem = parsed.equipment?.items?.find((it) => it.id === 'weapon_x_01_22');
++    expect(savedItem?.name).toBe('Винтовка');
+   });
+ 
+   it('loadCharacter: восстанавливает стор из сейв-ключей (effects → traitEffects), глушит автосейв', async () => {
+@@ -176,6 +185,45 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
+     expect(state().rewardedSkills).toEqual(['small_guns', 'repair']);
+   });
+ 
++  it('формат-v2, мост: картотека старого сейва переносится на предметы при загрузке', async () => {
++    // Готовим «старый» сейв руками: худой предмет в комплекте + полная
++    // копия в картотеке (как до патча 237).
++    db.saveCharacter.mockClear();
++    await db.saveCharacter('char_old', 'Ветеран', 2, 'minuteman', {
++      schemaVersion: 27,
++      characterName: 'Ветеран',
++      level: 2,
++      origin: { id: 'minuteman' },
++      trait: null,
++      equipment: { id: 'kit_old', name: 'Старый комплект', items: [{ id: 'weapon_x_01_22', name: 'Винтовка' }] },
++      equippedWeapons: [{ id: 'weapon_x_01_22_dupe', name: 'Дублёр' }],
++      modifiedItems: [
++        ['weapon_x_01_22', { id: 'weapon_x_01_22', name: 'Винтовка мод.', damage: 9 }],
++        ['weapon_orphan', { id: 'weapon_orphan', name: 'Потеряшка' }],
++      ],
++      caps: 5,
++    });
++
++    const ok = await loadCharacter('char_old');
++    expect(ok).toBe(true);
++
++    // Мост: предмет в словаре стора обогащён картотекой (моды видны).
++    // damage нормализуется параметрами стора в форму { base, modifiers, total }.
++    expect(state().items.weapon_x_01_22?.name).toBe('Винтовка мод.');
++    expect(state().items.weapon_x_01_22?.damage?.base).toBe(9);
++    // Комплект тоже несёт обогащённую запись.
++    const kitItem = state().equipment?.items?.find((it) => it.id === 'weapon_x_01_22');
++    expect(kitItem?.name).toBe('Винтовка мод.');
++    // Запись без пары (предмет потерян) оседает в стор-альбоме — read-only.
++    expect(state().modifiedItems.weapon_orphan?.name).toBe('Потеряшка');
++
++    // Пересохранение: картотека в запись больше не попадает (v2), а
++    // обогащённый предмет — да; повторная загрузка ничего не теряет.
++    await saveCharacter('Ветеран');
++    const resent = db.saveCharacter.mock.calls.at(-1)[4];
++    expect(resent.modifiedItems).toBeUndefined();
++  });
++
+   it('список и удаление: прокидываются в db', async () => {
+     seedStore();
+     const id = await saveCharacter('Минутмен');
+diff --git a/__tests__/saves/data-passports.test.js b/__tests__/saves/data-passports.test.js
+index 6a745cf..dc6e330 100644
+--- a/__tests__/saves/data-passports.test.js
++++ b/__tests__/saves/data-passports.test.js
+@@ -15,8 +15,11 @@
+ //      с CHARACTER_SAVE_KEYS: паспорт ⊆ сейв, сейв \ паспорт = только
+ //      расширения сеттингов. Исторические инварианты формата — caps (не
+ //      currency), effects (= traitEffects стора), legacy-массивы
+-//      { name, value }, origin = { id }, modifiedItems — пары, и
+-//      maxLuckPoints НЕ пишется (Правило 1 counters-storage.md).
++//      { name, value }, origin = { id }, и maxLuckPoints НЕ пишется
++//      (Правило 1 counters-storage.md). Формат-v2 (патч 247): ключ
++//      modifiedItems (картотека модов) в запись НЕ идёт вовсе — даже
++//      когда в сторе есть унаследованные записи (они переносятся на
++//      предметы при загрузке старых сейвов).
+ 
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ 
+@@ -174,7 +177,7 @@ describe('патч 244: паспорт сейва против реальной
+     expect(saved.maxLuckPoints).toBeUndefined();
+   });
+ 
+-  it('исторические инварианты: caps/effects/legacy-массивы/origin={id}/пары модов', async () => {
++  it('исторические инварианты: caps/effects/legacy-массивы/origin={id}', async () => {
+     seedStore();
+     const saved = await saveOnce();
+ 
+@@ -189,11 +192,13 @@ describe('патч 244: паспорт сейва против реальной
+     expect(saved.attributes[0]).toHaveProperty('value');
+     // Ориджин — { id } без локализованных полей.
+     expect(saved.origin).toEqual({ id: 'minuteman' });
+-    // Альбом модификаций — массив пар.
+-    expect(Array.isArray(saved.modifiedItems)).toBe(true);
+-    expect(saved.modifiedItems[0][0]).toBe('weapon_x_01_22');
+-    expect(saved.modifiedItems[0][1].name).toBe('Винтовка');
+     // Версия схемы проставлена.
+     expect(Number.isInteger(saved.schemaVersion)).toBe(true);
+   });
++
++  it('формат-v2: картотека модов (modifiedItems) в запись не идёт', async () => {
++    seedStore(); // в сторе есть унаследованные записи картотеки
++    const saved = await saveOnce();
++    expect(saved.modifiedItems).toBeUndefined(); // ключа нет целиком
++  });
+ });
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index 276f65a..51e3d27 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -34,6 +34,7 @@ import {
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../store/saveSchema.js';
+ import { slimSaveData, restoreSaveData } from '../../domain/saveSlimming';
+ import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
++import { getItemId } from '../../domain/itemIdentity';
+ import { canonizeLoadedCharacterItems } from '../../domain/kitItemCanonical';
+ import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../../domain/origins';
+ import {
+@@ -103,14 +104,19 @@ const clampAttributesToRules = (rawAttributes, trait) => {
+   });
+ };
+ 
+-const serializeState = (state) => ({
+-  ...state,
+-  origin: state.origin?.id ? { id: state.origin.id } : null,
+-  modifiedItems: state.modifiedItems instanceof Map
+-    ? Array.from(state.modifiedItems.entries())
+-    : (Array.isArray(state.modifiedItems) ? state.modifiedItems : []),
+-  schemaVersion: CURRENT_SCHEMA_VERSION,
+-});
++const serializeState = (state) => {
++  const serialized = {
++    ...state,
++    origin: state.origin?.id ? { id: state.origin.id } : null,
++    schemaVersion: CURRENT_SCHEMA_VERSION,
++  };
++  // Формат-v2 (патч 247): картотека модификаций в запись не идёт — ключ
++  // отсутствует целиком; миграции/загрузка трактуют отсутствие как
++  // «альбома нет». Нормализация Map→пары при чтении сохранена для старых
++  // сейвов (см. deserializeState).
++  delete serialized.modifiedItems;
++  return serialized;
++};
+ 
+ // Каталог активной локали. Если построение каталога падает (дефект данных),
+ // возвращаем null и ужимание/восстановление просто пропускается — сейв
+@@ -149,6 +155,29 @@ const deserializeState = (data) => {
+   const restored = catalog
+     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
+     : migrated;
++  // ── Формат-v2 (патч 247): мост картотеки модификаций НА ПРЕДМЕТЫ ──
++  // Картотека (modifiedItems) в запись сейва больше не пишется; в СТАРЫХ
++  // сейвах (до патча 237) в ней лежат полные копии модифицированных
++  // предметов той эпохи. Один раз при загрузке переносим их на сами
++  // предметы (схема «база + id модов на предмете»): запись альбома
++  // заменяет худую запись в комплекте и на надетом оружии — дальше сейв
++  // пересохранится уже без картотеки, а предметы не потеряют вид.
++  // Записи без пары (предмет продан/потерян) оседают в стор-альбоме
++  // как раньше (read-only поддержка инвентаря). Мост стоит ДО
++  // канонизации id (canonizeLoadedCharacterItems), чтобы переехавшие
++  // предметы прошли починку битых id на общих основаниях.
++  const albumPairs = Array.isArray(restored.modifiedItems) ? restored.modifiedItems : [];
++  if (albumPairs.length > 0) {
++    const albumById = new Map(albumPairs.map(([albumItemId, albumItem]) => [albumItemId, albumItem]));
++    const applyAlbumEntry = (item) => (item ? (albumById.get(getItemId(item)) || item) : item);
++    if (Array.isArray(restored.equipment?.items)) {
++      restored.equipment.items = restored.equipment.items.map(applyAlbumEntry);
++    }
++    if (Array.isArray(restored.equippedWeapons)) {
++      restored.equippedWeapons = restored.equippedWeapons.map(applyAlbumEntry);
++    }
++  }
++
+   return {
+     ...restored,
+     origin: resolveOrigin(restored.origin),
+@@ -227,7 +256,9 @@ export const buildSnapshot = () => {
+     caps: state.currency,
+     currentHealth: state.currentHealth,
+     radiation: state.radiation,
+-    modifiedItems: new Map(Object.entries(state.modifiedItems || {})),
++    // Формат-v2 (247): картотека модификаций в снапшот не входит —
++    // моды живут на предметах (id+моды); содержимое старых сейвов
++    // переносится на предметы при загрузке (мост в deserializeState).
+     availablePerkAttributePoints: state.availablePerkAttributePoints,
+     luckPoints: state.luckPoints,
+     attributesSaved: state.attributesSaved,
+diff --git a/src/saves/saveSnapshot.ts b/src/saves/saveSnapshot.ts
+index c763d6e..025222d 100644
+--- a/src/saves/saveSnapshot.ts
++++ b/src/saves/saveSnapshot.ts
+@@ -11,7 +11,10 @@
+ //   - caps (не currency): ресурс назывался крышками до переименования рантайма;
+ //   - effects — «эффекты трейтов» (в сторе поле traitEffects);
+ //   - attributes/skills — legacy-массивы { name, value };
+-//   - modifiedItems — массив пар [itemId, item] (Map деструктурируется);
++//   - Формат-v2 (патч 247): ключ modifiedItems В ЗАПИСЬ НЕ ПИШЕТСЯ —
++//     моды живут на предметах (id+моды). Читающая сторона по-прежнему
++//     принимает пары [itemId, item] из старых сейвов и переносит их на
++//     предметы при загрузке (мост в deserializeState);
+ //   - origin — { id } без локализованных полей;
+ //   - maxLuckPoints в сейв НЕ пишется (Правило 1 counters-storage.md);
+ //   - rewardedSkills едет в сейве «попутным грузом»: конвейер мерджит
+@@ -44,9 +47,6 @@ export interface LegacyParameterRecord {
+   value: number;
+ }
+ 
+-/** Пара альбома модификаций: [itemId, item]. */
+-export type ModifiedItemPair = [string, StoreItem];
+-
+ /**
+  * Снапшот сейва на диске (schemaVersion CURRENT, saveSchema.js).
+  * Расширения сеттингов приходят верхним уровнем — потому индексная подпись.
+@@ -80,7 +80,6 @@ export type CharacterSaveData = {
+   caps: number;
+   currentHealth: number;
+   radiation: number;
+-  modifiedItems: ModifiedItemPair[];
+   availablePerkAttributePoints: number;
+   luckPoints: number;
+   attributesSaved: boolean;
+@@ -126,7 +125,6 @@ export const CHARACTER_SAVE_KEYS = [
+   'caps',
+   'currentHealth',
+   'radiation',
+-  'modifiedItems',
+   'availablePerkAttributePoints',
+   'luckPoints',
+   'attributesSaved',
+-- 
+2.39.5
+
