@@ -264,12 +264,13 @@ export default function CharacterScreen() {
   const {
     isSaved,
     saveCharacter,
-    currency,
-    earnCurrency,
-    spendCurrency,
     resetCharacter,
-    resetKitAndRewards,
   } = useCharacter();
+  // Шаг 8а (патч 241): деньги и сброс комплекта — стор напрямую (с Шага 2/8а).
+  const currency = useCharacterStore((s) => s.currency);
+  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
+  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+  const resetKitAndRewards = useCharacterStore((s) => s.resetKitAndRewards);
   // Шаг 8а (патч 238): подтверждение атрибутов — стор-экшен напрямую.
   const commitAttributeChanges = useCharacterStore((s) => s.commitAttributeChanges);
   // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.

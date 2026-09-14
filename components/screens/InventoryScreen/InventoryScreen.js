@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
-import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
 import { selectCarryWeight } from '../../../src/store/selectors';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
@@ -76,9 +75,10 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 );
 
 const InventoryScreen = () => {
-  const {
-    currency, earnCurrency, spendCurrency,
-  } = useCharacter();
+  // Деньги — стор напрямую (Шаг 8а, патч 241; поле в сторе с Шага 2).
+  const currency = useCharacterStore((s) => s.currency);
+  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
+  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
   // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
   const applyConsumableFull = useCharacterStore((s) => s.applyConsumableFull);
   // Шаг 8а (патч 239): превью радиации — стор-экшен.

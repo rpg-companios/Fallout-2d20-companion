@@ -12,6 +12,8 @@ import {
   storeItemToWeaponDisplay,
   weaponModPatchToStore,
   selectActiveTimedEffects,
+  selectLegacyAttributes,
+  selectLegacySkills,
 } from '../../../../src/store/selectors';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../../domain/characterCreation';
 import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
@@ -392,7 +394,11 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 
 export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
-    const { attributes, skills } = useCharacter();
+    // Шаг 8а (патч 241): атрибуты/навыки — стор напрямую.
+    const storeAttributes = useCharacterStore((state) => state.attributes);
+    const storeSkills = useCharacterStore((state) => state.skills);
+    const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+    const skills = useMemo(() => selectLegacySkills({ skills: storeSkills }), [storeSkills]);
     const trait = useCharacterStore((state) => state.trait); // Шаг 7
     // Шаг 8а: проверка трейта — по store.trait (замыкание фасада hasTrait снято).
     const hasTrait = (id) => !!(
@@ -633,9 +639,9 @@ const resolveStoreItemId = (weapon) => {
 };
 
 const WeaponsAndArmorScreen = () => {
-  const {
-    attributes,
-  } = useCharacter();
+  // Шаг 8а (патч 241): атрибуты (legacy-массив) — из стор-словаря.
+  const storeAttributes = useCharacterStore((s) => s.attributes);
+  const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
   // Шаг 8а: слоты робота — слайс robot стора напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
   const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);

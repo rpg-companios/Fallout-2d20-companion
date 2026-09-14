@@ -56,6 +56,7 @@ import { advanceEffectsByScene, applyConsumableToEffects, pruneExpiredTimedEffec
 import { hasRadiationImmunity } from '../../domain/immunities';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
 import { createOrchestrationActions } from './orchestratorsSlice.js';
+import { denormalizeCharacterState } from './migrations.js';
 import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
@@ -1510,6 +1511,56 @@ const useCharacterStore = create(devtools(
         set((state) => ({ sceneCounter: state.sceneCounter + 1 }));
         get().triggerDependentCalculations();
         return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+      },
+
+      /**
+       * Сброс комплекта снаряжения (смена ориджина/комплекта): очищает
+       * инвентарь, награды за навыки, снаряжение, слоты робота, броню/СБ,
+       * крышки — но СОХРАНЯЕТ атрибуты/навыки/профиль/здоровье.
+       * keepSkills: true — не чистит tagged-skills и skillsSaved (смена
+       * комплекта без сброса навыков). Шаг 8а (патч 241): переехал из
+       * CharacterContext 1-в-1.
+       */
+      resetKitAndRewards: (opts = {}) => {
+        const keepSkills = Boolean(opts.keepSkills);
+        const legacy = denormalizeCharacterState(get());
+        // resetCharacterStore сеет «полный сброс», но смена комплекта — НЕ
+        // полный сброс: пока эти поля жили в CharacterContext, они сброс
+        // переживали (в противоположность инвентарю/крышкам/наградам).
+        // Захватываем и возвращаем — поведение 1-в-1 с до-миграционным.
+        const survivorState = {
+          currentHealth: get().currentHealth,
+          radiation: get().radiation,
+          sceneCounter: get().sceneCounter,
+          traitEffects: get().traitEffects,
+          modifiedItems: get().modifiedItems,
+          conditions: get().conditions,
+          chemDosesLog: get().chemDosesLog,
+          lastDiseaseResistAt: get().lastDiseaseResistAt,
+          stateExtensions: get().stateExtensions,
+          // Tagged-skills и skillsSaved: при keepSkills выживают (смена
+          // комплекта без сброса навыков); при !keepSkills чистятся ниже.
+          // С Шага 5 resetCharacterStore их затирал — keepSkills не работал,
+          // восстановлено в 241.
+          selectedSkills: get().selectedSkills,
+          extraTaggedSkills: get().extraTaggedSkills,
+          forcedSelectedSkills: get().forcedSelectedSkills,
+          skillsSaved: get().skillsSaved,
+        };
+        get().resetCharacterStore({
+          attributes: legacy.attributes,
+          skills: legacy.skills,
+          rewardedSkills: [],
+        });
+        set(survivorState);
+        if (!keepSkills) {
+          set({
+            selectedSkills: [],
+            extraTaggedSkills: [],
+            forcedSelectedSkills: [],
+            skillsSaved: false,
+          });
+        }
       },
 
       resetCharacterStore: (legacyDefaults = {}) => {

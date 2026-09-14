@@ -117,3 +117,47 @@ describe('orchestratorsSlice: расходник и мост времени (п�
     }
   });
 });
+
+describe('characterStore: resetKitAndRewards (патч 241)', () => {
+  it('чистит комплект/награды/крышки, сохраняет атрибуты/навыки/здоровье; keepSkills', () => {
+    const store = useCharacterStore.getState();
+    store.setBaseAttributes([{ name: 'STR', value: 7 }]);
+    store.setBaseSkills([{ name: 'Ближний бой', value: 3 }]);
+    store.addNewItem({ id: 'stimpack', itemType: 'consumable', quantity: 2 });
+    store.markSkillsAsRewarded(['Ближний бой']);
+    store.earnCurrency(500);
+    store.setCurrentHealth(9);
+    store.setSelectedSkills(['Ближний бой']);
+    store.setSkillsSaved(true);
+    store.setSceneCounter(4);
+    store.setConditions(['diseased']);
+    store.setChemDosesLog([{ chemId: 'x', takenAt: Date.now() }]);
+    store.setCurrentHealth(9);
+    store.addRadiation(2);
+
+    store.resetKitAndRewards({ keepSkills: true });
+    let s = useCharacterStore.getState();
+    expect(s.items).toEqual({});               // инвентарь пуст
+    expect(s.rewardedSkills).toEqual([]);      // награды очищены
+    expect(s.currency).toBe(0);                // крышки обнулены
+    expect(s.attributes.STR.base).toBe(7);     // атрибуты выжили
+    expect(s.skills['Ближний бой']?.base).toBe(3); // навыки выжили
+    // «Выжившие поля» смены комплекта (до миграции жили в контексте и
+    // resetCharacterStore не трогались): здоровье/радиация/сцены/условия/
+    // журнал доз — регресс 234–240 пойман тестом и починен в 241.
+    expect(s.currentHealth).toBe(9);
+    expect(s.radiation).toBe(2);
+    expect(s.sceneCounter).toBe(4);
+    expect(s.conditions).toEqual(['diseased']);
+    expect(s.chemDosesLog.length).toBe(1);
+    expect(s.selectedSkills).toEqual(['Ближний бой']); // keepSkills: tagged живы
+    expect(s.skillsSaved).toBe(true);
+
+    store.resetKitAndRewards();                // без keepSkills: tagged чистятся
+    s = useCharacterStore.getState();
+    expect(s.selectedSkills).toEqual([]);
+    expect(s.extraTaggedSkills).toEqual([]);
+    expect(s.forcedSelectedSkills).toEqual([]);
+    expect(s.skillsSaved).toBe(false);
+  });
+});

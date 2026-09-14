@@ -9,8 +9,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
-import { useCharacter } from '../../../../../components/CharacterContext';
 import useCharacterStore from '../../../../../src/store/characterStore';
+import { selectLegacyAttributes } from '../../../../../src/store/selectors';
 import { calculateMaxHealth } from '../../../../../domain/characterCreation';
 import {
     forecastSleep,
@@ -97,7 +97,9 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
     useModuleLocale();
     const survival = useSurvivalState();
     const { sleepSurvival } = useSurvivalActions();
-    const { attributes } = useCharacter();
+    // Шаг 8а (патч 241): атрибуты — из стор-словаря (legacy-массив).
+    const storeAttributes = useCharacterStore((state) => state.attributes);
+    const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
     // Шаг 7: level/attributesSaved — стор напрямую.
     const level = useCharacterStore((state) => state.level);
     const attributesSaved = useCharacterStore((state) => state.attributesSaved);

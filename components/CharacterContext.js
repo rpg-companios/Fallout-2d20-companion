@@ -37,7 +37,7 @@ import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../domain/origins';
 import { createStateExtensionFields, hydrateStateExtensionFields, resetStateExtensionFields } from '../src/store/stateExtensions';
 import { CHEM_DOSE_WINDOW_MS } from '../src/store/orchestratorsSlice';
 import { inspectSelectedPerkRecords } from '../domain/perks';
-import { pruneExpiredTimedEffects, SCENE_RULES } from '../domain/effects';
+import { pruneExpiredTimedEffects } from '../domain/effects';
 import { createSceneRiskTracker } from '../domain/sceneRiskChecks';
 import { syncCharacterToCloudIfEnabled } from './cloudSync/googleDriveSync';
 
@@ -836,43 +836,8 @@ export const CharacterProvider = ({ children }) => {
     characterIdRef.current = null;
   };
 
-  /**
-   * Сброс комплекта снаряжения (при смене ориджина или комплекта):
-   * очищает инвентарь, награды за навыки (rewardedSkills), снаряжение, слоты
-   * робота и крышки. Атрибуты/навыки и сам персонаж сохраняются.
-   * @param {object} opts - { keepSkills: boolean } — если true, не сбрасывает tagged skills и skillsSaved (смена комплекта без сброса персонажа)
-   */
-  const resetKitAndRewards = useCallback((opts = {}) => {
-    const keepSkills = Boolean(opts.keepSkills);
-    setEquipment(null);
-    // equippedWeapons обнуляет resetCharacterStore (Шаг 3 миграции).
-    setEquippedRobotSlots(null);
-    setEquippedRobotModules([]);
-    // Броня/СБ/рантайм блока сбрасываются resetCharacterStore (Шаг 4 миграции;
-    // раньше надетый пакет СБ здесь не сбрасывался и «повисал» над пустым
-    // инвентарём — теперь консистентно спадает).
-    // Ресурс обнуляет resetCharacterStore (слайс currency, Шаг 2 миграции).
-    // resetCharacterStore принимает legacy-формат (массивы) — денормализуем.
-    const { attributes: legacyAttributes, skills: legacySkills } =
-      denormalizeCharacterState(useCharacterStore.getState());
-    useCharacterStore.getState().resetCharacterStore({
-      attributes: legacyAttributes,
-      skills: legacySkills,
-      rewardedSkills: [],
-    });
-    if (!keepSkills) {
-      const resetSt = useCharacterStore.getState();
-      resetSt.setSelectedSkills([]);
-      resetSt.setExtraTaggedSkills([]);
-      resetSt.setForcedSelectedSkills([]);
-      setSkillsSaved(false);
-    }
-  }, []);
-
-  // Сброс только комплекта без сброса навыков (для смены комплекта без сброса персонажа)
-  const resetKitOnly = useCallback(() => {
-    resetKitAndRewards({ keepSkills: true });
-  }, [resetKitAndRewards]);
+  // resetKitAndRewards/resetKitOnly — Шаг 8а (патч 241): стор-экшен
+  // (resetKitOnly был мёртв — удалён вовсе).
 
   const value = {
     // characterName/setCharacterName — Шаг 7: только в сторе.
@@ -886,15 +851,12 @@ export const CharacterProvider = ({ children }) => {
     // Атрибуты/навыки (данные) — Шаг 5: экраны читают производные массивы
     // отсюда, пишут ТОЛЬКО в стор (setBaseAttributes/setBaseSkills +
     // selection-экшены useCharacterStore). Сеттеры из фасада убраны.
-    attributes, skills,
-    selectedSkills,
-    extraTaggedSkills,
-    forcedSelectedSkills,
+    // attributes/skills/selection-списки — Шаг 8а (патч 241): стор-селекторы.
     // origin/setOrigin/trait/setTrait — Шаг 7: только в сторе.
     // equipment/setEquipment, effects/setEffects (→ traitEffects), sceneCounter —
     // Шаг 8а (часть 3): стор напрямую (поле equipment живёт в сторе с Шага 1).
     // sceneRiskStates — Шаг 6: экраны читают стор напрямую (useCharacterStore).
-    sceneDurationMinutes: SCENE_RULES.SCENE_DURATION_MINUTES,
+    // sceneDurationMinutes удалён (мёртвый член).
     // previewConsumableRadiation/applyConsumableTimedEffects/applyConsumableFull —
     // Шаг 8а (патчи 239/240): стор.
     // conditions/setConditions/chemDosesLog — Шаг 6: только в сторе.
@@ -907,7 +869,7 @@ export const CharacterProvider = ({ children }) => {
     // Ресурсы наружу — числом, как и раньше. Менять их можно только
     // именованными операциями: правило границ живёт в domain/counters.js,
     // а не переписывается заново на каждом экране.
-    currency, earnCurrency, spendCurrency,
+    // currency/earnCurrency/spendCurrency — Шаг 8а (патч 241): стор (с Шага 2).
     // currentHealth/radiation и их действия — Шаг 8а: только в сторе.
     // luckPoints/maxLuckPoints/attributesSaved/skillsSaved — Шаг 7: только в сторе.
     // selectedPerks/setSelectedPerks — Шаг 8а: только в сторе.
@@ -921,8 +883,7 @@ export const CharacterProvider = ({ children }) => {
     // applyDiseaseExposureEvent (resolveSceneRiskEventById) — Шаг 8а (патч 240): стор.
     // lastDiseaseResistAt — Шаг 6: экраны читают стор напрямую.
     resetCharacter,
-    resetKitAndRewards,
-    resetKitOnly,
+    // resetKitAndRewards — Шаг 8а (патч 241): стор; resetKitOnly удалён (мёртв).
     // availablePerkAttributePoints/addPerkAttributePoints — Шаг 7: только в сторе.
     // commitAttributeChanges — Шаг 8а (патч 238): только в сторе.
     // meetsPerkRequirements/getPerkUnmetReasons/annotatePerks — Шаг 8а:

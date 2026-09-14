@@ -72,11 +72,11 @@ describe('Шаг 5: фасад useCharacter() без сеттеров атриб
     }
   });
 
-  it('в value остались только чтения: атрибуты/навыки/selection-списки', () => {
-    const required = ['attributes', 'skills', 'selectedSkills', 'extraTaggedSkills', 'forcedSelectedSkills'];
+  it('патч 241: чтения атрибутов/навыков/selection тоже ушли в стор', () => {
+    const forbidden = ['attributes', 'skills', 'selectedSkills', 'extraTaggedSkills', 'forcedSelectedSkills'];
     const names = valueObjects.flatMap((object) => object.properties.map(propertyName));
-    for (const name of required) {
-      expect(names).toContain(name);
+    for (const name of forbidden) {
+      expect(names).not.toContain(name);
     }
   });
 
