@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { useCharacter, useRobotBodyPlan } from '../../../../../components/CharacterContext';
+import useCharacterStore from '../../../../../src/store/characterStore';
 import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
 import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
@@ -108,8 +108,11 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
  *   onClose      {function}
  */
 const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
-  const { equippedRobotSlots, setEquippedRobotSlots } = useCharacter();
-  const bodyPlan = useRobotBodyPlan();
+  // Шаг 8а: слоты робота — слайс robot стора напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  // Шаг 8в (патч 243): контекст снесён — bodyPlan читается из стора напрямую.
+  const bodyPlan = useCharacterStore((s) => s.robot?.bodyPlan ?? null);
   useLocale();
   const moduleLocale = useModuleLocale();
   const equipmentCatalog = useMemo(

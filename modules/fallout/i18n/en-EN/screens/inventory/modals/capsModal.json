@@ -4,5 +4,7 @@
   "inputPlaceholder": "Enter amount",
   "save": "Save",
   "cancel": "Cancel",
-  "invalidAmount": "Please enter a valid number greater than zero."
+  "invalidAmount": "Please enter a valid number greater than zero.",
+  "notEnoughCapsTitle": "Not enough caps",
+  "notEnoughCapsMessage": "Cannot spend {amount}: only {caps} available."
 }

@@ -1,3 +1,4 @@
+import useCharacterStore from '../../../../../src/store/characterStore';
 import React, { useMemo } from 'react';
 import {
   Modal,
@@ -8,7 +9,6 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { useCharacter } from '../../../../../components/CharacterContext';
 import { applyLimbReplacement } from '../../../../../domain/robotEquip';
 import { limbOptionsForSlot } from '../../../../../domain/robotSlots';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
@@ -115,8 +115,13 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
  *   onClose      {function}
  */
 const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
-  const { equippedRobotSlots, setEquippedRobotSlots, setEquippedWeapons, equipment, setEquipment } =
-    useCharacter();
+  // Шаг 8а: слоты робота и комплект — слайсы стора напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const equipment = useCharacterStore((s) => s.equipment);
+  const setEquipment = useCharacterStore((s) => s.setEquipment);
+  // Надетое оружие — Шаг 3 миграции: список пишется напрямую в стор.
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   useLocale();
   const moduleLocale = useModuleLocale();
   const equipmentCatalog = useMemo(

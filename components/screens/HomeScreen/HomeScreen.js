@@ -1,3 +1,5 @@
+import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { findCatalogEntry } from '../../../domain/resolveItem';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -16,7 +18,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCharacter } from '../../CharacterContext';
+import useCharacterStore from '../../../src/store/characterStore';
+// Шаг 8б (патч 242): сохранения — обычный модуль без React.
+import * as savesModule from '../../../src/saves/characterSaves';
 import { findEnrichedOrigin } from '../../../domain/origins';
 import {
   SUPPORTED_LOCALES,
@@ -201,7 +205,12 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 export default function HomeScreen({ navigation }) {
   const locale = useLocale();
   const moduleLocale = useModuleLocale();
-  const { getCharactersList, loadCharacter, resetCharacter, deleteCharacter } = useCharacter();
+  // Шаг 8б (патч 242): папка сохранений — модуль src/saves/characterSaves.js,
+  // сброс — стор-экшен; фасад useCharacter() сейв-члены больше не отдаёт.
+  const getCharactersList = savesModule.getCharactersList;
+  const loadCharacter = savesModule.loadCharacter;
+  const deleteCharacter = savesModule.deleteCharacter;
+  const resetCharacter = useCharacterStore((s) => s.resetCharacter);
   const [characters, setCharacters] = useState([]);
   const [folders, setFolders] = useState([]);
   const [folderCounts, setFolderCounts] = useState({});
@@ -524,7 +533,18 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      const payload = createCharacterExportPayload(row);
+      // Экспорт худым телом (слайм): имя/цена/вес/статы восстанавливаются
+      // из каталога на импорте — файл не тащит дубли каталога.
+      let exportCatalog = null;
+      try { exportCatalog = getEquipmentCatalog(moduleLocale); } catch (e) { exportCatalog = null; }
+      const payload = createCharacterExportPayload(row, {
+        getEntry: exportCatalog
+          ? (id, itemType) => {
+              try { return findCatalogEntry(exportCatalog, id, itemType); }
+              catch (e) { return null; }
+            }
+          : undefined,
+      });
       const result = await downloadCharacterPayload(payload, row.name);
       
       if (!result.success && !result.aborted) {

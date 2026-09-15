@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCharacter } from '../../../../components/CharacterContext';
 import { showRawAlert } from '../../../../components/alerts/alertService';
 import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../../../domain/diseaseConditions';
 import useCharacterStore from '../../../../src/store/characterStore';
@@ -12,6 +11,8 @@ import {
   storeItemToWeaponDisplay,
   weaponModPatchToStore,
   selectActiveTimedEffects,
+  selectLegacyAttributes,
+  selectLegacySkills,
 } from '../../../../src/store/selectors';
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../../domain/characterCreation';
 import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
@@ -37,7 +38,7 @@ import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, 
 import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
 import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
-import { hpMaxPenaltyForFatigue, survivalEffectRows, totalFatigue } from '../../survival/survival';
+import { ladderColorKey, survivalEffectRows } from '../../survival/survival';
 import { useSurvivalState } from '../../survival/hooks';
 import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
 import SleepModal from './modals/SleepModal';
@@ -70,7 +71,10 @@ import { isAmmoWeapon } from '../../../../domain/weaponDurability';
 
 
 const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
-  const { currentHealth, healCharacter, damageCharacter } = useCharacter();
+  // Шаг 8а: здоровье/радиация — стор-каунтеры напрямую.
+  const currentHealth = useCharacterStore((state) => state.currentHealth);
+  const healCharacter = useCharacterStore((state) => state.healCharacter);
+  const damageCharacter = useCharacterStore((state) => state.damageCharacter);
   // Радиация опускает потолок ОЗ, не нанося урона: текущее здоровье может
   // остаться выше него. Лечение до этого потолка не поднимает и — важно —
   // не уменьшает уже набранное. Правило живёт в domain/counters.js.
@@ -108,7 +112,8 @@ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
 };
 
 const RadiationCounter = ({ isEnabled }) => {
-  const { radiation, setRadiation } = useCharacter();
+  const radiation = useCharacterStore((state) => state.radiation);
+  const setRadiation = useCharacterStore((state) => state.setRadiation);
   const canDecrease = isEnabled && radiation > 0;
 
   const handleAdjust = (amount) => {
@@ -191,7 +196,10 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
   const [isOpen, setIsOpen] = useState(false);
   useLocale();
   const moduleLocale = useModuleLocale();
-  const { resistDisease, lastDiseaseResistAt } = useCharacter();
+  // Шаг 8а (патч 240): «Сопротивляться» болезни — стор-экшен.
+  const resistDisease = useCharacterStore((state) => state.resistDisease);
+  // lastDiseaseResistAt — Шаг 6 миграции: состояние в сторе, экран читает напрямую.
+  const lastDiseaseResistAt = useCharacterStore((state) => state.lastDiseaseResistAt);
   const diseasesById = useMemo(() => new Map(
     getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
   ), [moduleLocale]);
@@ -328,14 +336,25 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
 
 // --- Reusable Components ---
 
-const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false }) => (
+// Патч 231: ключ цвета лестницы → стиль значения ('ok' — без перекраски).
+const SURVIVAL_VALUE_STYLES = {
+  ok: null,
+  grey: localStyles.survivalValueGrey,
+  yellow: localStyles.survivalValueYellow,
+  orange: localStyles.survivalValueOrange,
+  red: localStyles.survivalValueRed,
+};
+
+// Патч 231: valueStyle — дополнительный цвет значения (шкала состояний
+// выживания: от обычного на потолке до красного на дне).
+const StatBox = ({ title, value, children, highlightMeleeBonus = false, disabled = false, valueStyle }) => (
   <View style={[localStyles.statBoxContainer, disabled && { opacity: 0.5 }]}>
     <View style={localStyles.statBoxHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
     </View>
     <View style={localStyles.statBoxValueContainer}>
       <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
-        {highlightMeleeBonus ? renderTextWithIcons(String(value).replace('{CD}', ' {CD}'), styles.statValue) : <Text style={styles.statValue}>{value}</Text>}
+        {highlightMeleeBonus ? renderTextWithIcons(String(value).replace('{CD}', ' {CD}'), styles.statValue) : <Text style={[styles.statValue, valueStyle]}>{value}</Text>}
         {children}
       </View>
     </View>
@@ -374,7 +393,19 @@ const ArmorPart = ({ title, subtitle, armorName, clothingName, stats, footer = n
 
 
 export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceSlot = false, equippedWeapons = [] }) => {
-    const { hasTrait, attributes, skills, trait } = useCharacter();
+    // Шаг 8а (патч 241): атрибуты/навыки — стор напрямую.
+    const storeAttributes = useCharacterStore((state) => state.attributes);
+    const storeSkills = useCharacterStore((state) => state.skills);
+    const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+    const skills = useMemo(() => selectLegacySkills({ skills: storeSkills }), [storeSkills]);
+    const trait = useCharacterStore((state) => state.trait); // Шаг 7
+    // Шаг 8а: проверка трейта — по store.trait (замыкание фасада hasTrait снято).
+    const hasTrait = (id) => !!(
+      trait && (
+        trait.id === id ||
+        (Array.isArray(trait?.ids) && trait.ids.includes(id))
+      )
+    );
     const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
     const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
     // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
@@ -607,25 +638,19 @@ const resolveStoreItemId = (weapon) => {
 };
 
 const WeaponsAndArmorScreen = () => {
-  const {
-    attributes,
-    level,
-    equippedWeapons: contextEquippedWeapons,
-    setEquippedWeapons,
-    equippedArmor: contextEquippedArmor,
-    setEquippedArmor,
-    equippedRobotSlots,
-    setEquippedRobotSlots,
-    saveModifiedItem,
-    attributesSaved,
-    trait,
-    origin,
-    radiation,
-    // Силовая броня (docs/architecture/power-armor-plan.md §5): надетый пакет и действия.
-    // ПРАВИЛО (от владельца): починка — только через инвентарь, здесь её действия нет.
-    equippedPowerArmor,
-    adjustPowerArmorDurability,
-  } = useCharacter();
+  // Шаг 8а (патч 241): атрибуты (legacy-массив) — из стор-словаря.
+  const storeAttributes = useCharacterStore((s) => s.attributes);
+  const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+  // Шаг 8а: слоты робота — слайс robot стора напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  // Шаг 7: level/attributesSaved/trait/origin — стор напрямую.
+  const level = useCharacterStore((s) => s.level);
+  // Шаг 8а: радиация — стор-каунтер.
+  const radiation = useCharacterStore((s) => s.radiation);
+  const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+  const trait = useCharacterStore((s) => s.trait);
+  const origin = useCharacterStore((s) => s.origin);
 
   // Выживание — поле расширения сеттинга (modules/fallout/survival/):
   // движок хранит его в stateExtensions, модуль читает через свой хук.
@@ -635,6 +660,17 @@ const WeaponsAndArmorScreen = () => {
   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
   const storeEquippedArmor = useMemo(() => getEquippedArmor({ items: storeItems }), [storeItems]);
+  // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
+  // напрямую из стора (powerArmorSlice), минуя фасад useCharacter().
+  // equippedArmorState — слайс надетой брони (в merged equippedArmor ниже).
+  const equippedArmorState = useCharacterStore((s) => s.equippedArmor);
+  const setEquippedArmor = useCharacterStore((s) => s.setEquippedArmor);
+  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
+  const adjustPowerArmorDurability = useCharacterStore((s) => s.adjustPowerArmorDurability);
+  // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора
+  // (метаданные кулаков/манипуляторов дополняют items с equipped: true).
+  const equippedWeaponsMeta = useCharacterStore((s) => s.equippedWeapons);
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const unequipItem = useCharacterStore((state) => state.unequipItem);
 
@@ -649,20 +685,20 @@ const WeaponsAndArmorScreen = () => {
     // источник. Люди: встроенные кулаки — в контекстном списке (как было).
     const robotExtras = isRobot
       ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
-      : (contextEquippedWeapons || []).filter(
+      : (equippedWeaponsMeta || []).filter(
           (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
         );
     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id));
     const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id));
     return [...fromStore, ...extras];
-  }, [storeEquippedWeapons, contextEquippedWeapons, isRobot, equippedRobotSlots]);
+  }, [storeEquippedWeapons, equippedWeaponsMeta, isRobot, equippedRobotSlots]);
 
   const equippedArmor = useMemo(() => {
     const hasStoreArmor = Object.values(storeEquippedArmor).some(
       (slot) => slot.armor || slot.clothing,
     );
-    return hasStoreArmor ? storeEquippedArmor : contextEquippedArmor;
-  }, [storeEquippedArmor, contextEquippedArmor]);
+    return hasStoreArmor ? storeEquippedArmor : equippedArmorState;
+  }, [storeEquippedArmor, equippedArmorState]);
 
   const storeEffects = useCharacterStore((state) => state.effects);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
@@ -683,13 +719,11 @@ const WeaponsAndArmorScreen = () => {
   // Выживание (§4 дока): «прекрасно отдохнувший» даёт +2 к макс. ОЗ
   // до следующего сна — hpBonus в состоянии survival.
   const survivalHpBonus = survival?.hpBonus || 0;
-  // Усталость снижает МАКСИМУМ ОЗ, а не текущие (§6, патч 213): −⌊N/2⌋,
-  // производная от текущей усталости; текущие ОЗ не трогаются (как радиация,
-  // законно быть выше максимума). Не ниже нуля.
-  const survivalMaxHpPenalty = survival ? hpMaxPenaltyForFatigue(totalFatigue(survival)) : 0;
+  // Патч 232: усталость больше не снижает максимум ОЗ — по книге она
+  // теряет ТЕКУЩИЕ ОЗ за игровой час (SurvivalClock → applySurvivalHpLoss).
   const effectiveMaxHealth = Math.max(
     0,
-    maxHealth + timedMaxHpBonus + survivalHpBonus - survivalMaxHpPenalty,
+    maxHealth + timedMaxHpBonus + survivalHpBonus,
   );
   const timedDR = getTimedDamageResistanceBonus(activeTimedEffects);
   
@@ -852,13 +886,14 @@ const WeaponsAndArmorScreen = () => {
       return;
     }
 
-    saveModifiedItem(selectedWeaponForModification, modifiedWeapon);
+    // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
+    // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
     setEquippedWeapons((prev) => prev.map((w) => (
       w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId
         ? modifiedWeapon
         : w
     )));
-  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, saveModifiedItem, setEquippedWeapons]);
+  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
 
   const handleUnequipWeapon = useCallback((weapon) => {
     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
@@ -880,9 +915,8 @@ const WeaponsAndArmorScreen = () => {
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;
     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
-    const original = equippedArmor?.[selectedArmorSlot]?.[field];
-    if (original) saveModifiedItem(original, modifiedItem);
-
+    // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
+    // appliedUniqueArmorModId (схема id+моды); сборщик пересоберёт при загрузке.
     setEquippedArmor((prev) => ({
       ...prev,
       [selectedArmorSlot]: {
@@ -940,26 +974,14 @@ const WeaponsAndArmorScreen = () => {
 
   // Строки выживания для панели «Эффекты» (док §6): «Усталость N» и
   // «Количество получаемых ОД −N» при N ≥ 1. Роботы/киборги — пусто (null).
-  // Патч 217: у строки «Усталость» в скобках активные источники —
-  // «Усталость 5 (голод: 1 / жажда: 2 / сон: 1 / болезнь: 1)»; показываются
-  // только источники с ненулевым вкладом.
+  // Патч 231 (решение владельца): разбивка источников в скобках убрана —
+  // происхождение усталости видно по цветам состояний лестниц (ряд
+  // Голод/Жажда/Сон выше); строка снова просто «Усталость N».
   const survivalRows = useMemo(
-    () => survivalEffectRows(survival).map((row) => {
-      const text = tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n));
-      if (row.key !== 'fatigue' || !row.sources || row.sources.length === 0) {
-        return { key: `survival_${row.key}`, text };
-      }
-      const join = tWeaponsAndArmorScreen('survival.fatigueSourceJoin');
-      const sources = row.sources
-        .map((entry) => `${tWeaponsAndArmorScreen(`survival.fatigueSource.${entry.source}`)}: ${entry.amount}`)
-        .join(join);
-      return {
-        key: `survival_${row.key}`,
-        text: tWeaponsAndArmorScreen('survival.fatigueSources')
-          .replace('{n}', String(row.n))
-          .replace('{sources}', sources),
-      };
-    }),
+    () => survivalEffectRows(survival).map((row) => ({
+      key: `survival_${row.key}`,
+      text: tWeaponsAndArmorScreen(`survival.${row.key}`).replace('{n}', String(row.n)),
+    })),
     [survival]
   );
 
@@ -1117,17 +1139,24 @@ const WeaponsAndArmorScreen = () => {
                 Роботы и киборги (survival === null) ряда не получают. */}
             {survival ? (
               <View style={[localStyles.statsRow, { marginTop: 8 }]}>
+                {/* Патч 231: значения окрашены по лестнице (решение владельца):
+                    потолок — обычный цвет, ниже — серый, серо-жёлтый,
+                    жёлто-красный, на дне — красный; у воды (4 ступени)
+                    жёлто-красный пропущен. */}
                 <StatBox
                   title={tWeaponsAndArmorScreen('survival.foodTitle')}
                   value={tWeaponsAndArmorScreen(`survival.food.${survival.food}`)}
+                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('food', survival.food)]}
                 />
                 <StatBox
                   title={tWeaponsAndArmorScreen('survival.waterTitle')}
                   value={tWeaponsAndArmorScreen(`survival.water.${survival.water}`)}
+                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('water', survival.water)]}
                 />
                 <StatBox
                   title={tWeaponsAndArmorScreen('survival.sleepTitle')}
                   value={tWeaponsAndArmorScreen(`survival.sleep.${survival.sleep}`)}
+                  valueStyle={SURVIVAL_VALUE_STYLES[ladderColorKey('sleep', survival.sleep)]}
                 />
               </View>
             ) : null}

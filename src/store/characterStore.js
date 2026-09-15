@@ -51,8 +51,13 @@ import {
 
 import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './migrations.js';
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
-import { legacyEffectToStore } from './effectsSync.js';
+import { legacyEffectToStore, effectsDictToLegacyArray, syncTimedEffectsToStore } from './effectsSync.js';
+import { advanceEffectsByScene, applyConsumableToEffects, pruneExpiredTimedEffects, resolveConsumableRadiationRoll } from '../../domain/effects';
+import { hasRadiationImmunity } from '../../domain/immunities';
 import { createInitialRobotState, createRobotActions } from './robotSlice.js';
+import { createOrchestrationActions } from './orchestratorsSlice.js';
+import { denormalizeCharacterState } from './migrations.js';
+import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
@@ -60,6 +65,17 @@ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDura
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
 import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+// Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+// стор-словари единственный источник, производный legacy-массив обязан быть
+// валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
+import { isRobotCharacter } from '../../domain/origins';
+// Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
+// число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
+// в CharacterContext.
+import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
+import { selectLegacyAttributes } from './selectors.js';
+import { createStateExtensionFields } from './stateExtensions.js';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -182,24 +198,58 @@ const applyModModifiers = (item, appliedMods = {}) => {
   return updatedItem;
 };
 
-// Helper to get trait, level, and equipment state from context (to be provided by components)
-const getCharacterContext = () => {
-  // These would come from the CharacterContext or props in real usage
-  // For now, return defaults
-  return {
-    trait: null,
-    level: 1,
-    equipmentState: {},
-  };
-};
-
 // Main store creation
 const useCharacterStore = create(devtools(
   persist(
     (set, get) => ({
       // --- Initial State ---
-      attributes: {},
-      skills: {},
+      // Атрибуты/навыки — Parameter-словари, единственный источник (Шаг 5).
+      // Сеются дефолтами создания: «пустой словарь при открытом UI» — недопустимое
+      // состояние (производный legacy-массив обязан содержать все атрибуты/навыки).
+      ...normalizeForStore({
+        attributes: createInitialAttributes(),
+        skills: ALL_SKILLS.map((skill) => ({ ...skill, value: 0 })),
+      }),
+      selectedSkills: [],
+      extraTaggedSkills: [],
+      forcedSelectedSkills: [],
+      // Профиль персонажа — Шаг 7 миграции (источник — стор).
+      origin: null,
+      trait: null,
+      level: 1,
+      characterName: '',
+      attributesSaved: false,
+      skillsSaved: false,
+      luckPoints: 0,
+      maxLuckPoints: 0,
+      availablePerkAttributePoints: 0,
+      // ═══ Каунтеры персонажа — Шаг 8а миграции (источник — стор). ═══
+      // В состоянии лежит только текущее значение числом; потолок и границы
+      // собираются в момент операции (domain/counters.js,
+      // docs/architecture/counters-storage.md). Здоровье может быть законно
+      // ВЫШЕ базового потолка (радиация опускает максимум, не нанося урона;
+      // бонус отдыха повышает) — экшены это учитывают.
+      currentHealth: 0,
+      radiation: 0,
+      // ═══ Шаг 8а (часть 3): счётчик сцен, эффекты трейтов, изменённые предметы. ═══
+      // sceneCounter — сколько сцен сменилось с начала персонажа (данные).
+      // traitEffects — «эффекты трейтов» (в сейве ключ effects; смена трейта
+      // вычитает старые и дописывает новые — пишутся только из trait-логики).
+      // modifiedItems — модифицированные предметы: словарь { [itemId]: item };
+      // в снапшот сейва идёт как Map→массив пар (формат не менялся), поэтому
+      // в сторе держим JSON-дружелюбный объект, а не Map.
+      sceneCounter: 0,
+      traitEffects: [],
+      modifiedItems: {},
+      // Текущий сейв — runtime-состояние (НЕ персистится): персонаж выбирается
+      // из списка при старте; автосейв работает только для isSaved+id.
+      currentCharacterId: null,
+      isSaved: false,
+      // Заболевания/состояния — Шаг 6 миграции (источник — стор).
+      conditions: [],
+      chemDosesLog: [],
+      lastDiseaseResistAt: null,
+      sceneRiskStates: {},
       items: {},
       effects: {},
       // Поля расширений состояния сеттингов (src/store/stateExtensions.js,
@@ -210,9 +260,28 @@ const useCharacterStore = create(devtools(
       // селекторами. В сейв поля идут под своими ключами верхнего уровня
       // (buildSnapshot контекста раскладывает словарь).
       stateExtensions: {},
+      // Комплект снаряжения { id, name, weight, price, items,
+      // purchaseMaxRarity } | null — единственный источник истины, мигрирован
+      // из useState в CharacterContext. Мутации — только через setEquipment
+      // (поддерживает и функциональный апдейтер prev => next).
+      equipment: null,
+      /**
+       * Персонажный счётный ресурс без верхней границы (в Fallout — крышки).
+       * Единственный источник правды. Название нейтральное: движок не знает
+       * про крышки — конкретное имя/иконка/локализация остаются в UI-слое
+       * сеттинга (см. tInventory('screen.caps.title')).
+       * @type {number}
+       */
+      currency: 0,
       selectedPerks: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
+      // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
+      // sourceSlot и т.п.) — «живые» предметы лежат в items (equipped: true),
+      // этот список их дополняет (Шаг 3 миграции из CharacterContext).
+      // Мутации — только через setEquippedWeapons (поддерживает и
+      // функциональный апдейтер prev => next).
+      equippedWeapons: [],
       derivedStats: {}, // Calculated derived stats
 
       perkBonuses: {},
@@ -220,12 +289,22 @@ const useCharacterStore = create(devtools(
       // Robot equipment slice (slots / modules / bodyPlan). See robotSlice.js.
       ...createInitialRobotState(),
 
+      // Надетая броня / силовая броня / рантайм блока / диалог выбора блока.
+      // See powerArmorSlice.js (Шаг 4 миграции из CharacterContext).
+      ...createInitialPowerArmorState(),
+
       // Status flags (not part of persistence)
       isEffectsProcessing: false,
 
       // --- Actions: Perks ---
-      setSelectedPerks: (selectedPerks = []) => {
-        set({ selectedPerks });
+      /**
+       * Выбранные перки: массивом или функцией от предыдущего (Шаг 8а;
+       * функциональный апдейтер — обязательное требование к сеттерам).
+       */
+      setSelectedPerks: (updater) => {
+        const prev = get().selectedPerks || [];
+        const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
+        set({ selectedPerks: next });
         get().recalculatePerkBonuses();
         get().recalculateDerivedStats();
       },
@@ -240,6 +319,10 @@ const useCharacterStore = create(devtools(
 
       // --- Actions: Robot equipment (delegated to robotSlice) ---
       ...createRobotActions(set, get),
+
+      // --- Actions: Equipped armor & power armor (delegated to powerArmorSlice) ---
+      ...createPowerArmorActions(set, get),
+      ...createOrchestrationActions(set, get),
 
       // --- Actions: Attributes ---
 
@@ -941,8 +1024,11 @@ const useCharacterStore = create(devtools(
         // Merge provided options with the last context pushed via setCharacterContext,
         // falling back to defaults. (Previously this used a stub that always returned
         // trait:null/level:1 — see Fix #4.)
+        // Шаг 7: trait/level/origin — публичные поля стора; зеркало
+        // _characterContext хранит только equipmentState (эффект провайдера).
         const context = {
-          ...getCharacterContext(),
+          trait: state.trait,
+          level: state.level,
           ...(state._characterContext || {}),
           ...options,
         };
@@ -951,7 +1037,7 @@ const useCharacterStore = create(devtools(
         // (the robot slice is the single source of truth — Fix #2).
         const equipmentState = {
           ...(context.equipmentState || {}),
-          isRobot: Boolean(context.isRobot ?? context.equipmentState?.isRobot),
+          isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
           robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
         };
 
@@ -968,16 +1054,39 @@ const useCharacterStore = create(devtools(
       },
 
       /**
+       * Шаг 8в (патч 243): заполнить ещё не созданные поля сеттинговых
+       * расширений (src/store/stateExtensions.js) по текущим origin/trait.
+       * Раньше это делал эффект CharacterProvider (патч 207); после сноса
+       * контекста действие зовут setOrigin/setTrait и колбэк реидратации.
+       * null = «не создано»: фабрика заполняет ТОЛЬКО отсутствующие поля
+       * (undefined/null); заданные сейвом/миграциями не трогает.
+       */
+      ensureStateExtensionFields: () => {
+        const { origin, trait, stateExtensions } = get();
+        if (!origin) return;
+        const created = createStateExtensionFields({ origin, trait });
+        let changed = false;
+        const merged = { ...stateExtensions };
+        for (const [fieldKey, value] of Object.entries(created)) {
+          if (merged[fieldKey] === undefined || merged[fieldKey] === null) {
+            if (merged[fieldKey] === value) continue; // null → null: менять нечего
+            merged[fieldKey] = value;
+            changed = true;
+          }
+        }
+        if (changed) set({ stateExtensions: merged });
+      },
+
+      /**
        * Set character context for derived stats calculation
        * @param {Object} context - { trait, level, equipmentState }
        */
-      setCharacterContext: (context) => {
-        // Store context for derived stats calculation
-        // This would typically be called by CharacterContext
+      setCharacterContext: (context = {}) => {
+        // Шаг 7: зеркалируются ТОЛЬКО производственные данные экипировки
+        // (переносимый вес/СБ); trait/level/origin — публичные поля стора,
+        // читаются recalculateDerivedStats и characterRules напрямую.
         set({
           _characterContext: {
-            trait: context.trait || null,
-            level: context.level || 1,
             equipmentState: context.equipmentState || {},
           }
         });
@@ -1010,6 +1119,191 @@ const useCharacterStore = create(devtools(
       })),
 
       /**
+       * Комплект снаряжения персонажа: { id, name, weight, price, items,
+       * purchaseMaxRarity } | null. Единственный источник — стор (мигрировано
+       * из CharacterContext). Поддерживает функциональный апдейтер (prev => next)
+       * для обратной совместимости с существующими вызовами.
+       */
+      setEquipment: (updater) => {
+        set((state) => ({
+          equipment: typeof updater === 'function' ? updater(state.equipment) : updater,
+        }));
+      },
+
+      /**
+       * Начислить ресурс. Без верхней границы; отрицательная/некорректная
+       * сумма — no-op.
+       * @param {number} amount
+       */
+      earnCurrency: (amount) => {
+        const state = get();
+        const counter = createCounter({ id: 'currency', current: state.currency, max: null });
+        set({ currency: restore(counter, amount).current });
+      },
+
+      /**
+       * Потратить ресурс. Транзакционная операция: при недостатке средств
+       * баланс не меняется, возвращается явный отказ.
+       * @param {number} amount
+       * @returns {import('../../domain/types').SpendOutcome}
+       */
+      spendCurrency: (amount) => {
+        const state = get();
+        const delta = Number(amount);
+        // Мусор (NaN и т.п.) — ошибка вызывающего: no-op вместо порчи ресурса
+        // (раньше эту защиту давал toFiniteOrNull внутри consume).
+        if (!Number.isFinite(delta)) return { ok: true };
+        if (delta < 0) return { ok: true };
+        if (delta > state.currency) {
+          debugLog('store.currency.insufficient', { current: state.currency, amount });
+          return { ok: false, reason: 'not-enough-currency' };
+        }
+        set({ currency: state.currency - delta });
+        return { ok: true };
+      },
+
+      /**
+       * Установить абсолютное значение — только при загрузке сейва.
+       * @param {number} amount
+       */
+      setCurrency: (amount) => set({ currency: Math.max(0, Number(amount) || 0) }),
+
+      /**
+       * Список надетого оружия (метаданные: встроенные кулаки, манипуляторы,
+       * sourceSlot). Единственный источник — стор (Шаг 3 миграции из
+       * CharacterContext). Поддерживает функциональный апдейтер (prev => next)
+       * для обратной совместимости с существующими вызовами.
+       */
+      setEquippedWeapons: (updater) => {
+        set((state) => ({
+          equippedWeapons: typeof updater === 'function' ? updater(state.equippedWeapons) : updater,
+        }));
+      },
+
+      /**
+       * Абсолютная запись базовых атрибутов из legacy-массива [{name, value}]
+       * (создание персонажа, смена трейта, загрузка сейва). Словарь —
+       * единственный источник (Шаг 5); дельта-обновления поверх — updateAttribute.
+       */
+      setBaseAttributes: (legacyArray) => {
+        const normalized = normalizeForStore({ attributes: legacyArray });
+        set({ attributes: normalized.attributes });
+        get().recalculateDerivedStats();
+      },
+
+      /**
+       * Абсолютная запись базовых навыков из legacy-массива [{name, value}]
+       * (тегирование, прокачка, загрузка сейва). Дельта-обновления — updateSkill.
+       */
+      setBaseSkills: (legacyArray) => {
+        const normalized = normalizeForStore({ skills: legacyArray });
+        set({ skills: normalized.skills });
+        get().recalculateDerivedStats();
+      },
+
+      /**
+       * Отмеченные (tagged) навыки — список имён. Поддерживает функциональный
+       * апдейтер (прецедент setEquippedWeapons): (prev) => next.
+       */
+      setSelectedSkills: (updater) => {
+        set((state) => ({
+          selectedSkills: typeof updater === 'function' ? updater(state.selectedSkills) : [...(updater || [])],
+        }));
+      },
+      /** Дополнительные тегированные (трейт/перк) — как setSelectedSkills. */
+      setExtraTaggedSkills: (updater) => {
+        set((state) => ({
+          extraTaggedSkills: typeof updater === 'function' ? updater(state.extraTaggedSkills) : [...(updater || [])],
+        }));
+      },
+      /** Навязанные трейтом (forced) — как setSelectedSkills. */
+      setForcedSelectedSkills: (updater) => {
+        set((state) => ({
+          forcedSelectedSkills: typeof updater === 'function' ? updater(state.forcedSelectedSkills) : [...(updater || [])],
+        }));
+      },
+
+      /**
+       * Состояния персонажа (['addicted', 'diseased', ...]) — Шаг 6.
+       * Поддерживает функциональный апдейтер (прецедент setEquippedWeapons).
+       */
+      setConditions: (updater) => {
+        set((state) => ({
+          conditions: typeof updater === 'function' ? updater(state.conditions) : [...(updater || [])],
+        }));
+      },
+
+      /** Журнал доз препаратов ([{ chemId, takenAt }]) — Шаг 6. */
+      setChemDosesLog: (updater) => {
+        set((state) => ({
+          chemDosesLog: typeof updater === 'function' ? updater(state.chemDosesLog) : [...(updater || [])],
+        }));
+      },
+
+      /** Момент последней проверки «Сопротивляться» болезни (v25) — Шаг 6. */
+      setLastDiseaseResistAt: (updater) => {
+        set((state) => ({
+          lastDiseaseResistAt: typeof updater === 'function' ? updater(state.lastDiseaseResistAt) : (updater ?? null),
+        }));
+      },
+
+      /** Состояния проверок риска сцен (ruleId → scene state) — Шаг 6. */
+      setSceneRiskStates: (updater) => {
+        set((state) => ({
+          sceneRiskStates: typeof updater === 'function' ? updater(state.sceneRiskStates) : { ...(updater || {}) },
+        }));
+      },
+
+      // ── Профиль персонажа (Шаг 7): сеттеры с функциональным апдейтером ──
+
+      /** Ориджин (объект каталога | null). */
+      setOrigin: (updater) => {
+        set((state) => ({
+          origin: typeof updater === 'function' ? updater(state.origin) : updater,
+        }));
+        // Шаг 8в (патч 243): эффект провайдера снесён — фабрики полей
+        // сеттингов заполняются действием стора.
+        get().ensureStateExtensionFields();
+      },
+      /** Трейт (объект каталога | null). */
+      setTrait: (updater) => {
+        set((state) => ({
+          trait: typeof updater === 'function' ? updater(state.trait) : updater,
+        }));
+        get().ensureStateExtensionFields();
+      },
+      /** Уровень персонажа. */
+      setLevel: (updater) => set((state) => ({
+        level: typeof updater === 'function' ? updater(state.level) : updater,
+      })),
+      /** Имя персонажа. */
+      setCharacterName: (updater) => set((state) => ({
+        characterName: typeof updater === 'function' ? updater(state.characterName) : updater,
+      })),
+      /** Флаг «атрибуты сохранены» (UI создания). */
+      setAttributesSaved: (value) => set({ attributesSaved: Boolean(value) }),
+      /** Флаг «навыки сохранены» (UI создания). */
+      setSkillsSaved: (value) => set({ skillsSaved: Boolean(value) }),
+      /** Текущие очки удачи (current; потолок — производная, не персистится). */
+      setLuckPoints: (updater) => set((state) => ({
+        luckPoints: typeof updater === 'function' ? updater(state.luckPoints) : updater,
+      })),
+      /** Потолок очков удачи (производная getLuckPoints; хранится для UI). */
+      setMaxLuckPoints: (updater) => set((state) => ({
+        maxLuckPoints: typeof updater === 'function' ? updater(state.maxLuckPoints) : updater,
+      })),
+      /** Свободные очки атрибутов перков. */
+      setAvailablePerkAttributePoints: (updater) => set((state) => ({
+        availablePerkAttributePoints: typeof updater === 'function'
+          ? updater(state.availablePerkAttributePoints)
+          : updater,
+      })),
+      /** Начислить/списать очки атрибутов перков (не ниже 0). */
+      addPerkAttributePoints: (points = 0) => set((state) => ({
+        availablePerkAttributePoints: Math.max(0, state.availablePerkAttributePoints + points),
+      })),
+
+      /**
        * Reset all per-character Zustand data before starting a new character.
        *
        * The store is a working cache for the currently opened character, while
@@ -1017,21 +1311,371 @@ const useCharacterStore = create(devtools(
        * and skills immediately so queued React effects from the previously
        * opened character cannot refill an empty store with stale values.
        */
+      // ── Каунтеры: здоровье/радиация (Шаг 8а миграции из CharacterContext) ──
+      /**
+       * Прямая установка здоровья (значение или функция от предыдущего).
+       * Без клампов: вызывающий отвечает за границы (оркестратор расходников
+       * передаёт посчитанный результат, выживание режет в 0).
+       */
+      setCurrentHealth: (valueOrUpdater) => set((state) => ({
+        currentHealth: typeof valueOrUpdater === 'function'
+          ? valueOrUpdater(state.currentHealth)
+          : valueOrUpdater,
+      })),
+      /**
+       * Лечение до потолка. Потолок — переданный вызывающим (уже уменьшенный
+       * на радиацию) либо формула сеттинга от атрибутов и уровня.
+       */
+      healCharacter: (amount, maxOverride) => {
+        const state = get();
+        const legacyAttributes = selectLegacyAttributes({ attributes: state.attributes });
+        const ceiling = maxOverride ?? calculateMaxHealth(legacyAttributes, state.level);
+        set({
+          currentHealth: restore(
+            createCounter({ id: 'health', current: state.currentHealth, max: ceiling }),
+            amount,
+          ).current,
+        });
+      },
+      /**
+       * Урон — без потолка базовой формулы: текущее ОЗ может быть законно
+       * ВЫШЕ базового максимума (бонус «прекрасно отдохнувший», патч 213,
+       * радиация опускает максимум, не нанося урона). Граница — только 0.
+       */
+      damageCharacter: (amount) => {
+        const state = get();
+        set({
+          currentHealth: consume(
+            createCounter({ id: 'health', current: state.currentHealth, max: null }),
+            amount,
+          ).current,
+        });
+      },
+      /** Радиация: ресурс «наоборот» — «хорошо» быть у нуля. Потолка нет. */
+      addRadiation: (amount) => {
+        const state = get();
+        set({
+          radiation: restore(
+            createCounter({ id: 'radiation', current: state.radiation, max: null }),
+            amount,
+          ).current,
+        });
+      },
+      healRadiation: (amount) => {
+        const state = get();
+        set({
+          radiation: consume(
+            createCounter({ id: 'radiation', current: state.radiation, max: null }),
+            amount,
+          ).current,
+        });
+      },
+      /** Установка радиации (значение или функция), нижняя граница 0. */
+      setRadiation: (updater) => set((state) => {
+        const requested = typeof updater === 'function' ? updater(state.radiation) : updater;
+        return {
+          radiation: setCounter(
+            { id: 'radiation', current: state.radiation, max: null, min: 0 },
+            requested,
+          ).current,
+        };
+      }),
+      /**
+       * Потеря ТЕКУЩИХ ОЗ от усталости за игровой час (патч 232, решение
+       * владельца — по книге): без сопротивлений, до нуля включительно.
+       * Зовёт SurvivalClock (тип выживания) и часы сна потерь не дают.
+       */
+      applySurvivalHpLoss: (loss) => {
+        if (!(loss > 0)) return;
+        set((state) => ({ currentHealth: Math.max(0, state.currentHealth - loss) }));
+      },
+
+      /** Счётчик сменённых сцен: значением или функцией от предыдущего. */
+      setSceneCounter: (valueOrUpdater) => set((state) => ({
+        sceneCounter: typeof valueOrUpdater === 'function'
+          ? valueOrUpdater(state.sceneCounter)
+          : valueOrUpdater,
+      })),
+      /**
+       * «Эффекты трейтов» (в сейве — ключ effects; поле traitEffects): значением
+       * или функцией. Пишутся только из логики смены трейта (CharacterScreen).
+       */
+      setTraitEffects: (valueOrUpdater) => set((state) => ({
+        traitEffects: typeof valueOrUpdater === 'function'
+          ? (valueOrUpdater(state.traitEffects) || [])
+          : (valueOrUpdater || []),
+      })),
+      /**
+       * Модифицированные предметы: словарь { [itemId]: item } (значение или
+       * функция). Патч 237: альбом ПЕРЕСТАЛ ПИСАТЬСЯ — моды кладутся прямо на
+       * предмет (схема id+моды: appliedMods/appliedArmorModId/…), собирает их
+       * доменный конвейер (applyModModifiers/applyArmorMods/resolveEffectiveItem).
+       * Осталась роль: ЧТЕНИЕ старых сейвов (записи альбома продолжают
+       * работать через getModifiedItem инвентаря) + загрузка сейва
+       * (setModifiedItems). В снапшот сейва провайдер кладёт Map→массив пар —
+       * формат сейва не менялся.
+       */
+      setModifiedItems: (valueOrUpdater) => set((state) => ({
+        modifiedItems: typeof valueOrUpdater === 'function'
+          ? (valueOrUpdater(state.modifiedItems) || {})
+          : (valueOrUpdater || {}),
+      })),
+
+      /**
+       * Подтвердить распределение атрибутов (экран создания персонажа).
+       * Принимает legacy-массив нового распределения и потраченные perk-очки:
+       *   - значения клампятся к потолку трейта (getAttributeLimits);
+       *   - дельты пишутся в стор через updateAttribute (тот сам пересчитывает
+       *     производные — perkBonuses, вес, инициативу и т.д.);
+       *   - списываются очки perk-атрибутов;
+       *   - потолок удачи следует за УДАЧ+модификатором трейта, текущая
+       *     удача подрезается сверху (понижение УДАЧ не возвращает очки);
+       *   - здоровье подрезается к новому потолку (уровень мог упасть).
+       * Шаг 8а (патч 238): переехал из CharacterContext 1-в-1; в контексте
+       * при этом ушла работа с локальным зеркалом-массивом — теперь и «текущие
+       * значения» берутся из словаря стора напрямую.
+       */
+      commitAttributeChanges: (newAttributes, pointsSpent) => {
+        const state = get();
+        const { trait } = state;
+        const committedAttributes = (newAttributes || []).map((newAttr) => {
+          if (!newAttr?.name) return newAttr;
+          const { max } = getAttributeLimits(trait, newAttr.name);
+          const value = Math.min(Number(newAttr.value) || 0, max);
+          return value === newAttr.value ? newAttr : { ...newAttr, value };
+        });
+
+        committedAttributes.forEach((newAttr) => {
+          if (!newAttr?.name) return;
+          const currentAttr = state.attributes?.[newAttr.name]?.base ?? 0;
+          const delta = newAttr.value - currentAttr;
+          if (delta !== 0) get().updateAttribute(newAttr.name, delta);
+        });
+
+        set((s) => ({ availablePerkAttributePoints: s.availablePerkAttributePoints - pointsSpent }));
+        const newLuck = getLuckPoints(committedAttributes, trait);
+        set((s) => ({
+          maxLuckPoints: newLuck,
+          luckPoints: Math.min(s.luckPoints, newLuck),
+        }));
+        const newMaxHealth = calculateMaxHealth(newAttributes, get().level);
+        set((s) => ({ currentHealth: Math.min(s.currentHealth, newMaxHealth) }));
+      },
+
+      // ── Сцены/эффекты/расходники-превью (Шаг 8а, патч 239) ──────────────
+      /**
+       * Превью радиации расходника (без применения): бросок и «сколько получит
+       * фактически» с учётом текущей радиации и перков. Зовут инвентарь и
+       * модалка выживания для диалога переброса.
+       */
+      previewConsumableRadiation: (item) => {
+        const state = get();
+        const {
+          irradiatedConsumableRadiationImmune = false,
+          irradiatedConsumableRadiationRerollIfDamage = 0,
+        } = state.perkBonuses || {};
+        const roll = resolveConsumableRadiationRoll(item, {
+          radiationImmune: hasRadiationImmunity({ origin: state.origin, trait: state.trait }),
+          skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+        });
+        const receivedRadiationDamage = roll.requestedAmount == null
+          ? 0
+          : Math.max(0, state.radiation + roll.requestedAmount) - state.radiation;
+        return {
+          requestedAmount: roll.requestedAmount,
+          receivedRadiationDamage,
+          rolls: roll.rolls,
+          canOfferReroll: Boolean(
+            item?.irradiated
+            && Number(irradiatedConsumableRadiationRerollIfDamage) > 0
+            && receivedRadiationDamage > 0
+            && Array.isArray(roll.rolls)
+          ),
+        };
+      },
+
+      /**
+       * Применить ТОЛЬКО временные эффекты расходника (без витальных,
+       * условий и журнала доз). Истёкшие эффекты гасятся до применения.
+       */
+      applyConsumableTimedEffects: (item) => {
+        const store = get();
+        const currentLegacy = effectsDictToLegacyArray(store.effects);
+        const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+        normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+        const result = applyConsumableToEffects(item, normalizedCurrent.effects);
+        const normalizedResult = pruneExpiredTimedEffects(result.effects);
+        syncTimedEffectsToStore(normalizedResult.effects, store);
+
+        if (normalizedResult.effects.length > 0) {
+          const timerPreview = normalizedResult.effects
+            .map((effect) => `${effect.effectName || effect.effectLabel}: ${effect.scenesLeft} scenes`)
+            .join(' | ');
+          debugLog('consumable.timedEffects', { timerPreview });
+        } else {
+          debugLog('consumable.timedEffects', { timerPreview: null });
+        }
+
+        return { ...result, expired: normalizedCurrent.expired };
+      },
+
+      /**
+       * Смена сцены: тик временных эффектов (истёкшие гаснут, у живых
+       * уменьшается счётчик) и +1 к счётчику сцен. Сцены в приложении не
+       * тикают сами (выживание тикает игровыми часами) — действие оставлено
+       * для полноты конвейера (спящий код, как и раньше).
+       */
+      advanceScene: () => {
+        const store = get();
+        const currentLegacy = effectsDictToLegacyArray(store.effects);
+        const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+        normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+
+        const { effects: nextEffects, expired } = advanceEffectsByScene(normalizedCurrent.effects);
+        expired.forEach((effect) => store.expireEffect(effect.id));
+
+        nextEffects.forEach((effect) => {
+          if (store.effects[effect.id]) {
+            store.updateEffect(effect.id, {
+              scenesLeft: effect.scenesLeft,
+              expiresAt: effect.expiresAt,
+              durationMs: effect.durationMs,
+            });
+          }
+        });
+
+        set((state) => ({ sceneCounter: state.sceneCounter + 1 }));
+        get().triggerDependentCalculations();
+        return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+      },
+
+      /**
+       * Полный сброс персонажа («создать нового»): стартовые атрибуты/навыки,
+       * здоровье на полный потолок, удача по стартовым атрибутам, чистый сейв-
+       * статус. Шаг 8б (патч 242): переехал из CharacterContext; вся рутинная
+       * часть — resetCharacterStore (профиль/счётчики/условия/снаряжение/робот/
+       * броня/расширения), здесь — только то, что он не сеет.
+       * Параметр preserveOrigin исторический: полному сбросу нечего сохранять.
+       */
+      resetCharacter: () => {
+        useCharacterStore.persist?.clearStorage?.();
+        get().resetCharacterStore({});
+        const initialAttributes = createInitialAttributes();
+        const initialLuck = getLuckPoints(initialAttributes);
+        set({
+          currentHealth: calculateMaxHealth(initialAttributes, 1),
+          maxLuckPoints: initialLuck,
+          luckPoints: initialLuck,
+          currentCharacterId: null,
+          isSaved: false,
+        });
+      },
+
+      /**
+       * Сброс комплекта снаряжения (смена ориджина/комплекта): очищает
+       * инвентарь, награды за навыки, снаряжение, слоты робота, броню/СБ,
+       * крышки — но СОХРАНЯЕТ атрибуты/навыки/профиль/здоровье.
+       * keepSkills: true — не чистит tagged-skills и skillsSaved (смена
+       * комплекта без сброса навыков). Шаг 8а (патч 241): переехал из
+       * CharacterContext 1-в-1.
+       */
+      resetKitAndRewards: (opts = {}) => {
+        const keepSkills = Boolean(opts.keepSkills);
+        const legacy = denormalizeCharacterState(get());
+        // resetCharacterStore сеет «полный сброс», но смена комплекта — НЕ
+        // полный сброс: пока эти поля жили в CharacterContext, они сброс
+        // переживали (в противоположность инвентарю/крышкам/наградам).
+        // Захватываем и возвращаем — поведение 1-в-1 с до-миграционным.
+        const survivorState = {
+          currentHealth: get().currentHealth,
+          radiation: get().radiation,
+          sceneCounter: get().sceneCounter,
+          traitEffects: get().traitEffects,
+          modifiedItems: get().modifiedItems,
+          conditions: get().conditions,
+          chemDosesLog: get().chemDosesLog,
+          lastDiseaseResistAt: get().lastDiseaseResistAt,
+          stateExtensions: get().stateExtensions,
+          // Tagged-skills и skillsSaved: при keepSkills выживают (смена
+          // комплекта без сброса навыков); при !keepSkills чистятся ниже.
+          // С Шага 5 resetCharacterStore их затирал — keepSkills не работал,
+          // восстановлено в 241.
+          selectedSkills: get().selectedSkills,
+          extraTaggedSkills: get().extraTaggedSkills,
+          forcedSelectedSkills: get().forcedSelectedSkills,
+          skillsSaved: get().skillsSaved,
+        };
+        get().resetCharacterStore({
+          attributes: legacy.attributes,
+          skills: legacy.skills,
+          rewardedSkills: [],
+        });
+        set(survivorState);
+        if (!keepSkills) {
+          set({
+            selectedSkills: [],
+            extraTaggedSkills: [],
+            forcedSelectedSkills: [],
+            skillsSaved: false,
+          });
+        }
+      },
+
       resetCharacterStore: (legacyDefaults = {}) => {
-        const normalizedDefaults = normalizeForStore(legacyDefaults);
+        // Инвариант Шага 5: словари атрибутов/навыков никогда не пусты.
+        // Вызывающий не передал дефолты → сеем стартовые значения создания.
+        const defaultsSource = (legacyDefaults && (legacyDefaults.attributes || legacyDefaults.skills))
+          ? legacyDefaults
+          : { attributes: createInitialAttributes(), skills: ALL_SKILLS.map((skill) => ({ ...skill, value: 0 })) };
+        const normalizedDefaults = normalizeForStore(defaultsSource);
 
         set({
           attributes: normalizedDefaults.attributes || {},
           skills: normalizedDefaults.skills || {},
+          selectedSkills: [],
+          extraTaggedSkills: [],
+          forcedSelectedSkills: [],
+          conditions: [],
+          chemDosesLog: [],
+          lastDiseaseResistAt: null,
+          sceneRiskStates: {},
+          // Профиль — Шаг 7.
+          origin: null,
+          trait: null,
+          level: 1,
+          characterName: '',
+          attributesSaved: false,
+          skillsSaved: false,
+          luckPoints: 0,
+          maxLuckPoints: 0,
+          availablePerkAttributePoints: 0,
           items: {},
           effects: {},
           stateExtensions: {},
+          // Счётчики — Шаг 8а: новый персонаж начинается со здоровьем по
+          // формуле (дозирует resetCharacter контекста сразу после сброса)
+          // и нулевой радиацией. Раньше радиация переживала полный сброс —
+          // остаточное состояние; теперь чистится консистентно.
+          currentHealth: 0,
+          radiation: 0,
+          // Шаг 8а (часть 3).
+          sceneCounter: 0,
+          traitEffects: [],
+          modifiedItems: {},
+          // Текущий сейв — runtime (Шаг 8б).
+          currentCharacterId: null,
+          isSaved: false,
           selectedPerks: legacyDefaults?.selectedPerks || [],
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
           derivedStats: {},
+          equipment: null,
+          currency: 0,
+          equippedWeapons: [],
           _characterContext: undefined,
           ...createInitialRobotState(),
+          ...createInitialPowerArmorState(),
         });
 
         get().recalculatePerkBonuses();
@@ -1080,6 +1724,36 @@ const useCharacterStore = create(devtools(
         rewardedSkills: state.rewardedSkills,
         robot: state.robot,
         stateExtensions: state.stateExtensions,
+        equipment: state.equipment,
+        currency: state.currency,
+        equippedWeapons: state.equippedWeapons,
+        equippedArmor: state.equippedArmor,
+        equippedPowerArmor: state.equippedPowerArmor,
+        powerArmorRuntime: state.powerArmorRuntime,
+        selectedSkills: state.selectedSkills,
+        extraTaggedSkills: state.extraTaggedSkills,
+        forcedSelectedSkills: state.forcedSelectedSkills,
+        conditions: state.conditions,
+        chemDosesLog: state.chemDosesLog,
+        lastDiseaseResistAt: state.lastDiseaseResistAt,
+        sceneRiskStates: state.sceneRiskStates,
+        // Профиль — Шаг 7 (maxLuckPoints не персистится: производная,
+        // правило 1 counters-storage.md).
+        origin: state.origin,
+        trait: state.trait,
+        level: state.level,
+        characterName: state.characterName,
+        attributesSaved: state.attributesSaved,
+        skillsSaved: state.skillsSaved,
+        luckPoints: state.luckPoints,
+        availablePerkAttributePoints: state.availablePerkAttributePoints,
+        // Счётчики — Шаг 8а (текущее значение — данные, не производная).
+        currentHealth: state.currentHealth,
+        radiation: state.radiation,
+        // Шаг 8а (часть 3): сцены/эффекты трейтов/модификации предметов.
+        sceneCounter: state.sceneCounter,
+        traitEffects: state.traitEffects,
+        modifiedItems: state.modifiedItems,
         schemaVersion: CURRENT_SCHEMA_VERSION,
       }),
       // On rehydrate, ensure all totals are recalculated
@@ -1089,6 +1763,9 @@ const useCharacterStore = create(devtools(
           // stale equipped item must not make the whole PWA fail before the
           // canonical character row can be loaded from SQLite.
           try {
+            // Шаг 8в (патч 243): сначала фабрики расширений (эффект
+            // провайдера снесён), затем пересчёт производных.
+            state.ensureStateExtensionFields?.();
             state.recalculateAll();
           } catch (error) {
             debugLog('characterStore.rehydrate.recalculateFailed', {
@@ -1110,5 +1787,51 @@ const useCharacterStore = create(devtools(
     enabled: process.env.NODE_ENV !== 'production',
   }
 ));
+
+// ── Шаг 8в (патч 243): derived-самосинхронизация стора ─────────────────────
+// Эффект CharacterProvider (пуш equipmentState → setCharacterContext) снесён
+// вместе с контекстом: стор сам следит за экипировкой/профилем и пересчитывает
+// производные. Наблюдаемые ключи — deps бывшего эффекта провайдера (атрибуты
+// не смотрим: их стор-действия зовут recalculateDerivedStats сами). Подписка
+// срабатывает вне рендера (микрозадача патча 218 больше не нужна), повторный
+// пуш с теми же ссылками гасится сравнением сигнатуры — цикла нет.
+const derivedSnapshot = (state) => [
+  state.trait,
+  state.level,
+  state.origin,
+  state.equippedArmor,
+  state.robot?.slots ?? null,
+  state.equippedPowerArmor,
+];
+
+const pushDerivedContext = () => {
+  const state = useCharacterStore.getState();
+  useCharacterStore.getState().setCharacterContext({
+    equipmentState: {
+      equippedArmor: state.equippedArmor,
+      equippedRobotSlots: state.robot?.slots ?? null,
+      powerArmorFrameId: state.equippedPowerArmor?.frame
+        ? state.equippedPowerArmor.frame.catalogId
+        : null,
+    },
+  });
+};
+
+let lastDerivedSignature = null;
+useCharacterStore.subscribe((state) => {
+  const signature = derivedSnapshot(state);
+  if (lastDerivedSignature !== null
+    && signature.length === lastDerivedSignature.length
+    && signature.every((value, index) => value === lastDerivedSignature[index])) {
+    return;
+  }
+  lastDerivedSignature = signature;
+  pushDerivedContext();
+});
+
+// Стартовый пуш — эквивалент монтирования провайдера: derivedStats не пустые
+// до первого действия пользователя (свежая установка без реидратации).
+pushDerivedContext();
+lastDerivedSignature = derivedSnapshot(useCharacterStore.getState());
 
 export default useCharacterStore;

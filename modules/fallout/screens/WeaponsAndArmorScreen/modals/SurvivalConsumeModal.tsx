@@ -15,7 +15,6 @@
 
 import React, { useMemo } from 'react';
 import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
-import { useCharacter } from '../../../../../components/CharacterContext';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { selectItemsByEquipped } from '../../../../../src/store/selectors';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
@@ -55,12 +54,13 @@ const t = (path: string): string => tWeaponsAndArmorScreen(path);
 const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalProps) => {
     useLocale();
     const moduleLocale = useModuleLocale();
-    const {
-        applyConsumableFull,
-        previewConsumableRadiation,
-        origin,
-        trait,
-    } = useCharacter();
+    // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
+    const applyConsumableFull = useCharacterStore((state) => state.applyConsumableFull);
+    // Шаг 8а (патч 239): превью радиации — стор-экшен.
+    const previewConsumableRadiation = useCharacterStore((state) => state.previewConsumableRadiation);
+    // Шаг 7: origin/trait — стор напрямую.
+    const origin = useCharacterStore((state) => state.origin);
+    const trait = useCharacterStore((state) => state.trait);
     const survival = useSurvivalState();
     const storeItems = useCharacterStore((state) => state.items);
     const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);

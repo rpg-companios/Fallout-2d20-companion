@@ -20,6 +20,17 @@
 
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
+/**
+ * Канонический id предмета (Шаг 8а, часть 3): ключ модификаций в сейве
+ * (modifiedItems) и вообще «какой это предмет». Порядок проверок — прежний
+ * (была локальная функция CharacterContext): уникальный id экземпляра
+ * важнее канонического кода; Name (с заглавной) — легаси-поле старых сейвов.
+ */
+export const getItemId = (item = {}) => {
+  if (item.uniqueId) return item.uniqueId;
+  return item.weaponId || item.code || item.id || item.Name;
+};
+
 /** slug для имени в ключе: читаемый, без пробелов/спецсимволов. */
 export const slugifyBaseName = (baseName = '') => String(baseName)
   .toLowerCase()

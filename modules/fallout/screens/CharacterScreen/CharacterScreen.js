@@ -11,9 +11,11 @@ import {
   Modal,
   TextInput,
 } from "react-native";
-import { useCharacter } from "../../../../components/CharacterContext";
+// Шаг 8б (патч 242): сохранение — модуль сейвов (без React).
+import { saveCharacter } from "../../../../src/saves/characterSaves";
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
 import useCharacterStore from "../../../../src/store/characterStore";
+import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
 import { selectActiveTimedEffects } from "../../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
@@ -260,77 +262,79 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
 
 export default function CharacterScreen() {
 
-  const {
-    characterName, setCharacterName,
-    isSaved,
-    saveCharacter,
-    level,
-    setLevel,
-    attributes: contextAttributes,
-    setAttributes,
-    skills: contextSkills,
-    setSkills,
-    selectedSkills,
-    setSelectedSkills,
-    extraTaggedSkills,
-    setExtraTaggedSkills,
-    forcedSelectedSkills,
-    setForcedSelectedSkills,
-    origin,
-    setOrigin,
-    trait,
-    setTrait,
-    equipment,
-    setEquipment,
-    effects,
-    setEffects,
-    caps,
-    earnCaps,
-    spendCaps,
-    setCurrentHealth,
-    luckPoints,
-    setLuckPoints,
-    maxLuckPoints,
-    setMaxLuckPoints,
-    attributesSaved,
-    setAttributesSaved,
-    skillsSaved,
-    setSkillsSaved,
-    resetCharacter,
-    resetKitAndRewards,
-    availablePerkAttributePoints,
-    commitAttributeChanges,
-    setEquippedWeapons,
-    setEquippedRobotSlots,
-    setEquippedRobotModules,
-    equippedPowerArmor,
-  } = useCharacter();
+  // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
+  const isSaved = useCharacterStore((s) => s.isSaved);
+  const resetCharacter = useCharacterStore((s) => s.resetCharacter);
+  // Шаг 8а (патч 241): деньги и сброс комплекта — стор напрямую (с Шага 2/8а).
+  const currency = useCharacterStore((s) => s.currency);
+  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
+  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+  const resetKitAndRewards = useCharacterStore((s) => s.resetKitAndRewards);
+  // Шаг 8а (патч 238): подтверждение атрибутов — стор-экшен напрямую.
+  const commitAttributeChanges = useCharacterStore((s) => s.commitAttributeChanges);
+  // Шаг 8а (часть 3): комплект, эффекты трейтов — стор напрямую.
+  const equipment = useCharacterStore((s) => s.equipment);
+  const setEquipment = useCharacterStore((s) => s.setEquipment);
+  const setTraitEffects = useCharacterStore((s) => s.setTraitEffects);
+  // Шаг 8а: слоты/модули робота — слайс robot стора напрямую.
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const setEquippedRobotModules = useCharacterStore((s) => s.setEquippedRobotModules);
+
+  // Шаг 7: профиль персонажа (origin/trait/level/имя, флаги сохранения,
+  // удача, очки перков) — стор; фасад useCharacter() поля не отдаёт.
+  const characterName = useCharacterStore((s) => s.characterName);
+  const setCharacterName = useCharacterStore((s) => s.setCharacterName);
+  const level = useCharacterStore((s) => s.level);
+  const setLevel = useCharacterStore((s) => s.setLevel);
+  const origin = useCharacterStore((s) => s.origin);
+  const setOrigin = useCharacterStore((s) => s.setOrigin);
+  const trait = useCharacterStore((s) => s.trait);
+  const setTrait = useCharacterStore((s) => s.setTrait);
+  const attributesSaved = useCharacterStore((s) => s.attributesSaved);
+  const setAttributesSaved = useCharacterStore((s) => s.setAttributesSaved);
+  const skillsSaved = useCharacterStore((s) => s.skillsSaved);
+  const setSkillsSaved = useCharacterStore((s) => s.setSkillsSaved);
+  const luckPoints = useCharacterStore((s) => s.luckPoints);
+  const setLuckPoints = useCharacterStore((s) => s.setLuckPoints);
+  const maxLuckPoints = useCharacterStore((s) => s.maxLuckPoints);
+  const setMaxLuckPoints = useCharacterStore((s) => s.setMaxLuckPoints);
+  const availablePerkAttributePoints = useCharacterStore((s) => s.availablePerkAttributePoints);
+  // Шаг 8а: здоровье — стор-каунтер (подтверждение атрибутов ставит полное ОЗ).
+  const setCurrentHealth = useCharacterStore((s) => s.setCurrentHealth);
 
   const debugLocale = useLocale();
   const moduleLocale = useModuleLocale();
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
+  // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
+  // (фасад useCharacter() это поле больше не отдаёт).
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
+  // Пакет СБ — Шаг 4 миграции: напрямую из стора (модификаторы каркаса
+  // в атрибутах, applyFrameAttributeModifiers).
+  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
   const storeEffects = useCharacterStore((state) => state.effects);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
 
-  const attributes = useMemo(() => {
-    const fromStore = Object.values(storeAttributes);
-    if (fromStore.length > 0) {
-      return fromStore.map((attr) => ({ name: attr.id, value: attr.base }));
-    }
-    return contextAttributes;
-  }, [storeAttributes, contextAttributes]);
-
-  const skills = useMemo(() => {
-    if (Object.keys(storeSkills).length > 0) {
-      return ALL_SKILLS.map((skill) => {
-        const stored = storeSkills[skill.name];
-        return stored ? { name: skill.name, value: stored.base } : { ...skill };
-      });
-    }
-    return contextSkills;
-  }, [storeSkills, contextSkills]);
+  // Шаг 5: стор-словари — единственный источник; legacy-массивы — производные
+  // (ЕДИНЫЕ селекторы с провайдером). Дублирующее чтение контекста убрано.
+  const attributes = useMemo(
+    () => selectLegacyAttributes({ attributes: storeAttributes }),
+    [storeAttributes],
+  );
+  const skills = useMemo(
+    () => selectLegacySkills({ skills: storeSkills }),
+    [storeSkills],
+  );
+  const selectedSkills = useCharacterStore((s) => s.selectedSkills);
+  const extraTaggedSkills = useCharacterStore((s) => s.extraTaggedSkills);
+  const forcedSelectedSkills = useCharacterStore((s) => s.forcedSelectedSkills);
+  // Писатели — только стор-экшены.
+  const setBaseAttributes = useCharacterStore((s) => s.setBaseAttributes);
+  const setBaseSkills = useCharacterStore((s) => s.setBaseSkills);
+  const setSelectedSkills = useCharacterStore((s) => s.setSelectedSkills);
+  const setExtraTaggedSkills = useCharacterStore((s) => s.setExtraTaggedSkills);
+  const setForcedSelectedSkills = useCharacterStore((s) => s.setForcedSelectedSkills);
 
   useEffect(() => {
     debugLog('character.renderState', {
@@ -552,8 +556,8 @@ export default function CharacterScreen() {
     if (kit.items && Array.isArray(kit.items)) {
       kit.items.forEach(item => {
         // Currency (caps) is not an inventory item — it is tracked separately via
-        // setCaps below. Skip it so it never hits addNewItem (which would warn about
-        // a missing id field).
+        // earnCurrency below. Skip it so it never hits addNewItem (which would warn
+        // about a missing id field).
         debugLog('kits.select.candidate', {
           name: item?.name,
           itemType: item?.itemType,
@@ -582,8 +586,8 @@ export default function CharacterScreen() {
       purchaseMaxRarity: kit.purchaseMaxRarity ?? null,
     });
     
-    // 3. Update caps
-    earnCaps(kit.caps || 0);
+    // 3. Update currency (kit.caps — поле данных комплекта, остаётся как есть)
+    earnCurrency(kit.caps || 0);
 
     // 4. Robot: apply slot/weapon/module state from initRobotSlots
     if (kit.robotSlots) {
@@ -619,7 +623,15 @@ export default function CharacterScreen() {
     items.forEach((item) => {
       useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
     });
-    if (spent > 0) spendCaps(spent);
+    if (spent > 0) {
+      // Корзина структурно не даёт перерасхода (canAfford в startingPurchase),
+      // так что отказ возможен только при рассинхроне — логируем. Предметы
+      // всё равно выдаются: это выдача комплекта создания, а не сделка.
+      const result = spendCurrency(spent);
+      if (!result.ok) {
+        debugLog('kits.purchase.spendRejected', { spent, reason: result.reason });
+      }
+    }
   };
 
   const handleToggleSkill = (skillName) => {
@@ -672,14 +684,6 @@ export default function CharacterScreen() {
     const isBonusFromSkillPick = isSkillPickActive && skillPickSelected.includes(skillName);
     const capForThis = isSkillPickActive && isInSkillPickGroup && !isBonusFromSkillPick ? 4 : undefined;
 
-    const syncSkillStore = (delta) => {
-      const store = useCharacterStore.getState();
-      if (!store.skills?.[skillName]) {
-        store.loadFromLegacyData({ skills });
-      }
-      useCharacterStore.getState().updateSkill(skillName, delta);
-    };
-
     if (!isCurrentlySelected) {
       const unclampedNextValue = currentSkill.value + 2;
       if (unclampedNextValue > skillMax) {
@@ -694,10 +698,11 @@ export default function CharacterScreen() {
         return;
       }
 
+      // (Шаг 5) Писатели — стор-экшены, абсолютные списки (апдейтеров больше нет).
       if (isForcedSkill) {
-        setExtraTaggedSkills((prev) => [...prev, skillName]);
+        setExtraTaggedSkills([...extraTaggedSkills, skillName]);
       } else if (selectedSkills.length < BASE_TAGGED_SKILLS) {
-        setSelectedSkills((prev) => [...prev, skillName]);
+        setSelectedSkills([...selectedSkills, skillName]);
       } else {
         const extraSkillsFromTrait = trait?.extraSkills || trait?.modifiers?.extraSkills || 0;
         const extraSkillsFromPerk = Number(storePerkBonuses?.extraTaggedSkills) || 0;
@@ -708,7 +713,7 @@ export default function CharacterScreen() {
           (traitForcedSkills.length === 0 || traitForcedSkills.includes(skillName));
 
         if (canSelectAsExtra && extraTaggedSkills.length < totalExtraSkillSlots) {
-          setExtraTaggedSkills((prev) => [...prev, skillName]);
+          setExtraTaggedSkills([...extraTaggedSkills, skillName]);
         } else {
           const extraText = canSelectAsExtra
             ? "\n\n" + tCharacterScreen("labels.extraSlotsAvailable") + ": " + (totalExtraSkillSlots - extraTaggedSkills.length)
@@ -720,27 +725,20 @@ export default function CharacterScreen() {
         }
       }
 
-      const appliedDelta = nextValue - currentSkill.value;
-      debugLog('skill.toggle.apply', { skillName, before: currentSkill.value, nextValue, appliedDelta, capForThis, skillMax });
-      setSkills((prev) =>
-        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
-      );
-      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
+      debugLog('skill.toggle.apply', { skillName, before: currentSkill.value, nextValue, capForThis, skillMax });
+      // (Шаг 5) Одна абсолютная запись в стор; словарь — единственный источник.
+      setBaseSkills(skills.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)));
     } else {
       if (isInMainSkills) {
-        setSelectedSkills((prev) => prev.filter((s) => s !== skillName));
+        setSelectedSkills(selectedSkills.filter((s) => s !== skillName));
       }
       if (isInExtraSkills) {
-        setExtraTaggedSkills((prev) => prev.filter((s) => s !== skillName));
+        setExtraTaggedSkills(extraTaggedSkills.filter((s) => s !== skillName));
       }
 
       const nextValue = Math.max(0, currentSkill.value - 2);
-      const appliedDelta = nextValue - currentSkill.value;
-      debugLog('skill.toggle.remove', { skillName, before: currentSkill.value, nextValue, appliedDelta });
-      setSkills((prev) =>
-        prev.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)),
-      );
-      if (appliedDelta !== 0) syncSkillStore(appliedDelta);
+      debugLog('skill.toggle.remove', { skillName, before: currentSkill.value, nextValue });
+      setBaseSkills(skills.map((s, i) => (i === skillIndex ? { ...s, value: nextValue } : s)));
     }
   };
 
@@ -774,19 +772,11 @@ export default function CharacterScreen() {
     }
     if (nextVal === skill.value) return;
 
-    const appliedDelta = nextVal - skill.value;
-    debugLog('skill.changeValue.apply', { skillName: skill.name, before: skill.value, nextVal, requestedDelta: delta, appliedDelta, capForThis });
-    setSkills((prev) => {
-      const newSkills = [...prev];
-      newSkills[index] = { ...skill, value: nextVal };
-      return newSkills;
-    });
-
-    const store = useCharacterStore.getState();
-    if (!store.skills?.[skill.name]) {
-      store.loadFromLegacyData({ skills });
-    }
-    useCharacterStore.getState().updateSkill(skill.name, appliedDelta);
+    debugLog('skill.changeValue.apply', { skillName: skill.name, before: skill.value, nextVal, requestedDelta: delta, capForThis });
+    // (Шаг 5) Абсолютная запись; дельта-зеркала loadFromLegacyData/updateSkill убраны.
+    const nextSkills = [...skills];
+    nextSkills[index] = { ...skill, value: nextVal };
+    setBaseSkills(nextSkills);
   };
 
   const handleChangeAttribute = (index, delta) => {
@@ -797,17 +787,9 @@ export default function CharacterScreen() {
     if (newValue < min || newValue > max) return;
     if (delta > 0 && remainingInitialPoints <= 0) return;
 
-    const store = useCharacterStore.getState();
-    if (!store.attributes[attr.name]) {
-      store.loadFromLegacyData({ attributes });
-    }
-    store.updateAttribute(attr.name, delta);
-
-    setAttributes((prev) => {
-      const newAttributes = [...prev];
-      newAttributes[index] = { ...newAttributes[index], value: newValue };
-      return newAttributes;
-    });
+    // (Шаг 5) Одна абсолютная запись в стор.
+    const nextAttributes = attributes.map((a, i) => (i === index ? { ...a, value: newValue } : a));
+    setBaseAttributes(nextAttributes);
   };
 
   // Возвращает true если для данного origin есть трейт-модал
@@ -891,88 +873,53 @@ export default function CharacterScreen() {
       );
       return { ...attr, value: attr.value - oldBonus + newBonus };
     });
-    setAttributes(nextAttributes);
-
-    // Синхронизируем атрибуты в Zustand store, иначе CharacterScreen продолжит
-    // читать старые значения из store и remaining points будут считаться неверно.
-    const store = useCharacterStore.getState();
-    const storeAttributes = store.attributes || {};
-    nextAttributes.forEach((attr) => {
-      const storeAttr = storeAttributes[attr.name];
-      const storeValue = storeAttr?.base ?? 4;
-      const delta = attr.value - storeValue;
-      if (delta !== 0) {
-        store.updateAttribute(attr.name, delta);
-      }
-    });
+    // (Шаг 5) Одна абсолютная запись в стор — двойная синхронизация убрана.
+    setBaseAttributes(nextAttributes);
 
     const oldForcedSkills = oldTrait?.modifiers?.forcedSkills || [];
     const newForcedSkills = newTrait?.modifiers?.forcedSkills || [];
     const oldSelectedExtraSkills = oldTrait?.modifiers?.selectedExtraSkills || [];
     const newSelectedExtraSkills = newTrait?.modifiers?.selectedExtraSkills || [];
 
-    // Обновляем список обязательных навыков
-    setForcedSelectedSkills((currentForced) => {
-      const withoutOld = currentForced.filter(
-        (skill) => !oldForcedSkills.includes(skill),
-      );
-      return [...new Set([...withoutOld, ...newForcedSkills])];
-    });
+    // (Шаг 5) Писатели — стор-экшены, абсолютные списки.
+    setForcedSelectedSkills([...new Set([
+      ...forcedSelectedSkills.filter((skill) => !oldForcedSkills.includes(skill)),
+      ...newForcedSkills,
+    ])]);
 
-    // Обновляем отмеченные навыки и их значения
-    setSelectedSkills((currentSelected) => {
-      const withoutOld = currentSelected.filter(
-        (skill) => !oldForcedSkills.includes(skill),
-      );
-      return withoutOld; // Forced skills go to extraTaggedSkills now
-    });
+    // Forced skills go to extraTaggedSkills now
+    setSelectedSkills(selectedSkills.filter((skill) => !oldForcedSkills.includes(skill)));
 
-    // Обновляем экстра навыки (forced skills теперь идут сюда)
-    setExtraTaggedSkills((currentExtra) => {
-      const withoutOld = currentExtra.filter(
+    setExtraTaggedSkills([...new Set([
+      ...extraTaggedSkills.filter(
         (skill) => !oldForcedSkills.includes(skill) && !oldSelectedExtraSkills.includes(skill),
-      );
-      return [...new Set([...withoutOld, ...newForcedSkills, ...newSelectedExtraSkills])];
-    });
+      ),
+      ...newForcedSkills,
+      ...newSelectedExtraSkills,
+    ])]);
 
-    const syncTraitSkillDelta = (skillName, delta) => {
-      if (!delta) return;
-      const store = useCharacterStore.getState();
-      if (!store.skills?.[skillName]) {
-        store.loadFromLegacyData({ skills });
+    // (Шаг 5) ±2 обязательных навыка — одна абсолютная запись в стор.
+    let nextTraitSkills = [...skills];
+    // Отменяем +2 от старых обязательных навыков
+    [...oldForcedSkills, ...oldSelectedExtraSkills].forEach((skillName) => {
+      const index = nextTraitSkills.findIndex((s) => s.name === skillName);
+      if (index > -1) {
+        const next = Math.max(0, nextTraitSkills[index].value - 2);
+        nextTraitSkills[index] = { ...nextTraitSkills[index], value: next };
       }
-      useCharacterStore.getState().updateSkill(skillName, delta);
-    };
-
-    setSkills((currentSkills) => {
-      let tempSkills = [...currentSkills];
-      // Отменяем +2 от старых обязательных навыков
-      [...oldForcedSkills, ...oldSelectedExtraSkills].forEach((skillName) => {
-        const index = tempSkills.findIndex((s) => s.name === skillName);
-        if (index > -1) {
-          const before = tempSkills[index].value;
-          const next = Math.max(0, before - 2);
-          tempSkills[index] = {
-            ...tempSkills[index],
-            value: next,
-          };
-          syncTraitSkillDelta(skillName, next - before);
-        }
-      });
-      // Применяем +2 к новым об��зательным навыкам (если их значение < 2)
-      [...newForcedSkills, ...newSelectedExtraSkills].forEach((skillName) => {
-        const index = tempSkills.findIndex((s) => s.name === skillName);
-        if (index > -1 && tempSkills[index].value < 2) {
-          const before = tempSkills[index].value;
-          tempSkills[index] = { ...tempSkills[index], value: 2 };
-          syncTraitSkillDelta(skillName, 2 - before);
-        }
-      });
-      return tempSkills;
     });
+    // Применяем +2 к новым обязательным навыкам (если их значение < 2)
+    [...newForcedSkills, ...newSelectedExtraSkills].forEach((skillName) => {
+      const index = nextTraitSkills.findIndex((s) => s.name === skillName);
+      if (index > -1 && nextTraitSkills[index].value < 2) {
+        nextTraitSkills[index] = { ...nextTraitSkills[index], value: 2 };
+      }
+    });
+    setBaseSkills(nextTraitSkills);
 
     // Обновляем эффекты
-    setEffects((currentEffects) => {
+    // Шаг 8а (часть 3): «эффекты трейтов» — стор (в сейве ключ effects).
+    setTraitEffects((currentEffects) => {
       const oldEffects = oldTrait?.modifiers?.effects || [];
       const newEffects = newTrait?.modifiers?.effects || [];
       const withoutOld = currentEffects.filter((e) => !oldEffects.includes(e));
@@ -1125,7 +1072,7 @@ export default function CharacterScreen() {
           const { items: rewardItems, caps: rewardCaps } = await resolveSkillRewards(unrewardedSkills, { ammoFromKit: ammoItem?.id || null });
           rewardItems.forEach(item => addNewItem(item));
           // Крышки (BARTER) — в счётчик, как у комплектов; в инвентаре им не место.
-          if (rewardCaps) earnCaps(rewardCaps);
+          if (rewardCaps) earnCurrency(rewardCaps);
           markSkillsAsRewarded(unrewardedSkills);
         }
       }
@@ -1162,7 +1109,7 @@ export default function CharacterScreen() {
         ...skill,
         value: forcedSelectedSkills.includes(skill.name) ? 2 : 0,
       }));
-      setSkills(newSkills);
+      setBaseSkills(newSkills);
       setSelectedSkills([]);
       setExtraTaggedSkills([...forcedSelectedSkills]);
       setSkillsSaved(false);

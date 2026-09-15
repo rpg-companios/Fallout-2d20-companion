@@ -118,6 +118,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 3,
   },
+  // Патч 231: цветовая шкала состояний выживания (решение владельца) —
+  // потолок обычным цветом, дальше бледнее (серый), серо-жёлтый,
+  // жёлто-красный, на дне красный. «Ок» отдельного стиля не имеет.
+  survivalValueGrey: { color: '#9a9a9a' },
+  survivalValueYellow: { color: '#c9a227' },
+  survivalValueOrange: { color: '#e0762c' },
+  survivalValueRed: { color: '#D62828' },
   // Болезнь (патч 215): название с рангом занимает всю свободную ширину
   // строки и центрируется внутри неё (flex: 1 + textAlign center — цвет
   // задан прямо в стиле, не зависит от effectKind эффекта); кнопка

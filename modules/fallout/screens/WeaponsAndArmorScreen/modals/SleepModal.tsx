@@ -1,21 +1,20 @@
 // Модалка сна выживания (docs/survival-system-design.md §4, §5, §7).
 //
 // Место (кровать/пустошь) и часы 1–24. Перед подтверждением — прогноз
-// чистым доменом forecastSleep (шаг шкал, усталость, итоговый максимум ОЗ:
-// усталость снижает МАКСИМУМ ОЗ, а не текущие — патч 213, §6). Подтверждение
+// чистым доменом forecastSleep (шаг шкал, усталость; максимум ОЗ от
+// усталости не зависит — патч 232). Подтверждение
 // — операция контекста sleepSurvival: применяет rest(), двигает таймеры
 // эффектов на N × 12 сцен (мост контуров, §5) и в пустоши проверяет болезнь
 // по имеющейся механике (событие sleepOnGround).
 
 import React, { useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
-import { useCharacter } from '../../../../../components/CharacterContext';
+import useCharacterStore from '../../../../../src/store/characterStore';
+import { selectLegacyAttributes } from '../../../../../src/store/selectors';
 import { calculateMaxHealth } from '../../../../../domain/characterCreation';
 import {
     forecastSleep,
-    hpMaxPenaltyForFatigue,
     SURVIVAL_RULES,
-    totalFatigue,
     type SleepPlace,
     type SurvivalState,
     type RestResult,
@@ -42,10 +41,11 @@ interface ForecastLine {
     tone: 'neutral' | 'positive' | 'negative';
 }
 
-// Максимум ОЗ после сна: базовый + бонус «прекрасно отдохнувший» −
-// снижение от усталости (⌊N/2⌋, патч 213). Не ниже нуля.
+// Максимум ОЗ после сна: базовый + бонус «прекрасно отдохнувший».
+// Патч 232: усталость больше не снижает максимум (потеря текущих ОЗ
+// за игровой час — SurvivalClock). Не ниже нуля.
 const maxHpAfterSleep = (state: SurvivalState, baseMaxHealth: number): number =>
-    Math.max(0, baseMaxHealth + state.hpBonus - hpMaxPenaltyForFatigue(totalFatigue(state)));
+    Math.max(0, baseMaxHealth + state.hpBonus);
 
 const buildForecastLines = (forecast: RestResult, baseMaxHealth: number): ForecastLine[] => {
     const lines: ForecastLine[] = [
@@ -97,7 +97,12 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
     useModuleLocale();
     const survival = useSurvivalState();
     const { sleepSurvival } = useSurvivalActions();
-    const { attributes, level, attributesSaved } = useCharacter();
+    // Шаг 8а (патч 241): атрибуты — из стор-словаря (legacy-массив).
+    const storeAttributes = useCharacterStore((state) => state.attributes);
+    const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
+    // Шаг 7: level/attributesSaved — стор напрямую.
+    const level = useCharacterStore((state) => state.level);
+    const attributesSaved = useCharacterStore((state) => state.attributesSaved);
     const [place, setPlace] = useState<SleepPlace>('bed');
     const [hours, setHours] = useState(8);
 

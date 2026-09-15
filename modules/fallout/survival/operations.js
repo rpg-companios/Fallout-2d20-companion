@@ -19,9 +19,10 @@ import { consumeDrink, consumeFood, rest } from './survival';
 
 // Хранилище выживания — слайс stateExtensions стора (патч 209). Операции
 // читают СВЕЖЕЕ состояние прямо из стора (не из замыканий рендеров), а
-// пишут — действием стора через ctx.setStateExtension (контекст делегирует
-// туда же). Так «поесть/попить/поспать» из любого места работают на одних
-// данных — в точности как items/effects.
+// пишут — действиями того же стора (setStateExtension; Шаг 8а, патч 240:
+// и болезни/эффекты тоже в сторе — React-контекст не нужен). Так
+// «поесть/попить/поспать» из любого места работают на одних данных —
+// в точности как items/effects.
 const currentSurvival = () =>
   useCharacterStore.getState().stateExtensions?.survival ?? null;
 
@@ -58,15 +59,16 @@ export const survivalConsumableListener = (item, ctx) => {
   return null;
 };
 
-export const sleepSurvival = (ctx, { place, hours }) => {
+export const sleepSurvival = ({ place, hours }) => {
   if (!survivalEnabled()) return { ok: false, reason: 'disabled' };
 
+  // Шаг 8а (патч 240): все зависимости — стор (React-контекст не нужен).
+  const store = useCharacterStore.getState();
   const {
     setStateExtension,
     reducePersistentDiseaseRanks,
     advanceEffectsByGameHours,
-    resolveSceneRiskEventById,
-  } = ctx;
+  } = store;
 
   const survival = currentSurvival();
   if (!survival) return { ok: false, reason: 'notCapable' };
@@ -86,7 +88,7 @@ export const sleepSurvival = (ctx, { place, hours }) => {
 
   // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
   const diseaseRiskResult = place === 'wasteland'
-    ? resolveSceneRiskEventById('sleepOnGround')
+    ? store.applyDiseaseExposureEvent('sleepOnGround')
     : null;
 
   debugLog('survival.sleep.apply', {

@@ -70,7 +70,7 @@ describe('survival: разбивка усталости по источника�
         ],
       },
       { key: 'apPenalty', n: 3 },
-      { key: 'maxHpPenalty', n: 1 }, // ⌊3/2⌋
+      { key: 'hpPerHour', n: 1 }, // ⌊3/2⌋ — потеря ОЗ за игровой час (патч 232)
     ]);
     expect(rows[1].sources).toBeUndefined();
     expect(rows[2].sources).toBeUndefined();

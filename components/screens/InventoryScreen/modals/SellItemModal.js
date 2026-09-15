@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { showRawAlert } from '../../../alerts/alertService';
 import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
+import { defaultSellPricePerItem } from '../logic/sellPrice';
 import { useLocale } from '../../../../i18n/locale';
 
 const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
@@ -12,8 +13,10 @@ const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
   useEffect(() => {
     if (item) {
       setQuantity('1');
-      const initialPrice = item.price ?? 0;
-      setPricePerItem(String(initialPrice));
+      // Цена по умолчанию: цена последней сделки (price), иначе каталожная
+      // cost (у добычи price нет — репорт «цены высветилась 0»). Поле
+      // редактируемое: игрок может назначить свою цену торговли.
+      setPricePerItem(String(defaultSellPricePerItem(item)));
     }
   }, [item]);
 

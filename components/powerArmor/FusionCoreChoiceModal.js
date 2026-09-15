@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
-import { useCharacter } from '../CharacterContext';
+import useCharacterStore from '../../src/store/characterStore';
 import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { useLocale, useModuleLocale } from '../../i18n/locale';
@@ -19,7 +19,10 @@ import { FUSION_CORE_ID } from '../../domain/powerArmor';
 const FusionCoreChoiceModal = () => {
   useLocale();
   const moduleLocale = useModuleLocale();
-  const { pendingCoreChoice, resolveCoreChoice } = useCharacter();
+  // Шаг 4 миграции: диалог выбора блока читает отложенное состояние
+  // транзакции и разрешает его напрямую через стор (powerArmorSlice).
+  const pendingCoreChoice = useCharacterStore((s) => s.pendingCoreChoice);
+  const resolveCoreChoice = useCharacterStore((s) => s.resolveCoreChoice);
 
   if (!pendingCoreChoice) return null;
 

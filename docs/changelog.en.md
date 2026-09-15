@@ -2,6 +2,72 @@
 
 ---
 
+## Update — Reworking the game's core: unified store, saves, data passports (patches 219–247)
+
+> Major behind-the-scenes work: everything the game remembers about a character moved into a unified store, saves became a standalone module, and data/operations got machine-readable "passports". For players: quieter, more reliable, plus several gameplay fixes; the save format did not change (old saves keep loading).
+
+### Unified character store (219–243)
+- The entire character state — profile (name, origin, trait, level), attributes/skills, health/radiation, caps, inventory and equipped gear, equipment kit, robot, power armor, perks, diseases and conditions, scene counter, timed effects, modified items, "saved" flags — moved from a React wrapper into a unified store (Zustand). Screens read and write it directly, with no mirrors or middlemen.
+- The migration went step by step (each patch = one group of fields, the app kept working), and at the end (243) the old "dispatcher" file and its entry-point wrapper were deleted entirely — about 1,300 lines and a whole class of desync bugs gone.
+- Operation rules are now anchored in the store: spending returns "done / rejected with reason" and never touches the balance on rejection ("you cannot buy more than you have"); all setters accept value-or-updater form; the Fusion Core drain ticks only while the app is open.
+
+### Gameplay fixes and rulebook decisions (229–241)
+- 229 — "fake water": a broken purified-water item from old saves is repaired on load.
+- 230 — items with no price in the rules now sell for a sensible default instead of 0.
+- 231 — the fatigue ladder indicates its level by color, without text hints.
+- 232 — fatigue per the book: −⌊N/2⌋ current HP per game hour of activity; sleep removed from the rule (bed rest heals).
+- 237 — item scheme "base + mod ids on the item": the catalog composes the name (e.g. `weapon_huntingRifle_05_76_48_35` → ".50 long-barreled high-capacity suppressed hunting rifle"); the workbench updates the item in place.
+- 238 — confirming attributes: a single operation with rule clamps and a health recalculation.
+- 239–240 — scenes and time: timed effects tick by scenes and game hours; consumables apply as one operation (heal → radiation → effects → infection risk); radiation preview before use; resisting a disease once per day; treatment lowers disease ranks.
+- 241 — "change kit" no longer wipes health/radiation/scenes/conditions/chem dose log; tagged skills survive a kit change (while a full reset honestly clears everything).
+
+### Saves (242)
+- The save notebook (save/load/list/delete/autosave) is a standalone module with no React ties. Autosave writes only already-saved characters, after a half-second debounce, and skips unchanged state; cloud sync runs in the background.
+
+### Data & action passports (244–246, TypeScript)
+- The store and the save format got machine-readable "passports" with strict checking: a new field or action missing from the passport fails a contract test — sneaking past is no longer possible.
+- The passport immediately exposed a live defect (244): the "one-time skill rewards issued" journal was written into saves but never read back — after save → load → confirming skills, the game could hand out starting rewards a second time. Fixed (save format untouched).
+- 246 — the action passport now covers all 98 store actions, with a unified "done / rejected with reason" outcome contract.
+
+### Format v2: saves without the mod album (247)
+- The legacy modified-items album was removed from save writing — a duplicate ledger left over from the old scheme (writing stopped in 237; now the key is gone entirely). Nothing visible changes: names and mods are restored from the item id via the catalog.
+- A bridge for old characters: when loading a pre-237 save, the album contents are transferred onto the items themselves once; entries for lost/sold items stay in the read-only inventory album. After a re-save the save is album-free. Schema version and the migration chain are untouched.
+
+---
+
+## Update — Reworking the game's core: unified store, saves, data passports (patches 219–247)
+
+> Major behind-the-scenes work: everything the game remembers about a character moved into a unified store, saves became a standalone module, and data/operations got machine-readable "passports". For players: quieter, more reliable, plus several gameplay fixes; the save format did not change (old saves keep loading).
+
+### Unified character store (219–243)
+- The entire character state — profile (name, origin, trait, level), attributes/skills, health/radiation, caps, inventory and equipped gear, equipment kit, robot, power armor, perks, diseases and conditions, scene counter, timed effects, modified items, "saved" flags — moved from a React wrapper into a unified store (Zustand). Screens read and write it directly, with no mirrors or middlemen.
+- The migration went step by step (each patch = one group of fields, the app kept working), and at the end (243) the old "dispatcher" file and its entry-point wrapper were deleted entirely — about 1,300 lines and a whole class of desync bugs gone.
+- Operation rules are now anchored in the store: spending returns "done / rejected with reason" and never touches the balance on rejection ("you cannot buy more than you have"); all setters accept value-or-updater form; the Fusion Core drain ticks only while the app is open.
+
+### Gameplay fixes and rulebook decisions (229–241)
+- 229 — "fake water": a broken purified-water item from old saves is repaired on load.
+- 230 — items with no price in the rules now sell for a sensible default instead of 0.
+- 231 — the fatigue ladder indicates its level by color, without text hints.
+- 232 — fatigue per the book: −⌊N/2⌋ current HP per game hour of activity; sleep removed from the rule (bed rest heals).
+- 237 — item scheme "base + mod ids on the item": the catalog composes the name (e.g. `weapon_huntingRifle_05_76_48_35` → ".50 long-barreled high-capacity suppressed hunting rifle"); the workbench updates the item in place.
+- 238 — confirming attributes: a single operation with rule clamps and a health recalculation.
+- 239–240 — scenes and time: timed effects tick by scenes and game hours; consumables apply as one operation (heal → radiation → effects → infection risk); radiation preview before use; resisting a disease once per day; treatment lowers disease ranks.
+- 241 — "change kit" no longer wipes health/radiation/scenes/conditions/chem dose log; tagged skills survive a kit change (while a full reset honestly clears everything).
+
+### Saves (242)
+- The save notebook (save/load/list/delete/autosave) is a standalone module with no React ties. Autosave writes only already-saved characters, after a half-second debounce, and skips unchanged state; cloud sync runs in the background.
+
+### Data & action passports (244–246, TypeScript)
+- The store and the save format got machine-readable "passports" with strict checking: a new field or action missing from the passport fails a contract test — sneaking past is no longer possible.
+- The passport immediately exposed a live defect (244): the "one-time skill rewards issued" journal was written into saves but never read back — after save → load → confirming skills, the game could hand out starting rewards a second time. Fixed (save format untouched).
+- 246 — the action passport now covers all 98 store actions, with a unified "done / rejected with reason" outcome contract.
+
+### Format v2: saves without the mod album (247)
+- The legacy modified-items album was removed from save writing — a duplicate ledger left over from the old scheme (writing stopped in 237; now the key is gone entirely). Nothing visible changes: names and mods are restored from the item id via the catalog.
+- A bridge for old characters: when loading a pre-237 save, the album contents are transferred onto the items themselves once; entries for lost/sold items stay in the read-only inventory album. After a re-save the save is album-free. Schema version and the migration chain are untouched.
+
+---
+
 ## Update — Assaultron equipment kits
 
 ### Origin "Assaultron" (content)

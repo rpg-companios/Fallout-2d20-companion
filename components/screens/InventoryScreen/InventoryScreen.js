@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
-import { useCharacter } from '../../CharacterContext';
 import useCharacterStore from '../../../src/store/characterStore';
+import { selectCarryWeight } from '../../../src/store/selectors';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import CapsModal from './modals/CapsModal';
@@ -30,7 +30,7 @@ import { getPerkDisplay } from '../../../modules/fallout/screens/PerksAndTraitsS
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { useLocale, useModuleLocale } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { generateStackKey } from '../../../domain/itemIdentity';
+import { generateStackKey, getItemId } from '../../../domain/itemIdentity';
 import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { isRobotCharacter } from '../../../domain/origins';
 import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
@@ -75,29 +75,45 @@ const CapsSection = ({ caps, onAdd, onSubtract }) => (
 );
 
 const InventoryScreen = () => {
-  const { 
-    equippedWeapons, setEquippedWeapons, 
-    equippedArmor, setEquippedArmor,
-    equippedRobotSlots, setEquippedRobotSlots,
-    caps, earnCaps, spendCaps,
-    equipment,
-    applyConsumableFull,
-    previewConsumableRadiation,
-    getModifiedItem,
-    trait,
-    origin,
-    carryWeight,
-    // Силовая броня: свой слой и свои действия (docs/architecture/power-armor-plan.md).
-    equippedPowerArmor,
-    equipPowerArmorPackage,
-    equipPowerArmorPiece,
-    unequipPowerArmorPackage,
-    unequipPowerArmorPieceAt,
-    repairPowerArmorPieceAt,
-    repairPowerArmorStack,
-  } = useCharacter();
+  // Деньги — стор напрямую (Шаг 8а, патч 241; поле в сторе с Шага 2).
+  const currency = useCharacterStore((s) => s.currency);
+  const earnCurrency = useCharacterStore((s) => s.earnCurrency);
+  const spendCurrency = useCharacterStore((s) => s.spendCurrency);
+  // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
+  const applyConsumableFull = useCharacterStore((s) => s.applyConsumableFull);
+  // Шаг 8а (патч 239): превью радиации — стор-экшен.
+  const previewConsumableRadiation = useCharacterStore((s) => s.previewConsumableRadiation);
+  // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
+  const equipment = useCharacterStore((s) => s.equipment);
+  const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
+  // Read-хелпер альбома модификаций: с патча 237 альбом только читается
+  // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
+  const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
+  // Шаг 7: origin/trait — стор напрямую.
+  // Шаг 8а: слоты робота и производный вес — стор напрямую.
+  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const carryWeight = useCharacterStore(selectCarryWeight);
+  const trait = useCharacterStore((s) => s.trait);
+  const origin = useCharacterStore((s) => s.origin);
 
   const storeItems = useCharacterStore((state) => state.items);
+  // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
+  // напрямую из стора (powerArmorSlice), минуя фасад useCharacter(). Имена
+  // локальные сохранены — точки вызова не менялись.
+  const equippedArmor = useCharacterStore((s) => s.equippedArmor);
+  const setEquippedArmor = useCharacterStore((s) => s.setEquippedArmor);
+  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
+  const equipPowerArmorPackage = useCharacterStore((s) => s.equipPowerArmorPackage);
+  const equipPowerArmorPiece = useCharacterStore((s) => s.equipPowerArmorPieceInto);
+  const unequipPowerArmorPackage = useCharacterStore((s) => s.unequipPowerArmorPackage);
+  const unequipPowerArmorPieceAt = useCharacterStore((s) => s.unequipPowerArmorPieceAt);
+  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
+  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
+  // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
+  // минуя фасад useCharacter().
+  const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
+  const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   // ОС Mk II (Секьюритрон): нерабочие ракетница/гранатомёт активируются
   // драйвером из инвентаря; флаг живёт в robot-срезе стора (персистится).
   const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
@@ -376,11 +392,11 @@ const InventoryScreen = () => {
   const handleSaveCaps = (amount) => {
     if (capsOperationType === 'add') {
       const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
-      earnCaps(amount + sumFoundItemBonus(bonusEvents));
+      earnCurrency(amount + sumFoundItemBonus(bonusEvents));
       showFoundItemBonusAlerts(bonusEvents);
       return;
     }
-    spendCaps(amount);
+    spendCurrency(amount);
   };
 
   const handleApplyConsumable = (item) => {
@@ -485,7 +501,7 @@ const InventoryScreen = () => {
   };
 
   const handleConfirmSale = (quantity, finalPrice) => {
-    earnCaps(finalPrice);
+    earnCurrency(finalPrice);
 
     const stackKey = selectedItemForSale?.stackKey || getStackKey(selectedItemForSale);
     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
@@ -606,7 +622,17 @@ const InventoryScreen = () => {
 
   const handleConfirmBuy = (quantity, unitPrice) => {
     const finalCost = quantity * unitPrice;
-    spendCaps(finalCost);
+    // Списание атомарно (инвариант стора «нельзя купить на больше, чем
+    // есть»): при отказе предмет НЕ выдаётся. Модалка уже проверяет баланс —
+    // это вторая линия на случай иного пути вызова.
+    const result = spendCurrency(finalCost);
+    if (!result.ok) {
+      showAlert(
+        tInventory('modals.buyItemModal.notEnoughCapsTitle'),
+        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps: currency }),
+      );
+      return;
+    }
     handleAddItem({ ...selectedItemForBuy, price: unitPrice, cost: unitPrice }, quantity, 'buy');
     setIsBuyItemModalVisible(false);
     setSelectedItemForBuy(null);
@@ -1743,7 +1769,7 @@ const InventoryScreen = () => {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <CapsSection 
-            caps={caps}
+            caps={currency}
             onAdd={() => handleOpenCapsModal('add')}
             onSubtract={() => handleOpenCapsModal('subtract')}
           />
@@ -1769,6 +1795,7 @@ const InventoryScreen = () => {
           onClose={() => setIsCapsModalVisible(false)}
           onSave={handleSaveCaps}
           operationType={capsOperationType}
+          caps={currency}
         />
         <SellItemModal
             visible={isSellModalVisible}
@@ -1791,7 +1818,7 @@ const InventoryScreen = () => {
             setSelectedItemForBuy(null);
           }}
           item={selectedItemForBuy}
-          caps={caps}
+          caps={currency}
           onConfirmBuy={handleConfirmBuy}
         />
 
