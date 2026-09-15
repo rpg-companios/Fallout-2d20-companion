@@ -18,9 +18,9 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import useCharacterStore from '../../src/store/characterStore';
+import useCharacterStore from '../../../src/store/characterStore';
 // Шаг 8б (патч 242): сохранения — обычный модуль без React.
-import * as savesModule from '../../src/saves/characterSaves';
+import * as savesModule from '../../../src/saves/characterSaves';
 import { findEnrichedOrigin } from '../../../domain/origins';
 import {
   SUPPORTED_LOCALES,
