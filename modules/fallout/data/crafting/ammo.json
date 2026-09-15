@@ -1,0 +1,607 @@
+[
+  {
+    "id": "ammo_38",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_38",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 10,
+        "cd": 5
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_10mm",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_10mm",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 8,
+        "cd": 4
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_308",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_308",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 6,
+        "cd": 3
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_flare",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_flare",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 2,
+        "cd": 1
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_shotgun_shell",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_shotgun_shell",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 6,
+        "cd": 3
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_45",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_45",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 8,
+        "cd": 4
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_flamer_fuel",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_flamer_fuel",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 12,
+        "cd": 6
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_energy_cell",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_energy_cell",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 14,
+        "cd": 7
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_gamma_round",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_gamma_round",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 4,
+        "cd": 2
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_railway_spike",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_railway_spike",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 6,
+        "cd": 3
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_syringe",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_syringe",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 4,
+        "cd": 2
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_44_magnum",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_44_magnum",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 4,
+        "cd": 2
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_50_cal",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_50_cal",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 4,
+        "cd": 2
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_5_56mm",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_5_56mm",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 8,
+        "cd": 4
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_5mm",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_5mm",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 12,
+        "cd": 6
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_fusion_core",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_fusion_core",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 1
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_missile",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_missile",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 2,
+        "cd": 1
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_plasma_cartridge",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_plasma_cartridge",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 10,
+        "cd": 5
+      }
+    },
+    "sourcePage": 211
+  },
+  {
+    "id": "ammo_2mm_ec",
+    "bench": "weapons",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "ammosmith",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "derivedMaterials": true,
+    "output": {
+      "itemId": "ammo_2mm_ec",
+      "itemType": "ammo",
+      "quantity": {
+        "base": 6,
+        "cd": 3
+      }
+    },
+    "sourcePage": 211
+  }
+]

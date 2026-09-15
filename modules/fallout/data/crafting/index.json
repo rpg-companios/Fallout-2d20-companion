@@ -1,0 +1,35 @@
+{
+  "id": "crafting",
+  "benches": [
+    "chemistry",
+    "cooking",
+    "weapons"
+  ],
+  "recipes": [
+    {
+      "file": "ammo.json",
+      "bucket": "ammo",
+      "count": 19
+    },
+    {
+      "file": "chems.json",
+      "bucket": "chems",
+      "count": 12
+    },
+    {
+      "file": "drinks.json",
+      "bucket": "drinks",
+      "count": 8
+    },
+    {
+      "file": "food.json",
+      "bucket": "food",
+      "count": 27
+    },
+    {
+      "file": "weapons.json",
+      "bucket": "weapons",
+      "count": 9
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+[
+  {
+    "id": "weapon_baseball_grenade",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "weapon_baseball_grenade",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_frag_grenade",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "weapon_frag_grenade",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_molotov",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "weapon_molotov",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_plasma_grenade",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        },
+        {
+          "perkId": "science",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "weapon_plasma_grenade",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_pulse_grenade",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        },
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "weapon_pulse_grenade",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_bottlecap_mine",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "weapon_bottlecap_mine",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_frag_mine",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "weapon_frag_mine",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_plasma_mine",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        },
+        {
+          "perkId": "science",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "weapon_plasma_mine",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  },
+  {
+    "id": "weapon_pulse_mine",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "EXPLOSIVES",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "demolitionExpert",
+          "rank": 1
+        },
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "weapon_pulse_mine",
+      "itemType": "weapon",
+      "quantity": 1
+    },
+    "sourcePage": 214
+  }
+]

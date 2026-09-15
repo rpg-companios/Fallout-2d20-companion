@@ -15,6 +15,7 @@ JSON по категориям, машино-читаемый, чтобы мож
 | `lonestar` | [iggyiggy127/lone-star-character-creator](https://github.com/iggyiggy127/lone-star-character-creator) | EN | оружие, броня, расходники, аммо, разное, перки |
 | `pipboy3000` | [vittoema96/vittoema96.github.io](https://github.com/vittoema96/vittoema96.github.io) | EN | оружие, броня, aid, моды, перки, трейты, эффекты |
 | `focharactersheet` | [focharactersheet.vercel.app](https://focharactersheet.vercel.app) | EN | оружие, броня, расходники, моды (оружие+броня), перки, журналы. Данные извлечены из сохранённого JS-бандла архива `fallout 2char.zip` (коммит `b03a6da` на `main`) |
+| `pipboyapp` | [bekhram/fallout-pipboy-app](https://github.com/bekhram/fallout-pipboy-app) | EN | **рецепты крафта** (данные, без механик) — сырой датасет приложения, коммит `fba3a93` |
 
 ## Файлы
 
@@ -53,6 +54,23 @@ JSON по категориям, машино-читаемый, чтобы мож
 - `focharactersheet_weapon_mods.json` — моды оружия (`area`, `prefix`)
 - `focharactersheet_armor_mods.json` — моды брони (`type`, `DR`)
 - `focharactersheet_magazines.json` — журналы/книги/холотейпы (одноразовые бонусы)
+
+### Pip-Boy app (`pipboyapp`, EN)
+
+- `pipboyapp_crafting.json` — 356 рецептов крафта в формате источника: `name`, `perks`
+  («Armorer 1, Science! 2»), `materials` («Common Materials»: 4), `complexity`, `skill`,
+  `rarity`, `sourcePage` (страница Core Rulebook), `appGenerated` (пометка самого
+  приложения: этого в книге нет).
+
+- `Missing_craft.json` — файл-обменник (тоже порождается генератором, не источник):
+  рецепты, которые уперлись в дыры каталога, в тех же полях, что данные рецептов,
+  а где чисел нет — строка `unknown`. Владелец дописывает недостающее по книгам и
+  возвращает файл для слияния; после переноса правил в генератор позиции закрываются.
+
+Это **не** данные каталога: ссылки здесь — по имени. В id нашего каталога их перекладывает
+`scripts/build-crafting-data.mjs`, а что он не смог привести и почему — расписано в
+`CRAFTING-MAPPING.md`. Формат получившихся рецептов —
+`docs/architecture/crafting-data.md`.
 
 > **Примечание.** `focharactersheet_perks.json` независимо подтверждает, что
 > требование УДЧ/`Luck` для перков `Demolition Expert` (PER 6 + LCK 6),

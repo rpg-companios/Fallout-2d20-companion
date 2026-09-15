@@ -1,0 +1,210 @@
+[
+  {
+    "id": "drink_glowing_blood_pack",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "drink_blood_pack",
+        "count": 1
+      },
+      {
+        "itemId": "drink_irradiated_blood",
+        "count": 1
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "drink_glowing_blood_pack",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "drink_refreshing_beverage",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 5
+    },
+    "materials": [
+      {
+        "itemId": "chem_radaway",
+        "count": 2
+      },
+      {
+        "itemId": "chem_stimpak",
+        "count": 1
+      },
+      {
+        "itemId": "drink_blood_pack",
+        "count": 1
+      },
+      {
+        "itemId": "drink_purified_water",
+        "count": 2
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "drink_refreshing_beverage",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "drink_dirty_wastelander",
+    "bench": "cooking",
+    "requires": {
+      "skill": "SURVIVAL",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "drink_nuka_cola",
+        "count": 1
+      },
+      {
+        "itemId": "drink_whiskey",
+        "count": 2
+      },
+      {
+        "itemId": "food_mutfruit",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "drink_dirty_wastelander",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 216
+  },
+  {
+    "id": "drink_purified_water",
+    "bench": "cooking",
+    "requires": {
+      "skill": "SURVIVAL",
+      "complexity": 1
+    },
+    "materials": [
+      {
+        "itemId": "drink_dirty_water",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "drink_purified_water",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 216
+  },
+  {
+    "id": "drink_melon_juice",
+    "bench": "cooking",
+    "requires": {
+      "skill": "SURVIVAL",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "drink_purified_water",
+        "count": 1
+      },
+      {
+        "itemId": "food_melon",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "drink_melon_juice",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 216
+  },
+  {
+    "id": "drink_mutfruit_juice",
+    "bench": "cooking",
+    "requires": {
+      "skill": "SURVIVAL",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "drink_purified_water",
+        "count": 1
+      },
+      {
+        "itemId": "food_mutfruit",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "drink_mutfruit_juice",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 216
+  },
+  {
+    "id": "drink_tarberry_juice",
+    "bench": "cooking",
+    "requires": {
+      "skill": "SURVIVAL",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "drink_purified_water",
+        "count": 1
+      },
+      {
+        "itemId": "food_tarberry",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "drink_tarberry_juice",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 216
+  },
+  {
+    "id": "drink_potato_juice",
+    "bench": "cooking",
+    "requires": {
+      "skill": "SURVIVAL",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "drink_purified_water",
+        "count": 1
+      },
+      {
+        "itemId": "food_tato",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "drink_potato_juice",
+      "itemType": "drinks",
+      "quantity": 1
+    },
+    "sourcePage": 216
+  }
+]

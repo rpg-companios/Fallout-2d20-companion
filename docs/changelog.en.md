@@ -2,6 +2,29 @@
 
 ---
 
+## Update — Crafting, part 1: recipes as data (patch 249)
+
+> First step of the crafting system: recipes now live in the data as their own category. Nothing is visible to players yet — the next patch teaches the engine to check, spend and hand out.
+
+### What the data gained
+- The Fallout pack has a new "recipes" category: `modules/fallout/data/crafting/` — five files grouped by what crafting yields (ammo, explosives, chems, food, drinks) plus a category index. **75 recipes**: 19 ammunition, 9 grenades and mines, 12 chems, 27 dishes, 8 drinks.
+- A recipe id is the **id of the item it yields**: "craft berry mentats" is `chem_mentats_berry`, not a separate key `craft_chems_berry_mentats`. No second "recipe ↔ item" lookup table appears in the program: it would be a second source of truth and the first rename would kill it. Should several recipes yield the same item (the book has this for ammunition: another perk rank, another recipe), the difference is appended after an underscore — e.g. `ammo_45_ammosmith2`; today there are no such cases, all 75 recipes yield 75 different items.
+- Every recipe is references only: what it produces (a catalog item), from what (items and counts), which skill and complexity, which perk unlocks it and at what rank, which station it needs. No names, descriptions or "material titles" on purpose: the catalog still provides name, weight and price — never the recipe.
+- Ingredients come in two flavours: printed in the book's table (Berry Mentats = Mentats ×1 + Tarberry ×2 + Rare materials ×1) or derived from the printed rule "materials are determined by the recipe's Complexity" (p. 210). Derived ones are flagged in the data, and a test checks the flag against the real complexity curve — which was already written on 143 weapon mods, zero disagreements.
+- Ammunition is crafted in the amount it is found in: the quantity comes from our own found-table (.38 → 10+5 CD, a fusion core is exactly 1 — no dice apply to cores).
+- No rules number is baked into the data: work duration, 2 AP, complications and "do ingredients burn on a failure" will be settings, not recipe fields.
+
+### What this patch does not include, and why
+- **Modifications.** Crafting yields items; the "install a mod onto an item" branch is configured separately (owner's decision). Complexity/perk/material columns are already present on 205 weapon mods and on armor mods, so those recipes will move into the same format without new facts.
+- **Catalog holes.** Nine chems are blocked by ingredients that do not exist as items in our catalog (glowing fungus, hubflower, Abraxo cleaner, blood sac, antiseptic, bloodleaf, berserk syringe); nine syringer dart recipes and the "cooking station" are blocked because the result items do not exist either. The generator invents nothing and picks no book for the owner: all 19 such positions are exported to `docs/reference-data/Missing_craft.json` — an exchange file with recipe-shaped fields where missing data reads `unknown`. The owner fills the numbers from their own books and returns it for the merge.
+- **Name collisions are closed right away** because they are not new facts, just the same thing named differently: "Tato Juice" = our "Potato Juice", "Mutant Hound Chops" = our "Mutant Hound Ribs" (word-for-word effect), "Mutt Chops" = "Dog Chops", "Queen Mirelurk Meat" = "Mirelurk Queen Meat" — ten aliases, each with its reason in the report `docs/reference-data/CRAFTING-MAPPING.md`.
+- **Save format, store and screens are untouched:** for now only the guard test `__tests__/crafting/` reads the data (18 checks: index, references, no names, materials curve, files and exchange file matching the generator). 737 tests green, `tsc --noEmit` clean.
+
+### How to maintain it
+Reference dataset (`docs/reference-data/pipboyapp_crafting.json`) → `node scripts/build-crafting-data.mjs` → the `crafting` category files + report + exchange file. Hand-editing recipe JSON is pointless: the test compares the files with the generator output and fails on drift.
+
+---
+
 ## Update — Reworking the game's core: unified store, saves, data passports (patches 219–247)
 
 > Major behind-the-scenes work: everything the game remembers about a character moved into a unified store, saves became a standalone module, and data/operations got machine-readable "passports". For players: quieter, more reliable, plus several gameplay fixes; the save format did not change (old saves keep loading).
